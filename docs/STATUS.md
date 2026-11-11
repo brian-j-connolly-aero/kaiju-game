@@ -4,8 +4,10 @@ Living status file. Keep it short and true: when you finish a task, update what 
 the stubs you filled in, and add any decision the docs left open. Contracts live in
 `ARCHITECTURE.md`; numbers live in `DESIGN.md` and `shared/src/defs/`.
 
-Last updated by: the game server task (everything about `server/`) and simulation part 1 (the
-kaiju, damage and nerve, city destruction, projectiles); the rest is from the scaffold task.
+Last updated by: the game server task (everything about `server/`), simulation part 1 (the
+kaiju, damage and nerve, city destruction, projectiles) and simulation part 2 (the human side:
+squads, commands, sub-unit behavior, weapons, volleys, call-ins, lives, veterans, spotting);
+the rest is from the scaffold task.
 
 ## 1. How to run things
 
@@ -64,14 +66,34 @@ Everything below is in `shared/` (`@mb/shared`) unless it says otherwise, is cov
     loss when a friend dies, squad elimination), trample of units, `healKaiju`;
   - projectiles (`systems/projectiles.ts`): flight for all three flight models, sweeps against
     structures, kaiju, units and the ground, splash, the backstop rule, `projectileHit`;
-    `spawnProjectile` launches one. The kaiju's throw uses it; nothing fires for the humans yet;
+    `spawnProjectile` launches one. Bridge decks do not stop anything in flight; a projectile
+    that comes down on one has hit it;
+  - the human side (`systems/unitOrders.ts`, `systems/weapons.ts`, `sim/squads.ts`,
+    `sim/nav.ts`; rules in `DESIGN.md` section 5, "How squads work"):
+    - the four wheel commands with independent movement order and fire mode, from an input or
+      a `command` message;
+    - follow: a staggered column along the leader's trail that closes up in narrow streets;
+    - move to: a hold point per sub-unit on reachable open ground, and navigation to it
+      (straight line, else the road graph inside the bounds, with local steering round walls;
+      rubble, river and bridges passable; stuck handling);
+    - hold-and-charge: planted units, firing arcs, lasers (`state` 'charging'), charge 0 to 1,
+      `volley.ready`;
+    - fire at will with range and line-of-fire checks, target leading, weapon traverse;
+    - weapons: cooldowns, salvo size from members, the driven unit's exact aim, aim error and
+      the scatter multipliers (stage, spotted, slowed, veteran), the volley on the player's
+      shot with charge multipliers, `volley`, tallies;
+    - the artillery call-in: marker, delay, eight real shells, scatter, cooldown, `callin`;
+    - shaken sub-units backing off; takeover of the nearest survivor; elimination until the
+      next stage; `markVeterans`;
   - city damage: structure hp, the four visual stages, bar points with partial credit, tallies
     by class, prop destruction and wrecks, props taken by the kaiju, `barMark`, the molt prompt
     (`moltAvailable`), rage from wrecking, the `barPoints` modifier, the insurance rider,
     shields (sanctuaries), units falling with a collapsing bridge;
   - match flow basics: briefing, clock, the three end conditions, `beginStage`, `endMatch`;
   - spawning: kaiju at the anchor, `deploySquads` around the bounds edge, `refillSquad`;
-  - spotting: `kaiju.spotted` and `kaiju.known` from line of sight and noise;
+  - spotting (`sim/spotting.ts`): `kaiju.spotted` (a driven unit, a bot's included, has it in
+    sight within 150 m) and `kaiju.known` (the map rule: always at stages 2 and 3; at stage 1
+    line of sight within 250 m or 3 s after noise), both in the snapshot;
   - voice cues for everything that follows from an event or the clock, with throttling;
   - `resolveAimPoint` (where an aim ray lands), `computeBarMarks`, `barDisplayFraction`.
 - **`server/` (`@mb/server`):** the complete game server (`ARCHITECTURE.md` section 4). One
@@ -98,17 +120,15 @@ Everything below is in `shared/` (`@mb/shared`) unless it says otherwise, is cov
 ## 3. What is stubbed
 
 Every simulation stub is marked `STUB(sim):` with a header that says exactly what to build and
-which fields and helpers to use. `npm run lint` prints how many markers remain (9 `STUB(sim)`
+which fields and helpers to use. `npm run lint` prints how many markers remain (6 `STUB(sim)`
 today).
 
 | Where | What is missing | For |
 | --- | --- | --- |
-| `sim/systems/unitOrders.ts` | Applying squad commands, sub-unit AI and formation, hold-and-charge, what a shaken unit does, takeover, unit animation states. Today: spotting plus idle or moving states. (Shaking a unit, counting the timer down and marking a squad eliminated are done by the damage system.) | Simulation 2 |
-| `sim/systems/weapons.ts` | Firing, aim error and scatter, volleys, call-in missions and cooldowns. Empty: the humans cannot shoot yet. | Simulation 2 |
-| `sim/systems/matchFlow.ts` | The END of the molt: blast wave, intermission, calling `beginStage`, veterans. The prompt and the cocoon start are real, so today a kaiju that cocoons stays in the cocoon until the match ends. | Simulation 3 |
+| `sim/systems/matchFlow.ts` | The END of the molt: blast wave, intermission, calling `markVeterans` and `beginStage`. The prompt and the cocoon start are real, so today a kaiju that cocoons stays in the cocoon until the match ends. | Simulation 3 |
 | `sim/systems/bots.ts`, `sim/bots/types.ts` | Bot behavior for squads and for the kaiju. Today bots stand still. `BotState` is a starting shape. | Simulation 3 |
-| `sim/systems/voice.ts` | Three cues that need other systems: `volley.ready`, `kaiju.lowhp`, `bar.near`. | Simulation 2 and 3 |
-| `shared/scripts/sim.ts` | The balance report beyond the basics. With stub bots every match is a clock win for the humans. | Simulation 3 |
+| `sim/systems/voice.ts` | Two cues that need other systems: `kaiju.lowhp`, `bar.near`. | Simulation 3 |
+| `shared/scripts/sim.ts` | The balance report beyond the basics. With stub bots nobody moves, so a match is a clock win for the humans unless the squads deploy within range of the kaiju (then their sub-units shoot it where it stands). | Simulation 3 |
 | `server/src/room/gameRoom.ts` | `STUB(server)`: the `draftPick` message is accepted and ignored. When the simulation has upgrade drafts, pass the pick on (and add a draft step to the intermission). | Tier 2 |
 
 Placeholders (not `STUB`-tagged; each file says so at the top):
@@ -180,6 +200,45 @@ Kaiju combat (simulation part 1; the rules as built are written out in `DESIGN.m
   already past mark 2 when stage 2 begins offers the next molt at once. The kaiju drops what
   it holds when the cocoon closes.
 
+Human squads (simulation part 2; the rules as built are written out in `DESIGN.md` section 5,
+"How squads work", and the numbers the design left open are `SQUAD_RULES` in `defs/rules.ts`)
+
+- "Hold fire and charge" means "hold here and charge": the command parks sub-units where they
+  stand (or leaves them their move-to spots). The design says charging units are rooted "until
+  they fire or get a new movement order"; as built, firing spends the charge and the unit plants
+  itself again on its spot the next tick with a fresh arc, so a parked squad stays parked
+  through volley after volley (this is what makes the one-player crossfire work). "Follow me"
+  un-parks them and they do not plant again until the hold command is repeated.
+- With the order 'moveTo', hold-and-charge does not stop sub-units on their way: they go on to
+  their spots and plant there.
+- A sub-unit whose firing arc does not cover the aim point sits a volley out and keeps its
+  charge. Volleys check neither range nor line of sight.
+- With the crosshair on a kaiju, sub-units aim for the middle of its body at the height the
+  player picked (the event's aim point is still where the ray met its skin).
+- Aim error is drawn per projectile, on heading and elevation. A person's own shots have none.
+  A bot's driven unit shoots with the at-will error and half nerve, except when its shot
+  triggers a volley (then volley error, full nerve).
+- "Slowed", for scatter, is staggered, cocooned, or at least 30% of nerve capacity in
+  accumulated nerve damage (`COMBAT_RULES.scatterSlowedNerve`).
+- "Spotted" counts the driven unit of every squad, bot squads included (bots play by the same
+  rules). This changed the scaffold's behavior, which left bots out.
+- Sub-units firing at will lead the target, swing their weapon at 270 degrees per second, and
+  look for a clear line of fire to the middle of the body, then higher, then lower.
+- Formation is a staggered column along the leader's trail, not a wedge: it follows streets by
+  itself. Stragglers catch up at 1.3 times speed (`unit.nav.hurry`, sub-units only).
+- Hold points are chosen on open ground with 2 m to spare that can be reached straight from a
+  street, so a marker on a roof or in a back yard sends units to the nearest sensible spot.
+- Takeover goes to the survivor nearest the unit that died, the tick after it died.
+- Every unit alive at the end of a stage is a veteran at the next (the driven one too).
+- Artillery shells fall at 75 degrees from 400 m, over the caller's shoulder; the first lands
+  `delay` seconds after the marker (within a tick or two). A mission outlives its squad.
+- Bridge decks are road surface for projectiles, sight lines, lines of fire and aim rays
+  (`skipPassable` on the city casts). The kaiju's aim ray uses it too; the beam does not.
+- Tests written when sub-units did nothing were adjusted, not weakened: the kaiju tests order
+  every squad to hold fire (`holdFire` in `test/helpers.ts`) and use driven units (ids 0, 4,
+  8, 12) where a target must not move, and the one assertion that said "sub-units stay put
+  (their AI is not built yet)" now checks that they follow.
+
 City and bar
 
 - Cars and kiosks are props with a small bar value (sedan 2, kiosk 4, bus 6); trees and street
@@ -250,25 +309,32 @@ Server
   `test/soak.test.ts` hammers the whole pipeline with random inputs and must keep passing.
   Extend `World` by adding fields; if you add something a client must see, add it to the
   snapshot (bump `SNAPSHOT_VERSION`) or to an event, and update `ARCHITECTURE.md`.
-- **Simulation 2 (human squads):**
-  - Launch every projectile with `spawnProjectile(world, { ... })`. The projectile system
-    already flies it and resolves the impact; read its header before changing it. Set
-    `owner: 'unit'` and `ownerId` to the firing unit's id (that id is the crossfire source),
-    `owner: 'callin'` for artillery (never crossfire), `atWill` for fire-at-will shots, and put
-    the charge multipliers into `damage` / `nerve` before launching. Human projectiles do not
-    collide with human units.
-  - `applyHit` already does everything a hit on the kaiju or a unit should do. Do not add
-    multipliers at the call site other than the attacker's own (charge, mods).
-  - A unit with `unit.shaken > 0` must not fire and should back off; the damage system sets and
-    clears it (and `state: 'shaken'`), zeroes `charge`, but leaves `rooted` alone: un-root in the
-    orders system if a shaken charging unit should move.
-  - `squad.eliminated` and `squad.driven = -1` are set by the damage system when the last unit
-    dies. Takeover (the driven unit died, others live) is still to do, in the orders system.
-  - Dead vehicles keep `unit.wreck = true` until the kaiju takes the wreck or the stage refills.
-  - The roar already zeroes `unit.charge` through the hit (`resetsCharge`); stomps shove units
-    by setting `unit.vx / vz` (`shoveUnit`), so do not overwrite velocities in the orders system.
-  - `volley.ready` is the one voice cue left for this task.
+- **Anyone writing simulation tests:** sub-units now act. A test about something else should
+  call `holdFire(world)` (every squad on hold-and-charge) or park the squads out of range, and
+  use a squad's driven unit (ids 0, 4, 8, 12) for a target that must stay put: a sub-unit that
+  gets shaken backs off. Bot leaders stand still only until the bots exist.
 - **Simulation 3 (match flow, bots, balance):**
+  - Veterans: call `markVeterans(world)` when the stage is over (after the blast wave, before
+    `beginStage`). `beginStage` itself does not, because tests call it directly.
+  - Bots give squad orders the way people do: `botInput.wheel` (and `marker`), `Btn.fire`,
+    `Btn.callIn`. The loop that works: order 'follow' and drive to a firing position, stop,
+    'holdCharge' (sub-units plant where they stand, arcs on the kaiju), wait for
+    `squad.volleyReady` (or `squadCharge(world, squad)`), aim at the kaiju and press Fire; to
+    back off, 'follow' again (that un-parks them) and re-issue 'holdCharge' at the new spot.
+    A kaiju that leaves the arcs is not followed: re-issue 'holdCharge' (charge starts over).
+  - For the kaiju bot: `lasersOnKaiju(world, k)` counts the lasers on it,
+    `laserOnKaiju(world, unit, k)` tests one, `arcCovers(unit, x, z)` says whether a planted
+    unit can fire at a point. `scatterMult(stage, kaiju)` is the humans' current accuracy.
+  - A bot's own trigger shots are fire at will (half nerve, at-will error) unless they trigger
+    a volley. Sub-units of every squad fire at will by default from the moment a kaiju is in
+    range with a clear line: with stub bots, the three sub-units of one squad that happened to
+    deploy in range killed a titan that stood still in about ten minutes (anchor 0, 592 s).
+  - Balance, measured in the scripted scenarios (`test/volleyScenario.test.ts`): one squad's
+    full-charge volley is 45 nerve from the front (60.75 flank, 76.5 rear, about 77 as a
+    one-player crossfire); four squads from the front break the kaiju (180). Because nerve is
+    x(1 + 2 x charge), firing at every weapon cooldown with half charge delivers more nerve per
+    second than waiting for full charge; only the burst size (against the 9 per second leak)
+    rewards waiting. At-will fire at a hatchling beyond about 60 m mostly misses (3.5 degrees).
   - The cocoon is over when a kaiju has `phase === 'cocoon'` and `phaseTime >= phaseDuration`
     (the action system keeps counting; nothing else happens until the match flow system acts).
     From there: blast wave, intermission, `beginStage`. For the blast, queue hits with
@@ -350,9 +416,23 @@ Server
   for the 8-squad future (32).
 - Balance numbers added here (action move multipliers, wade damage, rage per bar segment, prop
   values, archetype hp and value) are untested starting values.
-- Until the weapon system exists nothing can hurt the kaiju in a real match, and until the match
-  flow system ends the cocoon a kaiju that molts sits in its cocoon for the rest of the match.
-  Both are covered by tests only through hits and inputs injected by hand.
+- Until the match flow system ends the cocoon a kaiju that molts sits in its cocoon for the
+  rest of the match (covered by tests only through inputs injected by hand).
+- Sub-unit navigation was tuned and stress-tested against the placeholder grid city (3600
+  random move-to trips across the three stages all arrived, nobody ever inside a wall). The
+  handcrafted city will have other shapes: it needs a road graph whose edges are drivable for
+  a 9 m radius body at stage 3, and the stress should be rerun against it
+  (`test/nav.test.ts` has a small version). A unit that cannot reach its spot waits and
+  retries; it never pushes into a wall forever, but it will not arrive either.
+- Units do not collide with each other or with the kaiju; sub-units only keep apart while
+  moving. A parked squad can be walked through.
+- Hold-and-charge deviates from the letter of the design in one place (firing does not release
+  a parked unit; see section 4). If the owner wants squads to regroup on their leader after a
+  volley instead, it is one branch in `orderSubUnit`.
+- The snapshot does not carry `arcYaw`: a client can draw each laser but not the 35 degree arc
+  a planted unit is locked to. Adding it means a snapshot layout change.
+- The beam still treats a bridge deck as a wall while projectiles and sight lines pass it: a
+  hatchling standing on a bridge and firing its beam level burns the deck it stands on.
 - The beam is aimed with pitch. Looking level, a titan's beam passes over everything shorter
   than its mouth (88 m): right for a first-person view, but bots and the HUD must account for it.
 - `kaijuAction` and the hit events are the only way clients learn of tells and impacts; a

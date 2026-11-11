@@ -216,8 +216,20 @@ deep-merges every partial into `manifest.json`, which the client loads. Never ha
   "group"?: "stage1" } }`
 - `"sfx"`: `{ "<id>": { "variants": ["audio/sfx/<id>_1", ..], "gain": 1, "loop"?: [start, end] } }`
 - `"voice"`: `{ "<lineId>": { "base": "audio/voice/<lineId>", "duration": seconds } }`
+- `"ui"`: `{ "<name>": { "file": "ui/<name>.svg" | "ui/<name>.png" } }`. Nobody writes this
+  section: the merge script fills it in from the files it finds in `ui/` (section 5), so the
+  client knows which icons and portraits exist.
 
 Audio `base` and `variants` paths have no extension; both `.ogg` and `.mp3` exist for each.
+
+The merge script (`tools/build-manifest.mjs`, also run by the client build) checks every entry
+against the disk: an entry whose file is missing is reported and left out of `manifest.json`,
+and the client draws its procedural stand-in for that asset instead of asking the server for a
+file that is not there. `npm run assets:manifest -- --check` only says whether `manifest.json`
+is up to date. Sprite ids the client draws: `soldier_army_rocket`, `soldier_army_rifle`, every
+sprite whose id starts with `civ` (the crowd), and the effect frames `fx_explosion`, `fx_smoke`,
+`fx_dust`, `fx_fire`, `fx_debris`, `fx_flash`, `fx_spark`, `fx_glow`, `fx_laserdot`, `fx_ring`,
+`fx_shadow`, `fx_white` (each with one animation; the first one is played).
 
 ## 8. Review material
 

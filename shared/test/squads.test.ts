@@ -137,7 +137,7 @@ describe('the driven unit: arcade handling', () => {
   it('infantry is nimble: it goes where the stick points at once, whatever it is looking at', () => {
     const world = field();
     const [leader] = lineUp(world, 0, 0);
-    // Looking north, stick to the right: it sidesteps east and its weapon keeps pointing north.
+    // Looking along +Z, stick to the right: it sidesteps (to -X) and its weapon keeps pointing along +Z.
     lead(world, 15, { aimYaw: 0, moveX: 1 });
     expect(leader.vx).toBeLessThan(-INFANTRY.speed + 0.01);
     expect(Math.abs(leader.vz)).toBeLessThan(1e-6);
@@ -159,23 +159,23 @@ describe('the driven unit: arcade handling', () => {
     placeKaiju(world, -700, -700, 0);
     const [leader] = lineUp(world, 0, 0);
     const tank = UNIT_TYPES.army_tank;
-    leader.yaw = 0;
-    // Looking north-east with the stick to the right of the view: travel is to the south-east.
+    leader.yaw = 100 * DEG;
+    // The view is at 45 degrees and the stick is to its right: travel is a quarter turn off the view, at -45 degrees.
     const aimYaw = 45 * DEG;
     lead(world, 1, { aimYaw, aimPitch: 0.1, moveX: 1 });
     // The turret is on the aim at once; the hull has only begun to turn, and the tank has barely moved.
     expect(leader.aimYaw).toBeCloseTo(aimYaw, 9);
     expect(leader.aimPitch).toBeCloseTo(0.1, 9);
-    expect(leader.yaw).toBeCloseTo(tank.turnRate / TICK_RATE, 9);
+    expect(leader.yaw).toBeCloseTo(100 * DEG - tank.turnRate / TICK_RATE, 9);
+    expect(Math.hypot(leader.vx, leader.vz)).toBeLessThan(0.5);
     lead(world, 20, { aimYaw, aimPitch: 0.1, moveX: 1 });
-    expect(leader.yaw).toBeCloseTo((21 * tank.turnRate) / TICK_RATE, 6);
-    expect(Math.hypot(leader.vx, leader.vz)).toBeLessThan(tank.speed * 0.6);
-    // Once the hull points along the travel direction (135 degrees) it drives at full speed, turret still on the aim.
+    expect(leader.yaw).toBeCloseTo(100 * DEG - (21 * tank.turnRate) / TICK_RATE, 6);
+    // Once the hull points along the travel direction it drives at full speed, turret still on the aim.
     lead(world, 90, { aimYaw, aimPitch: 0.1, moveX: 1 });
-    expect(leader.yaw).toBeCloseTo(135 * DEG, 6);
+    expect(leader.yaw).toBeCloseTo(-45 * DEG, 6);
     expect(Math.hypot(leader.vx, leader.vz)).toBeCloseTo(tank.speed, 6);
-    expect(leader.vx).toBeGreaterThan(0);
-    expect(leader.vz).toBeLessThan(0);
+    expect(leader.vx).toBeLessThan(0);
+    expect(leader.vz).toBeGreaterThan(0);
     expect(leader.aimYaw).toBeCloseTo(aimYaw, 9);
   });
 });
@@ -360,8 +360,8 @@ describe('move to', () => {
       const b = world.match.bounds;
       // A point well inside the bounds, blocks away from where the squad deployed.
       const leader = world.units[squad.driven];
-      const tx = (b.minX + b.maxX) / 2 + (leader.x < (b.minX + b.maxX) / 2 ? 1 : -1) * 0.25 * (b.maxX - b.minX);
-      const tz = (b.minZ + b.maxZ) / 2 + (leader.z < (b.minZ + b.maxZ) / 2 ? 1 : -1) * 0.2 * (b.maxZ - b.minZ);
+      const tx = leader.x + (leader.x < (b.minX + b.maxX) / 2 ? 1 : -1) * Math.min(260, 0.6 * (b.maxX - b.minX));
+      const tz = leader.z + (leader.z < (b.minZ + b.maxZ) / 2 ? 1 : -1) * Math.min(230, 0.5 * (b.maxZ - b.minZ));
       // The squads hold their fire: this is about getting there.
       lead(world, 1, { wheel: 'holdCharge' });
       lead(world, 1, { wheel: 'moveTo', marker: { x: tx, z: tz } });

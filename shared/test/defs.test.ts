@@ -35,6 +35,7 @@ import {
   shotsForMembers,
   SNAPSHOT_EVERY_TICKS,
   SQUAD_CALLSIGNS,
+  SQUAD_RULES,
   STAGES,
   stageDef,
   TALLY_CLASSES,
@@ -122,6 +123,24 @@ describe('the one rule set (DESIGN.md section 3)', () => {
       rageDamagePerPoint: 12,
     });
     expect(COMBAT_RULES.chargeHalfArc).toBeCloseTo(35 * DEG, 12);
+  });
+});
+
+describe('squad rules the design leaves to the build', () => {
+  it('has sane starting values', () => {
+    expect(COMBAT_RULES.scatterSlowedNerve).toBe(0.3);
+    expect(SQUAD_RULES).toMatchObject({ formationGap: 2, catchUpSpeed: 1.3, aimRayRange: 1500, aimHeights: [0.5, 0.8, 0.25] });
+    expect(SQUAD_RULES.aimTurnRate).toBeCloseTo(270 * DEG, 12);
+    expect(SQUAD_RULES.callInElevation).toBeCloseTo(75 * DEG, 12);
+    for (const [key, value] of Object.entries(SQUAD_RULES)) {
+      const numbers = typeof value === 'number' ? [value] : value;
+      for (const n of numbers) expect(n, key).toBeGreaterThan(0);
+    }
+    // A tank's about-turn fits inside the stuck timer, or turning round would count as being stuck.
+    expect(Math.PI / UNIT_TYPES.army_tank.turnRate).toBeLessThan(SQUAD_RULES.stuckTime);
+    // The slot tolerance is tighter than the spacing, or neighbours would settle on each other.
+    expect(SQUAD_RULES.slotTolerance).toBeLessThan(1);
+    expect(SQUAD_RULES.formationStagger).toBeLessThan(1);
   });
 });
 

@@ -1,33 +1,33 @@
 {
   "speakers": {
     "Overlord": {
-      "voice": { "engine": "rhvoice", "voice": "bdl", "rate": 0.88, "pitch": 0.82 },
+      "voice": { "engine": "rhvoice", "voice": "bdl", "rate": 0.86, "pitch": 0.78 },
       "chain": "radio",
-      "chain_settings": { "band_hz": [280.0, 3500.0], "drive_db": 5.0, "static_db": -34.0 },
+      "chain_settings": { "band_hz": [260.0, 4000.0], "drive_db": 2.0, "static_db": -34.0 },
       "max_pause_ms": 380
     },
     "Granite": {
-      "voice": { "engine": "flite", "voice": "rms", "rate": 0.96, "shift_st": -2.0 },
+      "voice": { "engine": "flite", "voice": "rms", "rate": 0.97 },
       "chain": "radio",
       "max_pause_ms": 300
     },
     "Beacon": {
-      "voice": { "engine": "rhvoice", "voice": "clb", "rate": 1.04 },
+      "voice": { "engine": "rhvoice", "voice": "clb", "rate": 1.06 },
       "chain": "radio",
       "max_pause_ms": 260
     },
     "Tempest": {
-      "voice": { "engine": "flite", "voice": "awb", "rate": 1.0 },
+      "voice": { "engine": "rhvoice", "voice": "alan" },
       "chain": "radio",
       "max_pause_ms": 300
     },
     "Anchor": {
-      "voice": { "engine": "pico", "voice": "en-US" },
+      "voice": { "engine": "rhvoice", "voice": "slt", "rate": 0.94 },
       "chain": "broadcast",
       "max_pause_ms": 380
     },
     "Chair": {
-      "voice": { "engine": "rhvoice", "voice": "alan", "rate": 0.84, "pitch": 0.8 },
+      "voice": { "engine": "pico", "voice": "en-US", "rate": 0.9, "pitch": 0.78 },
       "chain": "hall",
       "max_pause_ms": 650,
       "min_pause_ms": 450

@@ -28,6 +28,8 @@ export class InputManager {
   mouseY = 0;
 
   private readonly keys = new Set<string>();
+  /** Keys that went down since the last poll: a tap shorter than a frame still counts once. */
+  private readonly tapped = new Set<string>();
   private mouseDX = 0;
   private mouseDY = 0;
   private readonly previous: Record<ButtonAction, boolean>;
@@ -110,6 +112,7 @@ export class InputManager {
   private readonly onKeyDown = (e: KeyboardEvent): void => {
     if (this.typing(e)) return;
     this.keys.add(e.code);
+    this.tapped.add(e.code);
     this.state.device = 'keyboard';
     // Keys the game uses must not scroll the page or move focus.
     if (e.code === 'Tab' || e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
@@ -135,6 +138,7 @@ export class InputManager {
   private readonly onMouseDown = (e: MouseEvent): void => {
     if (e.target !== this.element) return;
     this.keys.add(`Mouse${e.button}`);
+    this.tapped.add(`Mouse${e.button}`);
     this.state.device = 'keyboard';
     this.capture = true;
   };
@@ -181,7 +185,7 @@ export class InputManager {
     let padUsed = false;
     for (const action of BUTTON_ACTIONS) {
       let down = false;
-      for (const key of this.bindings.keyboard[action]) if (this.keys.has(key)) down = true;
+      for (const key of this.bindings.keyboard[action]) if (this.keys.has(key) || this.tapped.has(key)) down = true;
       if (pad) {
         for (const button of this.bindings.gamepad[action]) {
           if (padDown(button)) {
@@ -192,6 +196,8 @@ export class InputManager {
       }
       s.down[action] = down;
     }
+
+    this.tapped.clear();
 
     let moveX = (s.down.moveRight ? 1 : 0) - (s.down.moveLeft ? 1 : 0);
     let moveZ = (s.down.moveForward ? 1 : 0) - (s.down.moveBack ? 1 : 0);

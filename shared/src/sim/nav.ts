@@ -56,6 +56,8 @@ export interface UnitNav {
   repath: number;
   /** Which way round it is going past a wall: 1 or -1, 0 when the way is open. */
   side: number;
+  /** The turn off the straight heading it is holding to get past a wall, radians (0 when the way is open). */
+  turn: number;
   /** Seconds the way ahead has been open while `side` is still remembered. */
   openTime: number;
   /** Progress watch: where it was when it last got somewhere, and for how long it has not since. */
@@ -69,6 +71,12 @@ export interface UnitNav {
   sinceBest: number;
   /** Seconds left of standing still after giving up on a goal it cannot reach. */
   wait: number;
+  /**
+   * Fire at will: the kaiju it has a clear line of fire to (-1: none) and the height on its body
+   * it found the line to (an index into SQUAD_RULES.aimHeights), as of the last look.
+   */
+  shotAt: number;
+  shotHeight: number;
 }
 
 export function createUnitNav(): UnitNav {
@@ -88,6 +96,7 @@ export function createUnitNav(): UnitNav {
     planned: false,
     repath: 0,
     side: 0,
+    turn: 0,
     openTime: 0,
     markX: 0,
     markZ: 0,
@@ -96,6 +105,8 @@ export function createUnitNav(): UnitNav {
     bestDist: Infinity,
     sinceBest: 0,
     wait: 0,
+    shotAt: -1,
+    shotHeight: 0,
   };
 }
 
@@ -109,6 +120,7 @@ export function resetRoute(nav: UnitNav): void {
   nav.planned = false;
   nav.repath = 0;
   nav.side = 0;
+  nav.turn = 0;
   nav.openTime = 0;
   nav.stuck = 0;
   nav.fails = 0;
@@ -121,6 +133,8 @@ export function resetNav(nav: UnitNav): void {
   nav.hasHold = false;
   nav.settled = true;
   nav.hurry = 1;
+  nav.shotAt = -1;
+  nav.shotHeight = 0;
 }
 
 /** What `steerToward` answers. */
@@ -148,6 +162,8 @@ const LEG_MARGIN = 0.5;
 const PROBE_SLACK = 0.4;
 /** The straight line to the goal and the corner-cutting are re-checked every this many ticks. */
 const RECHECK_TICKS = 5;
+/** The look-ahead for walls is repeated every this many ticks; in between the unit holds the turn it chose. */
+const LOOK_TICKS = 3;
 /** A goal that moves this far (in unit radii, at least this many meters) needs a new route. */
 const REPLAN_RADII = 2;
 const REPLAN_MIN = 8;
@@ -393,21 +409,13 @@ function planRoute(world: World, u: Unit, gx: number, gz: number): void {
 // Steering
 // ---------------------------------------------------------------------------------------------
 
-const turned = { x: 0, z: 0 };
-
-/**
- * Tries heading `angle` off (dirX, dirZ) (positive toward +X from +Z, like yaw). When the way is
- * clear for `look` meters it leaves the new direction in `turned` and returns true.
- */
-function tryTurn(q: CityQuery, u: Unit, dirX: number, dirZ: number, angle: number, look: number, probeR: number): boolean {
+/** True when the way is clear for `look` meters at `angle` off the heading (dirX, dirZ) (positive toward +X from +Z, like yaw). */
+function wayClear(q: CityQuery, u: Unit, dirX: number, dirZ: number, angle: number, look: number, probeR: number): boolean {
   const c = Math.cos(angle);
   const s = Math.sin(angle);
   const rx = dirX * c + dirZ * s;
   const rz = dirZ * c - dirX * s;
-  if (!corridorClear(q, u.x, u.z, u.x + rx * look, u.z + rz * look, probeR)) return false;
-  turned.x = rx;
-  turned.z = rz;
-  return true;
+  return corridorClear(q, u.x, u.z, u.x + rx * look, u.z + rz * look, probeR);
 }
 
 /**
@@ -505,42 +513,53 @@ export function steerToward(world: World, u: Unit, gx: number, gz: number, toler
   let dirX = d > 1e-6 ? dx / d : gdx / goalDist;
   let dirZ = d > 1e-6 ? dz / d : gdz / goalDist;
   const look = Math.max(SQUAD_RULES.probeRadii * r, SQUAD_RULES.probeMin);
-  const probe = Math.min(Math.max(d, 1), look);
-  if (corridorClear(q, u.x, u.z, u.x + dirX * probe, u.z + dirZ * probe, probeR)) {
-    if (nav.side !== 0) {
-      nav.openTime += DT;
-      if (nav.openTime >= SIDE_MEMORY) nav.side = 0;
-    }
-  } else {
-    nav.openTime = 0;
-    let found = false;
-    if (nav.side !== 0) {
-      // Keep going round the same way; only when that side is shut at every angle try the other.
-      for (let pass = 0; pass < 2 && !found; pass++) {
-        const side = pass === 0 ? nav.side : -nav.side;
-        for (let i = 0; i < DEFLECTIONS.length && !found; i++) {
-          if (!tryTurn(q, u, dirX, dirZ, DEFLECTIONS[i] * side, look, probeR)) continue;
-          nav.side = side;
-          found = true;
-        }
+  if (recheck || (world.tick + u.id) % LOOK_TICKS === 0) {
+    const probe = Math.min(Math.max(d, 1), look);
+    if (corridorClear(q, u.x, u.z, u.x + dirX * probe, u.z + dirZ * probe, probeR)) {
+      nav.turn = 0;
+      if (nav.side !== 0) {
+        nav.openTime += DT * LOOK_TICKS;
+        if (nav.openTime >= SIDE_MEMORY) nav.side = 0;
       }
     } else {
-      // No side chosen yet: whichever opens at the smaller angle.
-      for (let i = 0; i < DEFLECTIONS.length && !found; i++) {
-        if (tryTurn(q, u, dirX, dirZ, DEFLECTIONS[i], look, probeR)) {
-          nav.side = 1;
-          found = true;
-        } else if (tryTurn(q, u, dirX, dirZ, -DEFLECTIONS[i], look, probeR)) {
-          nav.side = -1;
-          found = true;
+      nav.openTime = 0;
+      // With every way shut it pushes on regardless: the movement system slides it along the wall.
+      nav.turn = 0;
+      let found = false;
+      if (nav.side !== 0) {
+        // Keep going round the same way; only when that side is shut at every angle try the other.
+        for (let pass = 0; pass < 2 && !found; pass++) {
+          const side = pass === 0 ? nav.side : -nav.side;
+          for (let i = 0; i < DEFLECTIONS.length && !found; i++) {
+            if (!wayClear(q, u, dirX, dirZ, DEFLECTIONS[i] * side, look, probeR)) continue;
+            nav.side = side;
+            nav.turn = DEFLECTIONS[i] * side;
+            found = true;
+          }
+        }
+      } else {
+        // No side chosen yet: whichever opens at the smaller angle.
+        for (let i = 0; i < DEFLECTIONS.length && !found; i++) {
+          if (wayClear(q, u, dirX, dirZ, DEFLECTIONS[i], look, probeR)) {
+            nav.side = 1;
+            nav.turn = DEFLECTIONS[i];
+            found = true;
+          } else if (wayClear(q, u, dirX, dirZ, -DEFLECTIONS[i], look, probeR)) {
+            nav.side = -1;
+            nav.turn = -DEFLECTIONS[i];
+            found = true;
+          }
         }
       }
     }
-    // With every way shut it pushes on regardless: the movement system slides it along the wall.
-    if (found) {
-      dirX = turned.x;
-      dirZ = turned.z;
-    }
+  }
+  if (nav.turn !== 0) {
+    // Positive angles turn toward +X from +Z, like yaw.
+    const c = Math.cos(nav.turn);
+    const sn = Math.sin(nav.turn);
+    const rx = dirX * c + dirZ * sn;
+    dirZ = dirZ * c - dirX * sn;
+    dirX = rx;
   }
 
   // --- Progress watch ---------------------------------------------------------------------------
@@ -557,6 +576,7 @@ export function steerToward(world: World, u: Unit, gx: number, gz: number, toler
       nav.stuck = 0;
       nav.fails++;
       nav.side = nav.side === 0 ? -1 : -nav.side;
+      nav.turn = 0;
       nav.openTime = 0;
       nav.planned = false;
       nav.repath = 0;

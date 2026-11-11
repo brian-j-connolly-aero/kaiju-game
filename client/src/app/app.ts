@@ -74,6 +74,8 @@ export class App {
       ui,
       name: params.name ?? storedName(store, params.profile),
       notice: '',
+      matchesEnded: 0,
+      lastResult: null,
       now: () => performance.now() / 1000,
     };
     this.screens = {
@@ -133,7 +135,13 @@ export class App {
       this.ctx.renderer?.endMatch();
       this.backdrop.cut();
     });
-    client.events.on('event', (e) => this.ctx.runtime?.handleEvent(e));
+    client.events.on('event', (e) => {
+      this.ctx.runtime?.handleEvent(e);
+      if (e.type === 'matchEnd') {
+        this.ctx.matchesEnded++;
+        this.ctx.lastResult = { winner: e.winner, reason: e.reason, duration: e.duration };
+      }
+    });
     client.events.on('cityResync', () => this.ctx.renderer?.resync());
     client.events.on('closed', (reason) => {
       this.ctx.notice = CLOSED_NOTICE[reason];

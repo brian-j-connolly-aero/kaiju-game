@@ -30,6 +30,8 @@ export class DebugOverlay {
       `sprites   ${stats ? stats.sprites : 0}, props ${stats ? stats.props : 0}, particles ${stats ? stats.particles : 0}, chunks ${stats ? stats.chunks : 0}, projectiles ${stats ? stats.projectiles : 0}`,
       `ping      ${ctx.client.ping.toFixed(0)} ms, link ${ctx.client.status}`,
     ];
+    const timing = ctx.runtime?.timing;
+    if (timing) lines.push(`split     logic ${timing.logic.toFixed(1)} ms, scene ${timing.scene.toFixed(1)} ms, draw ${timing.draw.toFixed(1)} ms`);
     if (session) {
       const m = session.latest?.match;
       lines.push(

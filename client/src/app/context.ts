@@ -32,6 +32,9 @@ export interface AppContext {
   name: string;
   /** Why the last room was left, for the home screen to show (an icon id), or ''. */
   notice: string;
+  /** Matches this page has seen end, and how the last one ended (for the autopilot and for tests). */
+  matchesEnded: number;
+  lastResult: { winner: string; reason: string; duration: number } | null;
   /** Local time in seconds. */
   now(): number;
 }

@@ -86,8 +86,8 @@ export class Boundary {
       const [bx, bz] = corners[(i + 1) % 4];
       // The curtain: bright at the ground, gone at the top.
       const bands: Array<[number, number, number, number]> = [
-        [0.05, line, 1.6, 1.6],
-        [line, this.height, 0.45, 0],
+        [0.05, line, 1.5, 1.5],
+        [line, this.height, 0.28, 0],
       ];
       for (const [y0, y1, c0, c1] of bands) {
         add(ax, y0, az, c0);

@@ -131,9 +131,10 @@ async function main() {
         await sleep(Math.max(500, opts.seconds * 100));
         await shot('5-third-person');
         const state = await page.evaluate(() => window.__mb.state());
+        const timing = await page.evaluate(() => ({ ...window.__mb.internals.ctx.runtime.timing }));
         const info = await page.evaluate(() => window.__mb.renderer.info());
         report.push({ stage, role, phase: state.match?.phase, bar: state.match?.barPoints, frameMs: Number(state.frame.ms.toFixed(1)), calls: info.calls, triangles: info.triangles, sprites: info.sprites, props: info.props, errors: errors.length });
-        console.log(`shots: stage ${stage} ${role}: ${info.calls} draw calls, ${info.triangles} triangles, ${info.sprites} sprites, ${info.props} props, frame ${state.frame.ms.toFixed(1)} ms, ${errors.length} console errors`);
+        console.log(`shots: stage ${stage} ${role}: ${info.calls} draw calls, ${info.triangles} triangles, ${info.sprites} sprites, ${info.props} props, frame ${state.frame.ms.toFixed(1)} ms (logic ${timing.logic.toFixed(1)}, scene ${timing.scene.toFixed(1)}, draw ${timing.draw.toFixed(1)}), ${errors.length} console errors`);
       } catch (err) {
         failures.push(err instanceof Error ? err.message : String(err));
       }

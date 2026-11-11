@@ -92,6 +92,18 @@ describe('the artillery call-in', () => {
     }
     // Not all in one hole.
     expect(new Set(hits.map((h) => Math.round(h.x))).size).toBeGreaterThan(3);
+    // A client that flies each shell from its spawn event with the shared kinematics sees it
+    // come down exactly where and when the server says it did.
+    for (const h of hits) {
+      const s = spawns.find((e) => e.id === h.id);
+      if (!s) throw new Error('a shell landed that was never announced');
+      const body = { x: s.x, y: s.y, z: s.z, vx: s.vx, vy: s.vy, vz: s.vz, gravity: s.gravity };
+      for (let tick = s.tick; tick < h.tick; tick++) stepProjectile(body, 1 / TICK_RATE);
+      expect(body.y).toBeGreaterThan(0);
+      stepProjectile(body, 1 / TICK_RATE);
+      expect(body.y).toBeLessThanOrEqual(0);
+      expect(Math.hypot(body.x - h.x, body.z - h.z)).toBeLessThan(1);
+    }
 
     // Its phases, in order; the marker can come off the ground at 'done'.
     expect(eventsOf(events, 'callin').map((e) => e.phase)).toEqual(['marked', 'inbound', 'done']);

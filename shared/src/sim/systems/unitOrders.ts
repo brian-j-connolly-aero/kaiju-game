@@ -66,7 +66,7 @@ import {
   scatterMult,
   updateTrail,
 } from '../squads';
-import type { Kaiju, Squad, Unit, World } from '../types';
+import type { Squad, Unit, World } from '../types';
 import { emit } from '../worldOps';
 import { say } from './voice';
 
@@ -77,6 +77,8 @@ const FLEE_STEP = 30;
 /** Units push apart when their circles come closer than this to touching. */
 const SEPARATION_GAP = 0.5;
 const SEPARATION_WEIGHT = 0.8;
+/** A sub-unit firing at will checks its lines of fire every this many ticks (five times a second). */
+const SHOT_LOOK_TICKS = 6;
 
 const steer = createSteer();
 const slot: Vec2 = { x: 0, z: 0 };
@@ -364,41 +366,55 @@ function separate(world: World, u: Unit): void {
 
 /**
  * Looks for something to shoot at will: the nearest living kaiju within the weapon's range that
- * the unit has a clear line of fire to. Leaves the aim (leading the target by the projectile's
- * flight time) in `want` and returns true when there is one.
+ * the unit has a clear line of fire to (to the middle of its body, or failing that higher or
+ * lower on it). The lines are cast a few times a second; in between the unit keeps tracking
+ * the target it found. Leaves the aim (leading the target by the projectile's flight time) in
+ * `want` and returns true when there is a shot.
  */
 function findShot(world: World, squad: Squad, u: Unit): boolean {
   const type = unitTypeDef(u.type);
   const weapon = weaponDef(type.weapon);
   const range = weapon.range * modMult(squad.mods, 'weaponRange');
   const speed = projectileTypeDef(weapon.projectile).speed;
+  const nav = u.nav;
   muzzle.x = u.x;
   muzzle.y = u.y + type.muzzleHeight;
   muzzle.z = u.z;
 
-  let target: Kaiju | null = null;
-  let best = Infinity;
-  for (const k of world.kaijus) {
-    if (!k.alive) continue;
-    const d = Math.hypot(k.x - u.x, k.z - u.z);
-    if (d - k.radius > range || d >= best) continue;
-    // Aim where it will be when the shot arrives.
-    const t = speed > 0 ? d / speed : 0;
-    const tx = k.x + k.vx * t;
-    const tz = k.z + k.vz * t;
-    for (const h of SQUAD_RULES.aimHeights) {
-      mark.x = tx;
-      mark.y = k.height * h;
-      mark.z = tz;
-      if (castSegment(world.cityQuery, muzzle, mark, undefined, -1, true)) continue;
-      target = k;
-      best = d;
-      want.yaw = yawFromTo(u.x, u.z, tx, tz);
-      want.pitch = Math.atan2(mark.y - muzzle.y, Math.max(Math.hypot(tx - u.x, tz - u.z), 1e-6));
-      break;
+  if ((world.tick + u.id) % SHOT_LOOK_TICKS === 0 || nav.shotAt >= world.kaijus.length) {
+    nav.shotAt = -1;
+    let best = Infinity;
+    for (const k of world.kaijus) {
+      if (!k.alive) continue;
+      const d = Math.hypot(k.x - u.x, k.z - u.z);
+      if (d - k.radius > range || d >= best) continue;
+      // The line of fire to where it will be when the shot arrives.
+      const t = speed > 0 ? d / speed : 0;
+      mark.x = k.x + k.vx * t;
+      mark.z = k.z + k.vz * t;
+      for (let h = 0; h < SQUAD_RULES.aimHeights.length; h++) {
+        mark.y = k.height * SQUAD_RULES.aimHeights[h];
+        if (castSegment(world.cityQuery, muzzle, mark, undefined, -1, true)) continue;
+        nav.shotAt = k.id;
+        nav.shotHeight = h;
+        best = d;
+        break;
+      }
     }
   }
-  return target !== null;
+  if (nav.shotAt < 0) return false;
+  const k = world.kaijus[nav.shotAt];
+  const d = Math.hypot(k.x - u.x, k.z - u.z);
+  if (!k.alive || d - k.radius > range) {
+    nav.shotAt = -1;
+    return false;
+  }
+  const t = speed > 0 ? d / speed : 0;
+  const tx = k.x + k.vx * t;
+  const tz = k.z + k.vz * t;
+  want.yaw = yawFromTo(u.x, u.z, tx, tz);
+  want.pitch = Math.atan2(k.height * SQUAD_RULES.aimHeights[nav.shotHeight] - muzzle.y, Math.max(Math.hypot(tx - u.x, tz - u.z), 1e-6));
+  return true;
 }
 
 /** A shaken unit lets go of everything and backs away from a kaiju that is near. */

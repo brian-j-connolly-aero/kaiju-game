@@ -63,8 +63,8 @@ DEFAULTS = {
         "rt60_s": 1.9,                   # decay time of the room below 1 kHz
         "rt60_high_s": 1.0,              # decay time above 3 kHz (air and upholstery)
         "early_db": -18.0,               # early reflections relative to the direct voice
-        "wet_db": -14.0,                 # late reverberation energy relative to the direct voice
-        "duck_db": 10.0,                 # how far the reverberation drops while a word is spoken
+        "wet_db": -12.0,                 # late reverberation energy relative to the direct voice
+        "duck_db": 12.0,                 # how far the reverberation drops while a word is spoken
         "ring_s": 1.3,                   # how long the room rings after the last word
         "lead_ms": 30.0,
     },

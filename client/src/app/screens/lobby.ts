@@ -154,8 +154,10 @@ export class LobbyScreen implements Screen {
         client.send('setOptions', { botKaiju: ctx.params.practice });
         return;
       }
+      // One match, unless asked to loop: a playtest wants the room to rest in the lobby afterwards.
       const present = lobby.players.filter((p) => p.connected).length;
-      if (present >= ctx.params.startAt && canStartMatch(lobby)) client.send('start', {});
+      const again = ctx.matchesEnded === 0 || ctx.params.loop;
+      if (again && present >= ctx.params.startAt && canStartMatch(lobby)) client.send('start', {});
     } else if (!me.ready) {
       client.send('ready', { ready: true });
     }

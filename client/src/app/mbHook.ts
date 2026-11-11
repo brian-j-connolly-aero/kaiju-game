@@ -38,6 +38,9 @@ export interface MbState {
   net: { snapshots: number; events: number; inputs: number; pending: number; correction: number; predicting: boolean } | null;
   frame: { ms: number; maxMs: number; count: number };
   result: { winner: string; reason: string; duration: number } | null;
+  /** Matches this page has seen end, and how the last of them ended (kept after the room returns to its lobby). */
+  matchesEnded: number;
+  lastResult: { winner: string; reason: string; duration: number } | null;
 }
 
 export interface MbHook {
@@ -123,6 +126,8 @@ export function installHook(source: HookSource): MbHook {
           : null,
         frame: { ...source.frameStats },
         result: runtime?.result ? { winner: runtime.result.winner, reason: runtime.result.reason, duration: runtime.result.duration } : null,
+        matchesEnded: ctx.matchesEnded,
+        lastResult: ctx.lastResult,
       };
     },
     renderer: {

@@ -40,7 +40,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer } from 'node:net';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const require = createRequire(import.meta.url);
@@ -214,6 +214,12 @@ async function main() {
         if (opts.role === 'human') q.set('practice', '1');
       }
       if (opts.noAssets) q.set('assets', 'none');
+      // Only the first two pages are photographed. The rest draw at low resolution and rate so
+      // that five software-rendered pages fit on four cores.
+      if (index >= 2) {
+        q.set('res', '0.4');
+        q.set('fps', '20');
+      }
       await page.goto(`${origin}/?${q.toString()}${hash ? `#${hash}` : ''}`, { waitUntil: 'load' });
       pages.push({ page, record });
       return { page, record };
@@ -277,19 +283,24 @@ async function main() {
         lastStates[i] = s ?? lastStates[i];
         const rec = pages[i].record;
         const inf = infos[i];
-        if (inf && s && s.screen === 'match') {
+        if (inf && s && s.screen === 'match' && s.matchesEnded === 0) {
           rec.maxCalls = Math.max(rec.maxCalls, inf.calls);
           rec.maxTriangles = Math.max(rec.maxTriangles, inf.triangles);
           rec.maxSprites = Math.max(rec.maxSprites, inf.sprites);
         }
         if (s && s.me && !first[i]) first[i] = { x: s.me.x, z: s.me.z };
+        // How far this player has travelled, sampled every poll (a lower bound on the real path).
+        if (s && s.me && s.matchesEnded === 0) {
+          const rec2 = pages[i].record;
+          if (rec2.lastPos) rec2.travelled = (rec2.travelled ?? 0) + Math.hypot(s.me.x - rec2.lastPos.x, s.me.z - rec2.lastPos.z);
+          rec2.lastPos = { x: s.me.x, z: s.me.z };
+        }
       });
       while (moments.length > 0 && elapsed >= moments[0][0]) {
         const [, name] = moments.shift();
-        if (states[0]?.screen !== 'end') {
+        if ((states[0]?.matchesEnded ?? 0) === 0) {
           await shot(host.page, `${name}-kaiju`);
           await shot(other.page, `${name}-human`);
-          if (last !== other) await shot(last.page, `${name}-human-b`);
         }
       }
       if (opts.reconnect && !dropped && elapsed > 20 && pages.length > 1) {
@@ -305,27 +316,30 @@ async function main() {
             ` kaiju=${s0.kaiju ? `${s0.kaiju.phase}/${s0.kaiju.action} hp ${s0.kaiju.hp.toFixed(0)}` : '-'} units=${s0.unitsAlive} frame=${s0.frame.ms.toFixed(0)}ms calls=${infos[0]?.calls ?? 0} tris=${infos[0]?.triangles ?? 0}`,
         );
       }
-      if (states.every((s) => s && s.screen === 'end' && s.result)) {
+      // `matchesEnded` stays up after the room returns to its lobby, so a slow poll cannot miss the end.
+      if (states.every((s) => s && s.matchesEnded >= 1)) {
         ended = true;
         break;
       }
       if (pages.some((p) => p.record.crashed)) break;
       await sleep(2000);
     }
-    if (!ended) failures.push(`the match did not reach the end screen on every page within ${opts.timeout} s`);
+    if (!ended) failures.push(`the match did not end on every page within ${opts.timeout} s`);
     await sleep(1500);
     await shot(host.page, '10-end-kaiju');
     await shot(other.page, '10-end-human');
+    if (last !== other) await shot(last.page, '10-end-human-debug');
 
     // --- verdict -------------------------------------------------------------------------------
     for (let i = 0; i < pages.length; i++) {
       const { record } = pages[i];
       const s = lastStates[i];
-      const moved = s && s.me && first[i] ? Math.hypot(s.me.x - first[i].x, s.me.z - first[i].z) : 0;
+      const moved = record.travelled ?? 0;
+      delete record.lastPos;
       Object.assign(record, {
         screen: s?.screen ?? 'unknown',
         role: s?.role ?? record.role,
-        result: s?.result ?? null,
+        result: s?.lastResult ?? null,
         snapshots: s?.net?.snapshots ?? 0,
         inputs: s?.net?.inputs ?? 0,
         predicting: s?.net?.predicting ?? false,
@@ -343,7 +357,7 @@ async function main() {
       summary.pages.push(record);
     }
     const s0 = lastStates[0];
-    summary.result = s0?.result ?? null;
+    summary.result = s0?.lastResult ?? null;
     summary.finalMatch = s0?.match ?? null;
     summary.matchSeconds = Number(((Date.now() - matchStart) / 1000).toFixed(1));
     if (s0 && opts.role === 'kaiju' && s0.match && s0.match.barPoints <= 0) failures.push('the autoplay kaiju destroyed nothing (bar stayed at 0)');
@@ -382,7 +396,10 @@ async function main() {
   console.log('PASSED: the match ran to its end with no console errors.');
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+// Only when run as a program: shots.mjs imports CHROMIUM_ARGS from this file.
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

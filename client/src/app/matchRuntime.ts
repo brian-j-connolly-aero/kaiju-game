@@ -55,6 +55,8 @@ export class MatchRuntime {
   /** Called for every simulation event after the renderer and the audio have had it. */
   onEvent: ((e: SimEvent) => void) | null = null;
   eventCounts: Record<string, number> = {};
+  /** Where a frame's time goes, milliseconds, smoothed: input and network, scene update, drawing. */
+  readonly timing = { logic: 0, scene: 0, draw: 0 };
 
   private readonly deps: RuntimeDeps;
   private readonly player: KaijuController | HumanController | null;
@@ -205,6 +207,7 @@ export class MatchRuntime {
     const { renderer, input, audio, autopilot } = this.deps;
     const session = this.session;
 
+    const t0 = performance.now();
     autopilot?.setContext(session, this.frame);
     const actions = input.poll(dt);
     const frame = session.sample(now, dt);
@@ -254,7 +257,9 @@ export class MatchRuntime {
       hint: frame.localKaiju ? session.hintFor(frame.localKaiju, now) : null,
       now,
     };
+    const t1 = performance.now();
     renderer.update(frame, dt, view);
+    const t2 = performance.now();
 
     if (this.shot) {
       this.cinematic.aim(this.shot, dt);
@@ -273,7 +278,13 @@ export class MatchRuntime {
     this.matchAudio.update(frame, dt);
     audio.update(dt);
 
+    const t3 = performance.now();
     renderer.render();
+    const t4 = performance.now();
+    const timing = this.timing;
+    timing.logic += (t1 - t0 + (t3 - t2) - timing.logic) * 0.1;
+    timing.scene += (t2 - t1 - timing.scene) * 0.1;
+    timing.draw += (t4 - t3 - timing.draw) * 0.1;
     if (this.wantPhoto > 0) {
       this.wantPhoto -= dt;
       if (this.wantPhoto <= 0) this.takePhoto();

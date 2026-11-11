@@ -51,7 +51,7 @@ type checked with no DOM and no Node typings, so it cannot touch either by accid
 package.json              workspaces: shared, server, client; root scripts; the shared toolchain
 tsconfig.base.json        compiler options every workspace extends (strict)
 vitest.config.ts          one test run for the repo: <workspace>/test/**/*.test.ts
-scripts/                  dev.mjs (runs server + client), lint.mjs, merge-manifests.mjs
+scripts/                  dev.mjs (runs server + client), lint.mjs
 shared/                   @mb/shared: pure TypeScript, no DOM and no Node APIs
   src/math/               vectors, angles, seeded random numbers, geometry tests
   src/defs/               all tunable data: stages, kaiju, factions, units, weapons, upgrades, voiceLines.json
@@ -77,7 +77,8 @@ client/                   @mb/client
   public/assets/          models/ textures/ sprites/ audio/{music,sfx,voice}/ ui/  + manifest.json
 tools/art/                Blender Python sources for every model (source of truth for art)
 tools/audio/              music, sound-effect and voice generators (source of truth for audio)
-tools/playtest/           Playwright scripts: multi-client smoke test, screenshots
+tools/playtest/           Playwright scripts: smoke.mjs (multi-client match), shots.mjs (stage screenshots)
+tools/build-manifest.mjs  the `assets:manifest` script: merges partial manifests, checks files
 deploy/                   Containerfile, compose file with cloudflared, Windows and WSL scripts
 docs/                     requirements.md, DESIGN.md, ARCHITECTURE.md, ASSETS.md, art previews
 ```
@@ -132,10 +133,14 @@ State (plain objects and typed arrays, cheap to snapshot):
   state machine (`idle | windup | active | recover | brace | eat | roar | special | stagger |
   cocoon | dead`, with action id and timer), held object, cooldowns, mods.
 - `squads[]`: player or bot, faction, level, 4 unit ids, driven unit id (-1 when eliminated),
-  movement order, fire mode, call-in cooldowns, upgrades and mods, eliminated flag.
+  movement order, fire mode, call-in cooldowns, upgrades and mods, eliminated flag; server-side
+  only: the leader's `trail`, `formed`, `volleyReady`.
 - `units[]`: id, squad, type, pos (and altitude for aircraft), yaw, aim yaw and pitch, hp,
-  members, nerve, shaken timer, charge, weapon cooldown, veteran flag.
+  members, nerve, shaken timer, charge, weapon cooldown, veteran flag, `rooted` and `arcYaw`
+  (the firing arc of a planted unit); server-side only: `nav` (hold point, route, steering
+  memory of a sub-unit; `sim/nav.ts`).
 - `projectiles[]`: id, type, owner, pos, velocity, flight model (`flat | arc | thrown`), ttl.
+- `callIns[]`: artillery missions on their way (marker, timers, shells left, approach direction).
 - City state: `Float32Array` hp per structure id (plus the visual stage per structure), bitset
   of live props, bitset of prop wrecks still lying on the ground; `shields` (zones that reduce
   structure damage, Tier 2) and `insuredStructures` (landmarks covered by the insurance rider).
@@ -157,10 +162,10 @@ operates on `World`, and is covered by tests.
 | --- | --- | --- | --- |
 | 1 | `inputs.ts` | this tick's inputs, queued commands | `player.input` (edges, hold timers), `player.commands`, the driven unit's `control` |
 | 2 | `kaijuActions.ts` | `player.input` | the kaiju action state machine, held object, cocoon start; queues hits and city damage, spawns thrown projectiles |
-| 3 | `unitOrders.ts` | `player.commands` | squad orders, every sub-unit's `control`, charge, takeover |
+| 3 | `unitOrders.ts` | `player.commands`, the kaiju, the city | spotting, takeover, squad orders, call-in missions, every sub-unit's `control`, `rooted`, `arcYaw`, charge, `state`, `nav` |
 | 4 | `bots.ts` | the world | `player.botInput` for the NEXT tick (bots use the same input interface as people) |
 | 5 | `movement.ts` | `player.input`, `unit.control` | positions, the kaiju's head aim; queues trample and wade damage to the city |
-| 6 | `weapons.ts` | `unit.control.fire`, charge | projectiles, volleys, call-in missions |
+| 6 | `weapons.ts` | `unit.control.fire`, aim, charge, `callIns` | weapon and call-in cooldowns, projectiles (salvos, volleys, shells), `volley`, the later `callin` phases |
 | 7 | `projectiles.ts` | projectiles | flight, impacts; queues hits, structure and prop damage |
 | 8 | `damage.ts` | `hits` | hp, nerve, stagger, shaken, deaths, squad elimination, rage; tramples units under a moving kaiju |
 | 9 | `cityDamage.ts` | `structureHits`, `propHits` | structure hp and stages, props and wrecks, the bar, tallies, rage, `barMark`, `moltAvailable` |
@@ -168,6 +173,35 @@ operates on `World`, and is covered by tests.
 | 11 | `voice.ts` | this tick's events | `voice` events (throttled) |
 
 `docs/STATUS.md` says which of these are implemented and which are still stubs.
+
+How the human side is put together (`DESIGN.md` section 5 has the rules):
+
+- **Orders** (`systems/unitOrders.ts`). The driven unit's `control` comes straight from its
+  player's input. Every other living unit of the squad is a sub-unit and gets its `control`
+  here each tick: where to go (its hold point, or its slot in the column behind the leader),
+  where to point its weapon, and whether to fire at will. Hold-and-charge is a per-unit state:
+  `rooted` (planted), `arcYaw` (the arc it is locked to), `charge`, `state` 'charging' (which
+  is what the snapshot's `laser` flag reports). Squad helpers that bots and clients can use
+  are in `sim/squads.ts`: `formationSlot`, `scatterMult` and `kaijuIsSlowed` (both work on
+  snapshot data), `arcCovers`, `laserOnKaiju` / `lasersOnKaiju`, `squadCharge`, `markVeterans`.
+- **Navigation** (`sim/nav.ts`). `steerToward(world, unit, x, z, tolerance, out)` answers with
+  a direction and a throttle: the straight line when the unit's whole width fits
+  (`corridorClear`), otherwise along the road graph (onto the nearest street it can reach,
+  Dijkstra through the crossroads inside the bounds, off at the point nearest the goal), with
+  a look-ahead that steers round walls on every leg. It never moves anything: the movement
+  system does, with the same `stepMovement` as everybody. A sub-unit that has dropped out of
+  formation gets `nav.hurry` (a multiplier on its top speed); the driven unit never does, so
+  client prediction of one's own unit is unaffected.
+- **Weapons** (`systems/weapons.ts`). A unit that fires launches one projectile per launcher or
+  tank with `spawnProjectile`. The driven unit's shot goes to its aim point
+  (`resolveAimPoint` from the eye, kaiju included) and is the volley trigger; sub-units fire
+  along their own aim. Aim error is added per projectile from the world's generator. Call-in
+  missions live in `world.callIns` and release their shells here.
+- **Bridge decks.** For bodies a deck is road surface; so it is for everything that flies or
+  looks: `castSegment`, `castRay` and `lineOfSight` take a `skipPassable` flag, and projectile
+  flight, spotting, lines of fire, corridors and `resolveAimPoint` all set it. A projectile that
+  reaches the ground on a standing deck reports the deck as the structure it hit. (The beam is
+  the exception: `beamPath` still stops at a deck.)
 
 How the kaiju's action state machine, the damage rules and the molt hand over to each other:
 
@@ -192,7 +226,8 @@ How the kaiju's action state machine, the damage rules and the molt hand over to
   `aimYaw` / `aimPitch` are the true beam direction.
 - **Projectiles** fly along `p0 + v0 t - (0, g t² / 2, 0)` with t counted from the spawn tick
   (`stepProjectile`); a projectile has already flown one step at the end of the tick that
-  spawned it. `spawnProjectile(world, init)` is the one way to launch one.
+  spawned it. `spawnProjectile(world, init)` is the one way to launch one. The kaiju's throw,
+  unit fire, volleys and artillery shells all use it.
 
 Movement uses one shared pure function,
 `stepMovement(body, input, dt, cityQuery, params, result?)`, for circle bodies against
@@ -348,6 +383,28 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
 `volley`, `roar`, `callin`, `moltAvailable`, `cocoon`, `moltBlast`, `stageChange`, `barMark`,
 `matchPhase`, `voice`, `matchEnd`. Every event carries its `tick`; the payloads are defined and
 documented in `shared/src/sim/events.ts`.
+
+What clients can rely on from the squad events and the squad part of a snapshot:
+
+- A unit's salvo is one `projectileSpawn` per projectile, all on the same tick, with
+  `owner: 'unit'` and the unit's id. `volley: true` marks a charged volley, the trigger shot
+  included; the `volley` event of that tick lists the sub-units that fired (not the driven
+  unit), the aim point and their average charge. `test/weapons.test.ts` replays every spawn
+  with `stepProjectile` and checks it ends where its `projectileHit` says.
+- A targeting laser is a snapshot unit with `laser` set: draw it from the unit's muzzle height
+  along its `aimYaw` / `aimPitch` to wherever `resolveAimPoint` (mirrored city, snapshot kaiju)
+  says that ray lands, with `charge` for brightness. The flag goes off for one tick when the
+  unit fires. `rooted` is true for as long as it is planted.
+- `callin` comes three times per mission: 'marked' (the marker is placed; `delay` is the time
+  to the first impact, `radius` the scatter to draw), 'inbound' (the first shell is falling)
+  and 'done' (the last shell has landed). Its shells are `projectileSpawn` events with
+  `owner: 'callin'` and `ownerId` the mission id. A stage change drops running missions
+  without a 'done'. `callInCooldowns` in the squad snapshot is the time until the button works.
+- `takeover` comes the tick after the `unitDestroyed` of the driven unit; from that tick the
+  squad's `driven` (and the unit flag) point at the new unit. An eliminated squad has
+  `driven: -1`.
+- `kaiju.known` is whether the humans' map may show the kaiju; `kaiju.spotted` whether a
+  driven unit has it in sight within the spotting range (it tightens scatter).
 
 What clients can rely on from the kaiju and city events:
 

@@ -47,6 +47,29 @@ describe('simulation soak with random inputs', () => {
     }
     expect(world.match.barPoints).toBeGreaterThanOrEqual(lastBar);
     expect(Number.isFinite(world.match.barPoints)).toBe(true);
+
+    // The human side: squads, charge, cooldowns, things in flight.
+    for (const u of world.units) {
+      expect(u.charge).toBeGreaterThanOrEqual(0);
+      expect(u.charge).toBeLessThanOrEqual(1);
+      expect(u.cooldown).toBeGreaterThanOrEqual(0);
+      expect(Number.isFinite(u.cooldown) && Number.isFinite(u.arcYaw) && Number.isFinite(u.nav.holdX) && Number.isFinite(u.nav.holdZ)).toBe(true);
+      expect(Number.isFinite(u.control.moveX) && Number.isFinite(u.control.moveZ) && Number.isFinite(u.control.aimYaw) && Number.isFinite(u.control.aimPitch)).toBe(true);
+      if (!u.alive) expect([u.rooted, u.charge, u.state]).toEqual([false, 0, 'dead']);
+      // Only a planted sub-unit shows a laser; the unit a player drives is never planted.
+      if (u.state === 'charging') expect(u.rooted && world.squads[u.squad].driven !== u.id).toBe(true);
+    }
+    for (const squad of world.squads) {
+      const living = squad.units.filter((id) => world.units[id].alive).length;
+      expect(squad.eliminated).toBe(living === 0);
+      expect(squad.driven < 0).toBe(squad.eliminated);
+      if (!squad.eliminated) expect(squad.units).toContain(squad.driven);
+      for (const c of squad.callInCooldowns) expect(c).toBeGreaterThanOrEqual(0);
+    }
+    // Nothing piles up: every projectile ends (a hit, the edge of the city, or its time running out).
+    expect(world.projectiles.length).toBeLessThan(400);
+    expect(world.callIns.length).toBeLessThanOrEqual(world.squads.length);
+    for (const p of world.projectiles) expect(Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z)).toBe(true);
   }
 
   it('survives 60 seconds of chaos at each stage', () => {
@@ -66,6 +89,7 @@ describe('simulation soak with random inputs', () => {
     const held: PlayerInput[] = config.players.map(() => ({ seq: 0, moveX: 0, moveZ: 0, aimYaw: 0, aimPitch: 0, buttons: 0 }));
     let eventCount = 0;
     let wrecked = 0;
+    const seen = new Set<string>();
 
     for (const stage of [1, 2, 3] as const) {
       if (stage > 1) beginStage(world, stage);
@@ -90,9 +114,18 @@ describe('simulation soak with random inputs', () => {
           held[p] = next;
           return next;
         });
+        // Now and then a unit is destroyed outright, the way a blast wave or a thrown bus would do it.
+        if (rngChance(rng, 0.004)) {
+          const id = rngInt(rng, world.units.length);
+          world.hits.push({
+            target: { entity: 'unit', id },
+            hit: { damage: Infinity, nerve: 0, fromDir: { x: 0, z: 0 }, sourceId: 0, player: 0, kind: 'blast', atWill: false },
+          });
+        }
         const events = world.step(inputs);
         eventCount += events.length;
         for (const e of events) {
+          seen.add(e.type);
           expect(known).toContain(e.type);
           expect(e.tick).toBe(world.tick);
           if (e.type === 'structureStage' && e.stage === 3) wrecked++;
@@ -107,6 +140,9 @@ describe('simulation soak with random inputs', () => {
       }
       expect(world.match.stage).toBe(stage);
     }
+    // The squads did their part of the chaos too: shots, volleys, call-ins, lost units, takeovers.
+    const wanted = ['projectileSpawn', 'projectileHit', 'volley', 'callin', 'kaijuHit', 'unitDestroyed', 'takeover'];
+    expect(wanted.filter((type) => !seen.has(type))).toEqual([]);
     // The kaiju walked through things: props at every stage, buildings once it was big enough.
     expect(eventCount).toBeGreaterThan(50);
     expect(wrecked).toBeGreaterThan(5);

@@ -259,6 +259,71 @@ photos for the front page).
 
 **Veterans:** sub-units that survive a stage come back with aim error ×0.7 and a chevron mark.
 
+**How squads work** (as built; `shared/src/sim/systems/unitOrders.ts`, `systems/weapons.ts`,
+`sim/squads.ts`, `sim/nav.ts`; the numbers the design left open are `SQUAD_RULES` in
+`shared/src/defs/rules.ts`):
+
+- **Driving.** The driven unit moves relative to the view; a tank turns its hull toward where it
+  is going and drives along it, infantry goes any way at once. The weapon is on the aim at once.
+  Holding Fire shoots every time the weapon is ready. The shots go to the point where the aim
+  ray from the unit's eye lands (a kaiju, a structure, the ground, or far out along the ray); a
+  person's own shots have no aim error. A salvo is one projectile per launcher or tank still
+  standing, leaving from points spread across the unit.
+- **Follow me.** Sub-units string out behind the leader along the path it took, in a staggered
+  column one unit width plus 2 m apart; where a street is too narrow for the stagger they close
+  up into single file. A fresh deployment stays where it was placed until the leader moves or
+  calls it in. A sub-unit that has dropped behind closes up at 1.3 times its speed.
+- **Move to.** Each sub-unit gets its own spot round the marker: open ground with room to
+  spare that it can drive to from a street (a marker on a roof or in a back yard sends them to
+  the nearest such ground). They get there by the straight line when it is clear, otherwise
+  along the streets, feeling their way round walls; rubble, the river and bridge decks are all
+  passable. Markers are pulled back inside the playable bounds.
+- **Fire at will.** A sub-unit shoots when a kaiju is inside its weapon's range and its line of
+  fire (to the middle of the body, or else higher or lower on it) is clear. It leads a moving
+  target by the flight time, swings its weapon at 270° per second, and fires with the at-will
+  aim error. These shots count half for nerve. A bot's own driven unit shoots like a sub-unit
+  (at-will error, half nerve) unless its shot is the trigger of a volley.
+- **Hold fire and charge** means "hold here and charge". Following the leader, the command parks
+  every sub-unit where it stands; by a move-to marker they keep their spots and go on to them
+  first. A sub-unit on its spot plants itself: rooted, laser on, charge from 0 to 1 over 6 s,
+  firing arc (±35°) fixed at that moment and centered on the kaiju when the humans know where it
+  is (or the unit sees it), otherwise on what the leader is aiming at. The laser follows the
+  kaiju inside the arc and stops at its edge.
+  - Planted units stay put while the leader goes wherever it likes, volley after volley.
+  - "Follow me" lets them go and clears the charge; they come along holding their fire and do
+    not plant again until the hold command is given again. "Move to" sends them to the marker,
+    where they plant. "Fire at will" ends the hold too.
+  - Giving the hold command again plants the squad afresh: new arcs, charge from 0.
+- **The volley.** Every shot of the driven unit is the trigger. Each sub-unit that has charge,
+  is not shaken, has its weapon off cooldown and whose arc covers the aim point fires at it
+  with the charge multipliers and the volley aim error. One whose arc does not reach keeps
+  charging and does not fire (the kaiju can walk out of an arc; plant the squad again). With the
+  crosshair on a kaiju the sub-units aim for the middle of its body at that height, so shots
+  from every side connect. Firing spends the charge; the unit stays planted, its arc is aimed
+  afresh, and the charge builds again. Nothing checks range or line of sight for a volley: a
+  building in the way is the player's problem, and the bar's gain.
+- **Aim error** is one sigma on heading and on elevation, drawn for every projectile, times the
+  scatter multipliers of the kaiju being shot at, ×0.7 for veterans. "Slowed" means staggered,
+  cocooned, or carrying at least 30% of its nerve capacity in accumulated nerve damage. The
+  spotter is the unit somebody drives: a bot squad's leader counts, sub-units do not.
+- **Shaken** units cannot fire, let go of a hold, and back away from a kaiju within 10 of its
+  body radii (at least 60 m). When they steady they go back to their spot and plant again.
+- **Artillery.** The marker is placed with the call-in button (crosshair, or a map marker). The
+  shells are real projectiles that fall from 400 m at 75° above the horizon, coming over the
+  caller's shoulder, timed so the first lands 4 s after the marker and the last 2 s later. Each
+  lands inside the scatter radius times the scatter multipliers of the kaiju nearest the
+  marker. They can hit a tall building or the kaiju's head on the way down. A mission already
+  called finishes even if its squad is wiped out; it is dropped when the stage ends.
+- **Lives.** The tick after the driven unit dies the player is in the surviving unit nearest to
+  where it fell; the stick and trigger do nothing for that one tick. An eliminated squad takes
+  no input, no commands and no call-ins until the next stage.
+- **Veterans.** Every unit alive when a stage ends comes back as a veteran (the driven one too:
+  it carries the chevron, and the accuracy matters if a bot drives it). A slot whose unit died
+  comes back green.
+- **Bridges.** A bridge deck is road surface: units on it stand at ground level, so nothing in
+  flight, no sight line and no aim ray is stopped by the deck. A projectile that comes down on
+  a standing deck has hit the bridge, and explosions beside it damage it like any structure.
+
 **Map view:** toggles a top-down city map at any time. The game does not pause; the player's
 unit idles. Shows bounds, rubble, friendly units, and the kaiju when it is known (always at
 stages 2 and 3; at stage 1 only while a human unit has line of sight within 250 m, or for 3 s
