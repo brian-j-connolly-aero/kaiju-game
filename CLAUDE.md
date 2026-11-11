@@ -27,7 +27,8 @@ Server-authoritative multiplayer, self-hosted on one PC behind a Cloudflare Tunn
 - Tone: absurd world, played completely straight. For the Coalition of Faiths the joke is
   earnest teamwork and absurd firepower, never any faith; all clergy are fictional.
 - Spell out acronyms on first use in anything a person will read (docs, slides, reports).
-- Never put model or tool vendor names in code, comments, commit messages or assets.
+- Never put model or tool vendor names in code, comments or assets. Commit messages carry only
+  the attribution trailer the coordinator supplies.
 - The project owner is non-technical. Anything written for them is plain language.
 
 ## Machine notes
@@ -42,3 +43,4 @@ Server-authoritative multiplayer, self-hosted on one PC behind a Cloudflare Tunn
 - Headless browser: Chromium and Playwright are pre-installed (`require('playwright')` from any
   directory). Never run `playwright install`.
 - Scratch files go in `/tmp/mb-scratch/<your-task>/`, never in the repo.
+- Blender renders: cap Cycles at 2 threads and low sample counts; previews should take seconds.
