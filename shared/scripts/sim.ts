@@ -18,7 +18,9 @@
  *
  * Columns: winner and why; match length; time per stage; kaiju nerve breaks (staggers) per
  * stage; units lost per stage; the bar at the end of each stage as a percentage of the way to
- * the third mark (the skyline display); kaiju hp lost per stage.
+ * the third mark (the skyline display, on which the marks sit at 21, 57 and 100); kaiju hp lost
+ * per stage. A stage that was not reached shows as "-". The summary adds, per stage, how long
+ * the kaiju took to fill its segment of the bar, volleys, healing and the squads' collateral.
  */
 
 import { runBotMatch, type BotMatchReport } from './botMatch';
@@ -143,12 +145,15 @@ function printTable(reports: BotMatchReport[], o: Options): void {
     const complete = done.filter((r) => (i < 2 ? r.stages[i + 1].reached : r.winner === 'kaiju'));
     const all = done.filter((r) => r.stages[i].reached);
     if (all.length === 0) continue;
+    // The segment is full when the molt is offered (stages 1 and 2) or the match is won (stage 3).
+    const filled = i < 2 ? all.filter((r) => r.stages[i].moltOffered >= 0).map((r) => r.stages[i].moltOffered) : complete.map((r) => r.stages[i].time);
+    const perMatch = (f: (s: BotMatchReport['stages'][number]) => number, digits = 1): string => mean(all.map((r) => f(r.stages[i]))).toFixed(digits);
     console.log(
-      `stage ${i + 1}: reached ${all.length}, completed ${complete.length}, mean time when completed ${clock(mean(complete.map((r) => r.stages[i].time)))}` +
-        `, molt offered after ${clock(mean(complete.filter((r) => r.stages[i].moltOffered >= 0).map((r) => r.stages[i].moltOffered)))}` +
-        `; per match: staggers ${mean(all.map((r) => r.stages[i].staggers)).toFixed(1)}, volleys ${mean(all.map((r) => r.stages[i].volleys)).toFixed(1)}` +
-        `, units lost ${mean(all.map((r) => r.stages[i].unitsLost)).toFixed(1)}, kaiju hp lost ${mean(all.map((r) => r.stages[i].kaijuHpLost)).toFixed(0)}` +
-        ` (healed ${mean(all.map((r) => r.stages[i].kaijuHpHealed)).toFixed(0)}), collateral ${mean(all.map((r) => r.stages[i].collateral)).toFixed(0)} points`,
+      `stage ${i + 1}: reached ${all.length}, completed ${complete.length}` +
+        `, segment filled after ${filled.length > 0 ? clock(mean(filled)) : '-'}` +
+        `, stage time when completed ${complete.length > 0 ? clock(mean(complete.map((r) => r.stages[i].time))) : '-'}` +
+        `; per match: staggers ${perMatch((s) => s.staggers)}, volleys ${perMatch((s) => s.volleys)}, units lost ${perMatch((s) => s.unitsLost)}` +
+        `, kaiju hp lost ${perMatch((s) => s.kaijuHpLost, 0)} (healed ${perMatch((s) => s.kaijuHpHealed, 0)}), collateral ${perMatch((s) => s.collateral, 0)} points`,
     );
   }
   const ticks = reports.reduce((a, r) => a + r.ticks, 0);

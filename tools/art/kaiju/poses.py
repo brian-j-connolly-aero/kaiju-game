@@ -113,11 +113,18 @@ class Body:
         q = self.pts[name] if pts is None else pts
         return q @ r.T + p
 
-    def triangles(self, world: dict, names) -> np.ndarray:
+    def triangles(self, world: dict, names, beyond_ball: bool = False) -> np.ndarray:
+        """Triangles of some nodes in model space. beyond_ball leaves out the ball of an upper
+        arm around its shoulder: that ball only turns in place, so what it touches at rest
+        (the hatchling's jaw sits on its shoulders) it touches in every pose."""
         chunks = []
         for name in names:
             r, p = world[name]
-            chunks.append(self.tris[name] @ r.T + p)
+            t = self.tris[name]
+            if beyond_ball and name.startswith("arm_"):
+                ball = 0.62 * float(np.linalg.norm(self.offset["forearm_" + name[-1]]))
+                t = t[np.linalg.norm(t, axis=2).min(axis=1) > ball]
+            chunks.append(t @ r.T + p)
         return np.vstack(chunks)
 
     # ---- the game's first-person lens
@@ -185,7 +192,7 @@ def check(asset: str, targets: dict, quiet: bool = False) -> list[str]:
         head = body.triangles(world, ("head", "jaw"))
         rest = body.triangles(world, ("neck", "torso", "spines"))
         for arm in (RIGHT_ARM, LEFT_ARM):
-            n = _overlaps(body.triangles(world, arm), head)
+            n = _overlaps(body.triangles(world, arm, beyond_ball=True), head)
             if n:
                 problems.append(f"{asset} {name}: {arm[0][-1]} arm cuts into the head or jaw ({n} triangle pairs)")
             n = _overlaps(body.triangles(world, arm[1:]), rest)
@@ -203,7 +210,7 @@ def check(asset: str, targets: dict, quiet: bool = False) -> list[str]:
 # =========================================================================================
 # solving (a tool for the artist: run this file, look, paste, tune)
 # =========================================================================================
-def solve(body: Body, base: dict, goal: dict, seed: int = 1, starts: int = 10, both: bool = True) -> tuple[dict, float]:
+def solve(body: Body, base: dict, goal: dict, seed: int = 1, starts: int = 10, both: bool = True, init=()):
     """Find right-arm angles (arm, forearm, hand) that put the right hand where `goal` says in
     the first-person frame, clear of the head, on top of the `base` pose (torso, neck, head).
 
@@ -212,8 +219,10 @@ def solve(body: Body, base: dict, goal: dict, seed: int = 1, starts: int = 10, b
           faces, both as (right, up, forward) seen by the camera, optional;
           low=True keeps the whole arm out of the upper two thirds of the frame.
     both: the left arm mirrors the right (two-handed poses); else it hangs at rest.
-    Returns (pose, cost)."""
-    from scipy.optimize import minimize
+    starts: size of the search (a population of 9 x starts poses evolves, then is polished).
+    init: poses to seed the search with (another stage's answer, say).
+    Returns (pose, cost, what the cost is made of)."""
+    from scipy.optimize import differential_evolution, minimize
     from scipy.spatial import ConvexHull
 
     h = body.height
@@ -226,6 +235,8 @@ def solve(body: Body, base: dict, goal: dict, seed: int = 1, starts: int = 10, b
     back0 = np.cross(fingers0, np.cross((0.0, 1.0, 0.0), fingers0))
     back0 /= np.linalg.norm(back0)
     arm_pts = {n: body.pts[n][:: max(1, len(body.pts[n]) // 60)] for n in RIGHT_ARM}
+    ball = 0.62 * float(np.linalg.norm(body.offset["forearm_R"]))       # the shoulder ball only turns in place
+    arm_pts["arm_R"] = arm_pts["arm_R"][np.linalg.norm(arm_pts["arm_R"], axis=1) > ball]
     wbase = body.world(base)
     # the head as a convex lump (skull, snout, jaw, tusks; not the crown spikes that sweep back)
     hp = np.vstack([body.at(wbase, "head", body.pts["head"][body.pts["head"][:, 2] > -0.02 * h]), body.at(wbase, "jaw")])
@@ -246,6 +257,9 @@ def solve(body: Body, base: dict, goal: dict, seed: int = 1, starts: int = 10, b
     want_f = cam(goal["fingers"]) if "fingers" in goal else None
     want_b = cam(goal["back"]) if "back" in goal else None
     dlo, dhi = goal.get("depth", (0.12, 0.40))
+    ray = f + r * (goal["x"] * TAN_H) + u * (goal["y"] * TAN_V)
+    cosr = 1.0 / float(np.linalg.norm(ray))           # depth along the view axis per unit along the ray
+    ray = ray * cosr
 
     def pose_of(q):
         p = dict(base)
@@ -257,11 +271,16 @@ def solve(body: Body, base: dict, goal: dict, seed: int = 1, starts: int = 10, b
         t = {}
         hw = body.at(w, "hand_R")
         x, y, d = body.project(w, hw)
-        mx, my, md = np.median(x), np.median(y), np.median(d)
-        t["place"] = ((mx - goal["x"]) / 0.05) ** 2 + ((my - goal["y"]) / 0.05) ** 2
-        t["depth"] = (max(0.0, dlo - md) / 0.02) ** 2 + (max(0.0, md - dhi) / 0.02) ** 2
-        t["frame"] = float((np.maximum(0, np.abs(x) - 0.96) ** 2).mean() + (np.maximum(0, -0.96 - y) ** 2).mean()) * 400
-        t["third"] = float((np.maximum(0, y + 0.30) ** 2).mean()) * 200       # the hand stays in the lower third
+        # the middle of the hand should sit on the ray through the wanted spot of the frame,
+        # at a distance inside the wanted range (a 3D error: it also pulls a hand that is still
+        # behind the camera the right way, which frame coordinates cannot)
+        e = np.median(hw, axis=0) - eye
+        along = float(e @ ray)
+        t["place"] = float(((e - ray * along) ** 2).sum()) / (0.012 * h) ** 2
+        t["depth"] = (max(0.0, dlo * h - along * cosr) / (0.02 * h)) ** 2 + (max(0.0, along * cosr - dhi * h) / (0.02 * h)) ** 2
+        ok = d > 0.02
+        t["frame"] = float((np.maximum(0, np.abs(x[ok]) - 0.96) ** 2).sum() + (np.maximum(0, -0.96 - y[ok]) ** 2).sum()) / len(x) * 400
+        t["third"] = float((np.maximum(0, y[ok] + 0.30) ** 2).sum()) / len(x) * 200   # the hand stays in the lower third
         rot = w["hand_R"][0]
         if want_f is not None:
             t["fingers"] = (1 - float((rot @ fingers0) @ want_f)) / 0.06
@@ -279,7 +298,7 @@ def solve(body: Body, base: dict, goal: dict, seed: int = 1, starts: int = 10, b
                     px, py, pd = body.project(w, pw)
                     t["high"] += float((np.maximum(0, py[pd > 0] + 0.25) ** 2).sum() / len(pw)) * 100
                 if both:                                               # mirrored arms must not meet
-                    t["mid"] += float((np.maximum(0, 0.012 * h + pw[:, 0]) ** 2).mean()) / (0.001 * h) ** 2
+                    t["mid"] += float((np.maximum(0, 0.014 * h + pw[:, 0]) ** 2).mean()) / (0.0005 * h) ** 2
         # joints: the elbow neither locks out nor folds flat, the wrist does not snap
         sh, el, wr = w["arm_R"][1], w["forearm_R"][1], w["hand_R"][1]
         a, b = el - sh, wr - el
@@ -295,14 +314,21 @@ def solve(body: Body, base: dict, goal: dict, seed: int = 1, starts: int = 10, b
     lo = np.array([-150, -90, -90, -110, -70, -70, -70, -70, -70], dtype=float)
     hi = np.array([70, 90, 90, 110, 70, 70, 70, 70, 70], dtype=float)
     rng = np.random.default_rng(seed)
-    best, best_c = None, 1e18
-    for k in range(starts):
-        q0 = lo + (hi - lo) * rng.uniform(0.2, 0.8, 9)
-        res = minimize(cost, q0, method="Powell", bounds=list(zip(lo, hi)),
-                       options={"maxiter": 6000, "xtol": 1e-2, "ftol": 1e-5})
-        if res.fun < best_c:
-            best, best_c = res.x, res.fun
-    q = [float(round(v)) for v in best]
+    pop = lo + (hi - lo) * rng.uniform(0.0, 1.0, (max(starts, 12) * 9, 9))
+    first = [np.array(p["arm_R"] + p["forearm_R"] + p["hand_R"], dtype=float) for p in init if "arm_R" in p]
+    for k, q0 in enumerate(first[: len(pop)]):
+        pop[k] = np.clip(q0, lo, hi)
+    if os.environ.get("MB_POSE_DEBUG"):
+        for q0 in first:
+            info0: dict = {}
+            print("    start", [round(v) for v in q0], round(cost(q0, info0), 1), info0)
+    res = differential_evolution(cost, list(zip(lo, hi)), init=pop, maxiter=220, tol=1e-7, mutation=(0.4, 0.9),
+                                 recombination=0.8, polish=False, seed=seed)
+    if os.environ.get("MB_POSE_DEBUG"):
+        print("    evolved to", [round(v) for v in res.x], round(res.fun, 1), res.message)
+    fine = minimize(cost, res.x, method="Powell", bounds=list(zip(lo, hi)),
+                    options={"maxiter": 6000, "xtol": 1e-2, "ftol": 1e-6})
+    q = min(([float(round(v)) for v in x] for x in (res.x, fine.x)), key=cost)     # whole degrees are plenty
     info: dict = {}
     c = cost(q, info)
     return pose_of(q), c, info

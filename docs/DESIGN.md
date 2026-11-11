@@ -70,13 +70,16 @@ squares clamped to the city, drawn as a thin glowing quarantine line; nobody can
   points, whoever caused it. At 0 hp it is rubble: flat, passable, worth nothing more, and shots
   that land on it cost nothing.
 - Marks are computed per match from the value actually present, so every neighborhood is fair:
-  `P1 = 0.35 × V(stage 1 bounds)`, `P2 = max(1.6 × P1, 0.30 × V(stage 2 bounds))`,
-  `P3 = max(1.6 × P2, 0.30 × V(whole city))`.
+  `P1 = 0.13 × V(stage 1 bounds)`, `P2 = max(1.6 × P1, 0.088 × V(stage 2 bounds))`,
+  `P3 = max(1.6 × P2, 0.31 × V(whole city))`. The three fractions are the pace knob; they were
+  tuned with the balance harness (`docs/BALANCE.md`).
 - Display: a skyline with three towers. Points 0..P1 map to the first 21% of its width, P1..P2 to
   21..57%, P2..P3 to 57..100% (these are the doc's 15 / 40 / 70 marks, rescaled so the third
   tower is the end of the bar).
 - Tuning target: an unopposed kaiju fills a stage's segment in 100 to 130 s; a typical contested
-  stage lasts about 200 to 230 s; a full match about 10 to 12 minutes.
+  stage lasts about 200 to 230 s; a full match about 10 to 12 minutes. Measured with
+  `npm run sim` (bot against bot): 120 to 127 s alone, 3:00 to 3:37 contested, 10:08 on average,
+  the kaiju winning 52% of 60 matches. `docs/BALANCE.md` has the tables.
 
 ### The molt
 
@@ -92,6 +95,27 @@ squares clamped to the city, drawn as a thin glowing quarantine line; nobody can
 5. Resets: kaiju health and nerve to full at the new size; every human squad returns fresh at the
    new level; eliminated players rejoin. Carries over: city damage, upgrades, veterans, rage.
 
+**How the molt runs** (as built; `shared/src/sim/systems/matchFlow.ts`, `sim/spawn.ts`):
+
+- The clock runs through the cocoon and stops for the intermission. A kill in the cocoon, the
+  bar passing the third mark or the clock running out all end the match there and then.
+- The blast is measured from the cocoon to the near edge of each unit, in body radii of the
+  NEW size (kill 3.5, shove 7: 31.5 m and 63 m into stage 2, 91 m and 182 m into stage 3).
+  Units it kills count as the kaiju's kills and do not come back as veterans; units it shoves
+  are shaken, lose their charge and are thrown just clear of the shove radius (walls and the
+  bounds stop them). Everything in flight is gone and running fire missions are called off.
+- The kaiju stands up at once at its new size, with full health and nerve, where the cocoon
+  was (kept inside the bounds). Rage and what it has wrecked are untouched.
+- Intermission: nobody can move, act or give orders; units the blast threw slide to a stop.
+  The stage number and the bounds are still the old ones until it is over.
+- Then the new stage: every unit alive at that moment is marked a veteran (aim error ×0.7),
+  the bounds widen, and every squad returns whole at the new level. Squads deploy one per
+  sector of bearings around the kaiju, so that they come at it from every side, each at the
+  point of the new perimeter nearest to it that is at least 250 m away (at stage 1 the bounds
+  are too small for that: the four squads start near the corners, about 210 m out).
+- The starting neighborhood is drawn from the match seed (or fixed by the match config); the
+  kaiju hatches at its anchor on the nearest open ground.
+
 ## 3. One rule set: health and nerve
 
 Every combatant (kaiju, human unit) has `hp` and `nerve`. All damage goes through one function:
@@ -100,16 +124,17 @@ Every combatant (kaiju, human unit) has `hp` and `nerve`. All damage goes throug
 **Kaiju (all stages):** hp 1000, nerve capacity 100.
 
 - Damage multiplier by state: normal ×0.12, bracing (hits on the front 120° arc) ×0.04,
-  staggered or cocooned ×1.0.
+  staggered or cocooned ×0.5.
 - Facing multiplier (damage and nerve): front (within 60° of facing) ×1.0, flank ×1.35, rear
   (more than 135° off) ×1.7.
-- Nerve damage accumulates and leaks away at 9 per second, continuously. Crossfire: a hit whose
+- Nerve damage accumulates and leaks away at 7.5 per second, continuously. Crossfire: a hit whose
   direction differs by 60° or more from another unit's hit in the last 2.5 s gets ×1.75 nerve.
   Bracing: ×0.25 nerve on the front arc. Fire-at-will hits from sub-units and bots: ×0.5 nerve.
 - While nerve damage is building, speed is reduced by up to 30% (this is "scattered fire only
   slows it").
-- At 100 accumulated: **stagger** for 5 s (helpless, weak point glows, full damage), then nerve
-  clears and the kaiju cannot take nerve damage for 6 s.
+- At 100 accumulated: **stagger** for 5 s (helpless, weak point glows, the ×0.5 multiplier: four
+  times what it otherwise takes), then nerve clears and the kaiju cannot take nerve damage for
+  8 s (long enough that four squads cannot keep it stunned).
 - After any freeze or trip ends (Tier 2), 6 s immunity to both.
 
 **Human units:** hp per the tables below, nerve capacity 100, nerve leaks at 8 per second.
@@ -213,23 +238,28 @@ Arcade handling: cooldowns, no ammo.
 
 ### Army (Tier 1)
 
-Damage is normalized so a squad's full salvo is about 38 raw damage and 18 raw nerve at every level.
+Damage is normalized so a squad's full salvo is about 38 raw damage at every level, and about
+20 raw nerve (19 to 22, tuned per level). The nerve numbers obey one rule: a single squad's
+full-charge volley stays under the kaiju's nerve capacity from any side, and as a one-player
+crossfire (54 from the front, 92 from behind or crossed for infantry and tanks), so it takes
+two squads to break it.
 
 | | Level 1: rocket infantry | Level 2: tank platoon | Level 3: tank company |
 | --- | --- | --- | --- |
 | Unit | section of 10 soldiers (3 launchers) | 1 tank | troop of 3 tanks |
 | Unit hp / speed / radius | 100 / 6.5 m/s / 3 m | 100 / 15 m/s / 4 m | 300 / 15 m/s / 9 m |
 | Shot | up to 3 rockets (one per 3.4 members) | 1 shell | up to 3 shells (one per tank) |
-| Per projectile: damage / nerve | 3.2 / 1.5 | 9.5 / 4.5 | 3.2 / 1.5 |
+| Per projectile: damage / nerve | 3.2 / 1.8 | 9.5 / 5.4 | 3.2 / 1.6 |
 | Projectile speed, flight | 55 m/s, flat | 110 m/s, flat | 110 m/s, flat |
 | Range / cooldown | 160 m / 2.6 s | 420 m / 3.2 s | 600 m / 3.2 s |
-| Splash radius / structure damage | 3 m / 28 | 5 m / 120 | 5 m / 120 |
+| Splash radius / structure damage | 3 m / 3 | 5 m / 25 | 5 m / 25 |
 | Sub-unit aim error (fire at will / volley) | 3.5° / 1.2° | 2.5° / 0.9° | 2.5° / 0.9° |
 | Extra | | | Artillery call-in |
 
 **Artillery call-in (level 3):** place a ground marker (crosshair or map). After 4 s, 8 arcing
-shells land over 2 s within a 28 m scatter radius: each 14 damage, 10 nerve, 14 m splash, 300
-structure damage. 35 s cooldown, per player.
+shells land over 2 s within a 28 m scatter radius: each 9 damage, 5 nerve, 14 m splash, 300
+structure damage. 35 s cooldown, per player. A whole barrage on target is half a stagger: it
+sets up a volley, it does not replace one.
 
 ### Commands (radial wheel of four pictograms)
 
@@ -338,6 +368,34 @@ is found. The kaiju bot roams toward the densest standing value, mixes swipes an
 on cooldown when lasers are on it, braces against charged volleys, eats when hurt, and molts
 somewhere out of sight. Bots are deliberately beatable.
 
+**How the bots play** (as built; `shared/src/sim/bots/`, numbers in `shared/src/defs/bots.ts`).
+A bot writes the same input a client sends (stick, aim, buttons, wheel picks, markers), one
+tick behind what it saw, and plays any slot it is handed at any moment.
+
+- **Squad bot.** It only knows what the humans' map shows. Loop: drive to a firing position (a
+  spot on a street at its own bearing, 50 to 90% of range out, with a line of fire; squads keep
+  their bearings 70° apart so their fire crosses), stop, order hold-and-charge, keep the
+  crosshair on the kaiju (the visible height of its body; ahead of it when it moves), and fire
+  at full charge, waiting up to 2.5 s for a neighbor that is nearly charged so the volleys
+  land together. It holds its fire on the move (stray rockets are the kaiju's gain), plants
+  the squad afresh when the kaiju has walked out of the arcs, moves on when most of its guns
+  have no clear line, drives away when the kaiju comes within 30% of range, and searches (last
+  known position, then around) while a hatchling is off the map. Into a staggered or cocooned
+  kaiju it fires as fast as the guns load. At level 3 it marks artillery a little ahead of the
+  kaiju whenever the battery is ready, anywhere in the city.
+- **Kaiju bot.** It goes for whatever standing structure (or car) pays best for the time it
+  takes to reach and bring down, walks through what it tramples, swipes what it must, stomps
+  when several things stand around it, and smashes what is in its way. It fights units that
+  come close, takes revenge on the nearest squad for 10 s after a stagger, dashes at charging
+  guns within reach for a few seconds when lasers are on it (they have to pack up and run),
+  roars at guns charging inside its roar, braces when four charged lasers are on it (2.5 s at
+  most, then not again for 6 s), throws what is at hand at a squad in range, turns the beam on
+  units in reach (else on something big), eats below 70% health, and when the molt is offered
+  looks for ground where fewer guns can see it, for 16 s at most, then cocoons.
+- **Handicap.** `MatchConfig.bots` handicaps either side from 0 (its best) to 1 (stands still):
+  in between, the bot idles that share of the time. For the balance harness, tests and
+  practice options.
+
 ### Tier 2 factions
 
 Per `docs/requirements.md`: Air (drones, helicopters, jets: spotting, flanking, fragile),
@@ -394,3 +452,24 @@ voiced lines with an audience (`humans`, `kaiju`, `all`).
 `player.takeover`, `molt.available`, `cocoon.start`, `molt.blast`, `stage.2`, `stage.3`,
 `callin.inbound`, `clock.3min`, `clock.1min`, `clock.10s`, `kaiju.lowhp`, `bar.near`,
 `end.humans.kill`, `end.humans.clock`, `end.kaiju`, `hearing.humans.win`, `hearing.kaiju.win`.
+
+**How the radio is kept lively but never spammy** (as built; `shared/src/sim/systems/voice.ts`,
+rules per cue in `shared/src/defs/voice.ts`):
+
+- The simulation chooses the lines. A `voice` event carries the line ids to play for each
+  side (`lines.humans`, `lines.kaiju`): one line, or the whole sequence for the briefing, or
+  none when the script has nothing for that side. The choice is made from whatever
+  `voiceLines.json` holds, with the match's own random numbers, so every listener and every
+  replay hears the same line. A cue about a squad is spoken in that squad's voice when it has
+  lines for it, and never in another squad's; a cue does not play the line it played last time.
+- Every cue has a minimum gap (for example 8 s between two "volley away" calls) and one of three
+  priorities. Cues the match turns on (briefing, start, nerve break, molt, cocoon, blast,
+  stages, clock, landmark, endings) always go out. Important ones (contact, crossfire, the
+  special, collateral, a squad wiped out, takeover, artillery, low health, the bar nearly
+  full) always go out too and use up chatter budget. Routine chatter (volley ready and fired,
+  roar, brace, a unit lost, a building down, stagger over, contact lost) spends a budget of two
+  lines that refills at one line per 5 s: a burst when something starts, then a trickle.
+- `kaiju.lowhp` is called once per stage, when the kaiju first drops below 25% health;
+  `bar.near` once on the way to each mark, at 85% of the way from the last one.
+- In bot matches this comes to about 14 cues a minute, each side hearing one line per cue:
+  two or three in a typical ten seconds, seven or eight in the very busiest.

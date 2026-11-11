@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { boundsContains, MATCH_RULES, SIM_EVENT_TYPES, TICK_RATE, type SimEvent, type World } from '../src/index';
+import {
+  boundsContains,
+  decodeSnapshot,
+  encodeSnapshot,
+  MATCH_RULES,
+  SIM_EVENT_TYPES,
+  snapshotOfWorld,
+  TICK_RATE,
+  type SimEvent,
+  type World,
+} from '../src/index';
 import { runBotMatch, type BotMatchReport } from '../scripts/botMatch';
 
 /**
@@ -9,55 +19,66 @@ import { runBotMatch, type BotMatchReport } from '../scripts/botMatch';
  */
 const KNOWN: readonly string[] = SIM_EVENT_TYPES;
 
-function checkWorld(world: World, events: SimEvent[], peak: { events: number }): void {
+/**
+ * Looks the world over and writes down anything wrong. (Plain checks: an assertion per number
+ * per tick would take longer than the matches themselves.)
+ */
+function checkWorld(world: World, events: SimEvent[], peak: { events: number }, problems: string[]): void {
+  if (problems.length > 20) return;
+  const bad = (what: string): void => {
+    problems.push(`tick ${world.tick}: ${what}`);
+  };
   if (events.length > peak.events) peak.events = events.length;
   for (const e of events) {
-    expect(KNOWN).toContain(e.type);
-    expect(e.tick).toBe(world.tick);
+    if (!KNOWN.includes(e.type)) bad(`unknown event ${e.type}`);
+    if (e.tick !== world.tick) bad(`event ${e.type} stamped ${e.tick}`);
+  }
+  // What goes over the wire stays sendable through every phase, the molt included: events
+  // survive JSON, and the snapshot survives its codec.
+  if (events.length > 0 && JSON.stringify(JSON.parse(JSON.stringify(events))) !== JSON.stringify(events)) bad('events do not survive JSON');
+  if (world.tick % 15 === 0) {
+    const snap = decodeSnapshot(encodeSnapshot(snapshotOfWorld(world)));
+    if (snap.tick !== world.tick || snap.match.phase !== world.match.phase || snap.match.stage !== world.match.stage) bad('snapshot header');
+    if (snap.kaijus[0].stage !== world.kaijus[0].stage || snap.kaijus[0].phase !== world.kaijus[0].phase) bad('snapshot kaiju');
+    if (snap.units.length !== world.units.length) bad('snapshot units');
   }
   // The full sweep is not needed every tick; ten times a second catches anything that lasts.
   if (world.tick % 3 !== 0) return;
   const m = world.match;
   const b = m.bounds;
-  expect(Number.isFinite(m.barPoints) && Number.isFinite(m.clock) && Number.isFinite(m.phaseTime)).toBe(true);
-  expect(m.clock).toBeGreaterThanOrEqual(0);
-  expect(world.kaijus.length).toBe(1);
-  expect(world.units.length).toBe(MATCH_RULES.squadsPerKaiju * MATCH_RULES.unitsPerSquad);
+  const finite = (name: string, values: number[]): void => {
+    for (const v of values) if (!Number.isFinite(v)) bad(`${name} has a number that is not finite`);
+  };
+  finite('match', [m.barPoints, m.clock, m.phaseTime, m.elapsed]);
+  if (m.clock < 0) bad('clock below zero');
+  if (world.kaijus.length !== 1) bad(`${world.kaijus.length} kaiju`);
+  if (world.units.length !== MATCH_RULES.squadsPerKaiju * MATCH_RULES.unitsPerSquad) bad(`${world.units.length} units`);
   for (const k of world.kaijus) {
-    for (const v of [k.x, k.z, k.yaw, k.vx, k.vz, k.hp, k.nerve, k.rage, k.aimYaw, k.aimPitch, k.phaseTime]) {
-      expect(Number.isFinite(v)).toBe(true);
-    }
-    expect(k.hp).toBeLessThanOrEqual(k.maxHp);
-    expect(k.rage).toBeGreaterThanOrEqual(0);
-    expect(boundsContains(b, k.x, k.z, k.radius - 1e-6)).toBe(true);
+    finite('kaiju', [k.x, k.z, k.yaw, k.vx, k.vz, k.hp, k.nerve, k.rage, k.aimYaw, k.aimPitch, k.phaseTime]);
+    if (k.hp > k.maxHp) bad('kaiju hp above its maximum');
+    if (k.rage < 0) bad('negative rage');
+    if (!boundsContains(b, k.x, k.z, k.radius - 1e-6)) bad('kaiju outside the bounds');
+    if (k.recentHits.length > world.units.length) bad('recent hits pile up');
   }
   for (const u of world.units) {
-    for (const v of [u.x, u.z, u.yaw, u.vx, u.vz, u.hp, u.aimYaw, u.aimPitch, u.charge, u.cooldown, u.nerve]) {
-      expect(Number.isFinite(v)).toBe(true);
-    }
-    expect(boundsContains(b, u.x, u.z, u.radius - 1e-6)).toBe(true);
-    expect(u.charge).toBeGreaterThanOrEqual(0);
-    expect(u.charge).toBeLessThanOrEqual(1);
+    finite(`unit ${u.id}`, [u.x, u.z, u.yaw, u.vx, u.vz, u.hp, u.aimYaw, u.aimPitch, u.charge, u.cooldown, u.nerve]);
+    if (!boundsContains(b, u.x, u.z, u.radius - 1e-6)) bad(`unit ${u.id} outside the bounds`);
+    if (u.charge < 0 || u.charge > 1) bad(`unit ${u.id} charge ${u.charge}`);
   }
-  for (const p of world.projectiles) {
-    expect(Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z)).toBe(true);
-  }
-  for (const p of world.players) {
-    expect(Number.isFinite(p.botInput.moveX) && Number.isFinite(p.botInput.moveZ) && Number.isFinite(p.botInput.aimYaw)).toBe(true);
-  }
+  for (const p of world.projectiles) finite(`projectile ${p.id}`, [p.x, p.y, p.z, p.vx, p.vy, p.vz]);
+  for (const p of world.players) finite(`bot input ${p.id}`, [p.botInput.moveX, p.botInput.moveZ, p.botInput.aimYaw, p.botInput.aimPitch]);
   // Nothing piles up.
-  expect(world.projectiles.length).toBeLessThan(400);
-  expect(world.callIns.length).toBeLessThanOrEqual(world.squads.length);
-  expect(world.hits.length).toBe(0);
-  expect(world.structureHits.length).toBe(0);
-  expect(world.propHits.length).toBe(0);
-  for (const k of world.kaijus) expect(k.recentHits.length).toBeLessThanOrEqual(world.units.length);
-  for (const squad of world.squads) expect(squad.trail.length).toBeLessThan(200);
+  if (world.projectiles.length >= 400) bad(`${world.projectiles.length} projectiles`);
+  if (world.callIns.length > world.squads.length) bad(`${world.callIns.length} call-ins`);
+  if (world.hits.length + world.structureHits.length + world.propHits.length > 0) bad('a damage queue was not drained');
+  for (const squad of world.squads) if (squad.trail.length >= 200) bad(`squad ${squad.id} trail ${squad.trail.length}`);
 }
 
 function play(seed: number, fast: boolean): { report: BotMatchReport; peakEvents: number } {
   const peak = { events: 0 };
-  const { report, world } = runBotMatch({ seed, fast, onTick: (w, events) => checkWorld(w, events, peak) });
+  const problems: string[] = [];
+  const { report, world } = runBotMatch({ seed, fast, onTick: (w, events) => checkWorld(w, events, peak, problems) });
+  expect(problems).toEqual([]);
   const clock = world.config.tuning.clock;
 
   // It ended, the way matches end.

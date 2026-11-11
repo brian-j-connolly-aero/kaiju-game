@@ -18,7 +18,7 @@
       "file": "models/kaiju_lizard_s1.glb",
       "kind": "kaiju",
       "nodes": ["root", "hips", "leg_L", "shin_L", "foot_L", "leg_R", "shin_R", "foot_R", "tail_1", "tail_2", "tail_3", "tail_4", "tail_5", "torso", "arm_L", "forearm_L", "hand_L", "arm_R", "forearm_R", "hand_R", "hold", "neck", "head", "cam_fp", "jaw", "mouth", "spines", "weak_point"],
-      "size": [4.173, 4.5, 6.102],
+      "size": [4.256, 4.5, 6.102],
       "tris": 2253,
       "rig": "lizard"
     },

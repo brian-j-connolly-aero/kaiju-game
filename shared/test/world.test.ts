@@ -307,7 +307,8 @@ describe('input intake', () => {
     world.step([input({ seq: 5, moveZ: 1 }), null]);
     expect(world.players[KAIJU_PLAYER].input.moveZ).toBe(1);
     setPlayerBot(world, KAIJU_PLAYER, true);
-    // The (stub) bot stands still; the person's input is ignored while the bot drives.
+    // The bot (standing still here: test worlds handicap their bots fully) drives the slot; the
+    // person's input is ignored meanwhile. test/bots.test.ts does this with a bot that plays.
     run(world, 3, [input({ seq: 6, moveZ: 1 }), null]);
     expect(world.players[KAIJU_PLAYER].input.moveZ).toBe(0);
     setPlayerBot(world, KAIJU_PLAYER, false);

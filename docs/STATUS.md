@@ -6,7 +6,9 @@ the stubs you filled in, and add any decision the docs left open. Contracts live
 
 Last updated by: the game server task (everything about `server/`), simulation part 1 (the
 kaiju, damage and nerve, city destruction, projectiles) and simulation part 2 (the human side:
-squads, commands, sub-unit behavior, weapons, volleys, call-ins, lives, veterans, spotting) and
+squads, commands, sub-unit behavior, weapons, volleys, call-ins, lives, veterans, spotting),
+simulation part 3 (match flow and the molt, bots, voice lines, the balance harness and the
+tuning: `docs/BALANCE.md`) and
 the client core task (everything in `client/`, `tools/playtest/`, `tools/build-manifest.mjs`:
 section 7); the rest is from the scaffold task.
 
@@ -16,8 +18,8 @@ section 7); the rest is from the scaffold task.
 | --- | --- |
 | `npm install` | Installs the pinned toolchain and the server's dependencies (Express, the room library). |
 | `npm run check` | Type checks all three workspaces, runs `scripts/lint.mjs`, runs every test. The gate. |
-| `npm test` | `vitest run`: every test in `shared/test`, `server/test` and `client/test`, about 20 seconds (the server's integration tests take most of it). |
-| `npm run sim` | Headless all-bot match with metrics. Options after `--`: `--seed N --matches N --anchor N --fast --max-minutes N`. |
+| `npm test` | `vitest run`: every test in `shared/test`, `server/test` and `client/test`, about 40 seconds (the server's integration tests and the whole-match simulation tests take most of it). |
+| `npm run sim` | The balance harness: full bot-versus-bot matches, headless, a few hundred times real speed, one table row per match plus a summary. Options after `--`: `--seeds N` (default 5), `--seed N`, `--unopposed` (no squads), `--kaiju-handicap H`, `--human-handicap H` (0 best, 1 stands still), `--fast`, `--anchor N`, `--max-minutes N`, `--events`, `--json`. 20 matches take 25 to 50 s depending on what else the machine is doing. How to read it: `docs/BALANCE.md`. |
 | `npx vitest run server/test` | Only the server tests: 62 tests, about 15 seconds (three files start a real server on a free port and connect real clients). `MB_TEST_SPEED=1 npx vitest run server/test/lifecycle.test.ts` plays the full five-client match in real time (about 3 minutes). |
 | `npm run dev` | Starts the server (`tsx watch`, port 2567) and the client (Vite, port 5173) side by side with hot reload; open the Vite address. Vite forwards matchmaking and the WebSocket to the server, so the page talks to its own origin exactly as in production. |
 | `npm run build`, `npm start` | Bundles the server to `server/dist/index.js`, builds the client to `client/dist`; `npm start` runs the bundle, which serves the built client and the game on one port (`PORT`, default 2567). Environment variables: `ARCHITECTURE.md` section 4.4. |
@@ -93,12 +95,24 @@ Everything below is in `shared/` (`@mb/shared`) unless it says otherwise, is cov
     by class, prop destruction and wrecks, props taken by the kaiju, `barMark`, the molt prompt
     (`moltAvailable`), rage from wrecking, the `barPoints` modifier, the insurance rider,
     shields (sanctuaries), units falling with a collapsing bridge;
-  - match flow basics: briefing, clock, the three end conditions, `beginStage`, `endMatch`;
-  - spawning: kaiju at the anchor, `deploySquads` around the bounds edge, `refillSquad`;
+  - match flow, complete (`systems/matchFlow.ts`): briefing, the clock, the three end
+    conditions, and the whole molt: the blast wave when the cocoon has run its time, the kaiju's
+    new body, the intermission (longer with drafts), veterans, `beginStage` (wider bounds, fresh
+    squads at the new level on the new perimeter), `endMatch`;
+  - spawning: the starting neighborhood from the seed, the kaiju at its anchor, `deploySquads`
+    (one squad per sector around the kaiju, each at the nearest allowed point of the bounds
+    edge), `refillSquad`;
+  - the hook for people coming and going: `setPlayerBot` (a bot takes a slot over with a blank
+    mind; handing it back lets go of the controls until the person's first input);
+  - bots (`sim/bots/kaijuBot.ts`, `sim/bots/squadBot.ts`, numbers in `defs/bots.ts`): the kaiju
+    bot and the squad bot of `DESIGN.md` section 5, playing through `PlayerInput` only, with a
+    per-side handicap in `MatchConfig.bots`;
   - spotting (`sim/spotting.ts`): `kaiju.spotted` (a driven unit, a bot's included, has it in
     sight within 150 m) and `kaiju.known` (the map rule: always at stages 2 and 3; at stage 1
     line of sight within 250 m or 3 s after noise), both in the snapshot;
-  - voice cues for everything that follows from an event or the clock, with throttling;
+  - voice (`systems/voice.ts`, `defs/voice.ts`): every cue of `DESIGN.md` section 8, each with a
+    minimum gap and a priority, routine chatter on a budget, and the concrete line ids for
+    both sides chosen in the simulation from whatever `voiceLines.json` holds;
   - `resolveAimPoint` (where an aim ray lands), `computeBarMarks`, `barDisplayFraction`.
 - **`server/` (`@mb/server`):** the complete game server (`ARCHITECTURE.md` section 4). One
   process, one port: Express 5 (`/healthz`, the built client, the page fallback) and the room
@@ -122,22 +136,23 @@ Everything below is in `shared/` (`@mb/shared`) unless it says otherwise, is cov
   `@colyseus/sdk` 0.18.10. Screens, net layer with prediction, AssetStore with procedural
   fallbacks, renderer, controllers, HUD, audio, automation hooks. Module map, placeholders and
   decisions: section 7.
+- **The balance harness:** `shared/scripts/sim.ts` (`npm run sim`) and `shared/scripts/botMatch.ts`
+  (`runBotMatch`, the per-stage report, `worldHash`). The tuning history is `docs/BALANCE.md`.
+- **Whole-match tests:** `shared/test/determinism.test.ts` (two matches side by side from one
+  seed, hashed every tick; recorded inputs replayed) and `shared/test/matchSoak.test.ts` (three
+  full-length and six fast bot matches with every invariant checked), besides `molt.test.ts`,
+  `bots.test.ts` and `voice.test.ts`.
 - **Root scripts:** `scripts/dev.mjs`, `scripts/lint.mjs`. `npm run assets:manifest` now runs
   `tools/build-manifest.mjs`; `scripts/merge-manifests.mjs` is the older merge-only script,
   no longer referenced by anything and safe to delete.
 
 ## 3. What is stubbed
 
-Every simulation stub is marked `STUB(sim):` with a header that says exactly what to build and
-which fields and helpers to use. `npm run lint` prints how many markers remain (6 `STUB(sim)`
-today).
+The Tier 1 simulation has no stubs left: `npm run lint` counts no `STUB(sim)` marker. What
+remains is marked `STUB(<area>):` where it lives.
 
 | Where | What is missing | For |
 | --- | --- | --- |
-| `sim/systems/matchFlow.ts` | The END of the molt: blast wave, intermission, calling `markVeterans` and `beginStage`. The prompt and the cocoon start are real, so today a kaiju that cocoons stays in the cocoon until the match ends. | Simulation 3 |
-| `sim/systems/bots.ts`, `sim/bots/types.ts` | Bot behavior for squads and for the kaiju. Today bots stand still. `BotState` is a starting shape. | Simulation 3 |
-| `sim/systems/voice.ts` | Two cues that need other systems: `kaiju.lowhp`, `bar.near`. | Simulation 3 |
-| `shared/scripts/sim.ts` | The balance report beyond the basics. With stub bots nobody moves, so a match is a clock win for the humans unless the squads deploy within range of the kaiju (then their sub-units shoot it where it stands). | Simulation 3 |
 | `server/src/room/gameRoom.ts` | `STUB(server)`: the `draftPick` message is accepted and ignored. When the simulation has upgrade drafts, pass the pick on (and add a draft step to the intermission). | Tier 2 |
 
 Placeholders (not `STUB`-tagged; each file says so at the top):
@@ -262,17 +277,62 @@ City and bar
 Match
 
 - Slot 0 is the kaiju, slots 1 to 4 the squads. Unit id is `squad * 4 + slot`, stable all match.
-- At stage 1 the bounds are too small for the 250 m redeploy distance, so squads start in the
-  four corners, about 225 m from the kaiju. From stage 2 on the rule holds.
+- At stage 1 the bounds are too small for the 250 m redeploy distance, so squads start near
+  the four corners, about 210 m from the kaiju. From stage 2 on the rule holds.
 - `fastTuning()` (`MB_FAST`): clock 150 s, briefing 1 s, intermission 1.5 s, cocoon 2 s, bar x0.12.
 - Default callsigns are Granite, Beacon, Tempest, Anvil. The voice script has radio lines for the
   first three; the fourth falls back to Overlord's lines.
 - `match.briefing` is the one cue whose lines play in sequence (`VOICE_SEQUENCE_CUES`); every
-  other cue plays one line chosen by the `variant` number in the voice event.
+  other cue plays one line. Since simulation part 3 the lines are named in the voice event
+  itself (`lines.humans`, `lines.kaiju`); `variant` is only the number they were chosen with.
 - Two events were added to the list in `ARCHITECTURE.md`: `kaijuHit` and `matchPhase`.
 - Lobby: `setRole` carries `wantsKaiju`; `setOptions` (host) has `botKaiju` for practice; `toLobby`
   (host) leaves the end screen. A lone player who does not volunteer plays a squad against a bot
   kaiju.
+
+Match flow, bots, voice and balance (simulation part 3; the rules as built are written out in
+`DESIGN.md` sections 2, 5 and 8, the contracts in `ARCHITECTURE.md` section 3, the tuning in
+`docs/BALANCE.md`)
+
+- The kaiju takes its new body at the blast, not at the end of the intermission: clients see
+  the bigger kaiju stand up while the camera pulls back. `match.stage` and the bounds change
+  when the intermission ends (`stageChange`), because that is when the drafted upgrades (Tier 2)
+  must be in hand for the fresh squads.
+- The blast is applied through `applyHit` on the same tick as `moltBlast`, so the kills and
+  the shaken units are in that tick's events. Units it throws slide during the intermission
+  (the match flow system moves them; nothing else moves). The blast ends every projectile with
+  a `projectileHit` (target 'none') and every fire mission with `callin` 'done', so clients
+  need no special case for things left in the air.
+- With drafts on, the intermission is `tuning.intermission` scaled by 20 / 8 (20 s by default).
+- Squads no longer deploy at the points farthest from the kaiju but one per sector around it,
+  each at the nearest point of the bounds edge that is far enough away. At stage 3 the edge is
+  the city's: they used to start up to 1900 m from a titan, now 800 to 1300 m.
+- `setPlayerBot` is the whole hand-over: to a bot (blank mind, same aim), or back to a person
+  (controls let go until their first input, so a button the bot held is not held for them).
+- Bot handicaps are part of `MatchConfig` (`bots`, optional): 0 plays its best, 1 stands still
+  and never touches the random generator. `test/helpers.ts` worlds use `idleBots()` unless a
+  test asks for `bots: true`, so tests of one rule still have nothing else moving in them.
+- Squad bots hold their fire on the move and only shoot volleys (or as the guns load, into a
+  staggered or cocooned kaiju): at-will rockets at a hatchling mostly hit houses.
+- Squad bots mark artillery anywhere in the city, not only within gun range.
+- The kaiju bot has no map of the city's value: it scores every standing structure by bar
+  value over the time to reach and wreck it, which takes it to the rich blocks by itself.
+- Voice: cues about nobody in particular may be spoken by any voice in the script; a cue about
+  a squad is spoken by that squad, or by command when the squad has no line for it, never by
+  another squad. `kaiju.spotted` now names the squad whose unit saw it. `collateral.human` is an
+  important cue (it always goes out): it is the game's point being made on the radio.
+- Tuning changed design numbers (bar fractions, stagger damage, nerve leak and immunity, weapon
+  nerve and collateral, artillery); `DESIGN.md` has the new values and `docs/BALANCE.md` the
+  reasons and the before and after tables. Tests that pinned the old values now pin the new
+  ones or read them from `defs/`; `test/defs.test.ts` also pins the rule the nerve numbers must
+  keep (one squad's full volley never breaks the kaiju alone).
+- Existing tests adjusted, not weakened: the hand-over test in `kaijuActions.test.ts` now
+  follows the cocoon into the blast; the scripted block in `scenario.test.ts` keeps the mark it
+  was written for (35% of the block) and checks the tuned fraction separately; the
+  target-leading test in `squads.test.ts` reads the lead off the weapon's aim instead of one
+  randomly scattered rocket; one calibration bound in `volleyScenario.test.ts` moved from 50%
+  to 60% of nerve capacity (a lone volley is 54 now); the titan wading test tells the squads to
+  hold fire (they deploy closer now).
 
 Server
 
@@ -318,43 +378,30 @@ Server
 - **Anyone writing simulation tests:** sub-units now act. A test about something else should
   call `holdFire(world)` (every squad on hold-and-charge) or park the squads out of range, and
   use a squad's driven unit (ids 0, 4, 8, 12) for a target that must stay put: a sub-unit that
-  gets shaken backs off. Bot leaders stand still only until the bots exist.
-- **Simulation 3 (match flow, bots, balance):**
-  - Veterans: call `markVeterans(world)` when the stage is over (after the blast wave, before
-    `beginStage`). `beginStage` itself does not, because tests call it directly.
-  - Bots give squad orders the way people do: `botInput.wheel` (and `marker`), `Btn.fire`,
-    `Btn.callIn`. The loop that works: order 'follow' and drive to a firing position, stop,
-    'holdCharge' (sub-units plant where they stand, arcs on the kaiju), wait for
-    `squad.volleyReady` (or `squadCharge(world, squad)`), aim at the kaiju and press Fire; to
-    back off, 'follow' again (that un-parks them) and re-issue 'holdCharge' at the new spot.
-    A kaiju that leaves the arcs is not followed: re-issue 'holdCharge' (charge starts over).
-  - For the kaiju bot: `lasersOnKaiju(world, k)` counts the lasers on it,
-    `laserOnKaiju(world, unit, k)` tests one, `arcCovers(unit, x, z)` says whether a planted
-    unit can fire at a point. `scatterMult(stage, kaiju)` is the humans' current accuracy.
-  - A bot's own trigger shots are fire at will (half nerve, at-will error) unless they trigger
-    a volley. Sub-units of every squad fire at will by default from the moment a kaiju is in
-    range with a clear line: with stub bots, the three sub-units of one squad that happened to
-    deploy in range killed a titan that stood still in about ten minutes (anchor 0, 592 s).
-  - Balance, measured in the scripted scenarios (`test/volleyScenario.test.ts`): one squad's
-    full-charge volley is 45 nerve from the front (60.75 flank, 76.5 rear, about 77 as a
-    one-player crossfire); four squads from the front break the kaiju (180). Because nerve is
-    x(1 + 2 x charge), firing at every weapon cooldown with half charge delivers more nerve per
-    second than waiting for full charge; only the burst size (against the 9 per second leak)
-    rewards waiting. At-will fire at a hatchling beyond about 60 m mostly misses (3.5 degrees).
-  - The cocoon is over when a kaiju has `phase === 'cocoon'` and `phaseTime >= phaseDuration`
-    (the action system keeps counting; nothing else happens until the match flow system acts).
-    From there: blast wave, intermission, `beginStage`. For the blast, queue hits with
-    `kind: 'blast'`: `damage: Infinity` destroys, `nerve: COMBAT_RULES.unitNerveCapacity` shakes,
-    `shoveUnit(unit, dirX, dirZ, meters)` pushes. `beginStage` already resets the kaiju's phase.
-  - `moltAvailable` is set and announced by the city damage system; do not set it again.
-  - A kaiju bot presses the same buttons: `findGrabTarget`, `findEdible`, `beamPath` and
-    `throwAngle` are exported for it. To throw at a point it must look at it (aim yaw and
-    pitch); the beam goes along the aim from the mouth, so aim down at ground units.
-  - Balance, measured with a naive scripted kaiju that walks to the nearest building and
-    alternates swipes and stomps, unopposed, in the placeholder city: it fills 65% of the
-    stage 1 segment, 31% of stage 2 and 38% of stage 3 in 300 s, far slower than the 100 to
-    130 s target. Expect to tune structure hp and value or the bar fractions.
-  - `kaiju.lowhp` and `bar.near` are the voice cues left for this task.
+  gets shaken backs off. Bots do not get in the way: `makeTestWorld` handicaps them fully
+  (`idleBots()`: they stand still, hands off the buttons) unless the test passes `bots: true`
+  or its own `config.bots`. A world made with `createWorld` directly has real bots.
+- **Anyone tuning the game:** `docs/BALANCE.md` first. Change numbers in `shared/src/defs/`,
+  run `npm run sim -- --seeds 20` and `--unopposed`, compare summaries (not rows), and record
+  what you did there. When the handcrafted city lands, rerun all of it: start with the bar
+  fractions (`MATCH_RULES.bar`), which set the pace.
+- **Client workers (voice, intermission, bots):**
+  - Play `event.lines.humans` or `event.lines.kaiju` of a `voice` event, in order; do not pick
+    lines with `pickVoiceLine` any more (`client/src/audio/matchAudio.ts` still does: it works,
+    but it can choose a different line than the event names, and it ignores the "never another
+    squad's voice" rule).
+  - The intermission: `matchPhase` 'intermission' carries `duration` and `nextStage`; the new
+    bounds are `stageBounds(city, anchor, nextStage)`. The kaiju in snapshots is already at the
+    new stage; `match.stage` changes with `stageChange` when the intermission ends.
+  - A molt needs no clean-up of its own: the blast sends `projectileHit` for everything in
+    flight and `callin` 'done' for every marker. (`beginStage` called directly, as the sandbox
+    does, still clears both silently.)
+  - Practice options can expose `MatchConfig.bots` (handicaps) if wanted: nothing sets it today
+    outside the harness and the tests.
+- **Bot work:** behavior in `shared/src/sim/bots/`, numbers in `shared/src/defs/bots.ts`.
+  `shared/test/bots.test.ts` has a field and a street to try a behavior in; the harness says
+  what it did to the balance. A bot must stay inside `PlayerInput` (the first test of that
+  file checks every input of a whole match).
 - **Anyone changing the server:** game rules never go in `server/src/net`; that folder only
   adapts the room library. Put behavior in `server/src/room` and test it in
   `server/test/gameRoom.test.ts` with `makeRoom()` and `FakePeer` (no network, no real time).
@@ -420,10 +467,27 @@ Server
   tiny and smoothed), but the city generator must never branch on such a value.
 - The snapshot holds at most 255 units and uses one byte for unit ids: fine for Tier 1 (16) and
   for the 8-squad future (32).
-- Balance numbers added here (action move multipliers, wade damage, rage per bar segment, prop
-  values, archetype hp and value) are untested starting values.
-- Until the match flow system ends the cocoon a kaiju that molts sits in its cocoon for the
-  rest of the match (covered by tests only through inputs injected by hand).
+- The balance is tuned for bot against bot in the placeholder grid city (`docs/BALANCE.md`):
+  kaiju wins 52% of 60 matches, stages of about 3:00 to 3:35, matches of about 10 minutes.
+  It is sensitive: a bot that hesitates 30% of the time loses 10 of 10 on either side, and one
+  batch of 20 seeds ranged from 35% to 60%. The handcrafted city and real players will both
+  move it. Numbers nobody has tuned yet: action move multipliers, wade damage, rage per bar
+  segment, prop values, archetype hp and value.
+- Stage 1 runs a little short of the 200 to 230 s target (about 3:05) and is the stage where
+  squads matter least (1.5 staggers on average); stage 3 is where kaiju die (14 of 17 kills).
+- A bot kaiju at stage 3 is staggered about 7 times a stage. With a person in that seat it may
+  feel like too much time spent stunned; `staggerNerveImmunity` and the troop gun's nerve are
+  the numbers to look at.
+- The bots have only played the placeholder city. The squad bot finds firing positions on road
+  nodes and street midpoints and the kaiju bot steers by feel (it smashes or walks round what
+  is in its way); both have stuck handling, neither has been tried in a city with dead ends,
+  curved streets or a harbor.
+- The kaiju grows where its cocoon was. In a street narrower than its new body it is pushed
+  clear by collision on the first ticks of the next stage and tramples whatever low
+  structures it overlaps (a few free points; tall ones push it out).
+- `client/src/audio/matchAudio.ts` still picks voice lines itself from `variant` instead of
+  playing `event.lines`: both sides hear a valid line, but not necessarily the one the
+  simulation named.
 - Sub-unit navigation was tuned and stress-tested against the placeholder grid city (3600
   random move-to trips across the three stages all arrived, nobody ever inside a wall). The
   handcrafted city will have other shapes: it needs a road graph whose edges are drivable for

@@ -42,7 +42,7 @@ import mb_preview  # noqa: E402
 OLIVE = "army_olive"
 OLIVE_DK = "army_olive_dk"
 KHAKI = "army_khaki"
-STEEL = "army_track"          # tracks, gun barrel, exhausts
+STEEL = "army_track"          # tracks, muzzle brake, exhausts
 CYAN = "human_cyan"
 
 # Joints of the tank, in model space (authoring frame). The game rotates `turret` around the
@@ -106,10 +106,10 @@ def side_plate(w: float, h: float, at, outward: float, color) -> mb.Geo:
     return mb.polygon(pts if outward > 0 else pts[::-1], color=color)
 
 
-def wheel(radius: float, outward: float = 1.0, hub: bool = False, n: int = 8) -> mb.Geo:
+def wheel(radius: float, outward: float = 1.0, hub: bool = False, n: int = 8, color=OLIVE) -> mb.Geo:
     """A dished disc (a shallow n-sided cone) facing the model's left, or its right, all
     turned the same way; road wheels get a dark hub cap. Its back is open, except on the wreck."""
-    g = mb.cone(n, radius, 0.10, color=OLIVE, cap_bottom=KEEP_HIDDEN).ry(90 * outward)
+    g = mb.cone(n, radius, 0.10, color=color, cap_bottom=KEEP_HIDDEN).ry(90 * outward)
     g.bake_light(top=1.10, bottom=0.62).jitter(0.02, seed=4)
     if hub:
         r, x = radius * 0.30, outward * 0.105
@@ -128,7 +128,7 @@ def track_left(hubs: bool = True) -> mb.Geo:
     for y in ROAD_WHEELS:
         g += wheel(0.43, hub=hubs).move(1.82, y, 0.44)
     for y, z in ((-2.62, 0.70), (2.58, 0.72)):
-        g += wheel(0.30, n=6).paint(OLIVE_DK).move(1.82, y, z)
+        g += wheel(0.30, n=6, color=OLIVE_DK).move(1.82, y, z)
     return g
 
 
@@ -185,8 +185,9 @@ def turret_geo(wreck: bool = False) -> mb.Geo:
     # The floor is hidden by the deck, except under the bustle: at some yaws its rear corners
     # hang over the hull sides, so the last two bands keep theirs.
     g = drop(mb.loft(rings, color=OLIVE), lambda c, n: n.z < -0.5 and c.y < 1.05)
-    stripe = g.select(lambda c, n: 1.05 < c.y < 1.40 and abs(n.x) > 0.5)   # on the turret sides only: the roof
-    # stowage box on the bustle                                              belongs to the disc
+    # identification stripe, on the turret sides only: the roof belongs to the disc
+    stripe = g.select(lambda c, n: 1.05 < c.y < 1.40 and abs(n.x) > 0.5)
+    # stowage box on the bustle
     g += drop(mb.box((1.6, 0.34, 0.40), at=(0, 1.96, 2.32), color=KHAKI), "front")
     # smoke dischargers on the turret cheeks (closed underneath: they hang clear of the turret)
     for sx in (1, -1):
@@ -259,7 +260,8 @@ BELOW = mb.View("FROM BELOW", azimuth=35, elevation=-40, ortho=True)
                    dict(name="night", backdrop="night", azimuth=-150, elevation=24,
                         pose={"turret": {"y": -24}, "barrel": {"x": -10}})])
 def army_tank():
-    """Main battle tank, about 7.9 m long with the gun, 3.9 m wide, 2.8 m to the cupola."""
+    """Main battle tank, 8.0 m long with the gun, 3.9 m wide, 2.9 m to the turret roof and 3.3 m
+    to the top of the cupola. The gun is 2.30 m up: the simulation's muzzleHeight."""
     p = tank_geos()
     hull = mb.node("hull", p["hull"])
     mb.node("track_L", p["track_L"], pivot=(1.46, 0, 0.54), parent=hull)

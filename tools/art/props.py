@@ -25,6 +25,16 @@ the alpha of the vertex color (COLOR_0): alpha 1 = body paint (tint it), alpha 0
 tires, lights, trim (never tint). Their manifest entries carry a "tint" object naming the
 part, the mask and the suggested colors. Every other model has alpha 1 everywhere and no
 "tint" entry. tinted() below is the reference implementation (it is what the scene shots use).
+
+GRABBABLE THINGS HAVE NO HIDDEN SIDE. The kaiju picks the five vehicles up, holds them tilted
+in its hand and throws them spinning, and the game draws a face from its front only. So every
+vehicle and the wreck is closed underneath (dark trim, never tinted), and their contact sheets
+carry a FROM BELOW cell: any magenta there is a hole a player will look through. Street
+furniture stands on the ground and may stay open underneath, but nothing above a soldier's eye
+(1.7 m) may be open from below: eaves, lantern caps, finials.
+
+ONE WRECK FOR FIVE VEHICLES. prop_car_wreck's manifest entry carries tint.wreckScale, the
+[width, height, length] factors that stretch it to each vehicle kind (WRECK_SCALE below).
 """
 import hashlib
 import math
@@ -213,9 +223,9 @@ def sedan_parts(paint=PAINT, taxi: bool = False):
     for y in (-2.15, 2.15):                                                   # chunky bumpers
         fixed += drop(mb.box((w, 0.16, 0.22), at=(0, y, 0.43), color=TRIM), lambda c, n, y=y: n.y * y < -0.5)
     for x in (-0.6, 0.6):
-        fixed += lamp(0.40, 0.18, (x, -2.1 - DECAL, 0.62), "front", HEADLIGHT)
-        fixed += lamp(0.38, 0.16, (x, 2.1 + DECAL, 0.70), "back", TAILLIGHT)
-    fixed += plate(0.64, 0.14, (0, -2.1 - DECAL, 0.62), "front", TRIM)          # grille
+        fixed += lamp(0.40, 0.16, (x, -2.1 - DECAL, 0.61), "front", HEADLIGHT)
+        fixed += lamp(0.38, 0.16, (x, 2.1 + DECAL, 0.61), "back", TAILLIGHT)
+    fixed += plate(0.64, 0.14, (0, -2.1 - DECAL, 0.61), "front", TRIM)          # grille
     fixed += axles((-1.32, 1.30), 0.39, 0.94, n=6)
     if taxi:
         # the lit roof sign: safe to glow today, because the taxi is never tinted
@@ -478,19 +488,20 @@ def tree_b_geo() -> mb.Geo:
 
 
 def lamp_geo() -> mb.Geo:
-    """Street lamp, 6 m: two framed lanterns hanging from a crossbar. Chunky, so it is more than
-    a hairline at 60 m, and each cream lantern sits between a dark cap and a dark base so it
-    still reads against a bright afternoon cloud. Symmetric, so its heading does not matter."""
+    """Street lamp, 6 m: two framed lanterns hung close against the post from a short crossbar.
+    Chunky, so it is more than a hairline at 60 m, and each cream lantern sits between a dark
+    cap and a dark base so it still reads against a bright afternoon cloud. It stays within
+    0.6 m of its axis (the game treats it as a 0.4 m post). Symmetric: any heading works."""
     post = "#2f4f4a"
     g = mb.prism(6, 0.30, 0.60, radius_top=0.18, color=post, cap_bottom=False)
     g += mb.prism(5, 0.16, 5.00, radius_top=0.11, at=(0, 0, 0.60), color=post, cap_bottom=False, cap_top=False)
-    g += mb.box((1.24, 0.14, 0.14), at=(0, 0, 5.45), color=post)                       # crossbar
+    g += mb.box((1.00, 0.14, 0.14), at=(0, 0, 5.47), color=post)                       # crossbar
     g += mb.cone(4, 0.17, 0.38, at=(0, 0, 5.58), color=post)                           # finial, closed: seen from below
-    for x in (-0.52, 0.52):
-        g += mb.pyramid((0.64, 0.64), 0.20, at=(x, 0, 5.27), color=post)               # lantern cap, closed
+    for x in (-0.325, 0.325):
+        g += mb.pyramid((0.54, 0.54), 0.20, at=(x, 0, 5.27), color=post)               # lantern cap, closed
     lit(g, seed=8, amount=0.05)
-    for x in (-0.52, 0.52):
-        lantern = drop(mb.tapered_box((0.30, 0.30), (0.50, 0.50), 0.45, at=(x, 0, 4.82), color="glow_lamp", mat="glow"),
+    for x in (-0.325, 0.325):
+        lantern = drop(mb.tapered_box((0.26, 0.26), (0.44, 0.44), 0.45, at=(x, 0, 4.82), color="glow_lamp", mat="glow"),
                        "top")
         lantern.paint(mb.shade(post, 0.8), where="bottom").material("vcol", where="bottom")
         g += lantern
@@ -589,8 +600,8 @@ def busstop_geo() -> mb.Geo:
     end.paint("bld_salmon", where="left").paint("bld_mustard", where="right")
     g += end
     g += mb.beam((1.96, -0.60, 0), (1.96, -0.60, 2.44), (0.08, 0.08), color=frame, cap_start=False, cap_end=False)
-    g += drop(mb.box((2.7, 0.40, 0.08), at=(0.25, 0.40, 0.50), color="wood"),
-              lambda c, n: n.z < -0.5 or n.y > 0.5)                                    # bench (its back touches the glass)
+    g += drop(mb.box((2.7, 0.40, 0.08), at=(0.25, 0.40, 0.53), color="wood"),
+              lambda c, n: n.z < -0.5 or n.y > 0.5)                                    # bench (its back is against the glass)
     # the frame that makes the pale slab read as glazing: a mullion on both faces, a sill behind
     g += plate(0.10, 1.95, (0, 0.63 - 0.012, 1.455), "front", frame)
     g += plate(0.10, 1.95, (0, 0.69 + 0.012, 1.455), "back", frame)
@@ -789,7 +800,7 @@ SCENE_OPTS = {
                    view=mb.View("", eye=(7.0, -56.0, 14.5), target=(0.0, 9.0, 4.2), fov=46)),
     "tints": dict(backdrop="studio", size=(1400, 900), samples=14, azimuth=22, elevation=34, fov=30),
     "wrecks": dict(backdrop="sky", size=(1400, 800), samples=14, sun_azimuth=-50, sun_elevation=46,
-                   view=mb.View("", eye=(8.0, -31.0, 23.0), target=(0.0, 9.6, 0.5), fov=44)),
+                   view=mb.View("", eye=(6.0, -31.0, 23.0), target=(-1.3, 9.6, 0.5), fov=46)),
 }
 
 

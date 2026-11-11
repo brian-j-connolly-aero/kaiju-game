@@ -71,7 +71,7 @@
       "file": "models/prop_lamp.glb",
       "kind": "prop",
       "nodes": ["prop_lamp"],
-      "size": [1.68, 5.96, 0.64],
+      "size": [1.19, 5.96, 0.54],
       "tris": 76
     },
     "prop_trafficlight": {

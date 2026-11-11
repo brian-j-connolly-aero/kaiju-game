@@ -169,8 +169,9 @@ export function runBotMatch(o: BotMatchOptions): { report: BotMatchReport; world
           break;
         case 'voice':
           voiceCues++;
-          voiceTimes.push(m.elapsed);
-          while (voiceTimes.length > 0 && voiceTimes[0] < m.elapsed - 10) voiceTimes.shift();
+          // Wall time of the match, intermissions included (the clock stands still in those).
+          voiceTimes.push(world.tick / TICK_RATE);
+          while (voiceTimes.length > 0 && voiceTimes[0] < world.tick / TICK_RATE - 10) voiceTimes.shift();
           if (voiceTimes.length > voicePeak) voicePeak = voiceTimes.length;
           break;
         default:

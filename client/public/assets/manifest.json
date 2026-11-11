@@ -12,11 +12,11 @@
         "muzzle"
       ],
       "size": [
-        3.92,
-        3.301,
+        3.9,
+        3.29,
         8.03
       ],
-      "tris": 497
+      "tris": 498
     },
     "army_tank_wreck": {
       "file": "models/army_tank_wreck.glb",
@@ -25,11 +25,11 @@
         "army_tank_wreck"
       ],
       "size": [
-        6.185,
-        2.768,
-        6.726
+        6.043,
+        3.156,
+        6.798
       ],
-      "tris": 480
+      "tris": 460
     },
     "kaiju_cocoon": {
       "file": "models/kaiju_cocoon.glb",
@@ -43,7 +43,7 @@
         1,
         0.949
       ],
-      "tris": 447
+      "tris": 452
     },
     "kaiju_egg": {
       "file": "models/kaiju_egg.glb",
@@ -55,9 +55,9 @@
       "size": [
         0.758,
         1,
-        0.775
+        0.748
       ],
-      "tris": 180
+      "tris": 216
     },
     "kaiju_lizard_s1": {
       "file": "models/kaiju_lizard_s1.glb",
@@ -94,11 +94,11 @@
       ],
       "rig": "lizard",
       "size": [
-        4.173,
+        4.256,
         4.5,
         6.102
       ],
-      "tris": 2167
+      "tris": 2253
     },
     "kaiju_lizard_s2": {
       "file": "models/kaiju_lizard_s2.glb",
@@ -135,11 +135,11 @@
       ],
       "rig": "lizard",
       "size": [
-        25.591,
+        23.289,
         32,
         39.515
       ],
-      "tris": 2339
+      "tris": 2413
     },
     "kaiju_lizard_s3": {
       "file": "models/kaiju_lizard_s3.glb",
@@ -176,11 +176,11 @@
       ],
       "rig": "lizard",
       "size": [
-        108.416,
+        95.583,
         115,
-        144.827
+        145.71
       ],
-      "tris": 3379
+      "tris": 3485
     },
     "proj_arty": {
       "file": "models/proj_arty.glb",
@@ -202,8 +202,8 @@
         "proj_rocket"
       ],
       "size": [
-        0.255,
-        0.255,
+        0.24,
+        0.24,
         1.22
       ],
       "tris": 74
@@ -219,7 +219,7 @@
         0.173,
         0.9
       ],
-      "tris": 46
+      "tris": 58
     },
     "prop_bench": {
       "file": "models/prop_bench.glb",
@@ -242,10 +242,10 @@
       ],
       "size": [
         6.6,
-        8.95,
-        0.645
+        8.967,
+        0.805
       ],
-      "tris": 52
+      "tris": 76
     },
     "prop_bus": {
       "file": "models/prop_bus.glb",
@@ -269,7 +269,7 @@
         "mask": "COLOR_0 alpha: 1 = paint (multiply the tint color in), 0 = never tint",
         "part": "body paint"
       },
-      "tris": 146
+      "tris": 148
     },
     "prop_busstop": {
       "file": "models/prop_busstop.glb",
@@ -282,7 +282,7 @@
         3.128,
         1.5
       ],
-      "tris": 78
+      "tris": 80
     },
     "prop_car_sedan": {
       "file": "models/prop_car_sedan.glb",
@@ -310,7 +310,7 @@
         "mask": "COLOR_0 alpha: 1 = paint (multiply the tint color in), 0 = never tint",
         "part": "body paint"
       },
-      "tris": 128
+      "tris": 118
     },
     "prop_car_taxi": {
       "file": "models/prop_car_taxi.glb",
@@ -323,7 +323,7 @@
         1.67,
         4.46
       ],
-      "tris": 150
+      "tris": 140
     },
     "prop_car_van": {
       "file": "models/prop_car_van.glb",
@@ -348,7 +348,7 @@
         "mask": "COLOR_0 alpha: 1 = paint (multiply the tint color in), 0 = never tint",
         "part": "body paint"
       },
-      "tris": 150
+      "tris": 140
     },
     "prop_car_wreck": {
       "file": "models/prop_car_wreck.glb",
@@ -359,7 +359,7 @@
       "size": [
         2.429,
         0.892,
-        4.964
+        4.98
       ],
       "tint": {
         "blend": "multiply",
@@ -378,11 +378,38 @@
           "#f5f5f0",
           "#f7c21a"
         ],
-        "hint": "use the paint color of the vehicle that was crushed (taxi: #f7c21a)",
+        "hint": "use the paint color of the vehicle that was crushed (taxi: #f7c21a); wreckScale stretches this one wreck to the vehicle it was: [width, height, length] per prop kind, the instance's x, y, z scale",
         "mask": "COLOR_0 alpha: 1 = paint (multiply the tint color in), 0 = never tint",
-        "part": "body paint"
+        "part": "body paint",
+        "wreckScale": {
+          "bus": [
+            1.2,
+            1.8,
+            2.4
+          ],
+          "car_sedan": [
+            1,
+            1,
+            1
+          ],
+          "car_taxi": [
+            1,
+            1,
+            1
+          ],
+          "car_van": [
+            1.1,
+            1.3,
+            1.1
+          ],
+          "truck": [
+            1.2,
+            1.7,
+            1.75
+          ]
+        }
       },
-      "tris": 94
+      "tris": 148
     },
     "prop_hydrant": {
       "file": "models/prop_hydrant.glb",
@@ -405,10 +432,10 @@
       ],
       "size": [
         2.8,
-        3.09,
+        3.53,
         3.02
       ],
-      "tris": 80
+      "tris": 77
     },
     "prop_lamp": {
       "file": "models/prop_lamp.glb",
@@ -417,11 +444,11 @@
         "prop_lamp"
       ],
       "size": [
-        1.16,
-        6,
-        0.381
+        1.19,
+        5.96,
+        0.54
       ],
-      "tris": 66
+      "tris": 76
     },
     "prop_trafficlight": {
       "file": "models/prop_trafficlight.glb",
@@ -485,7 +512,7 @@
         "mask": "COLOR_0 alpha: 1 = paint (multiply the tint color in), 0 = never tint",
         "part": "body paint"
       },
-      "tris": 146
+      "tris": 150
     }
   },
   "sprites": {
@@ -1606,11 +1633,11 @@
   "voice": {
     "v_bar_near_1": {
       "base": "audio/voice/v_bar_near_1",
-      "duration": 3.467
+      "duration": 3.497
     },
     "v_bar_near_2": {
       "base": "audio/voice/v_bar_near_2",
-      "duration": 3.885
+      "duration": 3.636
     },
     "v_bar_near_3": {
       "base": "audio/voice/v_bar_near_3",
@@ -1622,19 +1649,19 @@
     },
     "v_building_down_1": {
       "base": "audio/voice/v_building_down_1",
-      "duration": 3.422
+      "duration": 3.458
     },
     "v_building_down_2": {
       "base": "audio/voice/v_building_down_2",
-      "duration": 3.38
+      "duration": 3.118
     },
     "v_building_down_3": {
       "base": "audio/voice/v_building_down_3",
-      "duration": 3.59
+      "duration": 3.348
     },
     "v_building_down_4": {
       "base": "audio/voice/v_building_down_4",
-      "duration": 3.148
+      "duration": 3.16
     },
     "v_building_down_5": {
       "base": "audio/voice/v_building_down_5",
@@ -1654,11 +1681,11 @@
     },
     "v_callin_inbound_1": {
       "base": "audio/voice/v_callin_inbound_1",
-      "duration": 3.046
+      "duration": 3.067
     },
     "v_callin_inbound_2": {
       "base": "audio/voice/v_callin_inbound_2",
-      "duration": 2.86
+      "duration": 2.659
     },
     "v_callin_inbound_3": {
       "base": "audio/voice/v_callin_inbound_3",
@@ -1670,11 +1697,11 @@
     },
     "v_clock_10s_1": {
       "base": "audio/voice/v_clock_10s_1",
-      "duration": 2.203
+      "duration": 2.227
     },
     "v_clock_10s_2": {
       "base": "audio/voice/v_clock_10s_2",
-      "duration": 2.372
+      "duration": 2.209
     },
     "v_clock_10s_3": {
       "base": "audio/voice/v_clock_10s_3",
@@ -1686,11 +1713,11 @@
     },
     "v_clock_1min_1": {
       "base": "audio/voice/v_clock_1min_1",
-      "duration": 3.815
+      "duration": 3.85
     },
     "v_clock_1min_2": {
       "base": "audio/voice/v_clock_1min_2",
-      "duration": 3.253
+      "duration": 3.265
     },
     "v_clock_1min_3": {
       "base": "audio/voice/v_clock_1min_3",
@@ -1702,11 +1729,11 @@
     },
     "v_clock_3min_1": {
       "base": "audio/voice/v_clock_3min_1",
-      "duration": 4.204
+      "duration": 4.144
     },
     "v_clock_3min_2": {
       "base": "audio/voice/v_clock_3min_2",
-      "duration": 3.585
+      "duration": 3.361
     },
     "v_clock_3min_3": {
       "base": "audio/voice/v_clock_3min_3",
@@ -1718,11 +1745,11 @@
     },
     "v_cocoon_start_1": {
       "base": "audio/voice/v_cocoon_start_1",
-      "duration": 3.489
+      "duration": 3.52
     },
     "v_cocoon_start_2": {
       "base": "audio/voice/v_cocoon_start_2",
-      "duration": 3.401
+      "duration": 3.148
     },
     "v_cocoon_start_3": {
       "base": "audio/voice/v_cocoon_start_3",
@@ -1734,23 +1761,23 @@
     },
     "v_collateral_human_1": {
       "base": "audio/voice/v_collateral_human_1",
-      "duration": 3.818
+      "duration": 3.841
     },
     "v_collateral_human_2": {
       "base": "audio/voice/v_collateral_human_2",
-      "duration": 3.764
+      "duration": 3.867
     },
     "v_collateral_human_3": {
       "base": "audio/voice/v_collateral_human_3",
-      "duration": 2.913
+      "duration": 2.699
     },
     "v_collateral_human_4": {
       "base": "audio/voice/v_collateral_human_4",
-      "duration": 4.576
+      "duration": 4.263
     },
     "v_collateral_human_5": {
       "base": "audio/voice/v_collateral_human_5",
-      "duration": 3.673
+      "duration": 3.685
     },
     "v_collateral_human_6": {
       "base": "audio/voice/v_collateral_human_6",
@@ -1770,19 +1797,19 @@
     },
     "v_crossfire_1": {
       "base": "audio/voice/v_crossfire_1",
-      "duration": 4
+      "duration": 4.032
     },
     "v_crossfire_2": {
       "base": "audio/voice/v_crossfire_2",
-      "duration": 2.837
+      "duration": 2.641
     },
     "v_crossfire_3": {
       "base": "audio/voice/v_crossfire_3",
-      "duration": 4.55
+      "duration": 4.232
     },
     "v_crossfire_4": {
       "base": "audio/voice/v_crossfire_4",
-      "duration": 2.938
+      "duration": 2.95
     },
     "v_crossfire_5": {
       "base": "audio/voice/v_crossfire_5",
@@ -1802,11 +1829,11 @@
     },
     "v_end_humans_clock_1": {
       "base": "audio/voice/v_end_humans_clock_1",
-      "duration": 4.504
+      "duration": 4.55
     },
     "v_end_humans_clock_2": {
       "base": "audio/voice/v_end_humans_clock_2",
-      "duration": 3.141
+      "duration": 2.941
     },
     "v_end_humans_clock_3": {
       "base": "audio/voice/v_end_humans_clock_3",
@@ -1818,11 +1845,11 @@
     },
     "v_end_humans_kill_1": {
       "base": "audio/voice/v_end_humans_kill_1",
-      "duration": 4.183
+      "duration": 4.213
     },
     "v_end_humans_kill_2": {
       "base": "audio/voice/v_end_humans_kill_2",
-      "duration": 2.143
+      "duration": 1.994
     },
     "v_end_humans_kill_3": {
       "base": "audio/voice/v_end_humans_kill_3",
@@ -1834,11 +1861,11 @@
     },
     "v_end_kaiju_1": {
       "base": "audio/voice/v_end_kaiju_1",
-      "duration": 4.768
+      "duration": 4.722
     },
     "v_end_kaiju_2": {
       "base": "audio/voice/v_end_kaiju_2",
-      "duration": 2.743
+      "duration": 2.755
     },
     "v_end_kaiju_3": {
       "base": "audio/voice/v_end_kaiju_3",
@@ -1874,11 +1901,11 @@
     },
     "v_kaiju_brace_1": {
       "base": "audio/voice/v_kaiju_brace_1",
-      "duration": 3.818
+      "duration": 3.857
     },
     "v_kaiju_brace_2": {
       "base": "audio/voice/v_kaiju_brace_2",
-      "duration": 3.453
+      "duration": 3.465
     },
     "v_kaiju_brace_3": {
       "base": "audio/voice/v_kaiju_brace_3",
@@ -1890,11 +1917,11 @@
     },
     "v_kaiju_lost_1": {
       "base": "audio/voice/v_kaiju_lost_1",
-      "duration": 4.466
+      "duration": 4.509
     },
     "v_kaiju_lost_2": {
       "base": "audio/voice/v_kaiju_lost_2",
-      "duration": 3.398
+      "duration": 3.145
     },
     "v_kaiju_lost_3": {
       "base": "audio/voice/v_kaiju_lost_3",
@@ -1906,11 +1933,11 @@
     },
     "v_kaiju_lowhp_1": {
       "base": "audio/voice/v_kaiju_lowhp_1",
-      "duration": 3.188
+      "duration": 3.215
     },
     "v_kaiju_lowhp_2": {
       "base": "audio/voice/v_kaiju_lowhp_2",
-      "duration": 2.523
+      "duration": 2.535
     },
     "v_kaiju_lowhp_3": {
       "base": "audio/voice/v_kaiju_lowhp_3",
@@ -1922,19 +1949,19 @@
     },
     "v_kaiju_roar_1": {
       "base": "audio/voice/v_kaiju_roar_1",
-      "duration": 3.907
+      "duration": 3.932
     },
     "v_kaiju_roar_2": {
       "base": "audio/voice/v_kaiju_roar_2",
-      "duration": 3.247
+      "duration": 3.007
     },
     "v_kaiju_roar_3": {
       "base": "audio/voice/v_kaiju_roar_3",
-      "duration": 4.028
+      "duration": 3.762
     },
     "v_kaiju_roar_4": {
       "base": "audio/voice/v_kaiju_roar_4",
-      "duration": 2.533
+      "duration": 2.545
     },
     "v_kaiju_roar_5": {
       "base": "audio/voice/v_kaiju_roar_5",
@@ -1954,11 +1981,11 @@
     },
     "v_kaiju_special_1": {
       "base": "audio/voice/v_kaiju_special_1",
-      "duration": 4.414
+      "duration": 4.443
     },
     "v_kaiju_special_2": {
       "base": "audio/voice/v_kaiju_special_2",
-      "duration": 1.561
+      "duration": 1.46
     },
     "v_kaiju_special_3": {
       "base": "audio/voice/v_kaiju_special_3",
@@ -1970,23 +1997,23 @@
     },
     "v_kaiju_spotted_1": {
       "base": "audio/voice/v_kaiju_spotted_1",
-      "duration": 2.859
+      "duration": 2.782
     },
     "v_kaiju_spotted_2": {
       "base": "audio/voice/v_kaiju_spotted_2",
-      "duration": 4.589
+      "duration": 4.63
     },
     "v_kaiju_spotted_3": {
       "base": "audio/voice/v_kaiju_spotted_3",
-      "duration": 2.966
+      "duration": 2.745
     },
     "v_kaiju_spotted_4": {
       "base": "audio/voice/v_kaiju_spotted_4",
-      "duration": 5.12
+      "duration": 4.754
     },
     "v_kaiju_spotted_5": {
       "base": "audio/voice/v_kaiju_spotted_5",
-      "duration": 3.663
+      "duration": 3.675
     },
     "v_kaiju_spotted_6": {
       "base": "audio/voice/v_kaiju_spotted_6",
@@ -2006,15 +2033,15 @@
     },
     "v_landmark_down_1": {
       "base": "audio/voice/v_landmark_down_1",
-      "duration": 4
+      "duration": 4.051
     },
     "v_landmark_down_2": {
       "base": "audio/voice/v_landmark_down_2",
-      "duration": 3.888
+      "duration": 3.618
     },
     "v_landmark_down_3": {
       "base": "audio/voice/v_landmark_down_3",
-      "duration": 3.053
+      "duration": 3.065
     },
     "v_landmark_down_4": {
       "base": "audio/voice/v_landmark_down_4",
@@ -2030,15 +2057,15 @@
     },
     "v_match_briefing_1": {
       "base": "audio/voice/v_match_briefing_1",
-      "duration": 3.654
+      "duration": 3.681
     },
     "v_match_briefing_2": {
       "base": "audio/voice/v_match_briefing_2",
-      "duration": 2.898
+      "duration": 2.924
     },
     "v_match_briefing_3": {
       "base": "audio/voice/v_match_briefing_3",
-      "duration": 3.926
+      "duration": 3.964
     },
     "v_match_briefing_4": {
       "base": "audio/voice/v_match_briefing_4",
@@ -2054,11 +2081,11 @@
     },
     "v_match_start_1": {
       "base": "audio/voice/v_match_start_1",
-      "duration": 3.755
+      "duration": 3.804
     },
     "v_match_start_2": {
       "base": "audio/voice/v_match_start_2",
-      "duration": 3.322
+      "duration": 3.363
     },
     "v_match_start_3": {
       "base": "audio/voice/v_match_start_3",
@@ -2070,11 +2097,11 @@
     },
     "v_molt_available_1": {
       "base": "audio/voice/v_molt_available_1",
-      "duration": 3.494
+      "duration": 3.64
     },
     "v_molt_available_2": {
       "base": "audio/voice/v_molt_available_2",
-      "duration": 3.298
+      "duration": 3.31
     },
     "v_molt_available_3": {
       "base": "audio/voice/v_molt_available_3",
@@ -2086,11 +2113,11 @@
     },
     "v_molt_blast_1": {
       "base": "audio/voice/v_molt_blast_1",
-      "duration": 4.125
+      "duration": 4.079
     },
     "v_molt_blast_2": {
       "base": "audio/voice/v_molt_blast_2",
-      "duration": 4.34
+      "duration": 4.05
     },
     "v_molt_blast_3": {
       "base": "audio/voice/v_molt_blast_3",
@@ -2102,19 +2129,19 @@
     },
     "v_nerve_break_1": {
       "base": "audio/voice/v_nerve_break_1",
-      "duration": 5.036
+      "duration": 5.07
     },
     "v_nerve_break_2": {
       "base": "audio/voice/v_nerve_break_2",
-      "duration": 2.511
+      "duration": 2.33
     },
     "v_nerve_break_3": {
       "base": "audio/voice/v_nerve_break_3",
-      "duration": 4.863
+      "duration": 4.499
     },
     "v_nerve_break_4": {
       "base": "audio/voice/v_nerve_break_4",
-      "duration": 3.808
+      "duration": 3.82
     },
     "v_nerve_break_5": {
       "base": "audio/voice/v_nerve_break_5",
@@ -2134,23 +2161,23 @@
     },
     "v_player_takeover_1": {
       "base": "audio/voice/v_player_takeover_1",
-      "duration": 4.139
+      "duration": 4.182
     },
     "v_player_takeover_2": {
       "base": "audio/voice/v_player_takeover_2",
-      "duration": 3.012
+      "duration": 2.797
     },
     "v_player_takeover_3": {
       "base": "audio/voice/v_player_takeover_3",
-      "duration": 3.53
+      "duration": 3.285
     },
     "v_squad_wiped_1": {
       "base": "audio/voice/v_squad_wiped_1",
-      "duration": 4.063
+      "duration": 4.101
     },
     "v_squad_wiped_2": {
       "base": "audio/voice/v_squad_wiped_2",
-      "duration": 3.272
+      "duration": 3.013
     },
     "v_squad_wiped_3": {
       "base": "audio/voice/v_squad_wiped_3",
@@ -2162,11 +2189,11 @@
     },
     "v_stage_2_1": {
       "base": "audio/voice/v_stage_2_1",
-      "duration": 3.772
+      "duration": 3.797
     },
     "v_stage_2_2": {
       "base": "audio/voice/v_stage_2_2",
-      "duration": 4.176
+      "duration": 4.215
     },
     "v_stage_2_3": {
       "base": "audio/voice/v_stage_2_3",
@@ -2178,11 +2205,11 @@
     },
     "v_stage_3_1": {
       "base": "audio/voice/v_stage_3_1",
-      "duration": 4.255
+      "duration": 4.327
     },
     "v_stage_3_2": {
       "base": "audio/voice/v_stage_3_2",
-      "duration": 4.057
+      "duration": 4.088
     },
     "v_stage_3_3": {
       "base": "audio/voice/v_stage_3_3",
@@ -2194,11 +2221,11 @@
     },
     "v_stagger_end_1": {
       "base": "audio/voice/v_stagger_end_1",
-      "duration": 4.707
+      "duration": 4.75
     },
     "v_stagger_end_2": {
       "base": "audio/voice/v_stagger_end_2",
-      "duration": 2.279
+      "duration": 2.116
     },
     "v_stagger_end_3": {
       "base": "audio/voice/v_stagger_end_3",
@@ -2210,19 +2237,19 @@
     },
     "v_unit_lost_1": {
       "base": "audio/voice/v_unit_lost_1",
-      "duration": 3.731
+      "duration": 3.755
     },
     "v_unit_lost_2": {
       "base": "audio/voice/v_unit_lost_2",
-      "duration": 2.312
+      "duration": 2.155
     },
     "v_unit_lost_3": {
       "base": "audio/voice/v_unit_lost_3",
-      "duration": 4.111
+      "duration": 3.853
     },
     "v_unit_lost_4": {
       "base": "audio/voice/v_unit_lost_4",
-      "duration": 3.343
+      "duration": 3.355
     },
     "v_unit_lost_5": {
       "base": "audio/voice/v_unit_lost_5",
@@ -2242,7 +2269,7 @@
     },
     "v_volley_fired_1": {
       "base": "audio/voice/v_volley_fired_1",
-      "duration": 1.265
+      "duration": 1.271
     },
     "v_volley_fired_10": {
       "base": "audio/voice/v_volley_fired_10",
@@ -2254,27 +2281,27 @@
     },
     "v_volley_fired_2": {
       "base": "audio/voice/v_volley_fired_2",
-      "duration": 2.09
+      "duration": 1.939
     },
     "v_volley_fired_3": {
       "base": "audio/voice/v_volley_fired_3",
-      "duration": 3.8
+      "duration": 3.535
     },
     "v_volley_fired_4": {
       "base": "audio/voice/v_volley_fired_4",
-      "duration": 2.878
+      "duration": 2.89
     },
     "v_volley_fired_5": {
       "base": "audio/voice/v_volley_fired_5",
-      "duration": 2.534
+      "duration": 2.36
     },
     "v_volley_fired_6": {
       "base": "audio/voice/v_volley_fired_6",
-      "duration": 3.083
+      "duration": 2.893
     },
     "v_volley_fired_7": {
       "base": "audio/voice/v_volley_fired_7",
-      "duration": 2.528
+      "duration": 2.54
     },
     "v_volley_fired_8": {
       "base": "audio/voice/v_volley_fired_8",
@@ -2286,7 +2313,7 @@
     },
     "v_volley_ready_1": {
       "base": "audio/voice/v_volley_ready_1",
-      "duration": 2.07
+      "duration": 1.93
     },
     "v_volley_ready_10": {
       "base": "audio/voice/v_volley_ready_10",
@@ -2298,27 +2325,27 @@
     },
     "v_volley_ready_2": {
       "base": "audio/voice/v_volley_ready_2",
-      "duration": 3.854
+      "duration": 3.591
     },
     "v_volley_ready_3": {
       "base": "audio/voice/v_volley_ready_3",
-      "duration": 2.868
+      "duration": 2.88
     },
     "v_volley_ready_4": {
       "base": "audio/voice/v_volley_ready_4",
-      "duration": 3.814
+      "duration": 3.834
     },
     "v_volley_ready_5": {
       "base": "audio/voice/v_volley_ready_5",
-      "duration": 2.14
+      "duration": 1.995
     },
     "v_volley_ready_6": {
       "base": "audio/voice/v_volley_ready_6",
-      "duration": 3.79
+      "duration": 3.523
     },
     "v_volley_ready_7": {
       "base": "audio/voice/v_volley_ready_7",
-      "duration": 2.913
+      "duration": 2.925
     },
     "v_volley_ready_8": {
       "base": "audio/voice/v_volley_ready_8",

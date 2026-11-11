@@ -59,7 +59,8 @@ shared/                   @mb/shared: pure TypeScript, no DOM and no Node APIs
   src/sim/                the authoritative simulation: World, systems/, bots/, events
   src/net/                protocol: message types, snapshot codec, input type
   test/                   vitest, including full bot-vs-bot matches
-  scripts/                export-defs.ts (archetypes for the art tools), sim.ts (headless match)
+  scripts/                export-defs.ts (archetypes for the art tools), sim.ts (the balance harness),
+                          botMatch.ts (plays one bot match and reports on it; also used by tests)
 server/                   @mb/server: Express + Colyseus room that owns a World
   src/index.ts            entry point: reads the environment, starts the server
   src/config.ts           ServerConfig and every environment variable
@@ -117,9 +118,17 @@ on the server, in headless tests, and (movement only) in the client for predicti
 `inputsByPlayer` is an array indexed by player id; a missing entry repeats that player's last
 input. `MatchConfig` (`sim/config.ts`) lists the player slots (slot 0 is the kaiju, then the
 squads; bots fill empty slots), the city seed, the starting anchor (or -1 for random) and the
-timers (`MatchTuning`; `fastTuning()` is the `MB_FAST` set). Squad commands that do not travel
-inside an input are handed over with `queueCommand(world, player, command)`; a dropped player is
-given to a bot with `setPlayerBot`.
+timers (`MatchTuning`; `fastTuning()` is the `MB_FAST` set) and, optionally, bot handicaps
+(`bots`: 0 is a bot at its best, 1 leaves it standing still; `idleBots()` for tests). Squad
+commands that do not travel inside an input are handed over with
+`queueCommand(world, player, command)`.
+
+People coming and going is one hook: `setPlayerBot(world, player, bot)`. With `true` a bot takes
+the slot over from the next tick, with a blank mind, from whatever state the slot is in (a
+dropped player, or a slot nobody ever had). With `false` the slot goes (back) to a person: the
+bot lets go of every control at once, and nothing is pressed for them until their own first
+input arrives. Any slot can change hands at any time, the kaiju's included; calling it with the
+state the slot is already in does nothing.
 
 Ids are array indexes: a kaiju id indexes `world.kaijus`, a squad id `world.squads`, a player id
 `world.players`, and a unit id `world.units`, where it always equals `squad id * 4 + slot`. The
@@ -163,16 +172,58 @@ operates on `World`, and is covered by tests.
 | 1 | `inputs.ts` | this tick's inputs, queued commands | `player.input` (edges, hold timers), `player.commands`, the driven unit's `control` |
 | 2 | `kaijuActions.ts` | `player.input` | the kaiju action state machine, held object, cocoon start; queues hits and city damage, spawns thrown projectiles |
 | 3 | `unitOrders.ts` | `player.commands`, the kaiju, the city | spotting, takeover, squad orders, call-in missions, every sub-unit's `control`, `rooted`, `arcYaw`, charge, `state`, `nav` |
-| 4 | `bots.ts` | the world | `player.botInput` for the NEXT tick (bots use the same input interface as people) |
+| 4 | `bots.ts` | the world | `player.botInput` for the NEXT tick (bots use the same input interface as people); `player.botState` |
 | 5 | `movement.ts` | `player.input`, `unit.control` | positions, the kaiju's head aim; queues trample and wade damage to the city |
 | 6 | `weapons.ts` | `unit.control.fire`, aim, charge, `callIns` | weapon and call-in cooldowns, projectiles (salvos, volleys, shells), `volley`, the later `callin` phases |
 | 7 | `projectiles.ts` | projectiles | flight, impacts; queues hits, structure and prop damage |
 | 8 | `damage.ts` | `hits` | hp, nerve, stagger, shaken, deaths, squad elimination, rage; tramples units under a moving kaiju |
 | 9 | `cityDamage.ts` | `structureHits`, `propHits` | structure hp and stages, props and wrecks, the bar, tallies, rage, `barMark`, `moltAvailable` |
-| 10 | `matchFlow.ts` | the bar marks, hp, the clock | phases, molt, stage changes, the end |
-| 11 | `voice.ts` | this tick's events | `voice` events (throttled) |
+| 10 | `matchFlow.ts` | the bar marks, hp, the clock, a cocoon that has run its time | phases, the clock, the end of the molt (blast wave, the kaiju's new body, intermission, `beginStage`), the end of the match |
+| 11 | `voice.ts` | this tick's events, kaiju hp, the bar | `voice` events with the lines to play (rationed) |
 
-`docs/STATUS.md` says which of these are implemented and which are still stubs.
+All eleven are implemented; `docs/STATUS.md` lists what is still a stub elsewhere.
+
+How a match runs from start to end (`systems/matchFlow.ts`; rules in `DESIGN.md` section 2):
+
+- `match.phase` goes 'briefing' (timed) -> 'playing' -> 'intermission' (timed) -> 'playing' ->
+  'intermission' -> 'playing' -> 'ended'. Every change is a `matchPhase` event. The clock,
+  `elapsed` and `stageTime` only count while the phase is 'playing'.
+- The end is checked every tick of play, in this order: a kaiju at 0 hp (humans, 'kill'), the
+  bar past the third mark (kaiju, 'bar'), the clock at 0 (humans, 'clock'). `matchEnd` carries
+  the tallies; after it `world.step` does nothing.
+- The molt, on the tick a cocoon has run its time, in this order of events: `moltBlast`; for
+  every unit it reaches `unitDestroyed` (inside the kill radius) or `unitShaken` (inside the
+  shove radius; those units also get a velocity kick outward); `kaijuAction` (molt, 'idle')
+  with the kaiju already at its new stage, size, full hp and nerve; a `projectileHit` with
+  target 'none' for everything that was in flight; `callin` 'done' for every running mission;
+  `matchPhase` 'intermission' with `duration` and `nextStage`. During the intermission
+  `match.stage` and `match.bounds` are still the old ones, only `kaiju.stage` is new, inputs
+  do nothing, and thrown units slide to a stop. When it is over: `stageChange` (new stage and
+  bounds; squads refilled and redeployed, survivors as veterans) and `matchPhase` 'playing'.
+- `beginStage(world, stage)` alone (tests and the sandbox call it to jump to a stage) does the
+  last step only: it clears projectiles and missions without events and marks no veterans.
+
+How the bots are put together (`sim/bots/`, numbers in `defs/bots.ts`; behavior in `DESIGN.md`
+section 5, "Bots"):
+
+- `systems/bots.ts` calls `kaijuBot` or `squadBot` for every slot with `player.bot` set. Each
+  writes `player.botInput` (a plain `PlayerInput`: stick relative to its aim, aim, button bits,
+  `wheel`, `marker`), which the input system applies on the next tick exactly as it applies a
+  person's. Bots read the World freely but change nothing in it except their own
+  `player.botState` and, for a squad leader, the route memory of the unit it drives
+  (`unit.nav`, through `steerToward`, the same navigation the sub-units use).
+- A squad bot acts on what the humans' map shows (`kaiju.known`), not on where the kaiju is.
+- Bots draw their random numbers from `world.rng`, so a match with bots is as reproducible as
+  one without. A bot handicapped to 1 draws none and sends neutral inputs.
+- `test/bots.test.ts` checks every input a bot sends over a whole match against
+  `sanitizeInput`: a bot can do nothing a client could not.
+
+How the radio works (`systems/voice.ts`, rules per cue in `defs/voice.ts`): every cue goes
+through `say(world, cue, squad?, player?)`, which applies the cue's minimum gap and the chatter
+budget (`VOICE_CUE_RULES`, `VOICE_RULES`), then chooses the lines for both sides from
+`voiceLines.json` as it stands (`chooseVoiceLines`) and emits the `voice` event. Clients play
+`event.lines.humans` or `event.lines.kaiju` in order (ids are also the audio file names); they
+do not choose lines themselves. (`pickVoiceLine` remains for tools that only have a cue.)
 
 How the human side is put together (`DESIGN.md` section 5 has the rules):
 
@@ -397,9 +448,9 @@ What clients can rely on from the squad events and the squad part of a snapshot:
   unit fires. `rooted` is true for as long as it is planted.
 - `callin` comes three times per mission: 'marked' (the marker is placed; `delay` is the time
   to the first impact, `radius` the scatter to draw), 'inbound' (the first shell is falling)
-  and 'done' (the last shell has landed). Its shells are `projectileSpawn` events with
-  `owner: 'callin'` and `ownerId` the mission id. A stage change drops running missions
-  without a 'done'. `callInCooldowns` in the squad snapshot is the time until the button works.
+  and 'done' (the last shell has landed, or the molt's blast called the mission off). Its
+  shells are `projectileSpawn` events with `owner: 'callin'` and `ownerId` the mission id.
+  `callInCooldowns` in the squad snapshot is the time until the button works.
 - `takeover` comes the tick after the `unitDestroyed` of the driven unit; from that tick the
   squad's `driven` (and the unit flag) point at the new unit. An eliminated squad has
   `driven: -1`.
@@ -462,8 +513,15 @@ layout, requires bumping `SNAPSHOT_VERSION` / `PROTOCOL_VERSION`.
   clocks, `Math.random` or `console`; shared, server and client respect the import layering; the
   room library stays inside the two `net/` wrappers; no unexplained `any`; no `@ts-ignore`; no
   `.only` / `.skip` in tests; no network URLs in the client); then every test.
-- Headless bot-vs-bot matches (`npm run sim`) finish without errors and print: winner, match
-  length, time per stage, breaks, kills. These are the balance instrument.
+- Headless bot-vs-bot matches (`npm run sim`) finish without errors and print a table: winner,
+  match length, time per stage, staggers, units lost, the bar at each stage end, kaiju hp lost
+  per stage. These are the balance instrument; `docs/BALANCE.md` says how to read them and
+  records every tuning pass. Options: `--seeds N`, `--seed N`, `--unopposed`,
+  `--kaiju-handicap H`, `--human-handicap H`, `--fast`, `--anchor N`, `--events`, `--json`.
+- The simulation is deterministic and the tests hold it to that: `test/determinism.test.ts`
+  plays two matches side by side from one seed and compares a hash of the whole state on every
+  tick, and replays recorded inputs; `test/matchSoak.test.ts` plays whole bot matches (three
+  full-length, six fast) with every number, bound and entity count checked ten times a second.
 - Browser playtest (`tools/playtest`): server + 5 headless clients complete a `MB_FAST` match
   with zero console errors, and screenshots are captured for visual review.
 - Never commit secrets. Never add a dependency that needs a network service at runtime: the

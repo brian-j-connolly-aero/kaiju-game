@@ -86,7 +86,9 @@ STAGES = {
         spine=[(0, 0.045, 0.355), (0, 0.02, 0.44), (0, -0.015, 0.525), (0, -0.05, 0.60)],
         torso=[(0.37, 0.31), (0.43, 0.37), (0.44, 0.35), (0.30, 0.25)],
         hump=0.0,
-        shoulder=(0.245, -0.115, 0.59), elbow=(0.32, -0.065, 0.46), wrist=(0.305, -0.225, 0.365),
+        # (the arms are a little longer than a hatchling's should be: with that head, any shorter
+        # and it cannot bring a hand in front of its own face, which the first-person view needs)
+        shoulder=(0.245, -0.115, 0.59), elbow=(0.33, -0.06, 0.44), wrist=(0.31, -0.245, 0.335),
         arm=(0.16, 0.125), forearm=(0.14, 0.12), fore_bulge=0.36, hand=0.125, hand_drop=18,
         finger=0.065, hand_claw=0.085,
         neck=(0, -0.035, 0.60), neck_size=(0.27, 0.24),
