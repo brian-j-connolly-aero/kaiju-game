@@ -1,0 +1,16 @@
+{
+  "name": "@mb/client",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Monster Battle 9001 browser client: Vite + three.js.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json"
+  },
+  "dependencies": {
+    "@mb/shared": "0.1.0"
+  }
+}

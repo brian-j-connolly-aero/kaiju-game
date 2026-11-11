@@ -1,0 +1,16 @@
+{
+  "name": "@mb/server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Monster Battle 9001 server: Express + Colyseus room that owns a World.",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false src/index.ts",
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node22 --packages=external --alias:@mb/shared=../shared/src/index.ts --sourcemap --outfile=dist/index.js",
+    "start": "node --enable-source-maps dist/index.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@mb/shared": "0.1.0"
+  }
+}

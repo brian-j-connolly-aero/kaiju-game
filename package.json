@@ -1,0 +1,36 @@
+{
+  "name": "monster-battle-9001",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Asymmetric browser party game: one kaiju wrecks a city, four army squads try to stop it.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "workspaces": [
+    "shared",
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "npm run build --workspaces --if-present",
+    "start": "npm run start --workspace @mb/server",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm run lint && npm run test",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "node scripts/lint.mjs",
+    "sim": "npm run sim --workspace @mb/shared --",
+    "export:defs": "npm run export:defs --workspace @mb/shared",
+    "assets:manifest": "node scripts/merge-manifests.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "esbuild": "0.28.2",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vite": "8.3.8",
+    "vitest": "5.1.0"
+  }
+}

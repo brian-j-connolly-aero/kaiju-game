@@ -1,0 +1,130 @@
+{
+  "models": {
+    "prop_hydrant": {
+      "file": "models/prop_hydrant.glb",
+      "kind": "prop",
+      "nodes": [
+        "prop_hydrant"
+      ],
+      "size": [
+        0.46,
+        0.9,
+        0.423
+      ],
+      "tris": 79
+    }
+  },
+  "sprites": {},
+  "textures": {},
+  "music": {
+    "briefing": {
+      "base": "audio/music/briefing",
+      "bpm": 96,
+      "duration": 20.5,
+      "loop": [
+        0.25,
+        20.25
+      ]
+    },
+    "cocoon": {
+      "base": "audio/music/cocoon",
+      "bpm": 96,
+      "duration": 12.5
+    },
+    "hearing": {
+      "base": "audio/music/hearing",
+      "bpm": 96,
+      "duration": 30.5,
+      "loop": [
+        0.25,
+        30.25
+      ]
+    },
+    "intermission": {
+      "base": "audio/music/intermission",
+      "bpm": 96,
+      "duration": 23.5
+    },
+    "lobby": {
+      "base": "audio/music/lobby",
+      "bpm": 96,
+      "duration": 80.5,
+      "loop": [
+        0.25,
+        80.25
+      ]
+    },
+    "stage1_base": {
+      "base": "audio/music/stage1_base",
+      "bpm": 96,
+      "duration": 80.5,
+      "group": "stage1",
+      "loop": [
+        0.25,
+        80.25
+      ]
+    },
+    "stage1_combat": {
+      "base": "audio/music/stage1_combat",
+      "bpm": 96,
+      "duration": 80.5,
+      "group": "stage1",
+      "loop": [
+        0.25,
+        80.25
+      ]
+    },
+    "stage2_base": {
+      "base": "audio/music/stage2_base",
+      "bpm": 96,
+      "duration": 80.5,
+      "group": "stage2",
+      "loop": [
+        0.25,
+        80.25
+      ]
+    },
+    "stage2_combat": {
+      "base": "audio/music/stage2_combat",
+      "bpm": 96,
+      "duration": 80.5,
+      "group": "stage2",
+      "loop": [
+        0.25,
+        80.25
+      ]
+    },
+    "stage3_base": {
+      "base": "audio/music/stage3_base",
+      "bpm": 96,
+      "duration": 80.5,
+      "group": "stage3",
+      "loop": [
+        0.25,
+        80.25
+      ]
+    },
+    "stage3_combat": {
+      "base": "audio/music/stage3_combat",
+      "bpm": 96,
+      "duration": 80.5,
+      "group": "stage3",
+      "loop": [
+        0.25,
+        80.25
+      ]
+    },
+    "win_humans": {
+      "base": "audio/music/win_humans",
+      "bpm": 96,
+      "duration": 14.5
+    },
+    "win_kaiju": {
+      "base": "audio/music/win_kaiju",
+      "bpm": 96,
+      "duration": 14.9
+    }
+  },
+  "sfx": {},
+  "voice": {}
+}

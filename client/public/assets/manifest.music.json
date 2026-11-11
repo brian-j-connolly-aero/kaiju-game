@@ -1,0 +1,111 @@
+{
+  "music": {
+    "lobby": {
+      "base": "audio/music/lobby",
+      "loop": [
+        0.25,
+        80.25
+      ],
+      "bpm": 96,
+      "duration": 80.5
+    },
+    "briefing": {
+      "base": "audio/music/briefing",
+      "loop": [
+        0.25,
+        20.25
+      ],
+      "bpm": 96,
+      "duration": 20.5
+    },
+    "stage1_base": {
+      "base": "audio/music/stage1_base",
+      "loop": [
+        0.25,
+        80.25
+      ],
+      "bpm": 96,
+      "group": "stage1",
+      "duration": 80.5
+    },
+    "stage1_combat": {
+      "base": "audio/music/stage1_combat",
+      "loop": [
+        0.25,
+        80.25
+      ],
+      "bpm": 96,
+      "group": "stage1",
+      "duration": 80.5
+    },
+    "stage2_base": {
+      "base": "audio/music/stage2_base",
+      "loop": [
+        0.25,
+        80.25
+      ],
+      "bpm": 96,
+      "group": "stage2",
+      "duration": 80.5
+    },
+    "stage2_combat": {
+      "base": "audio/music/stage2_combat",
+      "loop": [
+        0.25,
+        80.25
+      ],
+      "bpm": 96,
+      "group": "stage2",
+      "duration": 80.5
+    },
+    "stage3_base": {
+      "base": "audio/music/stage3_base",
+      "loop": [
+        0.25,
+        80.25
+      ],
+      "bpm": 96,
+      "group": "stage3",
+      "duration": 80.5
+    },
+    "stage3_combat": {
+      "base": "audio/music/stage3_combat",
+      "loop": [
+        0.25,
+        80.25
+      ],
+      "bpm": 96,
+      "group": "stage3",
+      "duration": 80.5
+    },
+    "cocoon": {
+      "base": "audio/music/cocoon",
+      "bpm": 96,
+      "duration": 12.5
+    },
+    "intermission": {
+      "base": "audio/music/intermission",
+      "bpm": 96,
+      "duration": 23.5
+    },
+    "win_humans": {
+      "base": "audio/music/win_humans",
+      "bpm": 96,
+      "duration": 14.5
+    },
+    "win_kaiju": {
+      "base": "audio/music/win_kaiju",
+      "bpm": 96,
+      "duration": 14.9
+    },
+    "hearing": {
+      "base": "audio/music/hearing",
+      "loop": [
+        0.25,
+        30.25
+      ],
+      "bpm": 96,
+      "duration": 30.5
+    }
+  }
+}
