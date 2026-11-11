@@ -1,0 +1,17 @@
+node_modules/
+dist/
+build/
+.vite/
+*.log
+.DS_Store
+*.blend1
+__pycache__/
+*.pyc
+.env
+.env.*
+coverage/
+/tmp/
+test-results/
+playwright-report/
+*.wav
+!client/public/assets/**/*.wav
