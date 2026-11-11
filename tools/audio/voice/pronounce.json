@@ -1,1 +1,21 @@
-{ "words": {}, "lines": {} }
+{
+  "words": {},
+  "lines": {},
+  "why": {},
+  "tried": [
+    { "line": "v_volley_fired_1", "voice": "Overlord", "fed": ["Vollee away.", "Volly away.", "Vawlee away.", "Voll ee away."], "result": "no change: the recognizer hears 'bali' or 'molly' for 'volley' from every voice and every spelling" },
+    { "line": "v_volley_fired_8", "voice": "Anchor", "fed": ["... a coordinated vollee ...", "... a coordinated volly ..."], "result": "no change ('valley')" },
+    { "line": "v_volley_fired_7", "voice": "Tempest", "fed": ["Fire ing. ...", "Fyring. ...", "Fyer ing. ..."], "result": "unprocessed clip fixed ('finding' becomes 'firing'), finished radio clip unchanged; not adopted" },
+    { "line": "v_volley_fired_4", "voice": "Tempest", "fed": ["Tempest fyring. ...", "Tempest fire ing. ..."], "result": "unprocessed clip fixed, finished radio clip worse (0 errors becomes 1 or 2); not adopted" },
+    { "line": "v_nerve_break_4", "voice": "Tempest", "fed": ["... Fyer everything.", "... Fyre everything.", "... Fiyer everything."], "result": "no improvement" },
+    { "line": "v_unit_lost_4", "voice": "Tempest", "fed": ["... when you fyer.", "... when you fiyer."], "result": "no improvement" },
+    { "line": "v_collateral_human_2", "voice": "Overlord", "fed": ["... Check your back stop.", "... Check your back-stop."], "result": "no change ('bag stop')" },
+    { "line": "v_hearing_humans_win_3", "voice": "Chair", "fed": ["... the squods. ...", "... commends, the squads. Claims, for damaged property, ...", "... Clayms ..."], "result": "no improvement; extra commas made the finished clip worse" },
+    { "line": "v_landmark_down_4", "voice": "Anchor", "fed": ["... Toors are canceled ...", "... Tours, are canceled ..."], "result": "no change" },
+    { "line": "v_nerve_break_2", "voice": "Granite", "fed": ["It is stag gered. ...", "It is staggerd. ..."], "result": "no change ('standard')" },
+    { "line": "v_kaiju_brace_2", "voice": "Tempest", "fed": ["... Hit the flanck.", "... Hit, the flank."], "result": "one error fewer with the comma, three remain; not adopted" },
+    { "line": "v_stage_2_2", "voice": "Overlord", "fed": ["... re deploy.", "... re-deploy."], "result": "worse unprocessed ('ray deployed')" },
+    { "line": "v_end_humans_clock_1", "voice": "Overlord", "fed": ["Time! ...", "Time, the city stands. ..."], "result": "no change" },
+    { "line": "v_match_briefing_5", "voice": "Anchor", "fed": ["A creature, the size of a bus, has hatched.", "... a buss ..."], "result": "no change in the finished clip" }
+  ]
+}

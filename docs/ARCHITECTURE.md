@@ -446,7 +446,14 @@ layout, requires bumping `SNAPSHOT_VERSION` / `PROTOCOL_VERSION`.
 - Debug and automation hooks (required for automated playtests): `window.__mb` exposes state,
   `renderer.info`, and helpers; `?autoplay=1` makes the client play itself with a simple
   autopilot; `?debug=1` shows an overlay. The server honors `MB_FAST=1` (short timers) and a
-  practice option (bot kaiju), see section 4.4.
+  practice option (bot kaiju), see section 4.4. `?sandbox=1|2|3` runs the shared simulation
+  inside the page (one player against the bots, starting at that stage) behind the same
+  message interface as a room: it is how stages are looked at without a server
+  (`tools/playtest/shots.mjs`). All page flags are listed in `client/src/app/params.ts`.
+- Client layout and data flow: `docs/STATUS.md` section 7. The rule that keeps it in pieces:
+  `net/` knows nothing of three.js or the DOM beyond timers, `render/` knows nothing of the
+  network or the HUD (it draws a `FrameState` and is handed events), `ui/` is DOM only, and the
+  screens in `app/screens/` are small modules that add an overlay and choose a camera.
 
 ## 6. Quality gates
 

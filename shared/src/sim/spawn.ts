@@ -22,6 +22,11 @@ import type { Kaiju, KaijuActionMemory, Squad, Unit, World } from './types';
 /** How far inside the bounds line squads deploy. */
 const DEPLOY_INSET = 20;
 const DEPLOY_STEP = 20;
+/** Two squads deploy at least this far apart. */
+const DEPLOY_SEPARATION = 120;
+/** Ways the sectors are turned when looking for the shortest drives, and what an empty sector costs (meters). */
+const DEPLOY_TURNS = 8;
+const DEPLOY_EMPTY_COST = 5000;
 
 interface Disc {
   x: number;
@@ -272,8 +277,9 @@ const spot: Vec2 = { x: 0, z: 0 };
 
 /**
  * Refills every squad for the current stage and spreads them around the inside of the bounds
- * line, as far from the kaiju as the rules ask (MATCH_RULES.redeployMinKaijuDist, or as far as
- * the bounds allow when they are smaller than that). Units face the kaiju.
+ * line: on every side of the kaiju, each as near to it as the rules allow (at least
+ * MATCH_RULES.redeployMinKaijuDist away, or as far as the bounds allow when they are smaller
+ * than that). Units face the kaiju.
  */
 export function deploySquads(world: World): void {
   const b = world.match.bounds;
@@ -298,24 +304,57 @@ export function deploySquads(world: World): void {
   const need = Math.min(MATCH_RULES.redeployMinKaijuDist, farthest * 0.92);
   const eligible = pts.filter((p) => Math.hypot(p.x - tx, p.z - tz) >= need);
 
-  // Spread the squads: repeatedly take the eligible point farthest from those already chosen.
-  const chosen: Vec2[] = [];
-  for (let n = 0; n < world.squads.length && eligible.length > 0; n++) {
+  // One squad per sector of bearings around the kaiju, so that they come at it from every
+  // side, each at the eligible point of its sector nearest to the kaiju: "at the new edge" should
+  // not mean the far corner of the city. The sectors are turned to whichever way round gives the
+  // shortest drives. A sector with no eligible ground takes the point farthest from the others.
+  const squads = world.squads.length;
+  const sector = (Math.PI * 2) / Math.max(1, squads);
+  const bearing = eligible.map((p) => Math.atan2(p.x - tx, p.z - tz) + Math.PI);
+  const range = eligible.map((p) => Math.hypot(p.x - tx, p.z - tz));
+  const farEnough = (p: Vec2, picked: Array<Vec2 | null>): boolean => {
+    for (const c of picked) if (c && Math.hypot(p.x - c.x, p.z - c.z) < DEPLOY_SEPARATION) return false;
+    return true;
+  };
+  let chosen: Array<Vec2 | null> = [];
+  let bestTotal = Infinity;
+  for (let turn = 0; turn < DEPLOY_TURNS && squads > 0; turn++) {
+    const offset = (turn / DEPLOY_TURNS) * sector;
+    const picked: Array<Vec2 | null> = new Array<Vec2 | null>(squads).fill(null);
+    let total = 0;
+    for (let n = 0; n < squads; n++) {
+      let best = -1;
+      for (let i = 0; i < eligible.length; i++) {
+        const slot = Math.floor(((bearing[i] - offset + Math.PI * 4) % (Math.PI * 2)) / sector) % squads;
+        if (slot !== n || (best >= 0 && range[i] >= range[best]) || !farEnough(eligible[i], picked)) continue;
+        best = i;
+      }
+      if (best >= 0) {
+        picked[n] = eligible[best];
+        total += range[best];
+      } else {
+        total += DEPLOY_EMPTY_COST;
+      }
+    }
+    if (total < bestTotal) {
+      bestTotal = total;
+      chosen = picked;
+    }
+  }
+  for (let n = 0; n < squads && eligible.length > 0; n++) {
+    if (chosen[n]) continue;
     let best = 0;
     let bestScore = -1;
     for (let i = 0; i < eligible.length; i++) {
-      const p = eligible[i];
-      let score = Math.hypot(p.x - tx, p.z - tz);
-      if (chosen.length > 0) {
-        score = Infinity;
-        for (const c of chosen) score = Math.min(score, Math.hypot(p.x - c.x, p.z - c.z));
-      }
+      let score = Infinity;
+      for (const c of chosen) if (c) score = Math.min(score, Math.hypot(eligible[i].x - c.x, eligible[i].z - c.z));
+      if (score === Infinity) score = range[i];
       if (score > bestScore) {
         bestScore = score;
         best = i;
       }
     }
-    chosen.push(eligible[best]);
+    chosen[n] = eligible[best];
   }
 
   const placed: Disc[] = world.kaijus.filter((k) => k.alive).map((k) => ({ x: k.x, z: k.z, radius: k.radius }));

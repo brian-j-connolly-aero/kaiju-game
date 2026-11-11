@@ -11,15 +11,15 @@
       "file": "models/prop_billboard.glb",
       "kind": "prop",
       "nodes": ["prop_billboard"],
-      "size": [6.6, 8.95, 0.645],
-      "tris": 52
+      "size": [6.6, 8.967, 0.805],
+      "tris": 76
     },
     "prop_bus": {
       "file": "models/prop_bus.glb",
       "kind": "prop",
       "nodes": ["prop_bus"],
       "size": [2.605, 3.2, 11.96],
-      "tris": 146,
+      "tris": 148,
       "tint": {"part": "body paint", "mask": "COLOR_0 alpha: 1 = paint (multiply the tint color in), 0 = never tint", "blend": "multiply", "colors": ["#d7263d", "#2f62c9", "#3fa652", "#f3e3b3"]}
     },
     "prop_busstop": {
@@ -27,14 +27,14 @@
       "kind": "prop",
       "nodes": ["prop_busstop"],
       "size": [4.41, 3.128, 1.5],
-      "tris": 78
+      "tris": 80
     },
     "prop_car_sedan": {
       "file": "models/prop_car_sedan.glb",
       "kind": "prop",
       "nodes": ["prop_car_sedan"],
       "size": [1.91, 1.5, 4.46],
-      "tris": 128,
+      "tris": 118,
       "tint": {"part": "body paint", "mask": "COLOR_0 alpha: 1 = paint (multiply the tint color in), 0 = never tint", "blend": "multiply", "colors": ["#e0372f", "#2f62c9", "#f5f5f0", "#3fa652", "#8f6fd0", "#f29b85", "#2a9d8f", "#aab2bc"]}
     },
     "prop_car_taxi": {
@@ -42,14 +42,14 @@
       "kind": "prop",
       "nodes": ["prop_car_taxi"],
       "size": [1.91, 1.67, 4.46],
-      "tris": 150
+      "tris": 140
     },
     "prop_car_van": {
       "file": "models/prop_car_van.glb",
       "kind": "prop",
       "nodes": ["prop_car_van"],
       "size": [2.25, 2.12, 5.14],
-      "tris": 150,
+      "tris": 140,
       "tint": {"part": "body paint", "mask": "COLOR_0 alpha: 1 = paint (multiply the tint color in), 0 = never tint", "blend": "multiply", "colors": ["#f5f5f0", "#2f62c9", "#e0372f", "#9fe0c0", "#b9a6e0"]}
     },
     "prop_car_wreck": {
@@ -64,15 +64,15 @@
       "file": "models/prop_kiosk.glb",
       "kind": "prop",
       "nodes": ["prop_kiosk"],
-      "size": [2.8, 3.09, 3.02],
-      "tris": 80
+      "size": [2.8, 3.53, 3.02],
+      "tris": 77
     },
     "prop_lamp": {
       "file": "models/prop_lamp.glb",
       "kind": "prop",
       "nodes": ["prop_lamp"],
-      "size": [1.16, 6.0, 0.381],
-      "tris": 66
+      "size": [1.68, 5.96, 0.64],
+      "tris": 76
     },
     "prop_trafficlight": {
       "file": "models/prop_trafficlight.glb",
@@ -100,7 +100,7 @@
       "kind": "prop",
       "nodes": ["prop_truck"],
       "size": [2.59, 3.3, 8.59],
-      "tris": 146,
+      "tris": 150,
       "tint": {"part": "body paint", "mask": "COLOR_0 alpha: 1 = paint (multiply the tint color in), 0 = never tint", "blend": "multiply", "colors": ["#2f62c9", "#e0372f", "#3fa652", "#f5f5f0", "#aab2bc"]}
     }
   }

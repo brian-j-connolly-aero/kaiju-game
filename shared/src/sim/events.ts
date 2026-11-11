@@ -379,28 +379,38 @@ export interface BarMarkEvent extends EventBase {
   points: number;
 }
 
-/** The match phase changed (briefing, playing, intermission, ended). */
+/**
+ * The match phase changed (briefing, playing, intermission, ended). An intermission follows a
+ * molt: `stage` is still the stage that just ended and `nextStage` the one that begins when it
+ * is over (with `stageChange`). The kaiju already has its new body during the intermission.
+ */
 export interface MatchPhaseEvent extends EventBase {
   type: 'matchPhase';
   phase: MatchPhase;
   stage: StageId;
   /** Length of the phase in seconds when it is timed (briefing, intermission), else 0. */
   duration: number;
+  /** Intermission only: the stage that begins when it ends. */
+  nextStage?: StageId;
 }
 
 /**
- * A voice cue. Each client looks up the lines for the cue and its own side (humans hear radio
- * chatter, the kaiju player hears the news) with `pickVoiceLine(cue, side, variant, callsign)`.
+ * A voice cue, with the lines to play already chosen. Humans hear radio chatter and the kaiju
+ * player hears the news, so there is one list per side: ids of lines in `voiceLines.json` (the
+ * id is also the audio file name), to be played in order. A list is usually one line; the
+ * briefing is several; it is empty when the script has nothing for that side.
  */
 export interface VoiceEvent extends EventBase {
   type: 'voice';
   cue: VoiceCueId;
-  /** Random number that selects the line, so every listener hears the same one. */
+  /** The random number the lines were chosen with (kept for tools; `lines` is what to play). */
   variant: number;
   /** Squad the cue is about (its callsign's lines are preferred), or -1. */
   squad: number;
   /** Player the cue is about, or -1. */
   player: PlayerId;
+  /** Line ids to play, per listening side. */
+  lines: { humans: string[]; kaiju: string[] };
 }
 
 export interface MatchEndEvent extends EventBase {

@@ -39,6 +39,16 @@ export interface MatchTuning {
   barScale: number;
 }
 
+/**
+ * How well the bots of a match play, per side. A handicap of 0 is the bot at its (deliberately
+ * beatable) best; 1 leaves it standing still with its hands off the buttons; in between it
+ * hesitates that much of the time. For the balance harness, tests and practice options.
+ */
+export interface BotTuning {
+  kaijuHandicap: number;
+  humanHandicap: number;
+}
+
 export interface MatchConfig {
   /** Every slot in the match, kaiju and humans; `players[i].id === i`. */
   players: PlayerSlot[];
@@ -48,6 +58,8 @@ export interface MatchConfig {
   /** Tier 2: whether upgrade drafts happen at each molt. */
   drafts: boolean;
   tuning: MatchTuning;
+  /** Bot handicaps; absent means every bot plays at its best. */
+  bots?: BotTuning;
 }
 
 export function defaultTuning(): MatchTuning {
@@ -73,6 +85,8 @@ export interface MatchConfigOptions {
   citySeed?: number;
   fast?: boolean;
   drafts?: boolean;
+  /** Bot handicaps (see BotTuning); left out of the config when not given. */
+  bots?: Partial<BotTuning>;
 }
 
 /**
@@ -110,11 +124,20 @@ export function createMatchConfig(options: MatchConfigOptions = {}): MatchConfig
       callsign,
     });
   }
-  return {
+  const config: MatchConfig = {
     players,
     citySeed: options.citySeed ?? CITY_SEED,
     anchor: options.anchor ?? -1,
     drafts: options.drafts ?? false,
     tuning: options.fast ? fastTuning() : defaultTuning(),
   };
+  if (options.bots) {
+    config.bots = { kaijuHandicap: options.bots.kaijuHandicap ?? 0, humanHandicap: options.bots.humanHandicap ?? 0 };
+  }
+  return config;
+}
+
+/** Handicaps that leave every bot standing still (what tests of a single rule want around them). */
+export function idleBots(): BotTuning {
+  return { kaijuHandicap: 1, humanHandicap: 1 };
 }

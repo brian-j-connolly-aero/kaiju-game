@@ -9,3 +9,4 @@ export * from './weapons';
 export * from './callins';
 export * from './upgrades';
 export * from './voice';
+export * from './bots';

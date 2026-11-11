@@ -76,7 +76,7 @@ export class Boundary {
     ];
     const position: number[] = [];
     const color: number[] = [];
-    const line = Math.max(0.25, this.height * 0.03);
+    const line = Math.max(0.3, this.height * 0.07);
     const add = (x: number, y: number, z: number, brightness: number): void => {
       position.push(x, y, z);
       color.push(COLOR.r * brightness, COLOR.g * brightness, COLOR.b * brightness);
@@ -87,7 +87,7 @@ export class Boundary {
       // The curtain: bright at the ground, gone at the top.
       const bands: Array<[number, number, number, number]> = [
         [0.05, line, 1.5, 1.5],
-        [line, this.height, 0.28, 0],
+        [line, this.height, 0.2, 0],
       ];
       for (const [y0, y1, c0, c1] of bands) {
         add(ax, y0, az, c0);

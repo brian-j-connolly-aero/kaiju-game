@@ -288,6 +288,16 @@ async function main() {
           rec.maxTriangles = Math.max(rec.maxTriangles, inf.triangles);
           rec.maxSprites = Math.max(rec.maxSprites, inf.sprites);
         }
+        // The room goes back to its lobby after the match: keep the match's numbers as they peak.
+        if (s && s.net) {
+          rec.snapshots = Math.max(rec.snapshots ?? 0, s.net.snapshots);
+          rec.inputs = Math.max(rec.inputs ?? 0, s.net.inputs);
+          rec.predicting = rec.predicting || s.net.predicting;
+          rec.matchRole = s.role;
+          rec.events = s.events;
+          rec.frameMs = Number(s.frame.ms.toFixed(1));
+          rec.fps = Number((s.frame.fps ?? 0).toFixed(1));
+        }
         if (s && s.me && !first[i]) first[i] = { x: s.me.x, z: s.me.z };
         // How far this player has travelled, sampled every poll (a lower bound on the real path).
         if (s && s.me && s.matchesEnded === 0) {
@@ -338,18 +348,19 @@ async function main() {
       delete record.lastPos;
       Object.assign(record, {
         screen: s?.screen ?? 'unknown',
-        role: s?.role ?? record.role,
+        role: record.matchRole ?? record.role,
         result: s?.lastResult ?? null,
-        snapshots: s?.net?.snapshots ?? 0,
-        inputs: s?.net?.inputs ?? 0,
-        predicting: s?.net?.predicting ?? false,
-        frameMs: s ? Number(s.frame.ms.toFixed(1)) : 0,
+        snapshots: record.snapshots ?? 0,
+        inputs: record.inputs ?? 0,
+        predicting: record.predicting ?? false,
+        frameMs: record.frameMs ?? 0,
         frames: s?.frame.count ?? 0,
         ping: s?.ping ?? 0,
         moved: Number(moved.toFixed(1)),
-        events: s?.events ?? {},
+        events: record.events ?? {},
         pageErrors: s?.errors ?? [],
       });
+      delete record.matchRole;
       if (record.errors.length > 0) failures.push(`page ${i} (${record.name}) logged ${record.errors.length} console error(s): ${record.errors.slice(0, 3).join(' | ')}`);
       if ((s?.errors ?? []).length > 0) failures.push(`page ${i} (${record.name}) saw uncaught errors: ${s.errors.slice(0, 3).join(' | ')}`);
       if (record.snapshots < 50) failures.push(`page ${i} (${record.name}) received only ${record.snapshots} snapshots`);
@@ -358,9 +369,11 @@ async function main() {
     }
     const s0 = lastStates[0];
     summary.result = s0?.lastResult ?? null;
-    summary.finalMatch = s0?.match ?? null;
     summary.matchSeconds = Number(((Date.now() - matchStart) / 1000).toFixed(1));
-    if (s0 && opts.role === 'kaiju' && s0.match && s0.match.barPoints <= 0) failures.push('the autoplay kaiju destroyed nothing (bar stayed at 0)');
+    if (opts.role === 'kaiju' && !(pages[0].record.events.structureStage > 0 || pages[0].record.events.propsDestroyed > 0)) {
+      failures.push('the autoplay kaiju destroyed nothing');
+    }
+    if (!summary.result) failures.push('no page reported how the match ended');
     if (opts.role === 'kaiju' && pages[0].record.moved < 5) failures.push('the autoplay kaiju did not move');
     summary.ok = failures.length === 0;
   } catch (err) {
@@ -378,7 +391,7 @@ async function main() {
     const warnings = [...new Set(p.warnings)];
     console.log(
       `page ${p.index} ${String(p.name).padEnd(4)} ${String(p.role).padEnd(6)} screen=${p.screen} snapshots=${p.snapshots} inputs=${p.inputs} predicting=${p.predicting} moved=${p.moved}m ` +
-        `frame=${p.frameMs}ms max draw calls=${p.maxCalls} max triangles=${p.maxTriangles} max sprites=${p.maxSprites} errors=${p.errors.length} warnings=${p.warnings.length} (${warnings.length} distinct)`,
+        `script=${p.frameMs}ms fps=${p.fps ?? 0} max draw calls=${p.maxCalls} max triangles=${p.maxTriangles} max sprites=${p.maxSprites} errors=${p.errors.length} warnings=${p.warnings.length} (${warnings.length} distinct)`,
     );
   }
   const allWarnings = [...new Set(summary.pages.flatMap((p) => p.warnings))];

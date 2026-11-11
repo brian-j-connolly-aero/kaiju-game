@@ -31,7 +31,7 @@ DEFAULTS = {
         "comp_release_ms": 90.0,
         "drive_db": 3.0,                 # into a soft clipper: light overdrive
         "static_db": -30.0,              # static bed between the words, relative to the speech level
-        "static_duck_db": 10.0,          # how far the bed drops while a word is spoken (the set's gain control)
+        "static_duck_db": 14.0,          # how far the bed drops while a word is spoken (the set's gain control)
         "crackle_per_s": 5.0,
         "squelch_db": -5.0,              # squelch bursts, relative to the speech level
         "open_ms": 55.0,                 # key-up click and burst
@@ -185,7 +185,7 @@ def radio(x: np.ndarray, cfg: dict, rng: np.random.Generator) -> tuple[np.ndarra
     bias = 0.06                                       # slight asymmetry: even harmonics
     v = (np.tanh(d * (v + bias)) - np.tanh(d * bias)) / np.tanh(d)
     v = v - np.mean(v)
-    v = butter(v, SR, "highpass", lo, 2)
+    v = butter(v, SR, "highpass", lo, cfg["hp_order"] + 2)  # the clipper puts energy back below the band
     v = butter(v, SR, "lowpass", hi * 1.12, 4)        # keep a little of the grit above the corner
     level = speech_level(v)
 
@@ -193,7 +193,8 @@ def radio(x: np.ndarray, cfg: dict, rng: np.random.Generator) -> tuple[np.ndarra
     n_lead = int(SR * cfg["lead_ms"] / 1000)
     n_tail = int(SR * cfg["tail_ms"] / 1000)
     n_close = int(SR * cfg["close_ms"] / 1000)
-    total = n_open + n_lead + len(v) + n_tail + n_close
+    n_end = int(SR * 0.020)                           # the bed fades out after the squelch has shut
+    total = n_open + n_lead + len(v) + n_tail + n_close + n_end
     out = np.zeros(total)
     start = n_open + n_lead
     out[start:start + len(v)] = v
@@ -223,16 +224,17 @@ def radio(x: np.ndarray, cfg: dict, rng: np.random.Generator) -> tuple[np.ndarra
     shape = np.minimum(1.0, t / 0.12) * (1.0 - 0.35 * t)       # fast rise, slight fall, then cut
     cut = max(2, int(SR * 0.003))
     shape[-cut:] *= np.linspace(1, 0, cut)
-    fx[total - n_close:] += sq * _noise(rng, n_close, lo, hi) * shape * 1.25
+    close_end = total - n_end
+    fx[close_end - n_close:close_end] += sq * _noise(rng, n_close, lo, hi) * shape * 1.25
     c = _click(rng)
-    k0 = total - len(c) - int(SR * 0.004)
+    k0 = close_end - len(c) - int(SR * 0.004)
     fx[k0:k0 + len(c)] += sq * 3.2 * c
     # static and squelch come out of the same small speaker as the voice
     fx = butter(fx, SR, "highpass", lo, cfg["hp_order"])
     fx = butter(fx, SR, "lowpass", hi * 1.12, 4)
     out += fx
     out[:44] *= np.linspace(0, 1, 44)
-    out[-132:] *= np.linspace(1, 0, 132)                       # 3 ms: the last sample is zero
+    out[-n_end:] *= 0.5 + 0.5 * np.cos(np.linspace(0, np.pi, n_end))   # the last sample is zero
     return out, (start / SR, (start + len(v)) / SR)
 
 

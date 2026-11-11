@@ -16,7 +16,7 @@ import {
 } from '@mb/shared';
 import { Emitter } from '../util/emitter';
 import { CLOSE_CONSENTED, createRoom, ERROR_NO_ROOM, JoinFailure, joinRoom, type RoomLink } from './connection';
-import { createLocalLink, type LocalMatchOptions } from './localLink';
+import { createLocalLink, type LocalMatchControl, type LocalMatchOptions } from './localLink';
 import { MatchSession } from './matchSession';
 
 export type LinkStatus = 'offline' | 'connecting' | 'online' | 'reconnecting';
@@ -72,6 +72,8 @@ export class GameClient {
   session: MatchSession | null = null;
   /** Round trip time in milliseconds, smoothed; 0 until measured. */
   ping = 0;
+  /** The sandbox simulation when this client runs one (`startLocal`), else null. */
+  local: LocalMatchControl | null = null;
 
   private readonly options: GameClientOptions;
   private link: RoomLink | null = null;
@@ -117,7 +119,8 @@ export class GameClient {
     this.leaving = false;
     this.name = options.name;
     const generation = ++this.generation;
-    const link = createLocalLink(options, (l) => this.attach(l, generation));
+    const { link, control } = createLocalLink(options, (l) => this.attach(l, generation));
+    this.local = control;
     this.code = link.code;
     this.setStatus('online');
   }
@@ -183,6 +186,7 @@ export class GameClient {
 
   private dropLink(): void {
     this.generation++;
+    this.local = null;
     if (this.rejoinTimer !== null) clearTimeout(this.rejoinTimer);
     this.rejoinTimer = null;
     if (this.pingTimer !== null) clearInterval(this.pingTimer);

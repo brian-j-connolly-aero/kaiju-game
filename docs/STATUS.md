@@ -6,8 +6,9 @@ the stubs you filled in, and add any decision the docs left open. Contracts live
 
 Last updated by: the game server task (everything about `server/`), simulation part 1 (the
 kaiju, damage and nerve, city destruction, projectiles) and simulation part 2 (the human side:
-squads, commands, sub-unit behavior, weapons, volleys, call-ins, lives, veterans, spotting);
-the rest is from the scaffold task.
+squads, commands, sub-unit behavior, weapons, volleys, call-ins, lives, veterans, spotting) and
+the client core task (everything in `client/`, `tools/playtest/`, `tools/build-manifest.mjs`:
+section 7); the rest is from the scaffold task.
 
 ## 1. How to run things
 
@@ -15,13 +16,16 @@ the rest is from the scaffold task.
 | --- | --- |
 | `npm install` | Installs the pinned toolchain and the server's dependencies (Express, the room library). |
 | `npm run check` | Type checks all three workspaces, runs `scripts/lint.mjs`, runs every test. The gate. |
-| `npm test` | `vitest run`: every test in `shared/test` and `server/test`, about 20 seconds (the server's integration tests take most of it). |
+| `npm test` | `vitest run`: every test in `shared/test`, `server/test` and `client/test`, about 20 seconds (the server's integration tests take most of it). |
 | `npm run sim` | Headless all-bot match with metrics. Options after `--`: `--seed N --matches N --anchor N --fast --max-minutes N`. |
 | `npx vitest run server/test` | Only the server tests: 62 tests, about 15 seconds (three files start a real server on a free port and connect real clients). `MB_TEST_SPEED=1 npx vitest run server/test/lifecycle.test.ts` plays the full five-client match in real time (about 3 minutes). |
-| `npm run dev` | Starts the server (`tsx watch`, port 2567) and the client `dev` script side by side (the client is still a placeholder). |
+| `npm run dev` | Starts the server (`tsx watch`, port 2567) and the client (Vite, port 5173) side by side with hot reload; open the Vite address. Vite forwards matchmaking and the WebSocket to the server, so the page talks to its own origin exactly as in production. |
 | `npm run build`, `npm start` | Bundles the server to `server/dist/index.js`, builds the client to `client/dist`; `npm start` runs the bundle, which serves the built client and the game on one port (`PORT`, default 2567). Environment variables: `ARCHITECTURE.md` section 4.4. |
 | `npm run export:defs` | Rewrites `tools/art/data/archetypes.json` from the code (`-- --check` only verifies). A test fails when the file is stale. |
-| `npm run assets:manifest` | Merges `client/public/assets/manifest.*.json` into `manifest.json`. |
+| `npm run assets:manifest` | `tools/build-manifest.mjs`: merges `client/public/assets/manifest.*.json` into `manifest.json`, lists the files in `ui/`, and leaves out (and reports) entries whose files are missing. `-- --check` only says whether the file is stale. The client build runs it first. |
+| `npx vitest run client/test` | Only the client tests: 20 tests, about 1 second (prediction against a real simulation through latency, the mirrored city, interpolation, the clock, the action map, the animator, the manifest tool). |
+| `node tools/playtest/smoke.mjs` | The browser smoke playtest: starts the server with `MB_FAST=1` on a free port against the production build, opens 5 headless Chromium pages on autoplay (one creates a room, four join by code), plays one match to its end, fails on any console error or page crash, saves screenshots to `/tmp/mb-scratch/playtest/` and prints draw calls and triangles per page. About 2 to 4 minutes on this machine. Options in the file header (`--players N`, `--role human`, `--no-assets`, `--reconnect`, `--debug`). |
+| `node tools/playtest/shots.mjs` | Stage screenshots with no server: opens the built client in sandbox mode (`?sandbox=<stage>`, the simulation runs in the page) for stages 1 to 3 on both sides, plus scripted extras (command wheel, charging lasers, two molts, the beam, a stagger). Pictures in `/tmp/mb-scratch/playtest/shots/`; fails on console errors. |
 
 ## 2. What exists
 
@@ -114,8 +118,13 @@ Everything below is in `shared/` (`@mb/shared`) unless it says otherwise, is cov
     the room closes; plus real-time rhythm (30 ticks and 15 snapshots a second), the library's
     automatic reconnection, seat takeover, grace period expiry, simulated latency, the room
     limit and the HTTP side.
-- **`client/`:** placeholder package only (see section 3).
-- **Root scripts:** `scripts/dev.mjs`, `scripts/lint.mjs`, `scripts/merge-manifests.mjs`.
+- **`client/` (`@mb/client`):** the playable client core: Vite + TypeScript + three.js 0.187,
+  `@colyseus/sdk` 0.18.10. Screens, net layer with prediction, AssetStore with procedural
+  fallbacks, renderer, controllers, HUD, audio, automation hooks. Module map, placeholders and
+  decisions: section 7.
+- **Root scripts:** `scripts/dev.mjs`, `scripts/lint.mjs`. `npm run assets:manifest` now runs
+  `tools/build-manifest.mjs`; `scripts/merge-manifests.mjs` is the older merge-only script,
+  no longer referenced by anything and safe to delete.
 
 ## 3. What is stubbed
 
@@ -136,11 +145,8 @@ Placeholders (not `STUB`-tagged; each file says so at the top):
 - `shared/src/city/generateCity.ts`: a plain grid city (2592 structures, 4303 props, 10 anchors,
   a straight river with 5 bridges, 8 park and plaza blocks, 2 landmark stand-ins). The city task replaces this
   one file behind `generateCity(seed?): CityData` and extends `archetypes.ts`.
-- `client/src/main.ts`, `client/index.html`, `client/vite.config.ts`: a few lines each that
-  prove the wiring. Replace them freely. The client has no runtime dependencies yet (no
-  three.js, no `@colyseus/sdk`): add them with exact versions and commit the updated
-  `package-lock.json`. Use `@colyseus/sdk` 0.18.10, the version the server's tests already run
-  against (it is a development dependency of `server/`).
+- The client's placeholders (boxes for buildings, the functional HUD, stand-in icons and
+  sounds) are listed in section 7.3 with what a specialist should put in their place.
 
 ## 4. Decisions made here (where the docs left it open)
 
@@ -450,3 +456,170 @@ Server
   fail without the server being wrong; rerun before digging.
 - Every refused join prints one `ServerError` line from the room library on the server's
   standard error. It is noise, not a fault.
+
+## 7. The client (`client/`, `tools/playtest/`, `tools/build-manifest.mjs`)
+
+A playable, ugly-but-correct game in the browser, split so specialists can deepen one area at a
+time. Everything here was run in headless Chromium (software rendering); see 7.5 for what was
+and was not verified.
+
+### 7.1 Module map
+
+```
+client/index.html, vite.config.ts   the page (a canvas and an overlay root); dev proxy to the game server
+client/src/main.ts, styles.css      entry point; placeholder styling for every screen and the HUD
+client/src/app/
+  app.ts            creates the services, runs the frame loop, picks the screen from room and match state
+  context.ts        AppContext (the services) and the Screen interface
+  params.ts         the page address flags (?autoplay, ?debug, ?sandbox, ... listed in the file header)
+  matchRuntime.ts   one match: 30 Hz input ticks, session sampling, controller, renderer, audio, event routing
+  screens/          boot, home, lobby, briefing, match, end: one small module each (overlay + camera choice)
+  debugOverlay.ts   ?debug=1: frames per second, script time split, draw calls, triangles, ping, net counters
+  mbHook.ts         window.__mb: state(), renderer.info(), assets(), helpers, internals
+client/src/net/
+  connection.ts     the ONLY file that imports the room library: createRoom, joinRoom, RoomLink
+  gameClient.ts     room life cycle: lobby state, MatchSession on welcome, ping, rejoin with the token
+  matchSession.ts   one match: mirrored city, snapshot buffer, server clock, predictor, event queue -> FrameState
+  snapshotBuffer.ts interpolation between snapshots     serverClock.ts  render time, 100 ms behind
+  prediction.ts     stepMovement prediction and reconciliation with a fading error
+  cityMirror.ts     live city from the welcome bytes, kept current from events
+  session.ts        session token, callsign, room code in the address
+  localLink.ts      sandbox: runs the shared simulation in the page behind the same RoomLink
+client/src/assets/
+  assetStore.ts     loads manifest.json; models, textures, sprite atlas, ui art, audio addresses; fallbacks
+  manifest.ts, rigModel.ts (a model as named nodes + parts), spriteAtlas.ts (all sheets in one texture)
+  procedural/       geo.ts, models.ts (box stand-in for every model id), textures.ts, sprites.ts
+client/src/render/
+  gameRenderer.ts   scene, per-frame update from a FrameState, simulation events -> visuals, stats
+  materials.ts      vcol / glow / city_atlas shared materials, paint-mask tint, placeholder building material
+  sky.ts            gradient dome, sun or moon disc, cloud layers, fog and lights for afternoon / sunset / night
+  ground.ts         land, roads, parks, plazas, water, far plain from CityData
+  cityView.ts       instanced structures per archetype and state, props near the camera, collapse chunks
+  structureGeometry.ts  an archetype's three states from its .glb, or painted boxes
+  sceneRig.ts, instancedRig.ts   the rig abstraction: one posable copy, or many instanced copies, of a RigModel
+  kaijuAnimator.ts, kaijuView.ts procedural animation from the action state; cocoon, held object, beam
+  unitsView.ts, crowd.ts         vehicles, soldier sprites, lasers, markers; fleeing civilians
+  projectilesView.ts, effects.ts projectiles flown from events; explosions, dust, rings, flashes
+  quadBatch.ts, lineBatch.ts, boundary.ts   instanced sprite quads; glowing lines; the quarantine line
+client/src/game/
+  input/actions.ts, inputManager.ts   the bindable action map, glyph lookup; keyboard, mouse, gamepad
+  controllers/      kaijuController, humanController, droneController, cinematicCamera, types (shake, lens)
+  autoplay.ts       the autopilot for both sides and the drone
+client/src/ui/      hud.ts, commandWheel.ts, mapView.ts, subtitles.ts, icons.ts, iconArt.ts (stand-in icons)
+client/src/audio/   audioEngine.ts (effects, staged music, voice queue with ducking), matchAudio.ts (events -> sound)
+client/test/        net.test.ts, game.test.ts, manifestTool.test.ts
+tools/build-manifest.mjs            the assets:manifest script
+tools/playtest/smoke.mjs, shots.mjs the multi-client smoke playtest; stage screenshots from the sandbox
+```
+
+How a frame flows: `App.tick` picks the screen, calls its `frame`, then `MatchRuntime.update`:
+input poll (the autopilot overrides it) -> `MatchSession.sample` (interpolated state, the local
+body at its predicted place, due events released) -> controller `update` -> 30 Hz `tickInput`
+(send + predict) -> `GameRenderer.update` -> controller `applyCamera` (after the rigs are posed,
+so the kaiju camera sits exactly on `cam_fp`) -> audio -> `render`.
+
+### 7.2 Automation hooks
+
+- `window.__mb.state()`: screen, link, room code, seat, lobby, role, controller, match scalars,
+  the kaiju, the local body, event counts, net counters, frame statistics (`fps` is frames
+  actually shown, `ms` is script time), `matchesEnded` and `lastResult` (kept after the room
+  returns to its lobby). `__mb.renderer.info()`: draw calls, triangles, sprites, props,
+  particles, chunks, projectiles. `__mb.assets()`: what is real and what is a stand-in.
+  `__mb.helpers`: `dropConnection()`, `screenshot()`, `setMuted()`, `toggleCamera()`.
+  `__mb.internals.ctx` is the app's services for poking at (not a stable interface);
+  `ctx.client.local` is the sandbox simulation (`world`, `toStage(n)`).
+- Page flags: `?autoplay=1` (with `role=kaiju|human`, `start=N` players before the host starts,
+  `practice=1`, `loop=1`), `?debug=1`, `?sandbox=1|2|3`, `?assets=none`, `?mute=1`, `?res=0.5`,
+  `?fps=30`, `?cam=tp`, `?name=`, `?profile=` (separate stored token: two players in one browser).
+- Headless WebGL on this machine: Chromium has no GPU and draws with SwiftShader, its software
+  renderer; the flags are `--use-angle=swiftshader --enable-unsafe-swiftshader
+  --ignore-gpu-blocklist` (plus `--autoplay-policy=no-user-gesture-required` so audio runs).
+  They are exported as `CHROMIUM_ARGS` from `tools/playtest/smoke.mjs`. Pages of one browser
+  share one GPU process, which under software rendering serializes them down to about 2 frames
+  a second, so the smoke test launches one browser per page.
+
+### 7.3 Placeholders a specialist should replace
+
+| Where | What is there now | What it should become |
+| --- | --- | --- |
+| `render/structureGeometry.ts` | No `bld_*` / `lm_*` models exist yet, so every structure is a painted box: repeating window tile, gable roofs on houses, a scorched version, a grey heap. The loader for real files (nodes `intact`, `damaged`, `rubble`, `chunk_NN`) is written but has never met a real file. `STUB(render)`: collapse draws every chunk as a box of the chunk's size. | Real building art through the same function; draw the real `chunk_NN` meshes. |
+| `render/cityView.ts` | One instanced mesh per archetype, state and material, never culled; props are repacked around the camera (radius grows with camera height). Bridges are drawn as a low road slab with side trusses. | District chunking or level of detail if the real models push triangles past the budget. |
+| `render/kaijuAnimator.ts` | One pose function for the lizard node list; reads well, tuned by eye on stage 1 to 3 art. | Per-kind animation sets for the Tier 2 kaiju; footfall timing against the art. |
+| `render/effects.ts`, `projectilesView.ts` | Sparkler bursts, dust, rings and flashes from `fx.png`; capped at 520 particles. No fire that lingers on ruins, no searchlights or tracers at night. | The effects pass (night fires, tracers, searchlights, water splashes, beam scorch). |
+| `render/sky.ts` | Three presets, two scrolling cloud planes, a sun or moon disc; windows light up at sunset and night through the placeholder building material. | Per-stage polish; emissive city atlas when it exists. |
+| `render/crowd.ts` | 260 civilians near the kaiju who run from it and wander otherwise; they do not follow streets. | Street-following crowds, panic sound. |
+| `ui/hud.ts`, `styles.css` | Functional HUD: skyline bar with three marks, sun-and-moon arc, meters, squad pips, verb hints with glyphs, crosshair, status pictures. Cramped below about 700 px wide. | The designed HUD (skyline that crumbles, portraits, stat bars). |
+| `ui/iconArt.ts` | Stand-in drawings for every icon id; the 69 real SVG files in `assets/ui/` already replace them at run time. | Delete entries once the art list is complete. |
+| `app/screens/*` | Plain panels: home (callsign, create, join by code), lobby (seats, role, ready, practice, start), briefing (portrait, names), end (winner, pictogram tally, front page with a photo). | Kaiju and faction select with stat bars, the playable tutorial, the hearing, the draft. |
+| `ui/mapView.ts` | 2D canvas map: bounds, streets, buildings by state, friendly units, the kaiju when known; click or confirm places move-to, right click or the call-in button places artillery. | Styled map, district names, rubble tint. |
+| `audio/matchAudio.ts` | Every event has a sound; combat stem follows a simple "shots or lasers recently" heat. No tank engine, march or crowd loops. | Mix pass, unit loops, per-stage ambience balance. |
+| `game/autoplay.ts` | Plays both sides well enough to finish a match; no pathfinding for the kaiju, street routing for humans. | Nothing: it is a test tool. |
+| `game/input/actions.ts` | Default bindings only; bindings are data and are stored, but there is no rebinding screen. Gamepad: standard mapping, never tried on real hardware. | Settings screen; controller tuning. |
+
+### 7.4 Decisions (where the docs left it open)
+
+- **Screen from state.** The app derives the screen every frame: no room -> home; room in its
+  lobby -> lobby; a match -> briefing until the first `playing`, then match, then end once the
+  match has ended or the room says `end`. Reconnects, late joins and an abandoned match need no
+  special cases. Screens never switch screens; they talk to the client.
+- **Two timelines.** Everything but the local body is drawn 100 ms behind the estimated server
+  clock, between two snapshots (up to 120 ms of extrapolation, then it holds). Events update
+  the collision city the moment they arrive and are handed to the renderer, the audio and the
+  HUD when the delayed view reaches their tick (or after 1.2 s at the latest).
+- **Prediction.** One input per client tick is sent and applied locally; each snapshot restarts
+  the body from the server and replays unacknowledged inputs; the difference fades out
+  (half-life about 60 ms) and anything over 12 m snaps (a redeploy). Prediction is off when the
+  client's city checksum differs from the server's. At low frame rates up to 8 input ticks are
+  sent per frame. A fresh press shows its wind-up at once (a "hint", dropped as soon as the
+  server's own phase arrives or after 0.35 s).
+- **Kaiju view.** The mouse sets the desired heading, which may run up to 150 degrees ahead of
+  the body (enough to ask for a turn-around); the camera is the head and shows at most the 50
+  degree lead. In the cocoon and when dead the camera circles outside. Third person is a chase
+  camera with no wall avoidance.
+- **Human view.** First person hides the player's own infantry section (it stands all around
+  the camera) and the vehicle the camera sits in. In third person the aim sent to the server is
+  from the unit's eye to what the camera's center ray lands on, and the stick is turned into
+  that frame. After a redeploy or a takeover the view turns toward the middle of the zone.
+- **Default controls.** Keyboard and mouse: WASD move, mouse look, left button strike / fire,
+  right button grab / hold for the command wheel (also Q), Space or Shift brace, Q roar, E
+  special / call-in, F molt (hold), 1 to 4 direct commands, M or Tab map, V camera. Gamepad:
+  sticks, RT strike / fire, LT grab, LB brace / wheel, RB special, Y roar, B molt, X call-in,
+  d-pad commands (same directions as the wheel), Back map, right stick click camera.
+- **Command wheel layout.** Follow up, move-to right, fire-at-will down, hold-and-charge left.
+- **Map.** North is up: +Z up the screen, +X to the left (a true view from above). The kaiju
+  player's map shows only units whose lasers are on.
+- **Markers.** A cyan circle floats over every unit, a yellow diamond over a charging one, an
+  orange triangle over a known kaiju when it is far away; they grow with distance so a squad is
+  findable from a titan's eye.
+- **Asset manifest.** `manifest.json` gained a `ui` section that the script fills from the files
+  in `assets/ui/`, and the script drops entries whose files are missing, so the client never
+  requests a file that is not there (a 404 would be a console error). Civilians are every
+  sprite whose id starts with `civ`. Sprite ids the client draws are listed in `ASSETS.md` 7.
+- **Sandbox.** `?sandbox=N` runs the shared simulation in the page (one player against the
+  bots, starting at stage N) through the same message interface as a real room. It is a test
+  and screenshot tool, not a game mode.
+- **Autoplay** plays one match and then rests in the lobby (so a playtest ends cleanly);
+  `?loop=1` keeps going.
+- **Dependencies.** `three` 0.187.0, `@colyseus/sdk` 0.18.10 (the server's version),
+  `@types/three` 0.187.0, all exact. The root `assets:manifest` script line was repointed.
+
+### 7.5 What was verified, and what was not
+
+- Verified by running: type check and lint of all workspaces, the 20 client tests,
+  `npm run build`; `npm run dev` (the page through Vite's proxy creates a room and plays); the
+  5-page smoke playtest (create, join by code, start, play, end, zero console errors; the last
+  runs went through both molts and intermissions to stage 3 and ended on the clock, because the
+  simulation's molt landed meanwhile); a 2-page run with a dropped connection
+  (the library reconnected, the client resynchronized); late joiners taking over bot squads, a
+  fifth person watching as a spectator with the drone, a sixth refused, a reloaded page getting
+  its slot back; the sandbox at stages 1 to 3 on both sides including two forced stage changes;
+  the same on procedural fallbacks only (`--no-assets`).
+- NOT verified: a real GPU (frame rates here are software rendering on a loaded machine: about
+  6 to 12 frames a second per page, script time 2 to 6 ms a frame); a real gamepad; pointer
+  lock; building art; a Cloudflare Tunnel; a kaiju win and the kill ending on the same build
+  as the three-stage runs (earlier builds ended by a kill in the cocoon).
+- Measured: at stage 3 in the sandbox, from the titan's eye with the whole city in view, 92
+  draw calls and about 195,000 triangles; the highest seen in a 5-page match was 104 draw calls
+  and 390,000 triangles (an intermission's pulled-back camera draws more props). The budget is
+  350 and 1.5 million. Building art will add to the triangles; props are already limited to
+  those near the camera.

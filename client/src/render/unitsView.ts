@@ -232,7 +232,8 @@ export class UnitsView {
       }
 
       // Marker: a cyan circle over every unit, a yellow diamond while it charges a volley.
-      if (!(local && ctx.hideLocalLead)) {
+      // (Not over the unit the player drives: they know where they are, and it would sit on the crosshair.)
+      if (!local) {
         const size = Math.min(40, Math.max(1.6, dist * 0.022));
         const top = def.height + 1.2 + size * 0.5;
         const charging = u.laser || u.state === 'charging';

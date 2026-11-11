@@ -66,6 +66,68 @@ export interface VoiceLine {
 export const VOICE_SEQUENCE_CUES: readonly VoiceCueId[] = ['match.briefing'];
 
 /**
+ * How urgent a cue is. 2: the match turns on it, it always goes out. 1: worth interrupting
+ * routine chatter for. 0: routine chatter, which is rationed (VOICE_RULES).
+ */
+export type VoicePriority = 0 | 1 | 2;
+
+export interface VoiceCueRule {
+  priority: VoicePriority;
+  /** Minimum seconds between two emissions of this cue; 0 for none. */
+  gap: number;
+}
+
+/** Radio discipline per cue: how urgent it is and how soon it may be heard again. */
+export const VOICE_CUE_RULES: Readonly<Record<VoiceCueId, VoiceCueRule>> = {
+  'match.briefing': { priority: 2, gap: 0 },
+  'match.start': { priority: 2, gap: 0 },
+  'kaiju.spotted': { priority: 1, gap: 15 },
+  'kaiju.lost': { priority: 0, gap: 15 },
+  'volley.ready': { priority: 0, gap: 10 },
+  'volley.fired': { priority: 0, gap: 8 },
+  crossfire: { priority: 1, gap: 10 },
+  'nerve.break': { priority: 2, gap: 0 },
+  'stagger.end': { priority: 0, gap: 0 },
+  'kaiju.brace': { priority: 0, gap: 15 },
+  'kaiju.roar': { priority: 0, gap: 12 },
+  'kaiju.special': { priority: 1, gap: 5 },
+  'building.down': { priority: 0, gap: 9 },
+  'landmark.down': { priority: 2, gap: 2 },
+  'collateral.human': { priority: 0, gap: 12 },
+  'unit.lost': { priority: 0, gap: 6 },
+  'squad.wiped': { priority: 1, gap: 0 },
+  'player.takeover': { priority: 1, gap: 4 },
+  'molt.available': { priority: 2, gap: 0 },
+  'cocoon.start': { priority: 2, gap: 0 },
+  'molt.blast': { priority: 2, gap: 0 },
+  'stage.2': { priority: 2, gap: 0 },
+  'stage.3': { priority: 2, gap: 0 },
+  'callin.inbound': { priority: 1, gap: 5 },
+  'clock.3min': { priority: 2, gap: 0 },
+  'clock.1min': { priority: 2, gap: 0 },
+  'clock.10s': { priority: 2, gap: 0 },
+  'kaiju.lowhp': { priority: 1, gap: 20 },
+  'bar.near': { priority: 1, gap: 20 },
+  'end.humans.kill': { priority: 2, gap: 0 },
+  'end.humans.clock': { priority: 2, gap: 0 },
+  'end.kaiju': { priority: 2, gap: 0 },
+  'hearing.humans.win': { priority: 2, gap: 0 },
+  'hearing.kaiju.win': { priority: 2, gap: 0 },
+};
+
+/** The chatter budget and the thresholds of the two cues that watch a number. */
+export const VOICE_RULES = {
+  /** Routine cues (priority 0) spend one token each; none left, nothing said. */
+  chatterTokens: 2,
+  /** Seconds for one token to come back: the long-run pace of routine chatter. */
+  chatterRefill: 5,
+  /** `kaiju.lowhp` is called when a kaiju first drops below this fraction of its hp in a stage. */
+  lowHpFraction: 0.25,
+  /** `bar.near` is called when the bar is this far along the way from the last mark to the next. */
+  barNearFraction: 0.85,
+} as const;
+
+/**
  * Default squad callsigns, by squad index. The first three have voiced radio lines in the
  * script; lines for a cue fall back to Overlord when a squad has none of its own.
  */
@@ -174,6 +236,64 @@ export function pickVoiceLine(
   }
   const i = ((Math.floor(variant) % pool.length) + pool.length) % pool.length;
   return pool[i];
+}
+
+let linesByCue: Map<VoiceCueId, VoiceLine[]> | null = null;
+
+/** The shipped script, grouped by cue (built on first use from whatever the script holds today). */
+function scriptLinesFor(cue: VoiceCueId): readonly VoiceLine[] {
+  if (!linesByCue) {
+    linesByCue = new Map();
+    for (const line of VOICE_LINES) {
+      const list = linesByCue.get(line.cue);
+      if (list) list.push(line);
+      else linesByCue.set(line.cue, [line]);
+    }
+  }
+  return linesByCue.get(cue) ?? [];
+}
+
+export interface VoiceChoice {
+  /** The squad callsign whose own lines are preferred (the squad the cue is about), if any. */
+  callsign?: string;
+  /** Every squad callsign in the match: a line spoken by ANOTHER squad is never put in this one's mouth. */
+  callsigns?: readonly string[];
+  /** Id of the line this cue played last time on this side; another one is taken when there is a choice. */
+  avoid?: string;
+}
+
+/**
+ * Chooses the lines one side hears for a cue, deterministically from `variant`. A sequence cue
+ * (the briefing) gets all of its lines in script order; every other cue gets one:
+ * - when the cue is about a squad that has lines of its own, one of those;
+ * - otherwise a line that is not spoken by some other squad of the match (command, the news
+ *   anchor, the chair), falling back to any line at all;
+ * - never the line in `avoid` when there is another to take.
+ * Returns an empty list when the script has nothing for this side.
+ */
+export function chooseVoiceLines(
+  cue: VoiceCueId,
+  listener: 'humans' | 'kaiju',
+  variant: number,
+  choice: VoiceChoice = {},
+  lines?: readonly VoiceLine[],
+): VoiceLine[] {
+  const all = lines ? lines.filter((l) => l.cue === cue) : scriptLinesFor(cue);
+  let pool = all.filter((l) => l.audience === listener || l.audience === 'all');
+  if (pool.length === 0) return [];
+  if (VOICE_SEQUENCE_CUES.includes(cue)) return pool;
+
+  const own = choice.callsign ? pool.filter((l) => l.speaker === choice.callsign) : [];
+  if (own.length > 0) {
+    pool = own;
+  } else if (choice.callsigns && choice.callsigns.length > 0) {
+    const others = choice.callsigns.filter((c) => c !== choice.callsign);
+    const neutral = pool.filter((l) => !others.includes(l.speaker));
+    if (neutral.length > 0) pool = neutral;
+  }
+  let i = ((Math.floor(variant) % pool.length) + pool.length) % pool.length;
+  if (pool.length > 1 && pool[i].id === choice.avoid) i = (i + 1) % pool.length;
+  return [pool[i]];
 }
 
 /** Cues with no line at all for a listener; used by tests and tools to report script coverage. */

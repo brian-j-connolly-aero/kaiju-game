@@ -11,12 +11,14 @@ import {
   SQUAD_CALLSIGNS,
   stageDef,
   unitTypeDef,
+  VOICE_LINES,
   VOICE_SEQUENCE_CUES,
   voiceLinesFor,
   type SimEvent,
   type SnapKaiju,
   type StageId,
   type VoiceEvent,
+  type VoiceLine,
 } from '@mb/shared';
 import type { FrameState, MatchSession } from '../net/matchSession';
 import type { AudioEngine, LoopHandle } from './audioEngine';
@@ -25,6 +27,13 @@ import type { AudioEngine, LoopHandle } from './audioEngine';
 const REACH: Record<StageId, number> = { 1: 14, 2: 40, 3: 110 };
 
 const AMBIENCE = { afternoon: 'amb_day_loop', sunset: 'amb_sunset_loop', night: 'amb_night_loop' } as const;
+
+let linesById: Map<string, VoiceLine> | null = null;
+
+function lineById(id: string): VoiceLine | undefined {
+  if (!linesById) linesById = new Map(VOICE_LINES.map((l) => [l.id, l]));
+  return linesById.get(id);
+}
 
 /** Effects worth having decoded before the first shot is fired. */
 export const PRELOAD_SFX = [
@@ -99,15 +108,25 @@ export class MatchAudio {
   private speak(e: VoiceEvent): void {
     const side = this.side();
     const radio = side === 'humans';
+    const urgent = e.cue.startsWith('end.') || e.cue.startsWith('stage.') || e.cue.startsWith('hearing.') || e.cue === 'nerve.break' || e.cue === 'molt.available';
+    // The simulation names the lines to play for each side. (A server built before it did
+    // sends none: then the line is picked here by the same rule.)
+    const chosen = (e as { lines?: Partial<Record<'humans' | 'kaiju', string[]>> }).lines?.[side];
+    if (Array.isArray(chosen)) {
+      const many = chosen.length > 1;
+      for (const id of chosen) {
+        const line = lineById(id);
+        if (line) this.audio.say(line, { priority: many ? 3 : urgent ? 2 : 1, radio });
+      }
+      return;
+    }
     if (VOICE_SEQUENCE_CUES.includes(e.cue)) {
       for (const line of voiceLinesFor(e.cue, side)) this.audio.say(line, { priority: 3, radio });
       return;
     }
     const callsign = e.squad >= 0 ? SQUAD_CALLSIGNS[e.squad % SQUAD_CALLSIGNS.length] : undefined;
     const line = pickVoiceLine(e.cue, side, e.variant, callsign);
-    if (!line) return;
-    const urgent = e.cue.startsWith('end.') || e.cue.startsWith('stage.') || e.cue === 'nerve.break' || e.cue === 'molt.available';
-    this.audio.say(line, { priority: urgent ? 2 : 1, radio });
+    if (line) this.audio.say(line, { priority: urgent ? 2 : 1, radio });
   }
 
   /** A simulation event whose moment has come. */

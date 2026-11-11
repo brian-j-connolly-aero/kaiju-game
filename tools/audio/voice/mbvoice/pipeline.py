@@ -18,8 +18,8 @@ from .synth import synthesize
 
 TARGET_LUFS = -16.0
 CEILING_DBTP = -1.5
-OGG_QUALITY = "4"          # libvorbis -q:a
-MP3_QUALITY = "4"          # libmp3lame -q:a (variable bit rate)
+OGG_QUALITY = "3"          # libvorbis -q:a
+MP3_QUALITY = "5"          # libmp3lame -q:a (variable bit rate)
 
 _CODE = ("synth.py", "chains.py", "dsp.py", "pipeline.py")
 

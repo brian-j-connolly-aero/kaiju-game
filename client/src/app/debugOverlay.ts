@@ -13,7 +13,7 @@ export class DebugOverlay {
   }
 
   /** Feed every frame's duration; the text refreshes a few times a second. */
-  update(ctx: AppContext, frameMs: number, dt: number, screen: string): void {
+  update(ctx: AppContext, frameMs: number, dt: number, screen: string, fps: number): void {
     this.samples.push(frameMs);
     if (this.samples.length > 90) this.samples.shift();
     this.since += dt;
@@ -25,7 +25,7 @@ export class DebugOverlay {
     const session = ctx.runtime?.session;
     const lines = [
       `screen    ${screen}`,
-      `frame     ${avg.toFixed(1)} ms avg, ${max.toFixed(1)} ms max (${(1000 / Math.max(0.01, avg)).toFixed(0)} fps)`,
+      `frame     ${fps.toFixed(0)} fps; script ${avg.toFixed(1)} ms avg, ${max.toFixed(1)} ms max`,
       `draw      ${stats ? stats.calls : 0} calls, ${stats ? stats.triangles : 0} triangles`,
       `sprites   ${stats ? stats.sprites : 0}, props ${stats ? stats.props : 0}, particles ${stats ? stats.particles : 0}, chunks ${stats ? stats.chunks : 0}, projectiles ${stats ? stats.projectiles : 0}`,
       `ping      ${ctx.client.ping.toFixed(0)} ms, link ${ctx.client.status}`,

@@ -12,7 +12,7 @@
 
 import { factionLevelDef } from '../../defs/factions';
 import { unitTypeDef } from '../../defs/units';
-import { Btn, BUTTON_COUNT, type PlayerInput } from '../../net/input';
+import { Btn, BUTTON_COUNT, neutralInput, type PlayerInput } from '../../net/input';
 import { createAimPoint, resolveAimPoint } from '../aim';
 import type { SquadCommand } from '../commands';
 import type { InputsByPlayer, InputState, PlayerState, Squad, World } from '../types';
@@ -92,7 +92,17 @@ function collectCommands(world: World, p: PlayerState, input: PlayerInput | null
 
 export function inputSystem(world: World, inputs: InputsByPlayer | undefined): void {
   for (const p of world.players) {
-    const input = p.bot ? p.botInput : inputs?.[p.id];
+    let input = p.bot ? p.botInput : inputs?.[p.id];
+    if (!p.bot && p.handBack) {
+      // A slot a bot has just handed back: until the person's first input arrives the controls
+      // are let go, rather than repeating whatever the bot was pressing.
+      if (!input) {
+        input = neutralInput(p.input.seq);
+        input.aimYaw = p.input.aimYaw;
+        input.aimPitch = p.input.aimPitch;
+      }
+      p.handBack = false;
+    }
     applyInput(p.input, input);
     collectCommands(world, p, input);
 

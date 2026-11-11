@@ -45,7 +45,17 @@ TIRE = "tire"
 HUB = "grey_light"
 HEADLIGHT = "#fff2c4"
 TAILLIGHT = "#d92b2b"
+SIGN_LIT = "#ffe9a6"            # bus destination sign, taxi roof sign
 DECAL = 0.03                    # flat details sit this far proud of the surface behind them
+
+# Headlights, tail lights and the bus sign as glowing faces (material `glow`) instead of lit
+# paint. OFF for now: the game multiplies a prop's paint color into every part of the model
+# and only the `vcol` part honors the paint mask, so on a blue sedan glowing tail lights
+# would turn black. Turn this on once the client leaves the paint color off the `glow` part
+# (it costs one more instanced draw per vehicle model). The taxi's roof sign already glows:
+# the taxi is never tinted.
+LIGHTS_GLOW = False
+LAMP_GLOW = {HEADLIGHT: "glow_lamp", TAILLIGHT: "glow_red", SIGN_LIT: "glow_window"}
 
 # Paint colors the game may tint each vehicle with (sRGB hex). No kaiju orange, human cyan or
 # volley yellow: those belong to the color language.
@@ -101,6 +111,21 @@ def plate(w: float, h: float, at, facing: str, color, mat: str = "vcol") -> mb.G
     if facing in ("back", "right"):
         pts.reverse()
     return mb.polygon(pts, color=color, mat=mat)
+
+
+def lamp(w: float, h: float, at, facing: str, color) -> mb.Geo:
+    """A headlight, tail light or lit sign: a plate() that glows when LIGHTS_GLOW is on."""
+    if LIGHTS_GLOW:
+        return plate(w, h, at, facing, LAMP_GLOW.get(color, color), mat="glow")
+    return plate(w, h, at, facing, color)
+
+
+def underside(g: mb.Geo):
+    """(the downward faces of `g`, painted as dark trim; the rest). The kaiju picks vehicles
+    up, holds them tilted and throws them spinning, so every vehicle needs its floor: the game
+    draws faces from the front only, and a missing floor is a hole right through the car."""
+    belly, rest = split(g, "bottom")
+    return belly.paint(TRIM), rest
 
 
 def flat_top(center, normal) -> bool:
@@ -159,7 +184,8 @@ def sedan_parts(paint=PAINT, taxi: bool = False):
     w = 1.78
     body = drop(slab([(-2.1, 0.32), (-2.1, 0.70), (-1.95, 0.88), (-0.95, 0.98), (1.30, 1.00), (2.05, 0.92),
                       (2.1, 0.70), (2.1, 0.32)], -w / 2, w / 2, paint),
-                lambda c, n: n.z < -0.5 or (n.z > 0.95 and abs(c.y - 0.175) < 0.2))   # belly, and the deck under the cabin
+                lambda c, n: n.z > 0.95 and abs(c.y - 0.175) < 0.2)                    # the deck under the cabin
+    belly, body = underside(body)
     cab = mb.tapered_box((w, 2.25), (1.42, 1.50), 0.52, at=(0, 0.175, 0.98), offset=(0, 0.07), color=GLASS,
                          cap_bottom=False)
     cab.paint(GLASS_LT, where=lambda c, n: n.y < -0.5)
@@ -169,17 +195,17 @@ def sedan_parts(paint=PAINT, taxi: bool = False):
         lo, hi = s * (w / 2 + DECAL), s * (0.72 + DECAL)                       # stops just short of the roof
         pts = [(lo, 0.10, 0.98), (lo, 0.30, 0.98), (hi, 0.34, 1.47), (hi, 0.16, 1.47)]
         roof += mb.polygon(pts if s > 0 else pts[::-1], color=paint)
-    fixed = lit(glass, seed=3)
+    fixed = lit(glass + belly, seed=3)
     for y in (-2.15, 2.15):                                                   # chunky bumpers
-        fixed += drop(mb.box((w, 0.16, 0.22), at=(0, y, 0.41), color=TRIM),
-                      lambda c, n, y=y: n.z < -0.5 or n.y * y < -0.5)
+        fixed += drop(mb.box((w, 0.16, 0.22), at=(0, y, 0.43), color=TRIM), lambda c, n, y=y: n.y * y < -0.5)
     for x in (-0.6, 0.6):
-        fixed += plate(0.40, 0.18, (x, -2.1 - DECAL, 0.62), "front", HEADLIGHT)
-        fixed += plate(0.38, 0.16, (x, 2.1 + DECAL, 0.70), "back", TAILLIGHT)
+        fixed += lamp(0.40, 0.18, (x, -2.1 - DECAL, 0.62), "front", HEADLIGHT)
+        fixed += lamp(0.38, 0.16, (x, 2.1 + DECAL, 0.70), "back", TAILLIGHT)
     fixed += plate(0.64, 0.14, (0, -2.1 - DECAL, 0.62), "front", TRIM)          # grille
-    fixed += axles((-1.32, 1.30), 0.39, 0.94)
+    fixed += axles((-1.32, 1.30), 0.39, 0.94, n=6)
     if taxi:
-        fixed += drop(mb.box((0.52, 0.20, 0.17), at=(0, 0.25, 1.50), color="white", anchor="bottom"), "bottom")
+        # the lit roof sign: safe to glow today, because the taxi is never tinted
+        fixed += drop(mb.box((0.52, 0.20, 0.17), at=(0, 0.25, 1.50), anchor="bottom"), "bottom").glow("glow_window")
         for s in (1, -1):                                                     # checker band on the doors
             for y in (-0.52, 0.10, 0.72):
                 fixed += plate(0.31, 0.15, (s * (w / 2 + DECAL), y, 0.80), "left" if s > 0 else "right", "black")
@@ -190,25 +216,25 @@ def van_parts(paint=PAINT):
     """(paint, fixed) geometry of the delivery van: 5.0 m long, 2.0 m wide, 2.12 m tall."""
     w = 1.96
     body = drop(slab([(-2.45, 0.32), (-2.45, 0.82), (-2.22, 1.08), (-1.72, 1.14), (2.45, 1.14), (2.45, 0.32)],
-                     -w / 2, w / 2, paint), lambda c, n: n.z < -0.5 or (n.z > 0.95 and c.y > -1.0))
+                     -w / 2, w / 2, paint), lambda c, n: n.z > 0.95 and c.y > -1.0)     # the deck under the cargo box
+    belly, body = underside(body)
     cab = drop(mb.tapered_box((w, 1.30), (1.76, 0.85), 0.98, at=(0, -1.07, 1.14), offset=(0, 0.225), color=GLASS,
                               cap_bottom=False), "back")
     cab.paint(GLASS_LT, where=lambda c, n: n.y < -0.5)
     roof, glass = split(cab, flat_top)
     roof.paint(paint)
     cargo = drop(mb.box((w, 2.87, 0.98), at=(0, 1.015, 1.63), color=paint), "bottom")
-    fixed = lit(glass, seed=3)
+    fixed = lit(glass + belly, seed=3)
     for y in (-2.49, 2.49):
-        fixed += drop(mb.box((w, 0.16, 0.22), at=(0, y, 0.43), color=TRIM),
-                      lambda c, n, y=y: n.z < -0.5 or n.y * y < -0.5)
+        fixed += drop(mb.box((w, 0.16, 0.22), at=(0, y, 0.43), color=TRIM), lambda c, n, y=y: n.y * y < -0.5)
     for x in (-0.68, 0.68):
-        fixed += plate(0.36, 0.18, (x, -2.45 - DECAL, 0.68), "front", HEADLIGHT)
-        fixed += plate(0.14, 0.46, (x * 1.26, 2.45 + DECAL, 0.92), "back", TAILLIGHT)
+        fixed += lamp(0.36, 0.18, (x, -2.45 - DECAL, 0.68), "front", HEADLIGHT)
+        fixed += lamp(0.14, 0.46, (x * 1.26, 2.45 + DECAL, 0.92), "back", TAILLIGHT)
     fixed += plate(0.78, 0.15, (0, -2.45 - DECAL, 0.68), "front", TRIM)
     fixed += plate(1.20, 0.42, (0, 2.45 + DECAL, 1.72), "back", GLASS)          # rear door windows
     for s in (1, -1):                                                         # door mirrors
         fixed += mb.box((0.17, 0.10, 0.25), at=(s * 1.04, -1.58, 1.38), color=TRIM)
-    fixed += axles((-1.55, 1.50), 0.40, 1.03)
+    fixed += axles((-1.55, 1.50), 0.40, 1.03, n=6)
     return lit(body + roof + cargo, seed=1), fixed
 
 
@@ -223,26 +249,26 @@ def bus_parts(paint=PAINT):
     for y in (-4.25, -2.70, -1.20, 0.30, 1.85, 3.40):
         for s in (1, -1):
             pillars += plate(0.16, 1.10, (s * (w / 2 + DECAL), y, 2.0), "left" if s > 0 else "right", paint)
-    skirt = drop(mb.box((w, length, 0.38), at=(0, 0, 0.51), color=TRIM), hidden)
+    skirt = drop(mb.box((w, length, 0.38), at=(0, 0, 0.51), color=TRIM), "top")      # its bottom is the bus floor
     glass = drop(mb.box((w, length, 1.10), at=(0, 0, 2.0), color=GLASS), hidden)
     glass.paint(GLASS_LT, where="front")
     fixed = lit(skirt + glass, seed=3)
     fixed += drop(mb.box((1.5, 2.6, 0.20), at=(0, 1.2, 3.0), color="grey_light", anchor="bottom"), "bottom")   # roof unit
     for y in (-4.92, -0.45):                                                   # doors, right side
         fixed += plate(1.18, 2.02, (-(w / 2 + 2 * DECAL), y, 1.46), "right", mb.shade(GLASS, 0.75))
-    fixed += plate(1.70, 0.26, (0, -length / 2 - DECAL, 2.76), "front", "#ffe9a6")        # destination sign
+    fixed += lamp(1.70, 0.26, (0, -length / 2 - DECAL, 2.76), "front", SIGN_LIT)          # destination sign
     for x in (-0.86, 0.86):
-        fixed += plate(0.40, 0.20, (x, -length / 2 - DECAL, 0.92), "front", HEADLIGHT)
-        fixed += plate(0.30, 0.30, (x * 1.1, length / 2 + DECAL, 1.05), "back", TAILLIGHT)
-    fixed += axles((-3.70, 3.30), 0.50, 1.28)
+        fixed += lamp(0.40, 0.20, (x, -length / 2 - DECAL, 0.92), "front", HEADLIGHT)
+        fixed += lamp(0.30, 0.30, (x * 1.1, length / 2 + DECAL, 1.05), "back", TAILLIGHT)
+    fixed += axles((-3.70, 3.30), 0.60, 1.28)
     return lit(body + roof, seed=1) + pillars, fixed
 
 
 def truck_parts(paint=PAINT):
     """(paint, fixed) geometry of the box truck: 8.5 m long, 2.5 m wide, 3.3 m tall. The cab
     and the stripe round the cargo box take the tint; the box itself stays white."""
-    cab = drop(slab([(-4.2, 0.45), (-4.2, 1.40), (-4.02, 2.60), (-2.55, 2.60), (-2.55, 0.45)], -1.2, 1.2, paint),
-               "bottom")
+    cab = slab([(-4.2, 0.45), (-4.2, 1.40), (-4.02, 2.60), (-2.55, 2.60), (-2.55, 0.45)], -1.2, 1.2, paint)
+    floor, cab = underside(cab)
     windshield, cab = split(cab, lambda c, n: n.y < -0.5 and c.z > 1.4)
     windshield.paint(GLASS_LT)
     deflector = mb.wedge((2.2, 1.25, 0.62), at=(0, -3.2, 2.60), high="back", color=paint)
@@ -250,21 +276,27 @@ def truck_parts(paint=PAINT):
     mid = (y0 + y1) / 2
     sides = lambda c, n: abs(n.z) > 0.5                                        # noqa: E731
     stripe = drop(mb.box((w, y1 - y0, 0.50), at=(0, mid, 2.0), color=paint), sides)
-    box = drop(mb.box((w, y1 - y0, 0.70), at=(0, mid, 1.40), color="white"), sides)
+    box = drop(mb.box((w, y1 - y0, 0.70), at=(0, mid, 1.40), color="white"), "top")
+    box.paint(TRIM, where="bottom")                                                     # the cargo floor, seen from below
     box += drop(mb.box((w, y1 - y0, 1.05), at=(0, mid, 2.775), color="white"), "bottom")
-    fixed = lit(box + windshield, seed=3)
+    fixed = lit(box + windshield + floor, seed=3)
     fixed += drop(mb.box((1.1, 6.9, 0.50), at=(0, 0.72, 0.80), color=TRIM), "top")           # chassis
-    fixed += drop(mb.box((2.5, 0.18, 0.30), at=(0, -4.27, 0.62), color=TRIM), "back")        # bumper
+    fixed += drop(mb.box((2.4, 0.18, 0.30), at=(0, -4.27, 0.62), color=TRIM), "back")        # bumper
     for s in (1, -1):
         fixed += plate(0.95, 0.72, (s * (1.2 + DECAL), -3.28, 1.98), "left" if s > 0 else "right", GLASS)
-        fixed += plate(0.42, 0.20, (s * 0.86, -4.2 - DECAL, 0.98), "front", HEADLIGHT)
-        fixed += plate(0.30, 0.20, (s * 1.0, y1 + DECAL, 1.25), "back", TAILLIGHT)
+        fixed += lamp(0.42, 0.20, (s * 0.86, -4.2 - DECAL, 0.98), "front", HEADLIGHT)
+        fixed += lamp(0.30, 0.20, (s * 1.0, y1 + DECAL, 1.25), "back", TAILLIGHT)
     fixed += plate(1.0, 0.24, (0, -4.2 - DECAL, 1.0), "front", TRIM)
-    fixed += axles((-3.25,), 0.50, 1.25) + axles((2.60,), 0.50, 1.28)
+    fixed += axles((-3.25,), 0.60, 1.25) + axles((2.60,), 0.60, 1.28)
     return lit(cab + deflector + stripe, seed=1), fixed
 
 
-@mb.asset("prop_car_sedan", sheet=dict(extra=["top"]), concept=dict(azimuth=35, elevation=14))
+# Everything the kaiju can pick up is seen from every side: its sheet shows the underside too
+# (magenta there = a missing floor).
+BELOW = mb.View("FROM BELOW", azimuth=35, elevation=-35, fov=28)
+
+
+@mb.asset("prop_car_sedan", sheet=dict(extra=["top", BELOW]), concept=dict(azimuth=35, elevation=14))
 def prop_car_sedan():
     tint_node("prop_car_sedan", *sedan_parts())
 
@@ -275,22 +307,22 @@ def taxi_geo() -> mb.Geo:
     return paint + fixed
 
 
-@mb.asset("prop_car_taxi", sheet=dict(extra=["top"]), concept=dict(azimuth=35, elevation=14))
+@mb.asset("prop_car_taxi", sheet=dict(extra=["top", BELOW]), concept=dict(azimuth=35, elevation=14))
 def prop_car_taxi():
     mb.node("prop_car_taxi", taxi_geo())
 
 
-@mb.asset("prop_car_van", sheet=dict(extra=["top"]), concept=dict(azimuth=35, elevation=14))
+@mb.asset("prop_car_van", sheet=dict(extra=["top", BELOW]), concept=dict(azimuth=35, elevation=14))
 def prop_car_van():
     tint_node("prop_car_van", *van_parts())
 
 
-@mb.asset("prop_bus", sheet=dict(extra=["right", "top"]), concept=dict(azimuth=-40, elevation=14))
+@mb.asset("prop_bus", sheet=dict(extra=["right", "top", BELOW]), concept=dict(azimuth=-40, elevation=14))
 def prop_bus():
     tint_node("prop_bus", *bus_parts())
 
 
-@mb.asset("prop_truck", sheet=dict(extra=["top"]), concept=dict(azimuth=38, elevation=14))
+@mb.asset("prop_truck", sheet=dict(extra=["top", BELOW]), concept=dict(azimuth=38, elevation=14))
 def prop_truck():
     tint_node("prop_truck", *truck_parts())
 
@@ -316,13 +348,16 @@ def crumple(g: mb.Geo, amount: float, seed: int = 1, rough: float = 0.015) -> mb
 
 
 def scorch(g: mb.Geo, seed: int, soot: float = 0.55) -> mb.Geo:
-    """Blotchy soot and rust over whatever color is there: some faces nearly clean, some black."""
+    """Blotchy soot and rust over whatever color is there: some faces nearly clean, some black.
+    The dirt is only ever soot or rust (one roll per face, never per color channel, which gave
+    green and pink panels), and more of it settles on the faces that look up."""
     rng = random.Random(seed)
     black, rust = mb.palette.rgb("#1d1a18"), mb.palette.rgb("#6a3d24")
 
     def repaint(col, center, normal):
-        t = min(1.0, soot * rng.uniform(0.0, 1.9) ** 1.5)
-        dirt = tuple(b + (r - b) * rng.random() ** 2 * 0.7 for b, r in zip(black, rust))
+        t = min(1.0, soot * (1.0 + 0.6 * max(normal.z, 0.0)) * rng.uniform(0.25, 1.9) ** 1.5)
+        k = 0.7 * rng.random() ** 2                             # how rusty this patch of dirt is
+        dirt = tuple(b + (r - b) * k for b, r in zip(black, rust))
         return tuple(c + (d - c) * t for c, d in zip(col, dirt))
 
     return g.recolor(repaint)
@@ -362,18 +397,21 @@ def wreck_parts():
     return paint.move(0, 0, -low), fixed.move(0, 0, -low)
 
 
-@mb.asset("prop_car_wreck", sheet=dict(extra=["top"]), concept=dict(azimuth=35, elevation=16))
+@mb.asset("prop_car_wreck", sheet=dict(extra=["top", BELOW]), concept=dict(azimuth=35, elevation=16))
 def prop_car_wreck():
     tint_node("prop_car_wreck", *wreck_parts())
 
 
 # ---- street furniture -------------------------------------------------------------------------
 def kiosk_geo() -> mb.Geo:
-    """Newsstand, 2.6 x 2.4 m, 3.1 m to the top of its ball: striped awning over the counter."""
-    g = drop(mb.box((2.4, 2.0, 2.2), at=(0, 0.1, 0), color="bld_cream", anchor="bottom"), "bottom")
-    g += drop(mb.box((1.9, 0.06, 0.95), at=(0, -0.93, 1.55), color=mb.shade(GLASS, 0.7)), "back")       # serving window
-    g += drop(mb.box((2.1, 0.34, 0.10), at=(0, -1.05, 1.02), color="wood"), "back")                     # counter
-    g += mb.tapered_box((2.8, 2.4), (1.5, 1.1), 0.52, at=(0, 0.1, 2.2), color="bld_teal_glass", cap_bottom=False)
+    """Ice-cream kiosk, 2.8 x 2.6 m, 3.5 m to the top of the cone on its roof: striped awning
+    over the counter. The roof is slate, not teal: seen from above, cyan belongs to the army."""
+    g = drop(mb.box((2.4, 2.0, 2.2), at=(0, 0.1, 0), color="bld_cream", anchor="bottom"),
+             lambda c, n: abs(n.z) > 0.5)                                                  # floor and ceiling are hidden
+    g += plate(1.9, 0.95, (0, -0.9 - DECAL, 1.55), "front", mb.shade(GLASS, 0.7))          # serving window
+    g += drop(mb.box((2.1, 0.34, 0.10), at=(0, -1.05, 1.02), color="wood"), "back")        # counter
+    # the eaves overhang the walls at 2.2 m, above a soldier's eye: the roof needs its underside
+    g += mb.tapered_box((2.8, 2.4), (1.5, 1.1), 0.42, at=(0, 0.1, 2.2), color="bld_slate")
     lit(g, seed=4)
     # awning: a wedge under the eaves, its sloping top in five red and white stripes
     top, lip, wall = 2.22, 1.92, 1.98
@@ -384,11 +422,15 @@ def kiosk_geo() -> mb.Geo:
     g += mb.quad((-1.2, -0.9, wall), (1.2, -0.9, wall), (1.2, -1.72, lip), (-1.2, -1.72, lip), color="red_dk")
     g += mb.tri((1.2, -0.9, wall), (1.2, -0.9, top), (1.2, -1.72, lip), color="red_dk")
     g += mb.tri((-1.2, -0.9, top), (-1.2, -0.9, wall), (-1.2, -1.72, lip), color="red_dk")
-    g += plate(0.8, 1.8, (0.45, 1.1 + DECAL, 0.9), "back", "bld_teal_glass_dk")                        # door
-    # posters on the side walls, a ball on the roof
+    g += plate(0.8, 1.8, (0.45, 1.1 + DECAL, 0.9), "back", "bld_slate_dk")                              # door
+    # posters on the side walls
     g += plate(0.9, 1.1, (1.2 + DECAL, 0.15, 1.35), "left", "bld_salmon")
     g += plate(0.9, 1.1, (-1.2 - DECAL, 0.15, 1.35), "right", "bld_sky")
-    g += mb.icosphere(0.27, at=(0, 0.1, 2.86), color="red").jitter(0.08, seed=5)
+    # the sign on the roof says what it sells: a waffle cone with a pink scoop, 0.95 m tall
+    rim = 2.62 - 0.04 + 0.50
+    g += mb.cone(5, 0.27, 0.50, color="wood_lt", cap_bottom=False).rx(180).move(0, 0.1, rim) \
+        .bake_light(1.0, 0.82).jitter(0.07, seed=5)
+    g += mb.sphere(0.34, n=5, rings=3, at=(0, 0.1, rim + 0.11), color="#ff9db5").bake_light(1.1, 0.78).jitter(0.05, seed=6)
     return g
 
 
@@ -415,16 +457,21 @@ def tree_b_geo() -> mb.Geo:
 
 
 def lamp_geo() -> mb.Geo:
-    """Street lamp, 6 m: two lanterns on a short crossbar. Symmetric, so its heading does not matter."""
+    """Street lamp, 6 m: two framed lanterns hanging from a crossbar. Chunky, so it is more than
+    a hairline at 60 m, and each cream lantern sits between a dark cap and a dark base so it
+    still reads against a bright afternoon cloud. Symmetric, so its heading does not matter."""
     post = "#2f4f4a"
-    g = mb.prism(6, 0.22, 0.60, radius_top=0.13, color=post, cap_bottom=False)
-    g += mb.prism(5, 0.10, 5.15, radius_top=0.065, at=(0, 0, 0.60), color=post, cap_bottom=False, cap_top=False)
-    g += mb.box((0.96, 0.09, 0.09), at=(0, 0, 5.50), color=post)
-    g += mb.cone(4, 0.12, 0.32, at=(0, 0, 5.68), color=post, cap_bottom=False)
+    g = mb.prism(6, 0.30, 0.60, radius_top=0.18, color=post, cap_bottom=False)
+    g += mb.prism(5, 0.16, 5.00, radius_top=0.11, at=(0, 0, 0.60), color=post, cap_bottom=False, cap_top=False)
+    g += mb.box((1.24, 0.14, 0.14), at=(0, 0, 5.45), color=post)                       # crossbar
+    g += mb.cone(4, 0.17, 0.38, at=(0, 0, 5.58), color=post)                           # finial, closed: seen from below
+    for x in (-0.52, 0.52):
+        g += mb.pyramid((0.64, 0.64), 0.20, at=(x, 0, 5.27), color=post)               # lantern cap, closed
     lit(g, seed=8, amount=0.05)
-    for x in (-0.40, 0.40):
-        lantern = mb.tapered_box((0.22, 0.22), (0.36, 0.36), 0.36, at=(x, 0, 5.08), color="glow_lamp", mat="glow")
-        lantern.paint(post, where="top").material("vcol", where="top")
+    for x in (-0.52, 0.52):
+        lantern = drop(mb.tapered_box((0.30, 0.30), (0.50, 0.50), 0.45, at=(x, 0, 4.82), color="glow_lamp", mat="glow"),
+                       "top")
+        lantern.paint(mb.shade(post, 0.8), where="bottom").material("vcol", where="bottom")
         g += lantern
     return g
 
@@ -437,11 +484,16 @@ def trafficlight_geo() -> mb.Geo:
     g += mb.box((0.44, 0.44, 1.25), at=(0, 0, 3.45), color=housing, anchor="bottom")
     g += mb.pyramid((0.56, 0.56), 0.30, at=(0, 0, 4.70), color=post)
     lit(g, seed=9, amount=0.05)
+    # One lamp is lit per face, as on a real one: green along the street (front and back),
+    # red across it (left and right). The other two lamps are dark glass.
+    lamps = ((4.44, "glow_red", "#5a1512"), (4.07, "glow_amber", "#5a3d00"), (3.70, "glow_green", "#12431f"))
     for facing in ("front", "left", "back", "right"):
-        for z, color in ((4.44, "glow_red"), (4.07, "glow_amber"), (3.70, "glow_green")):
+        on = "glow_green" if facing in ("front", "back") else "glow_red"
+        for z, lit_color, dark in lamps:
             at = {"front": (0, -0.22 - 0.02, z), "back": (0, 0.22 + 0.02, z), "left": (0.22 + 0.02, 0, z),
                   "right": (-0.22 - 0.02, 0, z)}[facing]
-            g += plate(0.24, 0.24, at, facing, color, mat="glow")
+            g += plate(0.24, 0.24, at, facing, lit_color, mat="glow") if lit_color == on else \
+                plate(0.24, 0.24, at, facing, dark)
     return g
 
 
@@ -456,22 +508,48 @@ def bench_geo() -> mb.Geo:
     return lit(g, seed=10, amount=0.05)
 
 
+def ridge(p0, p1, half_width: float, depth: float, color) -> mb.Geo:
+    """A brace lying on a wall that faces the model's back: a bar with a triangular section
+    (two sloping faces and two end caps, 6 triangles; the face against the wall is left out)."""
+    a, b = mb.V(p0), mb.V(p1)
+    along = (b - a).normalized()
+    side = along.cross(mb.V(0, 1, 0)).normalized() * half_width
+    out = mb.V(0, depth, 0)
+    pts = [a - side, a + side, a + out, b - side, b + side, b + out]
+    g = mb.Geo()
+    middle = (a + b) / 2 + out / 3
+    for idx in ((0, 3, 5, 2), (1, 2, 5, 4), (0, 2, 1), (3, 4, 5)):
+        face = [pts[i] for i in idx]
+        center = sum(face, mb.V(0, 0, 0)) / len(face)
+        normal = (face[1] - face[0]).cross(face[2] - face[0])
+        g.face(face if normal.dot(center - middle) > 0 else face[::-1], color)
+    return g
+
+
 def billboard_geo() -> mb.Geo:
-    """Billboard, 9 m: a 6.4 x 3.2 m holiday poster (sun, sea, sail) on two legs. No words."""
+    """Billboard, 9 m: a 6.4 x 3.2 m holiday poster (sun, sea, sail) on two legs, braced behind.
+    No words. The sun is pale cream: orange is the kaiju's color."""
     steel = "metal_dk"
     g = mb.Geo()
     for x in (-2.1, 2.1):
         g += mb.beam((x, 0.12, 0), (x, 0.12, 5.75), (0.28, 0.28), color=steel, cap_start=False, cap_end=False)
     g += mb.box((6.6, 0.55, 0.10), at=(0, -0.10, 5.62), color=steel)                    # catwalk
     panel = mb.box((6.4, 0.30, 3.2), at=(0, 0.12, 5.75), color="white", anchor="bottom")
-    panel.paint("bld_sky", where="front").paint(steel, where="back")
+    panel.paint("bld_sky", where="front").paint("metal", where="back")
     g += panel
+    # the back is what one side of every street sees: an A-frame and two rails on bare sheet metal
+    back = 0.12 + 0.15
+    for sx in (1, -1):
+        g += ridge((sx * 2.1, back, 5.80), (sx * 0.25, back, 8.90), 0.13, 0.16, steel)
+    for z in (6.55, 8.05):
+        reach = 2.1 - (z - 5.80) * (2.1 - 0.25) / (8.90 - 5.80) + 0.55
+        g += ridge((-max(reach, 1.4), back, z), (max(reach, 1.4), back, z), 0.10, 0.12, steel)
     lit(g, seed=11)
     face = 0.12 - 0.15                                                                # y of the poster surface
     g += plate(6.1, 0.95, (0, face - 0.06, 6.38), "front", "water")                     # sea
     sun = [(1.35 + 0.85 * math.cos(a), face - 0.10, 7.55 + 0.85 * math.sin(a))
            for a in (math.radians(22.5 + 45 * k) for k in range(8))]
-    g += mb.polygon(sun, color="#ff8f6b")
+    g += mb.polygon(sun, color="#fff2c4")
     g += mb.tri((-1.75, face - 0.12, 6.45), (-0.55, face - 0.12, 6.45), (-1.75, face - 0.12, 8.25), color="white")   # sail
     g += mb.tri((-1.90, face - 0.12, 6.45), (-1.90, face - 0.12, 7.65), (-2.55, face - 0.12, 6.45), color="bld_salmon")
     g += mb.quad((-2.5, face - 0.12, 6.05), (-0.55, face - 0.12, 6.05), (-0.25, face - 0.12, 6.36), (-2.8, face - 0.12, 6.36),
@@ -480,16 +558,22 @@ def billboard_geo() -> mb.Geo:
 
 
 def busstop_geo() -> mb.Geo:
-    """Bus shelter, 4.2 m wide: glass back, poster end wall, bench, and a round stop sign."""
+    """Bus shelter, 4.2 m wide: glazed back with a blue frame, poster end wall, bench, and a
+    round stop sign."""
     frame = "blue"
     g = mb.box((4.2, 1.5, 0.12), at=(0, 0, 2.44), color=frame)                         # roof
-    g += drop(mb.box((4.0, 0.06, 1.95), at=(0, 0.66, 0.48), color="#a8d2e6", anchor="bottom"),
-              lambda c, n: abs(n.z) > 0.5)                                             # glass back
+    g += drop(mb.box((4.0, 0.06, 1.95), at=(0, 0.66, 0.48), color="#8fbfd6", anchor="bottom"),
+              lambda c, n: abs(n.z) > 0.5 or n.x < -0.5)                               # glass back (left edge: in the end wall)
     end = drop(mb.box((0.08, 1.25, 1.95), at=(-1.96, 0.02, 0.48), color=frame, anchor="bottom"), "top")
     end.paint("bld_salmon", where="left").paint("bld_mustard", where="right")
     g += end
     g += mb.beam((1.96, -0.60, 0), (1.96, -0.60, 2.44), (0.08, 0.08), color=frame, cap_start=False, cap_end=False)
-    g += drop(mb.box((2.7, 0.40, 0.08), at=(0.25, 0.40, 0.50), color="wood"), "bottom")  # bench
+    g += drop(mb.box((2.7, 0.40, 0.08), at=(0.25, 0.40, 0.50), color="wood"),
+              lambda c, n: n.z < -0.5 or n.y > 0.5)                                    # bench (its back touches the glass)
+    # the frame that makes the pale slab read as glazing: a mullion on both faces, a sill behind
+    g += plate(0.10, 1.95, (0, 0.63 - 0.012, 1.455), "front", frame)
+    g += plate(0.10, 1.95, (0, 0.69 + 0.012, 1.455), "back", frame)
+    g += plate(4.0, 0.12, (0, 0.69 + 0.012, 0.54), "back", frame)
     lit(g, seed=12)
     # stop sign: a disc on a short pole on the roof corner, a bus pictogram on both faces
     g += mb.rod((2.0, -0.60, 2.48), (2.0, -0.60, 2.70), 0.035, n=3, color="grey_dark", cap_start=False, cap_end=False)

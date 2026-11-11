@@ -63,6 +63,9 @@ export class HumanController implements Controller {
   private pendingWheel: CommandId | null = null;
   private pendingMarker: GroundMarker | null = null;
   private started = false;
+  private lastX = 0;
+  private lastZ = 0;
+  private lastUnit = -1;
   private kick = 0;
   private wasFiring = false;
   private readonly eye = { x: 0, y: 0, z: 0 };
@@ -151,6 +154,17 @@ export class HumanController implements Controller {
       this.viewYaw = u.aimYaw;
       this.aimYaw = u.aimYaw;
     }
+    // Redeployed (a new stage) or took over another unit: look toward the middle of the zone,
+    // which is where the kaiju is, instead of wherever the old view happened to point.
+    const jumped = Math.hypot(u.x - this.lastX, u.z - this.lastZ) > 40 || u.id !== this.lastUnit;
+    if (jumped && this.lastUnit >= 0) {
+      const b = ctx.frame.bounds;
+      this.viewYaw = Math.atan2((b.minX + b.maxX) / 2 - u.x, (b.minZ + b.maxZ) / 2 - u.z);
+      this.viewPitch = 0;
+    }
+    this.lastX = u.x;
+    this.lastZ = u.z;
+    this.lastUnit = u.id;
     if (input.pressed.camera) this.thirdPerson = !this.thirdPerson;
     if (!ctx.mapOpen) this.updateWheel(input);
     else this.wheel.open = false;

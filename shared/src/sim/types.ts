@@ -100,6 +100,11 @@ export interface PlayerState {
   botInput: PlayerInput;
   /** Scratch memory of the bot driving this slot. */
   botState: BotState;
+  /**
+   * The slot has just been handed back to its player: until their first input arrives the
+   * controls are let go (no buttons, no movement) instead of repeating what the bot last pressed.
+   */
+  handBack: boolean;
   tally: PlayerTally;
 }
 
@@ -454,12 +459,20 @@ export interface MatchState {
   kills: number;
 }
 
-/** Per-cue timers that keep the radio from repeating itself. */
+/** What keeps the radio lively but never spammy: per-cue timers, a chatter budget, and what was said last. */
 export interface VoiceState {
   /** Seconds until each cue may be emitted again. */
   cooldowns: Partial<Record<VoiceCueId, number>>;
   /** Clock announcements already made. */
   clockCalled: { min3: boolean; min1: boolean; sec10: boolean };
+  /** Chatter budget: routine cues spend one each and it refills slowly (VOICE_RULES). */
+  tokens: number;
+  /** The line last played for a cue on each side (key `<cue>|<side>`), so a cue does not repeat itself. */
+  lastLine: Record<string, string>;
+  /** The stage in which `kaiju.lowhp` was last called (0: never); it is called once per stage. */
+  lowHpStage: number;
+  /** How many marks `bar.near` has been called for (it is called once on the way to each mark). */
+  barNearCalled: number;
 }
 
 /** Inputs for one tick, indexed by PlayerId. A missing entry repeats that player's last input. */

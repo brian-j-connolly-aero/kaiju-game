@@ -83,7 +83,7 @@ def write(lines: list[dict], cast: dict, pron: dict, state: dict, report: dict) 
         rows.append([f"**{s}**", WHO.get(s, ("", ""))[0], WHO.get(s, ("", ""))[1], _voice_text(sp["voice"]),
                      sp["chain"], f"{f0[s]:.0f}", g.get("words_per_second", ""), count[s]])
     add(_table(["Character", "Heard by", "Who they are", "Synthesizer voice", "Chain", "Pitch (Hz)",
-                "Pace (words/s)", "Lines"], rows, "llllrrrr"))
+                "Pace (words/s)", "Lines"], rows, "lllllrrr"))
     add("")
     add(notes.CAST_NOTES)
 
@@ -106,9 +106,10 @@ def write(lines: list[dict], cast: dict, pron: dict, state: dict, report: dict) 
     if exps:
         add("### Casting experiments: candidate settings through the character's own chain\n")
         add(notes.EXPERIMENTS_INTRO)
-        titles = {"radio_voices": "Radio candidates (all 93 military lines, default radio chain)",
+        titles = {"radio_voices": "Radio candidates (all 93 military lines, first-pass radio chain)",
                   "anchor_voices": "Anchor candidates (all 82 news lines, broadcast chain)",
-                  "chair_voices": "Chair candidates (6 hearing lines plus 28 news lines, hall chain)"}
+                  "chair_voices": "Chair candidates, first round (6 hearing lines plus 28 news lines, first-pass hall)",
+                  "chair_voices2": "Chair candidates, second round (the 6 hearing lines, final hall chain)"}
         for g, title in titles.items():
             rs = [r for r in exps if r["group"] == g]
             if not rs:
@@ -138,14 +139,28 @@ def write(lines: list[dict], cast: dict, pron: dict, state: dict, report: dict) 
         add(_table(heads, rows))
         add("")
     if exps:
-        sweeps = [r for r in exps if r["group"].startswith("sweep_")]
-        if sweeps:
+        sweep_titles = [
+            ("sweep_radio", "Radio, first pass: one change at a time from 7 dB of drive and an unducked bed at -30 dB "
+                            "(31 military lines, Granite's and Beacon's voices)"),
+            ("sweep_radio2", "Radio, second pass: one change at a time from 3 dB of drive and a bed at -30 dB that "
+                             "drops 10 dB under the words (same 31 lines; Granite's, Beacon's and Tempest's voices)"),
+            ("sweep_radio3", "Radio, Tempest's voice only: looking for what costs it words (same 31 lines)"),
+            ("sweep_hall", "Hall, first pass: reverberation level and ducking (6 hearing lines plus 28 news lines, "
+                           "RHVoice `alan` slowed and lowered)"),
+            ("sweep_hall2", "Hall with the voice first tried for the chair (Pico lowered with its own pitch control)"),
+        ]
+        if any(r["group"].startswith("sweep_") for r in exps):
             add("### Chain sweeps: which settings keep the words\n")
             add(notes.SWEEPS_INTRO)
-            rows = [[r["group"].replace("sweep_", ""), r["label"], r["line_set"], r["wer_raw"], r["wer_processed"]]
-                    for r in sweeps]
-            add(_table(["Chain", "Setting", "Lines", "Unprocessed (%)", "Through the chain (%)"], rows, "lllrr"))
-            add("")
+            for g, title in sweep_titles:
+                rs = [r for r in exps if r["group"] == g]
+                if not rs:
+                    continue
+                add(f"**{title}**\n")
+                add(_table(["Setting", "Unprocessed (%)", "Through the chain (%)"],
+                           [[r["label"], r["wer_raw"], r["wer_processed"]] for r in rs], "lrr"))
+                add("")
+            add(notes.SWEEPS_AFTER)
     add("Pauses and timing per character:\n")
     rows = []
     for s in speakers:
@@ -160,7 +175,9 @@ def write(lines: list[dict], cast: dict, pron: dict, state: dict, report: dict) 
 
     # ---------------------------------------------------------------- client
     add("## 3. For the client\n")
-    add(notes.CLIENT)
+    radio_ms = [by_id[l["id"]] for l in lines if by_id[l["id"]].get("chain") == "radio" and "lead_s" in by_id[l["id"]]]
+    add(notes.CLIENT.format(lead=sum(m["lead_s"] for m in radio_ms) / max(len(radio_ms), 1),
+                            tail=sum(m["tail_s"] for m in radio_ms) / max(len(radio_ms), 1)))
 
     # ---------------------------------------------------------------- intelligibility
     add("## 4. Intelligibility check\n")
@@ -219,8 +236,14 @@ def write(lines: list[dict], cast: dict, pron: dict, state: dict, report: dict) 
     if rows:
         add(_table(["What", "Applies to", "Fed to the synthesizer", "Why"], rows))
     else:
-        add("None are needed at present.")
+        add(notes.PRONOUNCE_NONE)
     add("")
+    tried = pron.get("tried", [])
+    if tried:
+        add(notes.PRONOUNCE_TRIED)
+        add(_table(["Line", "Voice", "Respellings tried", "Result"],
+                   [[f"`{t['line']}`", t["voice"], "; ".join(f"`{x}`" for x in t["fed"]), t["result"]] for t in tried]))
+        add("")
 
     # ---------------------------------------------------------------- measurements
     add("## 6. Measurements of the finished files\n")
@@ -244,9 +267,11 @@ def write(lines: list[dict], cast: dict, pron: dict, state: dict, report: dict) 
     radio = [m for m in measured if m["chain"] == "radio"]
     if radio:
         add(f"Radio band: across the {len(radio)} radio lines at most "
-            f"{100 * max(m['ogg']['share_below_200'] for m in radio):.2f}% of the energy lies below 200 Hz and at most "
-            f"{100 * max(m['ogg']['share_above_4500'] for m in radio):.2f}% above 4.5 kHz; on average "
-            f"{100 * sum(m['ogg']['share_300_3600'] for m in radio) / len(radio):.1f}% lies between 300 Hz and 3.6 kHz.\n")
+            f"{100 * max(m['ogg']['share_below_band'] for m in radio):.2f}% of the energy lies below two thirds of "
+            f"the lower band corner (200 Hz for the squads) and at most "
+            f"{100 * max(m['ogg']['share_above_band'] for m in radio):.2f}% above 1.3 times the upper corner "
+            f"(4.9 kHz for the squads); on average "
+            f"{100 * sum(m['ogg']['share_in_band'] for m in radio) / len(radio):.1f}% lies inside the band.\n")
     if report["failures"]:
         add("**Checks that failed in the last build:**\n")
         for f in report["failures"]:

@@ -27,7 +27,7 @@
       "max_pause_ms": 380
     },
     "Chair": {
-      "voice": { "engine": "pico", "voice": "en-US", "rate": 0.9, "pitch": 0.78 },
+      "voice": { "engine": "pico", "voice": "en-US", "rate": 0.9, "pitch": 0.9, "shift_st": -3.0 },
       "chain": "hall",
       "max_pause_ms": 650,
       "min_pause_ms": 450

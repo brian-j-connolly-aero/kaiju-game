@@ -11,7 +11,7 @@ import type { MatchConfig } from './config';
 import { stepWorld } from './pipeline';
 import { createKaiju, createSquad, deploySquads, findClearSpot } from './spawn';
 import type { InputsByPlayer, World } from './types';
-import { createPlayerState } from './worldOps';
+import { createPlayerState, createVoiceState } from './worldOps';
 
 export interface WorldOptions {
   /** Match seed: decides the starting neighborhood and every random roll in the match. */
@@ -88,7 +88,7 @@ export function createWorld(options: WorldOptions): World {
     hits: [],
     structureHits: [],
     propHits: [],
-    voice: { cooldowns: {}, clockCalled: { min3: false, min1: false, sec10: false } },
+    voice: createVoiceState(),
     events: [],
     step(inputs?: InputsByPlayer) {
       return stepWorld(world, inputs);

@@ -2,20 +2,23 @@
  * System 11 of 11: voice cues.
  *
  * Turns what happened this tick into `voice` events (cue ids from DESIGN.md section 8). It runs
- * last, reads the tick's other events, and throttles each cue so the radio does not repeat
- * itself. Clients pick the actual line (see defs/voice.ts).
+ * last and reads the tick's other events; two cues come from watching a number instead
+ * (`kaiju.lowhp`, `bar.near`), three from the clock, and other systems call `say` themselves
+ * for `kaiju.spotted` / `kaiju.lost` (sim/spotting.ts) and `volley.ready` (the orders system).
  *
- * Real today: every cue that follows directly from an event or from the clock, plus
- * `kaiju.spotted` / `kaiju.lost`, which sim/spotting.ts says when `kaiju.known` changes, and
- * `volley.ready`, which the orders system says when every charging sub-unit of a squad is full.
+ * Every cue goes through `say`, which keeps the radio lively but never spammy:
+ * - each cue has a minimum gap before it may be heard again (VOICE_CUE_RULES);
+ * - routine chatter (priority 0) spends a token from a small budget that refills slowly
+ *   (VOICE_RULES): a burst when things start happening, then a steady trickle. Important cues
+ *   (priority 1) always go out and take a token with them, so chatter gives way to them.
+ *   Cues the match turns on (priority 2) always go out and cost nothing.
  *
- * STUB(sim): cues that need state other systems do not track yet:
- * - `kaiju.lowhp`: when a kaiju first drops below about 25% hp in a stage;
- * - `bar.near`: when the bar passes about 85% of the way to the next mark.
- * Add them here with `say(world, cue, squad, player)`.
+ * `say` also chooses the concrete lines, one list per listening side, from whatever
+ * `voiceLines.json` holds today (`chooseVoiceLines`): deterministic from the world's generator,
+ * the squad's own voice when the cue is about a squad, and not the line that cue played last.
  */
 
-import type { VoiceCueId } from '../../defs/voice';
+import { VOICE_CUE_RULES, VOICE_RULES, chooseVoiceLines, type VoiceCueId } from '../../defs/voice';
 import { DT } from '../../defs/rules';
 import { rngU32 } from '../../math/rng';
 import { NO_PLAYER } from '../config';
@@ -23,31 +26,33 @@ import type { SimEvent } from '../events';
 import type { World } from '../types';
 import { emit } from '../worldOps';
 
-/** Minimum seconds between two emissions of the same cue. Cues not listed are never throttled. */
-const CUE_GAP: Partial<Record<VoiceCueId, number>> = {
-  'building.down': 9,
-  'landmark.down': 2,
-  'collateral.human': 12,
-  'unit.lost': 6,
-  'volley.fired': 8,
-  'volley.ready': 10,
-  crossfire: 10,
-  'kaiju.roar': 12,
-  'kaiju.brace': 15,
-  'kaiju.special': 5,
-  'callin.inbound': 5,
-  'player.takeover': 4,
-  'kaiju.spotted': 15,
-  'kaiju.lost': 15,
-};
+const SIDES = ['humans', 'kaiju'] as const;
+const callsigns: string[] = [];
 
-/** Emits a voice cue unless the same cue was emitted too recently. Returns whether it was emitted. */
+/**
+ * Emits a voice cue unless radio discipline says no: the same cue was heard too recently, or it
+ * is routine chatter and the chatter budget is spent. Returns whether it was emitted.
+ */
 export function say(world: World, cue: VoiceCueId, squad = -1, player: number = NO_PLAYER): boolean {
-  const left = world.voice.cooldowns[cue] ?? 0;
-  if (left > 0) return false;
-  const gap = CUE_GAP[cue];
-  if (gap) world.voice.cooldowns[cue] = gap;
-  emit(world, { type: 'voice', cue, variant: rngU32(world.rng) & 0xffff, squad, player });
+  const v = world.voice;
+  if ((v.cooldowns[cue] ?? 0) > 0) return false;
+  const rule = VOICE_CUE_RULES[cue];
+  if (rule.priority === 0 && v.tokens < 1) return false;
+  if (rule.priority < 2) v.tokens = Math.max(0, v.tokens - 1);
+  if (rule.gap > 0) v.cooldowns[cue] = rule.gap;
+
+  const variant = rngU32(world.rng) & 0xffff;
+  callsigns.length = 0;
+  for (const s of world.squads) callsigns.push(s.callsign);
+  const callsign = world.squads[squad]?.callsign;
+  const lines = { humans: [] as string[], kaiju: [] as string[] };
+  for (const side of SIDES) {
+    const key = `${cue}|${side}`;
+    const chosen = chooseVoiceLines(cue, side, variant, { callsign, callsigns, avoid: v.lastLine[key] });
+    for (const line of chosen) lines[side].push(line.id);
+    if (chosen.length === 1) v.lastLine[key] = chosen[0].id;
+  }
+  emit(world, { type: 'voice', cue, variant, squad, player, lines });
   return true;
 }
 
@@ -81,7 +86,7 @@ function cueForEvent(world: World, e: SimEvent): void {
       if (!e.on) say(world, 'stagger.end');
       break;
     case 'crossfire':
-      say(world, 'crossfire');
+      say(world, 'crossfire', world.units[e.unitA]?.squad ?? -1);
       break;
     case 'volley':
       say(world, 'volley.fired', e.squad, e.player);
@@ -125,12 +130,41 @@ function cueForEvent(world: World, e: SimEvent): void {
   }
 }
 
+/** The two cues that watch a number: the kaiju's health, and the bar closing on its next mark. */
+function watchNumbers(world: World): void {
+  const v = world.voice;
+  const m = world.match;
+
+  // Once per stage, the first time a kaiju is badly hurt.
+  if (v.lowHpStage !== m.stage) {
+    for (const k of world.kaijus) {
+      if (!k.alive || k.hp <= 0 || k.hp >= k.maxHp * VOICE_RULES.lowHpFraction) continue;
+      v.lowHpStage = m.stage;
+      say(world, 'kaiju.lowhp', -1, k.player);
+      break;
+    }
+  }
+
+  // Once on the way to each mark, when the bar is most of the way there.
+  if (m.marksReached < 3 && v.barNearCalled <= m.marksReached) {
+    const from = m.marksReached > 0 ? m.marks[m.marksReached - 1] : 0;
+    const to = m.marks[m.marksReached];
+    if (to > from && m.barPoints >= from + (to - from) * VOICE_RULES.barNearFraction) {
+      v.barNearCalled = m.marksReached + 1;
+      say(world, 'bar.near');
+    }
+  }
+}
+
 export function voiceSystem(world: World): void {
   const v = world.voice;
   for (const cue of Object.keys(v.cooldowns) as VoiceCueId[]) {
     const left = (v.cooldowns[cue] ?? 0) - DT;
     if (left > 0) v.cooldowns[cue] = left;
     else delete v.cooldowns[cue];
+  }
+  if (v.tokens < VOICE_RULES.chatterTokens) {
+    v.tokens = Math.min(VOICE_RULES.chatterTokens, v.tokens + DT / VOICE_RULES.chatterRefill);
   }
 
   // Only the events that existed before this system ran: the cues it adds are not re-read.
@@ -139,6 +173,7 @@ export function voiceSystem(world: World): void {
 
   const m = world.match;
   if (m.phase === 'playing') {
+    watchNumbers(world);
     if (!v.clockCalled.min3 && m.clock <= 180) {
       v.clockCalled.min3 = true;
       say(world, 'clock.3min');

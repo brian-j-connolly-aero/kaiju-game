@@ -223,7 +223,8 @@ export class AssetStore {
       const entry = this.manifest.models[id];
       model = proceduralModel(id, entry?.size);
       this.models.set(id, model);
-      if (this.hasManifest) this.warnOnce(`model:${id}`, `no model "${id}" yet; drawing a box stand-in.`);
+      // Ids that only exist in the client (the chunk in a kaiju's hand) are always generated.
+      if (this.hasManifest && !id.startsWith('held_')) this.warnOnce(`model:${id}`, `no model "${id}" yet; drawing a box stand-in.`);
     }
     return model;
   }

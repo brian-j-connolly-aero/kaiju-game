@@ -23,6 +23,8 @@ MAX_SECONDS = 8.0               # radio and anchor lines (12 words at most)
 MAX_SECONDS_HALL = 13.0         # hearing lines (20 words at most, plus the room's ring)
 MAX_SECONDS_PER_WORD = 1.1      # anything slower than this is a synthesizer accident
 EDGE_DB = -35.0                 # first and last millisecond, relative to the peak
+BAND_LOW, BAND_HIGH = 0.67, 1.3  # radio lines: almost nothing below 0.67 x and above 1.3 x the band corners
+BAND_SHARE = 0.015              # "almost nothing": at most 1.5% of the energy on either side
 
 
 def measure_line(job: tuple[dict, dict, dict]) -> dict:
@@ -43,6 +45,7 @@ def measure_line(job: tuple[dict, dict, dict]) -> dict:
             continue
         ch = 1 if x.ndim == 1 else x.shape[1]
         peak = float(np.max(np.abs(x))) + 1e-12
+        lo, hi = plan["chain_cfg"].get("band_hz", [300.0, 3800.0])
         m = {
             "bytes": path.stat().st_size,
             "channels": ch,
@@ -51,9 +54,9 @@ def measure_line(job: tuple[dict, dict, dict]) -> dict:
             "true_peak_db": round(dsp.true_peak_db(x, SR), 2),
             "first_ms_db": round(dsp.db(np.max(np.abs(x[:44])) / peak), 1),
             "last_ms_db": round(dsp.db(np.max(np.abs(x[-44:])) / peak), 1),
-            "share_300_3600": round(dsp.band_share(x, SR, 300, 3600), 4),
-            "share_below_200": round(dsp.band_share(x, SR, 0, 200), 4),
-            "share_above_4500": round(dsp.band_share(x, SR, 4500, SR / 2), 4),
+            "share_in_band": round(dsp.band_share(x, SR, lo, hi * 1.12), 4),
+            "share_below_band": round(dsp.band_share(x, SR, 0, lo * BAND_LOW), 4),
+            "share_above_band": round(dsp.band_share(x, SR, hi * BAND_HIGH, SR / 2), 4),
             "centroid_hz": round(dsp.spectral_centroid(x, SR)),
             "rolloff99_hz": round(dsp.rolloff(x, SR)),
         }
@@ -76,9 +79,9 @@ def measure_line(job: tuple[dict, dict, dict]) -> dict:
             fail.append(f"{i}.{ext}: starts abruptly ({m['first_ms_db']} dB in the first millisecond)")
         if ext == "ogg" and m["last_ms_db"] > EDGE_DB:
             fail.append(f"{i}.{ext}: ends abruptly ({m['last_ms_db']} dB in the last millisecond)")
-        if plan["chain"] == "radio" and (m["share_below_200"] > 0.02 or m["share_above_4500"] > 0.01):
-            fail.append(f"{i}.{ext}: radio line is not band-limited "
-                        f"({100 * m['share_below_200']:.1f}% below 200 Hz, {100 * m['share_above_4500']:.1f}% above 4.5 kHz)")
+        if plan["chain"] == "radio" and (m["share_below_band"] > BAND_SHARE or m["share_above_band"] > BAND_SHARE):
+            fail.append(f"{i}.{ext}: radio line is not band-limited ({100 * m['share_below_band']:.1f}% of the "
+                        f"energy below {lo * BAND_LOW:.0f} Hz, {100 * m['share_above_band']:.1f}% above {hi * BAND_HIGH:.0f} Hz)")
     limit = MAX_SECONDS_HALL if plan["chain"] == "hall" else MAX_SECONDS
     if rec["duration"] > limit:
         fail.append(f"{i}: {rec['duration']} s is longer than the {limit} s limit")

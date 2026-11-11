@@ -65,7 +65,11 @@ export class HomeScreen implements Screen {
         // No such room, a full room, an old page, or no server at all.
         showNotice(failure === ERROR_NO_ROOM ? 'lb_join' : failure === JOIN_ERROR.roomFull || failure === JOIN_ERROR.serverFull ? 'lb_human' : failure === JOIN_ERROR.version ? 'ui_warning' : 'ui_offline');
         ctx.audio.play('ui_error');
-        if (failure === ERROR_NO_ROOM) code.classList.add('bad');
+        if (failure === ERROR_NO_ROOM) {
+          code.classList.add('bad');
+          // Do not keep trying a room that is gone every time the page is opened.
+          if (window.location.hash) window.history.replaceState(null, '', window.location.pathname + window.location.search);
+        }
       } finally {
         this.busy = false;
         create.disabled = false;

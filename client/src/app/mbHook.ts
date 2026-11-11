@@ -36,7 +36,8 @@ export interface MbState {
   unitsAlive: number;
   events: Record<string, number>;
   net: { snapshots: number; events: number; inputs: number; pending: number; correction: number; predicting: boolean } | null;
-  frame: { ms: number; maxMs: number; count: number };
+  /** `ms`: script time per frame, smoothed; `fps`: frames actually shown per second. */
+  frame: { ms: number; maxMs: number; count: number; fps: number };
   result: { winner: string; reason: string; duration: number } | null;
   /** Matches this page has seen end, and how the last of them ended (kept after the room returns to its lobby). */
   matchesEnded: number;
@@ -65,7 +66,7 @@ export interface HookSource {
   screen(): ScreenId;
   booted(): boolean;
   errors: string[];
-  frameStats: { ms: number; maxMs: number; count: number };
+  frameStats: { ms: number; maxMs: number; count: number; fps: number };
   /** Runs once after the next frame has been drawn. */
   afterFrame(fn: () => void): void;
 }

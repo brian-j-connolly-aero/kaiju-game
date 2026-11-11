@@ -1,12 +1,13 @@
 /** Small helpers every system uses: emitting events, looking entities up, queueing commands. */
 
 import { TALLY_CLASSES, type TallyClass } from '../defs/ids';
+import { VOICE_RULES } from '../defs/voice';
 import { BUTTON_COUNT, neutralInput } from '../net/input';
 import { createBotState } from './bots/types';
 import type { SquadCommand } from './commands';
 import type { PlayerId, PlayerSlot } from './config';
 import type { PlayerTally, SimEvent, SimEventInput } from './events';
-import type { InputState, Kaiju, PlayerState, Squad, Unit, World } from './types';
+import type { InputState, Kaiju, PlayerState, Squad, Unit, VoiceState, World } from './types';
 
 /** "Never pressed" value for InputState.sincePressTicks. */
 export const NEVER_PRESSED_TICKS = 1e9;
@@ -53,7 +54,19 @@ export function createPlayerState(slot: PlayerSlot): PlayerState {
     queuedCommands: [],
     botInput: neutralInput(),
     botState: createBotState(),
+    handBack: false,
     tally: createTally(),
+  };
+}
+
+export function createVoiceState(): VoiceState {
+  return {
+    cooldowns: {},
+    clockCalled: { min3: false, min1: false, sec10: false },
+    tokens: VOICE_RULES.chatterTokens,
+    lastLine: {},
+    lowHpStage: 0,
+    barNearCalled: 0,
   };
 }
 
@@ -92,14 +105,27 @@ export function queueCommand(world: World, player: PlayerId, command: SquadComma
 }
 
 /**
- * Gives a slot to a bot (its player dropped) or back to its player (they rejoined). The bot
- * starts from the slot's current state; nothing else changes.
+ * The server's hook for people coming and going. `bot: true` gives a slot to a bot (its player
+ * dropped, or never came): the bot starts from the slot's current state with a fresh mind and
+ * plays by the same rules. `bot: false` hands the slot back to a person (they rejoined, or a
+ * late joiner takes over a bot squad): the bot lets go of the controls at once, and the person
+ * carries on from wherever the bot left their kaiju or squad. Nothing else changes; calling it
+ * with the state the slot is already in does nothing.
  */
 export function setPlayerBot(world: World, player: PlayerId, bot: boolean): void {
   const p = world.players[player];
-  if (!p) return;
+  if (!p || p.bot === bot) return;
   p.bot = bot;
-  if (bot) p.botInput = neutralInput(p.input.seq);
+  if (bot) {
+    // The bot keeps looking where the player looked; everything else it works out afresh.
+    p.botInput = neutralInput(p.input.seq);
+    p.botInput.aimYaw = p.input.aimYaw;
+    p.botInput.aimPitch = p.input.aimPitch;
+    p.botState = createBotState();
+    p.handBack = false;
+  } else {
+    p.handBack = true;
+  }
 }
 
 /** The first living kaiju, or null. Tier 1 has exactly one kaiju. */

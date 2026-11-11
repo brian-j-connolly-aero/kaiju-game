@@ -48,7 +48,7 @@ export class App {
   private readonly debug: DebugOverlay | null;
   private readonly backdrop = new CinematicCamera();
   private readonly errors: string[] = [];
-  private readonly frameStats = { ms: 0, maxMs: 0, count: 0 };
+  private readonly frameStats = { ms: 0, maxMs: 0, count: 0, fps: 0 };
   private readonly afterFrame: Array<() => void> = [];
   private last = 0;
   private menuFrame = 0;
@@ -146,6 +146,11 @@ export class App {
     client.events.on('closed', (reason) => {
       this.ctx.notice = CLOSED_NOTICE[reason];
       if (reason !== 'left') console.warn(`net: left the room (${reason}).`);
+      // The address no longer names a room to come back to (after a network failure it still
+      // does: a reload tries again).
+      if (reason !== 'network' && window.location.hash) {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
     });
   }
 
@@ -205,8 +210,10 @@ export class App {
     const ctx = this.ctx;
     const cap = ctx.params.fpsCap;
     if (cap > 0 && time - this.last < 1000 / cap - 2) return;
+    const elapsed = Math.max(0.0001, (time - this.last) / 1000);
+    this.frameStats.fps += (1 / elapsed - this.frameStats.fps) * 0.08;
     // A long stall is played back as at most a quarter second, so nothing leaps.
-    const dt = Math.min(0.25, Math.max(0, (time - this.last) / 1000));
+    const dt = Math.min(0.25, elapsed);
     this.last = time;
     const started = performance.now();
 
@@ -236,6 +243,6 @@ export class App {
     stats.count++;
     stats.ms += (ms - stats.ms) * 0.05;
     stats.maxMs = Math.max(stats.maxMs * 0.995, ms);
-    this.debug?.update(ctx, ms, dt, this.current?.id ?? 'boot');
+    this.debug?.update(ctx, ms, dt, this.current?.id ?? 'boot', stats.fps);
   };
 }

@@ -64,6 +64,7 @@ def transcribe(x: np.ndarray, sr: int) -> str:
     y = y / peak * 0.7                       # same level for every clip
     pcm = (np.clip(y, -1, 1) * 32767).astype(np.int16).tobytes()
     d = decoder()
+    d.reinit_feat()                          # forget the previous clip: results must not depend on order
     d.start_utt()
     d.process_raw(pcm, full_utt=True)
     d.end_utt()

@@ -41,6 +41,14 @@ export interface LocalMatchOptions {
   fast?: boolean;
 }
 
+/** The sandbox's own handle on its simulation, for tests and visual checks. */
+export interface LocalMatchControl {
+  /** The simulation the sandbox is running. Change it only between frames. */
+  world: World;
+  /** Moves the match straight to a stage, as the end of a molt does. */
+  toStage(stage: StageId): void;
+}
+
 type Handlers = { [K in ServerMessageType]: Array<(payload: ServerMessages[K]) => void> };
 
 const MAX_CATCH_UP_TICKS = 4;
@@ -50,7 +58,7 @@ const MAX_CATCH_UP_TICKS = 4;
  * connection's, and messages are delivered asynchronously so the caller's order of events is
  * the same as over a socket.
  */
-export function createLocalLink(options: LocalMatchOptions, subscribe: (link: RoomLink) => void): RoomLink {
+export function createLocalLink(options: LocalMatchOptions, subscribe: (link: RoomLink) => void): { link: RoomLink; control: LocalMatchControl } {
   const handlers: Handlers = { welcome: [], lobby: [], snap: [], events: [], pong: [] };
   const emit = <K extends ServerMessageType>(type: K, payload: ServerMessages[K]): void => {
     for (const handler of handlers[type]) handler(payload);
@@ -177,7 +185,18 @@ export function createLocalLink(options: LocalMatchOptions, subscribe: (link: Ro
       // Nothing to cut.
     },
   };
+  const control: LocalMatchControl = {
+    world,
+    toStage(stage) {
+      if (closed || world.match.phase === 'ended') return;
+      // Events raised outside a step are collected by hand so the client still hears them.
+      world.events = [];
+      beginStage(world, stage);
+      for (const e of world.events) pending.push(e);
+      world.events = [];
+    },
+  };
   subscribe(link);
   setTimeout(start, 0);
-  return link;
+  return { link, control };
 }

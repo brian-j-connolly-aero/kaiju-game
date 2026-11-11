@@ -76,7 +76,8 @@ const FOG: Record<StageId, FogRange> = {
   2: { near: 280, far: 2700 },
   3: { near: 520, far: 4400 },
 };
-const CURTAIN: Record<StageId, number> = { 1: 5, 2: 16, 3: 46 };
+/** Height of the faint curtain above the quarantine line, by stage: a line first, a wall never. */
+const CURTAIN: Record<StageId, number> = { 1: 2.5, 2: 7, 3: 20 };
 
 interface GroundMark {
   /** Call-in mission id. */

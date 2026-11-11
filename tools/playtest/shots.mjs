@@ -17,6 +17,7 @@
  *   --seconds N      how long each visit plays before the last picture (default 14)
  *   --width W --height H   page size (default 960 x 540)
  *   --no-assets      procedural fallbacks only
+ *   --no-extras      skip the scripted extras (command wheel, charging lasers, molts, beam, stagger)
  *
  * The Chromium flags are the ones documented in smoke.mjs.
  */
@@ -46,7 +47,7 @@ const TYPES = {
 };
 
 function parseArgs(argv) {
-  const opts = { out: '/tmp/mb-scratch/playtest/shots', stages: [1, 2, 3], roles: ['kaiju', 'human'], seconds: 14, width: 960, height: 540, noAssets: false };
+  const opts = { out: '/tmp/mb-scratch/playtest/shots', stages: [1, 2, 3], roles: ['kaiju', 'human'], seconds: 14, width: 960, height: 540, noAssets: false, extras: true };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const next = () => argv[++i];
@@ -57,6 +58,7 @@ function parseArgs(argv) {
     else if (a === '--width') opts.width = Number(next()) || 960;
     else if (a === '--height') opts.height = Number(next()) || 540;
     else if (a === '--no-assets') opts.noAssets = true;
+    else if (a === '--no-extras') opts.extras = false;
     else {
       console.error(`unknown option ${a}`);
       process.exit(2);
@@ -142,6 +144,96 @@ async function main() {
       await browser.close();
     }
   }
+  // --- extras: things the autopilot does not show by itself ------------------------------------
+  if (opts.extras) {
+    const visit = async (tag, query, steps) => {
+      const browser = await chromium.launch({ headless: true, args: CHROMIUM_ARGS });
+      const page = await browser.newPage({ viewport: { width: opts.width, height: opts.height }, deviceScaleFactor: 1 });
+      const errors = [];
+      page.on('console', (m) => {
+        if (m.type() === 'error') errors.push(m.text());
+      });
+      page.on('pageerror', (e) => errors.push(`uncaught: ${e.message}`));
+      const q = new URLSearchParams({ fps: '30', name: 'Shots', ...query });
+      if (opts.noAssets) q.set('assets', 'none');
+      try {
+        await page.goto(`${origin}/?${q.toString()}`, { waitUntil: 'load' });
+        const deadline = Date.now() + 60000;
+        for (;;) {
+          const s = await page.evaluate(() => (window.__mb ? window.__mb.state() : null));
+          if (s && s.screen === 'match' && s.match && s.match.phase === 'playing') break;
+          if (Date.now() > deadline) throw new Error(`${tag}: the sandbox match did not start`);
+          await sleep(300);
+        }
+        await steps(page, (name) => page.screenshot({ path: join(opts.out, `${tag}-${name}.png`) }));
+        console.log(`shots: ${tag}: ${errors.length} console errors`);
+      } catch (err) {
+        failures.push(err instanceof Error ? err.message : String(err));
+      }
+      if (errors.length > 0) failures.push(`${tag}: ${errors.length} console error(s): ${errors.slice(0, 3).join(' | ')}`);
+      await browser.close();
+    };
+
+    // A person at the keyboard (no autopilot): the command wheel, charging lasers, then two molts.
+    await visit('x-human-keys', { sandbox: '1', role: 'human' }, async (page, shot) => {
+      await sleep(1500);
+      await page.keyboard.down('KeyQ');
+      await sleep(700);
+      await shot('1-wheel');
+      await page.keyboard.up('KeyQ');
+      await page.keyboard.press('Digit4');
+      await page.keyboard.down('KeyW');
+      await sleep(1500);
+      await page.keyboard.up('KeyW');
+      await page.keyboard.press('KeyV');
+      await sleep(3500);
+      await shot('2-hold-and-charge');
+      await page.evaluate(() => window.__mb.internals.ctx.client.local.toStage(2));
+      await sleep(3000);
+      await shot('3-after-molt-stage-2');
+      await page.evaluate(() => window.__mb.internals.ctx.client.local.toStage(3));
+      await sleep(6000);
+      await shot('4-after-molt-stage-3');
+    });
+
+    // The beam: fill the rage meter and let the autopilot breathe it.
+    await visit('x-kaiju-beam', { sandbox: '2', role: 'kaiju', autoplay: '1' }, async (page, shot) => {
+      await sleep(2500);
+      await page.evaluate(() => {
+        const w = window.__mb.internals.ctx.client.local.world;
+        w.kaijus[0].rage = 100;
+        // Put a squad in front of it so there is something to breathe on.
+        const k = w.kaijus[0];
+        for (const u of w.units.slice(0, 4)) {
+          u.x = k.x + Math.sin(k.yaw) * 90 + (u.id - 1.5) * 12;
+          u.z = k.z + Math.cos(k.yaw) * 90;
+        }
+      });
+      for (let i = 0; i < 40; i++) {
+        const s = await page.evaluate(() => window.__mb.state());
+        if (s.kaiju && s.kaiju.action === 'special' && s.kaiju.phase === 'special') break;
+        await sleep(150);
+      }
+      await sleep(500);
+      await shot('1-beam-first-person');
+      await page.evaluate(() => {
+        window.__mb.internals.ctx.runtime.controller.thirdPerson = true;
+      });
+      await sleep(700);
+      await shot('2-beam-third-person');
+      // Then a stagger: the weak point shows.
+      await page.evaluate(() => {
+        const k = window.__mb.internals.ctx.client.local.world.kaijus[0];
+        k.phase = 'stagger';
+        k.action = 'none';
+        k.phaseTime = 0;
+        k.phaseDuration = 5;
+      });
+      await sleep(1500);
+      await shot('3-stagger');
+    });
+  }
+
   server.close();
   writeFileSync(join(opts.out, 'summary.json'), `${JSON.stringify({ ok: failures.length === 0, report, failures }, null, 2)}\n`);
   console.log(`shots: pictures in ${opts.out}`);

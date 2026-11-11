@@ -163,7 +163,7 @@ body {
   font: inherit;
   font-size: 30px;
   color: var(--ink);
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--panel);
   border: 2px solid var(--panel-edge);
   border-radius: 12px;
   padding: 8px 14px;
@@ -176,7 +176,7 @@ body {
 }
 
 .btn:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(60, 70, 100, 0.9);
 }
 
 .btn:disabled {

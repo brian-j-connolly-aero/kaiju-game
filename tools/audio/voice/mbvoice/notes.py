@@ -27,31 +27,39 @@ still worth doing; section 7 says what to listen for.
 
 CAST_NOTES = """\
 "Pitch" is the middle (median) pitch of the voice measured on the unprocessed synthesizer output
-of that character's lines; "pace" is words per second while speaking. The three squad voices and
-Overlord share one radio channel, so they are spread out on purpose: three different speakers,
-pitched roughly 105, 140 and 185 Hz, with Overlord the slowest and lowest.
+of that character's lines; "pace" is words per second from first word to last, pauses included.
+The three squad voices and Overlord share one radio channel, so they are spread out on purpose:
+four different recorded speakers, the squads pitched roughly 105, 140 and 185 Hz, and Overlord the
+lowest and slowest of the men.
 
 Why these voices:
 
 - **Overlord** is RHVoice `bdl`, the most intelligible voice on the machine by a wide margin, and
-  the only one that stays clear on the radio almost whatever is done to it. Slowed to 88% speed
-  and lowered to 82% pitch it loses nothing measurable, so the gravity is free. Command also gets
-  the cleanest radio (wider band, less static): it is the base station, the squads are in the
-  field.
-- **Granite** is Flite `rms`, the deepest natural voice available. Lowering it further with a
-  pitch shifter was tried and rejected: two semitones down tripled the error rate.
-- **Beacon** is RHVoice `clb`, a precise female voice, spoken slightly faster than the others.
+  the only one that stays clear on the radio almost whatever is done to it. Slowed to 86% speed
+  and lowered to 78% pitch it loses nothing measurable, so the gravity is free. Command also gets
+  the cleanest radio (wider band, less drive, less static): it is the base station, the squads
+  are in the field.
+- **Granite** is Flite `rms`, the deepest natural voice available, close to Overlord in pitch but
+  a different man with a darker, rougher sound and a quicker, clipped delivery. Lowering it
+  further with a pitch shifter was tried and rejected: two semitones down tripled the error rate.
+- **Beacon** is RHVoice `clb`, a precise female voice. It is the slowest voice at its default
+  speed, so it is sped up to keep the by-the-book reports brisk.
 - **Tempest** is RHVoice `alan`, a male voice with a Scottish accent, noticeably higher than
   Granite and Overlord. It is the weakest radio voice by the numbers; the recognizer was trained
   on American speech and marks the accent down on every chain, so part of that is the instrument.
-  The other candidates were worse (Flite `awb` is the same speaker in a rougher synthesizer) or
-  already in use.
+  The other candidates were worse (Flite `awb` is the same speaker in a rougher synthesizer, Pico
+  falls apart on the radio) or already in use.
 - **Anchor** is RHVoice `slt`, a female voice with the widest frequency range on the machine
-  (up to 12 kHz), which is what a clean broadcast voice needs. Pico was the expected choice for
-  the anchor and lost on the numbers: about two and a half times the word errors.
-- **Chair** is Pico `en-US`, slowed to 90% and lowered to 78% pitch, in the hall. Pico is the only
-  speaker left that is not already a radio or news voice, so the hearing does not sound like
-  Overlord or the anchor reading the verdict.
+  (up to 12 kHz), which is what a clean broadcast voice needs, slowed a little for composure.
+  Pico was the expected choice for the anchor and lost on the numbers: about two and a half
+  times the word errors.
+- **Chair** is Pico `en-US`, the one speaker not already on the radio or the news, so the hearing
+  does not sound like Overlord or the anchor reading the verdict. It is slowed to 90%, lowered to
+  90% pitch with Pico's own control, and then moved down three more semitones together with its
+  resonances (a larger body, not just a lower note), which lands it at about 130 Hz: a low,
+  unhurried voice of no obvious age. Of all the ways of lowering Pico that were tried this was
+  the clearest (second-round table below); RHVoice `alan` would be slightly clearer still but is
+  Tempest.
 
 Several voices on this machine are the same recorded person inside different synthesizers
 (`slt` exists in RHVoice, Flite and Festival; RHVoice `alan` and Flite `awb` are one speaker), so
@@ -96,7 +104,10 @@ Before settling the chains, candidate voice settings were run through a first ve
 chain (radio with 7 dB of overdrive and an unducked static bed at -30 dB; hall with reverberation
 at -12 dB and early reflections at -9 dB). The first-pass chains were harsher than the final ones,
 so the "through the chain" numbers here are worse than the finished lines in section 4; what
-matters in these tables is the order of the candidates.
+matters in these tables is the order of the candidates. (The experiments were also scored before
+the recognizer was made to forget each clip before the next, which moves a result by a word or
+two depending on the order of the run; and the chain code has been refined since. Re-running
+them reproduces the ranking, not every decimal.)
 """
 
 CHAINS_INTRO = """\
@@ -143,13 +154,29 @@ tolerant of noise, distortion and reverberation than a person, so these sweeps e
 clarity. Differences of two or three points are within the noise of the measurement.
 """
 
+SWEEPS_AFTER = """\
+What the sweeps decided:
+
+- **Overdrive is the most expensive radio ingredient.** 12 dB of drive doubles the errors; 3 dB
+  costs almost nothing and still rounds the peaks. The default is 3 dB ("light").
+- **Static under the words costs a lot, static between the words costs little.** So the bed sits
+  at -30 dB in the gaps, where it is heard as radio hiss, and drops 14 dB while a word is spoken.
+- **A slightly wider band helps every voice.** 300 Hz to 3.8 kHz instead of 330 Hz to 3.3 kHz; it
+  is still plainly a radio.
+- **The compressor and the presence peak help** (removing either made things worse), so both stay.
+- **Reverberation on top of the words is what hurts in the hall,** above all the early
+  reflections. With the early reflections at -18 dB and the tail held 12 dB down while the chair
+  speaks, the room costs a few points instead of twenty-five, and the tail after the last word is
+  as long and as loud as in the first version.
+"""
+
 CLIENT = """\
 - **Files and manifest.** `manifest.voice.json` has one entry per line id:
-  `{ "base": "audio/voice/<lineId>", "duration": seconds }`. `duration` is the length of the whole
+  `{{ "base": "audio/voice/<lineId>", "duration": seconds }}`. `duration` is the length of the whole
   file including squelch or reverb tail (the `.mp3` can be up to 0.05 s longer because of frame
   padding). Use it to time subtitles and to queue lines.
 - **Do not add `radio_open` / `radio_close` around these files.** The radio lines already begin
-  with a key click and end with a squelch tail (about 0.09 s before the first word and 0.14 s
+  with a key click and end with a squelch tail ({lead:.2f} s before the first word and {tail:.2f} s
   after the last). Those two effects from the sound-effects set remain useful for radio moments
   without a voice line.
 - **One line at a time per listener.** Radio lines are mono and sit in one band; two at once turn
@@ -160,8 +187,7 @@ CLIENT = """\
   plays, and let loud sound effects win over chatter.
 - **The hearing lines are stereo** (the room is wide); everything else is mono. Play voice lines
   flat, not positioned in the 3D scene.
-- **Subtitles** come from the `text` field of the script, never from this folder. Two radio lines
-  are spoken from a respelling (section 5); the subtitle is unchanged.
+- **Subtitles** come from the `text` field of the script, never from this folder.
 - **Who speaks.** The script's `speaker` field has the name for the subtitle label. Squads
   without a voice of their own (the fourth squad, "Anvil") fall back to Overlord's lines, as
   `pickVoiceLine` in `shared/src/defs/voice.ts` already does.
@@ -199,10 +225,23 @@ trouble, but short one-word lines are the ones most likely to be lost under game
 
 PRONOUNCE_INTRO = """\
 `tools/audio/voice/pronounce.json` holds what is fed to the synthesizer where the plain text
-comes out wrong. The subtitle text is never changed. Respellings can be per word (for every
-voice, or for one engine or one engine and voice) or a whole replacement line. Each was accepted
-only when it lowered the recognizer's errors on the lines it touches without raising them
-elsewhere.
+comes out wrong. The subtitle text is never changed. A respelling can be per word (`"words"`: for
+every voice, or for one engine, or for one engine and voice, for example `"rhvoice:alan"`) or a
+whole replacement line (`"lines"`). `tools/audio/voice/respell.py <lineId> "candidate" ..` speaks
+candidates with the line's own voice and chain and prints what the recognizer hears, without
+writing anything. A respelling is accepted only when it lowers the errors of the finished clip.
+"""
+
+PRONOUNCE_NONE = """\
+**No respelling is in force.** Every word of the script is in the synthesizers' pronouncing
+dictionaries (the script was written to avoid words that can be read two ways), so the engines
+say the words correctly and the recognizer's misses are its own: it prefers "valley" to "volley",
+"ankles" to "angles" and "granted" to "Granite" whoever speaks and however the word is spelled.
+"""
+
+PRONOUNCE_TRIED = """\
+Respellings that were tried on the lines the recognizer does worst on, and rejected (kept in
+`pronounce.json` under `"tried"` so nobody repeats them):
 """
 
 MEASURE_INTRO = """\

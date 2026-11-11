@@ -41,15 +41,18 @@ def line_sets() -> dict:
         "radio sample": radio[::3],                  # every third military line (31)
         "anchor": anchor,                            # all 82 news lines
         "chair": chair + anchor[::3],                # the 6 hearing lines plus 28 news lines
+        "hearing": chair,                            # the 6 hearing lines only
         **{s: [l for l in lines if l["speaker"] == s] for s in ("Overlord", "Granite", "Beacon", "Tempest")},
     }
 
 
 # The first-pass chains the casting experiments were run through (harsher than the final ones).
-RADIO_V1 = {"drive_db": 7.0, "static_db": -30.0, "static_duck_db": 0.0}
+# Every setting that differs from today's defaults is spelled out, so these experiments keep
+# their meaning (and their cached results) when the defaults in mbvoice/chains.py move.
+RADIO_V1 = {"band_hz": [330.0, 3300.0], "drive_db": 7.0, "static_db": -30.0, "static_duck_db": 0.0}
 HALL_V1 = {"wet_db": -12.0, "early_db": -9.0, "duck_db": 0.0}
 # The second-pass radio chain (what the defaults became).
-RADIO_V2 = {"drive_db": 3.0, "static_db": -30.0, "static_duck_db": 10.0}
+RADIO_V2 = {"band_hz": [330.0, 3300.0], "drive_db": 3.0, "static_db": -30.0, "static_duck_db": 10.0}
 
 # group name -> list of (label, voice, chain, chain overrides, line set, max pause ms)
 GROUPS = {
@@ -169,6 +172,24 @@ def _hall_sweep2() -> list:
     return [(f"pico low: {label}", voice, "hall", {**HALL_V1, **over}, "chair", 650) for label, over in settings]
 
 
+def _chair_voices2() -> list:
+    final_hall = {"wet_db": -12.0, "early_db": -18.0, "duck_db": 12.0}
+    cands = [
+        ("pico en-US rate 0.9 pitch 0.78", V("pico", "en-US", rate=0.9, pitch=0.78)),
+        ("pico en-US rate 0.9, pitch and formants -2 semitones", V("pico", "en-US", rate=0.9, shift_st=-2.0)),
+        ("pico en-US rate 0.9, pitch and formants -3 semitones", V("pico", "en-US", rate=0.9, shift_st=-3.0)),
+        ("pico en-US rate 0.9, pitch and formants -4 semitones", V("pico", "en-US", rate=0.9, shift_st=-4.0)),
+        ("pico en-US rate 0.9, pitch and formants -5 semitones", V("pico", "en-US", rate=0.9, shift_st=-5.0)),
+        ("pico en-US rate 0.9 pitch 0.9, pitch and formants -3 semitones",
+         V("pico", "en-US", rate=0.9, pitch=0.9, shift_st=-3.0)),
+        ("pico en-GB rate 0.9, pitch and formants -4 semitones", V("pico", "en-GB", rate=0.9, shift_st=-4.0)),
+        ("alan rate 0.84 pitch 0.8", V("rhvoice", "alan", rate=0.84, pitch=0.8)),
+        ("kal16 rate 0.9", V("flite", "kal16", rate=0.9)),
+    ]
+    return [(label, v, "hall", final_hall, "hearing", 650) for label, v in cands]
+
+
+GROUPS["chair_voices2"] = _chair_voices2()
 GROUPS["sweep_radio3"] = _radio_sweep3()
 GROUPS["sweep_hall2"] = _hall_sweep2()
 GROUPS["sweep_radio2"] = _radio_sweep2()

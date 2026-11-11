@@ -21,6 +21,16 @@ from mathutils import Matrix, Vector  # noqa: E402  (available once bpy is loade
 V = mb.V
 UP, DOWN, FWD, BACK, LEFT, RIGHT = mb.UP, mb.DOWN, mb.FWD, mb.BACK, mb.LEFT, mb.RIGHT
 
+# ---- the weak-point light ----------------------------------------------------------------
+# Violet-white, used by every glowing "shoot here" part of the kaiju family (the chest organ,
+# the vent on the back, the light inside the cocoon). It must not be cyan: cyan is the humans'
+# color and yellow the volley's (DESIGN.md section 8). Violet also stays apart from the orange
+# hide for red-green colorblind players. The kit's palette entry "glow_weak" should follow.
+WEAK = "#c9a6ff"
+WEAK_HOT = "#f3e9ff"        # the bright facets
+WEAK_DEEP = "#8f5cf2"       # the shaded facets
+WEAK_DIM = "#6a3fd0"        # deep inside (the bottom of the cocoon)
+
 
 # =========================================================================================
 # cross-sections and tubes
@@ -187,6 +197,41 @@ def scute(center, normal, w: float, length: float, thick: float, along=UP, color
     if side.length < 1e-6:
         side = LEFT
     return g.along(c - nrm * (thick * sink), c + nrm * thick, side=side.normalized())
+
+
+def plate(center, normal, w: float, length: float, thick: float, along=UP, turn: float = 0.0,
+          root="white", edge="white", rim=None) -> mb.Geo:
+    """A grown scale: a keeled wedge lying on a surface. Its leading edge (toward -`along`)
+    is sunk into the hide, its trailing edge (toward +`along`) stands `thick` proud, so a row
+    of them overlaps like shingles. Colored from `root` at the sunk end to `edge` at the
+    free end; `rim` colors the thick trailing face. `turn` twists it (degrees) around the
+    normal so no two sit quite square. 14 triangles, open underneath."""
+    c, nrm = V(center), V(normal).normalized()
+    a = V(along)
+    a = (a - nrm * a.dot(nrm)).normalized()
+    side = a.cross(nrm).normalized()
+    rot = Matrix.Rotation(math.radians(turn), 3, nrm)
+    a, side = rot @ a, rot @ side
+    hl = length / 2.0
+    # (distance along, half width at the hide, half width on top, height of the top)
+    cuts = [(-hl, 0.34 * w, 0.20 * w, -0.10 * thick), (0.10 * hl, 0.50 * w, 0.36 * w, 0.62 * thick),
+            (hl, 0.40 * w, 0.30 * w, thick)]
+    low, top = [], []
+    for s, wb, wt, h in cuts:
+        o = c + a * s
+        low.append((o - side * wb - nrm * (0.30 * thick), o + side * wb - nrm * (0.30 * thick)))
+        top.append((o - side * wt + nrm * h, o + side * wt + nrm * h))
+    g = mb.Geo()
+    for k in range(2):
+        col = root if k == 0 else edge
+        g.face([top[k][0], top[k][1], top[k + 1][1], top[k + 1][0]], color=col)                    # top
+        g.face([low[k][0], top[k][0], top[k + 1][0], low[k + 1][0]], color=col)                    # one flank
+        g.face([top[k][1], low[k][1], low[k + 1][1], top[k + 1][1]], color=col)                    # the other
+    g.face([low[2][0], top[2][0], top[2][1], low[2][1]], color=rim if rim is not None else edge)   # trailing face
+    # which way round the faces must be listed depends on the handedness of (side, along, normal)
+    if g.face_normal(0).dot(nrm) < 0:
+        g.flip()
+    return g
 
 
 def sliver(a, b, w: float, h: float, up=UP, color="scar", n: int = 3) -> mb.Geo:
@@ -378,6 +423,8 @@ class Rig:
                 g.move(0, 0, -lo.z).scale(s)
             p = self.pivot[name]
             self.pivot[name] = Vector((p.x * s, p.y * s, (p.z - lo.z) * s))
+        if "root" in self.pivot:               # the root is the ground under the creature, by contract
+            self.pivot["root"] = Vector((0.0, 0.0, 0.0))
         return s
 
     def emit(self) -> None:
