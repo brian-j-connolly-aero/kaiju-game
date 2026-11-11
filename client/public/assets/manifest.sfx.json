@@ -1,0 +1,514 @@
+{
+  "sfx": {
+    "explosion_s": {
+      "variants": [
+        "audio/sfx/explosion_s_1",
+        "audio/sfx/explosion_s_2",
+        "audio/sfx/explosion_s_3"
+      ],
+      "gain": 1
+    },
+    "explosion_m": {
+      "variants": [
+        "audio/sfx/explosion_m_1",
+        "audio/sfx/explosion_m_2",
+        "audio/sfx/explosion_m_3"
+      ],
+      "gain": 1
+    },
+    "explosion_l": {
+      "variants": [
+        "audio/sfx/explosion_l_1",
+        "audio/sfx/explosion_l_2",
+        "audio/sfx/explosion_l_3"
+      ],
+      "gain": 1
+    },
+    "structure_hit": {
+      "variants": [
+        "audio/sfx/structure_hit_1",
+        "audio/sfx/structure_hit_2",
+        "audio/sfx/structure_hit_3"
+      ],
+      "gain": 1
+    },
+    "crumble_s": {
+      "variants": [
+        "audio/sfx/crumble_s_1",
+        "audio/sfx/crumble_s_2",
+        "audio/sfx/crumble_s_3"
+      ],
+      "gain": 1
+    },
+    "crumble_m": {
+      "variants": [
+        "audio/sfx/crumble_m_1",
+        "audio/sfx/crumble_m_2",
+        "audio/sfx/crumble_m_3"
+      ],
+      "gain": 1
+    },
+    "crumble_l": {
+      "variants": [
+        "audio/sfx/crumble_l_1",
+        "audio/sfx/crumble_l_2",
+        "audio/sfx/crumble_l_3"
+      ],
+      "gain": 1
+    },
+    "glass": {
+      "variants": [
+        "audio/sfx/glass_1",
+        "audio/sfx/glass_2",
+        "audio/sfx/glass_3"
+      ],
+      "gain": 1
+    },
+    "car_crush": {
+      "variants": [
+        "audio/sfx/car_crush_1",
+        "audio/sfx/car_crush_2",
+        "audio/sfx/car_crush_3"
+      ],
+      "gain": 1
+    },
+    "prop_break": {
+      "variants": [
+        "audio/sfx/prop_break_1",
+        "audio/sfx/prop_break_2",
+        "audio/sfx/prop_break_3"
+      ],
+      "gain": 1
+    },
+    "splash": {
+      "variants": [
+        "audio/sfx/splash"
+      ],
+      "gain": 1
+    },
+    "fire_loop": {
+      "variants": [
+        "audio/sfx/fire_loop"
+      ],
+      "gain": 1,
+      "loop": [
+        0.25,
+        4.25
+      ]
+    },
+    "crowd_panic_loop": {
+      "variants": [
+        "audio/sfx/crowd_panic_loop"
+      ],
+      "gain": 1,
+      "loop": [
+        0.25,
+        6.25
+      ]
+    },
+    "siren_loop": {
+      "variants": [
+        "audio/sfx/siren_loop"
+      ],
+      "gain": 1,
+      "loop": [
+        0.25,
+        3.25
+      ]
+    },
+    "amb_day_loop": {
+      "variants": [
+        "audio/sfx/amb_day_loop"
+      ],
+      "gain": 1,
+      "loop": [
+        0.25,
+        16.25
+      ]
+    },
+    "amb_sunset_loop": {
+      "variants": [
+        "audio/sfx/amb_sunset_loop"
+      ],
+      "gain": 1,
+      "loop": [
+        0.25,
+        16.25
+      ]
+    },
+    "amb_night_loop": {
+      "variants": [
+        "audio/sfx/amb_night_loop"
+      ],
+      "gain": 1,
+      "loop": [
+        0.25,
+        16.25
+      ]
+    },
+    "wind_high_loop": {
+      "variants": [
+        "audio/sfx/wind_high_loop"
+      ],
+      "gain": 1,
+      "loop": [
+        0.25,
+        10.25
+      ]
+    },
+    "rocket_launch": {
+      "variants": [
+        "audio/sfx/rocket_launch_1",
+        "audio/sfx/rocket_launch_2",
+        "audio/sfx/rocket_launch_3"
+      ],
+      "gain": 1
+    },
+    "tank_fire": {
+      "variants": [
+        "audio/sfx/tank_fire_1",
+        "audio/sfx/tank_fire_2",
+        "audio/sfx/tank_fire_3"
+      ],
+      "gain": 1
+    },
+    "shell_whoosh": {
+      "variants": [
+        "audio/sfx/shell_whoosh"
+      ],
+      "gain": 1
+    },
+    "arty_incoming": {
+      "variants": [
+        "audio/sfx/arty_incoming"
+      ],
+      "gain": 1
+    },
+    "arty_distant": {
+      "variants": [
+        "audio/sfx/arty_distant"
+      ],
+      "gain": 1
+    },
+    "laser_charge_loop": {
+      "variants": [
+        "audio/sfx/laser_charge_loop"
+      ],
+      "gain": 1,
+      "loop": [
+        0.25,
+        1.25
+      ]
+    },
+    "volley_ready": {
+      "variants": [
+        "audio/sfx/volley_ready"
+      ],
+      "gain": 1
+    },
+    "volley_fire": {
+      "variants": [
+        "audio/sfx/volley_fire"
+      ],
+      "gain": 1
+    },
+    "tank_engine_loop": {
+      "variants": [
+        "audio/sfx/tank_engine_loop"
+      ],
+      "gain": 1,
+      "loop": [
+        0.25,
+        2.25
+      ]
+    },
+    "march_loop": {
+      "variants": [
+        "audio/sfx/march_loop"
+      ],
+      "gain": 1,
+      "loop": [
+        0.25,
+        2.25
+      ]
+    },
+    "unit_destroyed": {
+      "variants": [
+        "audio/sfx/unit_destroyed_1",
+        "audio/sfx/unit_destroyed_2",
+        "audio/sfx/unit_destroyed_3"
+      ],
+      "gain": 1
+    },
+    "member_down": {
+      "variants": [
+        "audio/sfx/member_down_1",
+        "audio/sfx/member_down_2",
+        "audio/sfx/member_down_3"
+      ],
+      "gain": 1
+    },
+    "shaken": {
+      "variants": [
+        "audio/sfx/shaken"
+      ],
+      "gain": 1
+    },
+    "takeover": {
+      "variants": [
+        "audio/sfx/takeover"
+      ],
+      "gain": 1
+    },
+    "kaiju_roar_lizard_s1": {
+      "variants": [
+        "audio/sfx/kaiju_roar_lizard_s1"
+      ],
+      "gain": 1
+    },
+    "kaiju_roar_lizard_s2": {
+      "variants": [
+        "audio/sfx/kaiju_roar_lizard_s2"
+      ],
+      "gain": 1
+    },
+    "kaiju_roar_lizard_s3": {
+      "variants": [
+        "audio/sfx/kaiju_roar_lizard_s3"
+      ],
+      "gain": 1
+    },
+    "kaiju_step_s1": {
+      "variants": [
+        "audio/sfx/kaiju_step_s1_1",
+        "audio/sfx/kaiju_step_s1_2",
+        "audio/sfx/kaiju_step_s1_3"
+      ],
+      "gain": 1
+    },
+    "kaiju_step_s2": {
+      "variants": [
+        "audio/sfx/kaiju_step_s2_1",
+        "audio/sfx/kaiju_step_s2_2",
+        "audio/sfx/kaiju_step_s2_3"
+      ],
+      "gain": 1
+    },
+    "kaiju_step_s3": {
+      "variants": [
+        "audio/sfx/kaiju_step_s3_1",
+        "audio/sfx/kaiju_step_s3_2",
+        "audio/sfx/kaiju_step_s3_3"
+      ],
+      "gain": 1
+    },
+    "kaiju_stomp_s1": {
+      "variants": [
+        "audio/sfx/kaiju_stomp_s1"
+      ],
+      "gain": 1
+    },
+    "kaiju_stomp_s2": {
+      "variants": [
+        "audio/sfx/kaiju_stomp_s2"
+      ],
+      "gain": 1
+    },
+    "kaiju_stomp_s3": {
+      "variants": [
+        "audio/sfx/kaiju_stomp_s3"
+      ],
+      "gain": 1
+    },
+    "kaiju_swipe_s1": {
+      "variants": [
+        "audio/sfx/kaiju_swipe_s1"
+      ],
+      "gain": 1
+    },
+    "kaiju_swipe_s2": {
+      "variants": [
+        "audio/sfx/kaiju_swipe_s2"
+      ],
+      "gain": 1
+    },
+    "kaiju_swipe_s3": {
+      "variants": [
+        "audio/sfx/kaiju_swipe_s3"
+      ],
+      "gain": 1
+    },
+    "kaiju_grab": {
+      "variants": [
+        "audio/sfx/kaiju_grab"
+      ],
+      "gain": 1
+    },
+    "kaiju_throw": {
+      "variants": [
+        "audio/sfx/kaiju_throw"
+      ],
+      "gain": 1
+    },
+    "kaiju_eat": {
+      "variants": [
+        "audio/sfx/kaiju_eat"
+      ],
+      "gain": 1
+    },
+    "kaiju_brace": {
+      "variants": [
+        "audio/sfx/kaiju_brace"
+      ],
+      "gain": 1
+    },
+    "kaiju_hurt": {
+      "variants": [
+        "audio/sfx/kaiju_hurt_1",
+        "audio/sfx/kaiju_hurt_2",
+        "audio/sfx/kaiju_hurt_3"
+      ],
+      "gain": 1
+    },
+    "kaiju_stagger": {
+      "variants": [
+        "audio/sfx/kaiju_stagger"
+      ],
+      "gain": 1
+    },
+    "kaiju_beam_charge": {
+      "variants": [
+        "audio/sfx/kaiju_beam_charge"
+      ],
+      "gain": 1
+    },
+    "kaiju_beam_loop": {
+      "variants": [
+        "audio/sfx/kaiju_beam_loop"
+      ],
+      "gain": 1,
+      "loop": [
+        0.25,
+        2.25
+      ]
+    },
+    "kaiju_heartbeat_loop": {
+      "variants": [
+        "audio/sfx/kaiju_heartbeat_loop"
+      ],
+      "gain": 1,
+      "loop": [
+        0.25,
+        1.93
+      ]
+    },
+    "kaiju_molt_blast": {
+      "variants": [
+        "audio/sfx/kaiju_molt_blast"
+      ],
+      "gain": 1
+    },
+    "kaiju_death": {
+      "variants": [
+        "audio/sfx/kaiju_death"
+      ],
+      "gain": 1
+    },
+    "ui_click": {
+      "variants": [
+        "audio/sfx/ui_click"
+      ],
+      "gain": 1
+    },
+    "ui_hover": {
+      "variants": [
+        "audio/sfx/ui_hover"
+      ],
+      "gain": 1
+    },
+    "ui_ready": {
+      "variants": [
+        "audio/sfx/ui_ready"
+      ],
+      "gain": 1
+    },
+    "ui_error": {
+      "variants": [
+        "audio/sfx/ui_error"
+      ],
+      "gain": 1
+    },
+    "ui_wheel_open": {
+      "variants": [
+        "audio/sfx/ui_wheel_open"
+      ],
+      "gain": 1
+    },
+    "ui_wheel_select": {
+      "variants": [
+        "audio/sfx/ui_wheel_select"
+      ],
+      "gain": 1
+    },
+    "ui_join": {
+      "variants": [
+        "audio/sfx/ui_join"
+      ],
+      "gain": 1
+    },
+    "ui_tick": {
+      "variants": [
+        "audio/sfx/ui_tick"
+      ],
+      "gain": 1
+    },
+    "ui_match_start": {
+      "variants": [
+        "audio/sfx/ui_match_start"
+      ],
+      "gain": 1
+    },
+    "radio_open": {
+      "variants": [
+        "audio/sfx/radio_open"
+      ],
+      "gain": 1
+    },
+    "radio_close": {
+      "variants": [
+        "audio/sfx/radio_close"
+      ],
+      "gain": 1
+    },
+    "sting_crossfire": {
+      "variants": [
+        "audio/sfx/sting_crossfire"
+      ],
+      "gain": 1
+    },
+    "sting_nerve_break": {
+      "variants": [
+        "audio/sfx/sting_nerve_break"
+      ],
+      "gain": 1
+    },
+    "sting_bar_mark": {
+      "variants": [
+        "audio/sfx/sting_bar_mark"
+      ],
+      "gain": 1
+    },
+    "sting_molt_ready": {
+      "variants": [
+        "audio/sfx/sting_molt_ready"
+      ],
+      "gain": 1
+    },
+    "camera_shutter": {
+      "variants": [
+        "audio/sfx/camera_shutter"
+      ],
+      "gain": 1
+    }
+  }
+}

@@ -18,8 +18,18 @@ def main() -> int:
     ap.add_argument("--no-encode", action="store_true", help="stop at the mastered WAV in scratch")
     ap.add_argument("--review", action="store_true", help="print the composer's score review and stop")
     ap.add_argument("--verify", action="store_true", help="measure the encoded files and draw spectrograms")
+    ap.add_argument("--verify-only", action="store_true",
+                    help="measure the files that are already built (needs the masters in scratch)")
+    ap.add_argument("--measure-tuning", action="store_true",
+                    help="re-measure the soundfont's intonation (writes mbmusic/tuning_table.json) and stop")
     args = ap.parse_args()
 
+    if args.measure_tuning:
+        from mbmusic import tuning
+        from mbmusic.synth import SCRATCH
+        table = tuning.measure_all(SCRATCH / "tuning")
+        print(f"measured {sum(len(v) for v in table.values())} keys of {len(table)} patches -> {tuning.TABLE_PATH}")
+        return 0
     cues = all_cues(args.cues or None)
     if not cues:
         print("no such cue", file=sys.stderr)
@@ -27,6 +37,9 @@ def main() -> int:
     if args.review:
         from mbmusic import review
         return review.run(cues)
+    if args.verify_only:
+        from mbmusic import analyze
+        return analyze.run(cues)
     t0 = time.time()
     entries = {}
     if mixdown.MANIFEST.exists() and args.cues:

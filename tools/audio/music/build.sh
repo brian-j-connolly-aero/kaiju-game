@@ -21,6 +21,9 @@ for tool in fluidsynth ffmpeg; do
 done
 [ -x "$py" ] || { echo "missing $py: run tools/setup-asset-tools.sh" >&2; exit 1; }
 
+# the intonation table is committed; measure it only if it is missing
+[ -f "$here/mbmusic/tuning_table.json" ] || "$py" "$here/build.py" --measure-tuning
+
 args=()
 verify=1
 review=0

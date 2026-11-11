@@ -90,8 +90,12 @@ def measure(x: np.ndarray, spec: Spec) -> dict:
     out["peak_at_ms"] = round(float(np.argmax(e)) / SR * 1000, 1)
     k = dsp.n_(0.5)
     out["energy_in_500ms"] = round(float(np.sum(m[:k] ** 2) / (np.sum(m ** 2) + 1e-30)), 3)
-    # ends: the very first samples and the last 3 ms, relative to the file's peak
-    out["start_db"] = round(dsp.db(float(np.max(np.abs(m[:3])))) - dsp.db(pk), 1)
+    # ends: the very first samples and the last 3 ms, relative to the file's peak. An impact
+    # starts with its attack, so the start is also compared with the next 10 ms: a click is a
+    # first sample that is not far below what immediately follows it.
+    first = float(np.max(np.abs(m[:3])))
+    out["start_db"] = round(dsp.db(first) - dsp.db(pk), 1)
+    out["start_vs_next_10ms_db"] = round(dsp.db(first) - dsp.db(float(np.max(np.abs(m[:dsp.n_(0.01)])))), 1)
     out["end_db"] = round(dsp.db(float(np.max(np.abs(m[-dsp.n_(0.003):])))) - dsp.db(pk), 1)
     loud = np.nonzero(e > e.max() * dsp.amp(-40.0))[0]
     out["above_minus40_s"] = round(float(loud[-1] - loud[0]) / SR, 3) if len(loud) else 0.0
@@ -142,7 +146,21 @@ def seam(x: np.ndarray, start: float, end: float, master: np.ndarray | None) -> 
         i = (span - n_fft // 2) // hop
         return float(fl[max(0, i - 6):i + 7].max())
 
-    out["splice_flux_db"] = round(dsp.db(flux_at_splice(jumped)) - dsp.db(flux_at_splice(straight)), 2)
+    quiet = 1e-3 * float(np.sqrt(np.mean(m ** 2)))            # floor: a splice in near-silence adds nothing
+    out["splice_flux_db"] = round(dsp.db(flux_at_splice(jumped) + quiet) - dsp.db(flux_at_splice(straight) + quiet), 2)
+    return out
+
+
+def roar_parts(x: np.ndarray, voiced_seconds: float, split: tuple[float, float]) -> dict:
+    """Loudness, brightness and bass share of the three parts of a roar (rise, tear, fall)."""
+    a, b = split
+    kp = dsp.k_power(x)
+    out = {}
+    for name, t0, t1 in (("rise", 0.0, a), ("tear", a, b), ("fall", b, 1.0)):
+        i, j = dsp.n_(t0 * voiced_seconds), dsp.n_(t1 * voiced_seconds)
+        st = spectrum_stats(x[i:j])
+        out[name] = {"seconds": round((j - i) / SR, 2), "level_db": round(float(10 * np.log10(kp[i:j].mean() + 1e-20) - 0.691), 1),
+                     "centroid_hz": st["centroid_hz"], "low_share": st["low_share"]}
     return out
 
 
@@ -231,10 +249,11 @@ def draw_panel(img: Image.Image, d: ImageDraw.ImageDraw, x0: int, y0: int, w: in
     dur = n / SR
     if ticks is None:
         ticks = [(t, f"{t:g}") for t in _time_ticks(dur)]
-    for t, lab in ticks:
+    for i, (t, lab) in enumerate(ticks):
         xx = x0 + int(t / dur * w)
         d.line([(xx, top + hh), (xx, top + hh + 3)], fill=AXIS)
-        d.text((xx, top + hh + 5), lab, fill=MUTED, font=f_small, anchor="ma")
+        anchor = "la" if i == 0 else "ra" if (i == len(ticks) - 1 and t / dur > 0.93) else "ma"
+        d.text((xx, top + hh + 5), lab, fill=MUTED, font=f_small, anchor=anchor)
     for t, lab in marks or []:
         xx = x0 + int(t / dur * w)
         _dash_v(d, xx, top, top + hh, INK2)
@@ -276,7 +295,8 @@ def sheet(panels: list[dict], path: Path, title: str, subtitle: str, cols: int =
                    axis_labels=(c == 0), ticks=p.get("ticks"), n_fft=p.get("n_fft"))
     draw_scale(d, width - right + 22, top + 18, ph - 18)
     path.parent.mkdir(parents=True, exist_ok=True)
-    img.save(path, optimize=True)
+    # a 128-colour palette is plenty for one blue ramp plus grey text, and a quarter of the size
+    img.quantize(colors=128, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).save(path, optimize=True)
 
 
 # ---- the verification run --------------------------------------------------------------------
@@ -342,6 +362,7 @@ def run(specs: dict[str, Spec], only: list[str] | None = None, build_info: list[
                                      master if master is not None and master.shape == x.shape else None)
                 if name in info:
                     m["limiter_db"] = info[name]["limiter_db"]
+                    m["soft_clip_db"] = info[name]["clip_db"]
                     m["codec_trim_db"] = info[name]["trim_db"]
                 frec[ext] = m
                 if ext == "ogg":
@@ -361,14 +382,15 @@ def run(specs: dict[str, Spec], only: list[str] | None = None, build_info: list[
                 if spec.loop:
                     s = m["seam"]
                     floor = s.get("codec_error_db", -30.0)
-                    if s["step_vs_p99"] > 3 or abs(s["splice_flux_db"]) > 3 or s["repeat_error_db"] > floor + 6:
+                    if s["step_vs_p99"] > 3 or s["splice_flux_db"] > 3 or s["repeat_error_db"] > floor + 6:
                         problems.append(f"{tag}: loop seam {s}")
                     want = LEAD_IN * 2 + spec.loop
                     if abs(m["seconds"] - want) > 0.03:
                         problems.append(f"{tag}: {m['seconds']} s, expected {want} s")
                 else:
-                    if m["start_db"] > -20:
-                        problems.append(f"{tag}: starts at {m['start_db']} dB below peak (click)")
+                    if m["start_db"] > -40 and m["start_vs_next_10ms_db"] > -10:
+                        problems.append(f"{tag}: starts at {m['start_db']} dB re peak, "
+                                        f"{m['start_vs_next_10ms_db']} dB re the next 10 ms (click)")
                     if m["end_db"] > -40:
                         problems.append(f"{tag}: ends at {m['end_db']} dB below peak (cut off)")
             rec["files"][name] = frec
@@ -400,11 +422,23 @@ def run(specs: dict[str, Spec], only: list[str] | None = None, build_info: list[
             if not avg(a, "level_db") < avg(b, "level_db") + 0.01:
                 problems.append(f"{group}: {a} is louder than {b}")
 
+    # ---- the signature roar: its three parts, measured ----
+    from .kaiju import ROAR_PARTS, ROAR_SECONDS
+    for sid in ORDERED["roar"]:
+        if sid in ids and sid in decoded:
+            p = roar_parts(decoded[sid], ROAR_SECONDS[int(sid[-1])], ROAR_PARTS)
+            report[sid]["parts"] = p
+            if not (p["tear"]["level_db"] > p["rise"]["level_db"] and p["tear"]["level_db"] > p["fall"]["level_db"]):
+                problems.append(f"{sid}: the tear is not the loudest part {p}")
+            if not (p["tear"]["centroid_hz"] > p["rise"]["centroid_hz"] and p["tear"]["centroid_hz"] > p["fall"]["centroid_hz"]):
+                problems.append(f"{sid}: the tear is not the brightest part {p}")
+            if not p["fall"]["low_share"] > p["tear"]["low_share"]:
+                problems.append(f"{sid}: the fall does not carry more bass than the tear {p}")
+
     report_path.write_text(json.dumps(report, indent=1, sort_keys=True) + "\n")
 
     # ---- pictures ----
-    if only is None or True:
-        _sheets(specs, report, decoded, manifest, ids)
+    _sheets(specs, report, decoded, manifest, ids)
 
     from . import docgen
     docgen.write(specs, report)
@@ -462,12 +496,13 @@ def _sheets(specs: dict[str, Spec], report: dict, decoded: dict[str, np.ndarray]
             stage = int(sid[-1])
             d = ROAR_SECONDS[stage]
             m = report[sid]["files"][sid]["ogg"]
-            panels.append({"x": mono(x), "title": sid, "sub": _sub(m, specs[sid]),
+            panels.append({"x": mono(x), "title": sid, "sub": _sub(m, specs[sid]), "n_fft": 512,
                            "marks": [(0.0, "rise"), (ROAR_PARTS[0] * d, "tear"), (ROAR_PARTS[1] * d, "falling rumble"),
                                      (d, "tail")]})
         sheet(panels, DOCS / "roar_contour.png", "The signature roar at stages 1, 2 and 3",
-              "Same three-part contour (rise, tear, falling rumble), longer and lower at each stage. "
-              "Decoded .ogg, 25 Hz to 20 kHz (log).", cols=1, pw=1180, ph=250)
+              "Same three-part contour (rise, tear, falling rumble), longer and lower at each stage. The vertical "
+              "stripes in the tear are its pulses. Decoded .ogg, 25 Hz to 20 kHz (log), 12 ms analysis window.",
+              cols=1, pw=1180, ph=250)
 
     # loops: one second either side of the splice, as the game will play it
     loops = [s for s in specs if specs[s].loop and s in report and s in ids]
@@ -478,13 +513,14 @@ def _sheets(specs: dict[str, Spec], report: dict, decoded: dict[str, np.ndarray]
                 x = decode(OUT_DIR / f"{sid}.{ext}")
                 lo, hi = manifest[sid]["loop"]
                 span = min(0.5, specs[sid].loop)
-                v = mono(spliced_view(x, lo, hi, span))
+                v = dsp.fade(mono(spliced_view(x, lo, hi, span)), 0.01, 0.01)      # soft edges: only the splice is on show
                 s = report[sid]["files"][sid][ext]["seam"]
                 panels.append({"x": v, "title": f"{sid}.{ext}",
-                               "sub": (f"step {s['step_vs_p99']:.2f}× · flux {s['splice_flux_db']:+.1f} dB · "
-                                       f"repeat {s['repeat_error_db']:.0f} dB (codec {s.get('codec_error_db', 0):.0f})"),
+                               "sub": (f"step {s['step_vs_p99']:.2f}× · onset {s['splice_flux_db']:+.1f} dB · repeat "
+                                       + ("exact" if s['repeat_error_db'] < -100 else f"{s['repeat_error_db']:.0f} dB")
+                                       + f" (encoder {s.get('codec_error_db', 0):.0f})"),
                                "marks": [(span, "splice")],
-                               "ticks": [(0, f"end −{span:g} s"), (span, "splice"), (2 * span - 1e-6, f"start +{span:g} s")]})
+                               "ticks": [(0, f"end −{span:g} s"), (2 * span - 1e-6, f"start +{span:g} s")]})
         for old in DOCS.glob("loop_seams_*.png"):
             old.unlink()
         per = 16

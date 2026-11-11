@@ -57,6 +57,8 @@ export function createWorld(options: WorldOptions): World {
     structureStage: new Uint8Array(city.structures.length),
     propAlive: state.propAlive,
     propWreck: createBitset(city.props.length),
+    shields: [],
+    insuredStructures: [],
     match: {
       phase: 'briefing',
       stage: 1,

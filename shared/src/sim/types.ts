@@ -115,6 +115,28 @@ export interface RecentHit {
   tick: number;
 }
 
+/**
+ * What the kaiju action system remembers between ticks: which button presses it has already
+ * used, and the bookkeeping of the action that is running. Server-side only; never in snapshots.
+ */
+export interface KaijuActionMemory {
+  /** Btn bits whose latest press has already started an action (cleared by the next press). */
+  usedPress: number;
+  /** Btn bits whose current hold has already been judged as a hold (eat). Cleared by the next press. */
+  usedHold: number;
+  /** The button that started the running action has been down ever since, so a tap can still become a hold. */
+  holdLive: boolean;
+  /** Ticks left in which a grab tap made with something in hand still turns into a throw. */
+  throwBuffer: number;
+  /** The running Eat took a meal (from the hand or off the ground) and will heal when it finishes. */
+  meal: boolean;
+  /** Beam special: how far the beam reaches this tick, and the structure it is burning through (-1: none). */
+  beamLength: number;
+  beamBlocker: number;
+  /** Tick of the last `crossfire` event for this kaiju (they are rate limited). */
+  crossfireTick: number;
+}
+
 export interface Kaiju {
   entity: 'kaiju';
   id: number;
@@ -146,7 +168,10 @@ export interface Kaiju {
   /** 0..COMBAT_RULES.rageMax. */
   rage: number;
 
-  /** Action state machine. `action` is 'none' exactly when `phase` is 'idle'. */
+  /**
+   * Action state machine. `action` is the verb that is running; it is 'none' while the kaiju is
+   * idle, staggered or dead (a cocoon is the 'molt' verb in phase 'cocoon').
+   */
   phase: KaijuPhase;
   action: KaijuActionId;
   /** Seconds spent in the current phase. */
@@ -157,6 +182,8 @@ export interface Kaiju {
   actionTime: number;
   /** Heading the action's effect is aimed along, fixed when the effect starts. */
   actionYaw: number;
+  /** Button and action bookkeeping of the kaiju action system. */
+  act: KaijuActionMemory;
 
   held: HeldObject | null;
   /** Seconds until each verb can be used again. */
@@ -335,6 +362,8 @@ export interface Hit {
   kind: DamageKind;
   /** Fire-at-will hit from a sub-unit or bot (halves nerve damage against the kaiju). */
   atWill: boolean;
+  /** The hit clears the volley charge of a unit it reaches, whatever its nerve (the roar). */
+  resetsCharge?: boolean;
 }
 
 export interface PendingHit {
@@ -356,6 +385,21 @@ export interface PropHit {
   id: number;
   by: PlayerId;
   cause: DamageKind;
+}
+
+/**
+ * A zone that protects the structures standing in it (Tier 2: the Coalition's sanctuaries).
+ * Damage to a structure whose center is inside is multiplied by `damageMult`; overlapping zones
+ * do not stack (the strongest wins). Walking through a building (trample) is never reduced.
+ */
+export interface StructureShield {
+  x: number;
+  z: number;
+  radius: number;
+  /** 0..1; 0.5 halves the damage. */
+  damageMult: number;
+  /** Squad that placed it, or -1. */
+  squad: number;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -421,6 +465,10 @@ export interface World {
   propAlive: Uint8Array;
   /** Bitset of destroyed props that left a wreck on the ground which nobody has taken yet. */
   propWreck: Uint8Array;
+  /** Zones that reduce structure damage (Tier 2 sanctuaries); empty in Tier 1. */
+  shields: StructureShield[];
+  /** Landmarks covered by an 'insuranceRider' upgrade: damage to them adds nothing to the bar. */
+  insuredStructures: number[];
 
   match: MatchState;
   players: PlayerState[];

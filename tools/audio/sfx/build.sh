@@ -5,6 +5,7 @@
 #   tools/audio/sfx/build.sh                 everything
 #   tools/audio/sfx/build.sh 'kaiju_roar*'   only the sounds that match (measurements for those)
 #   tools/audio/sfx/build.sh --no-verify     skip measurements, pictures and docs
+#   tools/audio/sfx/build.sh --verify-only   measure and draw the files already built
 #
 # Intermediate WAV files go to /tmp/mb-scratch/sfx/, never into the repository.
 set -euo pipefail

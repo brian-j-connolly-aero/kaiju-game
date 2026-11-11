@@ -1,6 +1,7 @@
 /** Test helpers: tiny hand-made cities and worlds, so each rule can be checked in isolation. */
 
 import {
+  bitGet,
   buildCityIndex,
   CITY_HALF,
   createCityQuery,
@@ -15,6 +16,8 @@ import {
   type PlayerInput,
   type Prop,
   type PropKindId,
+  PROP_KINDS,
+  type SimEvent,
   type Structure,
   type StructureClass,
   type World,
@@ -136,4 +139,64 @@ export function run(world: World, ticks: number, inputs: Array<PlayerInput | nul
   const events = [];
   for (let i = 0; i < ticks; i++) events.push(...world.step(inputs));
   return events;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Helpers for the combat tests: putting bodies exactly where a rule needs them
+// ---------------------------------------------------------------------------------------------
+
+/** Puts the kaiju at a point, facing a heading, standing still, with its head straight ahead. */
+export function placeKaiju(world: World, x: number, z: number, yaw = 0, id = 0): World['kaijus'][number] {
+  const k = world.kaijus[id];
+  k.x = x;
+  k.z = z;
+  k.yaw = yaw;
+  k.aimYaw = yaw;
+  k.aimPitch = 0;
+  k.vx = 0;
+  k.vz = 0;
+  return k;
+}
+
+/** Puts a unit at a point, standing still. */
+export function placeUnit(world: World, id: number, x: number, z: number): World['units'][number] {
+  const u = world.units[id];
+  u.x = x;
+  u.z = z;
+  u.vx = 0;
+  u.vz = 0;
+  return u;
+}
+
+/** Moves every unit far away from the action (to a corner of the stage bounds), so only the ones a test places matter. */
+export function parkUnits(world: World, except: number[] = []): void {
+  const b = world.match.bounds;
+  for (const u of world.units) {
+    if (except.includes(u.id)) continue;
+    u.x = b.maxX - 12 - (u.id % 4) * 8;
+    u.z = b.maxZ - 12 - Math.floor(u.id / 4) * 8;
+    u.vx = 0;
+    u.vz = 0;
+  }
+}
+
+/** Unit vector pointing along a heading (the forward vector of that yaw). */
+export function dirOfYaw(yaw: number): { x: number; z: number } {
+  return { x: Math.sin(yaw), z: Math.cos(yaw) };
+}
+
+/** The events of one type, typed. */
+export function eventsOf<T extends SimEvent['type']>(events: SimEvent[], type: T): Array<Extract<SimEvent, { type: T }>> {
+  return events.filter((e): e is Extract<SimEvent, { type: T }> => e.type === type);
+}
+
+/**
+ * Destruction bar points the city's current state accounts for: the value of every structure in
+ * proportion to the hp it has lost, plus the value of every prop that is gone.
+ */
+export function valueDestroyed(world: World): number {
+  let total = 0;
+  for (const s of world.city.structures) total += s.value * (1 - world.structureHp[s.id] / s.hp);
+  for (const p of world.city.props) if (!bitGet(world.propAlive, p.id)) total += PROP_KINDS[p.kind].value;
+  return total;
 }

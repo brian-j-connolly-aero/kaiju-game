@@ -1,0 +1,696 @@
+/**
+ * The room logic end to end, with fake connections and a hand-driven clock: lobby, match loop,
+ * snapshots and events, reconnects, late joiners, match end and the way back to the lobby.
+ */
+
+import {
+  Btn,
+  cityChecksum,
+  CLOSE_REPLACED,
+  CLOSE_SEAT_RELEASED,
+  decodeCityState,
+  decodeSnapshot,
+  getCity,
+  JOIN_ERROR,
+  PROTOCOL_VERSION,
+  SNAPSHOT_RATE,
+  TICK_RATE,
+} from '@mb/shared';
+import { describe, expect, it } from 'vitest';
+import { MAX_CATCH_UP_STEPS, STARVED_TICKS } from '../src/room/match';
+import { JoinRefused } from '../src/room/peer';
+import { FakePeer, input, makeRoom, seatPlayers, startMatch, TICK_MS, tokenOf } from './helpers';
+
+function refusal(fn: () => unknown): JoinRefused {
+  try {
+    fn();
+  } catch (err) {
+    if (err instanceof JoinRefused) return err;
+    throw err;
+  }
+  throw new Error('the join was not refused');
+}
+
+describe('lobby', () => {
+  it('seats the first player as host and tells everyone about every change', () => {
+    const { room } = makeRoom();
+    const [a, b] = seatPlayers(room, 2);
+    expect(a.lobby.you).toBe(0);
+    expect(b.lobby.you).toBe(1);
+    expect(a.lobby.lobby.code).toBe('BCDF');
+    expect(a.lobby.lobby.phase).toBe('lobby');
+    expect(a.lobby.lobby.host).toBe(0);
+    expect(a.lobby.lobby.options.fast).toBe(true);
+    expect(a.lobby.lobby.players.map((p) => p.name)).toEqual(['Player A', 'Player B']);
+    expect(a.lobby.lobby.players.every((p) => p.connected && p.slot === -1)).toBe(true);
+    // The first player was told about the second.
+    expect(a.all('lobby').length).toBe(2);
+  });
+
+  it('seats five players and refuses the sixth', () => {
+    const { room } = makeRoom();
+    seatPlayers(room, 5);
+    const err = refusal(() => room.join(new FakePeer('late'), { name: 'Late', token: 'token-late-abcdef' }));
+    expect(err.code).toBe(JOIN_ERROR.roomFull);
+    expect(room.seatCount).toBe(5);
+  });
+
+  it('refuses a client built for another protocol version, and accepts one that sends none', () => {
+    const { room } = makeRoom();
+    const err = refusal(() => room.join(new FakePeer('old'), { protocol: PROTOCOL_VERSION + 1 }));
+    expect(err.code).toBe(JOIN_ERROR.version);
+    expect(room.empty).toBe(true);
+    expect(room.join(new FakePeer('bare'), undefined)).toBe(0);
+  });
+
+  it('applies name, role, faction, ready and options, and ignores what is not allowed', () => {
+    const { room } = makeRoom();
+    const [a, b] = seatPlayers(room, 2);
+
+    room.message('p1', 'setName', { name: '  <b>Rex</b> the very long named one  ' });
+    expect(b.lobby.lobby.players[1].name).toBe('bRex/b the very ');
+    room.message('p1', 'setName', { name: 42 });
+    expect(b.lobby.lobby.players[1].name).toBe('Player 2');
+
+    room.message('p1', 'setRole', { wantsKaiju: true, kaijuKind: 'not-a-kaiju' });
+    expect(a.lobby.lobby.players[1].wantsKaiju).toBe(true);
+    expect(a.lobby.lobby.players[1].kaijuKind).toBe('lizard');
+    room.message('p1', 'setRole', { wantsKaiju: 'yes' });
+    expect(a.lobby.lobby.players[1].wantsKaiju).toBe(true);
+
+    room.message('p1', 'setFaction', { faction: 'martians' });
+    expect(a.lobby.lobby.players[1].faction).toBe('army');
+
+    room.message('p1', 'ready', { ready: true });
+    expect(a.lobby.lobby.players[1].ready).toBe(true);
+
+    // Only the host changes room options.
+    room.message('p1', 'setOptions', { botKaiju: true });
+    expect(a.lobby.lobby.options.botKaiju).toBe(false);
+    room.message('p0', 'setOptions', { botKaiju: true });
+    expect(a.lobby.lobby.options.botKaiju).toBe(true);
+    // Nobody changes the fast flag from outside.
+    room.message('p0', 'setOptions', { fast: false, botKaiju: false });
+    expect(a.lobby.lobby.options.fast).toBe(true);
+  });
+
+  it('survives every kind of nonsense message', () => {
+    const { room } = makeRoom();
+    const [a] = seatPlayers(room, 1);
+    const before = a.sent.length;
+    const junk: unknown[] = [undefined, null, 0, 'text', [], { seq: 'x' }, { t: Number.NaN }, { ready: 1 }];
+    for (const type of ['input', 'command', 'ping', 'ready', 'setRole', 'setFaction', 'draftPick', 'toLobby', '', 'bogus']) {
+      for (const payload of junk) expect(() => room.message('p0', type, payload)).not.toThrow();
+    }
+    expect(() => room.message('nobody', 'start', {})).not.toThrow();
+    expect(room.lobby.phase).toBe('lobby');
+    // None of it changed anything, so nothing was sent.
+    expect(a.sent.length).toBe(before);
+  });
+
+  it('starts only for the host, and only when everyone else is ready', () => {
+    const { room } = makeRoom();
+    const peers = seatPlayers(room, 3);
+    room.message('p0', 'start', {});
+    expect(room.lobby.phase).toBe('lobby');
+    room.message('p1', 'ready', { ready: true });
+    room.message('p2', 'ready', { ready: true });
+    room.message('p1', 'start', {});
+    expect(room.lobby.phase).toBe('lobby');
+    room.message('p0', 'start', {});
+    expect(room.lobby.phase).toBe('match');
+    for (const peer of peers) expect(peer.lobby.lobby.phase).toBe('match');
+  });
+
+  it('answers a ping with the same number and the current tick', () => {
+    const { room, run } = makeRoom();
+    const peers = seatPlayers(room, 1);
+    room.message('p0', 'ping', { t: 123.5 });
+    expect(peers[0].last('pong')).toEqual({ t: 123.5, tick: 0 });
+    startMatch(room, peers);
+    run(1);
+    room.message('p0', 'ping', { t: 7 });
+    expect(peers[0].last('pong')).toEqual({ t: 7, tick: TICK_RATE });
+  });
+
+  it('passes the host role on when the host leaves', () => {
+    const { room } = makeRoom();
+    const [, b, c] = seatPlayers(room, 3);
+    room.leave('p0');
+    expect(b.lobby.lobby.host).toBe(1);
+    expect(c.lobby.lobby.players.map((p) => p.seat)).toEqual([1, 2]);
+    // A newcomer takes the free seat.
+    const d = new FakePeer('p3');
+    expect(room.join(d, { name: 'D' })).toBe(0);
+    expect(d.lobby.lobby.host).toBe(1);
+  });
+
+  it('hands the host role to a connected player when the host has been gone a while', () => {
+    const { room, run } = makeRoom({ hostHandoffSeconds: 5, graceSeconds: 60 });
+    const [, b] = seatPlayers(room, 2);
+    room.drop('p0');
+    run(4);
+    expect(b.lobby.lobby.host).toBe(0);
+    run(2);
+    expect(b.lobby.lobby.host).toBe(1);
+    // The old host comes back as an ordinary player.
+    const back = new FakePeer('p0-again');
+    room.join(back, { token: tokenOf(0) });
+    expect(back.lobby.you).toBe(0);
+    expect(back.lobby.lobby.host).toBe(1);
+  });
+});
+
+describe('match start', () => {
+  it('gives every player a welcome with their own slot and the full city state', () => {
+    const { room } = makeRoom();
+    const peers = seatPlayers(room, 5);
+    room.message('p3', 'setRole', { wantsKaiju: true });
+    startMatch(room, peers);
+
+    const slots = peers.map((p) => p.welcome.playerId);
+    expect([...slots].sort()).toEqual([0, 1, 2, 3, 4]);
+    expect(peers[3].welcome.playerId).toBe(0);
+    expect(peers[3].welcome.kaijuId).toBe(0);
+    expect(peers[3].welcome.squadId).toBe(-1);
+    expect(peers[0].welcome.squadId).toBeGreaterThanOrEqual(0);
+
+    const built = getCity(peers[0].welcome.config.citySeed);
+    for (const peer of peers) {
+      const w = peer.welcome;
+      expect(w.protocol).toBe(PROTOCOL_VERSION);
+      expect(w.tick).toBe(0);
+      expect(w.cityChecksum).toBe(cityChecksum(built.city));
+      expect(w.config.tuning.clock).toBe(150);
+      expect(w.config.players.filter((p) => !p.bot).length).toBe(5);
+      const state = decodeCityState(w.cityState);
+      expect(state.structureStage.length).toBe(built.city.structures.length);
+      expect(state.propCount).toBe(built.city.props.length);
+    }
+    // The lobby tells everyone who plays which slot.
+    const lobby = peers[0].lobby.lobby;
+    expect(lobby.phase).toBe('match');
+    expect(lobby.lastKaijuSeat).toBe(3);
+    expect(lobby.players.map((p) => p.slot)).toEqual(slots);
+  });
+
+  it('lets a lone player practise: a squad against a bot kaiju, or the kaiju against bot squads', () => {
+    const solo = makeRoom();
+    const [a] = seatPlayers(solo.room, 1);
+    startMatch(solo.room, [a]);
+    expect(a.welcome.playerId).toBe(1);
+    expect(a.welcome.config.players[0].bot).toBe(true);
+    expect(a.welcome.config.players.filter((p) => p.bot).length).toBe(4);
+
+    const beast = makeRoom();
+    const [b] = seatPlayers(beast.room, 1);
+    beast.room.message('p0', 'setRole', { wantsKaiju: true });
+    startMatch(beast.room, [b]);
+    expect(b.welcome.playerId).toBe(0);
+    expect(b.welcome.config.players.filter((p) => p.bot).length).toBe(4);
+  });
+
+  it('honours the practice option: a bot kaiju, and the fifth person watches', () => {
+    const { room, run } = makeRoom();
+    const peers = seatPlayers(room, 5);
+    room.message('p0', 'setOptions', { botKaiju: true });
+    startMatch(room, peers);
+    expect(peers.map((p) => p.welcome.playerId)).toEqual([1, 2, 3, 4, -1]);
+    expect(room.lobby.lastKaijuSeat).toBe(-1);
+    run(0.5);
+    // The watcher gets snapshots like everyone else, with nothing to acknowledge.
+    expect(peers[4].snapshots.length).toBeGreaterThan(3);
+    expect(peers[4].lastSnapshot.ackSeq).toBe(0);
+  });
+
+  it('rotates the kaiju role: never the same player twice in a row unless they volunteer', () => {
+    const { room, runUntil } = makeRoom({ speed: 50 });
+    const peers = seatPlayers(room, 3);
+    const kaijuSeats: number[] = [];
+    for (let i = 0; i < 4; i++) {
+      startMatch(room, peers);
+      kaijuSeats.push(room.lobby.lastKaijuSeat);
+      runUntil(() => room.lobby.phase === 'end', 30);
+      room.message('p0', 'toLobby', {});
+      expect(room.lobby.phase).toBe('lobby');
+    }
+    for (let i = 1; i < kaijuSeats.length; i++) expect(kaijuSeats[i]).not.toBe(kaijuSeats[i - 1]);
+    for (const seat of kaijuSeats) expect(seat).toBeGreaterThanOrEqual(0);
+
+    // A volunteer gets it every time.
+    room.message('p2', 'setRole', { wantsKaiju: true });
+    for (let i = 0; i < 2; i++) {
+      startMatch(room, peers);
+      expect(room.lobby.lastKaijuSeat).toBe(2);
+      runUntil(() => room.lobby.phase === 'end', 30);
+      room.message('p0', 'toLobby', {});
+    }
+  });
+});
+
+describe('match loop', () => {
+  it('steps 30 times a second and sends 15 snapshots a second, with events alongside', () => {
+    const { room, run } = makeRoom();
+    const peers = seatPlayers(room, 2);
+    startMatch(room, peers);
+    for (const p of peers) p.clear();
+    run(2);
+
+    expect(room.match?.world.tick).toBe(2 * TICK_RATE);
+    for (const peer of peers) {
+      const snaps = peer.snapshots;
+      expect(snaps.length).toBe(2 * SNAPSHOT_RATE);
+      expect(snaps.map((s) => s.tick)).toEqual(snaps.map((_, i) => (i + 1) * 2));
+      // Fast tuning: a one second briefing, then play.
+      expect(snaps[0].match.phase).toBe('briefing');
+      expect(snaps[snaps.length - 1].match.phase).toBe('playing');
+      const phases = peer.events.filter((e) => e.type === 'matchPhase').map((e) => (e.type === 'matchPhase' ? e.phase : ''));
+      expect(phases).toEqual(['briefing', 'playing']);
+    }
+
+    // Events travel just before the snapshot that covers their tick: after the previous
+    // snapshot's tick, at or before the next one's.
+    let previousSnapTick = 0;
+    let waiting: number[] = [];
+    let eventMessages = 0;
+    for (const sent of peers[0].sent) {
+      if (sent.type === 'events') {
+        eventMessages++;
+        waiting = (sent.payload as Array<{ tick: number }>).map((e) => e.tick);
+        for (const tick of waiting) expect(tick).toBeGreaterThan(previousSnapTick);
+      } else if (sent.type === 'snap') {
+        const tick = decodeSnapshot(sent.payload as Uint8Array).tick;
+        for (const eventTick of waiting) expect(eventTick).toBeLessThanOrEqual(tick);
+        waiting = [];
+        previousSnapTick = tick;
+      }
+    }
+    expect(eventMessages).toBeGreaterThanOrEqual(2);
+    expect(waiting).toEqual([]);
+  });
+
+  it('applies one input per player per tick and acknowledges the last one applied', () => {
+    const { room, run } = makeRoom();
+    const peers = seatPlayers(room, 2);
+    room.message('p0', 'setRole', { wantsKaiju: true });
+    startMatch(room, peers);
+    run(1.5); // through the briefing
+
+    // Three inputs arrive at once; the simulation takes exactly one per tick.
+    for (const seq of [1, 2, 3]) room.message('p1', 'input', input(seq, { moveZ: 1 }));
+    const world = room.match!.world;
+    const slot = peers[1].welcome.playerId;
+    const before = world.tick;
+    run(TICK_MS / 1000);
+    expect(world.tick).toBe(before + 1);
+    expect(world.players[slot].input.seq).toBe(1);
+    // A snapshot goes out every second tick and carries the last input applied by then.
+    expect(peers[1].lastSnapshot.tick).toBe(world.tick);
+    expect(peers[1].lastSnapshot.ackSeq).toBe(1);
+    run(TICK_MS / 1000);
+    expect(world.players[slot].input.seq).toBe(2);
+    expect(peers[1].lastSnapshot.ackSeq).toBe(1);
+    run(TICK_MS / 1000);
+    expect(world.players[slot].input.seq).toBe(3);
+    expect(peers[1].lastSnapshot.tick).toBe(world.tick);
+    expect(peers[1].lastSnapshot.ackSeq).toBe(3);
+    // The other player sent nothing and is acknowledged nothing.
+    expect(peers[0].lastSnapshot.ackSeq).toBe(0);
+    // With the queue empty the last input repeats: the unit keeps moving.
+    const unit = world.units[world.squads[world.players[slot].squadId].driven];
+    const x0 = unit.x;
+    const z0 = unit.z;
+    run(0.3);
+    expect(Math.hypot(unit.x - x0, unit.z - z0)).toBeGreaterThan(0.5);
+    expect(peers[1].lastSnapshot.ackSeq).toBe(3);
+  });
+
+  it('cleans what clients send before it reaches the simulation', () => {
+    const { room, run } = makeRoom();
+    const peers = seatPlayers(room, 1);
+    startMatch(room, peers);
+    run(1.5);
+    room.message('p0', 'input', { seq: 1, moveX: 50, moveZ: -50, aimYaw: 100, aimPitch: 9, buttons: 0xffff });
+    run(TICK_MS / 1000);
+    const state = room.match!.world.players[peers[0].welcome.playerId].input;
+    expect(Math.hypot(state.moveX, state.moveZ)).toBeLessThanOrEqual(1.0001);
+    expect(Math.abs(state.aimYaw)).toBeLessThanOrEqual(Math.PI + 1e-9);
+    expect(Math.abs(state.aimPitch)).toBeLessThan(Math.PI / 2);
+    expect(state.buttons).toBe(0xff);
+  });
+
+  it('brings a connected but silent player to a stop instead of leaving them walking', () => {
+    const { room, run } = makeRoom();
+    const peers = seatPlayers(room, 1);
+    startMatch(room, peers);
+    run(1.5);
+    room.message('p0', 'input', input(1, { moveZ: 1, aimYaw: 0.7, buttons: Btn.fire }));
+    run(TICK_MS / 1000);
+    const state = room.match!.world.players[peers[0].welcome.playerId].input;
+    expect(state.moveZ).toBe(1);
+    run((STARVED_TICKS + 1) * (TICK_MS / 1000));
+    expect(state.moveZ).toBe(0);
+    expect(state.buttons).toBe(0);
+    expect(state.aimYaw).toBeCloseTo(0.7);
+    expect(peers[0].lastSnapshot.ackSeq).toBe(1);
+  });
+
+  it('never spirals: a long stall costs a handful of ticks and one snapshot', () => {
+    const { room, run, skip } = makeRoom();
+    const peers = seatPlayers(room, 1);
+    startMatch(room, peers);
+    run(1);
+    const world = room.match!.world;
+    const tick = world.tick;
+    const snaps = peers[0].all('snap').length;
+    skip(30_000);
+    room.update();
+    expect(world.tick - tick).toBe(MAX_CATCH_UP_STEPS);
+    expect(peers[0].all('snap').length).toBe(snaps + 1);
+    // And it is back to one tick per tick of time straight away.
+    run(1);
+    expect(world.tick).toBe(tick + MAX_CATCH_UP_STEPS + TICK_RATE);
+  });
+
+  it('routes squad commands to the right squad and ignores them from the kaiju', () => {
+    const { room, run } = makeRoom();
+    const peers = seatPlayers(room, 2);
+    room.message('p0', 'setRole', { wantsKaiju: true });
+    startMatch(room, peers);
+    run(1.5);
+    const world = room.match!.world;
+    room.message('p1', 'command', { type: 'moveTo', x: 99999, z: 12 });
+    room.message('p0', 'command', { type: 'holdCharge' });
+    room.message('p1', 'command', { type: 'selfDestruct' });
+    const human = world.players[peers[1].welcome.playerId];
+    expect(human.queuedCommands).toEqual([{ type: 'moveTo', x: world.city.half, z: 12 }]);
+    expect(world.players[0].queuedCommands).toEqual([]);
+  });
+
+  it('takes everyone back to the lobby instead of crashing when the simulation throws', () => {
+    const { room, run, log } = makeRoom();
+    const peers = seatPlayers(room, 2);
+    startMatch(room, peers);
+    run(0.5);
+    room.match!.world.step = () => {
+      throw new Error('boom');
+    };
+    expect(() => run(0.2)).not.toThrow();
+    expect(room.lobby.phase).toBe('lobby');
+    expect(room.match).toBeNull();
+    expect(peers[0].lobby.lobby.phase).toBe('lobby');
+    expect(peers[0].lobby.lobby.players.every((p) => p.slot === -1 && !p.ready)).toBe(true);
+    expect(log.some((line) => line.includes('boom'))).toBe(true);
+    // The room still works: a new match can start.
+    startMatch(room, peers);
+    expect(room.lobby.phase).toBe('match');
+  });
+});
+
+describe('dropped players', () => {
+  it('covers a dropped player with a bot and gives the slot back on a token rejoin', () => {
+    const { room, run } = makeRoom();
+    const peers = seatPlayers(room, 3);
+    room.message('p0', 'setRole', { wantsKaiju: true });
+    startMatch(room, peers);
+    run(1.5);
+    const world = room.match!.world;
+    const slot = peers[2].welcome.playerId;
+    room.message('p2', 'input', input(40, { moveZ: 1 }));
+    run(0.2);
+    expect(peers[2].lastSnapshot.ackSeq).toBe(40);
+
+    expect(room.drop('p2')).toBe(true);
+    expect(room.drop('p2')).toBe(false);
+    expect(world.players[slot].bot).toBe(true);
+    expect(peers[0].lobby.lobby.players[2].connected).toBe(false);
+    expect(peers[0].lobby.lobby.players[2].slot).toBe(slot);
+    const sentWhileGone = peers[2].sent.length;
+    run(3);
+    expect(peers[2].sent.length).toBe(sentWhileGone);
+    expect(peers[0].lastSnapshot.squads.find((s) => s.player === slot)?.bot).toBe(true);
+    // Messages from the dead connection are ignored.
+    room.message('p2', 'input', input(41));
+
+    // The player reloads the page: a new connection, the same token, input numbering from 1.
+    const back = new FakePeer('p2-reloaded');
+    expect(room.join(back, { name: 'Somebody Else', token: tokenOf(2) })).toBe(2);
+    expect(peers[2].closed?.code).toBe(CLOSE_REPLACED);
+    expect(world.players[slot].bot).toBe(false);
+    expect(back.lobby.you).toBe(2);
+    expect(back.lobby.lobby.players[2].connected).toBe(true);
+    expect(back.lobby.lobby.players[2].name).toBe('Player C');
+    const welcome = back.welcome;
+    expect(welcome.playerId).toBe(slot);
+    expect(welcome.tick).toBe(world.tick);
+    expect(decodeCityState(welcome.cityState).structureStage.length).toBe(world.city.structures.length);
+    // The welcome comes after the lobby and before any snapshot.
+    expect(back.sent.map((s) => s.type)).toEqual(['lobby', 'welcome']);
+
+    run(0.2);
+    expect(back.lastSnapshot.ackSeq).toBe(0);
+    expect(back.lastSnapshot.squads.find((s) => s.player === slot)?.bot).toBe(false);
+    room.message('p2-reloaded', 'input', input(1, { moveX: 1 }));
+    run(0.1);
+    expect(back.lastSnapshot.ackSeq).toBe(1);
+    expect(back.snapshots.every((s) => s.tick > welcome.tick)).toBe(true);
+    expect(back.events.every((e) => e.tick > welcome.tick)).toBe(true);
+  });
+
+  it('keeps the acknowledgement when the same connection comes back by itself', () => {
+    const { room, run } = makeRoom();
+    const peers = seatPlayers(room, 2);
+    startMatch(room, peers);
+    run(1.5);
+    const slot = peers[1].welcome.playerId;
+    room.message('p1', 'input', input(77));
+    run(0.1);
+    room.drop('p1');
+    run(1);
+    const again = new FakePeer('p1');
+    expect(room.resume(again)).toBe(true);
+    expect(room.match!.world.players[slot].bot).toBe(false);
+    expect(again.sent.map((s) => s.type)).toEqual(['lobby', 'welcome']);
+    expect(again.welcome.playerId).toBe(slot);
+    run(0.1);
+    expect(again.lastSnapshot.ackSeq).toBe(77);
+    // Inputs the client had buffered from before the drop are stale and ignored.
+    room.message('p1', 'input', input(70));
+    room.message('p1', 'input', input(78));
+    run(0.1);
+    expect(again.lastSnapshot.ackSeq).toBe(78);
+    // Coming back for a seat that is gone is refused.
+    expect(room.resume(new FakePeer('stranger'))).toBe(false);
+  });
+
+  it('gives the seat up after the grace period; the bot keeps the slot', () => {
+    const { room, run } = makeRoom({ graceSeconds: 5 });
+    const peers = seatPlayers(room, 2);
+    startMatch(room, peers);
+    run(1.5);
+    const slot = peers[1].welcome.playerId;
+    room.drop('p1');
+    run(4);
+    expect(room.seatCount).toBe(2);
+    expect(peers[1].closed).toBeNull();
+    run(2);
+    expect(room.seatCount).toBe(1);
+    expect(peers[1].closed?.code).toBe(CLOSE_SEAT_RELEASED);
+    expect(peers[0].lobby.lobby.players.map((p) => p.seat)).toEqual([0]);
+    expect(room.match!.world.players[slot].bot).toBe(true);
+    // The library reporting the final leave afterwards changes nothing.
+    room.leave('p1');
+    expect(room.seatCount).toBe(1);
+
+    // Coming back later with the same token is a fresh seat, and the freed squad is theirs again.
+    const back = new FakePeer('p1-late');
+    room.join(back, { name: 'Late', token: tokenOf(1) });
+    expect(back.welcome.playerId).toBe(slot);
+    expect(room.match!.world.players[slot].bot).toBe(false);
+  });
+
+  it('is empty once the last player is gone for good', () => {
+    const { room, run } = makeRoom({ graceSeconds: 3 });
+    const [a] = seatPlayers(room, 1);
+    startMatch(room, [a]);
+    run(1);
+    room.drop('p0');
+    expect(room.empty).toBe(false);
+    run(2);
+    // The match plays on with bots while the seat is held.
+    expect(room.match!.world.tick).toBeGreaterThan(80);
+    expect(room.empty).toBe(false);
+    run(2);
+    expect(room.empty).toBe(true);
+    expect(room.connectedCount).toBe(0);
+  });
+
+  it('lets the newest connection with a token take the seat from an older live one', () => {
+    const { room } = makeRoom();
+    const [a, b] = seatPlayers(room, 2);
+    const second = new FakePeer('p0-second-tab');
+    expect(room.join(second, { token: tokenOf(0) })).toBe(0);
+    expect(a.closed?.code).toBe(CLOSE_REPLACED);
+    expect(room.seatCount).toBe(2);
+    expect(b.lobby.lobby.players.length).toBe(2);
+    // The library later reports the old connection as dropped and gone: both are ignored.
+    expect(room.drop('p0')).toBe(false);
+    room.leave('p0');
+    expect(room.seatCount).toBe(2);
+    expect(second.lobby.lobby.players[0].connected).toBe(true);
+    room.message('p0-second-tab', 'setName', { name: 'Tab Two' });
+    expect(b.lobby.lobby.players[0].name).toBe('Tab Two');
+  });
+
+  it('does not treat a missing or malformed token as an identity', () => {
+    const { room } = makeRoom();
+    room.join(new FakePeer('x'), { name: 'X', token: 'short' });
+    room.join(new FakePeer('y'), { name: 'Y', token: 'short' });
+    room.join(new FakePeer('z'), { name: 'Z' });
+    room.join(new FakePeer('w'), { name: 'W' });
+    expect(room.seatCount).toBe(4);
+  });
+
+  it('makes room for a newcomer by giving up the seat of whoever has been gone longest', () => {
+    const { room, run } = makeRoom({ graceSeconds: 600 });
+    const peers = seatPlayers(room, 5);
+    room.drop('p3');
+    run(1);
+    room.drop('p1');
+    run(1);
+    const newcomer = new FakePeer('new');
+    expect(room.join(newcomer, { name: 'New', token: 'token-new-abcdef' })).toBe(3);
+    expect(peers[3].closed?.code).toBe(CLOSE_SEAT_RELEASED);
+    expect(peers[1].closed).toBeNull();
+    expect(room.seatCount).toBe(5);
+  });
+
+  it('does not count a dropped player when the host starts', () => {
+    const { room } = makeRoom({ graceSeconds: 600 });
+    const peers = seatPlayers(room, 3);
+    room.drop('p2');
+    room.message('p1', 'ready', { ready: true });
+    room.message('p0', 'start', {});
+    expect(room.lobby.phase).toBe('match');
+    expect(peers[0].welcome.config.players.filter((p) => !p.bot).length).toBe(2);
+    // The dropped player returns during the match and takes over a bot squad.
+    const back = new FakePeer('p2-back');
+    room.join(back, { token: tokenOf(2) });
+    expect(back.lobby.you).toBe(2);
+    expect(back.welcome.playerId).toBeGreaterThan(0);
+    expect(room.match!.world.players[back.welcome.playerId].bot).toBe(false);
+  });
+});
+
+describe('late joiners', () => {
+  it('hands a late joiner a bot squad, by name', () => {
+    const { room, run } = makeRoom();
+    const peers = seatPlayers(room, 2);
+    room.message('p0', 'setRole', { wantsKaiju: true });
+    startMatch(room, peers);
+    run(2);
+    const world = room.match!.world;
+    const late = new FakePeer('late');
+    room.join(late, { name: 'Latecomer', token: 'token-late-abcdef' });
+    const slot = late.welcome.playerId;
+    expect(slot).toBeGreaterThanOrEqual(2);
+    expect(world.players[slot].role).toBe('human');
+    expect(world.players[slot].bot).toBe(false);
+    expect(late.welcome.config.players[slot].name).toBe('Latecomer');
+    expect(peers[0].lobby.lobby.players[2].slot).toBe(slot);
+    room.message('late', 'input', input(1, { moveZ: 1 }));
+    run(0.2);
+    expect(late.lastSnapshot.ackSeq).toBe(1);
+    expect(late.lastSnapshot.squads.find((s) => s.player === slot)?.bot).toBe(false);
+
+    // Two more fill the last squads; nobody is left a bot and nobody shares a slot.
+    const more = [new FakePeer('m1'), new FakePeer('m2')];
+    more.forEach((p, i) => room.join(p, { name: `More ${i}` }));
+    const taken = [...peers, late, ...more].map((p) => p.welcome.playerId);
+    expect(new Set(taken).size).toBe(5);
+    expect(world.players.every((p) => !p.bot)).toBe(true);
+  });
+});
+
+describe('match end', () => {
+  it('plays a fast match to the end, shows the result, and returns to the lobby on the host', () => {
+    const { room, runUntil, run } = makeRoom({ speed: 20 });
+    const peers = seatPlayers(room, 5);
+    startMatch(room, peers);
+    const firstKaiju = room.lobby.lastKaijuSeat;
+    runUntil(() => room.lobby.phase === 'end', 60);
+
+    for (const peer of peers) {
+      expect(peer.lobby.lobby.phase).toBe('end');
+      const end = peer.events.filter((e) => e.type === 'matchEnd');
+      expect(end.length).toBe(1);
+      const e = end[0];
+      if (e.type !== 'matchEnd') throw new Error('unreachable');
+      expect(['humans', 'kaiju']).toContain(e.winner);
+      expect(e.tallies.length).toBe(5);
+      const final = peer.lastSnapshot;
+      expect(final.match.phase).toBe('ended');
+      expect(final.match.winner).toBe(e.winner);
+      expect(final.tick).toBe(e.tick);
+      // The final snapshot is the last thing sent about the match.
+      expect(peer.sent.filter((s) => s.type !== 'lobby').at(-1)?.type).toBe('snap');
+    }
+
+    // Nothing more is simulated or sent on the end screen.
+    const tick = room.match!.world.tick;
+    const count = peers[0].sent.length;
+    run(2);
+    expect(room.match!.world.tick).toBe(tick);
+    expect(peers[0].sent.length).toBe(count);
+
+    // Someone arriving at the end screen sees the result too.
+    room.leave('p4');
+    const late = new FakePeer('late');
+    room.join(late, { name: 'Late' });
+    expect(late.sent.map((s) => s.type)).toEqual(['lobby', 'welcome', 'snap', 'events']);
+    expect(late.welcome.playerId).toBe(-1);
+    expect(late.lastSnapshot.match.phase).toBe('ended');
+    expect(late.events.map((e) => e.type)).toEqual(['matchEnd']);
+
+    // Only the host leaves the end screen.
+    room.message('p1', 'toLobby', {});
+    expect(room.lobby.phase).toBe('end');
+    room.message('p0', 'ready', { ready: true });
+    room.message('p0', 'toLobby', {});
+    expect(room.lobby.phase).toBe('lobby');
+    expect(room.match).toBeNull();
+    const lobby = peers[1].lobby.lobby;
+    expect(lobby.phase).toBe('lobby');
+    expect(lobby.players.every((p) => !p.ready && p.slot === -1)).toBe(true);
+    expect(lobby.lastKaijuSeat).toBe(firstKaiju);
+
+    // The next match gives the kaiju to somebody else.
+    const everyone = [...peers.slice(0, 4), late];
+    startMatch(room, everyone);
+    expect(room.lobby.phase).toBe('match');
+    expect(room.lobby.lastKaijuSeat).not.toBe(firstKaiju);
+    expect(everyone.map((p) => p.welcome.playerId).sort()).toEqual([0, 1, 2, 3, 4]);
+    expect(everyone.every((p) => p.welcome.tick === 0)).toBe(true);
+  });
+
+  it('returns to the lobby by itself when the host does nothing', () => {
+    const { room, runUntil, run } = makeRoom({ speed: 50, endScreenSeconds: 10 });
+    const peers = seatPlayers(room, 2);
+    startMatch(room, peers);
+    runUntil(() => room.lobby.phase === 'end', 30);
+    run(9);
+    expect(room.lobby.phase).toBe('end');
+    run(2);
+    expect(room.lobby.phase).toBe('lobby');
+    expect(peers[1].lobby.lobby.phase).toBe('lobby');
+  });
+
+  it('stays on the end screen for as long as the host likes when the timeout is off', () => {
+    const { room, runUntil, run } = makeRoom({ speed: 50, endScreenSeconds: 0 });
+    const peers = seatPlayers(room, 1);
+    startMatch(room, peers);
+    runUntil(() => room.lobby.phase === 'end', 30);
+    run(600);
+    expect(room.lobby.phase).toBe('end');
+  });
+});

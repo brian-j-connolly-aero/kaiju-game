@@ -22,6 +22,46 @@ export const PROTOCOL_VERSION = 1;
 /** Default port for the one process that serves both the page and the WebSocket. */
 export const DEFAULT_PORT = 2567;
 
+// --- Joining a room ----------------------------------------------------------------------------
+
+/**
+ * Name the game room is registered under with the room library. A client creates a room with
+ * this name and joins an existing one by its 4-letter code (the code is the library's room id).
+ */
+export const ROOM_NAME = 'mb';
+
+/** Options a client passes when it creates a room or joins one by code. Everything is optional. */
+export interface JoinOptions {
+  /** Display name; the server cleans it with `cleanPlayerName`. */
+  name?: string;
+  /**
+   * Session token: a random string the client makes once and keeps (8 to 64 characters of
+   * `A-Z a-z 0-9 _ -`). Joining a room where this token already holds a seat gives that seat
+   * back (the newest connection wins; the older one is closed with `CLOSE_REPLACED`).
+   */
+  token?: string;
+  /** The client's PROTOCOL_VERSION. A different version is refused with `JOIN_ERROR.version`. */
+  protocol?: number;
+}
+
+/** What a session token must look like to be accepted. */
+export const SESSION_TOKEN_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
+
+/** Error codes a refused create or join fails with. */
+export const JOIN_ERROR = {
+  /** All five seats are taken by people who are connected. */
+  roomFull: 4401,
+  /** The client was built for a different PROTOCOL_VERSION: reload the page. */
+  version: 4402,
+  /** The server is at its room limit. */
+  serverFull: 4403,
+} as const;
+
+/** WebSocket close code: this connection's seat was taken over by a newer one with the same token. */
+export const CLOSE_REPLACED = 4101;
+/** WebSocket close code: the seat was given up (the player stayed away longer than the grace period). */
+export const CLOSE_SEAT_RELEASED = 4102;
+
 // --- Client -> server ------------------------------------------------------------------------
 
 export interface ClientMessages {

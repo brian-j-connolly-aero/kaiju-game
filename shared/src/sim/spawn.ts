@@ -16,7 +16,7 @@ import { yawFromTo } from '../math/angle';
 import type { Bounds } from '../math/geom';
 import type { Vec2 } from '../math/vec';
 import type { PlayerSlot } from './config';
-import type { Kaiju, Squad, Unit, World } from './types';
+import type { Kaiju, KaijuActionMemory, Squad, Unit, World } from './types';
 
 /** How far inside the bounds line squads deploy. */
 const DEPLOY_INSET = 20;
@@ -84,6 +84,19 @@ function zeroCooldowns(): Record<KaijuVerb, number> {
   return c;
 }
 
+export function createActionMemory(): KaijuActionMemory {
+  return {
+    usedPress: 0,
+    usedHold: 0,
+    holdLive: false,
+    throwBuffer: 0,
+    meal: false,
+    beamLength: 0,
+    beamBlocker: -1,
+    crossfireTick: -1e9,
+  };
+}
+
 /** Sets a kaiju's size for a stage. Does not touch hp, nerve or position. */
 export function setKaijuStage(k: Kaiju, stage: StageId): void {
   const st = kaijuStageDef(k.kind, stage);
@@ -122,6 +135,7 @@ export function createKaiju(id: number, slot: PlayerSlot, x: number, z: number, 
     phaseDuration: 0,
     actionTime: 0,
     actionYaw: yaw,
+    act: createActionMemory(),
     held: null,
     cooldowns: zeroCooldowns(),
     moltAvailable: false,

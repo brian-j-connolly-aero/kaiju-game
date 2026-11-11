@@ -126,8 +126,9 @@ describe('city damage and the destruction bar', () => {
     expect(barDisplayFraction(5000, marks)).toBe(1);
   });
 
-  it('drains the hit queue even though applyHit is still a stub', () => {
+  it('drains the hit queue through applyHit every tick', () => {
     const world = makeTestWorld();
+    const k = world.kaijus[0];
     const hit: Hit = {
       damage: 10,
       nerve: 5,
@@ -138,9 +139,16 @@ describe('city damage and the destruction bar', () => {
       atWill: false,
     };
     world.hits.push({ target: { entity: 'kaiju', id: 0 }, hit });
-    world.step();
+    const events = world.step();
     expect(world.hits).toEqual([]);
-    expect(() => applyHit(world, { entity: 'unit', id: 0 }, hit)).not.toThrow();
+    expect(k.hp).toBeLessThan(k.maxHp);
+    expect(events.filter((e) => e.type === 'kaijuHit').length).toBe(1);
+    const before = world.units[0].hp;
+    applyHit(world, { entity: 'unit', id: 0 }, hit);
+    expect(world.units[0].hp).toBe(before - 10);
+    // Ids that do not exist are ignored rather than crashing the tick.
+    expect(() => applyHit(world, { entity: 'unit', id: 999 }, hit)).not.toThrow();
+    expect(() => applyHit(world, { entity: 'kaiju', id: 7 }, hit)).not.toThrow();
   });
 });
 

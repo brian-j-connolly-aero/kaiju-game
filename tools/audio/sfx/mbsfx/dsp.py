@@ -341,6 +341,15 @@ def resample(x: np.ndarray, ratio: float) -> np.ndarray:
     return signal.resample(x, m, axis=0)
 
 
+def warp(x: np.ndarray, rate) -> np.ndarray:
+    """Variable-speed playback: rate is the speed over time (1 = unchanged, below 1 = slower and
+    lower). All resonances glide together, like metal bending."""
+    r = np.broadcast_to(np.asarray(rate, dtype=float), (len(x),))
+    pos = np.cumsum(r) - r[0]
+    pos = pos[pos <= len(x) - 1]
+    return np.interp(pos, np.arange(len(x)), x)
+
+
 # ---- spaces ----------------------------------------------------------------------------------
 def space_ir(rng: np.random.Generator, t60: float, *, pre: float = 0.0, bright: float = 7000.0,
              dark: float = 900.0, echoes: tuple = (), stereo: bool = False, low_cut: float = 120.0,

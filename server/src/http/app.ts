@@ -1,0 +1,76 @@
+/**
+ * The HTTP side of the one port: a health check, the built client when there is one, and a
+ * fallback so any page address opens the game. Matchmaking requests and the WebSocket upgrade
+ * are handled by the room library on the same server before a request ever gets here.
+ *
+ * Every address is relative to wherever the page was loaded from, so the same build works on
+ * localhost, on a LAN address and behind a tunnel or reverse proxy on a single hostname.
+ */
+
+import { existsSync } from 'node:fs';
+import { extname, join } from 'node:path';
+import express, { type Application, type NextFunction, type Request, type Response } from 'express';
+
+export interface HealthInfo {
+  ok: true;
+  game: string;
+  protocol: number;
+  /** Seconds since the server started. */
+  uptime: number;
+  rooms: number;
+  players: number;
+  fast: boolean;
+}
+
+export interface AppOptions {
+  /** Folder with the built client (it need not exist yet), or null to serve no page. */
+  clientDir: string | null;
+  health: () => HealthInfo;
+}
+
+/** File names the bundler stamps with a content hash never change, so browsers may keep them. */
+const HASHED_ASSET = /-[A-Za-z0-9_-]{8,}\.(?:js|css|woff2?)$/;
+
+const NO_CLIENT_NOTE =
+  'Monster Battle 9001: the game server is running, but the game page has not been built yet.\n' +
+  'Run "npm run build" and reload, or use "npm run dev" while developing.\n';
+
+export function configureApp(app: Application, options: AppOptions): void {
+  app.disable('x-powered-by');
+
+  app.get('/healthz', (_req: Request, res: Response) => {
+    res.set('Cache-Control', 'no-store');
+    res.json(options.health());
+  });
+
+  const dir = options.clientDir;
+  if (dir) {
+    app.use(
+      express.static(dir, {
+        index: false,
+        setHeaders(res, filePath) {
+          res.setHeader(
+            'Cache-Control',
+            HASHED_ASSET.test(filePath) ? 'public, max-age=31536000, immutable' : 'no-cache',
+          );
+        },
+      }),
+    );
+  }
+
+  // Any other page address opens the game. A request for a missing file (it has an extension)
+  // stays a 404, so a missing model or sound is reported as missing instead of as a web page.
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if ((req.method !== 'GET' && req.method !== 'HEAD') || extname(req.path) !== '' || !req.accepts('html')) {
+      next();
+      return;
+    }
+    if (dir && existsSync(join(dir, 'index.html'))) {
+      res.set('Cache-Control', 'no-cache');
+      // Relative to `root`, so a dot folder somewhere above the client is not mistaken for a hidden file.
+      res.sendFile('index.html', { root: dir });
+    } else {
+      res.status(req.path === '/' ? 200 : 404).type('text/plain').send(NO_CLIENT_NOTE);
+    }
+  });
+}

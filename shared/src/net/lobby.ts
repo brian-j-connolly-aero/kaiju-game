@@ -36,6 +36,11 @@ export interface LobbyPlayer {
   ready: boolean;
   /** False while the player is disconnected and may still reclaim the seat. */
   connected: boolean;
+  /**
+   * Set by the server: the match slot (PlayerId) this seat plays while the room is in a match or
+   * on the end screen; -1 for a spectator and whenever the room is in the lobby.
+   */
+  slot?: number;
 }
 
 export interface LobbyOptions {

@@ -6,6 +6,7 @@ bar numbers are 1-based like a printed score.
 """
 from __future__ import annotations
 
+import math
 import random
 import re
 import zlib
@@ -182,53 +183,14 @@ class Part:
     def end_beat(self) -> float:
         return max((s + d for s, d, _, _ in self.notes), default=0.0)
 
-    def to_midi(self, total_beats: float, seed_text: str) -> mido.MidiFile:
-        """One-track MIDI file for this part. `total_beats` fixes the length of the render."""
-        inst = self.inst
-        ch = 9 if inst.drums else 0
+    def timed_notes(self, seed_text: str) -> list[list]:
+        """The notes as they will be played: [start beat, end beat, pitch, velocity], with the
+        section's small timing and velocity looseness applied (seeded, so every build is the same)."""
         rng = random.Random(zlib.crc32(f"{seed_text}/{self.name}".encode()))
-        ev: list[tuple[int, int, mido.Message]] = []      # tick, order, message
-
-        def add(beat: float, order: int, msg: mido.Message) -> None:
-            ev.append((max(0, int(round(beat * PPQ))), order, msg))
-
-        def cc(beat: float, control: int, value: int, order: int = 1) -> None:
-            add(beat, order, mido.Message("control_change", channel=ch, control=control,
-                                          value=max(0, min(127, int(value)))))
-
-        def nrpn(gen: int, value: int) -> None:
-            v = max(0, min(16383, int(value) + 8192))
-            cc(0, 99, 120, 0)
-            cc(0, 98, gen, 0)
-            cc(0, 6, v >> 7, 0)
-            cc(0, 38, v & 127, 0)
-
-        if inst.bank and not inst.drums:
-            cc(0, 0, inst.bank, 0)
-        add(0, 0, mido.Message("program_change", channel=ch, program=inst.program))
-        cc(0, 7, 100, 0)
-        cc(0, 10, 64, 0)
-        cc(0, 91, 0, 0)
-        cc(0, 93, 0, 0)
-        if not any(c == 11 and b <= 0 for b, c, _ in self.ccs):
-            cc(0, 11, 127, 0)
-        if self.ofs:
-            nrpn(0, self.ofs)                                # sample start offset, in samples
-        if self.atk_ms:
-            # volume-envelope attack: generator 34, timecents relative to the 1 ms default, scale 2
-            import math
-            nrpn(34, int(round(1200 * math.log2(self.atk_ms / 1.0) / 2)))
-        if self.tune:
-            nrpn(52, int(round(self.tune)))                  # fine tune in cents
-        for beat, control, value in self.ccs:
-            cc(beat, control, value)
-        for beat, value in self.bends:
-            add(beat, 1, mido.Message("pitchwheel", channel=ch, pitch=value))
-
-        # humanise: one small timing offset per attack point (a section plays together), a little
-        # extra per note, and a few points of velocity
+        # one small timing offset per attack point (a section plays together), a little extra
+        # per note, and a few points of velocity
         jitter_by_start: dict[float, float] = {}
-        timed = []                                       # [start, end, pitch, velocity]
+        timed = []
         for start, dur, p, vel in sorted(self.notes):
             base = jitter_by_start.setdefault(start, rng.gauss(0, self.human_ms) / 1000.0 / SEC_PER_BEAT)
             j = base + rng.gauss(0, self.human_ms * 0.3) / 1000.0 / SEC_PER_BEAT
@@ -243,6 +205,49 @@ class Part:
             if prev is not None and prev[1] > n[0] - 0.02:
                 prev[1] = max(prev[0] + 0.01, n[0] - 0.02)
             last_on_pitch[n[2]] = n
+        return timed
+
+    def to_midi(self, total_beats: float, timed: list[list], tune_cents: float = 0.0) -> mido.MidiFile:
+        """One-track MIDI file for this part (or for the subset of its notes in `timed`, which
+        is how the synth renders each intonation group). `total_beats` fixes the render length."""
+        inst = self.inst
+        ch = 9 if inst.drums else 0
+        ev: list[tuple[int, int, mido.Message]] = []      # tick, order, message
+
+        def add(beat: float, order: int, msg: mido.Message) -> None:
+            ev.append((max(0, int(round(beat * PPQ))), order, msg))
+
+        def cc(beat: float, control: int, value: int, order: int = 1) -> None:
+            add(beat, order, mido.Message("control_change", channel=ch, control=control,
+                                          value=max(0, min(127, int(value)))))
+
+        def nrpn(gen: int, value: int) -> None:
+            v = max(0, min(16383, int(value) + 8192))
+            cc(0, 99, 120, 0)
+            cc(0, 98, gen, 0)
+            cc(0, 38, v & 127, 0)        # fluidsynth applies the value when the MSB (6) arrives,
+            cc(0, 6, v >> 7, 0)          # so the LSB has to be sent first
+
+        if inst.bank and not inst.drums:
+            cc(0, 0, inst.bank, 0)
+        add(0, 0, mido.Message("program_change", channel=ch, program=inst.program))
+        cc(0, 7, 100, 0)
+        cc(0, 10, 64, 0)
+        cc(0, 91, 0, 0)
+        cc(0, 93, 0, 0)
+        if not any(c == 11 and b <= 0 for b, c, _ in self.ccs):
+            cc(0, 11, 127, 0)
+        if self.ofs:
+            nrpn(0, self.ofs)                                # sample start offset, in samples
+        if self.atk_ms:
+            # volume-envelope attack: generator 34, timecents relative to the 1 ms default, scale 2
+            nrpn(34, int(round(1200 * math.log2(self.atk_ms / 1.0) / 2)))
+        if tune_cents:
+            nrpn(52, int(round(max(-99, min(99, tune_cents)))))   # fine tune in cents
+        for beat, control, value in self.ccs:
+            cc(beat, control, value)
+        for beat, value in self.bends:
+            add(beat, 1, mido.Message("pitchwheel", channel=ch, pitch=value))
         for s, e, p, v in timed:
             add(s, 3, mido.Message("note_on", channel=ch, note=p, velocity=v))
             add(e, 2, mido.Message("note_off", channel=ch, note=p, velocity=0))

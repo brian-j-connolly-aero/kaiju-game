@@ -140,8 +140,13 @@ export interface KaijuActionEvent extends EventBase {
   kaiju: number;
   action: KaijuVerb;
   phase: KaijuPhase;
-  /** Length of this phase in seconds (0 when open-ended, like brace). */
+  /** Length of this phase in seconds (0 when open-ended, like brace, or instant, like a grab's snatch). */
   duration: number;
+  /**
+   * Seconds of this phase that had already passed when the event was emitted. Only present when
+   * it is not 0: a Swipe wind-up that becomes a Stomp keeps the time already spent.
+   */
+  elapsed?: number;
   x: number;
   z: number;
   /** Direction the action is aimed along. */
@@ -169,6 +174,7 @@ export interface KaijuStaggerEvent extends EventBase {
   kaiju: number;
   /** True at the start, false when it recovers. */
   on: boolean;
+  /** Start: how long the stagger lasts. Recovery: how long the nerve immunity that follows lasts. */
   duration: number;
 }
 
@@ -178,7 +184,10 @@ export type HeldSource =
   | 'prop'
   /** The wreck of a destroyed prop (`sourceId` is the prop id; its `propWreck` bit is cleared). */
   | 'propWreck'
-  /** A living vehicle (`sourceId` is the unit id; the unit is destroyed). */
+  /**
+   * A living vehicle (`sourceId` is the unit id). The unit loses that one vehicle (`memberLost`);
+   * when it was its last one the unit is destroyed (`unitDestroyed`) and leaves no wreck.
+   */
   | 'unit'
   /** The wreck of a dead vehicle (`sourceId` is the unit id; `unit.wreck` is cleared). */
   | 'unitWreck'
@@ -220,7 +229,10 @@ export interface CrossfireEvent extends EventBase {
   z: number;
 }
 
-/** A unit took damage. */
+/**
+ * A unit took damage. Continuous damage (the beam, being trampled) is reported only a few times
+ * a second, with the damage of that one tick; hp is always current.
+ */
 export interface UnitHitEvent extends EventBase {
   type: 'unitHit';
   unit: number;

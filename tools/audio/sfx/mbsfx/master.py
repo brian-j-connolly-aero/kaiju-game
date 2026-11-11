@@ -41,6 +41,7 @@ RUMBLE_HZ = 20.0          # everything below is removed (also removes any DC off
 FADE_IN = 0.0008          # one-shots: 35 samples, keeps the transient
 FADE_OUT = 0.02
 TRIM_DB = -66.0           # one-shots end 30 ms after the tail falls this far below the peak
+TAIL_PAD = 0.006          # then a few ms of silence (the Vorbis encoder may drop the last 128 samples)
 OGG_QUALITY = "5"         # libvorbis -q:a
 MP3_QUALITY = "2"         # libmp3lame -q:a (variable bit rate)
 
@@ -69,6 +70,7 @@ def master_oneshot(x: np.ndarray, spec: Spec) -> tuple[np.ndarray, dict]:
         if abs(err) < 0.05 or over > MAX_CLIP_DB or reduction > 9.0:
             break
         gain *= dsp.amp(err)
+    y = np.concatenate([y, np.zeros((dsp.n_(TAIL_PAD),) + y.shape[1:])], axis=0)
     return y, {"limiter_db": round(reduction, 2), "clip_db": round(over if spec.clip else 0.0, 2)}
 
 

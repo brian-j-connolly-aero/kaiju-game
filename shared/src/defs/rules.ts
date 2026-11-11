@@ -71,6 +71,10 @@ export const COMBAT_RULES = {
   staggerNerveImmunity: 6,
   /** Tier 2: immunity to freeze and trip after either ends. */
   freezeTripImmunity: 6,
+  /** At most one `crossfire` event per kaiju in this many seconds (every crossing hit still gets the multiplier). */
+  crossfireEventGap: 1,
+  /** A kaiju tramples the units under it only while it moves at least this fast, m/s. */
+  trampleMinSpeed: 1,
 
   /** Human units. */
   unitNerveCapacity: 100,
@@ -79,6 +83,11 @@ export const COMBAT_RULES = {
   /** Nerve damage to units near a friendly unit that is destroyed. */
   friendlyLossNerve: 15,
   friendlyLossRadius: 40,
+  /** Units standing on a bridge deck when it collapses fall into the river: damage and nerve. */
+  bridgeFallDamage: 40,
+  bridgeFallNerve: 100,
+  /** Continuous damage (beam, trample) reports `unitHit` / `kaijuHit` only every this many ticks. */
+  continuousHitEventTicks: 6,
 
   /** Volleys: sub-units on hold build charge 0..1 over chargeTime and lock to this firing arc. */
   chargeTime: 6,

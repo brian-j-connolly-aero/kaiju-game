@@ -25,7 +25,7 @@ def build() -> Cue:
               sections=[(1, "English horn"), (5, "bassoon, clarinet counter-line"), (9, "strings; half close")])
     s = cue.stem("hearing")
 
-    pz = s.add("basses pizz", "pizz_bass", gain=3.0, role="bass")
+    pz = s.add("basses pizz", "pizz_bass", gain=0.0, role="bass")
     pc = s.add("cellos pizz", "pizz_lo", gain=-1.0, role="bass")
     hp = s.add("harpsichord", "harpsichord", gain=2.0, role="pad")
     for bar in (1, 5, 9):

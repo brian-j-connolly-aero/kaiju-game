@@ -8,7 +8,7 @@ from __future__ import annotations
 import numpy as np
 
 from . import dsp, parts
-from .dsp import SR, TAU, n_
+from .dsp import TAU, n_
 from .parts import curve
 from .registry import sfx
 
@@ -107,7 +107,7 @@ def _roar(rng: np.random.Generator, stage: int) -> np.ndarray:
         rng, dur, size=size,
         f0=[(0, base), (a * 0.6, base * 1.35), (a, base * 1.9), (a + 0.06, base * 2.0), (b, base * 1.6),
             (b + 0.12, base * 1.05), (0.85, base * 0.6), (1, base * 0.42)],
-        growl=[(0, 0.3), (a * 0.5, 0.55), (a, 1.0), (b, 1.0), (b + 0.1, 0.8), (0.86, 0.45), (1, 0.0)],
+        growl=[(0, 0.45), (a * 0.5, 0.65), (a, 1.0), (b, 1.0), (b + 0.1, 0.8), (0.86, 0.45), (1, 0.0)],
         mouth=[(0, 0.1), (a * 0.7, 0.45), (a, 0.95), (b, 1.0), (b + 0.14, 0.45), (1, 0.05)],
         scream=[(0, 0.0), (a * 0.6, 0.1), (a - 0.02, 0.35), (a + 0.02, 1.0), (b - 0.03, 1.0), (b + 0.08, 0.3),
                 (0.8, 0.05), (1, 0.0)],
@@ -138,11 +138,15 @@ for _s in (1, 2, 3):
 
 
 # ---- footsteps, stomps, swipes -----------------------------------------------------------------
-def _ground_kernels(rng: np.random.Generator, stage: int) -> list[np.ndarray]:
-    """Asphalt and rubble under the foot: grit at stage 1, cracking slabs at stage 3."""
+def _ground(n: int, rng: np.random.Generator, rate, stage: int) -> np.ndarray:
+    """Asphalt and rubble under the foot: grit at stage 1, cracking slabs at stage 3. Dense
+    noisy grit plus a few resonant knocks (rare, so they stay knocks and do not fuse into a tone)."""
     lo, hi = {1: (900.0, 6000.0), 2: (500.0, 4000.0), 3: (280.0, 2600.0)}[stage]
-    return (parts.noise_kernels(rng, 8, lo, hi, 0.003, 0.008 * stage)
-            + parts.modal_kernels(rng, 6, lo * 0.5, lo * 2.5, 0.012 * stage, 0.03 * stage, damp=0.4))
+    rate = np.asarray(rate, dtype=float)
+    grit = parts.debris(n, rng, rate, parts.noise_kernels(rng, 8, lo, hi, 0.003, 0.008 * stage), sigma=0.6)
+    slabs = parts.debris(n, rng, rate * 0.025, parts.modal_kernels(rng, 10, lo * 0.5, lo * 2.5, 0.012 * stage, 0.03 * stage,
+                                                                 damp=0.4, tick=0.7), sigma=0.5)
+    return grit + 2.5 * slabs
 
 
 def _step(rng: np.random.Generator, stage: int, v: int) -> np.ndarray:
@@ -150,29 +154,27 @@ def _step(rng: np.random.Generator, stage: int, v: int) -> np.ndarray:
     if stage == 1:                                            # a bus-sized animal: a heavy thud
         n = n_(0.42)
         low = parts.thump(n, 125 * tune, 74 * tune, 0.035, 0.2, attack=0.003)
-        slap = parts.burst(n, rng, 4200, 700, 0.025, 0.1)
-        grit = parts.debris(n, rng, dsp.env([(0, 2600), (0.05, 900), (0.16, 0)], n), _ground_kernels(rng, 1), sigma=0.5)
+        slap = parts.burst(n, rng, 4500, 900, 0.03, 0.15)
+        grit = _ground(n, rng, dsp.env([(0, 2600), (0.05, 900), (0.16, 0)], n), 1)
         claw = np.zeros(n)
         for i in range(3):                                    # three claws tick the asphalt
             dsp.put(claw, dsp.click(rng, 2500, 9000, 0.006), 0.012 + 0.011 * i + rng.uniform(0, 0.004), rng.uniform(0.5, 1))
-        return dsp.mix((low, 0.8), (slap, 1.0), (grit, 0.08), (claw, 0.25))
+        return dsp.mix((low, 0.6), (slap, 0.8), (grit, 0.03), (claw, 0.12))
     if stage == 2:                                            # building-sized: a boom that cracks the road
         n = n_(1.0)
         low = parts.thump(n, 70 * tune, 38 * tune, 0.06, 0.5, attack=0.004, harm=0.35, sat=2.0)
         hit = parts.burst(n, rng, 2600, 200, 0.035, 0.24)
-        crunch = parts.debris(n, rng, dsp.env([(0, 2400), (0.12, 900), (0.45, 80), (0.8, 0)], n), _ground_kernels(rng, 2),
-                              sigma=0.6)
+        crunch = _ground(n, rng, dsp.env([(0, 2400), (0.12, 900), (0.45, 80), (0.8, 0)], n), 2)
         rumble = parts.unit(dsp.lp(dsp.noise(n, rng, -6), 140, 2)) * dsp.decay(n, 0.7, 0.01)
-        dry = dsp.mix((low, 0.9), (hit, 0.8), (crunch, 0.06), (rumble, 0.3))
+        dry = dsp.mix((low, 0.7), (hit, 1.0), (crunch, 0.03), (rumble, 0.12))
         return dsp.reverb(dry, dsp.space_ir(rng, 0.6, pre=0.02, bright=3000, dark=500, echoes=((0.14, 0.22, 1200.0),)), 0.16)
     n = n_(2.2)                                               # skyscraper-sized: a seismic boom
     low = parts.thump(n, 48 * tune, 25 * tune, 0.12, 1.25, attack=0.008, harm=0.45, sat=2.2)
     toe = parts.thump(n, 60 * tune, 31 * tune, 0.08, 0.7, attack=0.006, harm=0.35)     # heel, then toe
     hit = parts.burst(n, rng, 1700, 130, 0.07, 0.5, slope=-4.0)
-    crack = parts.debris(n, rng, dsp.env([(0, 2200), (0.25, 1200), (0.9, 150), (1.6, 0)], n), _ground_kernels(rng, 3),
-                         sigma=0.6)
+    crack = _ground(n, rng, dsp.env([(0, 2200), (0.25, 1200), (0.9, 150), (1.6, 0)], n), 3)
     shake = parts.unit(dsp.lp(dsp.noise(n, rng, -6), 85, 2)) * dsp.decay(n, 1.7, 0.02) * (1 + 0.5 * dsp.wander(n, rng, 11.0))
-    dry = dsp.mix((low, 0.85), (toe, 0.4, 0.085), (hit, 1.0), (crack, 0.07), (shake, 0.4))
+    dry = dsp.mix((low, 0.8), (toe, 0.4, 0.085), (hit, 1.0), (crack, 0.05), (shake, 0.16))
     ir = dsp.space_ir(rng, 1.6, pre=0.03, bright=1800, dark=350, echoes=((0.27, 0.3, 700.0), (0.46, 0.2, 450.0)),
                       low_cut=40.0)
     return dsp.reverb(dry, ir, 0.22)
@@ -200,9 +202,8 @@ def _stomp(rng: np.random.Generator, stage: int) -> np.ndarray:
     ring_f = dsp.env([(0, {1: 1400, 2: 900, 3: 600}[stage]), (dur * 0.5, {1: 420, 2: 230, 3: 140}[stage]),
                       (dur, {1: 200, 2: 110, 3: 70}[stage])], n, "exp")
     ring = parts.whoosh(n, rng, ring_f, 0.75) * dsp.hump(n, dur * 0.16, 1.2, 2.2)
-    rubble = parts.debris(n, rng, dsp.env([(0, 1200), (dur * 0.25, 500), (dur * 0.7, 80), (dur, 0)], n),
-                          _ground_kernels(rng, stage))
-    dry = dsp.mix((low, 1.0), (hit, 0.7), (crack, 0.35), (ring, 0.3), (rubble, 0.09))
+    rubble = _ground(n, rng, dsp.env([(0, 1200), (dur * 0.25, 500), (dur * 0.7, 80), (dur, 0)], n), stage)
+    dry = dsp.mix((low, 1.0), (hit, 0.9), (crack, 0.2), (ring, 0.12), (rubble, 0.035))
     ir = dsp.space_ir(rng, {1: 0.45, 2: 0.9, 3: 1.8}[stage], pre=0.012 * stage, bright=4500 / stage, dark=450,
                       echoes=((0.1 * stage, 0.3, 2400.0 / stage), (0.17 * stage, 0.2, 1500.0 / stage)), low_cut=50.0)
     return dsp.reverb(dry, ir, {1: 0.15, 2: 0.2, 3: 0.26}[stage])
@@ -235,27 +236,19 @@ for _s in (1, 2, 3):
 
 
 # ---- body sounds -------------------------------------------------------------------------------
-def _metal_crunch(rng: np.random.Generator, n: int, rate, low: float = 180.0, high: float = 2600.0) -> np.ndarray:
-    """Sheet metal and masonry giving way: bursts of grit driving a set of metallic resonances."""
-    grit = parts.debris(n, rng, rate, parts.noise_kernels(rng, 4, 600, 5000, 0.003, 0.012), sigma=0.9)
-    freqs = np.exp(rng.uniform(np.log(low), np.log(high), 14))
-    panel = dsp.modal(n_(0.12), freqs, rng.uniform(0.03, 0.11, 14), rng.uniform(0.3, 1.0, 14), rng)
-    return parts.unit(dsp.excite(grit, panel, n)) + 0.5 * parts.unit(grit)
-
-
-@sfx("kaiju_grab", "kaiju", level=-19.0, use="Grab: the claw closes on a car, wreck or chunk.")
+@sfx("kaiju_grab", "kaiju", level=-19.5, use="Grab: the claw closes on a car, wreck or chunk.")
 def kaiju_grab(rng, v):
     n = n_(0.6)
     reach = parts.whoosh(n, rng, [(0, 300), (0.13, 900), (0.3, 250)], 0.7) * dsp.env([(0, 0), (0.11, 1), (0.16, 0.2), (0.3, 0)], n)
     clamp = parts.thump(n, 120, 70, 0.03, 0.16)
-    crunch = _metal_crunch(rng, n, dsp.env([(0, 1500), (0.08, 600), (0.25, 0)], n)) * dsp.decay(n, 0.32)
+    crunch = parts.metal_crunch(rng, n, dsp.env([(0, 1500), (0.08, 600), (0.25, 0)], n)) * dsp.decay(n, 0.32)
     creak = dsp.fm(dsp.env([(0, 310), (0.25, 430)], n, "exp"), 2.76, 1.8, n) * dsp.env([(0, 0), (0.03, 1), (0.2, 0.3), (0.3, 0)], n)
     creak = creak * (0.5 + 0.5 * dsp.saw(70.0 * (1 + 0.2 * dsp.wander(n, rng, 8.0)))) ** 2       # stick and slip
     out = np.zeros(n)
-    out += reach * 0.5
+    out += reach * 0.2
     dsp.put(out, clamp, 0.13, 1.0)
-    dsp.put(out, crunch, 0.13, 0.33)
-    dsp.put(out, creak, 0.16, 0.12)
+    dsp.put(out, crunch, 0.13, 0.12)
+    dsp.put(out, creak, 0.16, 0.05)
     return out
 
 
@@ -271,27 +264,27 @@ def kaiju_throw(rng, v):
     return dsp.mix((grunt, 0.5), (air, 1.0), (mass, 0.8))
 
 
-@sfx("kaiju_eat", "kaiju", level=-20.0, use="Eat (2 s, rooted): three crunching bites and a swallow.")
+@sfx("kaiju_eat", "kaiju", level=-21.0, use="Eat (2 s, rooted): three crunching bites and a swallow.")
 def kaiju_eat(rng, v):
     n = n_(2.1)
     out = np.zeros(n)
     for i, t0 in enumerate((0.03, 0.55, 1.05)):
         m = n_(0.42)
         jaw = parts.thump(m, 150 - 12 * i, 85, 0.02, 0.12)
-        crunch = _metal_crunch(rng, m, dsp.env([(0, 2200), (0.1, 900), (0.3, 0)], m)) * dsp.decay(m, 0.38)
+        crunch = parts.metal_crunch(rng, m, dsp.env([(0, 2200), (0.1, 900), (0.3, 0)], m)) * dsp.decay(m, 0.38)
         wet = parts.whoosh(m, rng, [(0, 1500), (0.2, 700)], 0.6) * dsp.env([(0, 0), (0.015, 1), (0.12, 0.2), (0.25, 0)], m)
         dsp.put(out, jaw, t0, 1.0)
-        dsp.put(out, crunch, t0 + 0.005, 0.6 - 0.07 * i)
-        dsp.put(out, wet, t0, 0.3)
+        dsp.put(out, crunch, t0 + 0.005, 0.2 - 0.025 * i)
+        dsp.put(out, wet, t0, 0.1)
     hum = voice(rng, 1.5, f0=[(0, 80), (0.5, 88), (1, 70)], growl=[(0, 0), (0.1, 0.6), (0.9, 0.5), (1, 0)],
                 mouth=[(0, 0.1), (1, 0.15)], scream=[(0, 0), (1, 0)], scream_f=[(0, 800), (1, 800)], screech=[(0, 0), (1, 0)],
                 screech_f=[(0, 800), (1, 800)], tear=[(0, 0.5), (1, 0.5)], tear_rate=26.0)
-    dsp.put(out, hum, 0.05, 0.3)
+    dsp.put(out, hum, 0.05, 0.12)
     m = n_(0.3)                                              # the swallow: a pitch that drops through the throat
     gulp = dsp.sine(dsp.env([(0, 330), (0.07, 420), (0.22, 95)], m, "exp")) * dsp.env([(0, 0), (0.02, 1), (0.15, 0.7), (0.26, 0)], m)
     gulp = dsp.reson(gulp + 0.3 * dsp.noise(m, rng, -3) * dsp.env([(0, 0), (0.03, 1), (0.2, 0)], m), 300, 1.2)
-    dsp.put(out, gulp, 1.62, 0.8)
-    dsp.put(out, parts.thump(n_(0.25), 90, 60, 0.03, 0.2), 1.74, 0.6)
+    dsp.put(out, gulp, 1.62, 0.35)
+    dsp.put(out, parts.thump(n_(0.25), 90, 60, 0.03, 0.2), 1.74, 0.4)
     return out
 
 
@@ -299,13 +292,13 @@ def kaiju_eat(rng, v):
 def kaiju_brace(rng, v):
     n = n_(0.95)
     lock = parts.thump(n, 95, 58, 0.04, 0.3)
-    plates = parts.debris(n, rng, dsp.env([(0, 260), (0.12, 120), (0.35, 0)], n),
+    plates = parts.debris(n, rng, dsp.env([(0, 70), (0.12, 40), (0.35, 0)], n),
                           parts.modal_kernels(rng, 5, 220, 900, 0.03, 0.08, ratios=(1.0, 2.71, 5.3), damp=0.4))
     growl = voice(rng, 0.9, f0=[(0, 118), (0.25, 104), (1, 66)], growl=[(0, 0.2), (0.12, 1), (0.6, 0.7), (1, 0)],
                   mouth=[(0, 0.25), (1, 0.05)], scream=[(0, 0.2), (0.2, 0.1), (1, 0)], scream_f=[(0, 700), (1, 500)],
                   screech=[(0, 0), (1, 0)], screech_f=[(0, 700), (1, 700)], tear=[(0, 0.45), (1, 0.6)], tear_rate=33.0,
                   rumble=[(0, 0.3), (0.3, 0.8), (1, 0)])
-    return dsp.mix((lock, 0.9), (plates, 0.22), (growl, 0.75, 0.02))
+    return dsp.mix((lock, 1.0), (plates, 0.1), (growl, 0.4, 0.02))
 
 
 def _hurt(rng, v):
@@ -337,7 +330,7 @@ def kaiju_stagger(rng, v):
               vibrato=[(0, 0.02), (0.3, 0.07), (1, 0.12)], rumble=[(0, 0), (0.4, 0.5), (0.8, 0.6), (1, 0)])
     m = n_(0.3)
     snap = parts.burst(m, rng, 9000, 900, 0.012, 0.07, slope=0.0) + 0.8 * parts.thump(m, 170, 60, 0.03, 0.22)
-    dry = dsp.mix((snap, 0.5), (y, 1.0, 0.03))
+    dry = dsp.mix((snap, 0.9), (y, 1.0, 0.03))
     return dsp.reverb(dsp.hp(dry, 40), dsp.space_ir(rng, 0.9, pre=0.02, bright=4500, dark=700, echoes=((0.17, 0.25, 2000.0),)), 0.2)
 
 
@@ -389,15 +382,17 @@ def kaiju_heartbeat_loop(rng, v):
         lub = parts.thump(m, 82, 46, 0.04, 0.46, attack=0.008, harm=0.5, sat=3.0) + 0.5 * parts.thump(m, 170, 96, 0.03, 0.2, attack=0.005)
         dub = parts.thump(m, 100, 58, 0.035, 0.36, attack=0.007, harm=0.5, sat=3.0) + 0.5 * parts.thump(m, 210, 120, 0.03, 0.16, attack=0.005)
         skin = parts.unit(dsp.bp(dsp.noise(m, rng, -3), 90, 420)) * dsp.decay(m, 0.2, 0.008)
+        lub, dub = parts.norm(lub), parts.norm(dub)
         g = 1.0 if i == 0 else 0.94
-        events += [(t0 + 0.02, lub, g), (t0 + 0.02, skin, 0.3 * g), (t0 + 0.27, dub, 0.62 * g), (t0 + 0.27, skin, 0.2 * g)]
+        events += [(t0 + 0.02, lub, g), (t0 + 0.02, skin, 0.12 * g), (t0 + 0.27, dub, 0.62 * g), (t0 + 0.27, skin, 0.08 * g)]
     beat = parts.fold_events(body, events)
     hush = dsp.circular(lambda z: dsp.lp(z, 150, 2), dsp.noise(body, rng, -6)) * (0.7 + 0.3 * dsp.lfo(body, 2, 0.1))
-    return beat + 0.03 * parts.unit(hush)
+    return beat + 0.012 * parts.unit(hush)
 
 
 @sfx("kaiju_molt_blast", "kaiju", level=-13.0, clip=True,
-     use="The cocoon bursts: a short inward suck, the blast wave, shell fragments, and the bigger animal's first breath.")
+     use="The cocoon bursts: a short inward suck, the blast wave, shell fragments, and the bigger animal's first "
+         "breath. Start it 0.22 s before the blast frame.")
 def kaiju_molt_blast(rng, v):
     pre = 0.22
     n = n_(3.6)
@@ -407,19 +402,17 @@ def kaiju_molt_blast(rng, v):
     hit = parts.burst(n, rng, 9000, 140, 0.07, 1.1)
     wave_f = dsp.env([(0, 1800), (0.6, 400), (2.2, 90)], n, "exp")
     wave = parts.whoosh(n, rng, wave_f, 0.9) * dsp.hump(n, 0.28, 1.0, 2.6)
-    shell = parts.debris(n, rng, dsp.env([(0, 1500), (0.3, 900), (1.2, 150), (2.4, 0)], n),
-                         parts.modal_kernels(rng, 5, 500, 3000, 0.015, 0.05, ratios=(1.0, 2.4, 4.9), damp=0.4)
-                         + parts.noise_kernels(rng, 3, 1500, 7000, 0.003, 0.01))
+    shell = parts.rubble(n, rng, dsp.env([(0, 1500), (0.3, 900), (1.2, 150), (2.4, 0)], n), 0.6, knocks=0.05)
     breath = voice(rng, 1.5, size=1.3, f0=[(0, 60), (0.3, 96), (1, 40)], growl=[(0, 0), (0.25, 1), (0.7, 0.6), (1, 0)],
                    mouth=[(0, 0.2), (0.3, 0.9), (1, 0.2)], scream=[(0, 0), (0.3, 0.6), (1, 0)], scream_f=[(0, 900), (0.3, 1900), (1, 700)],
                    screech=[(0, 0), (0.3, 0.7), (1, 0)], screech_f=[(0, 700), (0.3, 1600), (1, 500)], tear=[(0, 0.3), (0.4, 0.7), (1, 0.3)],
                    tear_rate=31.0, rumble=[(0, 0), (0.5, 1), (1, 0)])
-    blast = dsp.mix((low, 0.8), (hit, 1.0), (wave, 0.45), (shell, 0.07), (breath, 0.55, 0.35))
+    blast = dsp.mix((low, 1.0), (hit, 0.9), (wave, 0.15), (shell, 0.03), (breath, 0.3, 0.35))
     ir = dsp.space_ir(rng, 2.2, pre=0.03, bright=5000, dark=500, echoes=((0.26, 0.3, 1800.0), (0.45, 0.22, 1100.0)),
                       stereo=True, low_cut=45.0)
     wet = dsp.reverb(blast, ir, 0.28)
     out = np.zeros((m + len(wet), 2))
-    out[:m] += (suck * 0.35)[:, None]
+    out[:m] += (suck * 0.12)[:, None]
     out[m:] += wet
     return out
 
@@ -444,9 +437,9 @@ def kaiju_death(rng, v):
     m = n_(2.2)
     fall = dsp.mix((parts.thump(m, 52, 24, 0.12, 1.4, attack=0.008, harm=0.4, sat=2.2), 1.0),
                    (parts.burst(m, rng, 1600, 110, 0.06, 0.6, slope=-4.0), 0.7),
-                   (parts.debris(m, rng, dsp.env([(0, 900), (0.4, 400), (1.5, 0)], m), _ground_kernels(rng, 3)), 0.08),
-                   (parts.unit(dsp.lp(dsp.noise(m, rng, -6), 85, 2)) * dsp.decay(m, 1.8, 0.02), 0.45))
-    dry = dsp.mix((dsp.hp(y, 28), 1.0), (fall, 0.95, fall_at))
+                   (_ground(m, rng, dsp.env([(0, 900), (0.4, 400), (1.5, 0)], m), 3), 0.03),
+                   (parts.unit(dsp.lp(dsp.noise(m, rng, -6), 85, 2)) * dsp.decay(m, 1.8, 0.02), 0.16))
+    dry = dsp.mix((dsp.hp(y, 28), 1.0), (fall, 1.7, fall_at))
     ir = dsp.space_ir(rng, 2.3, pre=0.04, bright=4500, dark=600, echoes=((0.25, 0.32, 1900.0), (0.43, 0.24, 1200.0), (0.7, 0.14, 800.0)),
                       stereo=True, low_cut=60.0)
     return dsp.reverb(dry, ir, 0.3)

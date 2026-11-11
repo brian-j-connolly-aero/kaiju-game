@@ -11,6 +11,14 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@mb/shared": "0.1.0"
+    "@colyseus/core": "0.18.28",
+    "@colyseus/schema": "5.0.47",
+    "@colyseus/ws-transport": "0.18.5",
+    "@mb/shared": "0.1.0",
+    "express": "5.3.0"
+  },
+  "devDependencies": {
+    "@colyseus/sdk": "0.18.10",
+    "@types/express": "5.0.6"
   }
 }
