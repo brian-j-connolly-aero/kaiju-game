@@ -80,15 +80,15 @@ export const BOT_RULES = {
     meleeMargin: 8,
     /** After a stagger it goes for the nearest squad within this many radii for this long. */
     revengeRadii: 16,
-    revengeTime: 8,
+    revengeTime: 10,
     /**
      * With at least this many lasers on it, it dashes at the nearest charging gun within this
      * many meters (per stage), for at most this long, and then goes back to work for this long.
      */
     rushLasers: 3,
-    rushRange: [110, 300, 450] as PerStage<number>,
+    rushRange: [110, 280, 450] as PerStage<number>,
     rushMax: 7,
-    rushRest: 12,
+    rushRest: 7,
     /** It roars when at least this many units stand inside the roar radius and are charging or it is hurt. */
     roarUnits: 2,
     /** It braces when at least this many lasers are on it with this much charge, for at most this long. */
@@ -98,7 +98,7 @@ export const BOT_RULES = {
     /** ...and then does not brace again for this long (so a patient squad cannot pin it forever). */
     braceRest: 6,
     /** It looks for food below this fraction of its health, within this many radii. */
-    eatBelow: 0.6,
+    eatBelow: 0.7,
     foodRadii: 14,
     /** The beam: used on units inside this fraction of its range, else on a structure worth at least this many points. */
     beamUnitRange: 0.9,
@@ -108,7 +108,7 @@ export const BOT_RULES = {
     throwEvery: 7,
 
     /** The molt: it looks for a place out of sight for at most this long, then cocoons where it stands. */
-    hideTime: 10,
+    hideTime: 16,
     /** Hiding places considered are within this many radii. */
     hideRadii: 40,
     /** Not making this many meters in this many seconds counts as stuck... */

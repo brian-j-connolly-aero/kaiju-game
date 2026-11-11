@@ -26,7 +26,7 @@ import {
   valueInBounds,
   type SimEvent,
 } from '../src/index';
-import { HUMAN_PLAYER, input, KAIJU_PLAYER, makeTestWorld, run } from './helpers';
+import { holdFire, HUMAN_PLAYER, input, KAIJU_PLAYER, makeTestWorld, run } from './helpers';
 
 describe('createWorld', () => {
   it('builds the Tier 1 match: one kaiju, four squads of four, in the briefing', () => {
@@ -106,11 +106,16 @@ describe('createWorld', () => {
     for (const anchor of city.anchors) {
       const world = createWorld({ seed: 2, config: createMatchConfig({ anchor: anchor.id }) });
       const [p1, p2, p3] = world.match.marks;
-      expect(p1).toBeCloseTo(0.35 * valueInBounds(city, stageBounds(city, anchor.id, 1)), 6);
-      expect(p2).toBeGreaterThanOrEqual(1.6 * p1 - 1e-9);
-      expect(p2).toBeGreaterThanOrEqual(0.3 * valueInBounds(city, stageBounds(city, anchor.id, 2)) - 1e-9);
-      expect(p3).toBeGreaterThanOrEqual(1.6 * p2 - 1e-9);
-      expect(p3).toBeGreaterThanOrEqual(0.3 * valueInBounds(city, stageBounds(city, anchor.id, 3)) - 1e-9);
+      const bar = MATCH_RULES.bar;
+      expect(p1).toBeCloseTo(bar.p1 * valueInBounds(city, stageBounds(city, anchor.id, 1)), 6);
+      expect(p2).toBeGreaterThanOrEqual(bar.growth * p1 - 1e-9);
+      expect(p2).toBeGreaterThanOrEqual(bar.p2 * valueInBounds(city, stageBounds(city, anchor.id, 2)) - 1e-9);
+      expect(p3).toBeGreaterThanOrEqual(bar.growth * p2 - 1e-9);
+      expect(p3).toBeGreaterThanOrEqual(bar.p3 * valueInBounds(city, stageBounds(city, anchor.id, 3)) - 1e-9);
+      // The marks rise: every stage has a segment of its own to fill.
+      expect(p1).toBeGreaterThan(0);
+      expect(p2).toBeGreaterThan(p1);
+      expect(p3).toBeGreaterThan(p2);
     }
     const scaled = computeBarMarks(city, 0, 0.5);
     const full = computeBarMarks(city, 0);
@@ -450,6 +455,8 @@ describe('movement under player input', () => {
     k.stage = 3;
     k.radius = 26;
     k.height = 115;
+    // Only the kaiju may touch the tower: no stray rockets from the squads it walks past.
+    holdFire(world);
     let wadedTicks = 0;
     for (let i = 0; i < 30 * 14; i++) {
       const before = world.structureHp[0];

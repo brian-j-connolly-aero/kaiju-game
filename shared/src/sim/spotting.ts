@@ -61,13 +61,18 @@ export function updateSpotting(world: World): void {
 
     let spotted = false;
     let seen = false;
+    // The squad whose unit has eyes on it (the first one found), for the radio call.
+    let seenBy = -1;
     for (const squad of world.squads) {
       for (const id of squad.units) {
         const u = world.units[id];
         if (!u.alive) continue;
         const driven = squad.driven === id;
         if (!spotted && driven && unitSeesKaiju(world, u, k, COMBAT_RULES.spotRange)) spotted = true;
-        if (!seen && !alwaysKnown && unitSeesKaiju(world, u, k, MATCH_RULES.revealSightRange)) seen = true;
+        if (!seen && !alwaysKnown && unitSeesKaiju(world, u, k, MATCH_RULES.revealSightRange)) {
+          seen = true;
+          seenBy = squad.id;
+        }
       }
     }
     k.spotted = spotted;
@@ -76,7 +81,7 @@ export function updateSpotting(world: World): void {
     if (known !== k.known) {
       k.known = known;
       // At later stages it is never out of sight, so there is nothing to announce.
-      if (!alwaysKnown) say(world, known ? 'kaiju.spotted' : 'kaiju.lost');
+      if (!alwaysKnown) say(world, known ? 'kaiju.spotted' : 'kaiju.lost', known ? seenBy : -1);
     }
   }
 }

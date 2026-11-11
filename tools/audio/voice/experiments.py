@@ -6,7 +6,9 @@ chain setting, measured as word error rate with pocketsphinx on real script line
   experiments.py summary                  collect every cached result into docs/audio/voice/experiments.json
 
 Each experiment = (voice, chain, chain settings, set of lines). Results are cached in
-$MB_SCRATCH/experiments/ by a hash of all of that, so re-running costs nothing."""
+$MB_SCRATCH/experiments/ by a hash of all of that, so re-running costs nothing. The recorded
+results in docs/audio/voice/experiments.json were measured while the chains were being
+developed; running an experiment afresh uses today's chain code and will differ by a few points."""
 
 from __future__ import annotations
 
@@ -197,8 +199,10 @@ GROUPS["sweep_hall"] = _hall_sweep()
 
 
 def key_of(exp) -> str:
+    # the key is what the experiment spells out, not the resolved settings, so that a new chain
+    # setting or a moved default does not orphan the recorded results
     label, voice, chain, over, lines, pause = exp
-    blob = json.dumps([voice, chain, chain_config(chain, over) if chain else None, lines, pause], sort_keys=True)
+    blob = json.dumps([voice, chain, over, lines, pause], sort_keys=True)
     return hashlib.sha256(blob.encode()).hexdigest()[:16]
 
 
@@ -256,8 +260,15 @@ def main() -> None:
                     r["group"], r["label"] = g, exp[0]
                     out.append(r)
         DOC_DIR.mkdir(parents=True, exist_ok=True)
-        (DOC_DIR / "experiments.json").write_text(json.dumps(out, indent=1) + "\n")
-        print("wrote", DOC_DIR / "experiments.json", len(out), "results")
+        target = DOC_DIR / "experiments.json"
+        total = sum(len(v) for v in GROUPS.values())
+        if target.exists() and len(out) < len(json.loads(target.read_text())):
+            # the cache lives in scratch space; never replace recorded results with fewer
+            print(f"only {len(out)} of {total} experiments are cached in {EXP}; {target.name} left as it is. "
+                  f"Run the missing groups first.")
+            return
+        target.write_text(json.dumps(out, indent=1) + "\n")
+        print("wrote", target, len(out), "of", total, "results")
         return
     jobs = [(g, exp) for g in names for exp in GROUPS[g]]
     with Pool(2) as pool:

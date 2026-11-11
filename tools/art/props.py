@@ -5,7 +5,7 @@
     /opt/mbtools/venv/bin/python tools/art/props.py                  build, validate, preview
     /opt/mbtools/venv/bin/python tools/art/props.py --no-previews    geometry only (fast)
     /opt/mbtools/venv/bin/python tools/art/props.py --only prop_bus,prop_truck
-    /opt/mbtools/venv/bin/python tools/art/props.py --scenes-only    just the street scene and the tint sheet
+    /opt/mbtools/venv/bin/python tools/art/props.py --scenes-only    just the street, tint and wreck scenes
 
 Writes, per docs/ASSETS.md section 3 "City" (props only), one mesh each:
     prop_car_sedan, prop_car_taxi, prop_car_van, prop_bus, prop_truck, prop_car_wreck,
@@ -13,7 +13,8 @@ Writes, per docs/ASSETS.md section 3 "City" (props only), one mesh each:
     prop_billboard, prop_busstop                       (prop_hydrant belongs to example.py)
     client/public/assets/manifest.props.json
     docs/art/previews/<id>.png, docs/art/concept/<id>.png,
-    docs/art/concept/props_street.png, docs/art/concept/props_car_tints.png
+    docs/art/concept/props_street.png, docs/art/concept/props_car_tints.png,
+    docs/art/concept/props_wrecks.png                  each vehicle beside the stretched wreck it leaves
 
 Sizes are real-world meters and match the height and crush radius the game uses for each
 prop (tools/art/data/archetypes.json): a sedan is 4.5 m long, the bus 12 m.
@@ -67,7 +68,20 @@ TINTS = {
 }
 # The wreck keeps scorched paint: tint it with whatever the crushed vehicle was painted.
 TINTS["prop_car_wreck"] = sorted({c for colors in TINTS.values() for c in colors} | {mb.palette.PALETTE["taxi_yellow"]})
-TINT_HINTS = {"prop_car_wreck": "use the paint color of the vehicle that was crushed (taxi: #f7c21a)"}
+TINT_HINTS = {"prop_car_wreck": "use the paint color of the vehicle that was crushed (taxi: #f7c21a); "
+                                "wreckScale stretches this one wreck to the vehicle it was: "
+                                "[width, height, length] per prop kind, the instance's x, y, z scale"}
+# One wreck model stands in for all five vehicles, and a crushed 12 m bus must not pop into a
+# 5 m wreck. Scale factors [width, height, length] (the game's x, y, z) per prop kind, written
+# into the wreck's manifest entry as tint.wreckScale. The slab shape takes the stretch well:
+# see docs/art/concept/props_wrecks.png.
+WRECK_SCALE = {
+    "car_sedan": [1, 1, 1],
+    "car_taxi": [1, 1, 1],
+    "car_van": [1.1, 1.3, 1.1],
+    "truck": [1.2, 1.7, 1.75],
+    "bus": [1.2, 1.8, 2.4],
+}
 TINT_NOTE = {
     "part": "body paint",
     "mask": "COLOR_0 alpha: 1 = paint (multiply the tint color in), 0 = never tint",
@@ -293,7 +307,7 @@ def truck_parts(paint=PAINT):
 
 # Everything the kaiju can pick up is seen from every side: its sheet shows the underside too
 # (magenta there = a missing floor).
-BELOW = mb.View("FROM BELOW", azimuth=35, elevation=-35, fov=28)
+BELOW = mb.View("FROM BELOW", azimuth=35, elevation=-35, ortho=True)   # flat: perspective cells have a ground disc
 
 
 @mb.asset("prop_car_sedan", sheet=dict(extra=["top", BELOW]), concept=dict(azimuth=35, elevation=14))
@@ -347,16 +361,19 @@ def crumple(g: mb.Geo, amount: float, seed: int = 1, rough: float = 0.015) -> mb
     return g.triangulate()
 
 
-def scorch(g: mb.Geo, seed: int, soot: float = 0.55) -> mb.Geo:
+def scorch(g: mb.Geo, seed: int, soot: float = 0.55, crease: float | None = None) -> mb.Geo:
     """Blotchy soot and rust over whatever color is there: some faces nearly clean, some black.
     The dirt is only ever soot or rust (one roll per face, never per color channel, which gave
-    green and pink panels), and more of it settles on the faces that look up."""
+    green and pink panels). With `crease` (a y position) the soot is thickest along that line
+    across the car, where it was stepped on and burned, and thin toward the ends, so the paint
+    still shows there; a little more settles on the faces that look up."""
     rng = random.Random(seed)
     black, rust = mb.palette.rgb("#1d1a18"), mb.palette.rgb("#6a3d24")
 
     def repaint(col, center, normal):
-        t = min(1.0, soot * (1.0 + 0.6 * max(normal.z, 0.0)) * rng.uniform(0.25, 1.9) ** 1.5)
-        k = 0.7 * rng.random() ** 2                             # how rusty this patch of dirt is
+        heat = 1.0 if crease is None else 0.3 + 0.7 * max(0.0, 1.0 - abs(center.y - crease) / 1.7) ** 1.5
+        t = min(0.94, soot * heat * (1.0 + 0.35 * max(normal.z, 0.0)) * rng.uniform(0.7, 1.5))
+        k = 0.4 * rng.random() ** 4                             # how rusty this patch of dirt is
         dirt = tuple(b + (r - b) * k for b, r in zip(black, rust))
         return tuple(c + (d - c) * t for c, d in zip(col, dirt))
 
@@ -365,21 +382,25 @@ def scorch(g: mb.Geo, seed: int, soot: float = 0.55) -> mb.Geo:
 
 def wreck_parts():
     """(paint, fixed) geometry of a car that has been stepped on: flat on the road, creased
-    across the middle, wheels splayed out, a bumper lying loose. 5 m long, 0.8 m tall. The
-    scorched body panels are still paint: tint them with the color of the car that was crushed."""
+    across the middle, wheels splayed out, a bumper lying loose. 5 m long, 0.9 m tall. The
+    scorched body panels are still paint: tint them with the color of the car that was crushed.
+    Untinted it is scorched grey metal. The game stretches it for the bigger vehicles
+    (WRECK_SCALE). It is closed underneath, like everything the kaiju may pick up."""
     w = 1.86
-    paint_color = (0.66, 0.66, 0.66)
+    paint_color = (0.70, 0.70, 0.70)
+    strips = (-w / 2, -0.31, 0.31, w / 2)                    # three strips across: panels for the soot to break up
     seam = lambda c, n: abs(n.y) > 0.9 and abs(c.y + 0.2) < 0.02                      # noqa: E731
-    front = drop(slab([(-2.1, 0.05), (-2.1, 0.50), (-1.95, 0.66), (-0.2, 0.36), (-0.2, 0.05)], -w / 2, w / 2,
-                      paint_color), seam)
-    rear = drop(slab([(-0.2, 0.05), (-0.2, 0.36), (1.4, 0.70), (2.05, 0.64), (2.1, 0.42), (2.1, 0.05)], -w / 2, w / 2,
-                     paint_color), seam)
-    cab = mb.tapered_box((1.74, 2.2), (1.56, 1.7), 0.17, at=(0, 0.2, 0.0), color="#15181c", cap_bottom=False)
+    body = mb.Geo()
+    for outline in ([(-2.1, 0.05), (-2.1, 0.50), (-1.95, 0.66), (-1.05, 0.506), (-0.2, 0.36), (-0.2, 0.05)],
+                    [(-0.2, 0.05), (-0.2, 0.36), (0.6, 0.53), (1.4, 0.70), (2.05, 0.64), (2.1, 0.42), (2.1, 0.05)]):
+        for i in range(3):
+            body += drop(slab(outline, strips[i], strips[i + 1], paint_color, cap0=i == 0, cap1=i == 2), seam)
+    cab = mb.tapered_box((1.74, 2.2), (1.56, 1.7), 0.17, at=(0, 0.2, 0.0), color="#15181c")   # closed: it lies loose
     roof, glass = split(cab, flat_top)
     roof.paint(paint_color)
     for part in (roof, glass):                               # the roof lies caved in on the rear half
         part.rx(-9, about=(0, 0.2, 0)).move(0, 0.1, 0.38)
-    paint = scorch(lit(front + rear + roof, seed=1), seed=3, soot=0.5)
+    paint = scorch(lit(body + roof, seed=1), seed=3, soot=0.68, crease=-0.2)
     fixed = mb.Geo()
     z = 0.32 * math.cos(math.pi / 6)
     for y, turn, lean in ((-1.34, 12, 6), (1.30, -9, -5)):   # flat tires on axles knocked askew
@@ -428,7 +449,7 @@ def kiosk_geo() -> mb.Geo:
     g += plate(0.9, 1.1, (-1.2 - DECAL, 0.15, 1.35), "right", "bld_sky")
     # the sign on the roof says what it sells: a waffle cone with a pink scoop, 0.95 m tall
     rim = 2.62 - 0.04 + 0.50
-    g += mb.cone(5, 0.27, 0.50, color="wood_lt", cap_bottom=False).rx(180).move(0, 0.1, rim) \
+    g += mb.cone(5, 0.27, 0.50, color="wood_lt", cap_bottom=False).ry(180).move(0, 0.1, rim) \
         .bake_light(1.0, 0.82).jitter(0.07, seed=5)
     g += mb.sphere(0.34, n=5, rings=3, at=(0, 0.1, rim + 0.11), color="#ff9db5").bake_light(1.1, 0.78).jitter(0.05, seed=6)
     return g
@@ -598,7 +619,11 @@ def prop_tree_b():
     mb.node("prop_tree_b", tree_b_geo())
 
 
-@mb.asset("prop_lamp", concept=dict(backdrop="night", azimuth=30, elevation=6))
+@mb.asset("prop_lamp", concept=[dict(backdrop="night", azimuth=30, elevation=6),
+                                # stage 1 is afternoon: the lanterns must also read against a bright sky,
+                                # from a hatchling's eye (3.8 m)
+                                dict(name="day", backdrop="sky",
+                                     view=mb.View("", eye=(4.2, -8.5, 3.8), target=(0.0, 0.0, 4.4), fov=38))])
 def prop_lamp():
     mb.node("prop_lamp", lamp_geo())
 
@@ -732,10 +757,39 @@ def build_tints() -> None:
     mb.node("vehicles", g)
 
 
+def stretched_wreck(kind: str, color=None) -> mb.Geo:
+    """The wreck as the game should draw it for a crushed vehicle of prop kind `kind`: scaled
+    by WRECK_SCALE and, with a color, tinted with the vehicle's paint."""
+    paint, fixed = wreck_parts()
+    g = tinted(paint, fixed, color) if color else paint + fixed
+    w, h, length = WRECK_SCALE[kind]
+    return g.scale(w, length, h)
+
+
+def build_wrecks() -> None:
+    """Every vehicle, the stretched wreck it leaves in its own paint, and the same wreck
+    untinted (what the game draws until wrecks get an instance color). Small in front."""
+    mb.reset()
+    rows = [("car_sedan", lambda: tinted(*sedan_parts(), "#e0372f"), "#e0372f"),
+            ("car_taxi", taxi_geo, mb.palette.PALETTE["taxi_yellow"]),
+            ("car_van", lambda: tinted(*van_parts(), "#9fe0c0"), "#9fe0c0"),
+            ("truck", lambda: tinted(*truck_parts(), "#2f62c9"), "#2f62c9"),
+            ("bus", lambda: tinted(*bus_parts(), "#3fa652"), "#3fa652")]
+    g = mb.box((46, 34, 0.1), at=(0, 9.5, 0), anchor="top", color="road")
+    for i, (kind, make, color) in enumerate(rows):
+        y = i * 5.2
+        g += at(make(), -13.5, y, 90, 0.02)
+        g += at(stretched_wreck(kind, color), 0.0, y, 90, 0.02)
+        g += at(stretched_wreck(kind), 13.5, y, 90, 0.02)
+    mb.node("wrecks", g)
+
+
 SCENE_OPTS = {
     "street": dict(backdrop="sky", size=(1600, 800), samples=16, sun_azimuth=-55, sun_elevation=48,
                    view=mb.View("", eye=(7.0, -56.0, 14.5), target=(0.0, 9.0, 4.2), fov=46)),
     "tints": dict(backdrop="studio", size=(1400, 900), samples=14, azimuth=22, elevation=34, fov=30),
+    "wrecks": dict(backdrop="sky", size=(1400, 800), samples=14, sun_azimuth=-50, sun_elevation=46,
+                   view=mb.View("", eye=(8.0, -31.0, 23.0), target=(0.0, 9.6, 0.5), fov=44)),
 }
 
 
@@ -748,7 +802,8 @@ def render_scenes(force: bool = False) -> None:
         if os.path.exists(path):
             src += mb._file_sha(path)
     jobs = [("street", build_street, os.path.join(mb.CONCEPT, "props_street.png")),
-            ("tints", build_tints, os.path.join(mb.CONCEPT, "props_car_tints.png"))]
+            ("tints", build_tints, os.path.join(mb.CONCEPT, "props_car_tints.png")),
+            ("wrecks", build_wrecks, os.path.join(mb.CONCEPT, "props_wrecks.png"))]
     for name, build, out in jobs:
         opts = SCENE_OPTS[name]
         stamp = f"{mb_preview.PREVIEW_VERSION}|{src}|{opts!r}"
@@ -767,6 +822,8 @@ def write_tint_notes() -> None:
             note = dict(TINT_NOTE, colors=colors)
             if asset_id in TINT_HINTS:
                 note["hint"] = TINT_HINTS[asset_id]
+            if asset_id == "prop_car_wreck":
+                note["wreckScale"] = WRECK_SCALE
             man.data["models"][asset_id]["tint"] = note
     man.write()
 

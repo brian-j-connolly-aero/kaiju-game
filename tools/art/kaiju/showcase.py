@@ -25,7 +25,7 @@ from mathutils import Vector  # noqa: E402  (available once bpy is loaded)
 import mb_preview  # noqa: E402
 import lizard  # noqa: E402
 
-VERSION = "s3"                      # bump to force these pictures to re-render
+VERSION = "s4"                      # bump to force these pictures to re-render
 UI = os.path.join(mb.ASSETS, "ui")
 STAGE_IDS = {1: "kaiju_lizard_s1", 2: "kaiju_lizard_s2", 3: "kaiju_lizard_s3"}
 STAGE_NAMES = {1: "HATCHLING", 2: "JUVENILE", 3: "TITAN"}
@@ -70,6 +70,8 @@ def _import(asset: str, at=(0, 0, 0), turn: float = 0.0) -> list:
     new = [o for o in bpy.data.objects if o not in before]
     for ob in new:
         ob.select_set(False)
+        if ob.name.split(".")[0] == "weak_point":       # the game shows it only while staggered
+            ob.hide_render = True
         if ob.parent is None:
             ob.rotation_mode = "XYZ"
             ob.rotation_euler = (0, 0, math.radians(turn))
@@ -195,25 +197,39 @@ def lineup(force: bool = False) -> str:
 
 
 # =========================================================================================
-PORTRAIT_POSE = {"torso": {"y": 8}, "neck": {"y": 8, "x": -4}, "head": {"y": 12, "x": -6, "z": -4}, "jaw": {"x": 15},
+PORTRAIT_POSE = {"torso": {"y": 8}, "neck": {"y": 8, "x": -4}, "head": {"y": 12, "x": -6, "z": -4}, "jaw": {"x": 28},
                  "arm_L": {"z": 6}, "arm_R": {"x": -18, "z": -10}}
-# warm key from one side, cold rim from behind, very little fill: a monster-movie poster
+# warm key from one side, a warmer ember rim from behind, a little fill: a monster-movie poster.
+# (The rim is not cold: a blue-white rim turned the spines cyan, which is the humans' color.)
 PORTRAIT_LIGHT = dict(zenith="#0d1020", horizon="#2a2f45", ground="#30343f", key=("#ffd0a0", 3.4),
-                      rim=("#7fd8ff", 4.2), ambient=0.22, clouds=0.0, cloud="#ffffff", night=False, glow=3.2)
+                      rim=("#ffb27a", 4.2), ambient=0.30, clouds=0.0, cloud="#ffffff", night=False, glow=3.2)
+
+
+PORTRAIT_FOV = 27.0
+
+
+def PORTRAIT_EYE(h: float):
+    return (0.58 * h, -1.32 * h, 0.60 * h)
+
+
+def PORTRAIT_TARGET(h: float):
+    return (0.0, -0.20 * h, 0.715 * h)
 
 
 def portrait(force: bool = False) -> str:
     out = os.path.join(UI, "portrait_lizard.png")
     card = os.path.join(mb.CONCEPT, "portrait_lizard.png")
-    stamp = _stamp("portrait", PORTRAIT_POSE, PORTRAIT_LIGHT)
+    stamp = _stamp("portrait", PORTRAIT_POSE, PORTRAIT_LIGHT, PORTRAIT_FOV, PORTRAIT_EYE(1.0), PORTRAIT_TARGET(1.0))
     if not force and _fresh(out, stamp) and _fresh(card, stamp):
         return out
     from PIL import Image, ImageDraw, ImageFilter
 
     mb.load_glb(STAGE_IDS[3])
+    bpy.data.objects["weak_point"].hide_render = True       # as in play: shown only while staggered
     h = lizard.HEIGHT[3]
-    # camera: low, in front and to the creature's left of the head, looking up at the face
-    view = mb.View("", eye=(0.58 * h, -1.32 * h, 0.95 * h), target=(0.0, -0.20 * h, 0.785 * h), fov=30.0)
+    # camera: low, in front and to the creature's left of the head, looking up at the face;
+    # the head fills most of the frame and the eyes sit on its upper third
+    view = mb.View("", eye=PORTRAIT_EYE(h), target=PORTRAIT_TARGET(h), fov=PORTRAIT_FOV)
     saved = mb_preview.BACKDROPS["studio"]
     mb_preview.BACKDROPS["studio"] = PORTRAIT_LIGHT
     tmp = os.path.join("/tmp/mb-scratch", "kaiju-lineup")

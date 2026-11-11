@@ -9,7 +9,7 @@ export const LIZARD: KaijuKindDef = {
   species: 'Lizard',
   hp: 1000,
   nerveCapacity: 100,
-  nerveLeak: 9,
+  nerveLeak: 7.5,
 
   stages: [
     {
@@ -62,7 +62,9 @@ export const LIZARD: KaijuKindDef = {
   damage: {
     normalMult: 0.12,
     braceFrontMult: 0.04,
-    helplessMult: 1.0,
+    // Tuned (docs/BALANCE.md): a stagger or a cocoon caught in the open hurts about four times
+    // as much as fire it shrugs off, enough for coordinated squads to kill, not for one volley.
+    helplessMult: 0.5,
     braceNerveMult: 0.25,
     braceHalfArc: 60 * DEG,
     frontHalfAngle: 60 * DEG,

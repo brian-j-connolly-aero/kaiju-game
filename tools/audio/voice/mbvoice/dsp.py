@@ -281,7 +281,7 @@ def f0_track(x: np.ndarray, sr: int, fmin: float = 50.0, fmax: float = 400.0) ->
 def band_share(x: np.ndarray, sr: int, lo: float, hi: float) -> float:
     """Fraction of the signal energy between lo and hi Hz."""
     m = np.mean(x, axis=1) if x.ndim == 2 else x
-    f, p = signal.welch(m, sr, nperseg=4096)
+    f, p = signal.welch(m, sr, nperseg=min(4096, len(m)))
     tot = np.sum(p) + 1e-20
     return float(np.sum(p[(f >= lo) & (f < hi)]) / tot)
 

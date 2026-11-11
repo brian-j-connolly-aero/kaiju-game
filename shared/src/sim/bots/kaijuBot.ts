@@ -136,10 +136,12 @@ function chooseWreckGoal(world: World, k: Kaiju, bs: BotState): void {
     }
   }
 
-  // Cars and kiosks in the street are worth the detour while the kaiju is small.
+  // Cars and kiosks in the street are worth the detour while the kaiju is small. With no
+  // building left to go for, it looks for them as far as the bounds reach.
   let bestProp = -1;
   if (k.stage < LAST_STAGE) {
-    propsInCircle(world.cityQuery, k.x, k.z, Math.max(PROP_SEARCH, 6 * k.radius), propIds);
+    const reach = best >= 0 ? Math.max(PROP_SEARCH, 6 * k.radius) : Math.hypot(b.maxX - b.minX, b.maxZ - b.minZ);
+    propsInCircle(world.cityQuery, k.x, k.z, reach, propIds);
     for (const id of propIds) {
       const value = PROP_KINDS[world.city.props[id].kind].value;
       if (!(value > 0) || !boundsContains(b, index.px[id], index.pz[id], k.radius)) continue;
@@ -630,9 +632,13 @@ export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
   // --- Units close by, the squad that just broke its nerve, or guns charging within a dash: fight them ---
   const meleeRange = R.meleeRadii * k.radius + R.meleeMargin;
   const revengeRange = R.revengeRadii * k.radius;
+  // Hungry and able to eat: food comes before chasing anybody (not before what is underfoot).
+  const hungry = hurt && k.cooldowns.eat <= 0 && !k.held;
   let foe: Unit | null = null;
-  if (near.unit && (near.dist <= meleeRange || (bs.revenge > 0 && near.dist <= revengeRange))) {
+  if (near.unit && (near.dist <= meleeRange || (bs.revenge > 0 && !hungry && near.dist <= revengeRange))) {
     foe = near.unit;
+    bs.rushTime = 0;
+  } else if (hungry) {
     bs.rushTime = 0;
   } else if (bs.rushRest > 0) {
     bs.rushRest -= DT;
@@ -668,7 +674,7 @@ export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
   } else {
     // --- Food, when hurt -----------------------------------------------------------------------
     let eating = false;
-    if (hurt && k.cooldowns.eat <= 0 && !k.held) {
+    if (hungry) {
       const reach = a.eat.reach * k.radius;
       const inReach = findEdible(world, k, def);
       if (inReach) {

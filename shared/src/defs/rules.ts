@@ -34,11 +34,15 @@ export const MATCH_RULES = {
   /** Squads redeploy at least this far from the kaiju. */
   redeployMinKaijuDist: 250,
 
-  /** Destruction bar marks: P1 = p1 * V(stage 1), P2 = max(growth * P1, p2 * V(stage 2)), ... */
+  /**
+   * Destruction bar marks: P1 = p1 * V(stage 1), P2 = max(growth * P1, p2 * V(stage 2)), ...
+   * Tuned with the balance harness so that a kaiju left alone fills each segment in about two
+   * minutes (docs/BALANCE.md).
+   */
   bar: {
-    p1: 0.35,
-    p2: 0.3,
-    p3: 0.3,
+    p1: 0.13,
+    p2: 0.088,
+    p3: 0.31,
     growth: 1.6,
     /** Where the three marks sit along the skyline display, 0..1. */
     display: [0.21, 0.57, 1] as PerStage<number>,
@@ -67,8 +71,8 @@ export const COMBAT_RULES = {
   /** Speed lost at full accumulated nerve damage ("scattered fire only slows it"). */
   nerveSlowMax: 0.3,
   staggerDuration: 5,
-  /** After a stagger ends the kaiju cannot take nerve damage for this long. */
-  staggerNerveImmunity: 6,
+  /** After a stagger ends the kaiju cannot take nerve damage for this long (long enough that it cannot be stun-locked). */
+  staggerNerveImmunity: 8,
   /** Tier 2: immunity to freeze and trip after either ends. */
   freezeTripImmunity: 6,
   /** At most one `crossfire` event per kaiju in this many seconds (every crossing hit still gets the multiplier). */

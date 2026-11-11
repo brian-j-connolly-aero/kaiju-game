@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  MATCH_RULES,
   angleDist,
   bitClear,
   bitCount,
@@ -142,12 +143,14 @@ const BLOCK: TestCityOptions = {
 
 describe('scripted scenario: a hatchling wrecks a block', () => {
   it('raises the bar by exactly what it destroys, passes the first mark and cocoons', () => {
-    const marks = computeBarMarks(makeTestCity(BLOCK).city, 0);
+    const marks: [number, number, number] = [...computeBarMarks(makeTestCity(BLOCK).city, 0)];
     const blockValue = 4 * HOUSE.value + 12 + 40 + PROP_KINDS.car_sedan.value + PROP_KINDS.car_taxi.value + PROP_KINDS.kiosk.value;
-    expect(marks[0]).toBeCloseTo(0.35 * blockValue, 9);
+    expect(marks[0]).toBeCloseTo(MATCH_RULES.bar.p1 * blockValue, 9);
 
-    // The first mark is the real one for this block; the later ones are put out of reach so
-    // that this one block cannot end the match.
+    // This walk was written for a first mark at 35% of the block's value (the fraction itself is
+    // a tuning number, checked above); the later marks are put out of reach so that this one
+    // block cannot end the match.
+    marks[0] = 0.35 * blockValue;
     const world = makeTestWorld({ ...BLOCK, marks: [marks[0], 1e6, 2e6] });
     placeKaiju(world, 0, 0, 0);
     parkUnits(world);

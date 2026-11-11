@@ -5,37 +5,37 @@
       "kind": "misc",
       "nodes": ["kaiju_cocoon", "cocoon_glow"],
       "size": [0.921, 1.0, 0.949],
-      "tris": 447
+      "tris": 452
     },
     "kaiju_egg": {
       "file": "models/kaiju_egg.glb",
       "kind": "misc",
       "nodes": ["kaiju_egg", "egg_glow"],
-      "size": [0.758, 1.0, 0.775],
-      "tris": 180
+      "size": [0.758, 1.0, 0.748],
+      "tris": 216
     },
     "kaiju_lizard_s1": {
       "file": "models/kaiju_lizard_s1.glb",
       "kind": "kaiju",
       "nodes": ["root", "hips", "leg_L", "shin_L", "foot_L", "leg_R", "shin_R", "foot_R", "tail_1", "tail_2", "tail_3", "tail_4", "tail_5", "torso", "arm_L", "forearm_L", "hand_L", "arm_R", "forearm_R", "hand_R", "hold", "neck", "head", "cam_fp", "jaw", "mouth", "spines", "weak_point"],
       "size": [4.173, 4.5, 6.102],
-      "tris": 2167,
+      "tris": 2253,
       "rig": "lizard"
     },
     "kaiju_lizard_s2": {
       "file": "models/kaiju_lizard_s2.glb",
       "kind": "kaiju",
       "nodes": ["root", "hips", "leg_L", "shin_L", "foot_L", "leg_R", "shin_R", "foot_R", "tail_1", "tail_2", "tail_3", "tail_4", "tail_5", "torso", "arm_L", "forearm_L", "hand_L", "arm_R", "forearm_R", "hand_R", "hold", "neck", "head", "cam_fp", "jaw", "mouth", "spines", "weak_point"],
-      "size": [25.591, 32.0, 39.515],
-      "tris": 2339,
+      "size": [23.289, 32.0, 39.515],
+      "tris": 2413,
       "rig": "lizard"
     },
     "kaiju_lizard_s3": {
       "file": "models/kaiju_lizard_s3.glb",
       "kind": "kaiju",
       "nodes": ["root", "hips", "leg_L", "shin_L", "foot_L", "leg_R", "shin_R", "foot_R", "tail_1", "tail_2", "tail_3", "tail_4", "tail_5", "torso", "arm_L", "forearm_L", "hand_L", "arm_R", "forearm_R", "hand_R", "hold", "neck", "head", "cam_fp", "jaw", "mouth", "spines", "weak_point"],
-      "size": [108.416, 115.0, 144.827],
-      "tris": 3379,
+      "size": [95.583, 115.0, 145.71],
+      "tris": 3485,
       "rig": "lizard"
     }
   }

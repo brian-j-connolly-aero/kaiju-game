@@ -185,11 +185,13 @@ def teeth(p0, p1, count: int, length: float, w: float, direction, color="bone", 
 
 
 def scute(center, normal, w: float, length: float, thick: float, along=UP, color="white", top=None,
-          taper: float = 0.55, sink: float = 0.35, closed: bool = True) -> mb.Geo:
-    """An armor plate: a low frustum lying on a surface. `along` is its length direction.
+          taper=0.55, sink: float = 0.35, closed: bool = True) -> mb.Geo:
+    """A plate: a low frustum lying on a surface. `along` is its length direction. taper is
+    the size of the top relative to the base, or (across, along) for a keel or a ridge.
     closed=False leaves the underside open (2 triangles less) where it can never be seen."""
     c, nrm = V(center), V(normal).normalized()
-    g = mb.tapered_box((w, length), (w * taper, length * taper), 1.0, color=color, cap_bottom=closed)
+    tx, ty = (taper, taper) if isinstance(taper, (int, float)) else taper
+    g = mb.tapered_box((w, length), (w * tx, length * ty), 1.0, color=color, cap_bottom=closed)
     if top is not None:
         g.paint(top, where="top")
     a = V(along)
@@ -200,12 +202,14 @@ def scute(center, normal, w: float, length: float, thick: float, along=UP, color
 
 
 def plate(center, normal, w: float, length: float, thick: float, along=UP, turn: float = 0.0,
-          root="white", edge="white", rim=None) -> mb.Geo:
+          root="white", edge="white", rim=None, sink: float = 1.0, closed: bool = False) -> mb.Geo:
     """A grown scale: a keeled wedge lying on a surface. Its leading edge (toward -`along`)
     is sunk into the hide, its trailing edge (toward +`along`) stands `thick` proud, so a row
     of them overlaps like shingles. Colored from `root` at the sunk end to `edge` at the
     free end; `rim` colors the thick trailing face. `turn` twists it (degrees) around the
-    normal so no two sit quite square. 14 triangles, open underneath."""
+    normal so no two sit quite square. `sink` is how deep its skirt reaches into the hide
+    (in thicknesses): more on a strongly curved surface. 16 triangles, open underneath;
+    closed=True adds the underside (4 more) where the surface curves away under it."""
     c, nrm = V(center), V(normal).normalized()
     a = V(along)
     a = (a - nrm * a.dot(nrm)).normalized()
@@ -219,7 +223,7 @@ def plate(center, normal, w: float, length: float, thick: float, along=UP, turn:
     low, top = [], []
     for s, wb, wt, h in cuts:
         o = c + a * s
-        low.append((o - side * wb - nrm * (0.30 * thick), o + side * wb - nrm * (0.30 * thick)))
+        low.append((o - side * wb - nrm * (sink * thick), o + side * wb - nrm * (sink * thick)))
         top.append((o - side * wt + nrm * h, o + side * wt + nrm * h))
     g = mb.Geo()
     for k in range(2):
@@ -228,9 +232,10 @@ def plate(center, normal, w: float, length: float, thick: float, along=UP, turn:
         g.face([low[k][0], top[k][0], top[k + 1][0], low[k + 1][0]], color=col)                    # one flank
         g.face([top[k][1], low[k][1], low[k + 1][1], top[k + 1][1]], color=col)                    # the other
     g.face([low[2][0], top[2][0], top[2][1], low[2][1]], color=rim if rim is not None else edge)   # trailing face
-    # which way round the faces must be listed depends on the handedness of (side, along, normal)
-    if g.face_normal(0).dot(nrm) < 0:
-        g.flip()
+    g.face([low[0][1], top[0][1], top[0][0], low[0][0]], color=root)                               # leading face
+    if closed:
+        for k in range(2):
+            g.face([low[k][1], low[k][0], low[k + 1][0], low[k + 1][1]], color=root)
     return g
 
 

@@ -670,11 +670,16 @@ describe('fire at will', () => {
     const k = placeKaiju(world, 12, 110, 0);
     k.vx = 6;
     const { events } = untilShot(world, 60);
-    const s = eventsOf(events, 'projectileSpawn')[1];
-    // The middle rocket leaves along the unit's aim: ahead of where the kaiju is now.
+    const spawns = eventsOf(events, 'projectileSpawn');
+    expect(spawns.length).toBe(3);
+    // The weapon points ahead of where the kaiju is now, by the flight time of a rocket. (The
+    // rockets themselves scatter around that aim, each with its own at-will error, so the lead
+    // is read off the weapon rather than off one rocket.)
     const dist = Math.hypot(k.x - a.x, k.z - a.z);
     const lead1 = Math.atan2(k.x + k.vx * (dist / 55) - a.x, k.z - a.z);
-    expect(Math.atan2(s.vx, s.vz)).toBeGreaterThan(Math.atan2(k.x - a.x, k.z - a.z) + 2 * DEG);
-    expect(Math.abs(Math.atan2(s.vx, s.vz) - lead1)).toBeLessThan(4 * ROCKETS.aimErrorAtWill);
+    expect(a.aimYaw).toBeGreaterThan(Math.atan2(k.x - a.x, k.z - a.z) + 2 * DEG);
+    expect(Math.abs(a.aimYaw - lead1)).toBeLessThan(1 * DEG);
+    const mean = spawns.reduce((sum, s) => sum + Math.atan2(s.vx, s.vz), 0) / spawns.length;
+    expect(Math.abs(mean - lead1)).toBeLessThan(4 * ROCKETS.aimErrorAtWill);
   });
 });

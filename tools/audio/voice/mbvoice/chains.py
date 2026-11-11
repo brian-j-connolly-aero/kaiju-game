@@ -21,8 +21,9 @@ from .dsp import butter, gain, peaking, shelf
 DEFAULTS = {
     "radio": {
         "band_hz": [300.0, 3800.0],      # band-pass corners
-        "hp_order": 4,
-        "lp_order": 6,
+        "hp_order": 4,                   # steepness of the low corner going into the set
+        "lp_order": 6,                   # steepness of the high corner going into the set
+        "hp_order_out": 6,               # low corner again after the clipper, which puts energy back below the band
         "presence_db": 4.0,              # small-speaker honk around presence_hz
         "presence_hz": 1900.0,
         "comp_threshold_db": -24.0,      # relative to the clip's peak
@@ -30,7 +31,7 @@ DEFAULTS = {
         "comp_attack_ms": 2.0,
         "comp_release_ms": 90.0,
         "drive_db": 3.0,                 # into a soft clipper: light overdrive
-        "static_db": -30.0,              # static bed between the words, relative to the speech level
+        "static_db": -34.0,              # static bed between the words, relative to the speech level
         "static_duck_db": 14.0,          # how far the bed drops while a word is spoken (the set's gain control)
         "crackle_per_s": 5.0,
         "squelch_db": -5.0,              # squelch bursts, relative to the speech level
@@ -185,7 +186,7 @@ def radio(x: np.ndarray, cfg: dict, rng: np.random.Generator) -> tuple[np.ndarra
     bias = 0.06                                       # slight asymmetry: even harmonics
     v = (np.tanh(d * (v + bias)) - np.tanh(d * bias)) / np.tanh(d)
     v = v - np.mean(v)
-    v = butter(v, SR, "highpass", lo, cfg["hp_order"] + 2)  # the clipper puts energy back below the band
+    v = butter(v, SR, "highpass", lo, cfg["hp_order_out"])
     v = butter(v, SR, "lowpass", hi * 1.12, 4)        # keep a little of the grit above the corner
     level = speech_level(v)
 
@@ -209,8 +210,7 @@ def radio(x: np.ndarray, cfg: dict, rng: np.random.Generator) -> tuple[np.ndarra
         i = int(rng.integers(0, total - 200))
         k = int(rng.integers(20, 120))
         crack[i:i + k] += rng.standard_normal(k) * np.exp(-np.arange(k) / (k / 4)) * rng.uniform(1.5, 4.0)
-    duck = np.zeros(total)
-    duck[start:start + len(v)] = presence(v)
+    duck = presence(out)                              # over the whole clip, so it releases smoothly
     fx = (bed + crack) * level * gain(cfg["static_db"] - cfg["static_duck_db"] * duck)
 
     # 3. squelch: key-up click and a short falling burst; at the end a short squelch tail of
@@ -309,8 +309,8 @@ def hall(x: np.ndarray, cfg: dict, rng: np.random.Generator) -> tuple[np.ndarray
     total = n_lead + len(v) + n_ring
     out = np.zeros((total, 2))
     out[n_lead:n_lead + len(v), :] = v[:, None]
-    duck = np.zeros(total - n_lead)
-    duck[: len(v)] = presence(v, 20.0, 220.0)
+    # the ducking follows the voice over the whole clip, so it lets go smoothly after the last word
+    duck = presence(np.concatenate([v, np.zeros(total - n_lead - len(v))]), 20.0, 220.0)
     wet_gain = gain(-cfg["duck_db"] * duck)
     for ch in range(2):
         e = signal.fftconvolve(v, early_ir[:, ch])[: total - n_lead]

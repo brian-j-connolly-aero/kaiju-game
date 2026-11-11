@@ -73,7 +73,8 @@ describe('stages (DESIGN.md section 2)', () => {
     expect(MATCH_RULES.blastKillRadius).toBe(3.5);
     expect(MATCH_RULES.blastShoveRadius).toBe(7);
     expect(MATCH_RULES.redeployMinKaijuDist).toBe(250);
-    expect(MATCH_RULES.bar).toMatchObject({ p1: 0.35, p2: 0.3, p3: 0.3, growth: 1.6, display: [0.21, 0.57, 1] });
+    // The three fractions are tuned with the balance harness (docs/BALANCE.md).
+    expect(MATCH_RULES.bar).toMatchObject({ p1: 0.13, p2: 0.088, p3: 0.31, growth: 1.6, display: [0.21, 0.57, 1] });
     expect(MATCH_RULES.maxPlayers).toBe(5);
     expect(SNAPSHOT_EVERY_TICKS).toBe(2);
   });
@@ -83,11 +84,11 @@ describe('the one rule set (DESIGN.md section 3)', () => {
   it('has the kaiju damage profile', () => {
     expect(LIZARD.hp).toBe(1000);
     expect(LIZARD.nerveCapacity).toBe(100);
-    expect(LIZARD.nerveLeak).toBe(9);
+    expect(LIZARD.nerveLeak).toBe(7.5);
     expect(LIZARD.damage).toMatchObject({
       normalMult: 0.12,
       braceFrontMult: 0.04,
-      helplessMult: 1,
+      helplessMult: 0.5,
       braceNerveMult: 0.25,
       frontMult: 1,
       flankMult: 1.35,
@@ -106,7 +107,7 @@ describe('the one rule set (DESIGN.md section 3)', () => {
       atWillNerveMult: 0.5,
       nerveSlowMax: 0.3,
       staggerDuration: 5,
-      staggerNerveImmunity: 6,
+      staggerNerveImmunity: 8,
       unitNerveCapacity: 100,
       unitNerveLeak: 8,
       shakenDuration: 4,
@@ -244,18 +245,18 @@ describe('the Army (DESIGN.md section 5)', () => {
     const w = [l1, l2, l3].map((u) => WEAPONS[u.weapon]);
     expect(w.map((x) => x.maxShots)).toEqual([3, 1, 3]);
     expect(w.map((x) => x.damage)).toEqual([3.2, 9.5, 3.2]);
-    expect(w.map((x) => x.nerve)).toEqual([1.5, 4.5, 1.5]);
+    expect(w.map((x) => x.nerve)).toEqual([1.8, 5.4, 1.6]);
     expect(w.map((x) => x.range)).toEqual([160, 420, 600]);
     expect(w.map((x) => x.cooldown)).toEqual([2.6, 3.2, 3.2]);
     expect(w.map((x) => x.splashRadius)).toEqual([3, 5, 5]);
-    expect(w.map((x) => x.structureDamage)).toEqual([28, 120, 120]);
+    expect(w.map((x) => x.structureDamage)).toEqual([3, 25, 25]);
     expect(w.map((x) => +(x.aimErrorAtWill / DEG).toFixed(3))).toEqual([3.5, 2.5, 2.5]);
     expect(w.map((x) => +(x.aimErrorVolley / DEG).toFixed(3))).toEqual([1.2, 0.9, 0.9]);
     expect(w.map((x) => PROJECTILE_TYPES[x.projectile].speed)).toEqual([55, 110, 110]);
     expect(w.map((x) => PROJECTILE_TYPES[x.projectile].flight)).toEqual(['flat', 'flat', 'flat']);
   });
 
-  it('normalizes a squad salvo to about 38 damage and 18 nerve at every level', () => {
+  it('normalizes a squad salvo to about 38 damage and about 20 nerve at every level', () => {
     for (const level of ARMY.levels) {
       const unit = UNIT_TYPES[level.unitType];
       const weapon = WEAPONS[unit.weapon];
@@ -265,7 +266,25 @@ describe('the Army (DESIGN.md section 5)', () => {
       const nerve = MATCH_RULES.unitsPerSquad * shots * weapon.nerve;
       expect(damage).toBeGreaterThanOrEqual(38);
       expect(damage).toBeLessThan(38.5);
-      expect(nerve).toBeCloseTo(18, 9);
+      // Tuned per level with the balance harness (docs/BALANCE.md).
+      expect(nerve).toBeGreaterThanOrEqual(19);
+      expect(nerve).toBeLessThanOrEqual(22);
+    }
+  });
+
+  it('keeps one squad from breaking the kaiju alone: a full-charge volley stays under its nerve capacity', () => {
+    const P = LIZARD.damage;
+    for (const level of ARMY.levels) {
+      const unit = UNIT_TYPES[level.unitType];
+      const weapon = WEAPONS[unit.weapon];
+      const salvo = shotsForMembers(weapon, unit.members) * weapon.nerve;
+      const charged = 3 * salvo * (1 + COMBAT_RULES.volleyNervePerCharge);
+      // The trigger shot plus three fully charged sub-units, from the worst side...
+      expect((salvo + charged) * P.rearMult).toBeLessThan(LIZARD.nerveCapacity);
+      // ...and as the one-player crossfire: the leader on the flank, the sub-units in front.
+      expect(salvo * P.flankMult + charged * P.frontMult * COMBAT_RULES.crossfireNerveMult).toBeLessThan(LIZARD.nerveCapacity);
+      // Two squads whose fire crosses do break it, even from the front.
+      expect((salvo + charged) * P.frontMult * (1 + COMBAT_RULES.crossfireNerveMult)).toBeGreaterThan(LIZARD.nerveCapacity);
     }
   });
 
@@ -286,8 +305,8 @@ describe('the Army (DESIGN.md section 5)', () => {
       shells: 8,
       duration: 2,
       scatterRadius: 28,
-      damage: 14,
-      nerve: 10,
+      damage: 9,
+      nerve: 5,
       splashRadius: 14,
       structureDamage: 300,
       cooldown: 35,

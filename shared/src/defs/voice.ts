@@ -85,7 +85,7 @@ export const VOICE_CUE_RULES: Readonly<Record<VoiceCueId, VoiceCueRule>> = {
   'kaiju.lost': { priority: 0, gap: 15 },
   'volley.ready': { priority: 0, gap: 10 },
   'volley.fired': { priority: 0, gap: 8 },
-  crossfire: { priority: 1, gap: 10 },
+  crossfire: { priority: 1, gap: 12 },
   'nerve.break': { priority: 2, gap: 0 },
   'stagger.end': { priority: 0, gap: 0 },
   'kaiju.brace': { priority: 0, gap: 15 },
@@ -93,7 +93,7 @@ export const VOICE_CUE_RULES: Readonly<Record<VoiceCueId, VoiceCueRule>> = {
   'kaiju.special': { priority: 1, gap: 5 },
   'building.down': { priority: 0, gap: 9 },
   'landmark.down': { priority: 2, gap: 2 },
-  'collateral.human': { priority: 0, gap: 12 },
+  'collateral.human': { priority: 1, gap: 12 },
   'unit.lost': { priority: 0, gap: 6 },
   'squad.wiped': { priority: 1, gap: 0 },
   'player.takeover': { priority: 1, gap: 4 },
@@ -102,7 +102,7 @@ export const VOICE_CUE_RULES: Readonly<Record<VoiceCueId, VoiceCueRule>> = {
   'molt.blast': { priority: 2, gap: 0 },
   'stage.2': { priority: 2, gap: 0 },
   'stage.3': { priority: 2, gap: 0 },
-  'callin.inbound': { priority: 1, gap: 5 },
+  'callin.inbound': { priority: 1, gap: 10 },
   'clock.3min': { priority: 2, gap: 0 },
   'clock.1min': { priority: 2, gap: 0 },
   'clock.10s': { priority: 2, gap: 0 },
@@ -266,8 +266,9 @@ export interface VoiceChoice {
  * Chooses the lines one side hears for a cue, deterministically from `variant`. A sequence cue
  * (the briefing) gets all of its lines in script order; every other cue gets one:
  * - when the cue is about a squad that has lines of its own, one of those;
- * - otherwise a line that is not spoken by some other squad of the match (command, the news
- *   anchor, the chair), falling back to any line at all;
+ * - when it is about a squad that has none, a line that is not spoken by some other squad
+ *   (command, the news anchor), falling back to any line at all;
+ * - when it is about nobody in particular, any line: whoever is on the radio says it;
  * - never the line in `avoid` when there is another to take.
  * Returns an empty list when the script has nothing for this side.
  */
@@ -283,13 +284,15 @@ export function chooseVoiceLines(
   if (pool.length === 0) return [];
   if (VOICE_SEQUENCE_CUES.includes(cue)) return pool;
 
-  const own = choice.callsign ? pool.filter((l) => l.speaker === choice.callsign) : [];
-  if (own.length > 0) {
-    pool = own;
-  } else if (choice.callsigns && choice.callsigns.length > 0) {
-    const others = choice.callsigns.filter((c) => c !== choice.callsign);
-    const neutral = pool.filter((l) => !others.includes(l.speaker));
-    if (neutral.length > 0) pool = neutral;
+  if (choice.callsign) {
+    const own = pool.filter((l) => l.speaker === choice.callsign);
+    if (own.length > 0) {
+      pool = own;
+    } else if (choice.callsigns) {
+      const others = choice.callsigns.filter((c) => c !== choice.callsign);
+      const neutral = pool.filter((l) => !others.includes(l.speaker));
+      if (neutral.length > 0) pool = neutral;
+    }
   }
   let i = ((Math.floor(variant) % pool.length) + pool.length) % pool.length;
   if (pool.length > 1 && pool[i].id === choice.avoid) i = (i + 1) % pool.length;

@@ -30,18 +30,21 @@ CAST_NOTES = """\
 of that character's lines; "pace" is words per second from first word to last, pauses included.
 The three squad voices and Overlord share one radio channel, so they are spread out on purpose:
 four different recorded speakers, the squads pitched roughly 105, 140 and 185 Hz, and Overlord the
-lowest and slowest of the men.
+lowest (about 92 Hz) and the slowest. Overlord and Granite are the closest pair: two low American
+men, two and a half semitones apart, told apart mainly by pace (Granite is the quickest voice on
+the channel, Overlord the slowest) and by Overlord's cleaner, wider radio.
 
 Why these voices:
 
 - **Overlord** is RHVoice `bdl`, the most intelligible voice on the machine by a wide margin, and
-  the only one that stays clear on the radio almost whatever is done to it. Slowed to 86% speed
-  and lowered to 78% pitch it loses nothing measurable, so the gravity is free. Command also gets
+  the only one that stays clear on the radio almost whatever is done to it. Slowed to 85% speed
+  and lowered to 72% pitch it loses nothing measurable, so the gravity is free. Command also gets
   the cleanest radio (wider band, less drive, less static): it is the base station, the squads
   are in the field.
-- **Granite** is Flite `rms`, the deepest natural voice available, close to Overlord in pitch but
-  a different man with a darker, rougher sound and a quicker, clipped delivery. Lowering it
-  further with a pitch shifter was tried and rejected: two semitones down tripled the error rate.
+- **Granite** is Flite `rms`, the deepest natural voice available: a different man from Overlord
+  with a rougher sound, spoken 6% faster than the engine's default for a clipped delivery.
+  Lowering it further with a pitch shifter was tried and rejected: two semitones down tripled
+  the error rate.
 - **Beacon** is RHVoice `clb`, a precise female voice. It is the slowest voice at its default
   speed, so it is sped up to keep the by-the-book reports brisk.
 - **Tempest** is RHVoice `alan`, a male voice with a Scottish accent, noticeably higher than
@@ -58,8 +61,8 @@ Why these voices:
   90% pitch with Pico's own control, and then moved down three more semitones together with its
   resonances (a larger body, not just a lower note), which lands it at about 130 Hz: a low,
   unhurried voice of no obvious age. Of all the ways of lowering Pico that were tried this was
-  the clearest (second-round table below); RHVoice `alan` would be slightly clearer still but is
-  Tempest.
+  the clearest (second-round table below), about level with RHVoice `alan` slowed and lowered,
+  which is Tempest's speaker and so not available.
 
 Several voices on this machine are the same recorded person inside different synthesizers
 (`slt` exists in RHVoice, Flite and Festival; RHVoice `alan` and Flite `awb` are one speaker), so
@@ -159,8 +162,10 @@ What the sweeps decided:
 
 - **Overdrive is the most expensive radio ingredient.** 12 dB of drive doubles the errors; 3 dB
   costs almost nothing and still rounds the peaks. The default is 3 dB ("light").
-- **Static under the words costs a lot, static between the words costs little.** So the bed sits
-  at -30 dB in the gaps, where it is heard as radio hiss, and drops 14 dB while a word is spoken.
+- **Static under the words costs a lot, static between the words costs less.** So the bed drops
+  14 dB while a word is spoken and comes back in the gaps, where it is heard as radio hiss. A last
+  check on all 54 squad lines put the bed in the gaps at -34 dB instead of -30 dB (16.7% against
+  19.5% word errors), which is the default; Overlord's is at -38 dB.
 - **A slightly wider band helps every voice.** 300 Hz to 3.8 kHz instead of 330 Hz to 3.3 kHz; it
   is still plainly a radio.
 - **The compressor and the presence peak help** (removing either made things worse), so both stay.
@@ -177,8 +182,10 @@ CLIENT = """\
   padding). Use it to time subtitles and to queue lines.
 - **Do not add `radio_open` / `radio_close` around these files.** The radio lines already begin
   with a key click and end with a squelch tail ({lead:.2f} s before the first word and {tail:.2f} s
-  after the last). Those two effects from the sound-effects set remain useful for radio moments
-  without a voice line.
+  after the last). At the time of writing `client/src/audio/audioEngine.ts` (`nextLine`) plays
+  both effects around every radio line; with these files in place it should play them only in
+  its fallback path, when a line has no audio and it shows the subtitle with blips. Otherwise
+  every radio line gets two clicks at the start and two squelch tails at the end.
 - **One line at a time per listener.** Radio lines are mono and sit in one band; two at once turn
   to mush. Queue them; drop a queued line if it is more than about three seconds stale. The
   briefing lines are meant to play back to back in script order with about 0.3 s between them.
@@ -205,22 +212,24 @@ comparing voices and settings and for finding lines that need attention.
 ASR_READING = """\
 How to read it: the "unprocessed" column is the synthesizer and the recognizer's own limits; the
 gap to the right of it is what the chain costs. The broadcast chain costs almost nothing. The
-radio chain costs the most, as it should: it removes everything below 330 Hz and above 3.3 kHz,
-which people are used to from telephones and the recognizer is not. Encoding to `.ogg` or `.mp3`
+radio chain costs the most, as it should: it removes everything below 300 Hz and above about
+4 kHz, which people are used to from telephones and the recognizer is not. Encoding to `.ogg` or `.mp3`
 changes little.
 """
 
 WEAK_INTRO = """\
-The lines the recognizer does worst on, from the decoded `.ogg`. These are the ones to listen to
-first and the first candidates for a rewrite or a respelling.
+The lines the recognizer does worst on, from the decoded `.ogg` (two or more wrong words, the
+largest share of the line first). These are the ones to listen to first and the first candidates
+for a rewrite. "Unprocessed" is the same line straight from the synthesizer.
 """
 
 WEAK_AFTER = """\
-Patterns in the misses: single-word radio sentences ("Charged.", "Contact.", "Time.") give the
-recognizer nothing to hold on to; callsigns at the start of a line ("Granite", "Beacon",
-"Tempest") are rare words it does not expect; "volley" is never recognized from any voice. None
-of these is a pronunciation fault, and a listener with the subtitle in front of them will have no
-trouble, but short one-word lines are the ones most likely to be lost under game noise.
+Patterns in the misses, none of them a pronunciation fault: "volley" is never recognized from
+any voice (it comes back as "valley", "bali" or "molly"); callsigns at the start of a line
+("Granite", "Beacon") are rare words the recognizer does not expect; very short sentences give
+it little to hold on to; and Tempest's accent turns "fire" into "find" and "count" into "kind".
+A listener with the subtitle in front of them will have no trouble with any of these, but the
+short radio lines of Granite and Tempest are the ones most likely to be lost under game noise.
 """
 
 PRONOUNCE_INTRO = """\
@@ -252,9 +261,9 @@ Measured on the encoded files after decoding them again with `ffmpeg` (`.ogg` at
 CHECKS_PASSED = """\
 Every check passed on every file: both formats exist and decode at 44.1 kHz with the expected
 channel count; length matches the manifest; loudness within 0.8 LU of the target; true peak below
--0.5 dBTP; clean start and end (no clicks from cut waveforms); radio lines band-limited; no line
-longer than 8 s (13 s for the hearing) or slower than 1.1 s per word; nothing in the folder that
-is not in the script.
+-0.5 dBTP; clean start and end (no clicks from cut waveforms); radio lines band-limited and their
+squelch clicks at least 3 dB below the speech peaks; no line longer than 8 s (13 s for the
+hearing) or slower than 1.1 s per word; nothing in the folder that is not in the script.
 """
 
 WEAK_POINTS = """\
@@ -273,8 +282,8 @@ WEAK_POINTS = """\
   clear, and blooms in the pauses and at the end. In a recognizer's ears it still costs words;
   for a person with subtitles on the end screen it should be comfortable.
 - **Two voices are band-limited at the source.** RHVoice `clb` and `alan` and Pico stop at about
-  7.5 kHz. On the radio that does not matter (everything above 3.7 kHz is removed anyway); the
-  chair sounds a little duller than the anchor.
+  7.5 kHz. On the radio that does not matter (everything above about 4 kHz is removed anyway);
+  the chair sounds a little duller than the anchor.
 - **Granite's synthesizer (Flite) has a slightly rougher, buzzier sound** than the RHVoice
   voices. Under the radio chain most of that is masked, and it suits the character, but it is
   the lowest-fidelity voice in the cast.

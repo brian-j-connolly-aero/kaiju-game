@@ -21,6 +21,14 @@ export const PROJECTILE_TYPES: Readonly<Record<ProjectileTypeId, ProjectileTypeD
   thrown: { id: 'thrown', flight: 'thrown', speed: 0, gravity: COMBAT_RULES.gravity, radius: 1, ttl: 20, model: null },
 };
 
+/**
+ * Nerve and structure damage are tuned with the balance harness (docs/BALANCE.md). Nerve: one
+ * squad's full-charge volley stays under the kaiju's nerve capacity from any side and even as
+ * a one-player crossfire (54 from the front, 92 from behind or crossed), so it takes two squads
+ * to break it.
+ * Structure damage: a stray projectile dents a building rather than flattening it, so misses
+ * cost the humans the bar without filling it for the kaiju.
+ */
 export const WEAPONS: Readonly<Record<WeaponId, WeaponDef>> = {
   army_rocket_launchers: {
     id: 'army_rocket_launchers',
@@ -28,11 +36,11 @@ export const WEAPONS: Readonly<Record<WeaponId, WeaponDef>> = {
     maxShots: 3,
     membersPerShot: 3.4,
     damage: 3.2,
-    nerve: 1.5,
+    nerve: 1.8,
     range: 160,
     cooldown: 2.6,
     splashRadius: 3,
-    structureDamage: 28,
+    structureDamage: 3,
     aimErrorAtWill: 3.5 * DEG,
     aimErrorVolley: 1.2 * DEG,
   },
@@ -42,11 +50,11 @@ export const WEAPONS: Readonly<Record<WeaponId, WeaponDef>> = {
     maxShots: 1,
     membersPerShot: 1,
     damage: 9.5,
-    nerve: 4.5,
+    nerve: 5.4,
     range: 420,
     cooldown: 3.2,
     splashRadius: 5,
-    structureDamage: 120,
+    structureDamage: 25,
     aimErrorAtWill: 2.5 * DEG,
     aimErrorVolley: 0.9 * DEG,
   },
@@ -56,11 +64,11 @@ export const WEAPONS: Readonly<Record<WeaponId, WeaponDef>> = {
     maxShots: 3,
     membersPerShot: 1,
     damage: 3.2,
-    nerve: 1.5,
+    nerve: 1.6,
     range: 600,
     cooldown: 3.2,
     splashRadius: 5,
-    structureDamage: 120,
+    structureDamage: 25,
     aimErrorAtWill: 2.5 * DEG,
     aimErrorVolley: 0.9 * DEG,
   },

@@ -159,7 +159,7 @@ describe('the driven unit', () => {
     expect(spawns.length).toBe(1);
     expect(spawns[0]).toMatchObject({ projectile: 'shell', flight: 'flat', y: UNIT_TYPES.army_tank.muzzleHeight });
     expect(Math.hypot(spawns[0].vx, spawns[0].vy, spawns[0].vz)).toBeCloseTo(PROJECTILE_TYPES.shell.speed, 9);
-    expect(tank.projectiles[0]).toMatchObject({ damage: WEAPONS.army_tank_gun.damage, nerve: WEAPONS.army_tank_gun.nerve, structureDamage: 120, splash: 5 });
+    expect(tank.projectiles[0]).toMatchObject({ damage: WEAPONS.army_tank_gun.damage, nerve: WEAPONS.army_tank_gun.nerve, structureDamage: WEAPONS.army_tank_gun.structureDamage, splash: 5 });
     expect(t.cooldown).toBeCloseTo(WEAPONS.army_tank_gun.cooldown, 9);
 
     const troop = field({}, 3);
@@ -172,10 +172,12 @@ describe('the driven unit', () => {
     expect(eventsOf(lead(troop, 1, { buttons: Btn.fire }), 'projectileSpawn').length).toBe(2);
   });
 
-  it('a squad salvo is about 38 damage and 18 nerve at every level', () => {
+  it('a squad salvo is about 38 damage and about 20 nerve at every level', () => {
     for (const weapon of Object.values(WEAPONS)) {
       expect(4 * weapon.maxShots * weapon.damage).toBeCloseTo(38.4, 0);
-      expect(4 * weapon.maxShots * weapon.nerve).toBeCloseTo(18, 6);
+      // Nerve is tuned per level (docs/BALANCE.md); defs.test.ts checks what it must never exceed.
+      expect(4 * weapon.maxShots * weapon.nerve).toBeGreaterThanOrEqual(19);
+      expect(4 * weapon.maxShots * weapon.nerve).toBeLessThanOrEqual(22);
     }
   });
 });

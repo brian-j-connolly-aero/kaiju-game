@@ -4,15 +4,15 @@
       "file": "models/army_tank.glb",
       "kind": "vehicle",
       "nodes": ["hull", "track_L", "track_R", "turret", "barrel", "muzzle"],
-      "size": [3.92, 3.301, 8.03],
-      "tris": 497
+      "size": [3.9, 3.29, 8.03],
+      "tris": 498
     },
     "army_tank_wreck": {
       "file": "models/army_tank_wreck.glb",
       "kind": "vehicle",
       "nodes": ["army_tank_wreck"],
-      "size": [6.185, 2.768, 6.726],
-      "tris": 480
+      "size": [6.043, 3.156, 6.798],
+      "tris": 460
     },
     "proj_arty": {
       "file": "models/proj_arty.glb",
@@ -25,7 +25,7 @@
       "file": "models/proj_rocket.glb",
       "kind": "projectile",
       "nodes": ["proj_rocket"],
-      "size": [0.255, 0.255, 1.22],
+      "size": [0.24, 0.24, 1.22],
       "tris": 74
     },
     "proj_shell": {
@@ -33,7 +33,7 @@
       "kind": "projectile",
       "nodes": ["proj_shell"],
       "size": [0.2, 0.173, 0.9],
-      "tris": 46
+      "tris": 58
     }
   }
 }

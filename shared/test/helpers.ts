@@ -8,6 +8,7 @@ import {
   createCityState,
   createMatchConfig,
   createWorld,
+  idleBots,
   type Area,
   type BuiltCity,
   type CityData,
@@ -105,6 +106,11 @@ export interface TestWorldOptions extends TestCityOptions {
   realCity?: boolean;
   /** Bar marks. Hand-made cities default to marks far out of reach so a test match does not end early. */
   marks?: [number, number, number];
+  /**
+   * Let the bots play. By default every bot slot stands still with its hands off the buttons
+   * (`idleBots()`), so that a test of one rule has nothing else moving around it.
+   */
+  bots?: boolean;
   config?: Partial<MatchConfig>;
 }
 
@@ -117,7 +123,8 @@ export function makeTestWorld(options: TestWorldOptions = {}): World {
   const humans: NonNullable<Parameters<typeof createMatchConfig>[0]>['humans'] = [];
   if (people === 'kaiju' || people === 'both') humans.push({ name: 'Kay', role: 'kaiju' });
   if (people === 'human' || people === 'both') humans.push({ name: 'Hugh', role: 'human' });
-  const config = { ...createMatchConfig({ humans, anchor: 0 }), ...options.config };
+  const config: MatchConfig = { ...createMatchConfig({ humans, anchor: 0 }), ...options.config };
+  if (!options.bots && !config.bots) config.bots = idleBots();
   if (options.skipBriefing ?? true) config.tuning = { ...config.tuning, briefing: 0 };
   const world = createWorld({
     seed: options.seed ?? 7,

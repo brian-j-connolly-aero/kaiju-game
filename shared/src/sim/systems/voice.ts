@@ -139,8 +139,7 @@ function watchNumbers(world: World): void {
   if (v.lowHpStage !== m.stage) {
     for (const k of world.kaijus) {
       if (!k.alive || k.hp <= 0 || k.hp >= k.maxHp * VOICE_RULES.lowHpFraction) continue;
-      v.lowHpStage = m.stage;
-      say(world, 'kaiju.lowhp', -1, k.player);
+      if (say(world, 'kaiju.lowhp', -1, k.player)) v.lowHpStage = m.stage;
       break;
     }
   }
@@ -150,8 +149,7 @@ function watchNumbers(world: World): void {
     const from = m.marksReached > 0 ? m.marks[m.marksReached - 1] : 0;
     const to = m.marks[m.marksReached];
     if (to > from && m.barPoints >= from + (to - from) * VOICE_RULES.barNearFraction) {
-      v.barNearCalled = m.marksReached + 1;
-      say(world, 'bar.near');
+      if (say(world, 'bar.near')) v.barNearCalled = m.marksReached + 1;
     }
   }
 }

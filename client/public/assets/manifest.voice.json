@@ -2,15 +2,15 @@
   "voice": {
     "v_match_briefing_1": {
       "base": "audio/voice/v_match_briefing_1",
-      "duration": 3.666
+      "duration": 3.681
     },
     "v_match_briefing_2": {
       "base": "audio/voice/v_match_briefing_2",
-      "duration": 2.91
+      "duration": 2.924
     },
     "v_match_briefing_3": {
       "base": "audio/voice/v_match_briefing_3",
-      "duration": 3.938
+      "duration": 3.964
     },
     "v_match_briefing_4": {
       "base": "audio/voice/v_match_briefing_4",
@@ -26,11 +26,11 @@
     },
     "v_match_start_1": {
       "base": "audio/voice/v_match_start_1",
-      "duration": 3.767
+      "duration": 3.804
     },
     "v_match_start_2": {
       "base": "audio/voice/v_match_start_2",
-      "duration": 3.334
+      "duration": 3.363
     },
     "v_match_start_3": {
       "base": "audio/voice/v_match_start_3",
@@ -42,19 +42,19 @@
     },
     "v_kaiju_spotted_1": {
       "base": "audio/voice/v_kaiju_spotted_1",
-      "duration": 2.871
+      "duration": 2.782
     },
     "v_kaiju_spotted_2": {
       "base": "audio/voice/v_kaiju_spotted_2",
-      "duration": 4.601
+      "duration": 4.63
     },
     "v_kaiju_spotted_3": {
       "base": "audio/voice/v_kaiju_spotted_3",
-      "duration": 2.978
+      "duration": 2.745
     },
     "v_kaiju_spotted_4": {
       "base": "audio/voice/v_kaiju_spotted_4",
-      "duration": 5.132
+      "duration": 4.754
     },
     "v_kaiju_spotted_5": {
       "base": "audio/voice/v_kaiju_spotted_5",
@@ -78,11 +78,11 @@
     },
     "v_kaiju_lost_1": {
       "base": "audio/voice/v_kaiju_lost_1",
-      "duration": 4.478
+      "duration": 4.509
     },
     "v_kaiju_lost_2": {
       "base": "audio/voice/v_kaiju_lost_2",
-      "duration": 3.41
+      "duration": 3.145
     },
     "v_kaiju_lost_3": {
       "base": "audio/voice/v_kaiju_lost_3",
@@ -94,11 +94,11 @@
     },
     "v_volley_ready_1": {
       "base": "audio/voice/v_volley_ready_1",
-      "duration": 2.082
+      "duration": 1.93
     },
     "v_volley_ready_2": {
       "base": "audio/voice/v_volley_ready_2",
-      "duration": 3.866
+      "duration": 3.591
     },
     "v_volley_ready_3": {
       "base": "audio/voice/v_volley_ready_3",
@@ -106,15 +106,15 @@
     },
     "v_volley_ready_4": {
       "base": "audio/voice/v_volley_ready_4",
-      "duration": 3.827
+      "duration": 3.834
     },
     "v_volley_ready_5": {
       "base": "audio/voice/v_volley_ready_5",
-      "duration": 2.152
+      "duration": 1.995
     },
     "v_volley_ready_6": {
       "base": "audio/voice/v_volley_ready_6",
-      "duration": 3.802
+      "duration": 3.523
     },
     "v_volley_ready_7": {
       "base": "audio/voice/v_volley_ready_7",
@@ -138,15 +138,15 @@
     },
     "v_volley_fired_1": {
       "base": "audio/voice/v_volley_fired_1",
-      "duration": 1.277
+      "duration": 1.271
     },
     "v_volley_fired_2": {
       "base": "audio/voice/v_volley_fired_2",
-      "duration": 2.102
+      "duration": 1.939
     },
     "v_volley_fired_3": {
       "base": "audio/voice/v_volley_fired_3",
-      "duration": 3.812
+      "duration": 3.535
     },
     "v_volley_fired_4": {
       "base": "audio/voice/v_volley_fired_4",
@@ -154,11 +154,11 @@
     },
     "v_volley_fired_5": {
       "base": "audio/voice/v_volley_fired_5",
-      "duration": 2.546
+      "duration": 2.36
     },
     "v_volley_fired_6": {
       "base": "audio/voice/v_volley_fired_6",
-      "duration": 3.095
+      "duration": 2.893
     },
     "v_volley_fired_7": {
       "base": "audio/voice/v_volley_fired_7",
@@ -182,15 +182,15 @@
     },
     "v_crossfire_1": {
       "base": "audio/voice/v_crossfire_1",
-      "duration": 4.012
+      "duration": 4.032
     },
     "v_crossfire_2": {
       "base": "audio/voice/v_crossfire_2",
-      "duration": 2.849
+      "duration": 2.641
     },
     "v_crossfire_3": {
       "base": "audio/voice/v_crossfire_3",
-      "duration": 4.562
+      "duration": 4.232
     },
     "v_crossfire_4": {
       "base": "audio/voice/v_crossfire_4",
@@ -214,15 +214,15 @@
     },
     "v_nerve_break_1": {
       "base": "audio/voice/v_nerve_break_1",
-      "duration": 5.048
+      "duration": 5.07
     },
     "v_nerve_break_2": {
       "base": "audio/voice/v_nerve_break_2",
-      "duration": 2.523
+      "duration": 2.33
     },
     "v_nerve_break_3": {
       "base": "audio/voice/v_nerve_break_3",
-      "duration": 4.875
+      "duration": 4.499
     },
     "v_nerve_break_4": {
       "base": "audio/voice/v_nerve_break_4",
@@ -246,11 +246,11 @@
     },
     "v_stagger_end_1": {
       "base": "audio/voice/v_stagger_end_1",
-      "duration": 4.719
+      "duration": 4.75
     },
     "v_stagger_end_2": {
       "base": "audio/voice/v_stagger_end_2",
-      "duration": 2.291
+      "duration": 2.116
     },
     "v_stagger_end_3": {
       "base": "audio/voice/v_stagger_end_3",
@@ -262,7 +262,7 @@
     },
     "v_kaiju_brace_1": {
       "base": "audio/voice/v_kaiju_brace_1",
-      "duration": 3.83
+      "duration": 3.857
     },
     "v_kaiju_brace_2": {
       "base": "audio/voice/v_kaiju_brace_2",
@@ -278,15 +278,15 @@
     },
     "v_kaiju_roar_1": {
       "base": "audio/voice/v_kaiju_roar_1",
-      "duration": 3.919
+      "duration": 3.932
     },
     "v_kaiju_roar_2": {
       "base": "audio/voice/v_kaiju_roar_2",
-      "duration": 3.259
+      "duration": 3.007
     },
     "v_kaiju_roar_3": {
       "base": "audio/voice/v_kaiju_roar_3",
-      "duration": 4.04
+      "duration": 3.762
     },
     "v_kaiju_roar_4": {
       "base": "audio/voice/v_kaiju_roar_4",
@@ -310,11 +310,11 @@
     },
     "v_kaiju_special_1": {
       "base": "audio/voice/v_kaiju_special_1",
-      "duration": 4.426
+      "duration": 4.443
     },
     "v_kaiju_special_2": {
       "base": "audio/voice/v_kaiju_special_2",
-      "duration": 1.573
+      "duration": 1.46
     },
     "v_kaiju_special_3": {
       "base": "audio/voice/v_kaiju_special_3",
@@ -326,15 +326,15 @@
     },
     "v_building_down_1": {
       "base": "audio/voice/v_building_down_1",
-      "duration": 3.434
+      "duration": 3.458
     },
     "v_building_down_2": {
       "base": "audio/voice/v_building_down_2",
-      "duration": 3.392
+      "duration": 3.118
     },
     "v_building_down_3": {
       "base": "audio/voice/v_building_down_3",
-      "duration": 3.602
+      "duration": 3.348
     },
     "v_building_down_4": {
       "base": "audio/voice/v_building_down_4",
@@ -358,11 +358,11 @@
     },
     "v_landmark_down_1": {
       "base": "audio/voice/v_landmark_down_1",
-      "duration": 4.012
+      "duration": 4.051
     },
     "v_landmark_down_2": {
       "base": "audio/voice/v_landmark_down_2",
-      "duration": 3.9
+      "duration": 3.618
     },
     "v_landmark_down_3": {
       "base": "audio/voice/v_landmark_down_3",
@@ -382,19 +382,19 @@
     },
     "v_collateral_human_1": {
       "base": "audio/voice/v_collateral_human_1",
-      "duration": 3.83
+      "duration": 3.841
     },
     "v_collateral_human_2": {
       "base": "audio/voice/v_collateral_human_2",
-      "duration": 3.776
+      "duration": 3.867
     },
     "v_collateral_human_3": {
       "base": "audio/voice/v_collateral_human_3",
-      "duration": 2.925
+      "duration": 2.699
     },
     "v_collateral_human_4": {
       "base": "audio/voice/v_collateral_human_4",
-      "duration": 4.588
+      "duration": 4.263
     },
     "v_collateral_human_5": {
       "base": "audio/voice/v_collateral_human_5",
@@ -418,15 +418,15 @@
     },
     "v_unit_lost_1": {
       "base": "audio/voice/v_unit_lost_1",
-      "duration": 3.743
+      "duration": 3.755
     },
     "v_unit_lost_2": {
       "base": "audio/voice/v_unit_lost_2",
-      "duration": 2.324
+      "duration": 2.155
     },
     "v_unit_lost_3": {
       "base": "audio/voice/v_unit_lost_3",
-      "duration": 4.123
+      "duration": 3.853
     },
     "v_unit_lost_4": {
       "base": "audio/voice/v_unit_lost_4",
@@ -450,11 +450,11 @@
     },
     "v_squad_wiped_1": {
       "base": "audio/voice/v_squad_wiped_1",
-      "duration": 4.075
+      "duration": 4.101
     },
     "v_squad_wiped_2": {
       "base": "audio/voice/v_squad_wiped_2",
-      "duration": 3.284
+      "duration": 3.013
     },
     "v_squad_wiped_3": {
       "base": "audio/voice/v_squad_wiped_3",
@@ -466,19 +466,19 @@
     },
     "v_player_takeover_1": {
       "base": "audio/voice/v_player_takeover_1",
-      "duration": 4.151
+      "duration": 4.182
     },
     "v_player_takeover_2": {
       "base": "audio/voice/v_player_takeover_2",
-      "duration": 3.024
+      "duration": 2.797
     },
     "v_player_takeover_3": {
       "base": "audio/voice/v_player_takeover_3",
-      "duration": 3.542
+      "duration": 3.285
     },
     "v_molt_available_1": {
       "base": "audio/voice/v_molt_available_1",
-      "duration": 3.506
+      "duration": 3.64
     },
     "v_molt_available_2": {
       "base": "audio/voice/v_molt_available_2",
@@ -494,11 +494,11 @@
     },
     "v_cocoon_start_1": {
       "base": "audio/voice/v_cocoon_start_1",
-      "duration": 3.501
+      "duration": 3.52
     },
     "v_cocoon_start_2": {
       "base": "audio/voice/v_cocoon_start_2",
-      "duration": 3.413
+      "duration": 3.148
     },
     "v_cocoon_start_3": {
       "base": "audio/voice/v_cocoon_start_3",
@@ -510,11 +510,11 @@
     },
     "v_molt_blast_1": {
       "base": "audio/voice/v_molt_blast_1",
-      "duration": 4.137
+      "duration": 4.079
     },
     "v_molt_blast_2": {
       "base": "audio/voice/v_molt_blast_2",
-      "duration": 4.352
+      "duration": 4.05
     },
     "v_molt_blast_3": {
       "base": "audio/voice/v_molt_blast_3",
@@ -526,11 +526,11 @@
     },
     "v_stage_2_1": {
       "base": "audio/voice/v_stage_2_1",
-      "duration": 3.784
+      "duration": 3.797
     },
     "v_stage_2_2": {
       "base": "audio/voice/v_stage_2_2",
-      "duration": 4.188
+      "duration": 4.215
     },
     "v_stage_2_3": {
       "base": "audio/voice/v_stage_2_3",
@@ -542,11 +542,11 @@
     },
     "v_stage_3_1": {
       "base": "audio/voice/v_stage_3_1",
-      "duration": 4.267
+      "duration": 4.327
     },
     "v_stage_3_2": {
       "base": "audio/voice/v_stage_3_2",
-      "duration": 4.069
+      "duration": 4.088
     },
     "v_stage_3_3": {
       "base": "audio/voice/v_stage_3_3",
@@ -558,11 +558,11 @@
     },
     "v_callin_inbound_1": {
       "base": "audio/voice/v_callin_inbound_1",
-      "duration": 3.058
+      "duration": 3.067
     },
     "v_callin_inbound_2": {
       "base": "audio/voice/v_callin_inbound_2",
-      "duration": 2.872
+      "duration": 2.659
     },
     "v_callin_inbound_3": {
       "base": "audio/voice/v_callin_inbound_3",
@@ -574,11 +574,11 @@
     },
     "v_clock_3min_1": {
       "base": "audio/voice/v_clock_3min_1",
-      "duration": 4.216
+      "duration": 4.144
     },
     "v_clock_3min_2": {
       "base": "audio/voice/v_clock_3min_2",
-      "duration": 3.597
+      "duration": 3.361
     },
     "v_clock_3min_3": {
       "base": "audio/voice/v_clock_3min_3",
@@ -590,7 +590,7 @@
     },
     "v_clock_1min_1": {
       "base": "audio/voice/v_clock_1min_1",
-      "duration": 3.827
+      "duration": 3.85
     },
     "v_clock_1min_2": {
       "base": "audio/voice/v_clock_1min_2",
@@ -606,11 +606,11 @@
     },
     "v_clock_10s_1": {
       "base": "audio/voice/v_clock_10s_1",
-      "duration": 2.215
+      "duration": 2.227
     },
     "v_clock_10s_2": {
       "base": "audio/voice/v_clock_10s_2",
-      "duration": 2.384
+      "duration": 2.209
     },
     "v_clock_10s_3": {
       "base": "audio/voice/v_clock_10s_3",
@@ -622,7 +622,7 @@
     },
     "v_kaiju_lowhp_1": {
       "base": "audio/voice/v_kaiju_lowhp_1",
-      "duration": 3.2
+      "duration": 3.215
     },
     "v_kaiju_lowhp_2": {
       "base": "audio/voice/v_kaiju_lowhp_2",
@@ -638,11 +638,11 @@
     },
     "v_bar_near_1": {
       "base": "audio/voice/v_bar_near_1",
-      "duration": 3.479
+      "duration": 3.497
     },
     "v_bar_near_2": {
       "base": "audio/voice/v_bar_near_2",
-      "duration": 3.897
+      "duration": 3.636
     },
     "v_bar_near_3": {
       "base": "audio/voice/v_bar_near_3",
@@ -654,11 +654,11 @@
     },
     "v_end_humans_kill_1": {
       "base": "audio/voice/v_end_humans_kill_1",
-      "duration": 4.195
+      "duration": 4.213
     },
     "v_end_humans_kill_2": {
       "base": "audio/voice/v_end_humans_kill_2",
-      "duration": 2.155
+      "duration": 1.994
     },
     "v_end_humans_kill_3": {
       "base": "audio/voice/v_end_humans_kill_3",
@@ -670,11 +670,11 @@
     },
     "v_end_humans_clock_1": {
       "base": "audio/voice/v_end_humans_clock_1",
-      "duration": 4.516
+      "duration": 4.55
     },
     "v_end_humans_clock_2": {
       "base": "audio/voice/v_end_humans_clock_2",
-      "duration": 3.153
+      "duration": 2.941
     },
     "v_end_humans_clock_3": {
       "base": "audio/voice/v_end_humans_clock_3",
@@ -686,7 +686,7 @@
     },
     "v_end_kaiju_1": {
       "base": "audio/voice/v_end_kaiju_1",
-      "duration": 4.78
+      "duration": 4.722
     },
     "v_end_kaiju_2": {
       "base": "audio/voice/v_end_kaiju_2",

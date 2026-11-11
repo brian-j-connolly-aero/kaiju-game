@@ -207,9 +207,7 @@ def write(lines: list[dict], cast: dict, pron: dict, state: dict, report: dict) 
         scored.append((rate, m["ogg"]["errors"], l, m, rec))
     scored.sort(key=lambda t: (-t[0], -t[1], t[2]["id"]))
     rows = []
-    for rate, errs, l, m, rec in scored[:25]:
-        if errs == 0:
-            break
+    for rate, errs, l, m, rec in [t for t in scored if t[1] >= 2][:25]:
         rows.append([f"`{l['id']}`", l["speaker"], l["text"], m["ogg"]["hyp"] or "(nothing)",
                      f"{errs}/{rec['words']}", f"{rec['raw']['errors']}/{rec['words']}"])
     add(_table(["Line", "Voice", "Subtitle", "What the recognizer heard (.ogg)", "Errors", "Unprocessed"], rows))
@@ -237,7 +235,6 @@ def write(lines: list[dict], cast: dict, pron: dict, state: dict, report: dict) 
         add(_table(["What", "Applies to", "Fed to the synthesizer", "Why"], rows))
     else:
         add(notes.PRONOUNCE_NONE)
-    add("")
     tried = pron.get("tried", [])
     if tried:
         add(notes.PRONOUNCE_TRIED)
@@ -272,6 +269,16 @@ def write(lines: list[dict], cast: dict, pron: dict, state: dict, report: dict) 
             f"{100 * max(m['ogg']['share_above_band'] for m in radio):.2f}% above 1.3 times the upper corner "
             f"(4.9 kHz for the squads); on average "
             f"{100 * sum(m['ogg']['share_in_band'] for m in radio) / len(radio):.1f}% lies inside the band.\n")
+    sq = [m["squelch"] for m in radio if "squelch" in m]
+    if sq:
+        med = lambda k: sorted(q[k] for q in sq)[len(sq) // 2]
+        add(f"Squelch and static, measured on the decoded `.ogg` of every radio line against the speech they frame: "
+            f"the key click at the start peaks {-med('open_click_db'):.0f} dB below the loudest speech peak "
+            f"(never less than {-max(q['open_click_db'] for q in sq):.0f} dB below), the one at the end "
+            f"{-med('close_click_db'):.0f} dB below (never less than {-max(q['close_click_db'] for q in sq):.0f} dB); "
+            f"the bursts of static are {-med('open_burst_db'):.0f} dB and {-med('close_burst_db'):.0f} dB below the "
+            f"loud parts of the speech; the static bed before the first word is {-med('static_db'):.0f} dB below "
+            f"them.\n")
     if report["failures"]:
         add("**Checks that failed in the last build:**\n")
         for f in report["failures"]:

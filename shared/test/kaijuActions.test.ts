@@ -966,10 +966,19 @@ describe('the molt', () => {
     });
     expect(hp - k.hp).toBeCloseTo(20 * LIZARD.damage.helplessMult, 9);
 
-    // The hand-over to the match flow system: the cocoon phase has run its time.
-    play(world, ticksFor(world.config.tuning.cocoon) - 60);
+    // The cocoon runs its full time, to the tick...
+    play(world, ticksFor(world.config.tuning.cocoon) - 61);
     expect(k.phase).toBe('cocoon');
-    expect(k.phaseTime).toBeGreaterThanOrEqual(k.phaseDuration - 1e-6);
+    expect(k.stage).toBe(1);
+    expect(world.match.phase).toBe('playing');
+    // ...and then the match flow system takes over: the blast wave, the new body, the intermission
+    // (test/molt.test.ts follows it from here).
+    events = play(world, 1);
+    expect(eventsOf(events, 'moltBlast')).toMatchObject([{ kaiju: 0 }]);
+    expect(actions(events)).toEqual([['molt', 'idle']]);
+    expect(k.phase).toBe('idle');
+    expect(k.stage).toBe(2);
+    expect(world.match.phase).toBe('intermission');
   });
 
   it('offers the next molt at once when the bar is already past the next mark, and none at stage 3', () => {

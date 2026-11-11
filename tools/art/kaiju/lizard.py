@@ -42,6 +42,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import mb  # noqa: E402
 from mathutils import Vector  # noqa: E402  (available once bpy is loaded)
+from mathutils.bvhtree import BVHTree  # noqa: E402
 import parts  # noqa: E402
 from parts import BACK, DOWN, FWD, LEFT, UP, Local, Rig, V, tube, limb, spike, claw  # noqa: E402,F401
 
@@ -59,12 +60,15 @@ MAW = "maw"
 MAW_DK = "maw_dk"
 TONGUE = "tongue"
 SCAR = mb.mix("scar", "tongue", 0.35)
-ARMOR = mb.mix("gragnor_rust_dk", "#3b2a2a", 0.35)
-ARMOR_LT = mb.mix("gragnor_rust", "gragnor_rust_dk", 0.5)
+# grown plates (the titan's scales): hide-colored at the root, rust at the free edge
+PLATE_ROOT = ORANGE_DK
+PLATE_EDGE = mb.mix("gragnor_rust", "gragnor_orange_dk", 0.30)
+PLATE_RIM = mb.mix("gragnor_rust", "gragnor_rust_dk", 0.55)
 EYE = "glow_eye"
-WEAK = "glow_weak"
-WEAK_HOT = "#d9fdff"
+WEAK, WEAK_HOT, WEAK_DEEP = parts.WEAK, parts.WEAK_HOT, parts.WEAK_DEEP    # violet-white: see parts.py
+EMBER = "glow_ember"
 SOCKET = mb.mix("maw_dk", "#1b1d24", 0.4)
+VENT = mb.mix("gragnor_rust_dk", "maw_dk", 0.45)      # the slits on the back: dark, but not two black eyes
 
 HEIGHT = {1: 4.5, 2: 32.0, 3: 115.0}
 
@@ -90,14 +94,14 @@ STAGES = {
                   snout_h=0.27, brow_y=0.42, snout_y=0.56, jaw_w=1.04, jaw_h=0.23, underbite=0.04,
                   snarl=5.5, tusk=0.14, teeth_up=4, teeth_lo=3, tooth=0.055, eye=0.25, eye_slant=8,
                   pupil=True, brow=0.05, crown=[(0.30, 0.12, 62), (0.12, 0.10, 80)], cheek_spikes=0,
-                  chin_spikes=0, nose_horn=0.0, snout_scutes=1, cam_up=0.068),
+                  chin_spikes=0, snout_scutes=3, scute_from=0.07, cam_up=0.10),
         tail=[(0, 0.13, 0.305), (0, 0.25, 0.25), (0, 0.365, 0.195), (0, 0.47, 0.145), (0, 0.565, 0.11),
               (0, 0.65, 0.095)],
         tail_w=[0.29, 0.24, 0.185, 0.13, 0.085, 0.035],
         spines=[(0.45, 0.055), (0.66, 0.08), (0.86, 0.085), (1.04, 0.06)], spine_w=1.0, side_spines=0.0,
         tail_spines=[0.05, 0.04, 0.0, 0.0, 0.0], tail_club=0,
         stripes=dict(torso=True, tail=True, limb=True), stripe_color=mb.mix("gragnor_rust", "gragnor_orange", 0.35),
-        weak=dict(t=0.42, r=0.058), armor=False, scars=False, elbow_spike=0.0, knee_spike=0.0,
+        weak=dict(t=0.42, r=0.058, back=0.72), armor=False, scars=False, elbow_spike=0.0, knee_spike=0.0,
     ),
     # ---------------------------------------------------------------- 2: juvenile
     2: dict(
@@ -109,7 +113,7 @@ STAGES = {
         spine=[(0, 0.04, 0.43), (0, 0.02, 0.525), (0, -0.005, 0.62), (0, -0.04, 0.715), (0, -0.085, 0.795)],
         torso=[(0.25, 0.21), (0.29, 0.245), (0.37, 0.29), (0.43, 0.31), (0.29, 0.23)],
         hump=0.7,
-        shoulder=(0.23, -0.075, 0.745), elbow=(0.315, -0.02, 0.55), wrist=(0.295, -0.195, 0.385),
+        shoulder=(0.23, -0.075, 0.745), elbow=(0.28, -0.02, 0.55), wrist=(0.26, -0.195, 0.385),
         arm=(0.145, 0.105), forearm=(0.125, 0.105), fore_bulge=0.45, hand=0.105, hand_drop=20,
         finger=0.07, hand_claw=0.095,
         neck=(0, -0.10, 0.73), neck_size=(0.22, 0.20),
@@ -117,7 +121,7 @@ STAGES = {
                   snout_h=0.22, brow_y=0.33, snout_y=0.46, jaw_w=1.10, jaw_h=0.28, underbite=0.06,
                   snarl=7, tusk=0.28, teeth_up=4, teeth_lo=3, tooth=0.085, eye=0.18, eye_slant=22,
                   pupil=False, brow=0.07, crown=[(0.30, 0.30, 50), (0.17, 0.24, 66), (0.0, 0.20, 78)],
-                  cheek_spikes=0, chin_spikes=0, nose_horn=0.0, snout_scutes=2),
+                  cheek_spikes=0, chin_spikes=0, snout_scutes=3, cam_up=0.12),
         tail=[(0, 0.11, 0.375), (0, 0.235, 0.32), (0, 0.36, 0.255), (0, 0.48, 0.19), (0, 0.595, 0.135),
               (0, 0.70, 0.105)],
         tail_w=[0.26, 0.225, 0.18, 0.135, 0.09, 0.035],
@@ -125,19 +129,21 @@ STAGES = {
         spine_w=1.1, side_spines=0.0,
         tail_spines=[0.085, 0.07, 0.055, 0.04, 0.0], tail_club=0,
         stripes=dict(torso=True, tail=True, limb=True), stripe_color=STRIPE,
-        weak=dict(t=0.50, r=0.048), armor=False, scars=False, elbow_spike=0.05, knee_spike=0.0,
+        weak=dict(t=0.50, r=0.048, back=0.70), armor=False, scars=False, elbow_spike=0.05, knee_spike=0.0,
     ),
     # ---------------------------------------------------------------- 3: titan
     3: dict(
         sides=8,
-        hip=(0.125, 0.05, 0.385), knee=(0.20, -0.08, 0.235), ankle=(0.205, 0.045, 0.08),
-        thigh=(0.215, 0.25), knee_size=0.15, shin_end=0.12, foot_w=0.185, toe_y=-0.09, heel_y=0.115,
-        toe_len=0.065, toe_claw=0.07, heel_spur=0.05,
-        pelvis=(0, 0.045, 0.39), hip_size=(0.37, 0.235), hip_len=0.10,
+        # the legs and the trunk stay inside the 26 m body radius the simulation gives the titan
+        # (DESIGN.md section 2); arms, tail and spines may overhang it
+        hip=(0.10, 0.05, 0.385), knee=(0.148, -0.08, 0.235), ankle=(0.14, 0.045, 0.08),
+        thigh=(0.20, 0.25), knee_size=0.15, shin_end=0.12, foot_w=0.145, toe_y=-0.078, heel_y=0.115,
+        toe_len=0.058, toe_claw=0.064, toe_splay=0.24, heel_spur=0.05,
+        pelvis=(0, 0.045, 0.39), hip_size=(0.33, 0.235), hip_len=0.10,
         spine=[(0, 0.04, 0.43), (0, 0.02, 0.52), (0, -0.005, 0.61), (0, -0.045, 0.70), (0, -0.095, 0.775)],
-        torso=[(0.31, 0.26), (0.36, 0.30), (0.46, 0.345), (0.53, 0.36), (0.34, 0.26)],
+        torso=[(0.265, 0.26), (0.305, 0.30), (0.39, 0.345), (0.45, 0.36), (0.29, 0.26)],
         hump=1.0,
-        shoulder=(0.285, -0.08, 0.73), elbow=(0.39, -0.015, 0.54), wrist=(0.365, -0.205, 0.375),
+        shoulder=(0.245, -0.08, 0.73), elbow=(0.33, -0.015, 0.54), wrist=(0.305, -0.205, 0.375),
         arm=(0.185, 0.13), forearm=(0.155, 0.13), fore_bulge=0.45, hand=0.125, hand_drop=20,
         finger=0.08, hand_claw=0.11,
         neck=(0, -0.11, 0.71), neck_size=(0.25, 0.22),
@@ -146,17 +152,19 @@ STAGES = {
                   snarl=7.5, tusk=0.36, teeth_up=5, teeth_lo=4, tooth=0.09, eye=0.16, eye_slant=26,
                   pupil=False, brow=0.085,
                   crown=[(0.36, 0.44, 24), (0.33, 0.52, 46), (0.21, 0.46, 64), (0.0, 0.40, 76)],
-                  cheek_spikes=3, chin_spikes=2, nose_horn=0.15, snout_scutes=3),
+                  cheek_spikes=3, chin_spikes=2, snout_scutes=3, cam_up=0.12),
         tail=[(0, 0.115, 0.375), (0, 0.25, 0.32), (0, 0.385, 0.255), (0, 0.515, 0.19), (0, 0.64, 0.135),
               (0, 0.76, 0.105)],
         tail_w=[0.30, 0.26, 0.21, 0.16, 0.115, 0.06],
         spines=[(0.16, 0.10), (0.32, 0.14), (0.48, 0.19), (0.64, 0.235), (0.80, 0.245), (0.95, 0.225),
                 (1.08, 0.16)],
         spine_w=1.15, side_spines=0.55,
-        tail_spines=[0.12, 0.10, 0.085, 0.065, 0.05], tail_club=4,
-        stripes=dict(torso=True, tail=True, limb=True), stripe_color=STRIPE,
-        weak=dict(t=0.50, r=0.046), armor=True, scars=True, elbow_spike=0.09, knee_spike=0.065,
-        broken_spine=2,
+        # no tail mace: "tail club" is a mutation the kaiju drafts, and a mutation must be readable
+        # on the body. When mutations arrive, build the mace as its own node under tail_5.
+        tail_spines=[0.12, 0.10, 0.085, 0.065, 0.05], tail_club=0,
+        stripes=dict(torso=2, tail=True, limb=True), stripe_color=STRIPE,      # torso: a band at every 2nd ring
+        weak=dict(t=0.50, r=0.046, back=0.72), armor=True, scars=True, elbow_spike=0.09, knee_spike=0.065,
+        broken_spine=2, embers=True,
     ),
 }
 
@@ -240,8 +248,8 @@ def build(stage: int) -> Rig:
     nb = (len(sp) - 1) * 2
     parts.bands(g, sp[0], sp[-1], nb, [None, mb.mix(CREAM, CREAM_DK, 0.55)],
                 where=lambda c, nr: nr.dot(front) > 0.84)
-    if p.stripes["torso"]:                      # a zigzag band at every ring, from belly edge to belly edge
-        for k in range(1, len(sp) - 1):
+    if p.stripes["torso"]:        # zigzag bands from belly edge to belly edge: at every ring, or every 2nd
+        for k in range(1, len(sp) - 1, int(p.stripes["torso"])):
             tan = (sp[k + 1] - sp[k - 1])
             parts.zigzag(g, sp[k], tan, stripe, where=lambda c, nr: nr.dot(front) < 0.6)
     torso_g = g
@@ -256,7 +264,7 @@ def build(stage: int) -> Rig:
         dors = _dorsal(top_tan)
         crest = top_pt + dors * (td_ * 0.26) + V((0, 0, 0.035 + 0.035 * k))
         fb, ht = td_ * (0.52 + 0.06 * k), 0.10 + 0.05 * k          # front-to-back, height
-        ends = [Vector((sx * sh.x * 0.84, sh.y + 0.03, sh.z + 0.005)) for sx in (-1, 1)]
+        ends = [Vector((sx * sh.x * 0.79, sh.y + 0.03, sh.z + 0.005)) for sx in (-1, 1)]
         mids = [Vector((sx * sh.x * 0.42, crest.y + 0.004, crest.z - 0.022)) for sx in (-1, 1)]
         g = tube([ends[0], mids[0], crest, mids[1], ends[1]],
                  [(fb * 0.62, ht * 0.7), (fb * 0.92, ht), (fb, ht * 1.08), (fb * 0.92, ht), (fb * 0.62, ht * 0.7)],
@@ -264,38 +272,62 @@ def build(stage: int) -> Rig:
         parts.zigzag(g, crest, (1, 0, 0), stripe, where=lambda c, nr: nr.z > -0.2)
         torso_g += g
 
-    # chest organ: a dark kite-shaped pit gripped by four bone prongs; the glowing crystal
-    # that sits in it is its own node (weak_point), so the pit stays when the game hides it
+    # chest organ: a dark pit gripped by four bone prongs. The crystal that glows in it is a
+    # node of its own (weak_point), so the pit stays when the game hides the light. Pit and
+    # crystal are a triangle, point down: triangles are the kaiju's shape in the game's color
+    # language (DESIGN.md section 8); a diamond would say "volley".
     wk_c, wk_tan = _path_at(sp, p.weak["t"])
     wk_depth = _size_at(p.torso, sp, p.weak["t"])[1]
     ventral = -_dorsal(wk_tan)
     wk_surface = wk_c + ventral * (wk_depth * 0.5)
     r = p.weak["r"]
+    R = r * 1.15                 # corner radius of the crystal
 
-    def kite(g):                 # local x across the chest, y up the chest, z out of it
+    def shield(g):               # local x across the chest, y up the chest, z out of it
         for q in g.v:
-            q.x *= 0.84
-            q.y *= 1.55 if q.y < 0 else 1.05
+            q.x *= 0.92
+            q.y = q.y * (1.30 if q.y < 0 else 1.0) + r * 0.25
         return g
 
     def on_chest(g):
         return g.along(wk_surface, wk_surface + ventral, side=LEFT, stretch=False)
 
-    rim = kite(mb.lathe([(r * 1.95, -r * 1.0), (r * 1.50, r * 0.26), (r * 1.08, r * 0.10)], n=4, phase=0,
-                        color=CREAM_DK, cap_bottom=False, cap_top=True))
-    rim.paint(SOCKET, where=lambda c, nr: nr.z > 0.9 or (c.x ** 2 + c.y ** 2) ** 0.5 < r * 1.2)
+    rim = shield(mb.lathe([(R + r * 1.20, -r * 1.0), (R + r * 0.62, r * 0.26), (R + r * 0.10, r * 0.10)], n=3,
+                          phase=-90, color=CREAM_DK, cap_bottom=False, cap_top=True))
+    rim.paint(SOCKET, where=lambda c, nr: nr.z > 0.9 or nr.x * c.x + nr.y * (c.y - r * 0.25) < 0)
     for sx in (1, -1):
-        for (bx, by, tx, ty) in ((1.30, 0.80, 0.30, 0.22), (1.05, -1.45, 0.26, -0.55)):
+        for (bx, by, tx, ty) in ((1.42, 1.02, 0.42, 0.42), (0.80, -0.82, 0.16, -0.52)):
             rim += spike((sx * bx * r, by * r, -r * 0.15), (sx * tx * r, ty * r, r * 0.78), r * 0.62, r * 0.50, n=4,
                          up=(0, 0, 1), color=BONE, root=BONE_DK, root_at=0.45, closed=True)
     torso_g += on_chest(rim)
-    rig.add("torso", parts.finish(torso_g, seed=12), sp[0], "hips")
 
-    core = kite(mb.lathe([(r * 1.0, r * 0.08), (r * 0.60, r * 0.50), (0.0, r * 0.70)], n=4, phase=0, color=WEAK,
-                         mat="glow", cap_bottom=False))
-    core.paint(WEAK_HOT, where=lambda c, nr: nr.y > 0.2 and nr.x > -0.2)
-    core.paint(mb.mix(WEAK, "#1ea7c9", 0.45), where=lambda c, nr: nr.y < -0.1 and nr.x < 0.2)
-    rig.add("weak_point", on_chest(core).triangulate(), wk_surface, "torso")
+    core = shield(mb.lathe([(R, r * 0.08), (R * 0.56, r * 0.50), (0.0, r * 0.70)], n=3, phase=-90, color=WEAK,
+                           mat="glow", cap_bottom=False))
+    core.paint(WEAK_HOT, where=lambda c, nr: nr.y > 0.3)
+    core.paint(WEAK_DEEP, where=lambda c, nr: nr.y <= 0.3 and nr.x < -0.2)
+    weak_g = on_chest(core)
+
+    # The same light vents through the back, at the shoulder blades either side of the spines,
+    # so that flankers, rear attackers and drones see it too (from the front the drooping head
+    # of a staggered kaiju can hide the chest). Each shard lies on a ray from the weak point's
+    # pivot, which is on the chest: the game throbs that node's scale, and a shard on such a
+    # ray then slides along its own length, in and out of the hide, instead of floating off
+    # the back. At rest scale a fifth of it shows; at the game's 0.95 to 1.45 it pulses from a
+    # stub to the size of a dorsal spine. Where it comes out the hide has a dark socket.
+    bc, btan = _path_at(sp, p.weak["back"])
+    hide = BVHTree.FromPolygons([tuple(q) for q in torso_g.v], [tuple(f) for f in torso_g.f])
+    aim = (bc + _dorsal(btan) * 0.5 - wk_surface).normalized()
+    for sx in (1, -1):
+        ang = math.radians(p.weak.get("spread", 24))
+        d2 = (aim * math.cos(ang) + LEFT * (sx * math.sin(ang))).normalized()
+        out_pt = hide.ray_cast(wk_surface + d2 * 3.0, -d2)[0]            # where this ray leaves the back
+        ln2 = (out_pt - wk_surface).length
+        weak_g += spike(wk_surface + d2 * (ln2 * 0.62), wk_surface + d2 * (ln2 * 1.20), r * 3.0, r * 3.0, n=4,
+                        up=btan, color=WEAK_HOT, root=WEAK, root_at=0.72, phase=90)
+        torso_g += parts.scute(out_pt, d2, r * 1.6, r * 2.7, r * 0.18, along=btan, color=ORANGE_DK, top=VENT,
+                               taper=0.60, sink=4.0, closed=False)
+    rig.add("torso", parts.finish(torso_g, seed=12), sp[0], "hips")
+    rig.add("weak_point", weak_g.material("glow").triangulate(), wk_surface, "torso")
 
     # ------------------------------------------------------------------ dorsal spines
     sg = mb.Geo()
@@ -309,6 +341,8 @@ def build(stage: int) -> Rig:
         base = c + dors * (dz * 0.5 - ln * 0.22) + V((0, 0, lift))
         lean = (dors * 0.80 + tan * -0.10 + V((0, 0.10, 0.50))).normalized()
         w = ln * 0.50 * p.spine_w
+        if getattr(p, "embers", False):              # the titan's spines smoulder at the root
+            sg += _ember(base, lean, ln, w, tan)
         if i == getattr(p, "broken_spine", -1):      # snapped off: a stump with a flat, pale break
             stump = tube([base, base + lean * (ln * 0.42)], [(w * 0.78, w), (w * 0.52, w * 0.66)], n=4, up=tan,
                          phase=90, cap0="open", cap1="flat", color=BONE_DK)
@@ -347,7 +381,7 @@ def build(stage: int) -> Rig:
     if p.stripes["limb"]:
         parts.zigzag(g, sh.lerp(el, 0.3), el - sh, stripe, where=lambda c, nr: nr.dot(out) > -0.2)
     if p.armor:
-        g += _pauldron(sh, a0, stripe)
+        g += _pauldron(sh, el, a0)
     rig.add("arm_L", parts.finish(g, seed=21), sh, "torso")
 
     f0, f1 = p.forearm
@@ -360,13 +394,13 @@ def build(stage: int) -> Rig:
     if p.elbow_spike:
         g += spike(el + topd * (f0 * 0.1), el - fdir * (f0 * 0.5 + p.elbow_spike) +
                    topd * (p.elbow_spike * 0.45), f0 * 0.55, n=4, up=topd, color=BONE, root=BONE_DK, closed=True)
-    if p.armor:
-        for k, t in enumerate((0.22, 0.48, 0.72)):
+    if p.armor:                              # grown scales down the forearm, smaller toward the wrist
+        for t, k, turn in ((0.22, 1.0, -8), (0.47, 0.8, 6), (0.70, 0.62, -5)):
             c = el.lerp(wr, t)
             rad = f0 * (1.0 + p.fore_bulge * (1.0 - abs(t - 0.38) * 1.6)) * 0.5
             nrm = (topd * 0.75 + V((0.65, 0, 0))).normalized()
-            g += parts.scute(c + nrm * rad * 0.93, nrm, f0 * 0.62, f0 * 0.52, f0 * 0.16, along=fdir,
-                             color=ARMOR, top=ARMOR_LT)
+            g += parts.plate(c + nrm * rad * 0.93, nrm, f0 * 0.70 * k, f0 * 0.66 * k, f0 * 0.17 * k, along=fdir,
+                             turn=turn, root=PLATE_ROOT, edge=PLATE_EDGE, rim=PLATE_RIM)
     rig.add("forearm_L", parts.finish(g, seed=22), el, "arm_L")
     rig.add("hand_L", parts.finish(_hand(p, el, wr), seed=23), wr, "forearm_L")
 
@@ -391,10 +425,10 @@ def build(stage: int) -> Rig:
         parts.zigzag(g, kn.lerp(an, 0.3), an - kn, stripe, where=lambda c, nr: nr.x > -0.3)
     if p.armor:
         sd = (an - kn).normalized()
-        for t in (0.25, 0.6):
+        for t, k, turn in ((0.25, 1.0, 7), (0.58, 0.72, -6)):
             c = kn.lerp(an, t)
-            g += parts.scute(c + V((0, -ks * 0.47, 0)), FWD, ks * 0.62, ks * 0.55, ks * 0.14, along=sd,
-                             color=ARMOR, top=ARMOR_LT)
+            g += parts.plate(c + V((0, -ks * 0.47, 0)), FWD, ks * 0.70 * k, ks * 0.64 * k, ks * 0.15 * k, along=sd,
+                             turn=turn, root=PLATE_ROOT, edge=PLATE_EDGE, rim=PLATE_RIM)
     rig.add("shin_L", parts.finish(g, seed=32), kn, "leg_L")
     rig.add("foot_L", parts.finish(_foot(p, an), seed=33), an, "shin_L")
 
@@ -422,8 +456,11 @@ def build(stage: int) -> Rig:
                 wd = w0 + (w1 - w0) * t
                 k = 1.0 - 0.25 * t
                 base = c + up_t * (wd * 0.5 - ln * 0.15)
-                g += spike(base, base + (up_t * 0.9 + tan * 0.42).normalized() * (ln * k), ln * 0.5 * k * 0.8,
-                           ln * 0.5 * k, n=4, up=tan, color=BONE, root=BONE_DK, phase=90)
+                lean = (up_t * 0.9 + tan * 0.42).normalized()
+                g += spike(base, base + lean * (ln * k), ln * 0.5 * k * 0.8, ln * 0.5 * k, n=4, up=tan, color=BONE,
+                           root=BONE_DK, phase=90)
+                if getattr(p, "embers", False):
+                    g += _ember(base, lean, ln * k, ln * 0.5 * k, tan)
         if last and p.tail_club:
             for k in range(p.tail_club):
                 ang = math.radians(45 + 90 * k)
@@ -472,21 +509,37 @@ def _head(rig: Rig, p: P, stripe) -> None:
         lf.ring(-0.04, [(lip + 0.02, sw * 0.70), (0.0, sw * 0.86), (sh_ * 0.52, sw * 0.82), (sh_ * 0.90, sw * 0.46)]),
         lf.ring(0.12, [(lip, sw * 0.84), (0.0, sw), (sh_ * 0.52, sw * 0.95), (sh_, sw * 0.56)]),
         lf.ring(y2, [(lip, sw * 0.82), (0.0, sw * 0.93), (sh_ * 0.50, sw * 0.90), (sh_ * 0.98, sw * 0.60)]),
-        lf.ring(y3, [(lip, nw * 0.94), (-0.03, nw), (nh * 0.50, nw * 0.92), (nh, nw * 0.58)]),
-        lf.ring(ym, [(lip, nw * 0.88), (-0.03, nw * 0.94), (nh * 0.48, nw * 0.86), (nh, nw * 0.56)]),
-        lf.ring(0.80, [(lip + 0.01, nw * 0.80), (-0.03, nw * 0.86), (nh * 0.45, nw * 0.78), (nh, nw * 0.53)]),
-        lf.ring(0.91, [(lip + 0.03, nw * 0.62), (-0.03, nw * 0.68), (nh * 0.30, nw * 0.60), (nh * 0.70, nw * 0.40)]),
     ]
+    # The snout is the bottom of the player's view all game long, so it must not be a table:
+    # its top narrows toward the nose between two broad bevels, the tip drops away, a keeled
+    # ridge runs down the middle, and two of Gragnor's rust bands cross it.
+    key = [
+        (y3, [(lip, nw * 0.94), (-0.03, nw), (nh * 0.50, nw * 0.92), (nh, nw * 0.58)]),
+        (ym, [(lip, nw * 0.88), (-0.03, nw * 0.94), (nh * 0.48, nw * 0.86), (nh, nw * 0.50)]),
+        (0.80, [(lip + 0.01, nw * 0.80), (-0.03, nw * 0.86), (nh * 0.45, nw * 0.78), (nh * 0.96, nw * 0.40)]),
+        (0.91, [(lip + 0.03, nw * 0.62), (-0.03, nw * 0.68), (nh * 0.30, nw * 0.60), (nh * 0.55, nw * 0.28)]),
+    ]
+
+    def snout(y):                # the cross-section at y, between the key sections
+        for (y0, l0), (y1, l1) in zip(key, key[1:]):
+            if y <= y1 + 1e-9:
+                k = (y - y0) / (y1 - y0)
+                return [(z0 + (z1 - z0) * k, w0 + (w1 - w0) * k) for (z0, w0), (z1, w1) in zip(l0, l1)]
+        return key[-1][1]
+
+    ys = [y3 + (0.91 - y3) * t for t in (0.0, 0.27, 0.43, 0.63, 0.78, 1.0)]
+    rings += [lf.ring(y, snout(y)) for y in ys]
     g = mb.loft(rings, color=ORANGE, cap_start=True, cap_end=True)
+    ahead = lambda c: (c - lf.p(0, 0, 0)).dot(fwd_h) / L          # noqa: E731  how far forward, in head lengths
     g.paint(MAW, where=lambda c, nr: nr.dot(up_h) < -0.9)                 # palate: inside of the mouth
     g.paint(ORANGE_DK, where=lambda c, nr: nr.dot(fwd_h) > 0.9)           # nose pad
     top = lambda c, nr: nr.dot(up_h) > 0.55  # noqa: E731
     parts.bands(g, lf.p(0, -0.04, 0), lf.p(0, y2, 0), 2, [stripe, None], where=top)
-    parts.bands(g, lf.p(0, y3, 0), lf.p(0, 0.91, 0), 3, [None, stripe, None],
-                where=lambda c, nr: 0.15 < nr.dot(up_h) < 0.9)
-    g.paint(ORANGE_LT, where=lambda c, nr: nr.dot(up_h) > 0.9 and (c - lf.p(0, y3, 0)).dot(fwd_h) > 0)
-    g.paint(ORANGE_LT, where=lambda c, nr: abs(nr.dot(LEFT)) > 0.55 and (c - lf.p(0, y3, 0)).dot(fwd_h) > 0
+    g.paint(ORANGE_LT, where=lambda c, nr: nr.dot(up_h) > 0.9 and ahead(c) > y3)
+    g.paint(ORANGE_LT, where=lambda c, nr: abs(nr.dot(LEFT)) > 0.55 and ahead(c) > y3
             and nr.dot(up_h) < 0.2 and nr.dot(up_h) > -0.5)
+    for y0, y1 in ((ys[1], ys[2]), (ys[3], ys[4])):      # the rust bands: over the top and both bevels
+        g.paint(stripe, where=lambda c, nr, y0=y0, y1=y1: nr.dot(up_h) > 0.3 and y0 < ahead(c) < y1)
 
     # ---- eyes and brows sit on the facet that drops from the skull to the snout
     es = hd["eye"] * L
@@ -509,8 +562,10 @@ def _head(rig: Rig, p: P, stripe) -> None:
             g += pu.along(c + nrm * (es * 0.13), c + nrm * (es * 0.235), side=axis)
         # brow ridge: a wedge from the outer corner of the skull down to the middle of the
         # stop, so the two together make an angry V over the eyes
+        # (the inner ends stop short of the middle and behind the camera: nothing of the brow
+        # may come within 0.03 body heights of cam_fp, or the game's near plane slices it)
         b0 = lf.p(sx * sw * 0.40, y2 - 0.015, sh_ * 0.86)
-        b1 = lf.p(sx * nw * 0.10, y3 + 0.03, nh + 0.02)
+        b1 = lf.p(sx * nw * 0.215, y3 - 0.02, nh + 0.012)
         g += mb.beam(b0, b1, (bt * 1.7, bt * 1.25), (bt * 1.05, bt * 0.7), color=RUST, side=lf.d(sx * 0.45, 0.9, 0.0))
     # ---- nostrils: two bumps on the nose, dark on the front
     for sx in (1, -1):
@@ -518,18 +573,22 @@ def _head(rig: Rig, p: P, stripe) -> None:
                             color=ORANGE_DK)
         nb.paint(MAW_DK, where="front")
         g += nb.rx(hd["pitch"]).move(lf.p(sx * min(nw * 0.165, 0.092), 0.805, nh * 0.93))
-    # ---- scutes down the bridge of the snout (this is what the player looks at all game)
+    # ---- a keeled ridge down the bridge of the snout: three plates, smaller toward the nose.
+    # The first starts well ahead of the camera (scute_from, head lengths) so the game's near
+    # plane never cuts it. No nose horn: it would stand on the player's crosshair.
     ns = hd["snout_scutes"]
+    cam_y = y3 + 0.01
+    y0 = cam_y + hd.get("scute_from", 0.12)
+    span = 0.795 - y0
+    lens = [0.42, 0.34, 0.27][:ns]
+    at = y0
     for i in range(ns):
-        y = y3 + 0.075 + (0.74 - y3 - 0.075) * (i / max(ns - 1, 1) if ns > 1 else 0.35)
-        k = 1.0 - 0.22 * i
-        g += parts.scute(lf.p(0, y, nh * 0.97), up_h, 0.15 * L * k * (nw / 0.5), 0.11 * L * k, 0.035 * L, along=fwd_h,
-                         color=RUST, top=RUST, taper=0.5)
-    if hd["nose_horn"]:
-        hn = hd["nose_horn"] * L
-        base = lf.p(0, 0.80, nh * 0.86)
-        g += spike(base, base + lf.d(0, 0.30, 1) * hn, hn * 0.60, hn * 0.80, n=4, up=fwd_h, color=BONE,
-                   root=BONE_DK, phase=90)
+        ln = span * lens[i] / sum(lens)
+        k = 1.0 - 0.20 * i
+        zc = snout(at + ln / 2)[3][0]
+        g += parts.scute(lf.p(0, at + ln / 2, zc - 0.004), up_h, 0.20 * L * k * (nw / 0.64), ln * L * 1.12, 0.05 * L * k,
+                         along=fwd_h, color=RUST, top=STRIPE, taper=(0.14, 0.62), closed=False)
+        at += ln
     # ---- upper teeth along the lip
     tl = hd["tooth"] * L
     down = lf.d(0, 0, -1)
@@ -588,10 +647,7 @@ def _head(rig: Rig, p: P, stripe) -> None:
         tb = lf.p(sx * nw * 0.325 * jw, jx - 0.085, top_z - 0.03)
         tt = lf.p(sx * nw * 0.37 * jw, jx - 0.05, top_z + tk)
         if p.scars and sx == -1:          # the titan's right tusk snapped off in some old fight
-            stump = tube([tb, tb.lerp(tt, 0.46)], [tk * 0.36 * L, tk * 0.30 * L], n=4, up=fwd_h, cap0="flat",
-                         cap1="flat", color=BONE_DK)
-            stump.paint(BONE, where=[len(stump.f) - 1])
-            j += stump
+            j += _snapped_tusk(tb, tt, tk * L, fwd_h, lf.d(-1, 0, 0))
         else:
             j += claw(tb, tt, tk * 0.36 * L, lf.d(sx * 0.4, -1, 0), n=4, color=BONE, up=fwd_h, bend=0.16,
                       root=BONE_DK)
@@ -612,8 +668,11 @@ def _head(rig: Rig, p: P, stripe) -> None:
     j.rot(LEFT, -hd["snarl"], about=hinge_m)
     rig.add("jaw", parts.finish(j, seed=16), hinge_m, "head")
 
-    # ---- anchors: the camera sits just above the stop of the snout, between the eyes
-    rig.empty("cam_fp", lf.p(0, y3 + 0.01, nh + hd.get("cam_up", 0.06)), "head")
+    # ---- anchors: the camera sits between the eyes, just ahead of the stop and well above the
+    # snout (cam_up, head lengths). The game clips at 0.02 body heights and keeps the camera
+    # level while the head pitches up to 60 degrees (roar, beam): the snout top must then
+    # still be farther than that, which takes cam_up of at least 0.09 at these head sizes.
+    rig.empty("cam_fp", lf.p(0, cam_y, nh + hd.get("cam_up", 0.12)), "head")
     rig.empty("mouth", lf.p(0, 0.93, lip - 0.06), "head")
 
 
@@ -684,7 +743,7 @@ def _foot(p: P, an: Vector) -> mb.Geo:
     tl, cl = p.toe_len, p.toe_claw
     tw = fw * 0.42
     for k in (-1, 0, 1):
-        d = V((k * 0.30, -1, 0)).normalized()
+        d = V((k * getattr(p, "toe_splay", 0.30), -1, 0)).normalized()
         base = V((x * 1.04 + k * fw * 0.34, y_toe + 0.012, hz * 0.31))
         end = base + d * tl + V((0, 0, -hz * 0.06))
         g += tube([base, end], [(tw, hz * 0.62), (tw * 0.88, hz * 0.50)], n=4, up=UP, cap0="flat", cap1="flat",
@@ -701,31 +760,62 @@ def _foot(p: P, an: Vector) -> mb.Geo:
 # =========================================================================================
 # titan extras: armor and scars
 # =========================================================================================
-def _pauldron(sh: Vector, a0: float, stripe) -> mb.Geo:
-    """Layered shoulder plates with a spike: the titan's armor."""
-    g = mb.Geo()
+def _pauldron(sh: Vector, el: Vector, a0: float) -> mb.Geo:
+    """The titan's shoulder: one grown plate, keeled down the arm, with a bone spike."""
     out = V((0.80, 0.05, 0.60)).normalized()
-    for k, (t, s) in enumerate(((0.0, 1.0), (0.42, 0.78))):
-        c = sh + out * (a0 * 0.44) + V((0.012 * k, 0, -a0 * t * 0.8))
-        g += parts.scute(c, (out + V((0.25 * k, 0, -0.3 * k))).normalized(), a0 * 0.95 * s, a0 * 1.0 * s, a0 * 0.20,
-                         along=FWD, color=ARMOR, top=ARMOR_LT, taper=0.6, closed=True)
+    g = parts.plate(sh + out * (a0 * 0.44), out, a0 * 0.86, a0 * 0.90, a0 * 0.13, along=el - sh, turn=-7,
+                    root=PLATE_ROOT, edge=PLATE_EDGE, rim=PLATE_RIM, sink=1.4, closed=True)
     g += spike(sh + out * (a0 * 0.50), sh + out * (a0 * 0.50) + (out * 0.9 + V((0.25, 0.1, 0.3))).normalized() * (a0 * 0.62),
                a0 * 0.34, n=4, up=FWD, color=BONE, root=BONE_DK, closed=True)
     return g
 
 
 def _back_armor(rig: Rig, p: P, sp) -> None:
-    """Rows of dark scutes down the titan's back, either side of the spines."""
+    """Three pairs of grown scales down the titan's back, either side of the spines, pointing
+    at the tail and smaller toward the hips."""
     g = mb.Geo()
-    for t in (0.20, 0.36, 0.52, 0.68, 0.84):
+    for t, k, turn in ((0.84, 1.0, 6), (0.52, 0.85, -7), (0.20, 0.70, 5)):
         c, tan = _path_at(sp, t)
         w, d = _size_at(p.torso, sp, t)
         dors = _dorsal(tan)
         for sx in (-1, 1):
             nrm = (dors * 0.80 + V((sx * 0.60, 0, 0))).normalized()
             pos = c + dors * (d * 0.385) + V((sx * w * 0.335, 0, 0))
-            g += parts.scute(pos, nrm, w * 0.20, w * 0.17, w * 0.045, along=tan, color=ARMOR, top=ARMOR_LT)
+            g += parts.plate(pos, nrm, w * 0.24 * k, w * 0.21 * k, w * 0.05 * k, along=-tan, turn=turn * sx,
+                             root=PLATE_ROOT, edge=PLATE_EDGE, rim=PLATE_RIM)
     rig.more("torso", parts.finish(g, seed=51))
+
+
+def _ember(base: Vector, lean: Vector, ln: float, w: float, tan: Vector) -> mb.Geo:
+    """Heat in the seam around the root of a spine: an open cone of ember light that is wider
+    than the spine where it leaves the hide and is swallowed by it a little higher up.
+    6 triangles of glow; on the dorsal spines they sit in the `spines` node, so the game can
+    pulse them (rage, beam charge) and the titan carries its own orange at night."""
+    g = tube([base], [(w * 0.78 * 1.45, w * 1.45)], n=4, up=tan, phase=90, cap0="flat", tip=base + lean * (ln * 0.50),
+             color=EMBER)
+    return g.material("glow")
+
+
+def _snapped_tusk(tb: Vector, tt: Vector, size: float, fwd: Vector, outward: Vector) -> mb.Geo:
+    """The stump of a tusk that broke off at a slant, with two splinters left standing on
+    the high side of the break."""
+    end = tb.lerp(tt, 0.42)
+    axis = (tt - tb).normalized()
+    w0, w1 = size * 0.36, size * 0.30
+    g = tube([tb, end], [w0, w1], n=4, up=fwd, cap0="flat", cap1="flat", color=BONE_DK)
+    tilt = (V(outward) - axis * V(outward).dot(axis)).normalized()      # the high side of the break
+    slope = math.tan(math.radians(35))
+    half = (end - tb).length * 0.5
+    for i, q in enumerate(g.v):
+        if (q - tb).dot(axis) > half:
+            g.v[i] = q + axis * ((q - end).dot(tilt) * slope)
+    g.paint(BONE, where=[len(g.f) - 1])
+    across = axis.cross(tilt).normalized()
+    for dx, ln in ((-0.24, 0.62), (0.20, 0.40)):
+        b = end + tilt * (w1 * 0.26) + across * (dx * w1)
+        b = b + axis * ((b - end).dot(tilt) * slope - w1 * 0.06)
+        g += spike(b, b + (axis + tilt * 0.22 + across * dx).normalized() * (ln * w1), w1 * 0.30, n=3, up=fwd, color=BONE)
+    return g
 
 
 def _scars(rig: Rig, p: P, sp) -> None:

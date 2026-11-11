@@ -233,15 +233,16 @@ describe('a full coordinated volley', () => {
     expect(world.match.breaks).toBe(1);
     expect(world.players[breaks[0].by].tally.breaks).toBe(1);
 
-    // Rockets that arrive after the break hit the weak point: full damage instead of 12%.
+    // Rockets that arrive after the break hit the weak point: the helpless multiplier instead of 12%.
     const after = eventsOf(script.events.slice(script.events.indexOf(breaks[0])), 'kaijuHit');
     expect(after.length).toBeGreaterThan(0);
     expect(after.every((h) => h.nerve === 0)).toBe(true);
     for (const h of after) expect([ROCKETS.damage, 2 * ROCKETS.damage].some((d) => Math.abs(h.damage - d * P.helplessMult) < 1e-9)).toBe(true);
     const result = tally(script.events);
     expect(result.damage).toBeGreaterThan(4 * single.damage * 1.5);
-    // The single squad, for comparison, did not come close to breaking it.
-    expect(single.nerve).toBeLessThan(LIZARD.nerveCapacity * 0.5);
+    // The single squad, for comparison, did not come close to breaking it (a little over half
+    // the capacity since the nerve retune, docs/BALANCE.md; it takes two).
+    expect(single.nerve).toBeLessThan(LIZARD.nerveCapacity * 0.6);
   });
 });
 

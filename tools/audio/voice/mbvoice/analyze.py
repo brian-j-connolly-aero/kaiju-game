@@ -65,6 +65,21 @@ def measure_line(job: tuple[dict, dict, dict]) -> dict:
         m["hyp"] = hyp
         m["errors"] = e
         out[ext] = m
+        if plan["chain"] == "radio" and ext == "ogg":
+            # squelch and static against the speech they frame (levels over 10 ms)
+            a, b = int(rec["speech"][0] * SR), int(rec["speech"][1] * SR)
+            env = dsp.envelope_db(x, SR, 10.0)
+            loud = float(np.percentile(env[a:b], 90))
+            speech_peak = float(np.max(np.abs(x[a:b]))) + 1e-12
+            out["squelch"] = {
+                "open_click_db": round(dsp.db(np.max(np.abs(x[:a])) / speech_peak), 1),
+                "close_click_db": round(dsp.db(np.max(np.abs(x[b:])) / speech_peak), 1),
+                "open_burst_db": round(float(env[:a].max()) - loud, 1),
+                "close_burst_db": round(float(env[b:].max()) - loud, 1),
+                "static_db": round(float(np.median(env[max(0, a - 1300):a - 200])) - loud, 1),
+            }
+            if out["squelch"]["open_click_db"] > -3.0 or out["squelch"]["close_click_db"] > -3.0:
+                fail.append(f"{i}: a squelch click is as loud as the speech peaks ({out['squelch']})")
         want_ch = 2 if plan["chain"] == "hall" else 1
         if ch != want_ch:
             fail.append(f"{i}.{ext}: {ch} channels, expected {want_ch}")
@@ -112,7 +127,8 @@ def verify(lines: list[dict], cast: dict, state: dict, plans: dict, jobs: int = 
             results[l["id"]] = {"id": l["id"], "speaker": l["speaker"], "failures": [f"{l['id']} was never built"]}
             continue
         c = cached.get(l["id"])
-        if c and c.get("hash") == rec["hash"] and "ogg" in c and "mp3" in c and not c["failures"]:
+        fresh = c and c.get("hash") == rec["hash"] and "ogg" in c and "mp3" in c and not c["failures"]
+        if fresh and (c.get("chain") != "radio" or "squelch" in c):
             results[l["id"]] = c
         else:
             todo.append((l, rec, plans[l["id"]]))
@@ -284,5 +300,5 @@ def draw_sheets(lines: list[dict], cast: dict, plans: dict, state: dict) -> None
                 yy = y + h_wave + h_spec - int(h_spec * khz / 8.0)
                 d.text((pad, min(yy - 5, y + h_wave + h_spec - 10)), f"{khz} kHz", fill=(150, 155, 170))
             y += h_wave + h_spec + pad
-        sheet.save(target, optimize=True)
+        sheet.quantize(colors=160, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).save(target, optimize=True)
     stamp_file.write_text(json.dumps(fingerprint, indent=1) + "\n")
