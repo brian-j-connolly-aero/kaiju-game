@@ -32,10 +32,14 @@ CHORALE_T = "D4:4 | C4:4 | C4:4 | C4:4 | A3:4 | D4:4 | C#4:4 | E4:4"
 # harmony of those bars per half bar, for the string motor: (bass, upper voices)
 HARM_C = [
     ("D3", "D4 F4 A4"), ("D3", "D4 F4 A4"), ("F3", "C4 F4 A4"), ("F3", "C4 A4 C5"),
-    ("E3", "C4 G4 C5"), ("E3", "C4 G4 D5"), ("C3", "C4 G4 E5"), ("C3", "C4 C5 E5"),
+    ("E3", "C4 G4 C5"), ("E3", "C4 G4 C5"), ("C3", "C4 G4 E5"), ("C3", "C4 C5 E5"),
     ("F3", "A3 C5 F5"), ("F3", "A3 C5 F5"), ("Bb3", "D4 Bb4 F5"), ("Bb3", "D4 Bb4 D5"),
     ("A3", "C#4 A4 E5"), ("G3", "C#4 A4 E5"), ("E3", "E4 A4 E5"), ("E3", "E4 G4 C#5"),
 ]
+# low-brass and men's-shout dyads for those bars: the bass note plus a chord tone that is
+# clean above it (these chords are not all in root position, so "root and fifth" would be wrong)
+DYADS_C = ["D3 A3", "D3 A3", "F3 C4", "F3 C4", "E3 C4", "E3 C4", "C3 G3", "C3 G3",
+           "F3 C4", "F3 C4", "Bb2 F3", "Bb2 F3", "A2 E3", "G3 E4", "E3 C#4", "E3 C#4"]
 BELLS_A = {1: "D5", 3: "D5", 5: "D5", 7: "Bb4", 8: "D5"}
 BELLS_C = {17: "D5", 19: "C5", 21: "F5", 23: "A4"}
 BELLS_Z = {25: "D5", 26: "C5", 27: "D5", 28: "A4", 29: "D5", 30: "C5", 31: "Eb5", 32: "D5"}
@@ -210,8 +214,11 @@ def build() -> Cue:
     for first, harm, v in ((1, HARM_A, 104), (13, HARM_B[8:], 100), (17, HARM_C, 106), (25, HARM_A, 114)):
         roots = bass(harm)
         for i, r in enumerate(roots):
-            fifth = r + 6 if (harm is HARM_A and i == 13) else r + 7       # A7 flat 5: no clean fifth
-            chord = [r, r + 10] if (harm is HARM_A and i == 13) else [r, fifth]
+            chord = [r, r + 7]
+            if harm is HARM_A and i == 13:                       # A7 flat 5: root and seventh
+                chord = [r, r + 10]
+            if harm is HARM_C:
+                chord = [P(n) for n in DYADS_C[i].split()]
             for pos in (0, 1.5) if i % 2 == 0 else (1.0,):
                 stab(tbs, B(first) + i * 2 + pos, chord, v + (6 if pos == 0 and i % 2 == 0 else 0), 0.4)
     for first, v in ((1, 100), (25, 110)):
@@ -242,7 +249,8 @@ def build() -> Cue:
         for i in bars:
             hb = 2 * i
             root = bass(harm)[hb]
+            low = [P(n) for n in DYADS_C[hb].split()] if harm is HARM_C else [root, root + 7]
             for beat in beats:
                 stab(wh, B(first + i, beat), voices(harm, (0, 1, 2))[hb], v - (0 if beat == 1 else 8), 0.6)
-                stab(mh, B(first + i, beat), [root, root + 7], v - (0 if beat == 1 else 8), 0.6)
+                stab(mh, B(first + i, beat), low, v - (0 if beat == 1 else 8), 0.6)
     return cue

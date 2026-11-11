@@ -8,6 +8,7 @@ export * from './movement';
 export * from './aim';
 export * from './bar';
 export * from './spawn';
+export * from './spotting';
 export * from './pipeline';
 export * from './createWorld';
 export { applyInput, inputSystem } from './systems/inputs';

@@ -55,6 +55,8 @@ def _mix_stem(cue: Cue, stem: Stem, levels: dict) -> np.ndarray:
         x = x.astype(np.float64) * 10 ** ((part.inst.trim + part.gain) / 20)
         x = dsp.highpass(x, part.hp)
         x = dsp.lowpass(x, part.lp)
+        if part.inst.air and not part.lp:
+            x = dsp.shelf(x, 6000.0, part.inst.air, "high")
         x = dsp.place(x, part.pan, part.width)
         dry += x
         send += x * part.rev
@@ -66,9 +68,10 @@ def _mix_stem(cue: Cue, stem: Stem, levels: dict) -> np.ndarray:
     wet = dsp.highpass(dsp.reverb(send), WET_HP)
     mix = wet
     mix[:n] += dry
-    # master tone: rumble filter, a small cut where sampled orchestras pile up, a little air
+    # master tone: rumble filter, a small cut where the sampled choir, horns and strings pile
+    # up (the 350-700 Hz octave), a little air
     mix = dsp.highpass(mix, 30.0)
-    mix = dsp.peak_eq(mix, 300.0, -1.5, 0.8)
+    mix = dsp.peak_eq(mix, 450.0, -2.0, 0.8)
     mix = dsp.shelf(mix, 7000.0, 2.0, "high")
     return mix
 

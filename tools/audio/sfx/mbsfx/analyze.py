@@ -84,6 +84,7 @@ def measure(x: np.ndarray, spec: Spec) -> dict:
         out["level_swing_db"] = round(dsp.db(e.max()) - dsp.db(max(e.min(), 1e-9)), 1)
         return out
     out["level_db"] = round(dsp.level_short(x), 2)
+    out["level_small_db"] = round(dsp.level_short(dsp.hp(x, 180.0, 4)), 2)     # what a laptop speaker keeps
     out.update(spectrum_stats(x))
     e = envelope(m)
     out["peak_at_ms"] = round(float(np.argmax(e)) / SR * 1000, 1)
@@ -201,7 +202,8 @@ def _dash_v(d: ImageDraw.ImageDraw, x: int, y0: int, y1: int, fill) -> None:
 
 def draw_panel(img: Image.Image, d: ImageDraw.ImageDraw, x0: int, y0: int, w: int, h: int, m: np.ndarray,
                title: str, sub: str, marks: list[tuple[float, str]] | None = None,
-               axis_labels: bool = True, ticks: list[tuple[float, str]] | None = None) -> None:
+               axis_labels: bool = True, ticks: list[tuple[float, str]] | None = None,
+               n_fft: int | None = None) -> None:
     """One sound: title, numbers, waveform strip, spectrogram with axes. (x0, y0) is the top left
     of the plot area; the title sits above it."""
     f_title, f_small = _font(12, True), _font(10)
@@ -219,7 +221,7 @@ def draw_panel(img: Image.Image, d: ImageDraw.ImageDraw, x0: int, y0: int, w: in
         d.line([(x0 + i, mid - hi * (wave_h / 2 - 1)), (x0 + i, mid - lo * (wave_h / 2 - 1))], fill=WAVE)
     top = y0 + wave_h - 8
     hh = h - wave_h + 8
-    img.paste(Image.fromarray(heat(m, w, hh)), (x0, top))
+    img.paste(Image.fromarray(heat(m, w, hh, n_fft)), (x0, top))
     d.rectangle([x0 - 1, top - 1, x0 + w, top + hh], outline=AXIS)
     for f, lab in [(50, "50"), (200, "200"), (1000, "1k"), (5000, "5k"), (20000, "20k")]:
         y = _y_of(f, top, hh)
@@ -271,7 +273,7 @@ def sheet(panels: list[dict], path: Path, title: str, subtitle: str, cols: int =
         x0 = left + c * (pw + gap_x)
         y0 = top + r * (ph + gap_y)
         draw_panel(img, d, x0, y0, pw, ph, p["x"], p["title"], p["sub"], p.get("marks"),
-                   axis_labels=(c == 0), ticks=p.get("ticks"))
+                   axis_labels=(c == 0), ticks=p.get("ticks"), n_fft=p.get("n_fft"))
     draw_scale(d, width - right + 22, top + 18, ph - 18)
     path.parent.mkdir(parents=True, exist_ok=True)
     img.save(path, optimize=True)

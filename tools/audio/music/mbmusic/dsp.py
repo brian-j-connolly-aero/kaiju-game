@@ -82,8 +82,9 @@ _HALL_CACHE: dict[tuple, np.ndarray] = {}
 def hall_ir(seconds: float = 3.4, seed: int = 9001) -> np.ndarray:
     """Synthetic concert-hall impulse response, stereo, shape (n, 2, 2): [time, input, output].
 
-    Band-limited noise with a longer decay in the lows and mids than in the highs (about 2.5 s
-    at 500 Hz, 1.1 s at 8 kHz), a few early reflections, and 22 ms of pre-delay. A little of
+    Band-limited noise with a longer decay in the lows and mids than in the highs (measured
+    from the result: 2.6 s at 500 Hz, 2.3 s at 1 kHz, 1.5 s at 8 kHz), a few early reflections,
+    and 22 ms of pre-delay. A little of
     each input channel reaches the other side so the hall is wide but sources keep their seat.
     Deterministic: the noise comes from a fixed seed.
     """

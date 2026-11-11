@@ -172,13 +172,30 @@ export interface KaijuStaggerEvent extends EventBase {
   duration: number;
 }
 
+/** Where a grabbed (or eaten off the ground) object came from, so clients can remove it from the scene. */
+export type HeldSource =
+  /** A live prop (`sourceId` is the prop id; its `propAlive` bit is cleared). */
+  | 'prop'
+  /** The wreck of a destroyed prop (`sourceId` is the prop id; its `propWreck` bit is cleared). */
+  | 'propWreck'
+  /** A living vehicle (`sourceId` is the unit id; the unit is destroyed). */
+  | 'unit'
+  /** The wreck of a dead vehicle (`sourceId` is the unit id; `unit.wreck` is cleared). */
+  | 'unitWreck'
+  /** A chunk torn from a building (`sourceId` is the structure id). */
+  | 'structure'
+  /** Nothing in the world changed (throwing or dropping what was already held). */
+  | 'none';
+
 /** What the kaiju holds changed. */
 export interface KaijuHeldEvent extends EventBase {
   type: 'kaijuHeld';
   kaiju: number;
+  /** What it holds now (null after a throw, a meal or a drop). */
   held: HeldObject | null;
   reason: 'grab' | 'throw' | 'eat' | 'drop';
-  /** Prop id, unit id or structure id it was taken from, or -1. */
+  source: HeldSource;
+  /** Id of the prop, unit or structure named by `source`, or -1. */
   sourceId: number;
 }
 

@@ -33,8 +33,8 @@ for a in "$@"; do
 done
 if [ "$review" = 0 ]; then
   # the score must pass its own review before any audio is rendered
-  "$py" "$here/build.py" --review "${args[@]}" >/dev/null || {
-    "$py" "$here/build.py" --review "${args[@]}"; echo "score review failed" >&2; exit 1; }
+  "$py" "$here/build.py" --review ${args[@]+"${args[@]}"} >/dev/null || {
+    "$py" "$here/build.py" --review ${args[@]+"${args[@]}"}; echo "score review failed" >&2; exit 1; }
   [ "$verify" = 1 ] && args+=("--verify")
 fi
-exec "$py" "$here/build.py" "${args[@]}"
+exec "$py" "$here/build.py" ${args[@]+"${args[@]}"}

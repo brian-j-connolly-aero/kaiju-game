@@ -22,7 +22,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "node scripts/lint.mjs",
     "sim": "npm run sim --workspace @mb/shared --",
-    "export:defs": "npm run export:defs --workspace @mb/shared",
+    "export:defs": "npm run export:defs --workspace @mb/shared --",
     "assets:manifest": "node scripts/merge-manifests.mjs"
   },
   "devDependencies": {

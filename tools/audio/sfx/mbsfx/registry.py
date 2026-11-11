@@ -19,6 +19,7 @@ class Spec:
     level: float = -16.0       # target loudness in dB (see dsp.level_short / dsp.level_loop)
     use: str = ""              # intended use, for docs/audio/SFX.md
     group: str = ""            # sounds that are measured against each other (for example "step")
+    clip: bool = False         # impacts: soft-clip the peaks instead of limiting them
 
     def names(self) -> list[str]:
         if self.variants > 1:
@@ -30,14 +31,14 @@ REGISTRY: dict[str, Spec] = {}
 
 
 def sfx(id: str, family: str, *, variants: int = 1, loop: float = 0.0, level: float = -16.0,
-        use: str = "", group: str = ""):
+        use: str = "", group: str = "", clip: bool = False):
     """Register a generator: fn(rng, variant) -> mono (n,) or stereo (n, 2) float array.
     Loop generators return exactly one seamless pass of `loop` seconds."""
     assert family in FAMILIES, family
 
     def deco(fn):
         assert id not in REGISTRY, f"duplicate sound id {id}"
-        REGISTRY[id] = Spec(id, family, fn, variants, loop, level, use, group)
+        REGISTRY[id] = Spec(id, family, fn, variants, loop, level, use, group, clip)
         return fn
 
     return deco

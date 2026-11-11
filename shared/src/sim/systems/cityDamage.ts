@@ -23,6 +23,7 @@ import { COMBAT_RULES } from '../../defs/rules';
 import { modMult } from '../../defs/upgrades';
 import { structureStageFor } from '../bar';
 import type { PlayerId } from '../config';
+import { noteKaijuNoise } from '../spotting';
 import type { StructureHit, World } from '../types';
 import { emit } from '../worldOps';
 
@@ -62,7 +63,11 @@ export function applyStructureDamage(world: World, hit: StructureHit): number {
     emit(world, { type: 'structureStage', id: hit.id, stage, by: hit.by, cause: hit.cause });
     if (stage === 3) {
       const player = world.players[hit.by];
-      if (player) player.tally.wrecked[s.cls]++;
+      if (player) {
+        player.tally.wrecked[s.cls]++;
+        // Wrecking something is loud: a hatchling gives itself away.
+        if (player.kaijuId >= 0) noteKaijuNoise(world.kaijus[player.kaijuId]);
+      }
     }
   }
   return lost;
@@ -83,7 +88,10 @@ export function cityDamageSystem(world: World): void {
       if (def.leavesWreck) bitSet(world.propWreck, hit.id);
       addBarPoints(world, def.value, hit.by);
       const player = world.players[hit.by];
-      if (player && def.tally) player.tally.wrecked[def.tally]++;
+      if (player && def.tally) {
+        player.tally.wrecked[def.tally]++;
+        if (player.kaijuId >= 0) noteKaijuNoise(world.kaijus[player.kaijuId]);
+      }
       let causeIndex = causes.indexOf(hit.cause);
       if (causeIndex < 0) causeIndex = causes.push(hit.cause) - 1;
       const key = (hit.by + 1) * 64 + causeIndex;

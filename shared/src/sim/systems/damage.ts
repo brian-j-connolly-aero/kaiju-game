@@ -7,7 +7,8 @@
  *   body yaw, crossfire (`kaiju.recentHits`, COMBAT_RULES), brace and at-will nerve multipliers,
  *   nerve immunity, rage gain; emit `kaijuHit`, `crossfire`, and at full nerve `nerveBreak` +
  *   `kaijuStagger` (phase 'stagger'). For a unit: hp, members (`membersForHp`), nerve, shaken;
- *   emit `unitHit`, `memberLost`, `unitShaken`, `unitDestroyed`, and shake nearby friends;
+ *   emit `unitHit`, `memberLost`, `unitShaken`, `unitDestroyed`, and shake nearby friends; a
+ *   destroyed unit gets `alive = false`, `state = 'dead'` and, for vehicles, `wreck = true`;
  * - each tick: drain `world.hits` through `applyHit`, leak nerve (kaiju `nerveLeak`, units
  *   COMBAT_RULES.unitNerveLeak), count down `nerveImmune`, end staggers, apply trample damage
  *   to units under a moving kaiju, mark kaiju death (phase 'dead', `alive = false`);

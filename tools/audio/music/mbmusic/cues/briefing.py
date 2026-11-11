@@ -14,7 +14,7 @@ def build() -> Cue:
               sections=[(1, "pedal and pulse"), (5, "head motif, English horn"), (7, "flat-second colour")])
     s = cue.stem("briefing")
 
-    cb = s.add("basses", "basses", gain=6.0, role="bass")
+    cb = s.add("basses", "basses", gain=3.0, role="bass")
     cb.line(1, "D2:16_ D2:16", 78, gate=1.0)
     cb.expr([(B(1), 96), (B(3), 116), (B(5), 100), (B(7), 122), (B(9), 96)])
     vc = s.add("cellos", "cellos", gain=4.0, role="pad")

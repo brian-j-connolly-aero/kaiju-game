@@ -17,14 +17,18 @@
  *   `takeover`); when none is left set `squad.eliminated` and `squad.driven = -1`;
  * - keep `unit.state` current for animation ('idle' | 'moving' | 'charging' | 'shaken' | 'dead').
  *
- * The driven unit's control is already written by the input system, and the movement system
- * already moves every unit from its control.
+ * Real today: perception. `updateSpotting` (sim/spotting.ts) refreshes `kaiju.spotted` and
+ * `kaiju.known` every tick before any orders are decided, so sub-unit AI and bots can rely on
+ * them. The driven unit's control is already written by the input system, and the movement
+ * system already moves every unit from its control.
  */
 
+import { updateSpotting } from '../spotting';
 import type { World } from '../types';
 
 export function unitOrderSystem(world: World): void {
   if (world.match.phase !== 'playing') return;
+  updateSpotting(world);
   for (const u of world.units) {
     if (!u.alive) continue;
     // Minimal placeholder so animation states are not frozen: moving or idle from actual velocity.

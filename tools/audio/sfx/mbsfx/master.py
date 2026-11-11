@@ -34,7 +34,8 @@ MASTERS = SCRATCH / "masters"
 LEAD_IN = 0.25            # seconds before the loop start
 PAD = 0.25                # seconds after the loop end
 EDGE_KEEP = 0.08          # seconds next to each loop point that stay unfaded
-CEILING_DB = -2.0         # limiter ceiling for the master (sample peak)
+CEILING_DB = -2.0         # limiter and clipper ceiling for the master
+MAX_CLIP_DB = 7.0         # impacts may run this far into the soft clipper, no further
 SHIP_PEAK_DB = -1.0       # decoded files must stay under this
 RUMBLE_HZ = 20.0          # everything below is removed (also removes any DC offset)
 FADE_IN = 0.0008          # one-shots: 35 samples, keeps the transient
@@ -57,14 +58,18 @@ def master_oneshot(x: np.ndarray, spec: Spec) -> tuple[np.ndarray, dict]:
     x = dsp.fade(x, FADE_IN, min(FADE_OUT, 0.25 * len(x) / SR))
     gain = dsp.amp(spec.level - dsp.level_short(x))
     ceiling = dsp.amp(CEILING_DB)
-    y, reduction = x * gain, 0.0
-    for _ in range(4):
-        y, reduction = dsp.limiter(x * gain, ceiling)
+    y, reduction, over = x * gain, 0.0, 0.0
+    for _ in range(6):
+        y = x * gain
+        over = max(0.0, dsp.db(np.max(np.abs(y))) - CEILING_DB)
+        if spec.clip:
+            y = dsp.soft_clip(y, ceiling)
+        y, reduction = dsp.limiter(y, ceiling)
         err = spec.level - dsp.level_short(y)
-        if abs(err) < 0.05 or reduction > 9.0:
+        if abs(err) < 0.05 or over > MAX_CLIP_DB or reduction > 9.0:
             break
         gain *= dsp.amp(err)
-    return y, {"limiter_db": round(reduction, 2)}
+    return y, {"limiter_db": round(reduction, 2), "clip_db": round(over if spec.clip else 0.0, 2)}
 
 
 def master_loop(x: np.ndarray, spec: Spec) -> tuple[np.ndarray, dict]:
@@ -87,7 +92,7 @@ def master_loop(x: np.ndarray, spec: Spec) -> tuple[np.ndarray, dict]:
     head = dsp.fade(ext[-lead:], LEAD_IN - EDGE_KEEP, 0.0)      # end of the body, faded in
     tail = dsp.fade(ext[:pad], 0.0, PAD - EDGE_KEEP)            # start of the body, faded out
     out = np.concatenate([head, y, tail], axis=0)
-    return out, {"limiter_db": round(reduction, 2)}
+    return out, {"limiter_db": round(reduction, 2), "clip_db": 0.0}
 
 
 def loop_points(spec: Spec) -> list[float]:

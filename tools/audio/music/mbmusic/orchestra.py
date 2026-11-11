@@ -31,6 +31,12 @@ class Instrument:
     drums: bool = False
     pitched: bool = True
 
+    @property
+    def air(self) -> float:
+        """High-shelf lift in dB at 6 kHz. The sampled strings, voices and brass are dull on
+        top; percussion and bells are not, so they are left alone."""
+        return {"strings": 3.5, "choir": 4.0, "brass": 3.0, "winds": 2.0}.get(self.family, 0.0)
+
 
 def _i(key, program, lo, hi, family, **kw) -> Instrument:
     return Instrument(key, program, pitch(lo) if isinstance(lo, str) else lo,

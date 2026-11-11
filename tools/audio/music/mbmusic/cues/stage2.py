@@ -108,7 +108,7 @@ def build() -> Cue:
 
     # =========================== combat =========================================================
     # ---- drums -------------------------------------------------------------------------------------
-    sn = combat.add("snare", "snare", gain=0.0, role="perc")
+    sn = combat.add("snare", "snare", gain=2.0, role="perc")
     groove = "X.ggx.ggX.ggx.gg"
     fill = "X.ggx.ggXxXxXXXX"
     for bar in range(1, 33):
@@ -123,8 +123,8 @@ def build() -> Cue:
     sn.notes = [(st, d, SNARE_ALT if (i % 3 == 1 and v < 80) else p, v)
                 for i, (st, d, p, v) in enumerate(sorted(sn.notes))]
 
-    bd = combat.add("bass drum", "bass_drum", gain=0.0, role="perc")
-    tk = combat.add("taiko", "percussion", gain=0.0, role="perc")
+    bd = combat.add("bass drum", "bass_drum", gain=2.0, role="perc")
+    tk = combat.add("taiko", "percussion", gain=2.0, role="perc")
     for bar in range(1, 33):
         quiet = 17 <= bar <= 20
         bd.hits(bar, "x.......o......." if quiet else "X.......x.....o.", BASS_DRUM, dur=0.5)
@@ -133,7 +133,7 @@ def build() -> Cue:
             if bar % 2 == 0:
                 tk.hits(bar, "..........x.x...", TAIKO_LONG, dur=0.5)
 
-    tm = combat.add("timpani", "timpani", gain=0.0, role="perc")
+    tm = combat.add("timpani", "timpani", gain=2.0, role="perc")
     TIMP = {"D": "D2", "C": "C3", "Bb": "Bb2", "G": "G2", "A": "A2", "Eb": "Eb3", "F": "F2"}
 
     def timp(bar: int, harm: list, vel: int) -> None:
@@ -154,8 +154,8 @@ def build() -> Cue:
     tm.roll(B(24, 2), 3.0, "A2", 56, 116, step=0.125, dur=0.5, curve=1.4)
     timp(25, HARM_A, 106)
 
-    cy = combat.add("cymbals", "cymbals", gain=0.0, role="perc")
-    rc = combat.add("cymbal swell", "reverse_cymbal", gain=0.0, role="perc")
+    cy = combat.add("cymbals", "cymbals", gain=3.0, role="perc")
+    rc = combat.add("cymbal swell", "reverse_cymbal", gain=2.0, role="perc")
     for bar, v in ((1, 104), (9, 100), (17, 84), (25, 112)):
         cy.note(B(bar), CRASH, 4.0, v)
         swell_into(rc, B(bar) if bar > 1 else B(33), 96 if bar != 17 else 80)
@@ -185,7 +185,7 @@ def build() -> Cue:
             part.line(first + 7, f"{n}:1.5> {n}:.5 {n}:2", loud + 4, gate=0.8)
         tbs.line(first + 7, "D3+A3:1.5> D3+A3:.5 D3+A3:2", loud + 4, gate=0.8)
     # second strain: trombone stabs on the downbeats, then syncopated trumpets as it builds
-    for i, (r, f) in enumerate((("G2", "D3"), ("F2", "C3"), ("Eb3", "Bb3"), ("A2", "E3"),
+    for i, (r, f) in enumerate((("G2", "D3"), ("F2", "F3"), ("Eb3", "Bb3"), ("A2", "E3"),
                                 ("G2", "D3"), ("Bb2", "F3"), ("G2", "D3"), ("A2", "E3"))):
         stab(tbs, B(17 + i), [P(r), P(f)], 92 + 2 * i, 0.5)
     for i, (n1, n2) in enumerate((("D5", "Bb4"), ("D5", "Bb4"), ("E5", "Bb4"), ("E5", "C#5"))):

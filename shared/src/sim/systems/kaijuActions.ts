@@ -8,6 +8,11 @@
  *   `k.moltAvailable`) molt, using the timings in `kaijuKindDef(k.kind).actions`;
  * - advance `phase`, `phaseTime`, `phaseDuration`, `actionTime`, `actionYaw` and tick down
  *   `cooldowns`; emit `kaijuAction` on every phase change and `kaijuHeld`, `roar` as they happen;
+ *   call `noteKaijuNoise(k)` (sim/spotting.ts) when it roars or stomps, so a hatchling shows on
+ *   the humans' map for a few seconds;
+ * - grab and eat take things out of the world: a live prop (clear its `propAlive` bit), a prop
+ *   wreck (`world.propWreck`), a living grabbable vehicle or a dead one's wreck (`unit.wreck`),
+ *   or a chunk of a building; say which in `kaijuHeld.source` / `sourceId` so clients remove it;
  * - when an effect goes off, push the results into the queues: `world.hits` for units,
  *   `world.structureHits` and `world.propHits` for the city, and spawn thrown projectiles into
  *   `world.projectiles` (emit `projectileSpawn`);

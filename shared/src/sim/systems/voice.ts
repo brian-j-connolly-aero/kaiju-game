@@ -5,11 +5,10 @@
  * last, reads the tick's other events, and throttles each cue so the radio does not repeat
  * itself. Clients pick the actual line (see defs/voice.ts).
  *
- * Real today: every cue that follows directly from an event or from the clock.
+ * Real today: every cue that follows directly from an event or from the clock, plus
+ * `kaiju.spotted` / `kaiju.lost`, which sim/spotting.ts says when `kaiju.known` changes.
  *
  * STUB(sim): cues that need state other systems do not track yet:
- * - `kaiju.spotted` / `kaiju.lost`: when `kaiju.known` / `kaiju.spotted` change (Worker 2 sets
- *   them from line of sight; Worker 3 from the stage rules);
  * - `volley.ready`: when every charging sub-unit of a squad reaches full charge;
  * - `kaiju.lowhp`: when a kaiju first drops below about 25% hp in a stage;
  * - `bar.near`: when the bar passes about 85% of the way to the next mark.

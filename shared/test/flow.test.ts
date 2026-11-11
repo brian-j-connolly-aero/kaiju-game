@@ -10,19 +10,26 @@ import {
   createAimPoint,
   DT,
   endMatch,
+  noteKaijuNoise,
   resolveAimPoint,
   say,
   SIM_EVENT_TYPES,
   structureStageFor,
+  unitSeesKaiju,
   VOICE_CUE_IDS,
   type Hit,
   type SimEvent,
   type VoiceEvent,
 } from '../src/index';
-import { HUMAN_PLAYER, KAIJU_PLAYER, makeTestWorld, run } from './helpers';
+import { HUMAN_PLAYER, input, KAIJU_PLAYER, makeTestWorld, run } from './helpers';
 
 function voiceCues(events: SimEvent[]): string[] {
   return events.filter((e): e is VoiceEvent => e.type === 'voice').map((e) => e.cue);
+}
+
+/** Voice cues without the spotting chatter (in an empty test city everybody sees the kaiju at once). */
+function flowCues(events: SimEvent[]): string[] {
+  return voiceCues(events).filter((cue) => cue !== 'kaiju.spotted' && cue !== 'kaiju.lost');
 }
 
 describe('city damage and the destruction bar', () => {
@@ -164,7 +171,7 @@ describe('match flow', () => {
     const world = makeTestWorld({ people: 'none' });
     world.match.clock = 181;
     const events = run(world, 30 * 200);
-    expect(voiceCues(events)).toEqual([
+    expect(flowCues(events)).toEqual([
       'clock.3min',
       'clock.1min',
       'clock.10s',
@@ -191,7 +198,7 @@ describe('match flow', () => {
     world.kaijus[0].hp = 0;
     const events = world.step();
     expect(events.find((e) => e.type === 'matchEnd')).toMatchObject({ winner: 'humans', reason: 'kill' });
-    expect(voiceCues(events)).toEqual(['end.humans.kill', 'hearing.humans.win']);
+    expect(flowCues(events)).toEqual(['end.humans.kill', 'hearing.humans.win']);
   });
 
   it('gives the kaiju the win when the bar passes the third mark', () => {
@@ -290,7 +297,7 @@ describe('voice cues', () => {
       structures: [{ x: 200, z: 200, w: 30, d: 30, height: 90, hp: 100, value: 500, cls: 'landmark', landmark: 'Old Clock' }],
     });
     world.structureHits.push({ id: 0, damage: 100, by: KAIJU_PLAYER, cause: 'stomp' });
-    expect(voiceCues(world.step())).toEqual(['landmark.down']);
+    expect(flowCues(world.step())).toEqual(['landmark.down']);
   });
 
   it('only uses cue ids from the contract', () => {
@@ -331,5 +338,82 @@ describe('aim points', () => {
     expect(aim.on).toBe('none');
     expect(aim.dist).toBe(500);
     expect(DT).toBeGreaterThan(0);
+  });
+});
+
+describe('spotting', () => {
+  function place(world: ReturnType<typeof makeTestWorld>, unitId: number, x: number, z: number): void {
+    const u = world.units[unitId];
+    u.x = x;
+    u.z = z;
+  }
+
+  it('puts a hatchling on the map only while a unit can see it, and says so on the radio', () => {
+    // A long tall wall at z = 50 hides the kaiju (at the origin) from anything north of it.
+    const world = makeTestWorld({ structures: [{ x: 0, z: 50, w: 400, d: 4, height: 30 }] });
+    const k = world.kaijus[0];
+    k.x = 0;
+    k.z = 0;
+    // Everybody starts far away or behind the wall: unknown.
+    for (const u of world.units) place(world, u.id, 150 + u.id * 12, 170);
+    world.step();
+    expect(k.known).toBe(false);
+    expect(k.spotted).toBe(false);
+
+    // A bot squad's sub-unit walks into view, 200 m away: on the map, but not "spotted".
+    place(world, 9, 0, -200);
+    let events = world.step();
+    expect(k.known).toBe(true);
+    expect(k.spotted).toBe(false);
+    expect(voiceCues(events)).toEqual(['kaiju.spotted']);
+
+    // The player's own unit gets within 150 m with a clear line: spotted.
+    const squad = world.squads[world.players[HUMAN_PLAYER].squadId];
+    place(world, squad.driven, 0, -120);
+    world.step();
+    expect(k.spotted).toBe(true);
+    expect(unitSeesKaiju(world, world.units[squad.driven], k, 150)).toBe(true);
+
+    // The same distance on the far side of the wall sees nothing.
+    place(world, squad.driven, 0, 120);
+    place(world, 9, 150, 170);
+    events = world.step();
+    expect(k.spotted).toBe(false);
+    expect(k.known).toBe(false);
+    expect(voiceCues(events)).toEqual(['kaiju.lost']);
+    expect(unitSeesKaiju(world, world.units[squad.driven], k, 150)).toBe(false);
+
+    // With the wall down, the line is open again.
+    world.structureHp[0] = 0;
+    world.step();
+    expect(k.spotted).toBe(true);
+    expect(k.known).toBe(true);
+  });
+
+  it('gives a hatchling away for three seconds when it wrecks something', () => {
+    const world = makeTestWorld({ props: [{ kind: 'car_sedan', x: 0, z: 6 }] });
+    const k = world.kaijus[0];
+    k.x = 0;
+    k.z = 0;
+    for (const u of world.units) place(world, u.id, 700 + u.id * 12, 700);
+    world.match.bounds = world.match.stageBounds[2];
+    run(world, 5);
+    expect(k.known).toBe(false);
+    // It walks over the car.
+    run(world, 30, [input({ moveZ: 1, aimYaw: 0 })]);
+    expect(k.known).toBe(true);
+    noteKaijuNoise(k);
+    run(world, 30 * 2);
+    expect(k.known).toBe(true);
+    run(world, 30 * 2);
+    expect(k.known).toBe(false);
+  });
+
+  it('always shows the kaiju from stage 2 on', () => {
+    const world = makeTestWorld({ realCity: true });
+    beginStage(world, 2);
+    const events = run(world, 3);
+    expect(world.kaijus[0].known).toBe(true);
+    expect(voiceCues(events)).not.toContain('kaiju.spotted');
   });
 });

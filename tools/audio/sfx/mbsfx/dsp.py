@@ -477,11 +477,29 @@ def true_peak(x: np.ndarray) -> float:
     return float(np.max(np.abs(signal.resample_poly(x, 4, 1, axis=0))))
 
 
+def soft_clip(x: np.ndarray, ceiling: float, knee: float = 0.5) -> np.ndarray:
+    """Soft clipper for impacts: linear up to knee x ceiling, then a tanh curve that never
+    passes the ceiling. Unlike a limiter it does not duck what follows the transient, and the
+    harmonics it adds to bass peaks help them read on small speakers."""
+    t = ceiling * knee
+    a = np.abs(x)
+    y = np.array(x, dtype=float, copy=True)
+    over = a > t
+    y[over] = np.sign(x[over]) * (t + (ceiling - t) * np.tanh((a[over] - t) / (ceiling - t)))
+    return y
+
+
 def limiter(x: np.ndarray, ceiling: float, look: float = 0.003, release: float = 0.10) -> tuple[np.ndarray, float]:
     """Look-ahead peak limiter. Gain comes down smoothly just before a peak, never lets a
     sample past the ceiling, and recovers slowly. Returns the signal and the deepest gain
     reduction in dB (0 when the limiter did nothing)."""
     pk = np.max(np.abs(x), axis=1) if x.ndim == 2 else np.abs(x)
+    if pk.max() <= ceiling * 0.7:
+        return x, 0.0
+    up = np.abs(signal.resample_poly(x, 4, 1, axis=0))          # peaks between the samples count too
+    if up.ndim == 2:
+        up = up.max(axis=1)
+    pk = np.maximum(pk, up[:4 * len(pk)].reshape(len(pk), 4).max(axis=1))
     if pk.max() <= ceiling:
         return x, 0.0
     block = 16
