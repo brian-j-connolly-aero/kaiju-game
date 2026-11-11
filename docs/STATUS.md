@@ -4,7 +4,8 @@ Living status file. Keep it short and true: when you finish a task, update what 
 the stubs you filled in, and add any decision the docs left open. Contracts live in
 `ARCHITECTURE.md`; numbers live in `DESIGN.md` and `shared/src/defs/`.
 
-Last updated by: the game server task (everything about `server/`; the rest is from the scaffold task).
+Last updated by: the game server task (everything about `server/`) and simulation part 1 (the
+kaiju, damage and nerve, city destruction, projectiles); the rest is from the scaffold task.
 
 ## 1. How to run things
 
@@ -51,8 +52,23 @@ Everything below is in `shared/` (`@mb/shared`) unless it says otherwise, is cov
   - input intake: edges, hold timers, wheel and call-in commands, bot inputs, driven unit control;
   - `stepMovement` and the movement system: collision, bounds, trample, wade, water, bridges,
     kaiju and unit movement under player input, props crushed by kaiju and vehicles;
-  - city damage: structure hp, the four visual stages, bar points, tallies, prop destruction and
-    wrecks, `barMark`, rage from wrecking;
+  - the kaiju (`systems/kaijuActions.ts`, effects in `sim/kaijuEffects.ts`, the beam's path in
+    `sim/beam.ts`): the action state machine with every Tier 1 verb: swipe, stomp (tap or hold
+    from button timing), grab and throw with a held-object model (cars, wrecks, live vehicles,
+    building chunks), eat, brace, roar, the beam special with rage spend, the molt hold that
+    starts the cocoon; cooldowns, input buffering, `kaijuAction` events from the start of every
+    wind-up, `kaijuHeld`, `roar`, `cocoon`;
+  - damage and nerve (`systems/damage.ts`): `applyHit` for every combatant (state and facing
+    multipliers, brace, fire-at-will, crossfire, nerve leak, slow-down, stagger and the immunity
+    after it, rage from damage, death; unit hp, members, nerve, the shaken state, wrecks, nerve
+    loss when a friend dies, squad elimination), trample of units, `healKaiju`;
+  - projectiles (`systems/projectiles.ts`): flight for all three flight models, sweeps against
+    structures, kaiju, units and the ground, splash, the backstop rule, `projectileHit`;
+    `spawnProjectile` launches one. The kaiju's throw uses it; nothing fires for the humans yet;
+  - city damage: structure hp, the four visual stages, bar points with partial credit, tallies
+    by class, prop destruction and wrecks, props taken by the kaiju, `barMark`, the molt prompt
+    (`moltAvailable`), rage from wrecking, the `barPoints` modifier, the insurance rider,
+    shields (sanctuaries), units falling with a collapsing bridge;
   - match flow basics: briefing, clock, the three end conditions, `beginStage`, `endMatch`;
   - spawning: kaiju at the anchor, `deploySquads` around the bounds edge, `refillSquad`;
   - spotting: `kaiju.spotted` and `kaiju.known` from line of sight and noise;
@@ -82,17 +98,14 @@ Everything below is in `shared/` (`@mb/shared`) unless it says otherwise, is cov
 ## 3. What is stubbed
 
 Every simulation stub is marked `STUB(sim):` with a header that says exactly what to build and
-which fields and helpers to use. `npm run lint` prints how many markers remain (16 today).
+which fields and helpers to use. `npm run lint` prints how many markers remain (9 `STUB(sim)`
+today).
 
 | Where | What is missing | For |
 | --- | --- | --- |
-| `sim/systems/kaijuActions.ts` | The whole action state machine: swipe, stomp, grab, throw, eat, brace, roar, beam, the molt hold; cooldowns; `kaijuAction` / `kaijuHeld` / `roar` events. Today it only advances timers. | Simulation 1 |
-| `sim/systems/damage.ts` | `applyHit` (does nothing) and the per-tick damage and nerve rules: multipliers, facing, crossfire, stagger, shaken, nerve leak, trample damage to units, deaths, rage from damage. The system already drains `world.hits`. | Simulation 1 |
-| `sim/systems/cityDamage.ts` | Only the extras: the `barPoints` modifier, the insurance rider flag, sanctuaries, units on a falling bridge. The core is real. | Simulation 1 |
-| `sim/systems/unitOrders.ts` | Applying squad commands, sub-unit AI and formation, hold-and-charge, shaken behavior, takeover and elimination, unit animation states. Today: spotting plus idle or moving states. | Simulation 2 |
-| `sim/systems/weapons.ts` | Firing, aim error and scatter, volleys, call-in missions and cooldowns. Empty. | Simulation 2 |
-| `sim/systems/projectiles.ts` | Flight, sweeps against structures, kaiju, units and ground, impact damage, `projectileHit`. Empty. | Simulation 2 |
-| `sim/systems/matchFlow.ts` | The molt: `moltAvailable`, cocoon, blast wave, intermission, calling `beginStage`, veterans. | Simulation 3 |
+| `sim/systems/unitOrders.ts` | Applying squad commands, sub-unit AI and formation, hold-and-charge, what a shaken unit does, takeover, unit animation states. Today: spotting plus idle or moving states. (Shaking a unit, counting the timer down and marking a squad eliminated are done by the damage system.) | Simulation 2 |
+| `sim/systems/weapons.ts` | Firing, aim error and scatter, volleys, call-in missions and cooldowns. Empty: the humans cannot shoot yet. | Simulation 2 |
+| `sim/systems/matchFlow.ts` | The END of the molt: blast wave, intermission, calling `beginStage`, veterans. The prompt and the cocoon start are real, so today a kaiju that cocoons stays in the cocoon until the match ends. | Simulation 3 |
 | `sim/systems/bots.ts`, `sim/bots/types.ts` | Bot behavior for squads and for the kaiju. Today bots stand still. `BotState` is a starting shape. | Simulation 3 |
 | `sim/systems/voice.ts` | Three cues that need other systems: `volley.ready`, `kaiju.lowhp`, `bar.near`. | Simulation 2 and 3 |
 | `shared/scripts/sim.ts` | The balance report beyond the basics. With stub bots every match is a clock win for the humans. | Simulation 3 |
@@ -132,6 +145,39 @@ Input and actions
   0.2 s recovery.
 - The Lizard moves at 70% speed sideways and 60% backward relative to its body.
 - Tanks drive along their hull and turn toward where they want to go; infantry moves freely.
+
+Kaiju combat (simulation part 1; the rules as built are written out in `DESIGN.md` sections 3 and 4)
+
+- Every verb is committed; bracing is exclusive; input priority is molt, brace, special, roar,
+  strike, throw, eat, grab; each Grab hold is judged once.
+- Attacks follow the head's aim, not the body heading. A swipe hits everything in its arc once,
+  for full damage each.
+- Grab prefers loose objects over building chunks. Taking a tank from a troop removes one tank,
+  not the unit. A grabbed or eaten prop counts for the bar and the tally at once and leaves no
+  wreck; clients learn of it from `kaijuHeld`, not `propsDestroyed`.
+- Eat: the meal is gone at the first bite, the heal lands at the end, a stagger loses it.
+  Infantry cannot be eaten.
+- The beam is aimed in three dimensions from the mouth along the head's aim, and the head turns
+  at the beam's reduced rate while it is on. It burns one structure at a time: the first one
+  its center line or either edge meets.
+- Rage: what the special itself wrecks earns none.
+- Crossfire needs two different source units; the later hit gets the multiplier; call-ins never
+  count. The `crossfire` event is rate limited to one a second.
+- A stagger keeps the held object and loses any rage already spent on a special.
+- Stomp knockback is a velocity kick, so the movement system stops shoved units at walls.
+- Thrown objects and all other projectiles follow one kinematic rule (`stepProjectile`), exact
+  on tick boundaries. Human projectiles pass over human units; kaiju projectiles hit units.
+- A projectile's hit direction is against its travel when it flies flatter than 45 degrees,
+  otherwise from the target toward the impact point (shells from above).
+- Splash is all or nothing inside the radius, for structures, kaiju, units and props alike.
+- Continuous damage (beam, trample) reports `unitHit` / `kaijuHit` every sixth tick only.
+- No new damage kinds were added: a grab that kills and a torn-out chunk report cause 'swipe'.
+- Insurance rider: the first landmark to take damage while a policy is free is the insured one
+  (so the bar never has to go down). Shields do not stack; trample ignores them.
+- A collapsing bridge deck costs the ground units on it 40 hp and shakes them.
+- The molt prompt is a state check (bar past the current stage's mark), so a bar that is
+  already past mark 2 when stage 2 begins offers the next molt at once. The kaiju drops what
+  it holds when the cocoon closes.
 
 City and bar
 
@@ -198,10 +244,44 @@ Server
 - **Simulation workers:** build inside the stub files; the system signatures are all
   `(world: World) => void` and the order in `pipeline.ts` is fixed. Never change hp directly:
   push to `world.hits`, `world.structureHits`, `world.propHits`. `test/helpers.ts` builds tiny
-  hand-made cities and worlds (`makeTestWorld`) so one rule can be tested in isolation;
+  hand-made cities and worlds (`makeTestWorld`) so one rule can be tested in isolation, and has
+  `placeKaiju`, `placeUnit`, `parkUnits`, `eventsOf` and `valueDestroyed` for combat tests;
   `test/soak.test.ts` hammers the whole pipeline with random inputs and must keep passing.
   Extend `World` by adding fields; if you add something a client must see, add it to the
   snapshot (bump `SNAPSHOT_VERSION`) or to an event, and update `ARCHITECTURE.md`.
+- **Simulation 2 (human squads):**
+  - Launch every projectile with `spawnProjectile(world, { ... })`. The projectile system
+    already flies it and resolves the impact; read its header before changing it. Set
+    `owner: 'unit'` and `ownerId` to the firing unit's id (that id is the crossfire source),
+    `owner: 'callin'` for artillery (never crossfire), `atWill` for fire-at-will shots, and put
+    the charge multipliers into `damage` / `nerve` before launching. Human projectiles do not
+    collide with human units.
+  - `applyHit` already does everything a hit on the kaiju or a unit should do. Do not add
+    multipliers at the call site other than the attacker's own (charge, mods).
+  - A unit with `unit.shaken > 0` must not fire and should back off; the damage system sets and
+    clears it (and `state: 'shaken'`), zeroes `charge`, but leaves `rooted` alone: un-root in the
+    orders system if a shaken charging unit should move.
+  - `squad.eliminated` and `squad.driven = -1` are set by the damage system when the last unit
+    dies. Takeover (the driven unit died, others live) is still to do, in the orders system.
+  - Dead vehicles keep `unit.wreck = true` until the kaiju takes the wreck or the stage refills.
+  - The roar already zeroes `unit.charge` through the hit (`resetsCharge`); stomps shove units
+    by setting `unit.vx / vz` (`shoveUnit`), so do not overwrite velocities in the orders system.
+  - `volley.ready` is the one voice cue left for this task.
+- **Simulation 3 (match flow, bots, balance):**
+  - The cocoon is over when a kaiju has `phase === 'cocoon'` and `phaseTime >= phaseDuration`
+    (the action system keeps counting; nothing else happens until the match flow system acts).
+    From there: blast wave, intermission, `beginStage`. For the blast, queue hits with
+    `kind: 'blast'`: `damage: Infinity` destroys, `nerve: COMBAT_RULES.unitNerveCapacity` shakes,
+    `shoveUnit(unit, dirX, dirZ, meters)` pushes. `beginStage` already resets the kaiju's phase.
+  - `moltAvailable` is set and announced by the city damage system; do not set it again.
+  - A kaiju bot presses the same buttons: `findGrabTarget`, `findEdible`, `beamPath` and
+    `throwAngle` are exported for it. To throw at a point it must look at it (aim yaw and
+    pitch); the beam goes along the aim from the mouth, so aim down at ground units.
+  - Balance, measured with a naive scripted kaiju that walks to the nearest building and
+    alternates swipes and stomps, unopposed, in the placeholder city: it fills 65% of the
+    stage 1 segment, 31% of stage 2 and 38% of stage 3 in 300 s, far slower than the 100 to
+    130 s target. Expect to tune structure hp and value or the bar fractions.
+  - `kaiju.lowhp` and `bar.near` are the voice cues left for this task.
 - **Anyone changing the server:** game rules never go in `server/src/net`; that folder only
   adapts the room library. Put behavior in `server/src/room` and test it in
   `server/test/gameRoom.test.ts` with `makeRoom()` and `FakePeer` (no network, no real time).
@@ -239,6 +319,11 @@ Server
   the server for automated playtests; `GET /healthz` says when it is up and how many rooms and
   players it has. `SIGINT` and `SIGTERM` close every room and exit cleanly. A port already in
   use makes the server exit with code 1 and a plain message.
+- **Client workers (kaiju and effects):** `ARCHITECTURE.md` section 4 lists what the kaiju and
+  city events guarantee. Draw the beam with `beamPath(cityQuery, snapshotKaiju,
+  kaijuKindDef(kind).actions.special)` while the kaiju's phase is 'special'. Fly projectiles
+  with `stepProjectile` from `projectileSpawn` until `projectileHit`. Start a wind-up animation
+  from `kaijuAction` (phase 'windup', `duration`, optional `elapsed`).
 - **Client workers:** `test/prediction.test.ts` is the recipe for prediction: build the city with
   `getCity(config.citySeed)`, compare `cityChecksum` with the welcome, mirror the live state with
   `cityStateFromWire`, keep it current from `structureStage` / `propsDestroyed` / `kaijuHeld`
@@ -263,6 +348,13 @@ Server
   for the 8-squad future (32).
 - Balance numbers added here (action move multipliers, wade damage, rage per bar segment, prop
   values, archetype hp and value) are untested starting values.
+- Until the weapon system exists nothing can hurt the kaiju in a real match, and until the match
+  flow system ends the cocoon a kaiju that molts sits in its cocoon for the rest of the match.
+  Both are covered by tests only through hits and inputs injected by hand.
+- The beam is aimed with pitch. Looking level, a titan's beam passes over everything shorter
+  than its mouth (88 m): right for a first-person view, but bots and the HUD must account for it.
+- `kaijuAction` and the hit events are the only way clients learn of tells and impacts; a
+  client that drops an `events` message misses them (snapshots still carry phase and timers).
 - The server has only been driven by Node clients so far, never by a browser and never through
   an actual Cloudflare Tunnel. The single-origin design and the plain HTTP statuses are there
   for the tunnel, but the first real tunnel test is still to come.

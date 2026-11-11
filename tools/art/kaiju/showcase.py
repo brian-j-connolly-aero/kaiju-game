@@ -172,15 +172,18 @@ def lineup(force: bool = False) -> str:
     for stage, h in ((2, 32.0), (3, 115.0)):
         x0, y0 = _project((spots[stage] + (16 if stage == 2 else 58), 0, 0), eye, target, fov, size)
         x1, y1 = _project((spots[stage] + (16 if stage == 2 else 58), 0, h), eye, target, fov, size)
-        d.line([(x0, y0), (x1, y1)], fill=dim, width=2)
+        x0, y0, y1 = round(x0), round(y0), round(y1)
+        d.line([(x0, y0), (x0, y1)], fill=dim, width=2)
         for yy in (y0, y1):
             d.line([(x0 - 7, yy), (x0 + 7, yy)], fill=dim, width=2)
         d.text((x0 + 10, (y0 + y1) / 2 - 10), f"{h:g} m", font=f_small, fill=dim)
     # paste the inset bottom left, with a frame and a pointer to where it sits in the big picture
     ix, iy = 28, 78
     px, py = _project((-91, 0, 2.5), eye, target, fov, size)
-    d.line([(ix + inset_size[0] * 0.35, iy + inset_size[1]), (px, py - 16)], fill=(255, 122, 26), width=3)
-    d.rectangle([px - 34, py - 16, px + 34, py + 12], outline=(255, 122, 26), width=3)
+    d.line([(px, iy + inset_size[1]), (px, py - 22)], fill=(255, 122, 26), width=3)
+    bx0, by0 = _project((spots["bus"] - 8, 0, 6.5), eye, target, fov, size)
+    bx1, by1 = _project((spots[1] + 4, 0, -1.0), eye, target, fov, size)
+    d.rectangle([bx0, by0, bx1, by1], outline=(255, 122, 26), width=3)
     main.paste(inset, (ix, iy))
     d.rectangle([ix - 2, iy - 2, ix + inset_size[0] + 1, iy + inset_size[1] + 1], outline=(255, 122, 26), width=4)
     di = ImageDraw.Draw(main)
@@ -210,14 +213,14 @@ def portrait(force: bool = False) -> str:
     mb.load_glb(STAGE_IDS[3])
     h = lizard.HEIGHT[3]
     # camera: low, in front and to the creature's left of the head, looking up at the face
-    view = mb.View("", eye=(0.62 * h, -1.30 * h, 0.66 * h), target=(0.02 * h, -0.16 * h, 0.80 * h), fov=30.0)
+    view = mb.View("", eye=(0.58 * h, -1.32 * h, 0.95 * h), target=(0.0, -0.20 * h, 0.785 * h), fov=30.0)
     saved = mb_preview.BACKDROPS["studio"]
     mb_preview.BACKDROPS["studio"] = PORTRAIT_LIGHT
     tmp = os.path.join("/tmp/mb-scratch", "kaiju-lineup")
     os.makedirs(tmp, exist_ok=True)
     try:
         raw = mb.concept("portrait", out=os.path.join(tmp, "portrait.png"), backdrop=None, view=view, size=(512, 512),
-                         samples=24, pose=PORTRAIT_POSE, sun_azimuth=-58, sun_elevation=30)
+                         samples=24, pose=PORTRAIT_POSE, sun_azimuth=-60, sun_elevation=38)
     finally:
         mb_preview.BACKDROPS["studio"] = saved
     img = Image.open(raw).convert("RGBA")

@@ -84,7 +84,7 @@
       "file": "models/prop_tree_a.glb",
       "kind": "prop",
       "nodes": ["prop_tree_a"],
-      "size": [3.704, 6.733, 3.486],
+      "size": [3.719, 6.941, 3.403],
       "tris": 70
     },
     "prop_tree_b": {

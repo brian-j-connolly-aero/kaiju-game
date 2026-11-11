@@ -246,19 +246,22 @@ def build(stage: int) -> Rig:
             parts.zigzag(g, sp[k], tan, stripe, where=lambda c, nr: abs(nr.dot(back)) <= 0.30)
     torso_g = g
 
-    # trapezius hump between the shoulders: the brawler's hunch
+    # trapezius hump between the shoulders: the brawler's hunch. A ridge that arches from
+    # shoulder to shoulder over the spine, sunk into the back so no edge overhangs.
     sh = V(p.shoulder)
     if p.hump:
         k = p.hump
-        top_pt, top_tan = _path_at(sp, 0.78)
-        dz = _size_at(p.torso, sp, 0.78)[1]
-        crest = top_pt + _dorsal(top_tan) * (dz * 0.30) + V((0, 0, 0.02 * k))
-        hw_, hd_ = 0.15 + 0.035 * k, 0.13 + 0.03 * k
-        g = tube([Vector((-sh.x * 0.80, sh.y + 0.035, sh.z + 0.01)), crest, Vector((sh.x * 0.80, sh.y + 0.035, sh.z + 0.01))],
-                 [(hw_, hd_), (hw_ * 1.45, hd_ * 1.30), (hw_, hd_)], n=6, up=UP, cap0="point", cap1="point",
-                 d0=0.7, d1=0.7, color=ORANGE)
-        parts.bands(g, (-sh.x * 0.8, 0, 0), (sh.x * 0.8, 0, 0), 4, [stripe, None, None, stripe],
-                    where=lambda c, nr: nr.z > 0.15 or nr.y > 0.4)
+        top_pt, top_tan = _path_at(sp, 0.80)
+        tw_, td_ = _size_at(p.torso, sp, 0.80)
+        dors = _dorsal(top_tan)
+        crest = top_pt + dors * (td_ * 0.26) + V((0, 0, 0.035 + 0.035 * k))
+        fb, ht = td_ * (0.52 + 0.06 * k), 0.10 + 0.05 * k          # front-to-back, height
+        ends = [Vector((sx * sh.x * 0.84, sh.y + 0.03, sh.z + 0.005)) for sx in (-1, 1)]
+        mids = [Vector((sx * sh.x * 0.42, crest.y + 0.004, crest.z - 0.022)) for sx in (-1, 1)]
+        g = tube([ends[0], mids[0], crest, mids[1], ends[1]],
+                 [(fb * 0.62, ht * 0.7), (fb * 0.92, ht), (fb, ht * 1.08), (fb * 0.92, ht), (fb * 0.62, ht * 0.7)],
+                 n=6, up=(dors * 0.55 + UP).normalized(), cap0="point", cap1="point", d0=0.8, d1=0.8, color=ORANGE)
+        parts.zigzag(g, crest, (1, 0, 0), stripe, where=lambda c, nr: nr.z > -0.2)
         torso_g += g
 
     # chest organ: a dark kite-shaped pit gripped by four bone prongs; the glowing crystal
@@ -300,9 +303,10 @@ def build(stage: int) -> Rig:
         c, tan = _path_at(sp, t)
         dz = _size_at(p.torso, sp, t)[1]
         dors = _dorsal(tan)
-        if p.hump and 0.62 < t < 1.0:
-            dz *= 1.0 + 0.30 * p.hump * (1.0 - abs(t - 0.82) / 0.2) if abs(t - 0.82) < 0.2 else 1.0
-        base = c + dors * (dz * 0.5 - ln * 0.12)
+        lift = 0.0
+        if p.hump and abs(t - 0.80) < 0.16:                 # the ones that stand on the hump
+            lift = (0.05 + 0.05 * p.hump) * (1.0 - abs(t - 0.80) / 0.16)
+        base = c + dors * (dz * 0.5 - ln * 0.22) + V((0, 0, lift))
         lean = (dors * 0.80 + tan * -0.10 + V((0, 0.10, 0.50))).normalized()
         w = ln * 0.50 * p.spine_w
         if i == getattr(p, "broken_spine", -1):      # snapped off: a stump with a flat, pale break
@@ -770,17 +774,20 @@ FP_POSE = {
 
 POSES = {
     "fp": FP_POSE[2],
-    "roar": {"hips": {"x": -4}, "torso": {"x": -12}, "neck": {"x": -16}, "head": {"x": -22}, "jaw": {"x": 30},
-             "arm_L": {"x": 18, "z": 34}, "arm_R": {"x": 18, "z": -34}, "forearm_L": {"x": -38},
-             "forearm_R": {"x": -38}, "hand_L": {"x": -20}, "hand_R": {"x": -20},
+    # mid-roar: chest out, head thrown up, jaw wide, arms flung back, tail lashing
+    "roar": {"hips": {"x": -3}, "torso": {"x": -9}, "neck": {"x": -12}, "head": {"x": -16}, "jaw": {"x": 32},
+             "arm_L": {"x": 22, "z": 32}, "arm_R": {"x": 22, "z": -32}, "forearm_L": {"x": -42},
+             "forearm_R": {"x": -42}, "hand_L": {"x": -20}, "hand_R": {"x": -20},
              "tail_1": {"y": 10, "x": -6}, "tail_2": {"y": 12}, "tail_3": {"y": 14}, "tail_4": {"y": 16},
              "tail_5": {"y": 16}, "leg_L": {"x": -16}, "shin_L": {"x": 14}, "foot_L": {"x": 2},
              "leg_R": {"x": 12}, "shin_R": {"x": 4}, "foot_R": {"x": -16}},
-    "swipe": {"hips": {"y": -10}, "torso": {"y": -28, "x": 10}, "neck": {"y": 12}, "head": {"y": 14, "x": -6},
-              "jaw": {"x": 16}, "arm_R": {"x": -80, "y": 30, "z": -10}, "forearm_R": {"x": -30},
-              "hand_R": {"x": -25}, "arm_L": {"x": 30, "z": 22}, "forearm_L": {"x": -50},
-              "tail_1": {"y": -12}, "tail_2": {"y": -14}, "tail_3": {"y": -14}, "tail_4": {"y": -12},
-              "leg_R": {"x": -30}, "shin_R": {"x": 26}, "leg_L": {"x": 14}, "shin_L": {"x": 6}, "foot_L": {"x": -20}},
+    # mid-swipe: the right claw comes across the front, the body turns into it, the left arm cocks back
+    "swipe": {"hips": {"y": 8}, "torso": {"y": 24, "x": 8}, "neck": {"y": -8}, "head": {"y": -10, "x": -4},
+              "jaw": {"x": 18}, "arm_R": {"x": -72, "y": -30, "z": 34}, "forearm_R": {"x": 28},
+              "hand_R": {"x": -22}, "arm_L": {"x": 34, "z": 24}, "forearm_L": {"x": -55}, "hand_L": {"x": -15},
+              "tail_1": {"y": -14}, "tail_2": {"y": -14}, "tail_3": {"y": -14}, "tail_4": {"y": -12},
+              "tail_5": {"y": -10}, "leg_L": {"x": -24}, "shin_L": {"x": 20}, "foot_L": {"x": 4},
+              "leg_R": {"x": 16}, "shin_R": {"x": 6}, "foot_R": {"x": -22}},
     # every joint bent hard, to check that no gap opens
     "torture": {"torso": {"x": 25, "y": 25}, "neck": {"y": 40}, "head": {"y": 50, "x": -20}, "jaw": {"x": 40},
                 "arm_L": {"x": -60, "z": 30}, "forearm_L": {"x": -60}, "hand_L": {"x": -60},

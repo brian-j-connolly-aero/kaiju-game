@@ -63,6 +63,13 @@ function actions(events: SimEvent[]): Array<[KaijuActionEvent['action'], KaijuAc
   return eventsOf(events, 'kaijuAction').map((e) => [e.action, e.phase]);
 }
 
+/** The hatchling's body radius, and spots in front of it that depend on it rather than on today's numbers. */
+const R = radius(1);
+/** A prop of this kind standing just clear of the hatchling's feet (so it is not crushed), inside its reach. */
+function clearOf(kind: keyof typeof PROP_KINDS, gap = 0.9): number {
+  return R + PROP_KINDS[kind].radius + gap;
+}
+
 /** Gives a unit plenty of hp so a test can read damage numbers off it without killing it. */
 function toughen(world: World, id: number, hp = 10000): void {
   world.units[id].hp = hp;
@@ -293,9 +300,9 @@ describe('grab and throw', () => {
   it('picks up the nearest car in the arc; the car leaves the city and counts for the bar', () => {
     const world = arena({
       props: [
-        { kind: 'car_sedan', x: 0, z: 5.5 },
-        { kind: 'car_van', x: 1, z: 5 },
-        { kind: 'bus', x: 0, z: -7.5 },
+        { kind: 'car_sedan', x: 0, z: clearOf('car_sedan') },
+        { kind: 'car_van', x: 1, z: clearOf('car_van', 0.1) },
+        { kind: 'bus', x: 0, z: -clearOf('bus', 0.6) },
       ],
     });
     const k = world.kaijus[0];
@@ -327,7 +334,7 @@ describe('grab and throw', () => {
   });
 
   it('whiffs when nothing is in reach, and takes a wreck off the ground', () => {
-    let world = arena({ props: [{ kind: 'car_sedan', x: 0, z: 30 }, { kind: 'kiosk', x: 0, z: 5 }] });
+    let world = arena({ props: [{ kind: 'car_sedan', x: 0, z: R * A.grab.reach + 20 }, { kind: 'kiosk', x: 0, z: clearOf('kiosk', 0.6) }] });
     let events = [...tap(world, Btn.grab), ...untilIdle(world)];
     expect(world.kaijus[0].held).toBeNull();
     expect(eventsOf(events, 'kaijuHeld')).toEqual([]);
@@ -335,7 +342,7 @@ describe('grab and throw', () => {
     expect(bitGet(world.propAlive, 1)).toBe(true);
 
     // A car the kaiju stands on is crushed to a wreck, and the wreck can be picked up.
-    world = arena({ props: [{ kind: 'car_taxi', x: 0, z: 3 }] });
+    world = arena({ props: [{ kind: 'car_taxi', x: 0, z: R }] });
     play(world, 1);
     expect(bitGet(world.propAlive, 0)).toBe(false);
     expect(bitGet(world.propWreck, 0)).toBe(true);
@@ -350,7 +357,7 @@ describe('grab and throw', () => {
   it('throws what it holds at the aim point: tap grab again, or strike', () => {
     for (const button of [Btn.grab, Btn.strike]) {
       const world = arena({
-        props: [{ kind: 'car_sedan', x: 0, z: 5.5 }],
+        props: [{ kind: 'car_sedan', x: 0, z: clearOf('car_sedan') }],
         structures: [{ x: 30, z: 0, w: 8, d: 8, height: 6, hp: 1000 }],
       });
       const k = world.kaijus[0];
@@ -392,7 +399,7 @@ describe('grab and throw', () => {
 
   it('damages what the thrown object lands on: structures, and units in the impact radius', () => {
     const world = arena({
-      props: [{ kind: 'bus', x: 0, z: 7.2 }],
+      props: [{ kind: 'bus', x: 0, z: clearOf('bus', 0.3) }],
       structures: [{ x: 0, z: 28, w: 10, d: 8, height: 8, hp: 1000 }],
     });
     const k = world.kaijus[0];
@@ -493,7 +500,7 @@ describe('grab and throw', () => {
 
 describe('eat: grab held', () => {
   it('goes on from the grab to eat what it grabbed, healing when the meal is finished', () => {
-    const world = arena({ props: [{ kind: 'car_sedan', x: 0, z: 5.5 }] });
+    const world = arena({ props: [{ kind: 'car_sedan', x: 0, z: clearOf('car_sedan') }] });
     const k = world.kaijus[0];
     k.hp = 500;
     const timeline: Array<[number, string, string]> = [];
@@ -530,7 +537,7 @@ describe('eat: grab held', () => {
   });
 
   it('eats what it already holds when grab is held, and respects the cooldown', () => {
-    const world = arena({ props: [{ kind: 'car_sedan', x: 0, z: 5.5 }, { kind: 'car_taxi', x: 3, z: 5 }] });
+    const world = arena({ props: [{ kind: 'car_sedan', x: 0, z: clearOf('car_sedan') }, { kind: 'car_taxi', x: 3, z: clearOf('car_taxi', 0.6) }] });
     const k = world.kaijus[0];
     k.hp = 500;
     tap(world, Btn.grab);
@@ -562,7 +569,7 @@ describe('eat: grab held', () => {
   });
 
   it('eats an edible off the ground when the grab finds nothing to pick up', () => {
-    const world = arena({ props: [{ kind: 'kiosk', x: 0, z: 5 }] });
+    const world = arena({ props: [{ kind: 'kiosk', x: 0, z: clearOf('kiosk', 0.6) }] });
     const k = world.kaijus[0];
     k.hp = k.maxHp - 10;
     const events = [...play(world, ticksFor(A.eat.holdTime) + 3, { buttons: Btn.grab }), ...untilIdle(world)];
@@ -582,7 +589,7 @@ describe('eat: grab held', () => {
   });
 
   it('loses the meal and the heal when its nerve breaks mid-bite', () => {
-    const world = arena({ props: [{ kind: 'car_sedan', x: 0, z: 5.5 }] });
+    const world = arena({ props: [{ kind: 'car_sedan', x: 0, z: clearOf('car_sedan') }] });
     const k = world.kaijus[0];
     k.hp = 500;
     play(world, ticksFor(A.eat.holdTime) + 10, { buttons: Btn.grab });
@@ -866,7 +873,7 @@ describe('the molt', () => {
     const world = arena({
       marks: [10, 1e6, 2e6],
       structures: [{ x: 100, z: 100, w: 10, d: 10, height: 20, hp: 100, value: 40 }],
-      props: [{ kind: 'car_sedan', x: 0, z: 5.5 }],
+      props: [{ kind: 'car_sedan', x: 0, z: clearOf('car_sedan') }],
     });
     const k = world.kaijus[0];
     const hold = ticksFor(A.molt.holdTime);

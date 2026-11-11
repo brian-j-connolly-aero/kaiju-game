@@ -32,7 +32,7 @@ DEFAULTS = {
         "drive_db": 7.0,                 # into a soft clipper: light overdrive
         "static_db": -30.0,              # static bed, relative to the speech level
         "crackle_per_s": 5.0,
-        "squelch_db": -9.0,              # squelch bursts, relative to the speech peak
+        "squelch_db": -5.0,              # squelch bursts, relative to the speech level
         "open_ms": 55.0,                 # key-up click and burst
         "lead_ms": 35.0,                 # bed only, before the first word
         "tail_ms": 45.0,                 # bed only, after the last word
@@ -47,7 +47,7 @@ DEFAULTS = {
         "comp_ratio": 2.5,
         "comp_attack_ms": 6.0,
         "comp_release_ms": 140.0,
-        "tone_db": -50.0,                # studio tone (room noise and faint mains hum), relative to speech level
+        "tone_db": -44.0,                # studio tone (room noise and faint mains hum), relative to speech level
         "hum_hz": 60.0,
         "lead_ms": 40.0,
         "tail_ms": 90.0,
@@ -164,7 +164,6 @@ def radio(x: np.ndarray, cfg: dict, rng: np.random.Generator) -> tuple[np.ndarra
     v = butter(v, SR, "highpass", lo, 2)
     v = butter(v, SR, "lowpass", hi * 1.12, 4)        # keep a little of the grit above the corner
     level = speech_level(v)
-    peak = np.max(np.abs(v))
 
     n_open = int(SR * cfg["open_ms"] / 1000)
     n_lead = int(SR * cfg["lead_ms"] / 1000)
@@ -176,7 +175,7 @@ def radio(x: np.ndarray, cfg: dict, rng: np.random.Generator) -> tuple[np.ndarra
     out[start:start + len(v)] = v
 
     # 2. static bed for as long as the channel is open: hiss with slow flutter and sparse crackle
-    hiss = _noise(rng, total, lo * 1.2, hi)
+    hiss = _noise(rng, total, lo, hi)
     flutter = butter(rng.standard_normal(total + 4000), SR, "lowpass", 6.0, 2)[4000:]
     flutter = flutter / (np.max(np.abs(flutter)) + 1e-12)
     bed = hiss * gain(2.5 * flutter)
@@ -185,30 +184,29 @@ def radio(x: np.ndarray, cfg: dict, rng: np.random.Generator) -> tuple[np.ndarra
         i = int(rng.integers(0, total - 200))
         k = int(rng.integers(20, 120))
         crack[i:i + k] += rng.standard_normal(k) * np.exp(-np.arange(k) / (k / 4)) * rng.uniform(1.5, 4.0)
-    crack = butter(crack, SR, "bandpass", [lo * 1.5, hi], 2)
-    bed = (bed + crack) * level * gain(cfg["static_db"])
-    out += bed
+    fx = (bed + crack) * level * gain(cfg["static_db"])
 
     # 3. squelch: key-up click and a short falling burst; at the end a short squelch tail of
     #    receiver noise that is cut off, and the key-off click
-    sq = peak * gain(cfg["squelch_db"])
+    sq = level * gain(cfg["squelch_db"])
     t = np.arange(n_open) / SR
-    burst = _noise(rng, n_open, 600.0, 3600.0) * np.exp(-t / (cfg["open_ms"] / 1000 / 3.0)) * 0.45
-    out[:n_open] += sq * burst
+    fx[:n_open] += sq * _noise(rng, n_open, lo, hi) * np.exp(-t / (cfg["open_ms"] / 1000 / 3.0)) * 1.4
     c = _click(rng)
-    out[: len(c)] += sq * 1.1 * c
+    fx[: len(c)] += sq * 4.0 * c
     t = np.arange(n_close) / n_close
     shape = np.minimum(1.0, t / 0.12) * (1.0 - 0.35 * t)       # fast rise, slight fall, then cut
     cut = max(2, int(SR * 0.003))
     shape[-cut:] *= np.linspace(1, 0, cut)
-    tail = _noise(rng, n_close, 500.0, 3800.0) * shape * 0.5
-    out[total - n_close:] += sq * tail
+    fx[total - n_close:] += sq * _noise(rng, n_close, lo, hi) * shape * 1.25
     c = _click(rng)
-    k0 = total - len(c) - 1
-    out[k0:k0 + len(c)] += sq * 0.9 * c
-    # the bed ends with the squelch tail; a 2 ms fade keeps the last sample at zero
+    k0 = total - len(c) - int(SR * 0.004)
+    fx[k0:k0 + len(c)] += sq * 3.2 * c
+    # static and squelch come out of the same small speaker as the voice
+    fx = butter(fx, SR, "highpass", lo, cfg["hp_order"])
+    fx = butter(fx, SR, "lowpass", hi * 1.12, 4)
+    out += fx
     out[:44] *= np.linspace(0, 1, 44)
-    out[-88:] *= np.linspace(1, 0, 88)
+    out[-132:] *= np.linspace(1, 0, 132)                       # 3 ms: the last sample is zero
     return out, (start / SR, (start + len(v)) / SR)
 
 
