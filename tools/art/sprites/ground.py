@@ -3,6 +3,13 @@
 Every drawing call wraps around the edges of the tile (coordinates are taken modulo 64), so
 a tuft or a crack that leaves on the right comes back in on the left and the tile repeats
 without seams. The base color of each tile is its palette anchor from docs/ASSETS.md.
+
+Scale: the game lays one tile over 8 x 8 meters (TILE in client/src/render/ground.ts), so a
+ground pixel is 12.5 cm, almost twice the 6.9 cm of a character pixel. A paving slab one
+meter across is 8 pixels; anything drawn larger than a few pixels is larger than a person.
+The tiles cover most of the screen and are seen at grazing angles from a soldier's eye and
+from far above by a titan, so they are kept quiet: any strong repeating mark shows up as a
+lattice across the whole city.
 """
 from __future__ import annotations
 
@@ -13,6 +20,7 @@ import numpy as np
 from pix import Img, col, mix
 
 T = 64
+METERS_PER_TILE = 8.0        # how the game maps a tile (see above)
 
 
 class Tile:
@@ -116,40 +124,33 @@ def asphalt() -> Img:
 # ---- sidewalk -------------------------------------------------------------------------------
 
 def sidewalk() -> Img:
-    """Pavement: staggered concrete slabs, 16 x 16 pixels, each a touch different, with a lit
-    upper-left edge, dark joints and the odd chip or stain."""
+    """Pavement, the base land of the whole city and so the most-seen texture in the game:
+    plain square slabs on a straight grid, 8 x 8 pixels each (one meter in the game), parted
+    by one quiet joint line. No bevels and no running bond (they read as a brick wall laid
+    flat); the slabs differ in brightness by no more than 2 percent, so no lattice shows
+    from a titan's height. The slab tone is a touch lighter than the palette anchor so that
+    slabs and joints together average to the anchor #b9bcc6."""
     rng = np.random.default_rng(12)
-    base = col("sidewalk")                   # #b9bcc6
-    tones = [base, col("#c1c4cd"), col("#b2b5c0"), col("#bcbfc9")]
-    joint, hi, speck_d, speck_l = col("#9a9daa"), col("#cfd2da"), col("#a9acb8"), col("#c9ccd5")
-    t = Tile(base)
-    for row in range(4):
-        off = 8 if row % 2 else 0
-        for c in range(4):
-            x0, y0 = c * 16 + off, row * 16
-            tone = tones[int(rng.integers(len(tones)))]
-            t.rect(x0, y0, x0 + 15, y0 + 15, tone)
-            t.hline(x0, x0 + 15, y0 + 15, joint)           # joint below
-            t.vline(x0 + 15, y0, y0 + 15, joint)           # joint at the right
-            t.hline(x0, x0 + 14, y0, hi)                   # lit top edge
-            t.vline(x0, y0, y0 + 14, hi)                   # lit left edge
-            for _ in range(int(rng.integers(3, 7))):
-                sx, sy = x0 + rng.integers(2, 14), y0 + rng.integers(2, 14)
-                t.px(sx, sy, speck_d if rng.random() < 0.6 else speck_l)
-            if rng.random() < 0.25:                        # a chipped corner
-                t.px(x0 + 14, y0 + 14, joint).px(x0 + 13, y0 + 14, speck_d).px(x0 + 14, y0 + 13, speck_d)
-            if rng.random() < 0.2:                         # a short crack
-                cx, cy = x0 + int(rng.integers(3, 9)), y0 + int(rng.integers(3, 10))
-                for i in range(int(rng.integers(3, 6))):
-                    t.px(cx + i, cy + (i // 2), speck_d)
+    joint = col("#a9acb8")
+    tones = [col("#bec1ca"), col("#bbbec7"), col("#c1c4cd"), col("#bec1ca")]       # within 2% of each other
+    speck_d, speck_l = col("#b6b9c3"), col("#c5c8d0")
+    t = Tile(tones[0])
+    for row in range(8):
+        for c in range(8):
+            x0, y0 = c * 8, row * 8
+            t.rect(x0, y0, x0 + 7, y0 + 7, tones[int(rng.integers(len(tones)))])
+            t.hline(x0, x0 + 7, y0 + 7, joint)             # joint below
+            t.vline(x0 + 7, y0, y0 + 7, joint)             # joint at the right
+            if rng.random() < 0.3:                         # a grain of grit on some slabs
+                t.px(x0 + rng.integers(1, 6), y0 + rng.integers(1, 6), speck_d if rng.random() < 0.6 else speck_l)
     return t.img()
 
 
 # ---- grass ----------------------------------------------------------------------------------
 
 def grass() -> Img:
-    """Lawn: bright model-railway green with darker and lighter tufts of blades and a
-    sprinkle of tiny flowers."""
+    """Lawn: bright model-railway green with darker and lighter tufts of blades and two
+    tiny flowers."""
     rng = np.random.default_rng(13)
     base = col("grass")                      # #4fbf5f
     dk, dk2, lt, lt2 = col("#3fa652"), col("#36934a"), col("#63d273"), col("#84e38f")
@@ -169,7 +170,9 @@ def grass() -> Img:
             t.art(la, int(x) + int(rng.integers(-1, 3)), int(y) - 2, {"l": lt if rng.random() < 0.7 else lt2})
     for (x, y) in scatter(rng, 60, 4.0):
         t.px(x, y, lt if rng.random() < 0.6 else dk)
-    for (x, y), c in zip(scatter(rng, 5, 16.0), ("#ffffff", "#ffe45a", "#ffffff", "#ffb3d1", "#ffe45a")):
+    # two flowers only, white and pink: more of them line up into a lattice from above, and
+    # yellow is reserved for charging volleys
+    for (x, y), c in zip(scatter(rng, 2, 24.0), ("#dff5e1", "#ffb3d1")):
         t.px(x, y, c)
         t.px(x, y + 1, dk2)
     return t.img()
@@ -216,79 +219,67 @@ def water() -> Img:
 # ---- rubble ---------------------------------------------------------------------------------
 
 def rubble() -> Img:
-    """Flattened ground: crushed grey gravel strewn with broken slabs and blocks. Each chunk
-    has a lit upper-left edge, a dark lower-right edge and a one-pixel shadow; a few short
-    rusty lines are bent reinforcing bars. Everything is spread evenly so no single piece
-    gives the repeat away."""
+    """Flattened ground. The design says destroyed ground turns flat grey, and soldiers have
+    to read against it, so this is the quietest tile after asphalt: fine grit within ten
+    percent of the anchor #8d8d94, at most six broken slabs a little lighter than the grit,
+    each with a one-pixel shadow along its lower right side only (no light rim), and three
+    small brick-red flecks."""
     from PIL import Image, ImageDraw
     rng = np.random.default_rng(16)
     base = col("rubble_grey")                # #8d8d94
-    grit = [col("#7f7f87"), col("#85858c"), col("#96969d"), col("#96969d")]
-    chunk_tones = [col("#9d9da4"), col("#aaaab1")]
-    edge_dark = col("#75757d")
-    shadow, hi, rust = col("#5c5c65"), col("#c6c6cc"), col("#7c5f58")
+    grit_dk, grit_lt = col("#84848b"), col("#95959c")       # about 6% either side
+    grit_dk2 = col("#7f7f86")                               # 10% down, used sparingly
+    slab_tones = [col("#96969d"), col("#9a9aa1")]
+    shadow = col("#77777e")
+    brick = col("#9c6f66")
     t = Tile(base)
-    # crushed gravel: two sizes of grit
-    n = wrap_noise(rng, 8, 2)
-    t.a[n > 0.60] = grit[2]
-    t.a[n < 0.40] = grit[1]
-    for (x, y) in scatter(rng, 260, 1.8):
-        c = grit[int(rng.integers(len(grit)))]
+    # crushed gravel: soft patches, then single grains
+    n = wrap_noise(rng, 16, 2)
+    t.a[n > 0.62] = col("#919198")
+    t.a[n < 0.38] = col("#89898f")
+    for (x, y) in scatter(rng, 230, 2.0):
+        r = rng.random()
+        c = grit_dk if r < 0.5 else (grit_lt if r < 0.93 else grit_dk2)
         t.px(x, y, c)
-        if rng.random() < 0.3:
+        if rng.random() < 0.25:
             t.px(x + 1, y, c)
-    for (x, y) in scatter(rng, 40, 5.0):
-        t.px(x, y, shadow)
-    # reinforcing bars: short kinked rusty lines
-    for (x, y) in scatter(rng, 4, 22.0):
-        ang = rng.uniform(0, math.pi)
-        for i in range(int(rng.integers(6, 10))):
-            t.px(x, y, rust)
-            t.px(x + 1, y + 1, shadow)
-            if i == 4:
-                ang += rng.uniform(-0.9, 0.9)
-            x += math.cos(ang)
-            y += math.sin(ang)
-    # chunks: angular pieces, big ones first so small ones lie on top
-    sizes = [7.5] * 5 + [5.5] * 9 + [3.6] * 14 + [2.4] * 16
-    spots = scatter(rng, len(sizes), 6.5)
-    for (cx, cy), r in zip(spots, sizes):
-        k = int(rng.integers(4, 7))
+    # six slabs, about a meter across, well apart so none of them pairs up into a pattern
+    spots = scatter(rng, 6, 19.0)
+    for k, (cx, cy) in enumerate(spots):
+        r = 4.6 + 2.2 * rng.random()
+        sides = int(rng.integers(4, 6))
         a0 = rng.uniform(0, 2 * math.pi)
-        squash = rng.uniform(0.55, 1.0)
+        squash = rng.uniform(0.6, 0.9)
         rot = rng.uniform(0, math.pi)
         pts = []
-        for i in range(k):
-            ang = a0 + (i + rng.uniform(-0.25, 0.25)) / k * 2 * math.pi
-            rr = r * rng.uniform(0.75, 1.1)
+        for i in range(sides):
+            ang = a0 + (i + rng.uniform(-0.2, 0.2)) / sides * 2 * math.pi
+            rr = r * rng.uniform(0.8, 1.1)
             px_, py_ = math.cos(ang) * rr, math.sin(ang) * rr * squash
             pts.append((16 + px_ * math.cos(rot) - py_ * math.sin(rot),
                         16 + px_ * math.sin(rot) + py_ * math.cos(rot)))
         m = Image.new("L", (32, 32), 0)
         ImageDraw.Draw(m).polygon(pts, fill=255)
         m = np.asarray(m) > 0
-        tone = chunk_tones[int(rng.integers(len(chunk_tones)))]
-        if rng.random() < 0.14:                 # a trace of brick or plaster, heavily greyed
-            tone = mix("#b87862", base, 0.68) if rng.random() < 0.5 else mix("#ddd3b8", base, 0.6)
-        dark = edge_dark
+        tone = slab_tones[k % len(slab_tones)]
         ox, oy = int(round(cx)) - 16, int(round(cy)) - 16
-        pad = np.pad(m, 1)
-        lit = m & (~pad[:-2, 1:-1] | ~pad[1:-1, :-2])            # nothing above or to the left
-        shade_ = m & (~pad[2:, 1:-1] | ~pad[1:-1, 2:]) & ~lit    # nothing below or to the right
         for j in range(32):
             for i in range(32):
                 if m[j, i]:
-                    c = hi if (lit[j, i] and r > 3) else (dark if shade_[j, i] else tone)
-                    t.px(ox + i, oy + j, c)
-                elif (j > 0 and i > 0 and m[j - 1, i - 1]) or (j > 0 and m[j - 1, i] and r > 3):
-                    t.px(ox + i, oy + j, shadow)                 # cast shadow, down and right
-        if r > 5 and rng.random() < 0.7:        # a crack across a big slab
-            x, y = cx - r * 0.5, cy + rng.uniform(-1, 1)
-            for i in range(int(r)):
-                if m[int(round(y)) - oy, int(round(x)) - ox]:
-                    t.px(x, y, dark)
+                    t.px(ox + i, oy + j, tone)
+                elif j > 0 and i > 0 and m[j - 1, i - 1]:
+                    t.px(ox + i, oy + j, shadow)             # the one shadow line, down and right
+        if k % 2 == 0:                          # a hairline crack across every other slab
+            x, y = cx - r * 0.45, cy + rng.uniform(-1, 1)
+            for i in range(int(r * 0.9)):
+                if 0 <= int(round(y)) - oy < 32 and 0 <= int(round(x)) - ox < 32 and m[int(round(y)) - oy, int(round(x)) - ox]:
+                    t.px(x, y, base)
                 x += 1
-                y += rng.choice([-1, 0, 0, 1]) * 0.6
+                y += rng.choice([-1, 0, 0, 1]) * 0.5
+    # three brick flecks: what is left of a wall
+    for (x, y) in scatter(rng, 3, 20.0):
+        t.px(x, y, brick).px(x + 1, y, brick)
+        t.px(x + 1, y + 1, shadow)
     return t.img()
 
 
@@ -316,3 +307,26 @@ def seam_error(img: Img) -> float:
     wrap_x = np.abs(a[:, 0] - a[:, -1]).mean()
     wrap_y = np.abs(a[0, :] - a[-1, :]).mean()
     return float(max(wrap_x / max(inner_x, 1e-6), wrap_y / max(inner_y, 1e-6)))
+
+
+ANCHORS = {
+    "ground_asphalt": "road", "ground_sidewalk": "sidewalk", "ground_grass": "grass",
+    "ground_water": "water", "ground_rubble": "rubble_grey",
+}
+
+
+def anchor_error(name: str, img: Img) -> int:
+    """How far the tile's average color is from its palette anchor: the largest difference
+    of the three channels, in steps of 1/255."""
+    avg = img.a[..., :3].reshape(-1, 3).astype(np.float64).mean(axis=0)
+    want = np.array(col(ANCHORS[name])[:3], np.float64)
+    return int(np.ceil(np.abs(avg - want).max() - 1e-9))
+
+
+def busyness(img: Img) -> float:
+    """How loud the tile is: the spread of its brightness (5th to 95th percentile of
+    luminance, 0..1). Rubble must stay under 0.07, about half of its first version."""
+    a = img.a[..., :3].astype(np.float64) / 255.0
+    lum = a @ np.array([0.2126, 0.7152, 0.0722])
+    lo, hi = np.percentile(lum, [5, 95])
+    return float(hi - lo)

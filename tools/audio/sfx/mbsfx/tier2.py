@@ -32,6 +32,13 @@ C3, D3, E3, F3, A3, D4, F4, A4, D5, FS5, A5, D6 = (130.81, 146.83, 164.81, 174.6
                                                     587.33, 739.99, 880.0, 1174.66)
 
 
+def _dense(x: np.ndarray) -> np.ndarray:
+    """Soft-saturate a bass layer. Low noise has rare tall peaks; left alone they would set the
+    level of the whole roar and only make the limiter work. The harmonics this adds also carry
+    the bass on small speakers. Unit RMS."""
+    return parts.unit(np.tanh(1.2 * parts.unit(x)))
+
+
 # ---- Krabulon, the Crab ------------------------------------------------------------------------
 def _crab_roar(rng: np.random.Generator, stage: int) -> np.ndarray:
     dur = ROAR_SECONDS[stage]
@@ -47,9 +54,12 @@ def _crab_roar(rng: np.random.Generator, stage: int) -> np.ndarray:
     rate = curve([(0, r0), (a, r1), (b, r1 * 0.8), (1, r0 * 0.6)], dur, n, "exp")
     count = np.floor(np.cumsum(rate) / SR)
     hits = np.nonzero(np.diff(count, prepend=-1.0) > 0)[0]
-    loud = curve([(0, 0.5), (a * 0.9, 1.0), (a + 0.04, 0.3), (b, 0.22), (b + 0.05, 0.45), (1, 0.0)], dur, n)
-    knocks = parts.modal_kernels(rng, 4, 380 * k, 900 * k, 0.035 * size, 0.07 * size, ratios=(1.0, 1.83, 2.94, 4.3),
+    loud = curve([(0, 0.6), (a * 0.9, 1.0), (a + 0.04, 0.3), (b, 0.22), (b + 0.05, 0.45), (1, 0.0)], dur, n)
+    knocks = parts.modal_kernels(rng, 4, 380 * k, 900 * k, 0.06 * size, 0.11 * size, ratios=(1.0, 1.83, 2.94, 4.3),
                                  damp=0.55, tick=0.9)
+    # a claw is a heavy thing: under the clack of the shell, the thud of its weight
+    knocks = [parts.norm(kn + 0.9 * dsp.fit(parts.thump(n_(0.16 * size), 190 * k, 95 * k, 0.02, 0.12 * size), len(kn)))
+              for kn in knocks]
     claws = np.zeros((n, 2))
     for i, s in enumerate(hits):
         seg = dsp.pan(knocks[(i % 2) * 2 + int(rng.integers(2))], -0.55 if i % 2 == 0 else 0.55)
@@ -72,17 +82,20 @@ def _crab_roar(rng: np.random.Generator, stage: int) -> np.ndarray:
     src = (0.8 * honk + 1.1 * dsp.noise(n, rng, -3.0)) * (0.12 + 0.88 * rasp)
     opening = curve([(0, 0.0), (a - 0.03, 0.1), (a + 0.03, 1.0), (b, 0.9), (b + 0.12, 0.3), (1, 0.0)], dur, n)
 
+    ring = {1: 1.0, 2: 1.25, 3: 1.6}[stage]        # a bigger shell is lower; its upper resonances keep it heard
+
     def shell(f, tm):
         o = np.interp(tm, t, opening)
         m = (dsp.lorentz(f, k * 250, k * 60) + 0.9 * dsp.lorentz(f, k * 610, k * 90)
-             + (0.25 + 0.6 * o) * dsp.lorentz(f, k * 1180, k * 150) + (0.1 + 0.45 * o) * dsp.lorentz(f, k * 2050, k * 260)
-             + 0.15 * o * dsp.lorentz(f, k * 3300, k * 500))
+             + ring * (0.3 + 0.75 * o) * dsp.lorentz(f, k * 1180, k * 150)
+             + ring * (0.12 + 0.6 * o) * dsp.lorentz(f, k * 2050, k * 260) + ring * 0.25 * o * dsp.lorentz(f, k * 3300, k * 500))
         return m * dsp.lowpass_mask(f, k * 5000, 2)
 
     bellow = parts.unit(dsp.spectral_shape(src, shell, 1024))
-    bellow_env = curve([(0, 0.0), (a - 0.05, 0.0), (a - 0.01, 0.25), (a + 0.03, 1.0), (b, 1.0), (b + 0.1, 0.4),
+    # under the clatter the bellow is already there, mouth shut: a low rasping breath being drawn
+    bellow_env = curve([(0, 0.05), (a * 0.6, 0.1), (a - 0.01, 0.28), (a + 0.03, 1.0), (b, 1.0), (b + 0.1, 0.4),
                         (0.9, 0.12), (1, 0.0)], dur, n)
-    sub = dsp.sine(pitch * 0.5) * (0.4 + 0.6 * rasp) + 0.8 * parts.unit(dsp.lp(dsp.noise(n, rng, -6.0), 90.0 * k ** 0.5, 2))
+    sub = _dense(dsp.sine(pitch * 0.5) * (0.4 + 0.6 * rasp) + 0.8 * parts.unit(dsp.lp(dsp.noise(n, rng, -6.0), 90.0 * k ** 0.5, 2)))
     sub_env = curve([(0, 0.0), (a, 0.2), (a + 0.05, 0.8), (b, 1.0), (b + 0.15, 0.6), (1, 0.0)], dur, n)
 
     # hiss: steam and foam let go when the bellow ends, with bubbles popping in it
@@ -100,9 +113,9 @@ def _crab_roar(rng: np.random.Generator, stage: int) -> np.ndarray:
         dsp.put(foam, bubble, t0, rng.uniform(0.3, 1.0))
 
     voiced = (dsp.drive(bellow * bellow_env * 0.5, 2.2) * 2.0 + 0.3 * hiss * hiss_env + 0.12 * foam
-              + {1: 0.1, 2: 0.22, 3: 0.32}[stage] * sub * sub_env)
+              + {1: 0.13, 2: 0.26, 3: 0.34}[stage] * sub * sub_env)
     voiced = dsp.hp(voiced, {1: 60.0, 2: 38.0, 3: 24.0}[stage])
-    return roar_space(rng, dsp.fade(0.5 * claws + voiced[:, None], 0.002, 0.01), stage, size)
+    return roar_space(rng, dsp.fade(0.8 * claws + voiced[:, None], 0.002, 0.01), stage, size)
 
 
 # ---- Drillmaw, the Burrower --------------------------------------------------------------------
@@ -139,20 +152,24 @@ def _burrower_roar(rng: np.random.Generator, stage: int) -> np.ndarray:
         return m * dsp.lowpass_mask(f, np.interp(tm, t, surface), 2)
 
     growl = parts.unit(dsp.spectral_shape(src + 0.7 * bit, throat, 2048))
+    # the whine of the drill itself, outside the throat: it is what climbs, so it is what is heard winding up
+    whine = parts.unit(dsp.fm(pitch * 8.0, 1.41, 0.8 + 1.6 * bite) + 0.6 * dsp.fm(pitch * 12.06, 2.76, 0.5 + bite)) * bite ** 1.5
     grind_f = curve([(0, 180.0), (a, 420.0), (b, 2400.0 * k), (b + 0.1, 1500.0 * k), (1, 260.0)], dur, n, "exp")
     grind = parts.whoosh(n, rng, grind_f, 0.9, slope=-2.0)                   # rock being ground to gravel
     rocks = parts.rubble(n, rng, curve([(0, 300), (a, 900), (b, 2600), (b + 0.1, 1500), (0.95, 150), (1, 0)], dur, n),
                          1.6 * size, knocks=0.04)
-    low = parts.unit(dsp.lp(dsp.noise(n, rng, -6.0), 85.0 * k ** 0.5, 2)) + 0.9 * dsp.sine(pitch * 0.5)
+    low = _dense(parts.unit(dsp.lp(dsp.noise(n, rng, -6.0), 85.0 * k ** 0.5, 2)) + 0.9 * dsp.sine(pitch * 0.5))
 
+    surfaced = curve([(0, 0.2), (a - 0.04, 0.3), (a + 0.04, 1.0), (1, 1.0)], dur, n)       # loose rock only rattles above ground
     depth = curve([(0, 0.35), (a, 0.7), (b, 0.85), (1, 0.6)], dur, n)
     chop = 1.0 - depth * (1.0 - teeth)
     growl_env = curve([(0, 0.25), (a - 0.03, 0.55), (a + 0.03, 1.0), (b, 1.0), (b + 0.1, 0.6), (0.9, 0.2), (1, 0.0)], dur, n)
     grind_env = curve([(0, 0.1), (a, 0.4), (b, 1.0), (b + 0.12, 0.5), (1, 0.0)], dur, n)
     low_env = curve([(0, 0.7), (a, 1.0), (b, 0.8), (b + 0.15, 0.9), (0.92, 0.4), (1, 0.0)], dur, n)
-    y = (dsp.drive((growl * growl_env + 0.55 * grind * grind_env) * chop * 0.34, 2.5) * 2.2 + 0.04 * rocks * growl_env
-         + {1: 0.2, 2: 0.32, 3: 0.42}[stage] * low * low_env * (0.6 + 0.4 * teeth))
-    y = dsp.hp(y, {1: 50.0, 2: 32.0, 3: 22.0}[stage])
+    cut = {1: 1.0, 2: 1.25, 3: 1.55}[stage]         # the bigger the drill, the more of the roar is rock and metal
+    y = (dsp.drive((growl * growl_env + 0.55 * cut * grind * grind_env + 0.3 * cut * whine) * chop * 0.34, 2.5) * 2.2
+         + 0.04 * rocks * growl_env * surfaced + {1: 0.2, 2: 0.26, 3: 0.27}[stage] * low * low_env * (0.6 + 0.4 * teeth))
+    y = dsp.hp(y, {1: 50.0, 2: 34.0, 3: 28.0}[stage])
     return roar_space(rng, dsp.fade(y, 0.004, 0.01), stage, size)
 
 
@@ -183,6 +200,9 @@ def _moth_roar(rng: np.random.Generator, stage: int) -> np.ndarray:
     f = line * (1.0 + wobble * trill + 0.006 * dsp.wander(n, rng, 5.0))
     edge = size * curve([(0, 0.4), (a, 1.0), (a + 0.04, 1.9), (b, 1.7), (1, 0.5)], dur, n)
     reed = dsp.fm(f, 2.0, edge) + 0.8 * dsp.fm(f * 1.4142 * (1.0 + 0.004 * dsp.wander(n, rng, 3.0)), 2.0, 0.8 * edge)
+    # an insect does not sing, it scrapes: the tone is a comb drawn over a file, a buzz of fast pulses
+    scrape = {1: 150.0, 2: 115.0, 3: 85.0}[stage] * (1.0 + 0.07 * dsp.wander(n, rng, 6.0))
+    reed = reed * (1.0 - 0.5 * (0.5 + 0.5 * dsp.saw(scrape, start=rng.random())) ** 2)
     chirp = 1.0 - curve([(0, 0.2), (a, 0.4), (b, 0.6), (b + 0.1, 0.85), (1, 0.95)], dur, n) * (0.5 - 0.5 * trill)
     breath = parts.unit(dsp.spectral_shape(
         dsp.noise(n, rng), lambda fr, tm: dsp.bump(fr, np.interp(tm, t, line), 0.1) + 0.5 * dsp.bump(fr, 1.4142 * np.interp(tm, t, line), 0.1),
@@ -197,7 +217,7 @@ def _moth_roar(rng: np.random.Generator, stage: int) -> np.ndarray:
 
     y = (dsp.drive(parts.unit(reed) * chirp * shriek_env * 0.45, 1.6) * 1.6 + 0.3 * breath * chirp * shriek_env
          + {1: 0.1, 2: 0.25, 3: 0.42}[stage] * parts.unit(chest) * chirp * shriek_env
-         + 0.5 * wings * wing_env + {1: 0.1, 2: 0.3, 3: 0.5}[stage] * push * wing_env + 0.1 * dust)
+         + 0.5 * wings * wing_env + {1: 0.1, 2: 0.3, 3: 0.5}[stage] * push * wing_env + 0.22 * dust)
     y = dsp.hp(y, {1: 70.0, 2: 45.0, 3: 30.0}[stage])
     return roar_space(rng, dsp.fade(y, 0.004, 0.01), stage, size)
 
@@ -283,7 +303,7 @@ def heli_loop(rng, v):
     return dsp.drive(y * 0.6, 1.4)
 
 
-@sfx("jet_flyby", "tier2", level=-15.0,
+@sfx("jet_flyby", "tier2", level=-16.0,
      use="A pair of jets on a strafing pass: the whine comes in high, drops as they go over, and the roar rolls "
          "away behind them. Start it about 1.2 s before they cross the target.")
 def jet_flyby(rng, v):
@@ -473,7 +493,7 @@ def bell(rng, v):
     return dsp.reverb(dry, dsp.space_ir(rng, 1.2, pre=0.012, bright=5000, dark=900, echoes=((0.19, 0.2, 2200.0),)), 0.14)
 
 
-@sfx("relic_open", "tier2", level=-13.0, clip=True,
+@sfx("relic_open", "tier2", level=-14.5, clip=True,
      use="The pontiff opens the Ark: the lid grinds aside, voices and light swell, then the relic lets go. The "
          "blast is 1.9 s in: start it that long before the cone fires.")
 def relic_open(rng, v):
@@ -508,6 +528,8 @@ def relic_open(rng, v):
     k = n - n_(blast)
     burst = parts.burst(k, rng, 13000, 300, 0.09, 1.2) + parts.thump(k, 82, 28, 0.1, 1.3, attack=0.004, harm=0.4, sat=2.2)
     center = dsp.mix((lid, 0.6), (shimmer, 0.12), (riser, 0.1), (burst, 1.1, blast))
-    dry = np.stack([center + 0.45 * left + 0.06 * glint, center + 0.45 * right + 0.06 * np.roll(glint, 441)], axis=1)
+    # each half of the choir leans to its side but is heard on both, so little is lost on one speaker
+    dry = np.stack([center + 0.45 * (0.85 * left + 0.3 * right) + 0.06 * glint,
+                    center + 0.45 * (0.85 * right + 0.3 * left) + 0.06 * np.roll(glint, 441)], axis=1)
     ir = dsp.space_ir(rng, 2.6, pre=0.03, bright=6000, dark=1200, stereo=True, low_cut=120.0)
     return dsp.reverb(dsp.fade(dry, 0.01, 0.3), ir, 0.3)

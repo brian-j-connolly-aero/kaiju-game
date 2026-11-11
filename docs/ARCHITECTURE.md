@@ -78,7 +78,9 @@ client/                   @mb/client
   public/assets/          models/ textures/ sprites/ audio/{music,sfx,voice}/ ui/  + manifest.json
 tools/art/                Blender Python sources for every model (source of truth for art)
 tools/audio/              music, sound-effect and voice generators (source of truth for audio)
-tools/playtest/           Playwright scripts: smoke.mjs (multi-client match), shots.mjs (stage screenshots)
+tools/playtest/           Playwright scripts: smoke.mjs (multi-client match on autoplay), shots.mjs (stage
+                          screenshots), scripted.mjs (two sessions played with real key and mouse events,
+                          every action judged by what the server sent back), driver.mjs (the hands it uses)
 tools/build-manifest.mjs  the `assets:manifest` script: merges partial manifests, checks files
 deploy/                   Containerfile, compose file with cloudflared, Windows and WSL scripts
 docs/                     requirements.md, DESIGN.md, ARCHITECTURE.md, ASSETS.md, art previews
@@ -411,8 +413,14 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
 ### 4.4 Running the server
 
 - HTTP on the same port: `GET /healthz` (JSON: `ok`, `protocol`, `uptime`, `rooms`, `players`,
-  `fast`), the built client from `client/dist` when it exists, and the game page for any other
-  page address. Build files with a content hash in their name are cached for good; everything
+  `fast`, `perf`), the built client from `client/dist` when it exists, and the game page for any
+  other page address. `perf` is the room loop's own timing over the most recent updates of
+  running matches, all rooms together (`server/src/room/perf.ts`; a ring of 3000 updates, about
+  100 s): `samples`, `updateMs` and `gapMs` (each `mean`, `p99`, `max`, in milliseconds: the time
+  inside one update, and the time between two updates, which the timer aims to keep at 33.3) and
+  `ticksPerSecond` (30 when the server keeps up). All zero until a match has run. On a busy
+  machine `max` mostly shows the operating system pausing the process; read `p99` and
+  `ticksPerSecond`. Build files with a content hash in their name are cached for good; everything
   else is revalidated. A missing file is a 404, never the page.
 - No absolute address anywhere: the page, the matchmaking requests (`POST /matchmake/...`) and
   the WebSocket (`/<process id>/<room code>`) all go to the origin the page came from, so one
@@ -523,7 +531,10 @@ layout, requires bumping `SNAPSHOT_VERSION` / `PROTOCOL_VERSION`.
   tick, and replays recorded inputs; `test/matchSoak.test.ts` plays whole bot matches (three
   full-length, six fast) with every number, bound and entity count checked ten times a second.
 - Browser playtest (`tools/playtest`): server + 5 headless clients complete a `MB_FAST` match
-  with zero console errors, and screenshots are captured for visual review.
+  with zero console errors, and screenshots are captured for visual review (`smoke.mjs`).
+  `scripted.mjs` plays the kaiju and a squad with real key and mouse events and passes only
+  when every action was attempted and the server confirmed each one; an action it could not
+  get to is reported as not attempted, never as passed.
 - Never commit secrets. Never add a dependency that needs a network service at runtime: the
   game must run fully offline on one PC plus a tunnel.
 

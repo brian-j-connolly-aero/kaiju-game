@@ -39,10 +39,13 @@ jaw.rotation.x of about -6 degrees closes it. POSE_TARGETS at the bottom are the
 the game's animator blends toward (they ship in the manifest); poses.py checks them.
 
 First person: cam_fp sits between the eyes, 0.10 to 0.12 head lengths above the snout. The
-game clips at 0.02 body heights and keeps the camera level while the head pitches, so
-nothing of the head may come closer than about 0.03 body heights to cam_fp. Look at any
-change through the game's lens (the FIRST PERSON cells of the contact sheet), not from
-outside.
+game clips at 0.02 body heights, so nothing of the head may come closer than about 0.03
+body heights to cam_fp (as the game is driven today the camera stays level while the head
+pitches up to 60 degrees: that must not open the snout either). What the player is meant
+to see is a rigid assembly: head locked to the aim, both arms riding on the head, so snout
+and claws sit in the same place of the frame wherever the player looks (docs/ASSETS.md
+section 7, docs/art/client-notes-kaiju-lizard.md). Look at any change through the game's
+lens (the FIRST PERSON cells of the contact sheet), not from outside.
 
 Authoring frame: +Z up, -Y forward, +X the creature's left. See tools/art/README.md.
 """
@@ -850,7 +853,7 @@ def _scars(rig: Rig, p: P, sp) -> None:
     rig.more("torso", parts.finish(g, seed=52, jitter=0.02))
     hd = p.h
     lf = Local(hd["at"], scale=hd["L"], pitch=hd["pitch"])
-    sw, sh_, nw, nh = hd["skull_w"], hd["skull_h"], hd["snout_w"], hd["snout_h"]
+    sw, sh_, nw = hd["skull_w"], hd["skull_h"], hd["snout_w"]
     y2, y3 = hd["brow_y"], hd["snout_y"]
     out = lf.d(0.8, 0.3, 0.5)
     a = lf.p(sw * 0.36, y2 - 0.06, sh_ * 1.0) + out * 0.004
@@ -888,46 +891,59 @@ STAGGER = {"torso": (-17, 0, 0), "neck": (-11, 0, 0), "head": (-20, 0, 0), "jaw"
 # game's animator blends toward, per stage. Generic angles do not work on this character:
 # the head hangs low and far forward of the shoulders and the elbows rest bent, so the arms
 # have to be thrown almost straight out before a hand enters the player's view, and each
-# stage has its own proportions. Found with poses.solve() (run tools/art/kaiju/poses.py),
-# checked on every build by poses.check(): through the game's first-person lens the acting
-# hand is in the lower third of the frame and no arm touches the head.
-#   fp_claws        both claws out either side of the snout (the first-person carry)
-#   grab            the right hand reaches forward and down
-#   hold            the right hand carries, palm in, low on the right
-#   eat             both hands bring the meal to the open mouth
-#   brace           both forearms up in front of chest and throat, head tucked
-#   throw_windup    the right hand drawn back to the edge of the view, body turned away
-#   throw_release   the right arm thrust out toward the crosshair
-#   stagger         reeling back, chest and weak point open (no hand needs to show)
+# stage has its own proportions.
+#
+# The player's own view is a rigid assembly: the game locks the head to the aim and lets
+# both arms ride on the head, so what shows of a target there is its arms and its jaw
+# (poses.first_person), whatever the body does and wherever the player looks. Torso, neck
+# and head angles of a target are for everyone else: the lunge of a grab, the twist of a
+# throw. Found with poses.solve() (run tools/art/kaiju/poses.py), the two-handed ones then
+# tuned by eye, and checked on every build by poses.check(): in first person the acting
+# hand is in the lower third of the frame, nothing comes near the crosshair, and no arm
+# touches the head, neither there nor seen from outside.
+#   fp_claws        the first-person carry: both claws up beside the snout, palms in
+#                   (only the player's own view uses it; from outside the arms hang)
+#   grab            the right claw reaches forward; the body lunges
+#   hold            the right claw carries, palm up and in, low on the right
+#   eat             both claws close on the meal in front of the open mouth
+#   brace           guard: both claws crossed low in front of the face, body tucked
+#   throw_windup    the right claw cocked at the edge of the view, body twisted away
+#   throw_release   the right arm flung out, body twisted through
+#   swipe_hit       the end of the rake: the right claw across in front of the nose (the
+#                   wind-up stays the animator's own: arm high overhead, out of the view)
+#   stagger         reeling back, chest and weak point open (a body pose: no hand need show)
 POSE_TARGETS = {
     1: {
-        "fp_claws": _both({}, (-124, -15, 20), (82, -33, 10), (-8, 21, -13)),
-        "grab": _right({"torso": (14, 8, 0)}, (-127, 42, 34), (64, -30, 13), (23, -10, 70)),
-        "hold": _right({}, (-122, -12, 19), (84, -31, 15), (-4, -13, 15)),
-        "eat": _both({"torso": (8, 0, 0), "head": (8, 0, 0), "jaw": (22, 0, 0)}, (-122, 20, 31), (71, -19, -4), (4, -6, 43)),
-        "brace": _both({"torso": (16, 0, 0), "neck": (4, 0, 0), "head": (4, 0, 0)}, (-128, -8, 21), (84, -31, 20), (11, -1, 17)),
-        "throw_windup": _right({"torso": (-8, -10, 0)}, (-114, 17, 28), (71, -15, -7), (-5, -37, 40)),
-        "throw_release": _right({"torso": (12, 12, 0)}, (-126, 24, 26), (66, -13, 2), (-5, -14, 28)),
+        "fp_claws": _both({}, (-123, -14, 19), (83, -32, 13), (-8, -15, 10)),
+        "grab": _right({"torso": (18, 10, 0)}, (-117, 30, 24), (61, -14, 7), (16, -14, 70)),
+        "hold": _right({}, (-123, -10, 19), (85, -31, 18), (4, -6, 22)),
+        "eat": _both({"torso": (10, 0, 0), "head": (8, 0, 0), "jaw": (22, 0, 0)}, (-119, -6, 21), (83, -32, 22), (17, -9, 40)),
+        "brace": _both({"torso": (16, 0, 0), "neck": (4, 0, 0), "head": (4, 0, 0)}, (-120, -6, 18), (84, -28, 24), (20, -9, 39)),
+        "throw_windup": _right({"torso": (-12, -28, 0)}, (-121, -12, 17), (84, -30, 16), (-24, -11, 4)),
+        "throw_release": _right({"torso": (16, 22, 0)}, (-123, -5, 15), (85, -19, 29), (14, -6, 34)),
+        "swipe_hit": _right({"torso": (14, 43, 0), "head": (0, 11, 0)}, (-117, 54, 29), (52, -29, 28), (32, -11, 70)),
         "stagger": STAGGER,
     },
     2: {
-        "fp_claws": _both({}, (-97, 2, 11), (53, -15, -9), (-36, 3, 25)),
-        "grab": _right({"torso": (14, 8, 0)}, (-106, -5, 18), (53, -9, -9), (-7, -22, 0)),
-        "hold": _right({}, (-96, -16, 14), (52, -22, -6), (-16, -23, 22)),
-        "eat": _both({"torso": (8, 0, 0), "head": (8, 0, 0), "jaw": (22, 0, 0)}, (-100, -60, 4), (63, 9, -26), (-2, -36, 33)),
-        "brace": _both({"torso": (16, 0, 0), "neck": (4, 0, 0), "head": (4, 0, 0)}, (-106, 47, 32), (33, -13, -23), (-5, -26, 35)),
-        "throw_windup": _right({"torso": (-8, -10, 0)}, (-90, 9, 19), (40, 0, -16), (-2, 6, -40)),
-        "throw_release": _right({"torso": (12, 12, 0)}, (-103, -2, 20), (54, -7, -20), (-31, -18, -10)),
+        "fp_claws": _both({}, (-97, -15, 11), (53, -23, -3), (-22, -17, 18)),
+        "grab": _right({"torso": (18, 10, 0)}, (-103, -17, 13), (65, -17, 8), (-26, 24, 7)),
+        "hold": _right({}, (-102, -54, 8), (57, -45, 15), (21, -65, 50)),
+        "eat": _both({"torso": (10, 0, 0), "head": (8, 0, 0), "jaw": (22, 0, 0)}, (-100, -15, 10), (66, -29, 7), (9, -5, 44)),
+        "brace": _both({"torso": (16, 0, 0), "neck": (4, 0, 0), "head": (4, 0, 0)}, (-97, -19, 15), (54, -21, -1), (-3, -19, 13)),
+        "throw_windup": _right({"torso": (-12, -28, 0)}, (-105, -46, -1), (83, -33, 39), (-67, -39, 30)),
+        "throw_release": _right({"torso": (16, 22, 0)}, (-102, -22, 13), (64, -16, 2), (-26, 17, 11)),
+        "swipe_hit": _right({"torso": (14, 43, 0), "head": (0, 11, 0)}, (-104, -16, 12), (68, -15, 12), (11, -1, 26)),
         "stagger": STAGGER,
     },
     3: {
-        "fp_claws": _both({}, (-97, -2, 20), (55, -31, -8), (-28, 5, 9)),
-        "grab": _right({"torso": (14, 8, 0)}, (-101, -16, 22), (51, -24, 3), (-14, 1, -22)),
-        "hold": _right({}, (-98, -11, 18), (64, -37, 10), (-24, -10, 16)),
-        "eat": _both({"torso": (8, 0, 0), "head": (8, 0, 0), "jaw": (22, 0, 0)}, (-97, -23, 20), (62, -22, 1), (10, -43, 47)),
-        "brace": _both({"torso": (16, 0, 0), "neck": (4, 0, 0), "head": (4, 0, 0)}, (-103, -19, 23), (55, -29, -1), (-11, 45, -10)),
-        "throw_windup": _right({"torso": (-8, -10, 0)}, (-102, 44, 32), (51, 18, -37), (18, 67, -48)),
-        "throw_release": _right({"torso": (12, 12, 0)}, (-97, 1, 25), (44, -28, 0), (-27, -2, -13)),
+        "fp_claws": _both({}, (-97, -16, 18), (55, -33, -7), (-23, -14, 20)),
+        "grab": _right({"torso": (18, 10, 0)}, (-104, -13, 12), (74, -19, 27), (-20, 26, -3)),
+        "hold": _right({}, (-105, -48, 1), (77, -35, 35), (7, -67, 50)),
+        "eat": _both({"torso": (10, 0, 0), "head": (8, 0, 0), "jaw": (22, 0, 0)}, (-100, -15, 10), (66, -29, 7), (9, 5, 44)),
+        "brace": _both({"torso": (16, 0, 0), "neck": (4, 0, 0), "head": (4, 0, 0)}, (-103, -19, 13), (75, -28, 20), (-17, -15, 1)),
+        "throw_windup": _right({"torso": (-12, -28, 0)}, (-107, -32, 3), (99, -32, 54), (-64, -42, 28)),
+        "throw_release": _right({"torso": (16, 22, 0)}, (-105, -17, 13), (76, -25, 20), (-27, 37, 3)),
+        "swipe_hit": _right({"torso": (14, 43, 0), "head": (0, 11, 0)}, (-104, -15, 11), (76, -15, 26), (8, 2, 14)),
         "stagger": STAGGER,
     },
 }

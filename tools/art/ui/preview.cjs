@@ -17,17 +17,24 @@
  *   ui_icons_32px.png       every icon at true 32 px in the game's colors, plus the same pixels
  *                           enlarged 3 times without smoothing: this is the legibility test
  *   ui_icons_32px_light.png the same test, dark on light
- *   ui_skyline.png          the destruction-bar skyline: plain, with the three marks, and crumbling
+ *   ui_icons_real_sizes.png every icon at the sizes the client really draws it (18 to 52 px, from
+ *                           client/src/styles.css) over afternoon, sunset and night skies: true
+ *                           pixels and the same pixels enlarged. THE sheet to judge legibility on
+ *   ui_icons_client_fixes.png  before and after, for the changes only the client can make
+ *                           (docs/art/client-notes-ui-icons.md)
+ *   ui_skyline.png          the destruction-bar skyline in the client's 560 x 46 px bar: whole,
+ *                           with the three marks, and crumbling
  *   ui_icons_in_context.png a mock-up of the two heads-up displays, the lobby and the tally
  *
  * Checks (a failure exits with code 1):
  *   exists      every name in the contract has a file; nothing else is in the folder (warning)
  *   xml         the file is well-formed SVG with the right namespace
- *   viewbox     64 x 64 (the skyline: 400 x 64)
+ *   viewbox     64 x 64 (the skyline: 400 x 64, with preserveAspectRatio="none")
  *   color       every fill and stroke is "none" or "currentColor"; no style attributes or sheets
  *   no-text     no text, tspan, image, script, style, foreignObject, use, or id attributes
  *   weight      every stroke-width is the set's one weight (5)
  *   ink         the drawing is not empty and nothing is cut off by the edge of the viewBox
+ *   margin      the drawing stays 2 units away from every edge (inside 2 .. 62)
  */
 
 'use strict';
@@ -43,6 +50,10 @@ const STROKE_WEIGHT = '5';
 const SKYLINE = 'skyline';
 const SKYLINE_VIEWBOX = '0 0 400 64';
 const ICON_VIEWBOX = '0 0 64 64';
+/** Icons keep this many units clear of every edge of their 64 x 64 box. */
+const MARGIN = 2;
+/** The client's destruction bar (client/src/styles.css, .bar): the skyline is stretched into it. */
+const BAR_BOX = { width: 560, height: 46 };
 
 /** The contract: docs/ASSETS.md section 5. `tint` is the color the group wears in the game. */
 const GROUPS = [
@@ -58,7 +69,7 @@ const GROUPS = [
     title: 'Status',
     tint: 'plain',
     icons: [
-      'st_health', 'st_nerve', 'st_rage', 'st_charge', 'st_veteran', 'st_spotted', 'st_crossfire',
+      'st_health', 'st_nerve', 'st_rage', 'st_charge', 'st_reload', 'st_veteran', 'st_spotted', 'st_crossfire',
       'st_callin', 'st_shaken', 'st_map', 'st_camera', 'st_sun', 'st_moon',
     ],
   },
@@ -85,8 +96,14 @@ const GROUPS = [
     tint: 'plain',
     icons: [
       'gp_a', 'gp_b', 'gp_x', 'gp_y', 'gp_lb', 'gp_rb', 'gp_lt', 'gp_rt', 'gp_ls', 'gp_rs', 'gp_dpad',
-      'gp_start', 'gp_back',
+      'gp_dpad_up', 'gp_dpad_right', 'gp_dpad_down', 'gp_dpad_left', 'gp_start', 'gp_back',
     ],
+  },
+  {
+    id: 'system',
+    title: 'System',
+    tint: 'plain',
+    icons: ['ui_offline', 'ui_warning', 'ui_copy', 'ui_skull', 'ui_trophy', 'ui_clock', 'ui_newspaper', 'ui_sound'],
   },
 ];
 
@@ -104,17 +121,30 @@ const COLORS = {
   rubble: '#8d8d94',
   grass: '#4fbf5f',
   plain: '#f2f4f8',
+  // Colors the client's stylesheet uses next to the palette anchors (client/src/styles.css).
+  danger: '#ff3b5c',
+  health: '#ff5468',
+  nerve: '#7dfcff',
+  moon: '#c9d6ff',
+  ink: '#f4f6fb',
+  paperInk: '#2a2620',
 };
 
 /** A few icons wear a color of their own in the game: the color language, doubled by the shape. */
 const OWN_TINT = {
   cmd_holdcharge: 'volley',
   st_charge: 'volley',
+  st_reload: 'human',
   st_rage: 'kaiju',
   st_spotted: 'kaiju',
   st_crossfire: 'volley',
   lb_kaiju: 'kaiju',
   lb_human: 'human',
+  ui_offline: 'danger',
+  ui_warning: 'danger',
+  ui_copy: 'danger',
+  ui_skull: 'rubble',
+  ui_trophy: 'volley',
 };
 
 function parseArgs(argv) {
@@ -150,6 +180,10 @@ function staticProblems(name, text) {
   if (!/xmlns="http:\/\/www\.w3\.org\/2000\/svg"/.test(root[0])) problems.push('xml: the root needs xmlns="http://www.w3.org/2000/svg"');
   const vb = /viewBox="([^"]*)"/.exec(root[0]);
   if (!vb || vb[1].trim().replace(/\s+/g, ' ') !== viewBox) problems.push(`viewbox: expected "${viewBox}", found "${vb ? vb[1] : 'none'}"`);
+  if (name === SKYLINE && !/preserveAspectRatio="none"/.test(root[0])) {
+    problems.push('viewbox: the skyline root needs preserveAspectRatio="none" (it is stretched into the bar)');
+  }
+  if (name !== SKYLINE && /preserveAspectRatio=/.test(root[0])) problems.push('viewbox: icons must not set preserveAspectRatio');
   for (const tag of ['text', 'tspan', 'textPath', 'image', 'script', 'style', 'foreignObject', 'use', 'a', 'font']) {
     if (new RegExp(`<${tag}[\\s>/]`).test(body)) problems.push(`no-text: <${tag}> is not allowed`);
   }
@@ -177,7 +211,7 @@ function staticProblems(name, text) {
  * Runs in the page. Returns { name: { problems: [], ink: {x0, y0, x1, y1, cover} } }.
  */
 async function renderedProblems(page, icons) {
-  return page.evaluate(async (list) => {
+  return page.evaluate(async ({ list, margin }) => {
     const out = {};
     for (const { name, text, wide } of list) {
       const problems = [];
@@ -223,10 +257,16 @@ async function renderedProblems(page, icons) {
       if (edge > 0) problems.push('ink: the drawing touches the edge of the viewBox (something is cut off)');
       const ink = { x0: x0 / scale, y0: y0 / scale, x1: (x1 + 1) / scale, y1: (y1 + 1) / scale, cover: count / (w * h) };
       if (!wide && count > 0 && (ink.x1 - ink.x0 < 36 && ink.y1 - ink.y0 < 36)) problems.push('ink: the drawing is very small inside its 64 x 64 box');
+      // A quarter of a unit of slack: the measurement is made on a 4 px per unit raster.
+      const lo = margin - 0.25;
+      const hi = 64 - margin + 0.25;
+      if (!wide && count > 0 && (ink.x0 < lo || ink.y0 < lo || ink.x1 > hi || ink.y1 > hi)) {
+        problems.push(`margin: the drawing must stay inside ${margin} .. ${64 - margin}; it covers ${ink.x0}, ${ink.y0} .. ${ink.x1}, ${ink.y1}`);
+      }
       out[name] = { problems, ink };
     }
     return out;
-  }, icons);
+  }, { list: icons, margin: MARGIN });
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -314,42 +354,318 @@ async function sheet32(page, groups, file, light) {
   await shoot(page, html, file);
 }
 
-async function sheetSkyline(page, file) {
+/** Sky backdrops close to the game's three times of day, to judge icons that sit straight on the picture. */
+const SKIES = {
+  afternoon: 'linear-gradient(#4f9be6 0%, #9cc9f2 55%, #b9bcc6 56%, #8f96a8 100%)',
+  sunset: 'linear-gradient(#5b3a78 0%, #e8743a 50%, #ffc46b 56%, #3a3340 57%, #2a2630 100%)',
+  night: 'linear-gradient(#0a0e1e 0%, #1a2340 55%, #11131c 56%, #0b0c12 100%)',
+};
+
+/**
+ * The destruction bar the way the client should build it from skyline.svg: the file stretched
+ * into a box of the given size (the root carries preserveAspectRatio="none"), the class
+ * "sky-city" clipped from the left by the fill, the class "sky-rubble" in rubble grey, an orange
+ * edge at the fill line, and the mark icons hanging under the three marks (18 px, as in the client).
+ */
+function barHtml(width, height, fill, id, withMarks = true) {
   const text = readIcon(SKYLINE);
-  if (!text) return false;
-  const svg = (style, extra = '') => text.replace(/<\?xml[^>]*\?>/, '').replace(/<svg\b/, `<svg style="display:block;${style}" ${extra}`);
-  const marks = [0.21, 0.57, 1];
-  const bar = (width, bg, fg, fill) => {
-    const h = Math.round((width * 64) / 400);
-    const ticks = marks
-      .map((m) => `<div style="position:absolute; left:${m * width - 1}px; top:${h + 2}px; width:2px; height:8px; background:${COLORS.volley}"></div>`)
-      .join('');
-    // The crumble: the standing city is clipped from the left; the rubble under it is left alone.
-    const css =
-      fill === null
-        ? ''
-        : `<style>.f${Math.round(fill * 100)}w${width} .sky-city { clip-path: inset(0 0 0 ${fill * 100}%); } .f${Math.round(fill * 100)}w${width} .sky-rubble { color: ${COLORS.rubble}; }</style>`;
-    const cls = fill === null ? '' : `class="f${Math.round(fill * 100)}w${width}"`;
-    const label = fill === null ? 'whole' : `filled ${Math.round(fill * 100)}%`;
-    return (
-      `<div style="background:${bg}; padding:10px 12px 16px; border-radius:4px; margin-bottom:6px; display:flex; align-items:flex-end; gap:12px">` +
-      `<div style="position:relative; width:${width}px; height:${h + 10}px; color:${fg}">${css}${svg(`width:${width}px; height:${h}px`, cls)}${ticks}</div>` +
-      `<div style="color:${fg}; opacity:.7; width:70px">${label}</div></div>`
-    );
-  };
+  if (!text) return '';
+  const pct = (fill * 100).toFixed(1);
+  const marks = withMarks
+    ? [0.21, 0.57, 1]
+        .map((m, i) => {
+          const color = fill >= m ? COLORS.kaiju : 'rgba(255,255,255,.55)';
+          return `<span class="ic" style="position:absolute;top:100%;left:${m * 100}%;transform:translateX(-100%);width:18px;height:18px;color:${color}">${iconMarkup(
+            i === 2 ? 'lb_kaiju' : 'k_molt',
+            '',
+          )}</span>`;
+        })
+        .join('')
+    : '';
+  const edge = fill > 0 ? `<i style="position:absolute;top:0;bottom:0;left:calc(${pct}% - 1.5px);width:3px;background:${COLORS.kaiju}"></i>` : '';
+  return (
+    `<div class="${id}" style="position:relative;width:${width}px;height:${height}px;color:#e9edf7">` +
+    `<style>.${id} .sky-city { clip-path: inset(0 0 0 ${pct}%); } .${id} .sky-rubble { color: ${COLORS.rubble}; }</style>` +
+    text.replace(/<\?xml[^>]*\?>/, '').replace(/<svg\b/, `<svg style="display:block;width:100%;height:100%;filter:drop-shadow(0 2px 2px rgba(0,0,0,.6))"`) +
+    edge +
+    marks +
+    `</div>`
+  );
+}
+
+async function sheetSkyline(page, file) {
+  if (!readIcon(SKYLINE)) return false;
+  let n = 0;
+  const row = (label, sky, width, height, fill) =>
+    `<div style="margin:8px 0 3px;color:#d5d9e3">${label}</div>` +
+    `<div style="display:inline-block;background:${SKIES[sky]};padding:10px 16px 28px;border-radius:4px">${barHtml(width, height, fill, `sk${n++}`)}</div>`;
+  const { width: W, height: H } = BAR_BOX;
   const html = pageHtml(
-    `<h1>skyline.svg: the destruction bar</h1><p class="note">viewBox 0 0 400 64. The three towers end at x = 84, 228 and 400 (21%, 57%, 100%; ` +
-      `yellow ticks). The UI clips the class "sky-city" from the left as the bar fills; the class "sky-rubble" underneath stays.</p>` +
+    `<style>.ic { display: inline-block; flex: none; } .ic svg { width: 100%; height: 100%; display: block; }</style>` +
+      `<h1>skyline.svg: the destruction bar</h1><p class="note">viewBox 0 0 400 64, drawn to be stretched into the client's bar, ${W} x ${H} px ` +
+      `(1.4 px per unit across, 0.72 px per unit up). The three towers end at x = 84, 228 and 400 (21%, 57%, 100%). The UI clips the class ` +
+      `"sky-city" from the left as the bar fills; the class "sky-rubble" underneath stays. The mark icons are k_molt, k_molt and lb_kaiju at 18 px.</p>` +
       `<h2>Whole</h2>` +
-      bar(800, COLORS.darkPanel, COLORS.onDark, null) +
-      bar(400, COLORS.darkPanel, COLORS.onDark, null) +
-      bar(240, COLORS.darkPanel, COLORS.onDark, null) +
-      bar(800, COLORS.lightPanel, COLORS.onLight, null) +
-      `<h2>Crumbling left to right (rubble in grey)</h2>` +
-      [0.1, 0.21, 0.4, 0.57, 0.8, 1].map((f) => bar(800, COLORS.darkPanel, COLORS.kaiju, f)).join(''),
+      row(`${W} x ${H} px: the client's box, true pixels`, 'afternoon', W, H, 0) +
+      row(`${W * 2} x ${H * 2} px: the same, twice the size`, 'afternoon', W * 2, H * 2, 0) +
+      row(`397 x ${H} px: 62% of a 640 px wide screen`, 'sunset', 397, H, 0) +
+      `<h2>Crumbling left to right (rubble in grey, orange edge at the fill line)</h2>` +
+      [0.1, 0.19, 0.21, 0.4, 0.57, 0.8, 0.97, 1].map((f) => row(`filled ${Math.round(f * 100)}%`, f < 0.3 ? 'afternoon' : f < 0.6 ? 'sunset' : 'night', W, H, f)).join(''),
   );
   await shoot(page, html, file);
   return true;
+}
+
+/**
+ * The legibility test that matters: every icon at the sizes the client's stylesheet really uses
+ * (client/src/styles.css), in the colors it wears there, over the three skies. Each strip is
+ * painted at true size and then shown again enlarged without smoothing.
+ */
+async function sheetRealSizes(page, file) {
+  const C = COLORS;
+  const shadow = 'filter:drop-shadow(0 1px 1px #000);';
+  const gap = (px) => `<span style="display:inline-block;width:${px}px"></span>`;
+  const strips = [];
+  const add = (label, sky, html) => strips.push({ label, bg: SKIES[sky] || sky, html });
+
+  // Button glyphs: .wheel-glyph 18 px, .hint-glyph 24 px (19 px on small screens).
+  const pad = GROUPS.find((g) => g.id === 'gamepad').icons;
+  const mouse = ['ms_left', 'ms_right', 'ms_middle', 'ms_move'];
+  for (const px of [18, 19, 24]) {
+    add(
+      `button glyphs at ${px} px (${px === 18 ? 'command wheel' : px === 19 ? 'verb hints, small screens' : 'verb hints'}): ${pad.join(' ')} | ${mouse.join(' ')} | kb_key W, M, 1`,
+      px === 19 ? 'afternoon' : C.darkPanel,
+      [...pad, ...mouse].map((n) => `<span style="margin-right:6px;${shadow}">${ic(n, px, C.ink)}</span>`).join('') +
+        ['W', 'M', '1'].map((l) => `<span style="margin-right:6px;${shadow}">${keycap(l, px, C.ink)}</span>`).join(''),
+    );
+  }
+
+  // HUD: meters 20 px, bar marks 18 px, clock 26 / 20 px, stage pips 18 / 28 / 42 px. No panel behind them.
+  const meters = [['st_health', C.health], ['st_nerve', C.nerve], ['st_rage', C.kaiju], ['st_charge', C.volley], ['st_reload', C.human]];
+  const marks = [['k_molt', 'rgba(255,255,255,.55)'], ['k_molt', C.kaiju], ['k_molt', C.volley], ['lb_kaiju', 'rgba(255,255,255,.55)'], ['lb_kaiju', C.kaiju]];
+  for (const sky of ['afternoon', 'sunset', 'night']) {
+    add(
+      `HUD on the ${sky} sky: meters 20 px (health, nerve, rage, charge, reload) | bar marks 18 px (k_molt idle, reached, ready; lb_kaiju idle, reached) | clock sun 26, moon 20 | stage pips 18, 28, 42 | orders 30 px`,
+      sky,
+      meters.map(([n, c]) => `<span style="margin-right:8px;${shadow}">${ic(n, 20, c)}</span>`).join('') +
+        gap(14) +
+        marks.map(([n, c]) => `<span style="margin-right:8px">${ic(n, 18, c)}</span>`).join('') +
+        gap(14) +
+        `<span style="margin-right:8px;filter:drop-shadow(0 0 4px rgba(0,0,0,.8))">${ic('st_sun', 26, C.volley)}</span>${ic('st_moon', 20, C.moon)}` +
+        gap(14) +
+        [18, 28, 42].map((px) => `<span style="margin-right:4px">${ic('lb_kaiju', px, C.kaiju)}</span>`).join('') +
+        gap(14) +
+        ['cmd_follow', 'cmd_moveto', 'cmd_fireatwill', 'cmd_holdcharge'].map((n) => `<span style="margin-right:8px;filter:drop-shadow(0 1px 2px #000)">${ic(n, 30, C.human)}</span>`).join(''),
+    );
+  }
+
+  // Verb hints: a 32 px icon in a 46 px tile (26 in 38 on small screens).
+  const tile = (n, px, box, color, border = 'rgba(255,255,255,.3)') =>
+    `<span style="display:inline-flex;align-items:center;justify-content:center;width:${box}px;height:${box}px;border-radius:10px;background:rgba(14,18,30,.7);border:2px solid ${border};margin-right:6px">${ic(n, px, color)}</span>`;
+  const kaijuVerbs = [...GROUPS.find((g) => g.id === 'kaiju').icons, 'st_camera'];
+  const humanVerbs = ['cmd_fireatwill', 'cmd_holdcharge', 'st_callin', 'st_map', 'st_camera'];
+  for (const [px, box] of [[32, 46], [26, 38]]) {
+    add(
+      `verb hints, ${px} px in a ${box} px tile: ${kaijuVerbs.join(' ')} | ${humanVerbs.join(' ')}`,
+      px === 32 ? 'afternoon' : 'night',
+      kaijuVerbs.map((n) => tile(n, px, box, C.ink)).join('') + gap(16) + humanVerbs.map((n) => tile(n, px, box, C.ink)).join(''),
+    );
+  }
+  add(
+    `verb hints, 26 px, the states: unavailable (dimmed), ready (yellow), active (cyan)`,
+    'sunset',
+    kaijuVerbs.map((n) => tile(n, 26, 38, 'rgba(255,255,255,.4)')).join('') +
+      gap(16) +
+      ['k_special', 'k_molt'].map((n) => tile(n, 26, 38, C.volley, C.volley)).join('') +
+      tile('k_brace', 26, 38, C.human, C.human),
+  );
+
+  // Command wheel: 84 px discs, 40 px icons, 18 px glyphs; on a gamepad the four d-pad directions.
+  const disc = (n, color, glyphHtml, on) =>
+    `<span style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;width:84px;height:84px;border-radius:50%;background:${
+      on ? 'rgba(30,200,224,.35)' : 'rgba(14,18,30,.78)'
+    };border:3px solid ${on ? C.human : 'rgba(255,255,255,.16)'};margin-right:10px">${ic(n, 40, on ? '#fff' : color)}${glyphHtml}</span>`;
+  const wheel = (glyphs) =>
+    disc('cmd_follow', C.human, glyphs[0]) +
+    disc('cmd_moveto', C.human, glyphs[1]) +
+    disc('cmd_fireatwill', C.human, glyphs[2]) +
+    disc('cmd_holdcharge', C.volley, glyphs[3]) +
+    disc('cmd_moveto', C.human, glyphs[1], true);
+  add(
+    'command wheel on a gamepad: up follow, right move to, down fire at will, left hold and charge; last disc: selected',
+    'afternoon',
+    wheel(['gp_dpad_up', 'gp_dpad_right', 'gp_dpad_down', 'gp_dpad_left'].map((n) => ic(n, 18, '#fff'))),
+  );
+  add('command wheel on a keyboard: keys 1 to 4', 'night', wheel(['1', '2', '3', '4'].map((l) => keycap(l, 18, '#fff'))));
+
+  // Status pictures: 52 px (spotted 30, eliminated 34), straight on the picture.
+  const status = [
+    ['st_crossfire', C.volley, 52], ['st_spotted', C.kaiju, 30], ['st_shaken', C.danger, 52], ['st_nerve', C.nerve, 52],
+    ['st_charge', C.volley, 52], ['st_callin', C.danger, 52], ['ui_offline', C.danger, 52], ['ui_skull', C.rubble, 34],
+  ];
+  for (const sky of ['afternoon', 'sunset', 'night']) {
+    add(
+      `status pictures on the ${sky} sky: crossfire, spotted (30), shaken, nerve break, volley, call-in, offline, eliminated (34)`,
+      sky,
+      status.map(([n, c, px]) => `<span style="margin-right:12px;filter:drop-shadow(0 2px 3px #000)">${ic(n, px, c)}</span>`).join(''),
+    );
+  }
+
+  // End screen: tally icons at 22 px, side by side (no overlap), on the panel and on newsprint.
+  const tally = GROUPS.find((g) => g.id === 'tally').icons;
+  const group = (n, count, color) =>
+    `<span style="display:inline-flex;align-items:center;margin-right:10px">${Array.from({ length: count }, () => `<span style="margin-right:2px">${ic(n, 22, color)}</span>`).join('')}</span>`;
+  add(`end screen tally at 22 px, 2 px apart: ${tally.join(' ')}`, C.darkPanel, tally.map((n) => group(n, 3, C.ink)).join(''));
+  add('the same on newsprint', '#efe9d8', tally.map((n) => group(n, 3, C.paperInk)).join(''));
+  add(
+    'end banner: winner 44 px, trophy 31 px, reason 26 px (tl_tower, ui_skull, ui_clock) | front page stand-in 54 px',
+    C.darkPanel,
+    [['lb_kaiju', C.kaiju, 44], ['ui_trophy', C.volley, 31], ['tl_tower', C.ink, 26], ['ui_skull', C.ink, 26], ['ui_clock', C.ink, 26]]
+      .map(([n, c, px]) => `<span style="margin-right:10px">${ic(n, px, c)}</span>`)
+      .join('') +
+      gap(16) +
+      `<span style="display:inline-flex;align-items:center;justify-content:center;width:96px;height:72px;background:#8d8d94">${ic('ui_newspaper', 54, '#efe9d8')}</span>`,
+  );
+
+  // Lobby and home: seats 30 / 22 px, flags 24 px, buttons 30 and 44 px, notices 36 px, factions 30 and 20 px.
+  add(
+    'lobby: seats 30 and 22 px, flags 24, buttons 30 and 44, notices 36 (offline, warning, copy), factions 30 and 20, sound 30',
+    C.darkPanel,
+    [
+      ['lb_kaiju', C.kaiju, 30], ['lb_human', C.human, 30], ['lb_bot', C.ink, 30], ['lb_kaiju', C.kaiju, 22], ['lb_human', C.human, 22], ['lb_bot', C.ink, 22],
+      ['lb_host', C.volley, 24], ['lb_ready', '#49d17d', 24], ['ui_offline', C.ink, 24], ['lb_link', C.ink, 30], ['lb_back', C.ink, 30],
+      ['lb_create', C.ink, 44], ['lb_join', C.ink, 44], ['lb_play', C.ink, 44], ['ui_offline', C.danger, 36], ['ui_warning', C.danger, 36], ['ui_copy', C.danger, 36],
+      ['fac_army', C.human, 30], ['fac_air', C.human, 30], ['fac_science', C.human, 30], ['fac_faith', C.human, 30],
+      ['fac_army', C.human, 20], ['fac_air', C.human, 20], ['fac_science', C.human, 20], ['fac_faith', C.human, 20], ['ui_sound', C.ink, 30],
+    ]
+      .map(([n, c, px]) => `<span style="margin-right:10px">${ic(n, px, c)}</span>`)
+      .join(''),
+  );
+
+  // Paint each strip at true size (wrapped at 500 px, so the enlargement stays narrow enough to
+  // look at), then show the same pixels again, enlarged.
+  const zoom = 3;
+  const parts = [];
+  for (const strip of strips) {
+    const raw = await shoot(
+      page,
+      pageHtml(
+        `<style>${CONTEXT_CSS}</style><div style="display:flex;flex-wrap:wrap;align-items:center;row-gap:8px;max-width:500px;padding:8px 10px;background:${strip.bg}">${strip.html}</div>`,
+      ).replace(
+        'padding: 14px',
+        'padding: 0',
+      ),
+      null,
+    );
+    const w = raw.readUInt32BE(16);
+    const h = raw.readUInt32BE(20);
+    const uri = `data:image/png;base64,${raw.toString('base64')}`;
+    parts.push(
+      `<div style="margin:10px 0 3px;color:#d5d9e3;max-width:1500px">${strip.label}</div>` +
+        `<img src="${uri}" style="display:block;margin-bottom:3px"><img class="zoom" src="${uri}" style="width:${w * zoom}px;height:${h * zoom}px">`,
+    );
+  }
+  await shoot(
+    page,
+    pageHtml(
+      `<h1>UI pictograms at the sizes the client really uses</h1><p class="note" style="max-width:1500px">Sizes and colors are those of client/src/styles.css. ` +
+        `For each strip: the true pixels, then the same pixels enlarged ${zoom} times. An icon that cannot be named from the top strip is not finished.</p>` +
+        parts.join(''),
+    ),
+    file,
+  );
+}
+
+/**
+ * Before and after pictures for the changes that only the client can make (they are written up
+ * in docs/art/client-notes-ui-icons.md): each row shows what the client's stylesheet and code do
+ * now, and what they should do, at true size and enlarged.
+ */
+async function sheetClientFixes(page, file) {
+  const C = COLORS;
+  const rows = [];
+  const add = (label, bg, now, wanted) => rows.push({ label, bg: SKIES[bg] || bg, now, wanted });
+  const font = `font-family:'Trebuchet MS','Segoe UI',Verdana,'DejaVu Sans',sans-serif`;
+
+  // Note 3. Tally icons: 22 px, margin-right -8 px (overlapping) against 2 px.
+  const tally = GROUPS.find((g) => g.id === 'tally').icons;
+  const tallyRow = (margin) =>
+    tally
+      .map((n) => `<span style="display:inline-flex;align-items:center;margin-right:10px">${Array.from({ length: 3 }, () => `<span style="margin-right:${margin}px">${ic(n, 22, C.ink)}</span>`).join('')}</span>`)
+      .join('');
+  add('Note 3. End screen tally (.tally-icon, 22 px): margin-right -8px now, 2px wanted', C.darkPanel, tallyRow(-8), tallyRow(2));
+
+  // Note 4. The letter on the keycap: centered on the whole glyph now, on the key's top face wanted.
+  const key = (label, px, inset) =>
+    `<span style="position:relative;display:inline-block;width:${px}px;height:${px}px;line-height:0;margin-right:6px;color:${C.ink};filter:drop-shadow(0 1px 1px #000)">` +
+    `${ic('kb_key', px, C.ink)}<span style="position:absolute;inset:${inset};display:flex;align-items:center;justify-content:center;font-size:${px * 0.48}px;font-weight:700;line-height:1;${font}">${label}</span></span>`;
+  const keys = (inset) => [19, 24, 40].map((px) => ['W', 'M', 'Q', '1', '␣', '⇧', '⏎'].map((l) => key(l, px, inset)).join('')).join('<span style="display:inline-block;width:10px"></span>');
+  add('Note 4. Key letter (.glyph-label) at 19, 24 and 40 px: inset 0 now, inset 0 0 17% 0 wanted', C.darkPanel, keys('0'), keys('0 0 17% 0'));
+
+  // Note 5. The reload meter and the fire hint: the fire-at-will command now, the single shell wanted.
+  const reload = (n) =>
+    `<span style="display:inline-flex;align-items:center;gap:6px;margin-right:18px"><span style="filter:drop-shadow(0 1px 1px #000)">${ic(n, 20, C.human)}</span>` +
+    `<span style="display:inline-block;width:120px;height:12px;border-radius:7px;border:2px solid rgba(255,255,255,.35);background:rgba(0,0,0,.55);overflow:hidden"><i style="display:block;width:60%;height:100%;background:${C.human}"></i></span></span>` +
+    `<span style="display:inline-flex;align-items:center;justify-content:center;width:46px;height:46px;border-radius:10px;background:rgba(14,18,30,.7);border:2px solid rgba(255,255,255,.3)">${ic(n, 32, C.ink)}</span>`;
+  add('Note 5. Reload meter (20 px) and fire hint (32 px): cmd_fireatwill now, st_reload wanted', 'afternoon', reload('cmd_fireatwill'), reload('st_reload'));
+
+  // Note 6. The command wheel on a gamepad: four identical glyphs now, the four directions wanted.
+  const disc = (n, color, g) =>
+    `<span style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;width:84px;height:84px;border-radius:50%;background:rgba(14,18,30,.78);border:3px solid rgba(255,255,255,.16);margin-right:10px">${ic(n, 40, color)}${ic(g, 18, '#fff')}</span>`;
+  const wheel = (g) => disc('cmd_follow', C.human, g[0]) + disc('cmd_moveto', C.human, g[1]) + disc('cmd_fireatwill', C.human, g[2]) + disc('cmd_holdcharge', C.volley, g[3]);
+  add('Note 6. Command wheel on a gamepad (PAD_ICONS): gp_dpad four times now, gp_dpad_up / right / down / left wanted', 'night', wheel(['gp_dpad', 'gp_dpad', 'gp_dpad', 'gp_dpad']), wheel(['gp_dpad_up', 'gp_dpad_right', 'gp_dpad_down', 'gp_dpad_left']));
+
+  // Note 7. Orange and pale icons straight on the sky: one soft shadow now, a dark outline wanted.
+  const hud = (filter, markFilter) =>
+    [['st_health', C.health], ['st_nerve', C.nerve], ['st_rage', C.kaiju], ['st_charge', C.volley], ['st_reload', C.human]]
+      .map(([n, c]) => `<span style="margin-right:8px;filter:${filter}">${ic(n, 20, c)}</span>`)
+      .join('') +
+    `<span style="display:inline-block;width:12px"></span>` +
+    [['k_molt', 'rgba(255,255,255,.55)'], ['k_molt', C.kaiju], ['k_molt', C.volley], ['lb_kaiju', C.kaiju]]
+      .map(([n, c]) => `<span style="margin-right:8px;filter:${markFilter}">${ic(n, 18, c)}</span>`)
+      .join('') +
+    `<span style="display:inline-block;width:12px"></span>` +
+    [18, 28, 42].map((px) => `<span style="margin-right:4px;filter:${markFilter}">${ic('lb_kaiju', px, C.kaiju)}</span>`).join('');
+  const outline = 'drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000) drop-shadow(0 1px 1px #000)';
+  add('Note 7. HUD icons with no panel behind them, on the sunset sky: meters, bar marks, stage pips. Now: one shadow (meters) or none; wanted: ' + outline, 'sunset', hud('drop-shadow(0 1px 1px #000)', 'none'), hud(outline, outline));
+  add('Note 7, the same on the afternoon sky', 'afternoon', hud('drop-shadow(0 1px 1px #000)', 'none'), hud(outline, outline));
+
+  // Note 8. The spotted mark: the thing spotted is the kaiju, so it wears the kaiju's orange.
+  const spotted = (c) => `<span style="filter:drop-shadow(0 2px 3px #000)">${ic('st_spotted', 30, c)}</span>`;
+  add('Note 8. st_spotted (.status-spotted, 30 px): human cyan now, kaiju orange wanted', 'afternoon', spotted(C.human), spotted(C.kaiju));
+
+  const zoom = 3;
+  const parts = [];
+  for (const row of rows) {
+    const cells = [];
+    for (const [title, html] of [['now', row.now], ['wanted', row.wanted]]) {
+      const raw = await shoot(
+        page,
+        pageHtml(`<style>${CONTEXT_CSS}</style><div style="display:flex;flex-wrap:wrap;align-items:center;row-gap:8px;max-width:480px;padding:8px 10px;background:${row.bg}">${html}</div>`).replace(
+          'padding: 14px',
+          'padding: 0',
+        ),
+        null,
+      );
+      const w = raw.readUInt32BE(16);
+      const h = raw.readUInt32BE(20);
+      const uri = `data:image/png;base64,${raw.toString('base64')}`;
+      cells.push(
+        `<div style="margin-bottom:6px"><div style="color:${title === 'now' ? '#ff9d9d' : '#9de0a8'};margin-bottom:2px">${title}</div>` +
+          `<img src="${uri}" style="display:block;margin-bottom:3px"><img class="zoom" src="${uri}" style="width:${w * zoom}px;height:${h * zoom}px"></div>`,
+      );
+    }
+    parts.push(`<div style="margin:12px 0 4px;color:#fff;max-width:1450px">${row.label}</div>${cells.join('')}`);
+  }
+  await shoot(
+    page,
+    pageHtml(
+      `<h1>UI pictograms: what the client has to change (docs/art/client-notes-ui-icons.md)</h1><p class="note" style="max-width:1450px">` +
+        `The numbers are the note numbers of that page. For each: what the client's stylesheet or code does now, then what it should do. True pixels, then the same pixels enlarged ${zoom} times.</p>` +
+        parts.join(''),
+    ),
+    file,
+  );
 }
 
 /** An icon at a size and in a color, for the mock-ups below. */
@@ -384,21 +700,9 @@ const CONTEXT_CSS = `
   .btn { display: flex; align-items: center; justify-content: center; width: 50px; height: 50px; border-radius: 10px; background: ${COLORS.darkPanel}; }
 `;
 
-/** The destruction bar as the UI would build it from skyline.svg. */
+/** The destruction bar as the UI builds it from skyline.svg, in the proportion of the client's bar. */
 function skylineBar(width, fill, id) {
-  const text = readIcon(SKYLINE);
-  if (!text) return '';
-  const h = Math.round((width * 64) / 400);
-  const ticks = [0.21, 0.57, 1]
-    .map((m) => `<i style="position:absolute;left:${m * width - 1}px;top:${h + 2}px;width:2px;height:6px;background:${COLORS.volley}"></i>`)
-    .join('');
-  return (
-    `<div class="${id}" style="position:relative;width:${width}px;height:${h + 8}px;color:${COLORS.onDark}">` +
-    `<style>.${id} .sky-city { clip-path: inset(0 0 0 ${fill * 100}%); } .${id} .sky-rubble { color: ${COLORS.rubble}; }</style>` +
-    text.replace(/<svg\b/, `<svg style="display:block;width:${width}px;height:${h}px"`) +
-    ticks +
-    `</div>`
-  );
+  return barHtml(width, Math.round((width * BAR_BOX.height) / BAR_BOX.width), fill, id);
 }
 
 /**
@@ -437,10 +741,10 @@ async function sheetInContext(page, file) {
     `<div class="scene human">` +
     `<div style="position:absolute;left:70px;top:12px">${skylineBar(420, 0.34, 'skyB')}</div>` +
     `<div style="position:absolute;left:170px;top:92px;width:220px;height:220px;border-radius:110px;background:rgba(10,12,18,.62)">` +
-    spoke('cmd_follow', C.human, 'gp_y', 'left:88px;top:6px') +
-    spoke('cmd_moveto', C.human, 'gp_b', 'right:10px;top:74px') +
-    spoke('cmd_fireatwill', C.human, 'gp_a', 'left:88px;bottom:6px') +
-    spoke('cmd_holdcharge', C.volley, 'gp_x', 'left:10px;top:74px') +
+    spoke('cmd_follow', C.human, 'gp_dpad_up', 'left:88px;top:6px') +
+    spoke('cmd_moveto', C.human, 'gp_dpad_right', 'right:10px;top:74px') +
+    spoke('cmd_fireatwill', C.human, 'gp_dpad_down', 'left:88px;bottom:6px') +
+    spoke('cmd_holdcharge', C.volley, 'gp_dpad_left', 'left:10px;top:74px') +
     `<div style="position:absolute;left:94px;top:94px">${ic('gp_lb', 32, C.onDark)}</div>` +
     `</div>` +
     `<div style="position:absolute;left:12px;bottom:10px;display:flex;flex-direction:column;gap:5px">` +
@@ -581,6 +885,12 @@ async function main() {
         }
       }
       if (!args.only) {
+        const real = path.join(args.out, 'ui_icons_real_sizes.png');
+        await sheetRealSizes(page, real);
+        written.push(real);
+        const fixes = path.join(args.out, 'ui_icons_client_fixes.png');
+        await sheetClientFixes(page, fixes);
+        written.push(fixes);
         const context = path.join(args.out, 'ui_icons_in_context.png');
         await sheetInContext(page, context);
         written.push(context);

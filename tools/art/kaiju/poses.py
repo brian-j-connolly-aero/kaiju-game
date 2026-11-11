@@ -9,14 +9,25 @@ asset carries the angles that do work, per stage, in the manifest (docs/ASSETS.m
                                                         three.js Euler order XYZ, game axes
 
 and the animator blends toward them. The values live in lizard.POSE_TARGETS (found with
-solve() below, then tuned by eye). check() proves, on the exported file, what every target
-promises, through the game's own first-person lens (kaijuController.ts: the camera sits on
-cam_fp, looks level along the body's heading, vertical field of view 72 degrees, 16:9, near
-plane 0.02 body heights):
+solve() below, then tuned by eye).
 
-    - the acting hand(s) are inside the frame, in its lower third, beyond the near plane;
-    - no arm touches the head or the jaw, and the forearms and hands touch nothing else
-      (neck, torso, spines, each other).
+What the player sees in first person is a rigid assembly: the camera sits on cam_fp, the
+head is locked to the aim, and both arms ride on the head (docs/ASSETS.md section 7 and
+docs/art/client-notes-kaiju-lizard.md say how the game does that). So the picture of snout
+and claws depends only on the arm and jaw angles, not on where the player looks or on what
+the body does underneath. That is the frame the targets are built and checked in:
+first_person(pose) keeps the arms and the jaw of a target and leaves torso, neck and head
+at rest, and the lens is the game's (kaijuController.ts: vertical field of view 72 degrees,
+16:9, near plane 0.02 body heights). Arms that stayed on the torso would only be right
+while the player looks dead level: 25 degrees down and the claws are at the top of the frame.
+
+check() proves, on the exported file, what every target promises:
+
+    - first person: the acting hand(s) are inside the frame, in its lower third, beyond the
+      near plane; no arm comes near the crosshair; no arm touches the head or the jaw;
+    - from outside (the whole target, arms on the torso, as every other player sees it): no
+      arm touches the head or the jaw, and the forearms and hands touch nothing else (neck,
+      torso, spines, each other).
 
 Everything here works on the exported .glb with numpy, in the game's axes (x left, y up,
 z forward), so it can run without Blender's scene; the overlap test uses mathutils.
@@ -43,7 +54,18 @@ RIGHT_ARM = ("arm_R", "forearm_R", "hand_R")
 LEFT_ARM = ("arm_L", "forearm_L", "hand_L")
 # which hands a target must show in the lower third of the first-person frame
 SHOWS = {"fp_claws": "LR", "grab": "R", "hold": "R", "eat": "LR", "brace": "LR", "throw_windup": "R",
-         "throw_release": "R", "stagger": ""}
+         "throw_release": "R", "swipe_hit": "R", "stagger": ""}
+# poses of the body only: nothing of them is built for the first-person frame
+BODY_ONLY = ("stagger",)
+FP_NODES = RIGHT_ARM + LEFT_ARM + ("jaw",)
+CROSSHAIR = 0.14            # no arm may come closer than this to the middle of the frame (frame units)
+
+
+def first_person(pose: dict) -> dict:
+    """What a pose is in the player's own view: the arms and the jaw. In first person the head
+    is locked to the aim and the arms ride on it, so torso, neck and head angles change
+    nothing in the picture (they only move the camera with the body)."""
+    return {name: v for name, v in pose.items() if name in FP_NODES}
 
 
 def euler(x: float, y: float, z: float) -> np.ndarray:
@@ -163,8 +185,9 @@ def _overlaps(a: np.ndarray, b: np.ndarray) -> int:
 
 
 def hand_in_frame(body: Body, pose: dict, side: str, yaw: float = 0.0, pitch: float = 0.0) -> dict:
-    """Where a hand lands in the first-person frame: its middle (x, y), how much of it is inside
-    the frame, how much of it is in the lower third, and its nearest depth in body heights."""
+    """Where a hand lands in the first-person frame (pose as given: pass first_person(target)):
+    its middle (x, y), how much of it is inside the frame, how much of it is in the lower
+    third, and its nearest depth in body heights."""
     world = body.world(pose)
     x, y, d = body.project(world, body.at(world, f"hand_{side}"), yaw, pitch)
     inside = (np.abs(x) <= 1) & (np.abs(y) <= 1) & (d > NEAR)
@@ -173,22 +196,54 @@ def hand_in_frame(body: Body, pose: dict, side: str, yaw: float = 0.0, pitch: fl
                 depth=float(d.min()))
 
 
+def arm_to_crosshair(body: Body, pose: dict) -> float:
+    """How close any part of either arm comes to the middle of the first-person frame (frame
+    units: 1 is half the frame's width or height). Edges are sampled, so a big facet counts."""
+    world = body.world(pose)
+    best = 9.0
+    for name in RIGHT_ARM + LEFT_ARM:
+        t = body.triangles(world, (name,))
+        pts = np.vstack([t.reshape(-1, 3), t.mean(axis=1), (t[:, 0] + t[:, 1]) / 2, (t[:, 1] + t[:, 2]) / 2,
+                         (t[:, 2] + t[:, 0]) / 2])
+        x, y, d = body.project(world, pts)
+        ok = d > NEAR
+        if ok.any():
+            best = min(best, float(np.hypot(x[ok], y[ok]).min()))
+    return best
+
+
 def check(asset: str, targets: dict, quiet: bool = False) -> list[str]:
     """Problems with the pose targets of one exported stage (an empty list is a pass)."""
     body = Body(asset)
     problems = []
     for name, pose in targets.items():
-        world = body.world(pose)
         notes = []
-        for side in SHOWS.get(name, ""):
-            h = hand_in_frame(body, pose, side)
-            notes.append(f"hand_{side} at ({h['x']:+.2f}, {h['y']:+.2f}) {h['inside'] * 100:.0f}% in frame, "
-                         f"{h['low'] * 100:.0f}% in the lower third, nearest {h['depth']:.3f} h")
-            if h["y"] > -1.0 / 3.0 or h["low"] < 0.5:
-                problems.append(f"{asset} {name}: hand_{side} is not in the lower third of the first-person frame "
-                                f"(middle at y = {h['y']:+.2f}, {h['low'] * 100:.0f}% of it there)")
-            if h["inside"] < 0.6:
-                problems.append(f"{asset} {name}: only {h['inside'] * 100:.0f}% of hand_{side} is inside the frame")
+        if name not in BODY_ONLY:
+            # ---- the player's own view: arms and jaw on the head, camera level
+            fp = first_person(pose)
+            world = body.world(fp)
+            for side in SHOWS.get(name, ""):
+                h = hand_in_frame(body, fp, side)
+                notes.append(f"hand_{side} at ({h['x']:+.2f}, {h['y']:+.2f}) {h['inside'] * 100:.0f}% in frame, "
+                             f"{h['low'] * 100:.0f}% in the lower third, nearest {h['depth']:.3f} h")
+                if h["y"] > -1.0 / 3.0 or h["low"] < 0.5:
+                    problems.append(f"{asset} {name}: hand_{side} is not in the lower third of the first-person frame "
+                                    f"(middle at y = {h['y']:+.2f}, {h['low'] * 100:.0f}% of it there)")
+                if h["inside"] < 0.6:
+                    problems.append(f"{asset} {name}: only {h['inside'] * 100:.0f}% of hand_{side} is inside the frame")
+            near = arm_to_crosshair(body, fp)
+            notes.append(f"arms stay {near:.2f} from the crosshair")
+            if near < CROSSHAIR:
+                problems.append(f"{asset} {name}: an arm comes within {near:.2f} of the crosshair in first person "
+                                f"(at least {CROSSHAIR} is wanted)")
+            head = body.triangles(world, ("head", "jaw"))
+            for arm in (RIGHT_ARM, LEFT_ARM):
+                n = _overlaps(body.triangles(world, arm, beyond_ball=True), head)
+                if n:
+                    problems.append(f"{asset} {name}: in first person the {arm[0][-1]} arm cuts into the head or jaw "
+                                    f"({n} triangle pairs)")
+        # ---- from outside: the whole target, arms on the torso
+        world = body.world(pose)
         head = body.triangles(world, ("head", "jaw"))
         rest = body.triangles(world, ("neck", "torso", "spines"))
         for arm in (RIGHT_ARM, LEFT_ARM):
@@ -203,7 +258,7 @@ def check(asset: str, targets: dict, quiet: bool = False) -> list[str]:
         if n:
             problems.append(f"{asset} {name}: the arms cut into each other ({n} triangle pairs)")
         if not quiet:
-            print(f"  {asset} {name:<14} " + ("; ".join(notes) if notes else "(no hand must show)"))
+            print(f"  {asset} {name:<14} " + ("; ".join(notes) if notes else "(body pose: no hand must show)"))
     return problems
 
 
@@ -212,7 +267,10 @@ def check(asset: str, targets: dict, quiet: bool = False) -> list[str]:
 # =========================================================================================
 def solve(body: Body, base: dict, goal: dict, seed: int = 1, starts: int = 10, both: bool = True, init=()):
     """Find right-arm angles (arm, forearm, hand) that put the right hand where `goal` says in
-    the first-person frame, clear of the head, on top of the `base` pose (torso, neck, head).
+    the first-person frame, clear of the head, on top of the `base` pose (torso, neck, head,
+    jaw). The frame is the first-person assembly (see first_person()): of the base only the
+    jaw counts there; the rest of it is how the body looks from outside, where the arms must
+    clear the head as well.
 
     goal: x, y (frame coordinates of the middle of the hand), depth (lo, hi) in body heights,
           fingers = direction the fingers point and back = direction the back of the hand
@@ -226,7 +284,6 @@ def solve(body: Body, base: dict, goal: dict, seed: int = 1, starts: int = 10, b
     from scipy.spatial import ConvexHull
 
     h = body.height
-    rest = body.world({})
     hand = body.pts["hand_R"]
     far = np.linalg.norm(hand, axis=1)
     tips = hand[far > np.quantile(far, 0.8)].mean(axis=0)            # the claws, hand-local
@@ -234,16 +291,21 @@ def solve(body: Body, base: dict, goal: dict, seed: int = 1, starts: int = 10, b
     # the back of the hand faces away from the palm: at rest that is up and outward (see lizard._hand)
     back0 = np.cross(fingers0, np.cross((0.0, 1.0, 0.0), fingers0))
     back0 /= np.linalg.norm(back0)
-    arm_pts = {n: body.pts[n][:: max(1, len(body.pts[n]) // 60)] for n in RIGHT_ARM}
+    # sample points on the arm; every point of the hand (claw tips are what crosses a line first)
+    arm_pts = {n: body.pts[n] if n == "hand_R" else body.pts[n][:: max(1, len(body.pts[n]) // 140)] for n in RIGHT_ARM}
     ball = 0.62 * float(np.linalg.norm(body.offset["forearm_R"]))       # the shoulder ball only turns in place
     arm_pts["arm_R"] = arm_pts["arm_R"][np.linalg.norm(arm_pts["arm_R"], axis=1) > ball]
-    wbase = body.world(base)
-    # the head as a convex lump (skull, snout, jaw, tusks; not the crown spikes that sweep back)
-    hp = np.vstack([body.at(wbase, "head", body.pts["head"][body.pts["head"][:, 2] > -0.02 * h]), body.at(wbase, "jaw")])
-    if both:                          # the left arm mirrors the right: it must clear the mirrored head too
-        hp = np.vstack([hp, hp * (-1.0, 1.0, 1.0)])
-    hull = ConvexHull(hp)
-    hn, hd = hull.equations[:, :3], hull.equations[:, 3]
+    wbase = body.world(first_person(base))
+    # the head as a convex lump (skull, snout, jaw, tusks; not the crown spikes that sweep back):
+    # as the player's own view has it (head at rest, jaw as posed), and as it sits on the body
+    # seen from outside (neck and head as posed; the torso carries arms and head alike)
+    hulls = []
+    for wh in (wbase, body.world({k: v for k, v in base.items() if k != "torso"})):
+        hp = np.vstack([body.at(wh, "head", body.pts["head"][body.pts["head"][:, 2] > -0.02 * h]), body.at(wh, "jaw")])
+        if both:                      # the left arm mirrors the right: it must clear the mirrored head too
+            hp = np.vstack([hp, hp * (-1.0, 1.0, 1.0)])
+        hull = ConvexHull(hp)
+        hulls.append((hull.equations[:, :3], hull.equations[:, 3]))
     tp = np.vstack([body.at(wbase, "torso"), body.at(wbase, "neck")])
     thull = ConvexHull(tp)
     tn, td = thull.equations[:, :3], thull.equations[:, 3]
@@ -267,7 +329,7 @@ def solve(body: Body, base: dict, goal: dict, seed: int = 1, starts: int = 10, b
         return mirrored(p) if both else p
 
     def cost(q, parts_out=None):
-        w = body.world(pose_of(q))
+        w = body.world(first_person(pose_of(q)))
         t = {}
         hw = body.at(w, "hand_R")
         x, y, d = body.project(w, hw)
@@ -286,19 +348,24 @@ def solve(body: Body, base: dict, goal: dict, seed: int = 1, starts: int = 10, b
             t["fingers"] = (1 - float((rot @ fingers0) @ want_f)) / 0.06
         if want_b is not None:
             t["back"] = (1 - float((rot @ back0) @ want_b)) / 0.20
-        t["head"] = t["torso"] = t["high"] = t["mid"] = 0.0
+        t["head"] = t["torso"] = t["high"] = t["mid"] = t["cross"] = 0.0
         for n in RIGHT_ARM:
             pw = body.at(w, n, arm_pts[n])
-            sd = (pw @ hn.T + hd).max(axis=1)                          # > 0 outside the head lump
-            t["head"] += float((np.maximum(0, 0.012 * h - sd) ** 2).mean()) / (0.0008 * h) ** 2
+            px, py, pd = body.project(w, pw)
+            seen = pd > NEAR                                           # nothing of the arm near the crosshair
+            if seen.any():
+                t["cross"] += float((np.maximum(0, CROSSHAIR + 0.08 - np.hypot(px[seen], py[seen])) ** 2).sum()
+                                    / len(pw)) * 3000
+            for hn, hd in hulls:
+                sd = (pw @ hn.T + hd).max(axis=1)                      # > 0 outside the head lump
+                t["head"] += float((np.maximum(0, 0.020 * h - sd) ** 2).mean()) / (0.0008 * h) ** 2
             if n != "arm_R":
                 sd = (pw @ tn.T + td).max(axis=1)
                 t["torso"] += float((np.maximum(0, 0.006 * h - sd) ** 2).mean()) / (0.001 * h) ** 2
                 if goal.get("low"):
-                    px, py, pd = body.project(w, pw)
                     t["high"] += float((np.maximum(0, py[pd > 0.05] + 0.25) ** 2).sum() / len(pw)) * 100
                 if both:                                               # mirrored arms must not meet
-                    t["mid"] += float((np.maximum(0, 0.014 * h + pw[:, 0]) ** 2).mean()) / (0.0005 * h) ** 2
+                    t["mid"] += float((np.maximum(0, 0.030 * h + pw[:, 0]) ** 2).mean()) / (0.0005 * h) ** 2
         # joints: the elbow neither locks out nor folds flat, the wrist does not snap
         sh, el, wr = w["arm_R"][1], w["forearm_R"][1], w["hand_R"][1]
         a, b = el - sh, wr - el
@@ -336,33 +403,40 @@ def solve(body: Body, base: dict, goal: dict, seed: int = 1, starts: int = 10, b
 
 def goals(stage: int) -> dict:
     """What each first-person pose target should look like: name -> (body angles, goal for the
-    right hand as solve() takes it, both arms?). Depths are body heights from the camera; the
-    hatchling's big head keeps its hands a little farther out."""
+    right hand as solve() takes it, both arms?). The goal is in the first-person assembly's
+    frame; the body angles only shape what other players see. Depths are body heights from
+    the camera; the hatchling's big head keeps its hands a little farther out. (The shipped
+    eat targets were then turned palm-in by hand: the solver's answer showed two forearms
+    and no claws.)"""
     near = {1: 0.19, 2: 0.16, 3: 0.16}[stage]
     return {
-        # claws out either side of the snout: backs of the hands up, claws forward and a little in
-        "fp_claws": ({}, dict(x=0.64, y=-0.62, depth=(near + 0.01, near + 0.12), fingers=(-0.3, 0.5, 0.8),
-                              back=(0.1, 0.9, -0.4), low=True), True),
-        # reach forward and down for something on the ground ahead
-        "grab": ({"torso": (14, 8, 0)}, dict(x=0.30, y=-0.62, depth=(0.30, 0.50), fingers=(-0.15, -0.45, 0.88),
-                                             back=(0, 0.9, 0.4), low=True), False),
-        # carry: the hand up in the lower right, palm in, so the thing it holds sits toward the middle
-        "hold": ({}, dict(x=0.58, y=-0.68, depth=(near, near + 0.12), fingers=(-0.3, 0.45, 0.85),
-                          back=(0.8, -0.3, -0.5), low=True), False),
+        # the carry: claws up either side of the snout, palms in, claws hooking toward the middle
+        "fp_claws": ({}, dict(x=0.70, y=-0.64, depth=(near + 0.02, near + 0.12), fingers=(-0.25, 0.55, 0.80),
+                              back=(0.8, 0.5, -0.2), low=True), True),
+        # reach forward, fingers a little up so the claws show against the street
+        "grab": ({"torso": (18, 10, 0)}, dict(x=0.30, y=-0.50, depth=(0.28, 0.48), fingers=(-0.40, 0.20, 0.90),
+                                              back=(0.3, 0.9, -0.1), low=True), False),
+        # carry: the hand low on the right, palm up and in, so the thing it holds sits toward the middle
+        "hold": ({}, dict(x=0.56, y=-0.64, depth=(near, near + 0.12), fingers=(-0.3, 0.35, 0.88),
+                          back=(0.6, -0.7, -0.2), low=True), False),
         # both hands bring the meal to the mouth, either side of the snout tip
-        "eat": ({"torso": (8, 0, 0), "head": (8, 0, 0), "jaw": (22, 0, 0)},
-                dict(x=0.36, y=-0.74, depth=(near - 0.04, near + 0.06), fingers=(-0.75, 0.35, 0.55),
+        "eat": ({"torso": (10, 0, 0), "head": (8, 0, 0), "jaw": (22, 0, 0)},
+                dict(x=0.42, y=-0.72, depth=(near - 0.04, near + 0.06), fingers=(-0.75, 0.35, 0.55),
                      back=(0.6, -0.2, 0.75), low=True), True),
-        # guard: forearms up in front of the chest and throat, palms toward the body
+        # guard: claws crossed low in front of the face, palms toward the body
         "brace": ({"torso": (16, 0, 0), "neck": (4, 0, 0), "head": (4, 0, 0)},
-                  dict(x=0.38, y=-0.68, depth=(near - 0.01, near + 0.11), fingers=(-0.65, 0.45, 0.6),
-                       back=(0.4, 0.3, 0.85), low=True), True),
-        # cocked: the hand drawn back to the edge of the view, palm forward, the body turned away
-        "throw_windup": ({"torso": (-8, -10, 0)}, dict(x=0.80, y=-0.64, depth=(near - 0.04, near + 0.06),
-                                                       fingers=(0.1, 0.8, 0.6), back=(0.2, 0.0, -1.0)), False),
-        # thrust: the arm straight out toward the crosshair
-        "throw_release": ({"torso": (12, 12, 0)}, dict(x=0.30, y=-0.58, depth=(0.30, 0.60), fingers=(-0.1, 0.1, 1.0),
-                                                       back=(0, 1, 0.1), low=True), False),
+                  dict(x=0.40, y=-0.66, depth=(near - 0.01, near + 0.11), fingers=(-0.75, 0.40, 0.55),
+                       back=(0.35, 0.3, 0.88), low=True), True),
+        # cocked: the hand drawn back to the edge of the view, palm forward, the body twisted away
+        "throw_windup": ({"torso": (-12, -28, 0)}, dict(x=0.80, y=-0.68, depth=(near - 0.04, near + 0.06),
+                                                        fingers=(0.1, 0.8, 0.6), back=(0.2, 0.0, -1.0)), False),
+        # flung: the arm out toward the target, fingers open
+        "throw_release": ({"torso": (16, 22, 0)}, dict(x=0.32, y=-0.50, depth=(0.30, 0.55), fingers=(-0.25, 0.40, 0.88),
+                                                       back=(0.3, 0.8, -0.4), low=True), False),
+        # the end of the rake: the right claw across in front of the nose, under the crosshair
+        "swipe_hit": ({"torso": (14, 43, 0), "head": (0, 11, 0)},
+                      dict(x=0.20, y=-0.66, depth=(0.24, 0.40), fingers=(-0.9, 0.1, 0.4), back=(0.1, 0.6, 0.8),
+                           low=True), False),
     }
 
 
@@ -375,7 +449,7 @@ def main(argv=None) -> int:
     current targets seed the search, so an answer that still works is kept or improved.
     Then rebuild (tools/art/kaiju_lizard.py) and look at the FIRST PERSON cells and at the
     poses from outside: the solver only knows where the hand should be, not what reads well.
-    About 20 seconds per pose."""
+    About 30 seconds per pose."""
     import argparse
 
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

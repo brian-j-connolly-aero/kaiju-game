@@ -77,8 +77,10 @@ def arty_distant(rng, v):
     return dsp.reverb(out, ir, 0.5)
 
 
-@sfx("laser_charge_loop", "humans", loop=1.0, level=-27.0,
-     use="A sub-unit holding fire and charging: thin electric tone. Raise the playback rate with the charge (1.0 to about 1.5).")
+@sfx("laser_charge_loop", "humans", loop=1.0, level=-21.0,
+     use="A sub-unit holding fire and charging: thin electric tone. Raise the playback rate with the charge "
+         "(1.0 at empty to 1.5 at full, where volley_ready takes over from the same pitch), then keep it at about "
+         "a third of the level for as long as the charge is held.")
 def laser_charge_loop(rng, v):
     n = n_(1.0)
     t = np.arange(n) / n                                      # whole numbers of cycles: periodic
@@ -88,16 +90,29 @@ def laser_charge_loop(rng, v):
     return (tone * (0.85 + 0.15 * np.sin(TAU * 8 * t)) + shimmer + edge) * 0.4
 
 
-@sfx("volley_ready", "humans", level=-20.0, use="A sub-unit reaches full charge: bright two-note ping (the yellow diamond fills).")
+@sfx("volley_ready", "humans", level=-20.0,
+     use="A sub-unit reaches full charge (the yellow diamond fills): the charging tone whips upward and locks, "
+         "with a hard tick, into a ringing open fifth. The lock is 0.09 s in.")
 def volley_ready(rng, v):
-    n = n_(0.5)
-    out = np.zeros(n)
-    for f, t0, g in ((880.0, 0.0, 0.8), (1174.66, 0.085, 1.0)):
-        m = n_(0.4)
-        bell = dsp.fm(f, 2.0, 2.2 * dsp.decay(m, 0.12), m) * dsp.decay(m, 0.3, 0.002) + 0.3 * parts.note(f * 2, 0.4, "sine", 0.2)
-        dsp.put(out, bell, t0, g)
-    tick = dsp.fit(dsp.click(rng, 3000, 9000, 0.004), n)
-    return out + 0.25 * tick
+    # Not a figure of notes like the lobby's ui_ready: this is the charging laser itself. The tone
+    # of laser_charge_loop at full charge (1320 Hz, the loop played at rate 1.5) slides up a fourth
+    # in one sweep and locks on A with the fifth above it.
+    lock = 0.09
+    m = n_(lock)
+    f = dsp.sweep(1320.0, 1760.0, m)
+    whip = dsp.sine(f) + 0.9 * dsp.sine(f * 1.0045) + 0.3 * dsp.sine(f * 2.0) + 0.2 * dsp.sine(f * 0.5)
+    whip = whip * dsp.env([(0, 0.0), (0.006, 0.3), (lock - 0.004, 1.0), (lock, 0.0)], m)
+    whip = whip * (0.75 + 0.25 * dsp.sine(dsp.sweep(24.0, 70.0, m)))                       # the shimmer speeds up
+    k = n_(0.38)
+    t = dsp.secs(k)
+    beat = 0.8 + 0.2 * np.cos(TAU * 16.0 * t)                                             # locked, still humming
+    ring = (dsp.fm(1760.0, 1.5, 1.2 * dsp.decay(k, 0.07), k) + 0.55 * dsp.sine(2637.02, k) + 0.2 * dsp.sine(3520.0, k)) * beat
+    ring = ring * dsp.decay(k, 0.32, 0.0012)
+    out = np.zeros(m + k)
+    dsp.put(out, whip, 0.0, 0.4)
+    dsp.put(out, ring, lock, 1.0)
+    dsp.put(out, dsp.click(rng, 2500, 9000, 0.004), lock, 0.6)
+    return out
 
 
 @sfx("volley_fire", "humans", level=-16.0, clip=True,

@@ -52,8 +52,8 @@ class Part:
     def __init__(self, name: str, inst: str, *, gain: float = 0.0, pan: float | None = None,
                  rev: float | None = None, width: float | None = None, ofs: int | None = None,
                  atk_ms: float | None = None, tune: float = 0.0, hp: float | None = None,
-                 lp: float | None = None, human_ms: float | None = None, human_vel: int = 4,
-                 role: str = ""):
+                 lp: float | None = None, sub: float | None = None, human_ms: float | None = None,
+                 human_vel: int = 4, role: str = ""):
         from .orchestra import INSTRUMENTS
         self.name = name
         self.inst = INSTRUMENTS[inst]
@@ -66,6 +66,7 @@ class Part:
         self.tune = tune                      # cents, for section detune
         self.hp = self.inst.hp if hp is None else hp
         self.lp = self.inst.lp if lp is None else lp
+        self.sub = self.inst.sub if sub is None else sub          # dB of low-shelf lift (bass weight)
         self.human_ms = self.inst.human_ms if human_ms is None else human_ms
         self.human_vel = human_vel
         self.role = role or self.inst.family  # melody / bass / pad / ostinato / perc: for the review
@@ -288,7 +289,7 @@ class Cue:
 
     def __init__(self, name: str, bars: float, *, loop: bool, group: str | None = None,
                  title: str = "", tail_seconds: float = 0.0, sections: list[tuple[int, str]] | None = None,
-                 target_lufs: float = -16.0, notes: str = ""):
+                 target_lufs: float = -16.0, notes: str = "", mark: float | None = None):
         self.name = name
         self.bars = bars
         self.loop = loop
@@ -298,6 +299,10 @@ class Cue:
         self.sections = sections or []        # (first bar, label) for spectrogram annotation
         self.target_lufs = target_lufs        # of the full mix (all stems together)
         self.notes = notes
+        # one-shots written to land on a game event: seconds into the file of that moment (the
+        # intermission's hit, the cocoon's cut). It goes into the manifest so the game can start
+        # the file late and still land on time.
+        self.mark = mark
         self.stems: list[Stem] = []
 
     def stem(self, name: str) -> Stem:

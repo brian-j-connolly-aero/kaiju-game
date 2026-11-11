@@ -13,6 +13,7 @@ from scipy import signal
 
 from . import DOC_DIR, OUT_DIR, SR, asr, dsp
 from .pipeline import CEILING_DBTP, TARGET_LUFS, decode, render
+from .scriptdoc import BRIEFING_BUDGET, BRIEFING_SECONDS, WINDOW_SECONDS
 
 MEASUREMENTS = DOC_DIR / "measurements.json"
 
@@ -140,6 +141,8 @@ def verify(lines: list[dict], cast: dict, state: dict, plans: dict, jobs: int = 
     ordered = [results[l["id"]] for l in lines]
     failures = [f for m in ordered for f in m["failures"]]
 
+    failures += timing_failures(lines, state)
+
     # the script itself: every id must have files and nothing else may be in the folder
     ids = {l["id"] for l in lines}
     extra = sorted(f.name for f in OUT_DIR.iterdir() if f.stem not in ids) if OUT_DIR.exists() else []
@@ -154,6 +157,24 @@ def verify(lines: list[dict], cast: dict, state: dict, plans: dict, jobs: int = 
     MEASUREMENTS.write_text(json.dumps(report, indent=1) + "\n")
     draw_sheets(lines, cast, plans, state)
     return report
+
+
+def timing_failures(lines: list[dict], state: dict) -> list[str]:
+    """Lines that have to fit the moment they announce: the humans' lines for a nerve break and
+    for the signature attack are orders for a window of a few seconds, and the three briefing
+    lines of one side play back to back inside the briefing."""
+    out = []
+    dur = {i: rec["duration"] for i, rec in state["lines"].items()}
+    for l in lines:
+        limit = WINDOW_SECONDS.get(l["cue"])
+        if limit and l["audience"] == "humans" and dur.get(l["id"], 0) > limit:
+            out.append(f"{l['id']}: {dur[l['id']]} s, but an order for `{l['cue']}` must fit in {limit} s")
+    for side in ("humans", "kaiju"):
+        total = sum(dur.get(l["id"], 0) for l in lines if l["cue"] == "match.briefing" and l["audience"] == side)
+        if total > BRIEFING_BUDGET:
+            out.append(f"match.briefing ({side}): the lines add up to {total:.2f} s; the briefing lasts "
+                       f"{BRIEFING_SECONDS:g} s and they must fit in {BRIEFING_BUDGET} s")
+    return out
 
 
 def _rate(errs: int, words: int) -> float:

@@ -12,7 +12,7 @@ Combat stem: snare, bass drum, taiko, timpani, cymbals; trumpets and trombones a
 bar of the theme with its own rhythm; short choir shouts on the strong bars.
 """
 from ..orchestra import BASS_DRUM, CRASH, SNARE, SNARE_ALT, TAIKO_LONG
-from ..patterns import bass, drive_bass, gallop, pulse, stab, swell_into, voice, voices
+from ..patterns import bass, drive_bass, gallop, octaves, pluck_roots, pulse, stab, swell_into, voice, voices
 from ..score import B, Cue, pitch
 from ..theme import B1, HARM_A, HARM_B, STRAIN_B, THEME, pad, sustain
 
@@ -37,18 +37,26 @@ def build() -> Cue:
 
     # =========================== base ===========================================================
     # ---- bass and the gallop ------------------------------------------------------------------
-    cb = base.add("basses", "basses", gain=3.0, role="bass")
+    # The bowed basses play in octaves where the lower one is on the instrument (C1 and up), and
+    # half of the section plucks each root an octave below: the sampled bowed bass has no
+    # fundamental below A1, the plucked one does, and stage 2 should not be lighter at the bottom
+    # than stage 1.
+    cb = base.add("basses", "basses", gain=5.0, sub=4.0, role="bass")
+    pb = base.add("basses pizz", "pizz_bass", gain=1.0, role="bass")
     vc = base.add("cellos gallop", "cellos_marc", gain=1.0, role="ostinato")
     va = base.add("violas gallop", "violas_marc", gain=-1.0, role="ostinato")
     for bar, v in ((1, 98), (9, 100), (25, 106)):
-        drive_bass(cb, bar, bass(HARM_A, -1), v)
+        drive_bass(cb, bar, octaves(bass(HARM_A, -1)), v)
+        pluck_roots(pb, bar, bass(HARM_A, -1), v)
         gallop(vc, bar, bass(HARM_A), v - 4)
         gallop(va, bar, voice(HARM_A, 0), v - 10, alt=voice(HARM_A, 1))
     # second strain: four bars held back (long bass notes, plain eighths), then the gallop returns
-    cb.line(17, "G1:4_ | F1:4_ | Eb2:4_ | A1:4", 92, gate=0.97)
+    cb.line(17, "G1:4_ | F1:4_ | Eb1+Eb2:4_ | A1:4", 92, gate=0.97)
+    pb.line(17, "G1:4 | F1:4 | Eb1:4 | A1:4", 88, gate=0.5)
     pulse(vc, 17, bass(HARM_B)[:8], 78, accent=10)
     pulse(va, 17, voice(HARM_B, 0)[:8], 72, accent=8)
     drive_bass(cb, 21, bass(HARM_B, -1)[8:], 96, cresc=(92, 108))
+    pluck_roots(pb, 21, bass(HARM_B, -1)[8:], 96, cresc=(92, 108))
     gallop(vc, 21, bass(HARM_B)[8:], 92, cresc=(86, 104))
     gallop(va, 21, voice(HARM_B, 0)[8:], 84, alt=voice(HARM_B, 1)[8:], cresc=(80, 98))
     tuba = base.add("tuba", "tuba", gain=-1.0, role="bass")
@@ -115,7 +123,7 @@ def build() -> Cue:
         section_end = bar % 8 == 0
         pat = fill if bar % 4 == 0 and not section_end else groove
         if 17 <= bar <= 20:
-            pat = "x.g.o.g.x.g.o.gg"                   # held back with the strings
+            pat = "X.g.x.ggX.g.x.gg"                   # held back with the strings, but still a pulse
         if section_end:
             pat = groove[:8] + "x.gg...."
             sn.roll(B(bar, 4), 1.0, SNARE, 52, 118, curve=1.3, alt=SNARE_ALT)
@@ -127,11 +135,13 @@ def build() -> Cue:
     tk = combat.add("taiko", "percussion", gain=2.0, role="perc")
     for bar in range(1, 33):
         quiet = 17 <= bar <= 20
-        bd.hits(bar, "x.......o......." if quiet else "X.......x.....o.", BASS_DRUM, dur=0.5)
-        if not quiet:
-            tk.note(B(bar), TAIKO_LONG, 1.0, 108 if bar % 2 else 92)
-            if bar % 2 == 0:
-                tk.hits(bar, "..........x.x...", TAIKO_LONG, dur=0.5)
+        bd.hits(bar, "X.......x......." if quiet else "X.......x.....o.", BASS_DRUM, dur=0.5)
+        if quiet:
+            tk.note(B(bar), TAIKO_LONG, 1.0, 92)       # a reduced pulse: the fight does not stop
+            continue
+        tk.note(B(bar), TAIKO_LONG, 1.0, 108 if bar % 2 else 92)
+        if bar % 2 == 0:
+            tk.hits(bar, "..........x.x...", TAIKO_LONG, dur=0.5)
 
     tm = combat.add("timpani", "timpani", gain=2.0, role="perc")
     TIMP = {"D": "D2", "C": "C3", "Bb": "Bb2", "G": "G2", "A": "A2", "Eb": "Eb3", "F": "F2"}
@@ -147,7 +157,7 @@ def build() -> Cue:
                 tm.line(b, f"{r1}:1> r:.5 {r1}:.5 {r2}:1 r:.5 {r2}:.25 {r2}:.25", vel)
     timp(1, HARM_A, 94)
     timp(9, HARM_A, 98)
-    tm.line(17, "G2:1> r:3 | F2:1> r:3 | Eb3:1> r:3 | A2:1> r:2 A2:.5 A2:.5", 90)
+    tm.line(17, "G2:1> r:1 G2:1 r:1 | F2:1> r:1 F2:1 r:1 | Eb3:1> r:1 Eb3:1 r:1 | A2:1> r:1 A2:1 A2:.5 A2:.5", 104)
     tm.line(21, "G2:1> r:.5 G2:.5 G2:1 r:.5 G2:.25 G2:.25 | Bb2:1> r:.5 Bb2:.5 Bb2:1 r:.5 Bb2:.25 Bb2:.25 | "
                 "G2:1> r:.5 G2:.5 G2:1 r:.5 G2:.25 G2:.25", 98)
     tm.note(B(24), P("A2"), 0.9, 108)
@@ -187,7 +197,9 @@ def build() -> Cue:
     # second strain: trombone stabs on the downbeats, then syncopated trumpets as it builds
     for i, (r, f) in enumerate((("G2", "D3"), ("F2", "F3"), ("Eb3", "Bb3"), ("A2", "E3"),
                                 ("G2", "D3"), ("Bb2", "F3"), ("G2", "D3"), ("A2", "E3"))):
-        stab(tbs, B(17 + i), [P(r), P(f)], 92 + 2 * i, 0.5)
+        stab(tbs, B(17 + i), [P(r), P(f)], (98 if i < 4 else 92) + 2 * i, 0.5)
+        if i < 4:                                         # the held-back bars: a second, softer stab
+            stab(tbs, B(17 + i, 3), [P(r), P(f)], 90 + 2 * i, 0.4)
     for i, (n1, n2) in enumerate((("D5", "Bb4"), ("D5", "Bb4"), ("E5", "Bb4"), ("E5", "C#5"))):
         for beat in (2.5, 4.5):
             stab(tp1, B(21 + i, beat), [P(n1)], 96 + 4 * i, 0.3)

@@ -414,6 +414,331 @@
       "passable": false,
       "hp": 5000,
       "value": 900
+    },
+    {
+      "id": "tank_a",
+      "model": "bld_tank_a",
+      "class": "factory",
+      "footprint": [
+        18,
+        18
+      ],
+      "height": 14,
+      "sizeClass": "medium",
+      "landmark": null,
+      "zones": [
+        "industrial",
+        "harbor"
+      ],
+      "passable": false,
+      "hp": 800,
+      "value": 60
+    },
+    {
+      "id": "crane_a",
+      "model": "bld_crane_a",
+      "class": "factory",
+      "footprint": [
+        16,
+        26
+      ],
+      "height": 46,
+      "sizeClass": "medium",
+      "landmark": null,
+      "zones": [
+        "harbor"
+      ],
+      "passable": false,
+      "hp": 900,
+      "value": 70
+    },
+    {
+      "id": "container_a",
+      "model": "bld_container_a",
+      "class": "factory",
+      "footprint": [
+        13,
+        26
+      ],
+      "height": 8,
+      "sizeClass": "medium",
+      "landmark": null,
+      "zones": [
+        "harbor",
+        "industrial"
+      ],
+      "passable": false,
+      "hp": 250,
+      "value": 14
+    },
+    {
+      "id": "campus_a",
+      "model": "bld_campus_a",
+      "class": "office",
+      "footprint": [
+        44,
+        16
+      ],
+      "height": 16,
+      "sizeClass": "medium",
+      "landmark": null,
+      "zones": [
+        "university"
+      ],
+      "passable": false,
+      "hp": 900,
+      "value": 85
+    },
+    {
+      "id": "pavilion_a",
+      "model": "bld_pavilion_a",
+      "class": "shop",
+      "footprint": [
+        16,
+        12
+      ],
+      "height": 7,
+      "sizeClass": "small",
+      "landmark": null,
+      "zones": [
+        "boardwalk"
+      ],
+      "passable": false,
+      "hp": 140,
+      "value": 14
+    },
+    {
+      "id": "shrine_a",
+      "model": "bld_shrine_a",
+      "class": "shop",
+      "footprint": [
+        10,
+        10
+      ],
+      "height": 11,
+      "sizeClass": "small",
+      "landmark": null,
+      "zones": [
+        "temple",
+        "oldtown"
+      ],
+      "passable": false,
+      "hp": 150,
+      "value": 14
+    },
+    {
+      "id": "bridge_b",
+      "model": "bld_bridge_b",
+      "class": "bridge",
+      "footprint": [
+        22,
+        110
+      ],
+      "height": 36,
+      "sizeClass": "large",
+      "landmark": null,
+      "zones": [],
+      "passable": true,
+      "hp": 4000,
+      "value": 400
+    },
+    {
+      "id": "tidewater_cathedral",
+      "model": "lm_tidewater_cathedral",
+      "class": "landmark",
+      "footprint": [
+        40,
+        72
+      ],
+      "height": 58,
+      "sizeClass": "landmark",
+      "landmark": "Tidewater Cathedral",
+      "zones": [
+        "oldtown"
+      ],
+      "passable": false,
+      "hp": 6000,
+      "value": 900
+    },
+    {
+      "id": "anchor_field",
+      "model": "lm_anchor_field",
+      "class": "landmark",
+      "footprint": [
+        150,
+        120
+      ],
+      "height": 30,
+      "sizeClass": "landmark",
+      "landmark": "Anchor Field",
+      "zones": [
+        "boardwalk"
+      ],
+      "passable": false,
+      "hp": 14000,
+      "value": 1200
+    },
+    {
+      "id": "tidewheel",
+      "model": "lm_tidewheel",
+      "class": "landmark",
+      "footprint": [
+        64,
+        14
+      ],
+      "height": 76,
+      "sizeClass": "landmark",
+      "landmark": "The Tidewheel",
+      "zones": [
+        "boardwalk"
+      ],
+      "passable": false,
+      "hp": 2500,
+      "value": 500
+    },
+    {
+      "id": "halcyon_observatory",
+      "model": "lm_halcyon_observatory",
+      "class": "landmark",
+      "footprint": [
+        40,
+        40
+      ],
+      "height": 24,
+      "sizeClass": "landmark",
+      "landmark": "Halcyon Observatory",
+      "zones": [
+        "university"
+      ],
+      "passable": false,
+      "hp": 3000,
+      "value": 500
+    },
+    {
+      "id": "farewell_light",
+      "model": "lm_farewell_light",
+      "class": "landmark",
+      "footprint": [
+        12,
+        12
+      ],
+      "height": 48,
+      "sizeClass": "landmark",
+      "landmark": "Farewell Light",
+      "zones": [
+        "harbor"
+      ],
+      "passable": false,
+      "hp": 1500,
+      "value": 350
+    },
+    {
+      "id": "kiln_point_power",
+      "model": "lm_kiln_point_power",
+      "class": "landmark",
+      "footprint": [
+        110,
+        70
+      ],
+      "height": 82,
+      "sizeClass": "landmark",
+      "landmark": "Kiln Point Power Station",
+      "zones": [
+        "industrial"
+      ],
+      "passable": false,
+      "hp": 12000,
+      "value": 1300
+    },
+    {
+      "id": "sevenfold_temple",
+      "model": "lm_sevenfold_temple",
+      "class": "landmark",
+      "footprint": [
+        44,
+        44
+      ],
+      "height": 52,
+      "sizeClass": "landmark",
+      "landmark": "Sevenfold Temple",
+      "zones": [
+        "temple"
+      ],
+      "passable": false,
+      "hp": 4000,
+      "value": 700
+    },
+    {
+      "id": "grand_station",
+      "model": "lm_grand_station",
+      "class": "landmark",
+      "footprint": [
+        110,
+        50
+      ],
+      "height": 40,
+      "sizeClass": "landmark",
+      "landmark": "Grand Meridian Station",
+      "zones": [
+        "downtown"
+      ],
+      "passable": false,
+      "hp": 7000,
+      "value": 900
+    },
+    {
+      "id": "signal_mast",
+      "model": "lm_signal_mast",
+      "class": "landmark",
+      "footprint": [
+        16,
+        16
+      ],
+      "height": 160,
+      "sizeClass": "landmark",
+      "landmark": "Signal Hill Mast",
+      "zones": [
+        "suburb"
+      ],
+      "passable": false,
+      "hp": 3000,
+      "value": 500
+    },
+    {
+      "id": "gasworks",
+      "model": "lm_gasworks",
+      "class": "landmark",
+      "footprint": [
+        56,
+        56
+      ],
+      "height": 44,
+      "sizeClass": "landmark",
+      "landmark": "Number Three Gasworks",
+      "zones": [
+        "industrial"
+      ],
+      "passable": false,
+      "hp": 4000,
+      "value": 600
+    },
+    {
+      "id": "founders_clock",
+      "model": "lm_founders_clock",
+      "class": "landmark",
+      "footprint": [
+        12,
+        12
+      ],
+      "height": 62,
+      "sizeClass": "landmark",
+      "landmark": "Founders Clock Tower",
+      "zones": [
+        "university"
+      ],
+      "passable": false,
+      "hp": 2000,
+      "value": 400
     }
   ],
   "props": [

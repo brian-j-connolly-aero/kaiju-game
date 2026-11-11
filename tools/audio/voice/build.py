@@ -51,6 +51,16 @@ def main() -> int:
     lines = load_lines()
     cast = load_cast()
     pron = load_pronounce()
+    from mbvoice import asr, scriptcheck
+    errors, warnings = scriptcheck.check(lines, asr.known_words())
+    for msg in warnings:
+        print("script warning:", msg, file=sys.stderr)
+    for msg in errors:
+        print("script error:", msg, file=sys.stderr)
+    if errors:
+        print(f"voice: the script breaks {len(errors)} rules (docs/VOICE_SCRIPT.md, \"Rules for writing new "
+              f"lines\"); nothing was built", file=sys.stderr)
+        return 1
     order = [l["id"] for l in lines]
     state = load_state()
     t0 = time.time()
@@ -92,13 +102,14 @@ def main() -> int:
 
     if args.no_verify:
         return 0
-    from mbvoice import analyze, docgen
+    from mbvoice import analyze, docgen, scriptdoc
     stale = [i for i in order if state["lines"].get(i, {}).get("hash") != plans[i]["hash"]]
     if stale:
         print(f"voice: {len(stale)} lines are out of date with the script, cast or code "
               f"(for example {stale[0]}); run build.sh without --verify-only", file=sys.stderr)
     report = analyze.verify(lines, cast, state, plans, jobs=args.jobs)
     docgen.write(lines, cast, pron, state, report)
+    scriptdoc.write(lines, state, report)
     for msg in report["failures"]:
         print("FAIL:", msg, file=sys.stderr)
     print(f"voice: verified {len(report['lines'])} lines, {len(report['failures'])} failures, "

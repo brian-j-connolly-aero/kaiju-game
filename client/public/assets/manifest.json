@@ -95,34 +95,34 @@
       "poses": {
         "brace": {
           "arm_L": [
-            -128,
-            8,
-            -21
+            -120,
+            6,
+            -18
           ],
           "arm_R": [
-            -128,
-            -8,
-            21
+            -120,
+            -6,
+            18
           ],
           "forearm_L": [
             84,
-            31,
-            -20
+            28,
+            -24
           ],
           "forearm_R": [
             84,
-            -31,
-            20
+            -28,
+            24
           ],
           "hand_L": [
-            11,
-            1,
-            -17
+            20,
+            9,
+            -39
           ],
           "hand_R": [
-            11,
-            -1,
-            17
+            20,
+            -9,
+            39
           ],
           "head": [
             4,
@@ -142,423 +142,119 @@
         },
         "eat": {
           "arm_L": [
-            -122,
-            -20,
-            -31
+            -119,
+            6,
+            -21
           ],
           "arm_R": [
-            -122,
-            20,
-            31
+            -119,
+            -6,
+            21
           ],
           "forearm_L": [
-            71,
-            19,
-            4
+            83,
+            32,
+            -22
           ],
           "forearm_R": [
-            71,
-            -19,
-            -4
+            83,
+            -32,
+            22
           ],
           "hand_L": [
-            4,
-            6,
-            -43
+            17,
+            9,
+            -40
+          ],
+          "hand_R": [
+            17,
+            -9,
+            40
+          ],
+          "head": [
+            8,
+            0,
+            0
+          ],
+          "jaw": [
+            22,
+            0,
+            0
+          ],
+          "torso": [
+            10,
+            0,
+            0
+          ]
+        },
+        "fp_claws": {
+          "arm_L": [
+            -123,
+            14,
+            -19
+          ],
+          "arm_R": [
+            -123,
+            -14,
+            19
+          ],
+          "forearm_L": [
+            83,
+            32,
+            -13
+          ],
+          "forearm_R": [
+            83,
+            -32,
+            13
+          ],
+          "hand_L": [
+            -8,
+            15,
+            -10
+          ],
+          "hand_R": [
+            -8,
+            -15,
+            10
+          ]
+        },
+        "grab": {
+          "arm_R": [
+            -117,
+            30,
+            24
+          ],
+          "forearm_R": [
+            61,
+            -14,
+            7
+          ],
+          "hand_R": [
+            16,
+            -14,
+            70
+          ],
+          "torso": [
+            18,
+            10,
+            0
+          ]
+        },
+        "hold": {
+          "arm_R": [
+            -123,
+            -10,
+            19
+          ],
+          "forearm_R": [
+            85,
+            -31,
+            18
           ],
           "hand_R": [
             4,
             -6,
-            43
-          ],
-          "head": [
-            8,
-            0,
-            0
-          ],
-          "jaw": [
-            22,
-            0,
-            0
-          ],
-          "torso": [
-            8,
-            0,
-            0
-          ]
-        },
-        "fp_claws": {
-          "arm_L": [
-            -124,
-            15,
-            -20
-          ],
-          "arm_R": [
-            -124,
-            -15,
-            20
-          ],
-          "forearm_L": [
-            82,
-            33,
-            -10
-          ],
-          "forearm_R": [
-            82,
-            -33,
-            10
-          ],
-          "hand_L": [
-            -8,
-            -21,
-            13
-          ],
-          "hand_R": [
-            -8,
-            21,
-            -13
-          ]
-        },
-        "grab": {
-          "arm_R": [
-            -127,
-            42,
-            34
-          ],
-          "forearm_R": [
-            64,
-            -30,
-            13
-          ],
-          "hand_R": [
-            23,
-            -10,
-            70
-          ],
-          "torso": [
-            14,
-            8,
-            0
-          ]
-        },
-        "hold": {
-          "arm_R": [
-            -122,
-            -12,
-            19
-          ],
-          "forearm_R": [
-            84,
-            -31,
-            15
-          ],
-          "hand_R": [
-            -4,
-            -13,
-            15
-          ]
-        },
-        "stagger": {
-          "arm_L": [
-            12,
-            0,
-            32
-          ],
-          "arm_R": [
-            12,
-            0,
-            -32
-          ],
-          "forearm_L": [
-            -10,
-            0,
-            0
-          ],
-          "forearm_R": [
-            -10,
-            0,
-            0
-          ],
-          "head": [
-            -20,
-            0,
-            0
-          ],
-          "jaw": [
-            20,
-            0,
-            0
-          ],
-          "leg_L": [
-            -8,
-            0,
-            0
-          ],
-          "leg_R": [
-            10,
-            0,
-            0
-          ],
-          "neck": [
-            -11,
-            0,
-            0
-          ],
-          "torso": [
-            -17,
-            0,
-            0
-          ]
-        },
-        "throw_release": {
-          "arm_R": [
-            -126,
-            24,
-            26
-          ],
-          "forearm_R": [
-            66,
-            -13,
-            2
-          ],
-          "hand_R": [
-            -5,
-            -14,
-            28
-          ],
-          "torso": [
-            12,
-            12,
-            0
-          ]
-        },
-        "throw_windup": {
-          "arm_R": [
-            -114,
-            17,
-            28
-          ],
-          "forearm_R": [
-            71,
-            -15,
-            -7
-          ],
-          "hand_R": [
-            -5,
-            -37,
-            40
-          ],
-          "torso": [
-            -8,
-            -10,
-            0
-          ]
-        }
-      },
-      "rig": "lizard",
-      "size": [
-        4.256,
-        4.5,
-        6.102
-      ],
-      "tris": 2253
-    },
-    "kaiju_lizard_s2": {
-      "file": "models/kaiju_lizard_s2.glb",
-      "kind": "kaiju",
-      "nodes": [
-        "root",
-        "hips",
-        "leg_L",
-        "shin_L",
-        "foot_L",
-        "leg_R",
-        "shin_R",
-        "foot_R",
-        "tail_1",
-        "tail_2",
-        "tail_3",
-        "tail_4",
-        "tail_5",
-        "torso",
-        "arm_L",
-        "forearm_L",
-        "hand_L",
-        "arm_R",
-        "forearm_R",
-        "hand_R",
-        "hold",
-        "neck",
-        "head",
-        "cam_fp",
-        "jaw",
-        "mouth",
-        "spines",
-        "weak_point"
-      ],
-      "poses": {
-        "brace": {
-          "arm_L": [
-            -106,
-            -47,
-            -32
-          ],
-          "arm_R": [
-            -106,
-            47,
-            32
-          ],
-          "forearm_L": [
-            33,
-            13,
-            23
-          ],
-          "forearm_R": [
-            33,
-            -13,
-            -23
-          ],
-          "hand_L": [
-            -5,
-            26,
-            -35
-          ],
-          "hand_R": [
-            -5,
-            -26,
-            35
-          ],
-          "head": [
-            4,
-            0,
-            0
-          ],
-          "neck": [
-            4,
-            0,
-            0
-          ],
-          "torso": [
-            16,
-            0,
-            0
-          ]
-        },
-        "eat": {
-          "arm_L": [
-            -100,
-            60,
-            -4
-          ],
-          "arm_R": [
-            -100,
-            -60,
-            4
-          ],
-          "forearm_L": [
-            63,
-            -9,
-            26
-          ],
-          "forearm_R": [
-            63,
-            9,
-            -26
-          ],
-          "hand_L": [
-            -2,
-            36,
-            -33
-          ],
-          "hand_R": [
-            -2,
-            -36,
-            33
-          ],
-          "head": [
-            8,
-            0,
-            0
-          ],
-          "jaw": [
-            22,
-            0,
-            0
-          ],
-          "torso": [
-            8,
-            0,
-            0
-          ]
-        },
-        "fp_claws": {
-          "arm_L": [
-            -97,
-            -2,
-            -11
-          ],
-          "arm_R": [
-            -97,
-            2,
-            11
-          ],
-          "forearm_L": [
-            53,
-            15,
-            9
-          ],
-          "forearm_R": [
-            53,
-            -15,
-            -9
-          ],
-          "hand_L": [
-            -36,
-            -3,
-            -25
-          ],
-          "hand_R": [
-            -36,
-            3,
-            25
-          ]
-        },
-        "grab": {
-          "arm_R": [
-            -106,
-            -5,
-            18
-          ],
-          "forearm_R": [
-            53,
-            -9,
-            -9
-          ],
-          "hand_R": [
-            -7,
-            -22,
-            0
-          ],
-          "torso": [
-            14,
-            8,
-            0
-          ]
-        },
-        "hold": {
-          "arm_R": [
-            -96,
-            -16,
-            14
-          ],
-          "forearm_R": [
-            52,
-            -22,
-            -6
-          ],
-          "hand_R": [
-            -16,
-            -23,
             22
           ]
         },
@@ -614,47 +310,405 @@
             0
           ]
         },
-        "throw_release": {
+        "swipe_hit": {
           "arm_R": [
-            -103,
-            -2,
-            20
+            -117,
+            54,
+            29
           ],
           "forearm_R": [
-            54,
-            -7,
-            -20
+            52,
+            -29,
+            28
           ],
           "hand_R": [
-            -31,
-            -18,
-            -10
+            32,
+            -11,
+            70
+          ],
+          "head": [
+            0,
+            11,
+            0
           ],
           "torso": [
-            12,
-            12,
+            14,
+            43,
+            0
+          ]
+        },
+        "throw_release": {
+          "arm_R": [
+            -123,
+            -5,
+            15
+          ],
+          "forearm_R": [
+            85,
+            -19,
+            29
+          ],
+          "hand_R": [
+            14,
+            -6,
+            34
+          ],
+          "torso": [
+            16,
+            22,
             0
           ]
         },
         "throw_windup": {
           "arm_R": [
-            -90,
-            9,
-            19
+            -121,
+            -12,
+            17
           ],
           "forearm_R": [
-            40,
-            0,
-            -16
+            84,
+            -30,
+            16
           ],
           "hand_R": [
-            -2,
-            6,
-            -40
+            -24,
+            -11,
+            4
           ],
           "torso": [
-            -8,
+            -12,
+            -28,
+            0
+          ]
+        }
+      },
+      "rig": "lizard",
+      "size": [
+        4.256,
+        4.5,
+        6.102
+      ],
+      "tris": 2253
+    },
+    "kaiju_lizard_s2": {
+      "file": "models/kaiju_lizard_s2.glb",
+      "kind": "kaiju",
+      "nodes": [
+        "root",
+        "hips",
+        "leg_L",
+        "shin_L",
+        "foot_L",
+        "leg_R",
+        "shin_R",
+        "foot_R",
+        "tail_1",
+        "tail_2",
+        "tail_3",
+        "tail_4",
+        "tail_5",
+        "torso",
+        "arm_L",
+        "forearm_L",
+        "hand_L",
+        "arm_R",
+        "forearm_R",
+        "hand_R",
+        "hold",
+        "neck",
+        "head",
+        "cam_fp",
+        "jaw",
+        "mouth",
+        "spines",
+        "weak_point"
+      ],
+      "poses": {
+        "brace": {
+          "arm_L": [
+            -97,
+            19,
+            -15
+          ],
+          "arm_R": [
+            -97,
+            -19,
+            15
+          ],
+          "forearm_L": [
+            54,
+            21,
+            1
+          ],
+          "forearm_R": [
+            54,
+            -21,
+            -1
+          ],
+          "hand_L": [
+            -3,
+            19,
+            -13
+          ],
+          "hand_R": [
+            -3,
+            -19,
+            13
+          ],
+          "head": [
+            4,
+            0,
+            0
+          ],
+          "neck": [
+            4,
+            0,
+            0
+          ],
+          "torso": [
+            16,
+            0,
+            0
+          ]
+        },
+        "eat": {
+          "arm_L": [
+            -100,
+            15,
+            -10
+          ],
+          "arm_R": [
+            -100,
+            -15,
+            10
+          ],
+          "forearm_L": [
+            66,
+            29,
+            -7
+          ],
+          "forearm_R": [
+            66,
+            -29,
+            7
+          ],
+          "hand_L": [
+            9,
+            5,
+            -44
+          ],
+          "hand_R": [
+            9,
+            -5,
+            44
+          ],
+          "head": [
+            8,
+            0,
+            0
+          ],
+          "jaw": [
+            22,
+            0,
+            0
+          ],
+          "torso": [
+            10,
+            0,
+            0
+          ]
+        },
+        "fp_claws": {
+          "arm_L": [
+            -97,
+            15,
+            -11
+          ],
+          "arm_R": [
+            -97,
+            -15,
+            11
+          ],
+          "forearm_L": [
+            53,
+            23,
+            3
+          ],
+          "forearm_R": [
+            53,
+            -23,
+            -3
+          ],
+          "hand_L": [
+            -22,
+            17,
+            -18
+          ],
+          "hand_R": [
+            -22,
+            -17,
+            18
+          ]
+        },
+        "grab": {
+          "arm_R": [
+            -103,
+            -17,
+            13
+          ],
+          "forearm_R": [
+            65,
+            -17,
+            8
+          ],
+          "hand_R": [
+            -26,
+            24,
+            7
+          ],
+          "torso": [
+            18,
+            10,
+            0
+          ]
+        },
+        "hold": {
+          "arm_R": [
+            -102,
+            -54,
+            8
+          ],
+          "forearm_R": [
+            57,
+            -45,
+            15
+          ],
+          "hand_R": [
+            21,
+            -65,
+            50
+          ]
+        },
+        "stagger": {
+          "arm_L": [
+            12,
+            0,
+            32
+          ],
+          "arm_R": [
+            12,
+            0,
+            -32
+          ],
+          "forearm_L": [
             -10,
+            0,
+            0
+          ],
+          "forearm_R": [
+            -10,
+            0,
+            0
+          ],
+          "head": [
+            -20,
+            0,
+            0
+          ],
+          "jaw": [
+            20,
+            0,
+            0
+          ],
+          "leg_L": [
+            -8,
+            0,
+            0
+          ],
+          "leg_R": [
+            10,
+            0,
+            0
+          ],
+          "neck": [
+            -11,
+            0,
+            0
+          ],
+          "torso": [
+            -17,
+            0,
+            0
+          ]
+        },
+        "swipe_hit": {
+          "arm_R": [
+            -104,
+            -16,
+            12
+          ],
+          "forearm_R": [
+            68,
+            -15,
+            12
+          ],
+          "hand_R": [
+            11,
+            -1,
+            26
+          ],
+          "head": [
+            0,
+            11,
+            0
+          ],
+          "torso": [
+            14,
+            43,
+            0
+          ]
+        },
+        "throw_release": {
+          "arm_R": [
+            -102,
+            -22,
+            13
+          ],
+          "forearm_R": [
+            64,
+            -16,
+            2
+          ],
+          "hand_R": [
+            -26,
+            17,
+            11
+          ],
+          "torso": [
+            16,
+            22,
+            0
+          ]
+        },
+        "throw_windup": {
+          "arm_R": [
+            -105,
+            -46,
+            -1
+          ],
+          "forearm_R": [
+            83,
+            -33,
+            39
+          ],
+          "hand_R": [
+            -67,
+            -39,
+            30
+          ],
+          "torso": [
+            -12,
+            -28,
             0
           ]
         }
@@ -705,32 +759,32 @@
           "arm_L": [
             -103,
             19,
-            -23
+            -13
           ],
           "arm_R": [
             -103,
             -19,
-            23
+            13
           ],
           "forearm_L": [
-            55,
-            29,
-            1
+            75,
+            28,
+            -20
           ],
           "forearm_R": [
-            55,
-            -29,
-            -1
+            75,
+            -28,
+            20
           ],
           "hand_L": [
-            -11,
-            -45,
-            10
+            -17,
+            15,
+            -1
           ],
           "hand_R": [
-            -11,
-            45,
-            -10
+            -17,
+            -15,
+            1
           ],
           "head": [
             4,
@@ -750,34 +804,34 @@
         },
         "eat": {
           "arm_L": [
-            -97,
-            23,
-            -20
+            -100,
+            15,
+            -10
           ],
           "arm_R": [
-            -97,
-            -23,
-            20
+            -100,
+            -15,
+            10
           ],
           "forearm_L": [
-            62,
-            22,
-            -1
+            66,
+            29,
+            -7
           ],
           "forearm_R": [
-            62,
-            -22,
-            1
+            66,
+            -29,
+            7
           ],
           "hand_L": [
-            10,
-            43,
-            -47
+            9,
+            -5,
+            -44
           ],
           "hand_R": [
-            10,
-            -43,
-            47
+            9,
+            5,
+            44
           ],
           "head": [
             8,
@@ -790,7 +844,7 @@
             0
           ],
           "torso": [
-            8,
+            10,
             0,
             0
           ]
@@ -798,72 +852,72 @@
         "fp_claws": {
           "arm_L": [
             -97,
-            2,
-            -20
+            16,
+            -18
           ],
           "arm_R": [
             -97,
-            -2,
-            20
+            -16,
+            18
           ],
           "forearm_L": [
             55,
-            31,
-            8
+            33,
+            7
           ],
           "forearm_R": [
             55,
-            -31,
-            -8
+            -33,
+            -7
           ],
           "hand_L": [
-            -28,
-            -5,
-            -9
+            -23,
+            14,
+            -20
           ],
           "hand_R": [
-            -28,
-            5,
-            9
+            -23,
+            -14,
+            20
           ]
         },
         "grab": {
           "arm_R": [
-            -101,
-            -16,
-            22
+            -104,
+            -13,
+            12
           ],
           "forearm_R": [
-            51,
-            -24,
-            3
+            74,
+            -19,
+            27
           ],
           "hand_R": [
-            -14,
-            1,
-            -22
+            -20,
+            26,
+            -3
           ],
           "torso": [
-            14,
-            8,
+            18,
+            10,
             0
           ]
         },
         "hold": {
           "arm_R": [
-            -98,
-            -11,
-            18
+            -105,
+            -48,
+            1
           ],
           "forearm_R": [
-            64,
-            -37,
-            10
+            77,
+            -35,
+            35
           ],
           "hand_R": [
-            -24,
-            -10,
-            16
+            7,
+            -67,
+            50
           ]
         },
         "stagger": {
@@ -918,47 +972,74 @@
             0
           ]
         },
-        "throw_release": {
+        "swipe_hit": {
           "arm_R": [
-            -97,
-            1,
-            25
+            -104,
+            -15,
+            11
           ],
           "forearm_R": [
-            44,
-            -28,
+            76,
+            -15,
+            26
+          ],
+          "hand_R": [
+            8,
+            2,
+            14
+          ],
+          "head": [
+            0,
+            11,
             0
+          ],
+          "torso": [
+            14,
+            43,
+            0
+          ]
+        },
+        "throw_release": {
+          "arm_R": [
+            -105,
+            -17,
+            13
+          ],
+          "forearm_R": [
+            76,
+            -25,
+            20
           ],
           "hand_R": [
             -27,
-            -2,
-            -13
+            37,
+            3
           ],
           "torso": [
-            12,
-            12,
+            16,
+            22,
             0
           ]
         },
         "throw_windup": {
           "arm_R": [
-            -102,
-            44,
-            32
+            -107,
+            -32,
+            3
           ],
           "forearm_R": [
-            51,
-            18,
-            -37
+            99,
+            -32,
+            54
           ],
           "hand_R": [
-            18,
-            67,
-            -48
+            -64,
+            -42,
+            28
           ],
           "torso": [
-            -8,
-            -10,
+            -12,
+            -28,
             0
           ]
         }
@@ -1436,12 +1517,89 @@
         "play": {
           "col": 0,
           "fps": 1,
-          "frames": 4,
+          "frames": 1,
           "rows": [
             4
           ]
         }
       },
+      "blend": "alpha",
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_debris_1": {
+      "anims": {
+        "play": {
+          "col": 0,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            4
+          ]
+        }
+      },
+      "blend": "alpha",
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_debris_2": {
+      "anims": {
+        "play": {
+          "col": 1,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            4
+          ]
+        }
+      },
+      "blend": "alpha",
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_debris_3": {
+      "anims": {
+        "play": {
+          "col": 2,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            4
+          ]
+        }
+      },
+      "blend": "alpha",
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_debris_4": {
+      "anims": {
+        "play": {
+          "col": 3,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            4
+          ]
+        }
+      },
+      "blend": "alpha",
       "file": "sprites/fx.png",
       "frame": [
         64,
@@ -1460,6 +1618,7 @@
           ]
         }
       },
+      "blend": "alpha",
       "file": "sprites/fx.png",
       "frame": [
         64,
@@ -1478,6 +1637,7 @@
           ]
         }
       },
+      "blend": "alpha",
       "file": "sprites/fx.png",
       "frame": [
         64,
@@ -1496,6 +1656,7 @@
           ]
         }
       },
+      "blend": "alpha",
       "file": "sprites/fx.png",
       "frame": [
         64,
@@ -1514,6 +1675,7 @@
           ]
         }
       },
+      "blend": "alpha",
       "file": "sprites/fx.png",
       "frame": [
         64,
@@ -1532,6 +1694,7 @@
           ]
         }
       },
+      "blend": "alpha",
       "file": "sprites/fx.png",
       "frame": [
         64,
@@ -1550,6 +1713,7 @@
           ]
         }
       },
+      "blend": "add",
       "file": "sprites/fx.png",
       "frame": [
         64,
@@ -1568,6 +1732,7 @@
           ]
         }
       },
+      "blend": "add",
       "file": "sprites/fx.png",
       "frame": [
         64,
@@ -1586,6 +1751,7 @@
           ]
         }
       },
+      "blend": "alpha",
       "file": "sprites/fx.png",
       "frame": [
         64,
@@ -1604,6 +1770,7 @@
           ]
         }
       },
+      "blend": "alpha",
       "file": "sprites/fx.png",
       "frame": [
         64,
@@ -1622,6 +1789,7 @@
           ]
         }
       },
+      "blend": "alpha",
       "file": "sprites/fx.png",
       "frame": [
         64,
@@ -1640,6 +1808,7 @@
           ]
         }
       },
+      "blend": "add",
       "file": "sprites/fx.png",
       "frame": [
         64,
@@ -1658,6 +1827,7 @@
           ]
         }
       },
+      "blend": "alpha",
       "file": "sprites/fx.png",
       "frame": [
         64,
@@ -1699,7 +1869,7 @@
         },
         "walk": {
           "col": 8,
-          "fps": 8,
+          "fps": 12,
           "frames": 4,
           "rows": [
             0,
@@ -1750,7 +1920,7 @@
         },
         "walk": {
           "col": 1,
-          "fps": 8,
+          "fps": 12,
           "frames": 4,
           "rows": [
             0,
@@ -1771,11 +1941,25 @@
   "textures": {
     "clouds_a": {
       "file": "textures/clouds_a.png",
-      "tile": true
+      "ring": {
+        "bottomDeg": -5,
+        "repeats": 4,
+        "sunGap": [
+          258,
+          72
+        ]
+      }
     },
     "clouds_b": {
       "file": "textures/clouds_b.png",
-      "tile": true
+      "ring": {
+        "bottomDeg": -5,
+        "repeats": 3,
+        "sunGap": [
+          414,
+          58
+        ]
+      }
     },
     "ground_asphalt": {
       "file": "textures/ground_asphalt.png",
@@ -1811,7 +1995,8 @@
     "cocoon": {
       "base": "audio/music/cocoon",
       "bpm": 96,
-      "duration": 12.5
+      "duration": 12.5,
+      "mark": 10
     },
     "hearing": {
       "base": "audio/music/hearing",
@@ -1825,7 +2010,8 @@
     "intermission": {
       "base": "audio/music/intermission",
       "bpm": 96,
-      "duration": 23.5
+      "duration": 23.5,
+      "mark": 20
     },
     "lobby": {
       "base": "audio/music/lobby",
@@ -1950,6 +2136,24 @@
         "audio/sfx/arty_incoming"
       ]
     },
+    "bell": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/bell_1",
+        "audio/sfx/bell_2",
+        "audio/sfx/bell_3"
+      ]
+    },
+    "burrow_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        3.25
+      ],
+      "variants": [
+        "audio/sfx/burrow_loop"
+      ]
+    },
     "camera_shutter": {
       "gain": 1,
       "variants": [
@@ -1962,6 +2166,16 @@
         "audio/sfx/car_crush_1",
         "audio/sfx/car_crush_2",
         "audio/sfx/car_crush_3"
+      ]
+    },
+    "chant_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        5.25
+      ],
+      "variants": [
+        "audio/sfx/chant_loop"
       ]
     },
     "crowd_panic_loop": {
@@ -1998,6 +2212,26 @@
         "audio/sfx/crumble_s_3"
       ]
     },
+    "dish_beam_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        2.25
+      ],
+      "variants": [
+        "audio/sfx/dish_beam_loop"
+      ]
+    },
+    "drone_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        2.25
+      ],
+      "variants": [
+        "audio/sfx/drone_loop"
+      ]
+    },
     "explosion_l": {
       "gain": 1,
       "variants": [
@@ -2032,12 +2266,46 @@
         "audio/sfx/fire_loop"
       ]
     },
+    "freeze_ray": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/freeze_ray"
+      ]
+    },
+    "generator_overload": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/generator_overload"
+      ]
+    },
     "glass": {
       "gain": 1,
       "variants": [
         "audio/sfx/glass_1",
         "audio/sfx/glass_2",
         "audio/sfx/glass_3"
+      ]
+    },
+    "gust": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/gust"
+      ]
+    },
+    "heli_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        2.25
+      ],
+      "variants": [
+        "audio/sfx/heli_loop"
+      ]
+    },
+    "jet_flyby": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/jet_flyby"
       ]
     },
     "kaiju_beam_charge": {
@@ -2104,6 +2372,42 @@
         "audio/sfx/kaiju_molt_blast"
       ]
     },
+    "kaiju_roar_burrower_s1": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_roar_burrower_s1"
+      ]
+    },
+    "kaiju_roar_burrower_s2": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_roar_burrower_s2"
+      ]
+    },
+    "kaiju_roar_burrower_s3": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_roar_burrower_s3"
+      ]
+    },
+    "kaiju_roar_crab_s1": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_roar_crab_s1"
+      ]
+    },
+    "kaiju_roar_crab_s2": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_roar_crab_s2"
+      ]
+    },
+    "kaiju_roar_crab_s3": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_roar_crab_s3"
+      ]
+    },
     "kaiju_roar_lizard_s1": {
       "gain": 1,
       "variants": [
@@ -2120,6 +2424,24 @@
       "gain": 1,
       "variants": [
         "audio/sfx/kaiju_roar_lizard_s3"
+      ]
+    },
+    "kaiju_roar_moth_s1": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_roar_moth_s1"
+      ]
+    },
+    "kaiju_roar_moth_s2": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_roar_moth_s2"
+      ]
+    },
+    "kaiju_roar_moth_s3": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_roar_moth_s3"
       ]
     },
     "kaiju_stagger": {
@@ -2240,6 +2562,12 @@
       "gain": 1,
       "variants": [
         "audio/sfx/radio_open"
+      ]
+    },
+    "relic_open": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/relic_open"
       ]
     },
     "rocket_launch": {
@@ -3329,6 +3657,9 @@
     "st_rage": {
       "file": "ui/st_rage.svg"
     },
+    "st_reload": {
+      "file": "ui/st_reload.svg"
+    },
     "st_shaken": {
       "file": "ui/st_shaken.svg"
     },
@@ -3370,6 +3701,30 @@
     },
     "tl_tower": {
       "file": "ui/tl_tower.svg"
+    },
+    "ui_clock": {
+      "file": "ui/ui_clock.svg"
+    },
+    "ui_copy": {
+      "file": "ui/ui_copy.svg"
+    },
+    "ui_newspaper": {
+      "file": "ui/ui_newspaper.svg"
+    },
+    "ui_offline": {
+      "file": "ui/ui_offline.svg"
+    },
+    "ui_skull": {
+      "file": "ui/ui_skull.svg"
+    },
+    "ui_sound": {
+      "file": "ui/ui_sound.svg"
+    },
+    "ui_trophy": {
+      "file": "ui/ui_trophy.svg"
+    },
+    "ui_warning": {
+      "file": "ui/ui_warning.svg"
     }
   }
 }

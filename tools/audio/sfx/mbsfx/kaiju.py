@@ -359,8 +359,9 @@ def kaiju_beam_charge(rng, v):
     return dsp.fade(y, 0.0, 0.05)
 
 
-@sfx("kaiju_beam_loop", "kaiju", loop=2.0, level=-15.0,
-     use="Beam held (3 s): a roaring, buzzing stream. Loop while the beam fires.")
+@sfx("kaiju_beam_loop", "kaiju", loop=2.0, level=-18.0,
+     use="Beam held (3 s): a roaring, buzzing stream. Loop while the beam fires. It holds for three seconds, so it "
+         "sits 2 dB under the voice lines, not at the level of an explosion.")
 def kaiju_beam_loop(rng, v):
     n = n_(2.0)
     buzz = dsp.saw(55.0, n) + 0.8 * dsp.saw(110.5, n) + 0.6 * dsp.saw(165.0, n, start=0.3)      # 0.5 Hz grid: periodic
@@ -396,13 +397,15 @@ def kaiju_heartbeat_loop(rng, v):
 
 
 @sfx("kaiju_molt_blast", "kaiju", level=-13.0, clip=True,
-     use="The cocoon bursts: a short inward suck, the blast wave, shell fragments, and the bigger animal's first "
-         "breath. Start it 0.22 s before the blast frame.")
+     use="The cocoon bursts: the blast wave (led in by 0.03 s of air rushing inward), shell fragments, and the "
+         "bigger animal's first breath. Trigger it on the blast frame, the instant the cocoon music stops.")
 def kaiju_molt_blast(rng, v):
-    pre = 0.22
+    # The blast must land with the picture: the cocoon music stops dead on the frame the sound is
+    # triggered. So the inward suck before it is only an attack, 30 ms long (it used to be 0.22 s).
+    pre = 0.03
     n = n_(3.6)
     m = n_(pre)
-    suck = parts.whoosh(m, rng, [(0, 300), (pre, 4500)], 0.8) * dsp.env([(0, 0), (pre - 0.03, 1), (pre, 0.0)], m, "lin") ** 2
+    suck = parts.whoosh(m, rng, [(0, 300), (pre, 4500)], 0.8) * dsp.env([(0, 0), (pre * 0.75, 1), (pre, 0.0)], m, "lin") ** 2
     low = parts.thump(n, 95, 24, 0.12, 2.0, attack=0.004, harm=0.4, sat=2.4)
     hit = parts.burst(n, rng, 9000, 140, 0.07, 1.1)
     wave_f = dsp.env([(0, 1800), (0.6, 400), (2.2, 90)], n, "exp")

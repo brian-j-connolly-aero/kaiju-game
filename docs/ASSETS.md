@@ -30,7 +30,9 @@ grey `#8d8d94`, road `#2b3040`, sidewalk `#b9bcc6`, grass `#4fbf5f`, water `#2f7
 draw from about a dozen saturated-but-light tones (cream, salmon, sky blue, mint, mustard, brick,
 slate, white, teal glass). Army is olive with cyan identification stripes. Each kaiju owns a warm
 scheme: Gragnor burnt orange with rust stripes and a cream belly; Krabulon crimson; Drillmaw
-ochre and purple-brown; Vespera amber and pink with glowing eyespots.
+ochre and purple-brown; Vespera amber and pink with glowing eyespots. A kaiju's weak point and
+the light inside its cocoon glow violet-white `#c9a6ff`: never cyan or yellow, which belong to
+the humans and to charging volleys.
 
 ## 3. Models (`client/public/assets/models/*.glb`)
 
@@ -104,8 +106,17 @@ half-built), `faith_belltruck` (`hull`, `bell`), `faith_float`, `faith_ark` (`ba
   `prop_truck`, `prop_kiosk`, `prop_tree_a`, `prop_tree_b`, `prop_lamp`, `prop_trafficlight`,
   `prop_bench`, `prop_hydrant`, `prop_billboard`, `prop_busstop`, plus `prop_car_wreck`.
 - Ground tiles (64 px, tiling): `textures/ground_asphalt.png`, `ground_sidewalk.png`,
-  `ground_grass.png`, `ground_water.png`, `ground_rubble.png`. Sky: `textures/clouds_a.png`,
-  `clouds_b.png` (dramatic cumulus with alpha).
+  `ground_grass.png`, `ground_water.png`, `ground_rubble.png`. **One tile covers 8 × 8 m** in
+  the game, so a ground pixel is 12.5 cm (a character pixel is 6.9 cm): a paving slab is 8 px.
+- Sky: `textures/clouds_a.png`, `clouds_b.png` (dramatic cumulus with alpha, 512 × 256 px).
+  These are **horizon panoramas**, side views of clouds standing on the horizon: u runs around
+  an upright ring (an open cylinder) centered on the camera, v runs up. They wrap left to right
+  only; never lay them on a horizontal plane, never tile them vertically, and draw them
+  without fog. Mapping, also carried in the manifest as `"ring"` (section 7): `clouds_a` 4
+  repeats around the full circle, `clouds_b` 3 repeats and drawn behind it; each repeat keeps
+  the picture's 2:1 shape (ring height = π × radius ÷ repeats); the bottom edge sits 5° below
+  the horizon. Each painting has two clear gaps down to the horizon, one of them (`sunGap`)
+  for the sunset sun. Details and review pictures: `tools/art/sprites/README.md`.
 
 ## 4. Sprites (`client/public/assets/sprites/`)
 
@@ -116,20 +127,24 @@ Pixel art, drawn by script. Sheets are grids of equal cells. Characters are flat
   fire 2 frames per facing, die 4 frames.
 - `civilians.png`: 6 civilian variants: run 4 frames per facing, arms up.
 - `fx.png`: sparkler explosion (8 frames), smoke puff (6), dust (6), spark, muzzle flash (3),
-  debris bits (4), soft glow, laser dot, shockwave ring, fire (6). 64 px cells.
+  debris bits (4 different chunks, one sprite each), soft glow, laser dot, shockwave ring,
+  fire (6). 64 px cells. The explosion, fire and flash are full-color pictures for ordinary
+  alpha blending; only glow, spark and laser dot are added (manifest field `"blend"`).
 - Tier 2: `science.png` (lab coats with ray guns), `faith.png` (fictional clergy and choir
   members of many traditions, drawn with warmth and dignity), pilots are not needed.
 
 ## 5. UI art (`client/public/assets/ui/`)
 
 Hand-written SVG, 64 × 64 viewBox, single color via `currentColor`, thick strokes, readable at
-32 px. No text inside icons. No third-party icon sets.
+32 px and at the sizes the client really draws them (down to 18 px for button glyphs and bar
+marks). No text inside icons. No third-party icon sets.
 
 - Commands: `cmd_follow`, `cmd_moveto`, `cmd_fireatwill`, `cmd_holdcharge`.
 - Kaiju verbs: `k_swipe`, `k_stomp`, `k_grab`, `k_throw`, `k_eat`, `k_brace`, `k_roar`,
   `k_special`, `k_molt`.
-- Status: `st_health`, `st_nerve`, `st_rage`, `st_charge`, `st_veteran`, `st_spotted`,
-  `st_crossfire`, `st_callin`, `st_shaken`, `st_map`, `st_camera`, `st_sun`, `st_moon`.
+- Status: `st_health`, `st_nerve`, `st_rage`, `st_charge`, `st_reload` (one shell: the reload
+  meter and the player's own shot), `st_veteran`, `st_spotted`, `st_crossfire`, `st_callin`,
+  `st_shaken`, `st_map`, `st_camera`, `st_sun`, `st_moon`.
 - Lobby: `lb_kaiju`, `lb_human`, `lb_ready`, `lb_host`, `lb_bot`, `lb_link`, `lb_play`, `lb_back`,
   `lb_create`, `lb_join`.
 - Factions: `fac_army`, `fac_air`, `fac_science`, `fac_faith`.
@@ -137,8 +152,14 @@ Hand-written SVG, 64 × 64 viewBox, single color via `currentColor`, thick strok
   `tl_tower`, `tl_factory`, `tl_bridge`, `tl_landmark`.
 - Device glyphs: `kb_key` (blank keycap; the letter is added in code), `ms_left`, `ms_right`,
   `ms_middle`, `ms_move`, `gp_a`, `gp_b`, `gp_x`, `gp_y`, `gp_lb`, `gp_rb`, `gp_lt`, `gp_rt`,
-  `gp_ls`, `gp_rs`, `gp_dpad`, `gp_start`, `gp_back`.
+  `gp_ls`, `gp_rs`, `gp_dpad` (no direction), `gp_dpad_up`, `gp_dpad_right`, `gp_dpad_down`,
+  `gp_dpad_left` (one direction of the directional pad), `gp_start`, `gp_back`.
+- System: `ui_offline`, `ui_warning`, `ui_copy` (this seat was opened somewhere else),
+  `ui_skull` (eliminated), `ui_trophy`, `ui_clock` (time ran out), `ui_newspaper`, `ui_sound`.
 - `skyline.svg`: the destruction-bar skyline with three taller towers at 21%, 57% and 100%.
+  viewBox 400 × 64, drawn to be stretched into the bar (560 × 46 px; the root carries
+  `preserveAspectRatio="none"`). Two paths: `sky-city` (clip it from the left as the bar fills)
+  and `sky-rubble` (what is left). Details: `docs/art/UI_ICONS.md`.
 - Portraits (PNG, 512 px, rendered from the models): `portrait_<kaiju kind>.png`,
   `portrait_<faction>.png`.
 
@@ -155,7 +176,8 @@ same length and start together; the client fades the combat stem in when the fig
 `lobby` (brooding march, 60 to 90 s loop), `briefing` (tense bed, 20 s loop), `stage1_base` and
 `stage1_combat` (sparse: low strings, snare, pizzicato, a hint of choir), `stage2_base` and
 `stage2_combat` (full strings and brass, choir enters), `stage3_base` and `stage3_combat` (full
-choir, orchestra, timpani), `cocoon` (heartbeat and eerie choir, about 12 s), `intermission`
+choir, orchestra, timpani), `cocoon` (eerie choir, about 12 s; it carries no heartbeat of its
+own, because the heartbeat is the positional effect `kaiju_heartbeat_loop`), `intermission`
 (build, 20 s), `win_humans` (fanfare, 10 to 15 s), `win_kaiju` (ominous choir, 10 to 15 s),
 `hearing` (somber bureaucratic bed, 30 s loop).
 
@@ -186,8 +208,10 @@ Tier 2: `kaiju_roar_crab_s1..s3`, `kaiju_roar_burrower_s1..s3`, `kaiju_roar_moth
 
 Script: `shared/src/defs/voiceLines.json`, an array of
 `{ "id", "cue", "audience": "humans" | "kaiju" | "all", "speaker", "text" }`, covering every cue
-in `DESIGN.md` §8 with at least 3 variants for frequent cues (about 150 lines in total). Lines are
-short (12 words or fewer), deadly serious, and never acknowledge that anything is absurd.
+in `DESIGN.md` §8 with at least 3 variants for frequent cues (about 220 lines in total). Lines are
+short (12 words or fewer; the hearing lines on the end screen may run to 20), deadly serious, and
+never acknowledge that anything is absurd. The writing rules, and how many lines each voice needs
+of its own, are in `docs/VOICE_SCRIPT.md`; the voice build checks them.
 
 Cast: **Overlord** (command; stern), three or four squad callsigns with distinct voices, a
 **Channel 9 anchor** for the kaiju's news feed, and a **committee chair** for the end-screen
@@ -213,19 +237,42 @@ deep-merges every partial into `manifest.json`, which the client loads. Never ha
     joint angles, because each stage has its own proportions. Angles are degrees relative to the
     rest pose, in the game's axes, to be set as `node.rotation.set(x, y, z)` (three.js Euler
     order XYZ). Nodes a pose does not name are left to the animator (walk cycle, look,
-    breathing). The lizard stages carry `fp_claws` (both claws out either side of the snout:
-    the first-person carry), `grab`, `hold`, `eat`, `brace`, `throw_windup`, `throw_release`
-    and `stagger` (reeling back, chest and weak point open). The first seven are built for the
-    first-person lens (camera on `cam_fp`, level, vertical field of view 72 degrees, 16:9):
-    there the acting hand sits in the lower third of the frame, clear of the head. The art
-    build checks this on the exported file (`tools/art/kaiju/poses.py`) and fails if a target
-    stops holding.
+    breathing). The lizard stages carry `fp_claws` (both claws up beside the snout: the
+    first-person carry, used only in the player's own view), `grab`, `hold`, `eat`, `brace`,
+    `throw_windup`, `throw_release`, `swipe_hit` (the end of the rake) and `stagger` (reeling
+    back, chest and weak point open: a pose of the body, no hand has to show).
+    **First-person contract.** In the player's own view the game locks `head` to the aim and
+    lets `arm_L` and `arm_R` ride on `head` instead of `torso`. Snout, claws and camera
+    (`cam_fp`, vertical field of view 72 degrees, 16:9, near plane 0.02 body heights) are then
+    one rigid assembly, and the picture does not change with where the player looks or with
+    what the body does underneath. In that assembly every target but `stagger` puts the acting
+    hand in the lower third of the frame, clear of the head and of the crosshair; seen from
+    outside (the whole target, arms on the torso) the arms clear the head as well. The art
+    build checks both on the exported file (`tools/art/kaiju/poses.py`) and fails if a target
+    stops holding. How the client applies the targets:
+    `docs/art/client-notes-kaiju-lizard.md`.
 - `"sprites"`: `{ "<id>": { "file": "sprites/<sheet>.png", "frame": [w, h], "worldHeight":
   meters, "anims": { "<name>": { "rows": [front, left, back, right] | [row], "col"?: n,
-  "frames": n, "fps": n } } } }`
-- `"textures"`: `{ "<id>": { "file": "textures/<id>.png", "tile"?: true, "grid"?: [cols, rows] } }`
+  "frames": n, "fps": n } }, "blend"?: "alpha" | "add" } }`
+  - `"blend"` (effect sprites, `fx_*`): how the client must draw the sprite. `"alpha"` is
+    ordinary alpha blending (full-color pictures: `fx_explosion`, `fx_explosion_ground`,
+    `fx_fire`, `fx_flash`, and everything meant to be tinted: smoke, dust, debris, ring,
+    shadow, white); `"add"` adds it to what is behind (`fx_glow`, `fx_spark`, `fx_laserdot`).
+    A full-color effect added to a daytime background burns out to white.
+  - Debris: `fx_debris_1` to `fx_debris_4` are four different chunks, one frame each (pick
+    one per particle); `fx_debris` is kept as a second name for `fx_debris_1`.
+- `"textures"`: `{ "<id>": { "file": "textures/<id>.png", "tile"?: true, "grid"?: [cols, rows],
+  "ring"?: { "repeats": n, "bottomDeg": degrees, "sunGap": [firstColumn, width] } } }`
+  - `"tile"`: repeats in both directions (the ground tiles). `"ring"` (the cloud panoramas,
+    which carry no `"tile"`): `repeats` copies around the horizon ring, `bottomDeg` the
+    elevation of the bottom edge (negative: below the horizon), `sunGap` the clear gap in
+    the painting, in pixels, that the client turns toward the sunset sun (section 3).
 - `"music"`: `{ "<id>": { "base": "audio/music/<id>", "loop"?: [start, end], "bpm"?: n,
-  "group"?: "stage1" } }`
+  "group"?: "stage1", "duration"?: seconds, "mark"?: seconds } }` (an entry without `loop` is a
+  one-shot and is never looped; `duration` is the file length; `mark` is the moment in a
+  one-shot that is written to land on a game event, so that a file started late still lands on
+  time: the hit of `intermission` at 20 s, the cut of `cocoon` at 10 s; see
+  `docs/audio/MUSIC.md` section 4)
 - `"sfx"`: `{ "<id>": { "variants": ["audio/sfx/<id>_1", ..], "gain": 1, "loop"?: [start, end] } }`
 - `"voice"`: `{ "<lineId>": { "base": "audio/voice/<lineId>", "duration": seconds } }`
 - `"ui"`: `{ "<name>": { "file": "ui/<name>.svg" | "ui/<name>.png" } }`. Nobody writes this
@@ -241,7 +288,9 @@ file that is not there. `npm run assets:manifest -- --check` only says whether `
 is up to date. Sprite ids the client draws: `soldier_army_rocket`, `soldier_army_rifle`, every
 sprite whose id starts with `civ` (the crowd), and the effect frames `fx_explosion`, `fx_smoke`,
 `fx_dust`, `fx_fire`, `fx_debris`, `fx_flash`, `fx_spark`, `fx_glow`, `fx_laserdot`, `fx_ring`,
-`fx_shadow`, `fx_white` (each with one animation; the first one is played).
+`fx_shadow`, `fx_white` (each with one animation; the first one is played). Also delivered
+and ready to use: `fx_debris_1` to `fx_debris_4` and `fx_explosion_ground` (the burst going
+off on the ground; it and `fx_fire` stand on the bottom edge of their cell).
 
 ## 8. Review material
 

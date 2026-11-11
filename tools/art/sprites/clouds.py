@@ -1,10 +1,15 @@
 """Sky: towering cumulus as pixel art with alpha, in the spirit of flight-combat game skies.
 
-Each texture is a 512 x 256 panorama that wraps seamlessly left to right. Sky shows through
-everywhere there is no cloud; the lowest range dissolves toward the bottom edge, so the
-texture can sit on the horizon or be repeated around a sky dome. Clouds are authored in
-neutral daylight (warm white tops, slate-blue shadows); the game tints them for sunset and
-night.
+Each texture is a 512 x 256 horizon panorama: a side view of clouds standing on the horizon.
+It wraps seamlessly left to right and never top to bottom. In the game it is the inside of an
+upright ring (an open cylinder) around the camera: u runs around the ring, v runs up, the
+bottom edge sits 5 degrees below the horizon. It must never be laid on a horizontal plane.
+The numbers of the mapping are RING below; build.py writes them into the manifest.
+
+Sky shows through everywhere there is no cloud: every panorama has clear gaps that reach all
+the way down, one of them wide enough for the sunset sun (SUN_GAP). The lowest range
+dissolves toward the bottom edge. Clouds are authored in neutral daylight (warm white tops,
+slate-blue shadows); the game tints them for sunset and night.
 
 How a cloud is made:
   1. A silhouette is built from overlapping ellipses: stems, shoulders and bulging heads
@@ -226,54 +231,96 @@ def majority(tone: np.ndarray) -> np.ndarray:
     return np.where(change, best, tone).astype(np.int16)
 
 
-def bank(rng, x0: float, x1: float, base_y: float, lo: float, hi: float, width: float) -> list:
-    """A row of low heads between x0 and x1: the distant ranges and the shoulders of towers."""
+def bank(rng, x0: float, x1: float, base_y: float, lo: float, hi: float, width: float,
+         taper: float = 0.0) -> list:
+    """A row of low heads between x0 and x1: the distant ranges and the shoulders of towers.
+    Coordinates may run past the right edge (x1 > W): the picture wraps. With `taper` the
+    heads get lower toward both ends of the row (0 = all alike, 1 = down to `lo`)."""
     out = []
     x = x0
     while x < x1:
         w = width * rng.uniform(0.7, 1.3)
-        out += tower(rng, x, base_y, rng.uniform(lo, hi), w, head=rng.uniform(0.9, 1.2))
+        t = (x - x0) / max(x1 - x0, 1.0)
+        k = 1.0 - taper * (1.0 - math.sin(math.pi * min(max(t, 0.0), 1.0)))
+        out += tower(rng, x, base_y, lo + (rng.uniform(lo, hi) - lo) * k, w, head=rng.uniform(0.9, 1.2))
         x += w * rng.uniform(1.0, 1.5)
     return out
 
 
+def fit(ellipses: list, x0: float, x1: float) -> list:
+    """Squeeze a group of ellipses sideways, all by the same factor, until it lies inside
+    x0..x1. The group keeps its shape (nothing is cut off or lined up against the limit), so
+    it ends where it is told to and the gap beside it stays clear."""
+    lo = min(x - rx for (x, _y, rx, _ry) in ellipses)
+    hi = max(x + rx for (x, _y, rx, _ry) in ellipses)
+    a, b = max(lo, x0), min(hi, x1)
+    k = (b - a) / (hi - lo)
+    return [(a + (x - lo) * k, y, rx * k, ry) for (x, y, rx, ry) in ellipses]
+
+
+# How the game maps each panorama (docs/ASSETS.md section 3): `repeats` copies around the full
+# circle, the bottom edge `bottom_deg` below the horizon, the picture kept at its 2:1 shape.
+# `sun_gap` is the clear gap (first column, width in pixels) meant for the sunset sun.
+RING = {
+    "clouds_a": {"repeats": 4, "bottom_deg": -5.0},
+    "clouds_b": {"repeats": 3, "bottom_deg": -5.0},
+}
+SUN_GAP = {"clouds_a": (258, 72), "clouds_b": (414, 58)}
+
+
 def clouds_a() -> Img:
-    """The dramatic one: two great towers and their shoulders in front of a distant range."""
-    rng = np.random.default_rng(41)
+    """The dramatic one: two great towers with their shoulders, each over its own stretch of
+    distant range. Two clear gaps: the sunset sun's (SUN_GAP) between the towers and one
+    across the wrap."""
     sky = Sky()
-    sky.mass(rng, bank(rng, 0, W, H - 26, 26, 56, 26), base_y=H - 26, layer=0, r_max=12, density=1.3, r_min=4.5)
-    sky.mass(rng, bank(rng, 250, 350, H - 46, 50, 96, 30) + bank(rng, 0, 60, H - 46, 40, 70, 28)
-             + bank(rng, 470, 512, H - 46, 40, 76, 28),
-             base_y=H - 46, layer=1, r_max=18, density=1.2)
+    rng = np.random.default_rng(41)
+    far = fit(bank(rng, 64, 250, H - 26, 30, 62, 24, taper=0.5), 50, 264)
+    far += fit(bank(rng, 343, 486, H - 26, 30, 62, 24, taper=0.5), 329, 500)
+    sky.mass(rng, far, base_y=H - 26, layer=0, r_max=12, density=1.3, r_min=4.5)
+    rng = np.random.default_rng(43)
+    mid = fit(bank(rng, 70, 104, H - 46, 44, 76, 26) + bank(rng, 216, 240, H - 46, 40, 66, 24), 56, 258)
+    mid += fit(bank(rng, 349, 376, H - 46, 44, 72, 26) + bank(rng, 456, 476, H - 46, 40, 70, 24), 335, 494)
+    sky.mass(rng, mid, base_y=H - 46, layer=1, r_max=18, density=1.2)
     # the great tower with a second head and broad shoulders
+    rng = np.random.default_rng(51)
     e = tower(rng, 150, H - 62, 180, 50, head=1.25, lean=0.12)
-    e += tower(rng, 104, H - 62, 112, 40, head=1.15, lean=-0.1)
-    e += tower(rng, 206, H - 62, 84, 40, head=1.1, lean=0.15)
-    e += bank(rng, 70, 240, H - 62, 30, 48, 30)
+    e += tower(rng, 110, H - 62, 112, 40, head=1.15, lean=-0.1)
+    e += tower(rng, 200, H - 62, 84, 40, head=1.1, lean=0.15)
+    e += bank(rng, 96, 214, H - 62, 30, 48, 30)
     sky.mass(rng, e, base_y=H - 62, layer=2, r_max=26, density=1.1)
     # its neighbor: shorter, leaning the other way
-    e = tower(rng, 410, H - 66, 136, 40, head=1.3, lean=-0.15)
-    e += tower(rng, 452, H - 66, 80, 34, head=1.1, lean=0.1)
-    e += bank(rng, 370, 470, H - 66, 28, 44, 26)
+    rng = np.random.default_rng(151)
+    e = tower(rng, 396, H - 66, 136, 40, head=1.3, lean=-0.15)
+    e += tower(rng, 438, H - 66, 80, 34, head=1.1, lean=0.1)
+    e += bank(rng, 366, 442, H - 66, 28, 44, 26)
     sky.mass(rng, e, base_y=H - 66, layer=2, r_max=23, density=1.1)
     return sky.render([FAR, MID, NEAR], base_fade=(22.0, 0.0, 0.0))
 
 
 def clouds_b() -> Img:
-    """The broad one: a long cumulus bank with one anvil-topped giant and many lesser heads."""
-    rng = np.random.default_rng(42)
+    """The broad one: an anvil-topped giant with its lesser heads, and a low bank with one
+    small tower that runs across the wrap (so the left and right edges meet inside one
+    cloud). Two clear gaps, one on each side of the giant; the right one is the sunset
+    sun's (SUN_GAP)."""
     sky = Sky()
-    sky.mass(rng, bank(rng, 0, W, H - 24, 24, 50, 24), base_y=H - 24, layer=0, r_max=11, density=1.3, r_min=4.5)
-    sky.mass(rng, bank(rng, 20, 250, H - 42, 40, 92, 30) + bank(rng, 440, 500, H - 42, 50, 84, 30),
-             base_y=H - 42, layer=1, r_max=17, density=1.2)
-    e = tower(rng, 330, H - 58, 168, 62, head=1.15)
-    e += anvil(rng, 322, H - 58 - 170, 128, 78, 17)
-    e += tower(rng, 268, H - 58, 104, 40, head=1.2, lean=-0.1)
-    e += tower(rng, 396, H - 58, 84, 36, head=1.15, lean=0.12)
-    e += bank(rng, 236, 430, H - 58, 28, 46, 28)
+    rng = np.random.default_rng(42)
+    far = fit(bank(rng, 182, 408, H - 24, 28, 58, 24, taper=0.5), 168, 422)
+    far += fit(bank(rng, 488, 616, H - 24, 28, 58, 24, taper=0.5), 474, 630)       # crosses the wrap
+    sky.mass(rng, far, base_y=H - 24, layer=0, r_max=11, density=1.3, r_min=4.5)
+    rng = np.random.default_rng(44)
+    mid = fit(bank(rng, 188, 212, H - 42, 44, 74, 28) + bank(rng, 384, 402, H - 42, 44, 72, 28), 174, 416)
+    mid += fit(bank(rng, 494, 520, H - 42, 40, 70, 26) + bank(rng, 586, 606, H - 42, 40, 70, 26), 480, 624)
+    sky.mass(rng, mid, base_y=H - 42, layer=1, r_max=17, density=1.2)
+    rng = np.random.default_rng(61)
+    e = tower(rng, 290, H - 58, 168, 62, head=1.15)
+    e += anvil(rng, 282, H - 58 - 170, 128, 78, 17)
+    e += tower(rng, 228, H - 58, 104, 40, head=1.2, lean=-0.1)
+    e += tower(rng, 356, H - 58, 84, 36, head=1.15, lean=0.12)
+    e += bank(rng, 214, 380, H - 58, 28, 46, 28)
     sky.mass(rng, e, base_y=H - 58, layer=2, r_max=25, density=1.1)
-    e = tower(rng, 140, H - 68, 104, 36, head=1.3, lean=0.1)
-    e += bank(rng, 100, 190, H - 68, 26, 44, 24)
+    rng = np.random.default_rng(161)
+    e = tower(rng, 548, H - 68, 104, 36, head=1.3, lean=0.1)                        # crosses the wrap
+    e += bank(rng, 506, 576, H - 68, 26, 44, 24)
     sky.mass(rng, e, base_y=H - 68, layer=2, r_max=20, density=1.15)
     return sky.render([FAR, MID, NEAR], base_fade=(22.0, 0.0, 0.0))
 
@@ -282,10 +329,53 @@ def build() -> dict:
     return {"clouds_a": clouds_a(), "clouds_b": clouds_b()}
 
 
-def wrap_error(img: Img) -> float:
-    """Left/right seam check, as for ground tiles: the color step across the wrap divided by
-    the largest step between neighboring columns inside the picture."""
+LOW_ROWS = (150, 210)        # the rows of the low bank: where a wall of cloud would hide the horizon
+GAP_ROWS = (110, 205)        # a clear gap is clear from above the low bank down to the dissolve rows
+SUN_ROWS = (90, 205)         # the sunset sun (12 degrees up, 4 degrees in radius) lies inside these rows on both rings
+
+
+def wrap_error(img: Img, rows=(120, 210), window: int = 32, hop: int = 8) -> float:
+    """Left/right seam check. The color step across the wrap, averaged over a band of
+    `window` rows, divided by the 99th percentile of the same measure over all the ordinary
+    neighboring columns in that band; the worst band between `rows` counts. Around 1 or less
+    means the seam is no stronger than the edges the painting is full of; the build fails
+    above 1.5. (A band, not the whole height: a seam only 30 rows tall must not be averaged
+    away. Colors are weighted by alpha so clear sky counts as no step.)"""
     a = img.a.astype(np.float32)
-    inner = np.abs(a[:, 1:] - a[:, :-1]).mean(axis=(0, 2)).max()
-    wrap = np.abs(a[:, 0] - a[:, -1]).mean()
-    return float(wrap / max(inner, 1e-6))
+    pm = np.concatenate([a[..., :3] * a[..., 3:4] / 255.0, a[..., 3:4]], axis=2)
+    step = np.abs(np.roll(pm, -1, axis=1) - pm).mean(axis=2)       # [y, x]: between x and x + 1; the last column is the wrap
+    worst = 0.0
+    for y0 in range(rows[0], rows[1] - window + 2, hop):
+        band = step[y0:y0 + window].mean(axis=0)
+        ordinary = float(np.percentile(band[:-1], 99))
+        if ordinary > 1e-6:
+            worst = max(worst, float(band[-1]) / ordinary)
+    return worst
+
+
+def clear_gaps(img: Img, rows=GAP_ROWS) -> list:
+    """Runs of completely clear columns (first column, width), found around the wrap."""
+    clear = (img.a[rows[0]:rows[1] + 1, :, 3] == 0).all(axis=0)
+    if clear.all():
+        return [(0, W)]
+    start = int(np.argmin(clear))                  # begin at a covered column so no run is split by the wrap
+    out, run = [], 0
+    for i in range(1, W + 1):
+        x = (start + i) % W
+        if clear[x]:
+            run += 1
+        elif run:
+            out.append(((x - run) % W, run))
+            run = 0
+    return sorted(out)
+
+
+def low_coverage(img: Img, rows=LOW_ROWS) -> float:
+    """Share of the low bank's rows that is covered by cloud, 0..1."""
+    return float((img.a[rows[0]:rows[1] + 1, :, 3] > 0).mean())
+
+
+def gap_is_clear(img: Img, gap, rows=GAP_ROWS) -> bool:
+    x0, width = gap
+    cols = np.arange(x0, x0 + width) % W
+    return not (img.a[rows[0]:rows[1] + 1][:, cols, 3] > 0).any()

@@ -205,7 +205,7 @@ PORTRAIT_LIGHT = dict(zenith="#0d1020", horizon="#2a2f45", ground="#30343f", key
                       rim=("#ffb27a", 4.2), ambient=0.30, clouds=0.0, cloud="#ffffff", night=False, glow=3.2)
 
 
-PORTRAIT_FOV = 27.0
+PORTRAIT_FOV = 24.5
 
 
 def PORTRAIT_EYE(h: float):

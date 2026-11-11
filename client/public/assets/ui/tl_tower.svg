@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
-  <!-- Tally: a tower. A stepped skyscraper with a spire. -->
-  <path fill="currentColor" fill-rule="evenodd" d="M18.5 55.5V41.5H23V25.5H27.5V13.5H36.5V25.5H41V41.5H45.5V55.5ZM20.5 41.5H29.5V55.5H20.5ZM34.5 41.5H43.5V55.5H34.5ZM27.5 25.5H36.5V40.5H27.5Z"/>
-  <path d="M32 13.5V5"/>
+  <!-- Tally: a tower. A stepped skyscraper with a spire and two glass strips: the shape of the three mark towers on the destruction bar. -->
+  <path fill="currentColor" fill-rule="evenodd" d="M14.5 55.5V44.5H19.5V28.5H24.5V15.5H39.5V28.5H44.5V44.5H49.5V55.5ZM23 15.5H32V50.5H23ZM32 15.5H41V50.5H32Z"/>
+  <path d="M32 13V5"/>
 </svg>

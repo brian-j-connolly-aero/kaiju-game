@@ -2,9 +2,9 @@
   <!-- Command: hold fire and charge a volley. Three units (circles) aim their beams at one diamond (diamond = volley). -->
   <path fill="currentColor" d="M32 6l11.5 12.5L32 31 20.5 18.5z"/>
   <path d="M7 55L22.4 32.6"/>
-  <path d="M32 58V40"/>
+  <path d="M32 57V40"/>
   <path d="M57 55L41.6 32.6"/>
   <circle cx="7" cy="55" r="2.5" fill="currentColor"/>
-  <circle cx="32" cy="58" r="2.5" fill="currentColor"/>
+  <circle cx="32" cy="57" r="2.5" fill="currentColor"/>
   <circle cx="57" cy="55" r="2.5" fill="currentColor"/>
 </svg>

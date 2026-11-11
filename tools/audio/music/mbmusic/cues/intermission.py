@@ -4,7 +4,11 @@ The whole build stands on the dominant (A in the bass, timpani roll). Above it t
 cell (long, short, long) climbs one step a bar: A, B flat, C, then D (the head motif itself at
 its home pitch in bar 4), E, F, G, and finally A with the major third. More of the orchestra
 joins every two bars. The hit at 20.0 s is the D the next stage starts on.
-For a shorter intermission, start playback on a bar line (bar n starts at (n - 1) * 2.5 s).
+
+The game's intermission is shorter than the build when there is no draft (8 s). The file is then
+started late, at 20 - T seconds, so that the hit still lands as the next stage begins (the
+manifest carries the hit time as "mark"). The last 8 s are the loudest part of the build: bar 6
+onwards, with a half-second pickup before it.
 """
 from ..orchestra import BASS_DRUM, CRASH, SNARE, SNARE_ALT
 from ..patterns import pulse, swell_into
@@ -18,7 +22,7 @@ CLIMB = [("A3", "C4"), ("Bb3", "D4"), ("C4", "E4"), ("D4", "F4"), ("E4", "G4"), 
 def build() -> Cue:
     cue = Cue("intermission", 8, loop=False, title="Redeploy (build)", tail_seconds=3.5,
               sections=[(1, "low strings"), (3, "+ violas, horns"), (5, "+ violins, trombones, snare"),
-                        (7, "+ trumpets, choir")])
+                        (7, "+ trumpets, choir")], mark=20.0)
     s = cue.stem("intermission")
     cell = "{a}:1.5 {a}:.5 {b}:2"
 

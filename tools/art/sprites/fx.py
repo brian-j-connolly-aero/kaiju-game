@@ -1,10 +1,21 @@
 """The effects sheet: 64 x 64 pixel cells, drawn with numpy fields mapped onto short color ramps.
 
-Everything bright (explosion, fire, flash, spark) is pure light on transparent: no dark smoke is
-baked in, so the frames work with ordinary alpha blending and with additive blending alike.
-Smoke, dust, debris, glow, laser dot, ring, shadow and the white square are drawn white or
-near-white: the game tints each particle (dark for smoke, wall color for debris, black for
-the blob shadow).
+Blending (the manifest carries it per sprite as "blend", from FX_LAYOUT in build.py):
+  - The explosion, the ground explosion, the fire and the muzzle flash are full-color
+    pictures (deep red through orange and yellow to a white core, no smoke baked in). They
+    are drawn with ORDINARY ALPHA blending and a white tint. Added to a bright background
+    (the daytime sky, sidewalk, plaster) they burn out to a white blob and lose the orange
+    that makes them read; added to a dark one they happen to look fine, which is how the
+    mistake hides. The review picture fx_blend.png shows both.
+  - The glow, the spark and the laser dot are white light with soft or thin shapes: they are
+    ADDED, tinted by the game. An orange-tinted glow under an explosion gives it its bloom.
+  - Smoke, dust, debris, ring, shadow and the white square are drawn white or near-white
+    for alpha blending: the game tints each particle (dark for smoke, wall color for debris,
+    black for the blob shadow).
+
+Nothing touches the border of its cell (the outer pixel ring stays empty), so a frame is never
+cut off by its neighbors, except where it says so: the fire and the ground explosion stand on
+the bottom edge, and the white square fills its cell.
 
 All randomness comes from fixed seeds, so the sheet is the same on every run.
 """
@@ -34,7 +45,10 @@ DUST_TONES = [col("#fffaf0"), col("#f1e7d4"), col("#d9ccb3"), col("#b9aa90")]
 
 _e = np.minimum.reduce(np.meshgrid(np.minimum(np.arange(S), S - 1 - np.arange(S)),
                                    np.minimum(np.arange(S), S - 1 - np.arange(S))))
-EDGE_FADE = np.clip((_e + 1) / 4.0, 0, 1).astype(np.float32)      # 0.25 at the border, 1 from 3 px in
+EDGE_FADE = np.clip((_e - 1) / 3.0, 0, 1).astype(np.float32)      # 0 on the two outer pixels, 1 from 4 px in
+# the same without the bottom edge, for things that stand on it
+_eg = np.minimum(np.minimum(np.arange(S), S - 1 - np.arange(S))[None, :] + np.zeros((S, 1), int), np.arange(S)[:, None])
+EDGE_FADE_STANDING = np.clip((_eg - 1) / 3.0, 0, 1).astype(np.float32)
 
 BAYER4 = (np.array([[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]], np.float32) + 0.5) / 16.0
 
@@ -135,7 +149,7 @@ def explosion_frames(seed: int = 9001, frames: int = 8, ground: bool = False) ->
     and rain back down."""
     rng = np.random.default_rng(seed)
     xs, ys = grid()
-    cy = 58.5 if ground else C                 # the row the burst starts from
+    cy = S - 1.5 if ground else C              # the row the burst starts from (ground: the bottom edge)
     dx, dy = xs - C, ys - cy
     dist = np.hypot(dx, dy)
     theta = np.arctan2(dy, dx)
@@ -227,16 +241,16 @@ def explosion_frames(seed: int = 9001, frames: int = 8, ground: bool = False) ->
                 star(heat, x1, y1, 2 if big else 1, min(1.0, fade + 0.3), diag=big)
             elif k > 0.8 and blink:
                 deposit(heat, x1, y1, 0.8)
-        heat *= EDGE_FADE                     # sparks thin out before the cell border cuts them
-        if ground:
-            heat[ys > cy + 0.5] = 0           # nothing below the ground line
+        # sparks thin out and stop two pixels short of the cell border, so no frame is cut
+        # off flat (the ground burst keeps its bottom edge: it stands on it)
+        heat *= EDGE_FADE_STANDING if ground else EDGE_FADE
         img = heat_to_img(heat)
         # --- glow around the core: loose opaque orange pixels, denser toward the middle
         if f <= 3 and core_r[f] > 0:
             halo = Img(S, S)
             hr = core_r[f] * 1.2 + (6 if f < 3 else 3)
             b = bayer()
-            m = (dist < hr) & (b < 0.6 * np.clip(1 - dist / hr, 0, 1) ** 0.8) & (ys <= cy + 0.5)
+            m = (dist < hr) & (b < 0.6 * np.clip(1 - dist / hr, 0, 1) ** 0.8) & ((EDGE_FADE_STANDING if ground else EDGE_FADE) > 0)
             halo.a[m] = col("#ff8a1a") if f < 2 else col("#e8481a")
             halo.blit(img)
             img = halo
@@ -317,7 +331,8 @@ def fire_frames(seed: int = 5, frames: int = 6) -> list:
     n2 = value_noise(S, period, 8, 8, rng, 1)               # small licks
     sway = value_noise(S, period, 32, 24, rng, 1)
     xs, ys = grid()
-    base_y = S - 2.0
+    base_y = S - 1.0                                         # the fire stands on the bottom edge of the cell
+    keep = EDGE_FADE_STANDING * np.clip((ys - 1) / 5.0, 0, 1)    # embers cool before the top and the sides
     tongues = ((0.0, 1.0, 13.0, 0), (-12.0, 0.66, 10.0, 21), (12.5, 0.78, 10.5, 43))   # x, height, half width, noise shift
     out = []
     for f in range(frames):
@@ -338,7 +353,7 @@ def fire_frames(seed: int = 5, frames: int = 6) -> list:
             heat += np.clip(0.22 - up, 0, 1) * 0.9 * body                 # a steady white-hot root
             heat = np.where((ys > base_y) | (side > 1.2), 0, heat)
             total = np.maximum(total, heat)
-        out.append(heat_to_img(np.clip(total, 0, 0.98)))
+        out.append(heat_to_img(np.clip(total, 0, 0.98) * keep))
     return out
 
 
@@ -446,7 +461,8 @@ def white_cell() -> Img:
 
 def debris_cells() -> list:
     """Four chunks of broken wall, near-white so the game can tint them with the building's
-    color: a wedge of plaster, a slab, a shard and a scatter of crumbs. Dark outline."""
+    color: a wedge of plaster, a slab, a shard and a scatter of crumbs. Dark outline. They are
+    four different things, not an animation: each is its own one-frame sprite."""
     lt, md, dk, vdk = col("#ffffff"), col("#dfe0e6"), col("#b3b5c0"), col("#8b8d9b")
     line = col("#2a2c38")
     out = []
@@ -501,13 +517,18 @@ def debris_cells() -> list:
 
 def build() -> dict:
     """Every effect as a list of 64 x 64 frames, keyed by sprite id."""
+    debris = debris_cells()
     return {
         "fx_explosion": explosion_frames(),
         "fx_explosion_ground": explosion_frames(seed=77, ground=True),
         "fx_smoke": smoke_frames(),
         "fx_dust": dust_frames(),
         "fx_fire": fire_frames(),
-        "fx_debris": debris_cells(),
+        "fx_debris": debris[:1],              # the contract id: the same picture as fx_debris_1
+        "fx_debris_1": debris[0:1],
+        "fx_debris_2": debris[1:2],
+        "fx_debris_3": debris[2:3],
+        "fx_debris_4": debris[3:4],
         "fx_flash": flash_frames(),
         "fx_spark": [spark_cell()],
         "fx_glow": [glow_cell()],

@@ -48,10 +48,11 @@ Why these voices:
 - **Beacon** is RHVoice `clb`, a precise female voice. It is the slowest voice at its default
   speed, so it is sped up to keep the by-the-book reports brisk.
 - **Tempest** is RHVoice `alan`, a male voice with a Scottish accent, noticeably higher than
-  Granite and Overlord. It is the weakest radio voice by the numbers; the recognizer was trained
-  on American speech and marks the accent down on every chain, so part of that is the instrument.
-  The other candidates were worse (Flite `awb` is the same speaker in a rougher synthesizer, Pico
-  falls apart on the radio) or already in use.
+  Granite and Overlord. The recognizer was trained on American speech and marks the accent down
+  on every chain, so Tempest's lines are written around it: the accent loses "fire", "hurt" and
+  "count", and the lines now avoid those words where they can (section 7). The other candidates
+  were worse (Flite `awb` is the same speaker in a rougher synthesizer, Pico falls apart on the
+  radio) or already in use.
 - **Anchor** is RHVoice `slt`, a female voice with the widest frequency range on the machine
   (up to 12 kHz), which is what a clean broadcast voice needs, slowed a little for composure.
   Pico was the expected choice for the anchor and lost on the numbers: about two and a half
@@ -110,7 +111,10 @@ so the "through the chain" numbers here are worse than the finished lines in sec
 matters in these tables is the order of the candidates. (The experiments were also scored before
 the recognizer was made to forget each clip before the next, which moves a result by a word or
 two depending on the order of the run; and the chain code has been refined since. Re-running
-them reproduces the ranking, not every decimal.)
+them reproduces the ranking, not every decimal. All the experiments in this section and the
+sweeps in section 2 were run on the first version of the script, 181 lines of which 93 were
+military; the script has grown since, so the line counts in the table headings are those of
+that version.)
 """
 
 CHAINS_INTRO = """\
@@ -176,28 +180,47 @@ What the sweeps decided:
 """
 
 CLIENT = """\
+What the game code has to do with these files. The exact changes that were still open after the
+audio review, with file names, line numbers and numbers to use, are in
+`docs/audio/client-notes-voice.md`.
+
 - **Files and manifest.** `manifest.voice.json` has one entry per line id:
   `{{ "base": "audio/voice/<lineId>", "duration": seconds }}`. `duration` is the length of the whole
   file including squelch or reverb tail (the `.mp3` can be up to 0.05 s longer because of frame
   padding). Use it to time subtitles and to queue lines.
 - **Do not add `radio_open` / `radio_close` around these files.** The radio lines already begin
   with a key click and end with a squelch tail ({lead:.2f} s before the first word and {tail:.2f} s
-  after the last). At the time of writing `client/src/audio/audioEngine.ts` (`nextLine`) plays
-  both effects around every radio line; with these files in place it should play them only in
-  its fallback path, when a line has no audio and it shows the subtitle with blips. Otherwise
-  every radio line gets two clicks at the start and two squelch tails at the end.
+  after the last). Play those two effects only in the fallback, when a line has no audio and its
+  subtitle is shown with blips. Otherwise every radio line gets two clicks at the start and two
+  squelch tails at the end.
+- **Radio is a property of the line, not of the listener.** The lines with audience `humans`
+  (Overlord and the squads) are radio lines. The anchor's lines (`kaiju`) and the chair's (`all`)
+  are not, whoever hears them: no squelch, no blips with a radio click.
 - **One line at a time per listener.** Radio lines are mono and sit in one band; two at once turn
-  to mush. Queue them; drop a queued line if it is more than about three seconds stale. The
-  briefing lines are meant to play back to back in script order with about 0.3 s between them.
+  to mush. Queue them, and drop a queued line that has waited too long: an order for a window
+  that is closing (the humans' lines for `nerve.break` and `kaiju.special`) is stale after about
+  1.5 s, ordinary chatter after about 7 s, and the briefing, the endings and the hearing never.
+- **The briefing** lines play back to back in script order with 0.15 s between them. Built that
+  way, the humans' briefing takes {brief_h:.1f} s and the kaiju player's {brief_k:.1f} s of the
+  10 s briefing; the build fails if either side's lines add up to more than {brief_max:g} s.
+- **Orders are short on purpose.** The humans' lines for `nerve.break` (the stagger lasts 5 s) and
+  for `kaiju.special` (the attack lands 0.8 s after the cue and lasts 3 s) are {win_min:.1f} to
+  {win_max:.1f} s long with the order first. They only help if they start at once: load those
+  files before the match and let them jump the queue.
+- **The hearing** belongs to the `hearing` music on the end screen, not to the win fanfare. Hold
+  the chair's line until that music has started, and never drop it as stale.
 - **Duck the music.** Lines are mastered to -16 LUFS, the same as the full music mixes. Lower the
   music by 6 dB (4 to 6 dB for `briefing` and `hearing`, which are already quieter) while a line
   plays, and let loud sound effects win over chatter.
 - **The hearing lines are stereo** (the room is wide); everything else is mono. Play voice lines
   flat, not positioned in the 3D scene.
 - **Subtitles** come from the `text` field of the script, never from this folder.
-- **Who speaks.** The script's `speaker` field has the name for the subtitle label. Squads
-  without a voice of their own (the fourth squad, "Anvil") fall back to Overlord's lines, as
-  `pickVoiceLine` in `shared/src/defs/voice.ts` already does.
+- **Who speaks.** The simulation chooses the line (`chooseVoiceLines` in
+  `shared/src/defs/voice.ts`) and sends its id with the voice event; the script's `speaker` field
+  has the name for the subtitle label. A cue about one squad uses only that squad's own lines.
+  The fourth squad, "Anvil", has no voice of its own and gets Overlord's, which is why the script
+  gives each of the four radio voices several lines of its own for those cues
+  (`docs/VOICE_SCRIPT.md`, "Line counts").
 """
 
 ASR_INTRO = """\
@@ -227,9 +250,11 @@ WEAK_AFTER = """\
 Patterns in the misses, none of them a pronunciation fault: "volley" is never recognized from
 any voice (it comes back as "valley", "bali" or "molly"); callsigns at the start of a line
 ("Granite", "Beacon") are rare words the recognizer does not expect; very short sentences give
-it little to hold on to; and Tempest's accent turns "fire" into "find" and "count" into "kind".
-A listener with the subtitle in front of them will have no trouble with any of these, but the
-short radio lines of Granite and Tempest are the ones most likely to be lost under game noise.
+it little to hold on to; "weak" comes back as "week" and "its" as "it's", which sound the same
+and are counted as errors all the same; and Tempest's accent turns "fire" into "find", "hurt"
+into "out" and "count" into "kind". A listener with the subtitle in front of them will have no
+trouble with any of these, but the short radio lines of Granite and Tempest are the ones most
+likely to be lost under game noise.
 """
 
 PRONOUNCE_INTRO = """\
@@ -254,7 +279,7 @@ Respellings that were tried on the lines the recognizer does worst on, and rejec
 """
 
 MEASURE_INTRO = """\
-Measured on the encoded files after decoding them again with `ffmpeg` (`.ogg` at quality
+Measured on the encoded files after decoding them again with `ffmpeg` (`.ogg` at Vorbis quality
 {ogg_q}, `.mp3` at variable bit rate quality {mp3_q}; 44.1 kHz). Target loudness {target} LUFS.
 """
 
@@ -263,7 +288,10 @@ Every check passed on every file: both formats exist and decode at 44.1 kHz with
 channel count; length matches the manifest; loudness within 0.8 LU of the target; true peak below
 -0.5 dBTP; clean start and end (no clicks from cut waveforms); radio lines band-limited and their
 squelch clicks at least 3 dB below the speech peaks; no line longer than 8 s (13 s for the
-hearing) or slower than 1.1 s per word; nothing in the folder that is not in the script.
+hearing) or slower than 1.1 s per word; the humans' orders for a nerve break and for the
+signature attack no longer than {window:g} s; each side's briefing lines no longer than
+{brief_max:g} s together; nothing in the folder that is not in the script. Before anything is
+built the script itself is checked against its writing rules (`mbvoice/scriptcheck.py`).
 """
 
 WEAK_POINTS = """\

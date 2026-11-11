@@ -24,6 +24,7 @@ class Instrument:
     trim: float = 0.0       # dB
     hp: float = 0.0         # high-pass in Hz (clears rumble and low mud under each part)
     lp: float = 0.0         # low-pass in Hz (0 = none)
+    sub: float = 0.0        # low-shelf lift in dB under about 60 Hz (see SUB_HZ in mixdown.py)
     ofs: int = 0            # sample start offset: skips the slow sampled bow or breath attack
     atk_ms: float = 0.0     # replaces it with a short clean fade-in
     human_ms: float = 7.0   # timing looseness of the section

@@ -81,12 +81,14 @@
     "cocoon": {
       "base": "audio/music/cocoon",
       "bpm": 96,
-      "duration": 12.5
+      "duration": 12.5,
+      "mark": 10.0
     },
     "intermission": {
       "base": "audio/music/intermission",
       "bpm": 96,
-      "duration": 23.5
+      "duration": 23.5,
+      "mark": 20.0
     },
     "win_humans": {
       "base": "audio/music/win_humans",

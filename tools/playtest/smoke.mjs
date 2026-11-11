@@ -22,10 +22,19 @@
  *   --reconnect      drop one human's connection mid-match and expect it to come back
  *   --debug          show the ?debug=1 overlay on every page (default: on the last page only)
  *   --idle-humans    the human pages do not play (no autopilot): they join, get ready and then
- *                    stand still, so the autoplay kaiju goes through all three stages and, time
- *                    permitting, wins by the bar. The default (everyone on autoplay) usually
- *                    ends with the humans winning.
- *   --expect W       fail unless the match ends with this winner: kaiju or humans
+ *                    never touch the controls. Their squads still fight: sub-units fire at will
+ *                    by default, so the kaiju is shot at and staggered all the same, only less.
+ *                    This is the configuration that takes the autoplay kaiju through both molts
+ *                    to stage 3 inside the short MB_FAST clock (use it with --expect-stage 3).
+ *                    It does NOT hand the kaiju the match: measured, the autoplay kaiju got a
+ *                    quarter of the way through the last segment and the humans won on the clock.
+ *   --expect W       fail unless the match ends with this winner: kaiju or humans. Only assert
+ *                    what a configuration reliably produces. With the autopilot playing the
+ *                    kaiju, every run measured so far ended with the humans winning on the clock
+ *                    (with or without --idle-humans), so `--expect kaiju` fails there by nature,
+ *                    not by fault. A kaiju win needs the simulation's own bot in that seat
+ *                    (the practice option) against squads that are not on autoplay; see
+ *                    docs/STATUS.md for how each ending was exercised.
  *   --expect-stage N fail unless the match reached stage N (3: both molts happened)
  *
  * Besides the pass or fail verdict the summary carries measurements per page: draw calls and

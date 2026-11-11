@@ -7,3 +7,4 @@ export * from './spatialIndex';
 export * from './validate';
 export * from './generateCity';
 export * from './cache';
+export * from './meridian/index';

@@ -1,28 +1,26 @@
 """cocoon: "Chrysalis". One-shot: 4 bars (exactly 10 s, the length of the cocoon) plus ring-out.
 
-A heartbeat that speeds up (one beat in two, then three in a bar, then every beat), an eerie
-choir cluster that slides upward, glassy tremolo violins, and the head motif on celesta like a
-music box. Everything stops dead at 10.0 s, where the game plays the molt blast.
+An eerie choir cluster that slides upward, glassy tremolo violins, and the head motif on celesta
+like a music box. Everything stops dead at 10.0 s, where the game plays the molt blast.
+
+There is no heartbeat in the music, on purpose. The heartbeat the players hear is the game's
+positional sound effect (kaiju_heartbeat_loop): it gets quieter with distance, and following it
+is how the humans find the cocoon. Music is not positional, so a heartbeat in this cue would
+play at full level for everyone and bury that clue (it also beat at a different rate). So the
+cue has no drums and nothing that pulses, and nothing below about 120 Hz, where the effect lives.
+It is mastered 1 LU under the other full cues: the choir, strings and celesta sit where they
+sat when the cue still carried drums (within 0.1 dB).
 """
-from ..orchestra import BASS_DRUM, TAIKO_LONG
 from ..patterns import swell_into
 from ..score import B, Cue
 
 
 def build() -> Cue:
-    cue = Cue("cocoon", 4, loop=False, title="Chrysalis (heartbeat and eerie choir)", tail_seconds=2.5,
-              sections=[(1, "slow heartbeat"), (3, "faster"), (4, "every beat")])
+    cue = Cue("cocoon", 4, loop=False, title="Chrysalis (eerie choir; the heartbeat is the game's effect)",
+              tail_seconds=2.5, sections=[(1, "choir cluster, music box"), (3, "sopranos enter, cluster slides up"),
+                                          (4, "swell into the cut")],
+              target_lufs=-17.0, mark=10.0)
     s = cue.stem("cocoon")
-
-    # ---- heartbeat: lub-dub on a muffled bass drum with a taiko under the first stroke ---------
-    hb = s.add("heartbeat", "bass_drum", gain=4.0, lp=220, rev=0.12, role="perc")
-    tk = s.add("heartbeat body", "percussion", gain=-2.0, lp=180, rev=0.12, role="perc")
-    beats = [B(1), B(1, 3), B(2), B(2, 3), B(3), B(3, 2.5), B(3, 4), B(4), B(4, 2), B(4, 3), B(4, 4)]
-    for i, t in enumerate(beats):
-        v = 84 + int(36 * i / (len(beats) - 1))
-        hb.note(t, BASS_DRUM, 0.3, v)
-        hb.note(t + 0.34, BASS_DRUM, 0.3, v - 22)
-        tk.note(t, TAIKO_LONG, 0.4, v - 6)
 
     # ---- eerie choir: a cluster that slides upward ---------------------------------------------
     wo = s.add("women ooh", "women_ooh", gain=9.0, role="pad")

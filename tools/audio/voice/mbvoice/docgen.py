@@ -8,6 +8,7 @@ import json
 from . import DOC, DOC_DIR, OUT_DIR
 from .chains import DEFAULTS, chain_config
 from .pipeline import CEILING_DBTP, MP3_QUALITY, OGG_QUALITY, TARGET_LUFS
+from .scriptdoc import BRIEFING_BUDGET, WINDOW_SECONDS
 
 ENGINE_NAMES = {"rhvoice": "RHVoice", "flite": "Flite", "pico": "Pico (pico2wave)",
                 "festival": "Festival", "espeak": "eSpeak NG"}
@@ -176,8 +177,15 @@ def write(lines: list[dict], cast: dict, pron: dict, state: dict, report: dict) 
     # ---------------------------------------------------------------- client
     add("## 3. For the client\n")
     radio_ms = [by_id[l["id"]] for l in lines if by_id[l["id"]].get("chain") == "radio" and "lead_s" in by_id[l["id"]]]
+    dur = {i: rec["duration"] for i, rec in state["lines"].items()}
+    brief = {side: sum(dur.get(l["id"], 0) for l in lines if l["cue"] == "match.briefing" and l["audience"] == side)
+             for side in ("humans", "kaiju")}
+    orders = [dur[l["id"]] for l in lines if l["cue"] in WINDOW_SECONDS and l["audience"] == "humans"
+              and l["id"] in dur] or [0.0]
     add(notes.CLIENT.format(lead=sum(m["lead_s"] for m in radio_ms) / max(len(radio_ms), 1),
-                            tail=sum(m["tail_s"] for m in radio_ms) / max(len(radio_ms), 1)))
+                            tail=sum(m["tail_s"] for m in radio_ms) / max(len(radio_ms), 1),
+                            brief_h=brief["humans"], brief_k=brief["kaiju"], brief_max=BRIEFING_BUDGET,
+                            win_min=min(orders), win_max=max(orders)))
 
     # ---------------------------------------------------------------- intelligibility
     add("## 4. Intelligibility check\n")
@@ -285,7 +293,7 @@ def write(lines: list[dict], cast: dict, pron: dict, state: dict, report: dict) 
             add(f"- {f}")
         add("")
     else:
-        add(notes.CHECKS_PASSED)
+        add(notes.CHECKS_PASSED.format(window=max(WINDOW_SECONDS.values()), brief_max=BRIEFING_BUDGET))
     sheets = sorted(p.name for p in DOC_DIR.glob("sheet_*.png"))
     if sheets:
         add("Spectrogram sheets (three lines per voice; synthesizer output on the left, finished clip on the right): "

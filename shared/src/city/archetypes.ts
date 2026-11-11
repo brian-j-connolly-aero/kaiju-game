@@ -3,9 +3,10 @@
  * archetype (`bld_<id>.glb`, or `lm_<id>.glb` for landmarks); `npm run export:defs` writes this
  * list to tools/art/data/archetypes.json for the art tools.
  *
- * This is a small starter set that covers every structure class. The city worker extends it
- * (more variety, the full landmark list) without changing the schema. Ids are stable: art files
- * are named after them.
+ * The first 22 entries are the starter set the placeholder city is built from; the entries after
+ * them were appended for Port Meridian (docs/CITY.md describes every one for the artists). The
+ * list is append-only and ids are stable: art files are named after them, and the client draws
+ * one instanced batch per archetype and damage state, so the whole list is capped at 40.
  *
  * Tuning notes (starting values): hp is set against the kaiju's structure damage per stage
  * (swipe 40 / 300 / 2000), so a house takes about two hatchling swipes, a mid-rise three
@@ -95,6 +96,40 @@ export const ARCHETYPES: readonly ArchetypeDef[] = [
   // Landmark stand-ins. The city worker replaces these with the full named set (DESIGN.md section 7).
   landmark('meridian_tower', 'Meridian Tower', 36, 36, 220, 12000, 1500, ['downtown']),
   landmark('city_hall', 'City Hall', 50, 40, 45, 5000, 900, ['downtown', 'oldtown']),
+
+  // --- Port Meridian (docs/CITY.md). Everything below was appended for the handcrafted city; the
+  // placeholder generator never picks these, so its output does not change. -----------------------
+
+  // Harbor and industry: round tanks, gantry cranes on the quay, container stacks in the yards.
+  // The stack is the one low piece (a juvenile walks through it), so it is cheap.
+  building('tank_a', 'factory', 18, 18, 14, 800, 60, ['industrial', 'harbor']),
+  building('crane_a', 'factory', 16, 26, 46, 900, 70, ['harbor']),
+  building('container_a', 'factory', 13, 26, 8, 250, 14, ['harbor', 'industrial']),
+  // A long hall with a pitched roof: lecture halls round the university quads, cloisters and
+  // pilgrim halls on Temple Hill.
+  building('campus_a', 'office', 44, 16, 16, 900, 85, ['university', 'temple']),
+  // Boardwalk: a striped seaside pavilion (arcade, bandstand, bathhouse).
+  building('pavilion_a', 'shop', 16, 12, 7, 140, 14, ['boardwalk']),
+  // Temple Hill: a small tiered shrine.
+  building('shrine_a', 'shop', 10, 10, 11, 150, 14, ['temple', 'oldtown']),
+
+  // The Grand Harbor Bridge at the river mouth: a 22 m roadway under tall trusses. Taller than a
+  // juvenile can trample, so it survives stage 2 unless it is attacked on purpose.
+  { id: 'bridge_b', cls: 'bridge', footprint: [22, 110], height: 36, hp: 4000, value: 400, zones: [], landmark: null, passable: true },
+
+  // Named landmarks, one of each. Those over 70 m (the wheel, the power station, the mast) are
+  // not trampled even by the titan; the rest fall to its feet.
+  landmark('tidewater_cathedral', 'Tidewater Cathedral', 40, 72, 58, 6000, 900, ['oldtown']),
+  landmark('anchor_field', 'Anchor Field', 150, 120, 30, 14000, 1200, ['boardwalk']),
+  landmark('tidewheel', 'The Tidewheel', 64, 14, 76, 2500, 500, ['boardwalk']),
+  landmark('halcyon_observatory', 'Halcyon Observatory', 40, 40, 24, 3000, 500, ['university']),
+  landmark('farewell_light', 'Farewell Light', 12, 12, 48, 1500, 350, ['harbor']),
+  landmark('kiln_point_power', 'Kiln Point Power Station', 110, 70, 82, 12000, 1300, ['industrial']),
+  landmark('sevenfold_temple', 'Sevenfold Temple', 44, 44, 52, 4000, 700, ['temple']),
+  landmark('grand_station', 'Grand Meridian Station', 110, 50, 40, 7000, 900, ['downtown']),
+  landmark('signal_mast', 'Signal Hill Mast', 16, 16, 160, 3000, 500, ['suburb']),
+  landmark('gasworks', 'Number Three Gasworks', 56, 56, 44, 4000, 600, ['industrial']),
+  landmark('founders_clock', 'Founders Clock Tower', 12, 12, 62, 2000, 400, ['university']),
 ];
 
 const BY_ID = new Map<string, ArchetypeDef>(ARCHETYPES.map((a) => [a.id, a]));

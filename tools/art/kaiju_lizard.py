@@ -18,8 +18,11 @@ The review pictures show the kaiju the way the game does, which the kit's defaul
     times its size, the middle of the game's throb);
   - first person is drawn through the game's lens (the camera on cam_fp looking level,
     vertical field of view 72 degrees, 16:9, near plane 0.02 body heights, back faces
-    culled), not through the kit's 80-degree node view. Check any change to the head or
-    the arms there: a snout that looks fine from outside can be sliced by that near plane.
+    culled), not through the kit's 80-degree node view, and as the first-person assembly
+    the game shows (poses.first_person: the arms and jaw of a pose target on a head at
+    rest; a one-armed target keeps the left claw in the fp_claws carry). Check any change
+    to the head or the arms there: a snout that looks fine from outside can be sliced by
+    that near plane, and a hand that looks raised from outside can be off the frame.
 So this script renders its own previews instead of leaving them to mb.run_family().
 
 The character lives in tools/art/kaiju/:
@@ -46,7 +49,7 @@ import poses  # noqa: E402
 import showcase  # noqa: E402
 
 V = mb.View
-REVIEW = "r3"                       # bump to force this family's previews to re-render
+REVIEW = "r4"                       # bump to force this family's previews to re-render
 # time of day follows the stage in the game: afternoon, sunset, night
 BACKDROP = {1: "sky", 2: "sunset", 3: "sunset"}
 STAGES = {aid: stage for stage, aid in showcase.STAGE_IDS.items()}
@@ -126,16 +129,33 @@ def _write_poses() -> None:
 # =========================================================================================
 # review pictures
 # =========================================================================================
-def _fp_view(aid: str, target: dict, label: str = "") -> mb.View:
-    """The game's first-person camera for a pose target, as a kit view (which works in the
-    authoring frame and clips at 1% of the distance from the eye to its target)."""
+def _fp_pose(stage: int, name: str) -> dict:
+    """A pose target as the player's own view has it: its arms and jaw (the head is locked to
+    the aim and the arms ride on it); a one-armed target keeps the left claw in the carry."""
+    targets = lizard.POSE_TARGETS[stage]
+    pose = poses.first_person(targets[name]) if name else {}
+    if name and "arm_L" not in pose:
+        pose.update({node: v for node, v in targets["fp_claws"].items() if node in poses.LEFT_ARM})
+    return pose
+
+
+def _fp_view(aid: str, name: str, label: str = "") -> mb.View:
+    """The game's first-person camera on a pose target (name "" = the rest pose), as a kit view
+    (which works in the authoring frame and clips at 1% of the distance from the eye to its
+    target)."""
+    pose = _fp_pose(STAGES[aid], name)
     body = poses.Body(aid)
-    eye, _, _, fwd = body.lens(body.world(target))
+    eye, _, _, fwd = body.lens(body.world(pose))
     near = max(0.08, poses.NEAR * body.height)
     e = (eye[0], -eye[2], eye[1])
     d = (fwd[0], -fwd[2], fwd[1])
     return V(label, eye=e, target=tuple(a + b * near * 100.0 for a, b in zip(e, d)), fov=poses.HFOV,
-             pose=lizard.as_pose(target), cull_backfaces=True)
+             pose=lizard.as_pose(pose), cull_backfaces=True)
+
+
+FP_CELLS = (("fp_claws", "the carry: both claws up beside the snout"), ("grab", "the right claw reaches"),
+            ("hold", "carrying"), ("eat", "both claws to the mouth"), ("brace", "guard"),
+            ("throw_windup", "cocked"), ("throw_release", "thrown"), ("swipe_hit", "end of the rake"))
 
 
 def _shots(aid: str) -> tuple[dict, list]:
@@ -150,22 +170,20 @@ def _shots(aid: str) -> tuple[dict, list]:
     low = {1: 11, 2: 6, 3: 3}[stage]                 # the bigger it is, the lower the camera
     day = BACKDROP[stage]
     whole = mb.measure(aid)                           # the sheet's own count leaves out what is hidden
-    title = (f"{aid}   as in play: weak point hidden outside the STAGGER cells "
-             f"(the file has {whole['tris']} triangles, {len(whole['nodes'])} nodes)")
-    sheet = dict(cell=(672, 378), title=title, extra=[     # 16:9 cells: the first-person ones are the game's frame
-        _fp_view(aid, {}, "FIRST PERSON, the game's lens: at rest"),
-        _fp_view(aid, targets["fp_claws"], "FIRST PERSON, the game's lens: pose target fp_claws"),
-        V("STAGGER (pose target), weak point shown", azimuth=28, elevation=8, fov=30, pose=stagger, show=EVERYTHING),
-        V("STAGGER from behind: the vents on the back", azimuth=152, elevation=24, fov=30, pose=stagger,
-          show=EVERYTHING),
-        V("ROAR (joints turned in game axes)", azimuth=42, elevation=8, fov=30, pose=lizard.POSES["roar"]),
-    ])
+    title = (f"{aid}   weak point hidden outside STAGGER; FIRST PERSON = the game's lens on a pose target "
+             f"(file: {whole['tris']} triangles, {len(whole['nodes'])} nodes)")
+    extra = [V("STAGGER (pose target), weak point shown", azimuth=28, elevation=8, fov=30, pose=stagger, show=EVERYTHING),
+             V("STAGGER from behind: the vents on the back", azimuth=152, elevation=24, fov=30, pose=stagger,
+               show=EVERYTHING)]
+    extra += [_fp_view(aid, name, f"FIRST PERSON  {name}: {what}") for name, what in FP_CELLS]
+    extra.append(V("ROAR (joints turned in game axes)", azimuth=42, elevation=8, fov=30, pose=lizard.POSES["roar"]))
+    sheet = dict(cell=(672, 378), title=title, extra=extra)     # 16:9 cells: the first-person ones are the game's frame
     concept = [
         dict(backdrop=day, azimuth=36, elevation=low),
         dict(name="roar", backdrop="night" if stage == 3 else day, azimuth=30, elevation=low - 2,
              pose=lizard.POSES["roar"]),
         dict(name="swipe", backdrop=day, azimuth=-28, elevation=low, pose=lizard.POSES["swipe"]),
-        dict(name="fp", backdrop=day, view=_fp_view(aid, targets["fp_claws"]), size=(960, 540)),
+        dict(name="fp", backdrop=day, view=_fp_view(aid, "fp_claws"), size=(960, 540)),
         dict(name="stagger", backdrop="night" if stage == 3 else day, azimuth=24, elevation=low, pose=stagger,
              show=EVERYTHING),
     ]

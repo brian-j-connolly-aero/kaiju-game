@@ -1,8 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
-  <!-- Tally: a bridge. A suspension bridge. -->
-  <path d="M3.5 43H60.5"/>
-  <path d="M19 12V57.5M45 12V57.5"/>
-  <path d="M19 13Q32 43 45 13"/>
-  <path d="M19 13Q11 31 3.5 34M45 13Q53 31 60.5 34"/>
-  <path d="M32 28V43"/>
+  <!-- Tally: a bridge. A suspension bridge: two solid pylons, a solid deck, one main cable. -->
+  <path fill="currentColor" stroke="none" d="M3 40H61V48H3Z"/>
+  <path fill="currentColor" stroke="none" d="M14 10H22V58H14ZM42 10H50V58H42Z"/>
+  <path d="M18 12.5Q32 46 46 12.5"/>
+  <path d="M16 12.5L4.5 38M48 12.5L59.5 38"/>
 </svg>

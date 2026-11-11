@@ -33,8 +33,9 @@ from PIL import Image  # noqa: E402
 import characters as ch  # noqa: E402
 import clouds  # noqa: E402
 import fx  # noqa: E402
+import gameview as gv  # noqa: E402
 import ground  # noqa: E402
-from pix import (ASSETS, PREVIEWS, SPRITES, TEXTURES, Img, Sheet, col, hstack, label,  # noqa: E402
+from pix import (ASSETS, OUTLINE, PREVIEWS, SPRITES, TEXTURES, Img, Sheet, col, hstack, label,  # noqa: E402
                  on_backdrop, save_preview, strip, upscale, vstack)
 
 MANIFEST = os.path.join(ASSETS, "manifest.sprites.json")
@@ -58,29 +59,41 @@ SOLDIERS = [
     ("soldier_army_rifle", "rifle", 7, 1),
 ]
 DIE_COL = 14
-SOLDIER_ANIMS = [("idle", 0, 1, 1), ("walk", 1, 4, 8), ("fire", 5, 2, 8)]      # name, column offset, frames, fps
+# name, column offset, frames, fps. Walk is a run: 12 frames per second is two strides in a
+# third of a second, which matches the stride drawn (about 0.75 m) to the 6.5 m/s a section moves at.
+SOLDIER_ANIMS = [("idle", 0, 1, 1), ("walk", 1, 4, 12), ("fire", 5, 2, 8)]
 DIE_FRAMES, DIE_FPS = 4, 6
 
 # civilian i (0..5) -> first column, first row of its 4 x 4 block (run, 4 frames per facing)
 CIVILIAN_BLOCKS = [(0, 0), (4, 0), (8, 0), (0, 4), (4, 4), (8, 4)]
 RUN_FPS = 10
 
-# id -> (row, first column, frames, fps)
+# id -> (row, first column, frames, fps, blend). blend is how the game must draw the effect:
+# "alpha" = ordinary alpha blending, "add" = added to what is behind it (see fx.py).
 FX_LAYOUT = {
-    "fx_explosion": (0, 0, 8, 16),
-    "fx_smoke": (1, 0, 6, 8),
-    "fx_spark": (1, 6, 1, 1),
-    "fx_glow": (1, 7, 1, 1),
-    "fx_dust": (2, 0, 6, 8),
-    "fx_laserdot": (2, 6, 1, 1),
-    "fx_ring": (2, 7, 1, 1),
-    "fx_fire": (3, 0, 6, 10),
-    "fx_shadow": (3, 6, 1, 1),
-    "fx_white": (3, 7, 1, 1),
-    "fx_debris": (4, 0, 4, 1),
-    "fx_flash": (4, 4, 3, 20),
-    "fx_explosion_ground": (5, 0, 8, 16),      # not in the contract list: a bonus (see README)
+    "fx_explosion": (0, 0, 8, 16, "alpha"),
+    "fx_smoke": (1, 0, 6, 8, "alpha"),
+    "fx_spark": (1, 6, 1, 1, "add"),
+    "fx_glow": (1, 7, 1, 1, "add"),
+    "fx_dust": (2, 0, 6, 8, "alpha"),
+    "fx_laserdot": (2, 6, 1, 1, "add"),
+    "fx_ring": (2, 7, 1, 1, "alpha"),
+    "fx_fire": (3, 0, 6, 10, "alpha"),
+    "fx_shadow": (3, 6, 1, 1, "alpha"),
+    "fx_white": (3, 7, 1, 1, "alpha"),
+    "fx_debris_1": (4, 0, 1, 1, "alpha"),      # four different chunks: one-frame sprites, not an animation
+    "fx_debris_2": (4, 1, 1, 1, "alpha"),
+    "fx_debris_3": (4, 2, 1, 1, "alpha"),
+    "fx_debris_4": (4, 3, 1, 1, "alpha"),
+    "fx_debris": (4, 0, 1, 1, "alpha"),        # the contract id: an alias of fx_debris_1
+    "fx_flash": (4, 4, 3, 20, "alpha"),
+    "fx_explosion_ground": (5, 0, 8, 16, "alpha"),     # not in the contract list: a bonus (see README)
 }
+# Sprite ids that deliberately show the same cells as another id.
+ALIASES = {"fx_debris": "fx_debris_1"}
+# Effects that stand on the bottom edge of their cell (anchor them at the bottom middle).
+FX_STANDING = ("fx_fire", "fx_explosion_ground")
+FX_FULL_CELL = ("fx_white",)
 
 GROUND_IDS = ["ground_asphalt", "ground_sidewalk", "ground_grass", "ground_water", "ground_rubble"]
 CLOUD_IDS = ["clouds_a", "clouds_b"]
@@ -117,7 +130,7 @@ def build_civilians() -> tuple:
 def build_fx() -> tuple:
     sheet = Sheet(*FX_SHEET, *FX_CELL)
     frames = fx.build()
-    for sid, (row, col0, n, _fps) in FX_LAYOUT.items():
+    for sid, (row, col0, n, _fps, _blend) in FX_LAYOUT.items():
         cells = frames[sid]
         if len(cells) != n:
             raise SystemExit(f"{sid}: the generator made {len(cells)} frames, the layout wants {n}")
@@ -156,12 +169,18 @@ def make_manifest() -> dict:
             "file": "sprites/civilians.png", "frame": list(CELL), "worldHeight": CHARACTER_WORLD_HEIGHT,
             "anims": {"run": {"rows": [r0, r0 + 1, r0 + 2, r0 + 3], "col": c0, "frames": 4, "fps": RUN_FPS}},
         }
-    for sid, (row, col0, n, fps) in FX_LAYOUT.items():
-        sprites[sid] = {"file": "sprites/fx.png", "frame": list(FX_CELL), "worldHeight": 1,
+    for sid, (row, col0, n, fps, blend) in FX_LAYOUT.items():
+        sprites[sid] = {"file": "sprites/fx.png", "frame": list(FX_CELL), "worldHeight": 1, "blend": blend,
                         "anims": {"play": {"rows": [row], "col": col0, "frames": n, "fps": fps}}}
     textures = {}
-    for tid in GROUND_IDS + CLOUD_IDS:
+    for tid in GROUND_IDS:
         textures[tid] = {"file": f"textures/{tid}.png", "tile": True}
+    for tid in CLOUD_IDS:
+        # a horizon panorama, not a tile: it wraps left to right only and goes on a ring
+        ring = clouds.RING[tid]
+        textures[tid] = {"file": f"textures/{tid}.png",
+                         "ring": {"repeats": ring["repeats"], "bottomDeg": ring["bottom_deg"],
+                                  "sunGap": list(clouds.SUN_GAP[tid])}}
     return {"sprites": sprites, "textures": textures}
 
 
@@ -181,6 +200,8 @@ def dump_manifest(data: dict) -> str:
             lines.append(f'      "file": {json.dumps(entry["file"])},')
             lines.append(f'      "frame": {json.dumps(entry["frame"])},')
             lines.append(f'      "worldHeight": {json.dumps(entry["worldHeight"])},')
+            if "blend" in entry:
+                lines.append(f'      "blend": {json.dumps(entry["blend"])},')
             lines.append('      "anims": {')
             anims = list(entry["anims"].items())
             for ai, (name, anim) in enumerate(anims):
@@ -233,12 +254,50 @@ def verify(quiet: bool = False) -> int:
                     if x0 + fw > w or y0 + fh > h:
                         problems.append(f"{sid}.{name}: cell ({c}, {row}) is outside the {w}x{h} sheet")
                         continue
-                    if (c, row) in used.setdefault(entry["file"], {}):
-                        problems.append(f"{sid}.{name}: cell ({c}, {row}) is also used by {used[entry['file']][(c, row)]}")
+                    other = used.setdefault(entry["file"], {}).get((c, row))
+                    if other and other.split(".")[0] not in (ALIASES.get(sid), next((k for k, v in ALIASES.items() if v == sid), None)):
+                        problems.append(f"{sid}.{name}: cell ({c}, {row}) is also used by {other}")
                     used[entry["file"]][(c, row)] = f"{sid}.{name}"
                     cell = arr[y0:y0 + fh, x0:x0 + fw]
                     if not (cell[..., 3] > 0).any():
                         problems.append(f"{sid}.{name}: cell ({c}, {row}) is empty")
+                    if sid.startswith("fx_") and sid not in FX_FULL_CELL:
+                        # nothing may touch the cell border, or the frame is cut off flat there;
+                        # the standing effects keep their bottom edge
+                        al = cell[..., 3] > 0
+                        border = int(al[0].sum() + al[:, 0].sum() + al[:, -1].sum())
+                        if sid not in FX_STANDING:
+                            border += int(al[-1].sum())
+                        elif not al[-1].any() and k == 0:
+                            problems.append(f"{sid}.{name}: stands on the bottom edge but its first frame does not reach it")
+                        if border:
+                            problems.append(f"{sid}.{name}: frame {k + 1} has {border} pixel(s) on the border of its cell")
+        if sid.startswith("fx_") and entry.get("blend") not in ("alpha", "add"):
+            problems.append(f"{sid}: effects must say how they are blended (\"blend\": \"alpha\" or \"add\")")
+    # the human color: every soldier frame carries enough cyan to be told from the scenery
+    army = images.get("sprites/army.png")
+    if army is not None:
+        fw, fh = CELL
+        for sid, _kind, col0, die_row in SOLDIERS:
+            low = []
+            for row in FACING_ROWS:
+                for c in range(col0, col0 + 7):
+                    n = ch.cyan_pixels(army[row * fh:(row + 1) * fh, c * fw:(c + 1) * fw])
+                    if n < ch.CYAN_MIN:
+                        low.append(f"({c}, {row}): {n}")
+            for c in range(DIE_COL, DIE_COL + DIE_FRAMES):
+                n = ch.cyan_pixels(army[die_row * fh:(die_row + 1) * fh, c * fw:(c + 1) * fw])
+                if n < ch.CYAN_MIN_DOWN:
+                    low.append(f"die ({c}, {die_row}): {n}")
+            if low:
+                problems.append(f"{sid}: too little cyan (at least {ch.CYAN_MIN} pixels a frame, "
+                                f"{ch.CYAN_MIN_DOWN} when down) in cells {', '.join(low)}")
+    # civilians keep clear of the colors that mean something
+    civ = images.get("sprites/civilians.png")
+    if civ is not None:
+        colors = {tuple(int(v) for v in px[:3]) for px in civ[civ[..., 3] > 0]}
+        colors.discard(tuple(col(OUTLINE)[:3]))
+        problems += ch.check_civilian_colors(colors)
     # nothing may be drawn outside the cells the manifest names
     for file, arr in images.items():
         entry = next(e for e in data["sprites"].values() if e["file"] == file)
@@ -271,7 +330,15 @@ def verify(quiet: bool = False) -> int:
             seam = ground.seam_error(img)
             if seam > 1.05:
                 problems.append(f"{tid}: the tile does not wrap cleanly (seam {seam:.2f}, limit 1.05)")
-            notes.append(f"{entry['file']}: {w}x{h}, seam {seam:.2f}, {len(img.colors())} colors, {os.path.getsize(path)} bytes")
+            off = ground.anchor_error(tid, img)
+            limit = 3 if tid == "ground_rubble" else 4
+            if off > limit:
+                problems.append(f"{tid}: its average color is {off} steps from its palette anchor (limit {limit})")
+            busy = ground.busyness(img)
+            if tid == "ground_rubble" and busy > 0.08:
+                problems.append(f"{tid}: too busy for flattened ground (brightness spread {busy:.3f}, limit 0.08)")
+            notes.append(f"{entry['file']}: {w}x{h}, seam {seam:.2f}, {off} from anchor, spread {busy:.3f}, "
+                         f"{len(img.colors())} colors, {os.path.getsize(path)} bytes")
         else:
             if not (arr[..., 3] == 0).any() or not (arr[..., 3] == 255).any():
                 problems.append(f"{tid}: clouds need both clear sky (alpha 0) and solid cloud (alpha 255)")
@@ -280,8 +347,22 @@ def verify(quiet: bool = False) -> int:
             solid = Img.from_array(np.where(arr[..., 3:4] > 0, arr, 0))
             seam = clouds.wrap_error(solid)
             if seam > 1.5:
-                problems.append(f"{tid}: does not wrap left to right (seam {seam:.2f})")
-            notes.append(f"{entry['file']}: {w}x{h}, wrap {seam:.2f}, {len(solid.colors())} colors, {os.path.getsize(path)} bytes")
+                problems.append(f"{tid}: does not wrap left to right (seam {seam:.2f}, limit 1.5)")
+            # the horizon must show: clear gaps through the low bank, and no wall of cloud
+            gaps = [g for g in clouds.clear_gaps(solid) if g[1] >= 40]
+            if len(gaps) < 2:
+                problems.append(f"{tid}: needs at least two clear gaps of 40 pixels or more, has {len(gaps)}")
+            cover = clouds.low_coverage(solid)
+            if cover > 0.70:
+                problems.append(f"{tid}: the low bank covers {cover:.0%} of rows {clouds.LOW_ROWS[0]} to {clouds.LOW_ROWS[1]} (limit 70%)")
+            if any((arr[y, :, 3] > 0).all() for y in range(h)):
+                problems.append(f"{tid}: a row is covered from edge to edge: a wall of cloud around the whole horizon")
+            ring = entry.get("ring") or {}
+            sun = tuple(ring.get("sunGap") or (0, 0))
+            if not sun[1] or not clouds.gap_is_clear(solid, sun, clouds.SUN_ROWS):
+                problems.append(f"{tid}: the sun gap named in the manifest {list(sun)} is not clear")
+            notes.append(f"{entry['file']}: {w}x{h}, wrap {seam:.2f}, gaps {gaps}, low bank {cover:.0%}, "
+                         f"{len(solid.colors())} colors, {os.path.getsize(path)} bytes")
     if not quiet:
         for n in notes:
             print("      " + n)
@@ -295,6 +376,8 @@ def verify(quiet: bool = False) -> int:
 # ---- review pictures ---------------------------------------------------------------------
 
 GROUND_COLORS = ("#2b3040", "#b9bcc6", "#4fbf5f", "#8d8d94")
+FAR_DISTANCES = (40, 60, 80, 120, 160)      # meters from the stage 1 kaiju's eye
+FOCAL_1080 = 540 / np.tan(np.radians(36.0))  # pixels per unit of tangent: the 72 degree first-person lens at 1080 lines
 
 
 def side_label(text: str, height: int, width: int = 64) -> Image.Image:
@@ -319,39 +402,138 @@ def native_rows(frames: list, scale: int = 1) -> Image.Image:
     return vstack(bands)
 
 
-def preview_soldier(sid: str, fr: dict) -> str:
+def far_rows(frames: list, tiles: dict, k: int = 3) -> Image.Image:
+    """The frames at the size they really have on a 1080-line screen, seen through the stage 1
+    kaiju's lens from FAR_DISTANCES meters, on the real ground tiles at the same scale
+    (nearest sampling, as the game does), then enlarged k times so the pixels can be judged."""
+    bands = []
+    for tid in ("ground_grass", "ground_asphalt", "ground_sidewalk", "ground_rubble"):
+        parts = []
+        for dist in FAR_DISTANCES:
+            scale = CHARACTER_WORLD_HEIGHT * FOCAL_1080 / dist / CELL[1]        # screen pixels per sprite pixel
+            texel = (ground.METERS_PER_TILE / 64.0) * FOCAL_1080 / dist        # screen pixels per ground pixel
+            fw, fh = max(1, int(round(CELL[0] * scale))), max(1, int(round(CELL[1] * scale)))
+            w, h = (fw + 2) * len(frames) + 10, int(round(CHARACTER_WORLD_HEIGHT * FOCAL_1080 / FAR_DISTANCES[0])) + 6
+            ys = (np.arange(h) / texel).astype(int) % 64
+            xs = (np.arange(w) / texel).astype(int) % 64
+            band = Image.fromarray(tiles[tid].a[np.ix_(ys, xs)], "RGBA")
+            x = 4
+            for f in frames:
+                v = np.clip(((np.arange(fh) + 0.5) / scale).astype(int), 0, CELL[1] - 1)
+                u = np.clip(((np.arange(fw) + 0.5) / scale).astype(int), 0, CELL[0] - 1)
+                small = f.a[np.ix_(v, u)].copy()
+                small[..., 3] = np.where(small[..., 3] >= 128, 255, 0)
+                band.alpha_composite(Image.fromarray(small, "RGBA"), (x, h - 3 - fh))
+                x += fw + 2
+            parts.append(band)
+        bands.append(upscale(hstack(parts, gap=2), k))
+    return vstack(bands, gap=2)
+
+
+def preview_soldier(sid: str, fr: dict, tiles: dict) -> str:
     k = 8
     rows = []
     for facing, row in zip(ch.FACINGS, fr["grid"]):
         rows.append(hstack([side_label(facing, CELL[1] * k), strip(row, k)]))
     rows.append(hstack([side_label("die", CELL[1] * k), strip(fr["die"], k)]))
     width = rows[0].width
-    head = label(f"{sid}   24 x 32 px cells, shown 8x   columns: idle | walk 1-4 | fire 1-2   last row: die 1-4", width)
+    cyan = [ch.cyan_pixels(f.a) for row in fr["grid"] for f in row]
+    head = label(f"{sid}   24 x 32 px cells, shown 8x   columns: idle | walk 1-4 | fire 1-2   last row: die 1-4   "
+                 f"cyan pixels per frame: {min(cyan)} to {max(cyan)}", width)
     flat = [f for row in fr["grid"] for f in row] + fr["die"]
     foot = label("native size and 2x on asphalt, sidewalk, grass, rubble", width)
-    pic = vstack([head] + rows + [foot, native_rows(flat[:28]), native_rows(flat[:14] + fr["die"], 2)])
+    picks = [fr["grid"][0][0], fr["grid"][0][5], fr["grid"][1][2], fr["grid"][3][0], fr["grid"][2][0], fr["grid"][2][5]]
+    far = label("real screen size from the stage 1 kaiju's eye at 40, 60, 80, 120 and 160 m, on the real tiles (shown 3x): "
+                "front idle, front fire, left walk, right idle, back idle, back fire", width)
+    pic = vstack([head] + rows + [foot, native_rows(flat[:28]), native_rows(flat[:14] + fr["die"], 2), far, far_rows(picks, tiles)])
     return save_preview(pic, os.path.join(PREVIEWS, f"{sid}.png"))
 
 
-def preview_civilian(sid: str, grid: list, name: str) -> str:
+def preview_civilian(sid: str, grid: list, name: str, tiles: dict) -> str:
     k = 8
     rows = [hstack([side_label(facing, CELL[1] * k), strip(row, k)]) for facing, row in zip(ch.FACINGS, grid)]
     width = rows[0].width
     head = label(f"{sid} ({name})   24 x 32 px cells, shown 8x   run 1-4 per facing", width)
     flat = [f for row in grid for f in row]
-    pic = vstack([head] + rows + [label("native size and 2x", width), native_rows(flat), native_rows(flat[:10], 2)])
+    far = label("real screen size at 40 to 160 m (3x)", width)
+    pic = vstack([head] + rows + [label("native size and 2x", width), native_rows(flat), native_rows(flat[:10], 2),
+                                  far, far_rows([grid[0][0], grid[1][1], grid[2][2]], tiles)])
     return save_preview(pic, os.path.join(PREVIEWS, f"{sid}.png"))
 
 
-def preview_fx(frames: dict) -> list:
+def preview_lineup(civs: dict, army: dict) -> str:
+    """Everyone side by side, and the same as plain silhouettes: are they different people?"""
+    k = 6
+    people = [civs[f"civilian_{i + 1}"] for i in range(len(CIVILIAN_BLOCKS))]
+    rows = []
+    for title, facing, frame in (("front", 0, 0), ("right", 3, 0), ("back", 2, 2)):
+        cells = [g[facing][frame] for g in people] + [army["soldier_army_rifle"]["grid"][facing][0],
+                                                      army["soldier_army_rocket"]["grid"][facing][0]]
+        shapes = []
+        for c in cells:
+            sil = c.copy()
+            sil.a[sil.a[..., 3] > 0] = col("#15161f")
+            shapes.append(sil)
+        rows.append(hstack([side_label(title, CELL[1] * k), strip(cells, k, "#b9bcc6"), strip(shapes, k, "#b9bcc6")]))
+    head = label("the six civilians and the two soldiers at 6x on sidewalk grey, and their silhouettes: "
+                 "child, coral dress, stout office worker with briefcase, tall hoodie, pink top with bag, tourist with camera", rows[0].width)
+    return save_preview(vstack([head] + rows), os.path.join(PREVIEWS, "characters_lineup.png"))
+
+
+def _composite(bg: np.ndarray, cell: Img, mode: str, tint=(1.0, 1.0, 1.0)) -> np.ndarray:
+    """Blend an effect frame onto a background (floats 0..1, display values, as on screen)."""
+    c = cell.a.astype(np.float32) / 255.0
+    rgb, a = c[..., :3] * np.array(tint, np.float32), c[..., 3:4]
+    if mode == "add":
+        return np.clip(bg + rgb * a, 0, 1)
+    return bg * (1 - a) + rgb * a
+
+
+def preview_fx_blend(frames: dict, tiles: dict) -> str:
+    """The bright effects under both blend modes on every background the game has. The upper
+    row of each band is the mode the manifest names, the lower row the other one: added to a
+    bright background a full-color effect burns out to a white blob."""
+    k = 2
+    bgs = [("afternoon sky", "#8fbdf0"), ("sidewalk", "ground_sidewalk"), ("rubble", "ground_rubble"),
+           ("grass", "ground_grass"), ("asphalt", "ground_asphalt"), ("asphalt at night", "night")]
+    shown = [("fx_explosion", 6), ("fx_fire", 3), ("fx_flash", 3), ("fx_spark", 1), ("fx_glow", 1), ("fx_laserdot", 1)]
+    tints = {"fx_glow": (1.0, 0.54, 0.10), "fx_laserdot": (0.12, 0.78, 0.88), "fx_spark": (1.0, 0.91, 0.66)}
+    n = sum(c for _s, c in shown)
+    bands = []
+    for title, bg in bgs:
+        halves = []
+        for which in ("manifest", "other"):
+            if bg.startswith("#"):
+                back = np.ones((64, 64 * n, 3), np.float32) * np.array(col(bg)[:3], np.float32) / 255.0
+            else:
+                tile = tiles["ground_asphalt" if bg == "night" else bg].a[..., :3].astype(np.float32) / 255.0
+                back = np.tile(tile, (1, n, 1)) * (0.4 if bg == "night" else 1.0)
+            x = 0
+            for sid, count in shown:
+                blend = FX_LAYOUT[sid][4]
+                mode = blend if which == "manifest" else ("add" if blend == "alpha" else "alpha")
+                for f in frames[sid][:count]:
+                    back[:, x:x + 64] = _composite(back[:, x:x + 64], f, mode, tints.get(sid, (1, 1, 1)))
+                    x += 64
+            halves.append(upscale(Image.fromarray((back * 255).round().astype(np.uint8), "RGB").convert("RGBA"), k))
+        bands.append(vstack([label(f"{title}   upper row: blended as the manifest says (explosion, fire, flash: alpha; "
+                                   f"spark, orange glow, cyan laser dot: add)   lower row: the other mode (wrong)", halves[0].width),
+                             halves[0], halves[1]]))
+    return save_preview(vstack(bands), os.path.join(PREVIEWS, "fx_blend.png"))
+
+
+def preview_fx(frames: dict, tiles: dict) -> list:
     out = []
     k = 4
     blocks = []
     for bg, title in (("#2b3040", "on asphalt"), ("#a8d4f5", "on sky"), ("#8d8d94", "on rubble")):
         rows = []
-        for sid, (row, col0, n, fps) in sorted(FX_LAYOUT.items(), key=lambda kv: (kv[1][0], kv[1][1])):
+        for sid, (row, col0, n, fps, blend) in sorted(FX_LAYOUT.items(), key=lambda kv: (kv[1][0], kv[1][1])):
+            if sid in ALIASES:
+                continue
             cells = hstack([on_backdrop(f, bg, k) for f in frames[sid]])
-            rows.append(vstack([label(f"{sid}   {n} frame{'s' if n > 1 else ''}, {fps} fps   ({title}, 4x)", 64 * 8 * k), cells]))
+            rows.append(vstack([label(f"{sid}   {n} frame{'s' if n > 1 else ''}, {fps} fps, blend {blend}   ({title}, 4x, "
+                                      f"shown with ordinary alpha blending)", 64 * 8 * k), cells]))
         blocks.append(vstack(rows))
     out.append(save_preview(blocks[0], os.path.join(PREVIEWS, "fx.png")))
     out.append(save_preview(blocks[1], os.path.join(PREVIEWS, "fx_on_sky.png")))
@@ -365,17 +547,55 @@ def preview_fx(frames: dict) -> list:
     fire = frames["fx_fire"]
     pic = vstack([label("fx_fire   6 frames at 10 fps (loops), shown 6x", 64 * 6 * 6), strip(fire, 6, "#2b3040")])
     out.append(save_preview(pic, os.path.join(PREVIEWS, "fx_fire.png")))
+    out.append(preview_fx_blend(frames, tiles))
     return out
 
 
-def preview_ground(tid: str, img: Img) -> str:
+EYES = (("a soldier's eye, 1.7 m", 1.7, -12, 66, 1), ("stage 1 kaiju, 3.9 m", 3.9, -16, 72, 1),
+        ("stage 2 kaiju, 28 m", 28.0, -22, 72, 2), ("stage 3 kaiju, 100 m", 100.0, -25, 72, 3))
+
+
+def preview_ground(tid: str, img: Img, people: list) -> str:
+    """Tiling test, one enlarged tile, and the tile in the game's own perspective (8 m to
+    the tile) from a soldier's eye and from the smallest kaiju's, with people for scale."""
     t3 = Img.from_array(np.tile(img.a, (3, 3, 1)))
     left = upscale(t3, 4)
     right = upscale(img, 12)
-    width = left.width + 8 + right.width
-    head = label(f"{tid}   64 x 64 px   left: 3 x 3 tiling test (4x)   right: one tile (12x)   "
-                 f"{len(img.colors())} colors", width)
-    return save_preview(vstack([head, hstack([left, right], gap=8)]), os.path.join(PREVIEWS, f"{tid}.png"))
+    views = []
+    for title, eye, pitch, fov, stage in EYES[:2]:
+        v = gv.View(eye, 0, pitch, fov, (768, 432), "afternoon", stage).ground([img])
+        v.sprites([(people[0], -1.2, 6.0), (people[1], 1.2, 6.0), (people[0], -3.0, 14.0), (people[2], 3.0, 14.0),
+                   (people[1], -2.0, 30.0), (people[2], 2.0, 30.0)])
+        views.append(vstack([label(f"in the game: {title}, people at 6, 14 and 30 m", 768), v.pil()]))
+    top = hstack([left, right], gap=8)
+    bottom = hstack(views, gap=8)
+    width = max(top.width, bottom.width)
+    head = label(f"{tid}   64 x 64 px = 8 x 8 m in the game (a ground pixel is 12.5 cm)   left: 3 x 3 tiling test (4x)   "
+                 f"right: one tile (12x)   {len(img.colors())} colors", width)
+    return save_preview(vstack([head, top, bottom]), os.path.join(PREVIEWS, f"{tid}.png"))
+
+
+def preview_ground_views(tiles: dict, people: list) -> str:
+    """All five tiles side by side from the four eye heights of the game."""
+    order = [tiles[t] for t in GROUND_IDS]
+    views = []
+    for title, eye, pitch, fov, stage in EYES:
+        width = {1.7: 6.0, 3.9: 10.0, 28.0: 60.0, 100.0: 220.0}[eye]
+
+        def strips(x, z, width=width):
+            return np.clip(np.floor(-x / width + 2.5).astype(int), 0, 4)      # screen right is -x when looking along +z
+
+        time = {1: "afternoon", 2: "sunset", 3: "afternoon"}[stage]
+        v = gv.View(eye, 0, pitch, fov, (960, 540), time, stage).ground(order, strips)
+        items = []
+        for i in range(5):
+            for dist in (eye * 2.2 + 4, eye * 5 + 10, eye * 10 + 25):
+                items += [(people[i % 2], (2 - i) * width - 0.8, dist), (people[2 + i % 2], (2 - i) * width + 0.8, dist)]
+        v.sprites(items)
+        views.append(vstack([label(f"{title}   strips left to right: asphalt, sidewalk, grass, water, rubble; "
+                                   f"each {width:g} m wide; people at three distances", 960), v.pil()]))
+    pic = vstack([hstack(views[:2], gap=8), hstack(views[2:], gap=8)], gap=8)
+    return save_preview(pic, os.path.join(PREVIEWS, "ground_views.png"))
 
 
 def sky_gradient(w: int, h: int, top, bottom) -> Image.Image:
@@ -402,13 +622,59 @@ SKIES = (
 def preview_clouds(tid: str, img: Img) -> str:
     wide = Img.from_array(np.concatenate([img.a, img.a[:, :256]], axis=1))       # one and a half wraps
     k = 2
+    gaps = [g for g in clouds.clear_gaps(img) if g[1] >= 40]
     panels = []
     for name, top, bottom, tint in SKIES:
         bg = sky_gradient(wide.w * k, wide.h * k, top, bottom)
         bg.alpha_composite(upscale(tinted(wide, tint), k))
-        panels.append(vstack([label(f"{tid}   512 x 256 px, wraps left to right; shown 2x, one and a half wraps   "
+        panels.append(vstack([label(f"{tid}   the painting: 512 x 256 px, wraps left to right; shown 2x, one and a half wraps   "
                                     f"{name} (tint {tint[0]:.2f}, {tint[1]:.2f}, {tint[2]:.2f})", bg.width), bg]))
-    return save_preview(vstack(panels), os.path.join(PREVIEWS, f"{tid}.png"))
+    ring = clouds.RING[tid]
+    foot = label(f"clear gaps (first column, width): {gaps}   sun gap: {list(clouds.SUN_GAP[tid])}   low bank covered: "
+                 f"{clouds.low_coverage(img):.0%}   in the game: {ring['repeats']} repeats around the horizon ring, "
+                 f"bottom edge {abs(ring['bottom_deg']):g} degrees below the horizon (see sky_ring.png)", panels[0].width)
+    return save_preview(vstack(panels + [foot]), os.path.join(PREVIEWS, f"{tid}.png"))
+
+
+def preview_sky(sky: dict, tiles: dict, people: list) -> list:
+    """The clouds as the game must show them: on the two horizon rings."""
+    out = []
+    # 1. the whole horizon unrolled, three times of day
+    strips = []
+    for time in ("afternoon", "sunset", "night"):
+        ring = gv.unrolled_ring(sky, time, 512)
+        strips.append(vstack([label(f"the horizon ring unrolled, {time}: 360 degrees left to right (south, east, north in the "
+                                    f"middle, west, south), from 6 degrees below the horizon to 44 above; clouds_b (3 repeats) "
+                                    f"behind clouds_a (4 repeats)", ring.width), ring]))
+    out.append(save_preview(vstack(strips), os.path.join(PREVIEWS, "sky_ring.png")))
+    # 2. what a player sees
+    order = [tiles[t] for t in ("ground_asphalt", "ground_sidewalk", "ground_grass")]
+
+    def street(x, z):
+        idx = np.full(x.shape, 1)
+        idx[np.abs(x) < 6] = 0
+        idx[x < -10] = 2
+        return idx
+
+    sun = np.degrees(gv.sun_azimuth("sunset"))
+    shots = [
+        ("a soldier's eye looking up the street, afternoon (stage 1)", 1.7, 0.0, 9, 66, "afternoon", 1),
+        ("a soldier's eye, afternoon, turned 100 degrees", 1.7, 100.0, 9, 66, "afternoon", 1),
+        ("stage 2 kaiju looking at the setting sun: it stands in the gap of both rings", 28.0, sun, 5, 72, "sunset", 2),
+        ("stage 2 kaiju, sunset, turned 120 degrees from the sun", 28.0, sun + 120.0, 5, 72, "sunset", 2),
+        ("stage 3 kaiju, night", 100.0, 40.0, 3, 72, "night", 3),
+        ("a soldier looking up at 55 degrees, afternoon: the rings end at 35 and 44 degrees, above them is clear sky", 1.7, 0.0, 55, 66, "afternoon", 1),
+    ]
+    views = []
+    for title, eye, yaw, pitch, fov, time, stage in shots:
+        v = gv.View(eye, yaw, pitch, fov, (960, 540), time, stage).sky(sky).ground(order, street)
+        if eye < 5:
+            v.sprites([(people[0], -2.0 + 9 * np.sin(np.radians(yaw)), 9 * np.cos(np.radians(yaw))),
+                       (people[1], 2.5 + 16 * np.sin(np.radians(yaw)), 16 * np.cos(np.radians(yaw)))])
+        views.append(vstack([label(title, 960), v.pil()]))
+    pic = vstack([hstack(views[0:2], gap=8), hstack(views[2:4], gap=8), hstack(views[4:6], gap=8)], gap=8)
+    out.append(save_preview(pic, os.path.join(PREVIEWS, "sky_views.png")))
+    return out
 
 
 def preview_sheet(name: str, sheet: Sheet, k: int) -> str:
@@ -435,26 +701,34 @@ def preview_sheet(name: str, sheet: Sheet, k: int) -> str:
     return save_preview(vstack([head, big]), os.path.join(PREVIEWS, f"sheet_{name}.png"))
 
 
+GROUND_SCALE = 1.8      # a ground pixel (12.5 cm) is this many character pixels (6.9 cm) wide
+
+
 def preview_scene(army: dict, civs: dict, fxf: dict, tiles: dict, sky: dict) -> str:
     """A flat mock street: every sprite family together over the real tiles, to judge how the
-    palettes sit with each other. Native size, then enlarged three times."""
+    palettes sit with each other. The ground is enlarged 1.8 times under the sprites, because
+    that is how much bigger a ground pixel is than a character pixel in the game. Native
+    size, then enlarged three times. (For the true perspective see sprites_in_game.png.)"""
     rng = np.random.default_rng(9001)
     w, h = 448, 256
     scene = sky_gradient(w, h, "#2f6fd0", "#a8d4f5")
     cl = Img.from_array(sky["clouds_a"].a[40:232, 40:40 + w].copy())
     scene.alpha_composite(cl.pil(), (0, -70))
 
+    def scaled(tile: Img, width: int, height: int) -> Image.Image:
+        ys = (np.arange(height) / GROUND_SCALE).astype(int) % 64
+        xs = (np.arange(width) / GROUND_SCALE).astype(int) % 64
+        return Image.fromarray(tile.a[np.ix_(ys, xs)], "RGBA")
+
     def band(tile: Img, y0: int, y1: int) -> None:
-        reps = np.tile(tile.a, ((y1 - y0) // 64 + 2, w // 64 + 2, 1))[:y1 - y0, :w]
-        scene.paste(Image.fromarray(reps, "RGBA"), (0, y0))
+        scene.paste(scaled(tile, w, y1 - y0), (0, y0))
 
     band(tiles["ground_grass"], 104, 136)
     band(tiles["ground_sidewalk"], 136, 156)
     band(tiles["ground_asphalt"], 156, 220)
     band(tiles["ground_sidewalk"], 220, 236)
     band(tiles["ground_water"], 236, 256)
-    rub = np.tile(tiles["ground_rubble"].a, (2, 3, 1))[:84, :150]
-    scene.paste(Image.fromarray(rub, "RGBA"), (298, 104))
+    scene.paste(scaled(tiles["ground_rubble"], 150, 84), (298, 104))
 
     shadow = tinted(fxf["fx_shadow"][0], (0, 0, 0))
 
@@ -466,11 +740,18 @@ def preview_scene(army: dict, civs: dict, fxf: dict, tiles: dict, sky: dict) -> 
             scene.alpha_composite(sh, (x - 9, y - 4))
         scene.alpha_composite(img.pil(), (x - img.w // 2, y - img.h + 1))
 
-    def put_fx(img: Img, x: int, y: int, size: int = 64, tint=None) -> None:
+    def put_fx(img: Img, x: int, y: int, size: int = 64, tint=None, add: bool = False) -> None:
         im = (tinted(img, tint) if tint else img).pil()
         if size != 64:
             im = im.resize((size, size), Image.NEAREST)
-        scene.alpha_composite(im, (x - size // 2, y - size // 2))
+        if add:
+            x0, y0 = x - size // 2, y - size // 2
+            region = np.asarray(scene.crop((x0, y0, x0 + size, y0 + size))).astype(np.float32)
+            src = np.asarray(im).astype(np.float32)
+            region[..., :3] = np.clip(region[..., :3] + src[..., :3] * src[..., 3:4] / 255.0, 0, 255)
+            scene.paste(Image.fromarray(region.astype(np.uint8), "RGBA"), (x0, y0))
+        else:
+            scene.alpha_composite(im, (x - size // 2, y - size // 2))
 
     things = []      # (feet y, callable) so nearer things are drawn later
     rocket, rifle = army["soldier_army_rocket"], army["soldier_army_rifle"]
@@ -503,26 +784,78 @@ def preview_scene(army: dict, civs: dict, fxf: dict, tiles: dict, sky: dict) -> 
         things.append((y, lambda c=cell, x=x, y=y: put(c, x, y)))
     for _y, draw in sorted(things, key=lambda t: t[0]):
         draw()
-    # effects on the rubble side
+    # effects on the rubble side, each blended as its manifest entry says
     put_fx(fxf["fx_smoke"][3], 392, 96, 64, (0.42, 0.42, 0.47))
     put_fx(fxf["fx_smoke"][2], 372, 116, 48, (0.36, 0.36, 0.40))
     put_fx(fxf["fx_fire"][1], 384, 136, 48)
     put_fx(fxf["fx_fire"][4], 330, 150, 32)
     put_fx(fxf["fx_dust"][2], 322, 178, 64)
-    put_fx(fxf["fx_debris"][0], 356, 168, 16, (0.95, 0.89, 0.70))
-    put_fx(fxf["fx_debris"][2], 404, 172, 16, (0.77, 0.33, 0.24))
-    put_fx(fxf["fx_debris"][3], 378, 182, 24, (0.56, 0.78, 0.95))
+    put_fx(fxf["fx_debris_1"][0], 356, 168, 16, (0.95, 0.89, 0.70))
+    put_fx(fxf["fx_debris_3"][0], 404, 172, 16, (0.77, 0.33, 0.24))
+    put_fx(fxf["fx_debris_4"][0], 378, 182, 24, (0.56, 0.78, 0.95))
+    put_fx(fxf["fx_glow"][0], 300, 128, 96, (0.5, 0.27, 0.05), add=True)       # the bloom under the burst
     put_fx(fxf["fx_explosion"][2], 300, 128, 64)
     put_fx(fxf["fx_explosion"][4], 420, 150, 48)
     put_fx(fxf["fx_ring"][0], 300, 128, 96, (1.0, 0.95, 0.8))
-    put_fx(fxf["fx_laserdot"][0], 352, 112, 32, (0.12, 0.78, 0.88))
+    put_fx(fxf["fx_laserdot"][0], 352, 112, 32, (0.12, 0.78, 0.88), add=True)
     put_fx(fxf["fx_flash"][0], 258, 148, 24)
-    head = label("mock street: sprites, effects, ground tiles and clouds together   top: native size, bottom: 3x", w * 3)
+    head = label("mock street: sprites, effects, ground tiles (enlarged 1.8x, as in the game) and clouds together   "
+                 "top: native size, bottom: 3x", w * 3)
     native = Image.new("RGBA", (w * 3, h), col("#20222c"))
     native.paste(scene, (0, 0))
     native.paste(scene.resize((w * 2, h * 2), Image.NEAREST).crop((0, h, w * 2, h * 2)), (w + 8, 0))
     pic = vstack([head, native, upscale(scene, 3)])
     return save_preview(pic, os.path.join(PREVIEWS, "sprites_scene.png"))
+
+
+def preview_in_game(army: dict, civs: dict, tiles: dict, sky: dict) -> str:
+    """The two views that matter most: what the smallest kaiju sees of the army (fronts,
+    firing at it), and what a soldier sees of the allies (backs)."""
+    rng = np.random.default_rng(7)
+    order = [tiles[t] for t in ("ground_asphalt", "ground_sidewalk", "ground_grass", "ground_rubble", "ground_water")]
+
+    def city(x, z):
+        idx = np.full(x.shape, 1)
+        idx[np.abs(x) < 6] = 0
+        idx[x < -10] = 2
+        idx[(x > 10) & (z > 35) & (z < 75)] = 3
+        idx[(x > 10) & (z > 110)] = 4
+        idx[(np.abs(z - 100) < 5) & (x > -10)] = 0
+        return idx
+
+    def section(cx, cz, facing, anim, n=10, r=3.0):
+        out = []
+        for i in range(n):
+            a, d = rng.uniform(0, 6.283), np.sqrt(rng.uniform(0, 1)) * r
+            fr = army["soldier_army_rocket" if i < 3 else "soldier_army_rifle"]["grid"][facing]
+            cell = fr[0] if anim == "idle" else fr[1 + int(rng.integers(0, 4))] if anim == "walk" else fr[5 + int(rng.integers(0, 2))]
+            out.append((cell, cx + np.cos(a) * d, cz + np.sin(a) * d))
+        return out
+
+    def crowd(cx, cz, facing, n=8, r=4.0):
+        out = []
+        for _ in range(n):
+            a, d = rng.uniform(0, 6.283), np.sqrt(rng.uniform(0, 1)) * r
+            grid = civs[f"civilian_{int(rng.integers(0, 6)) + 1}"]
+            out.append((grid[facing][int(rng.integers(0, 4))], cx + np.cos(a) * d, cz + np.sin(a) * d))
+        return out
+
+    items = (section(-1, 22, 0, "fire") + section(3, 45, 1, "walk") + section(-16, 60, 0, "fire") + section(16, 55, 0, "idle")
+             + section(0, 90, 0, "fire") + section(-2, 150, 0, "fire") + section(8, 30, 3, "walk") + section(-14, 120, 0, "idle")
+             + crowd(8, 14, 2) + crowd(-14, 28, 2) + crowd(-8, 40, 3) + crowd(14, 45, 1, 5) + crowd(-20, 90, 2) + crowd(8, 80, 2))
+    kaiju = gv.View(3.9, 0, -7, 72, (1280, 720), "afternoon", 1).sky(sky).ground(order, city).sprites(items)
+    crop = kaiju.pil().crop((400, 250, 880, 420)).resize((1440, 510), Image.NEAREST).crop((80, 0, 1360, 510))
+    items = (section(-1, 9, 2, "fire") + section(-5, 22, 2, "idle") + section(8, 16, 2, "walk") + section(-14, 30, 3, "walk")
+             + section(2, 45, 2, "fire") + section(14, 50, 0, "idle") + crowd(9, 28, 0, 6) + crowd(-15, 18, 1, 5))
+    human = gv.View(1.7, 0, -3, 66, (1280, 720), "afternoon", 1).sky(sky).ground(order, city)
+    for it in sorted(items, key=lambda it: -((it[1] - 1.5) ** 2 + it[2] ** 2)):
+        human.sprite(it[0], it[1] - 1.5, it[2])
+    pic = vstack([label("what the stage 1 kaiju sees (eye 3.9 m, 72 degree lens): sections at 22, 30, 45, 55, 60, 90, 120 and 150 m, "
+                        "crowds between them", 1280), kaiju.pil(),
+                  label("the same picture, the middle distance enlarged 3x", 1280), crop,
+                  label("what a soldier sees of the allies (eye 1.7 m, 66 degree lens): sections at 9, 16, 22, 30, 45 and 50 m", 1280),
+                  human.pil()])
+    return save_preview(pic, os.path.join(PREVIEWS, "sprites_in_game.png"))
 
 
 # ---- main --------------------------------------------------------------------------------
@@ -562,19 +895,26 @@ def main(argv=None) -> int:
     if not no_previews:
         made = []
         for sid, _kind, _c, _r in SOLDIERS:
-            made.append(preview_soldier(sid, army_frames[sid]))
+            made.append(preview_soldier(sid, army_frames[sid], tiles))
         styles = ch.civilian_styles()
         for i in range(len(CIVILIAN_BLOCKS)):
-            made.append(preview_civilian(f"civilian_{i + 1}", civ_frames[f"civilian_{i + 1}"], styles[i]["name"]))
-        made += preview_fx(fx_frames)
+            made.append(preview_civilian(f"civilian_{i + 1}", civ_frames[f"civilian_{i + 1}"], styles[i]["name"], tiles))
+        made.append(preview_lineup(civ_frames, army_frames))
+        made += preview_fx(fx_frames, tiles)
+        # people for scale in the ground and sky pictures: two soldiers and two civilians
+        people = [army_frames["soldier_army_rifle"]["grid"][0][0], army_frames["soldier_army_rocket"]["grid"][0][0],
+                  civ_frames["civilian_3"][0][0], civ_frames["civilian_1"][0][0]]
         for tid in GROUND_IDS:
-            made.append(preview_ground(tid, tiles[tid]))
+            made.append(preview_ground(tid, tiles[tid], people))
+        made.append(preview_ground_views(tiles, people))
         for tid in CLOUD_IDS:
             made.append(preview_clouds(tid, sky[tid]))
+        made += preview_sky(sky, tiles, people)
         made.append(preview_sheet("army", army_sheet, 4))
         made.append(preview_sheet("civilians", civ_sheet, 4))
         made.append(preview_sheet("fx", fx_sheet, 2))
         made.append(preview_scene(army_frames, civ_frames, fx_frames, tiles, sky))
+        made.append(preview_in_game(army_frames, civ_frames, tiles, sky))
         if not args.quiet:
             print(f"wrote {len(made)} review pictures to {os.path.relpath(PREVIEWS)}")
     return 1 if verify(args.quiet) else 0

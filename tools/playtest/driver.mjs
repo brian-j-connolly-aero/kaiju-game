@@ -184,12 +184,16 @@ export class Driver {
     return this.page.evaluate(surroundingsInPage, { x, z, radius, limit });
   }
 
-  /** Waits until `test(probe)` is truthy; returns its value, or null on timeout. */
+  /**
+   * Waits until `test(probe)` is truthy; returns its value, or null on timeout. The test may be
+   * async: its result is awaited. (Without that, an async test's Promise counts as truthy and
+   * the wait ends at once, having waited for nothing.)
+   */
   async until(test, timeoutMs = 8000, everyMs = 60) {
     const deadline = Date.now() + timeoutMs;
     for (;;) {
       const p = await this.probe();
-      const v = p ? test(p) : null;
+      const v = p ? await test(p) : null;
       if (v) return v;
       if (Date.now() > deadline) return null;
       await sleep(everyMs);

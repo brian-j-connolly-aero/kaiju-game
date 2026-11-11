@@ -509,6 +509,148 @@
         "audio/sfx/camera_shutter"
       ],
       "gain": 1
+    },
+    "kaiju_roar_crab_s1": {
+      "variants": [
+        "audio/sfx/kaiju_roar_crab_s1"
+      ],
+      "gain": 1
+    },
+    "kaiju_roar_crab_s2": {
+      "variants": [
+        "audio/sfx/kaiju_roar_crab_s2"
+      ],
+      "gain": 1
+    },
+    "kaiju_roar_crab_s3": {
+      "variants": [
+        "audio/sfx/kaiju_roar_crab_s3"
+      ],
+      "gain": 1
+    },
+    "kaiju_roar_burrower_s1": {
+      "variants": [
+        "audio/sfx/kaiju_roar_burrower_s1"
+      ],
+      "gain": 1
+    },
+    "kaiju_roar_burrower_s2": {
+      "variants": [
+        "audio/sfx/kaiju_roar_burrower_s2"
+      ],
+      "gain": 1
+    },
+    "kaiju_roar_burrower_s3": {
+      "variants": [
+        "audio/sfx/kaiju_roar_burrower_s3"
+      ],
+      "gain": 1
+    },
+    "kaiju_roar_moth_s1": {
+      "variants": [
+        "audio/sfx/kaiju_roar_moth_s1"
+      ],
+      "gain": 1
+    },
+    "kaiju_roar_moth_s2": {
+      "variants": [
+        "audio/sfx/kaiju_roar_moth_s2"
+      ],
+      "gain": 1
+    },
+    "kaiju_roar_moth_s3": {
+      "variants": [
+        "audio/sfx/kaiju_roar_moth_s3"
+      ],
+      "gain": 1
+    },
+    "burrow_loop": {
+      "variants": [
+        "audio/sfx/burrow_loop"
+      ],
+      "gain": 1,
+      "loop": [
+        0.25,
+        3.25
+      ]
+    },
+    "gust": {
+      "variants": [
+        "audio/sfx/gust"
+      ],
+      "gain": 1
+    },
+    "drone_loop": {
+      "variants": [
+        "audio/sfx/drone_loop"
+      ],
+      "gain": 1,
+      "loop": [
+        0.25,
+        2.25
+      ]
+    },
+    "heli_loop": {
+      "variants": [
+        "audio/sfx/heli_loop"
+      ],
+      "gain": 1,
+      "loop": [
+        0.25,
+        2.25
+      ]
+    },
+    "jet_flyby": {
+      "variants": [
+        "audio/sfx/jet_flyby"
+      ],
+      "gain": 1
+    },
+    "freeze_ray": {
+      "variants": [
+        "audio/sfx/freeze_ray"
+      ],
+      "gain": 1
+    },
+    "dish_beam_loop": {
+      "variants": [
+        "audio/sfx/dish_beam_loop"
+      ],
+      "gain": 1,
+      "loop": [
+        0.25,
+        2.25
+      ]
+    },
+    "generator_overload": {
+      "variants": [
+        "audio/sfx/generator_overload"
+      ],
+      "gain": 1
+    },
+    "chant_loop": {
+      "variants": [
+        "audio/sfx/chant_loop"
+      ],
+      "gain": 1,
+      "loop": [
+        0.25,
+        5.25
+      ]
+    },
+    "bell": {
+      "variants": [
+        "audio/sfx/bell_1",
+        "audio/sfx/bell_2",
+        "audio/sfx/bell_3"
+      ],
+      "gain": 1
+    },
+    "relic_open": {
+      "variants": [
+        "audio/sfx/relic_open"
+      ],
+      "gain": 1
     }
   }
 }

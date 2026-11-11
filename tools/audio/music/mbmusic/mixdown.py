@@ -33,6 +33,7 @@ PAD = 0.25                # seconds after the loop end
 DRY_TAIL = 5.0            # seconds allowed for note releases after the last bar
 CEILING_DB = -1.5         # limiter ceiling (sample peak) for the sum of a cue's stems
 WET_HP = 140.0            # keep the hall out of the bass
+SUB_HZ = 80.0             # corner of the low shelf that parts with `sub` get (bass weight)
 OGG_QUALITY = "4"         # libvorbis -q:a (about 115 kbit/s for this material)
 MP3_QUALITY = "5"         # libmp3lame -q:a (VBR, about 115 kbit/s for this material)
 
@@ -41,6 +42,22 @@ def _section_bounds(cue: Cue) -> list[tuple[int, int]]:
     firsts = [b for b, _ in cue.sections] or [1]
     edges = [int(round((b - 1) * BAR_SECONDS * SR)) for b in firsts] + [int(round(cue.seconds * SR))]
     return list(zip(edges, edges[1:]))
+
+
+def part_chain(part, x: np.ndarray) -> np.ndarray:
+    """One part's own processing, from the dry render to its seat in the mix: level, high-pass
+    under the instrument, low-pass, bass shelf, air shelf, stereo position."""
+    x = x.astype(np.float64) * 10 ** ((part.inst.trim + part.gain) / 20)
+    x = dsp.highpass(x, part.hp)
+    x = dsp.lowpass(x, part.lp)
+    if part.sub:
+        # The samples are thin at the very bottom: the organ's fundamental is 5 to 9 dB under
+        # its own octave from C1 to C2, and the bowed basses have none below A1 (measured note
+        # by note). The shelf gives some of it back.
+        x = dsp.shelf(x, SUB_HZ, part.sub, "low")
+    if part.inst.air and not part.lp:
+        x = dsp.shelf(x, 6000.0, part.inst.air, "high")
+    return dsp.place(x, part.pan, part.width)
 
 
 def _mix_stem(cue: Cue, stem: Stem, levels: dict) -> np.ndarray:
@@ -52,12 +69,7 @@ def _mix_stem(cue: Cue, stem: Stem, levels: dict) -> np.ndarray:
     dry = np.zeros((n, 2))
     send = np.zeros((n, 2))
     for part, x in zip(stem.parts, dry_parts):
-        x = x.astype(np.float64) * 10 ** ((part.inst.trim + part.gain) / 20)
-        x = dsp.highpass(x, part.hp)
-        x = dsp.lowpass(x, part.lp)
-        if part.inst.air and not part.lp:
-            x = dsp.shelf(x, 6000.0, part.inst.air, "high")
-        x = dsp.place(x, part.pan, part.width)
+        x = part_chain(part, x)
         dry += x
         send += x * part.rev
         xk = dsp.k_weight(x[:int(cue.seconds * SR)])
@@ -164,6 +176,8 @@ def render_cue(cue: Cue, encode: bool = True, verbose: bool = True) -> dict:
         if cue.group:
             entry["group"] = cue.group
         entry["duration"] = round(len(out) / SR, 3)
+        if cue.mark is not None:
+            entry["mark"] = round(float(cue.mark), 3)
         wav = masters / f"{stem.name}.wav"
         sf.write(str(wav), out, SR, subtype="PCM_24")
         if encode:

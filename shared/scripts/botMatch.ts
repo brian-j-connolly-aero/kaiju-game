@@ -9,6 +9,7 @@ import {
   createMatchConfig,
   createWorld,
   TICK_RATE,
+  type BuiltCity,
   type EndReason,
   type SimEvent,
   type Winner,
@@ -30,6 +31,8 @@ export interface BotMatchOptions {
   maxMinutes?: number;
   /** Called after every tick, with that tick's events. */
   onTick?: (world: World, events: SimEvent[]) => void;
+  /** Play in this city instead of the default one (for example Port Meridian; see sim.ts --city). */
+  city?: BuiltCity;
 }
 
 /** What happened in one stage of a match. */
@@ -106,7 +109,7 @@ export function createBotWorld(o: BotMatchOptions): World {
     squads: o.squads,
     bots: { kaijuHandicap: o.kaijuHandicap ?? 0, humanHandicap: o.humanHandicap ?? 0 },
   });
-  return createWorld({ seed: o.seed, config });
+  return createWorld({ seed: o.seed, config, city: o.city });
 }
 
 /** Plays the match to its end and returns the report (and the world, for whoever wants to look). */

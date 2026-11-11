@@ -46,17 +46,31 @@ def pulse(part: Part, bar: float, pitches: list, vel: int, *, step: float = 0.5,
                 part.note(start + i * 2 + k * step, p, dur, base + (accent if k % every == 0 else 0))
 
 
-def drive_bass(part: Part, bar: float, roots: list[int], vel: int, *,
+def drive_bass(part: Part, bar: float, roots: list, vel: int, *,
                cresc: tuple[int, int] | None = None) -> None:
-    """Bass under the gallop: the same cell at half speed (a quarter and two eighths)."""
+    """Bass under the gallop: the same cell at half speed (a quarter and two eighths). `roots`
+    has one entry per half bar: a pitch, or a list of pitches (octaves, see `octaves`)."""
     start = B(bar)
     n = len(roots)
-    for i, r in enumerate(roots):
+    for i, rs in enumerate(roots):
         base = vel if cresc is None else cresc[0] + (cresc[1] - cresc[0]) * i / max(1, n - 1)
         t = start + i * 2
-        part.note(t, r, 0.8, base + 12)
-        part.note(t + 1, r, 0.36, base - 6)
-        part.note(t + 1.5, r, 0.36, base)
+        for r in rs if isinstance(rs, (list, tuple)) else [rs]:
+            part.note(t, r, 0.8, base + 12)
+            part.note(t + 1, r, 0.36, base - 6)
+            part.note(t + 1.5, r, 0.36, base)
+
+
+def pluck_roots(part: Part, bar: float, roots: list[int], vel: int, *, floor: str = "C1",
+                cresc: tuple[int, int] | None = None, dur: float = 1.0) -> None:
+    """Plucked basses under a bowed bass line: one pluck per entry of `roots` (one per half
+    bar), an octave below the bowed note where the instrument has it, otherwise in unison."""
+    start = B(bar)
+    lo = pitch(floor)
+    n = len(roots)
+    for i, r in enumerate(roots):
+        v = vel if cresc is None else cresc[0] + (cresc[1] - cresc[0]) * i / max(1, n - 1)
+        part.note(start + i * 2, r - 12 if r - 12 >= lo else r, dur, v)
 
 
 def voice(harm: list, v: int, tr: int = 0) -> list[int]:
@@ -70,6 +84,13 @@ def voices(harm: list, vs: tuple[int, ...], tr: int = 0) -> list[list[int]]:
 
 def bass(harm: list, octave_shift: int = 0, floor: str | None = None) -> list[int]:
     return _bass(harm, octave_shift, pitch(floor) if floor else None)
+
+
+def octaves(roots: list[int], floor: str = "C1") -> list[list[int]]:
+    """Each bass note with the octave below it, where that is still on the instrument (the
+    five-string basses and the organ pedals go down to C1); otherwise the note alone."""
+    lo = pitch(floor)
+    return [[r - 12, r] if r - 12 >= lo else [r] for r in roots]
 
 
 def stab(part: Part, beat: float, pitches: list[int], vel: int, dur: float = 0.45) -> None:

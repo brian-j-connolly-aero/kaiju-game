@@ -16,7 +16,7 @@ Combat stem: timpani, bass drum, taiko, snare, cymbals; trumpet calls and trombo
 the 3+3+2 accents; choir shouts.
 """
 from ..orchestra import BASS_DRUM, CRASH, SNARE, SNARE_ALT, TAIKO_LONG, TAIKO_SHORT
-from ..patterns import bass, hammer, motor, stab, swell_into, voice, voices
+from ..patterns import bass, hammer, motor, octaves, stab, swell_into, voice, voices
 from ..score import B, Cue, pitch
 from ..theme import B1, HARM_A, HARM_B, STRAIN_B, THEME, pad, sustain
 
@@ -25,6 +25,10 @@ LOW_BRASS = ("D3+A3+D4:4 | C3+G3+C4:4 | Bb2+F3+Bb3:2 G2+D3+G3:2 | A2+E3+A3:4 | "
              "D3+A3+D4:4 | C3+G3+C4:4 | Eb3+Bb3+Eb4:2 A2+G3+A3:2 | D3+A3+D4:4")
 # bars 17-24: the first half of the theme at half speed, as the bass (cello octave)
 CANTUS = "D3:3 D3:1 | F3:4 | E3:3 D3:1 | C3:4 | F3:3 F3:1 | Bb3:4 | A3:3 G3:1 | E3:4"
+# the basses' lower octave of the cantus. It rests on the long C of the fourth bar: bowed C1 under
+# C2 adds up to a boom at 65 Hz there (measured 5 dB over every other bar), and the organ pedal
+# holds that C1 anyway.
+CANTUS_LOW = "D3:3 D3:1 | F3:4 | E3:3 D3:1 | r:4 | F3:3 F3:1 | Bb3:4 | A3:3 G3:1 | E3:4"
 # and the chorale above it (soprano, alto, tenor), led against the bass in contrary motion
 CHORALE_S = "A4:4 | A4:2 C5:2 | C5:3 D5:1 | E5:4 | F5:4 | F5:2 D5:2 | E5:4 | E5:2 C#5:2"
 CHORALE_A = "F4:4 | F4:2 A4:2 | G4:4 | G4:2 C5:2 | C5:4 | Bb4:4 | A4:4 | A4:2 G4:2"
@@ -60,21 +64,26 @@ def build() -> Cue:
 
     # =========================== base ===========================================================
     # ---- bass: basses, tuba, organ pedal; cellos hammer the roots in 3+3+2 ---------------------
-    cb = base.add("basses", "basses", gain=3.0, role="bass")
-    tuba = base.add("tuba", "tuba", gain=0.0, role="bass")
-    org = base.add("organ pedal", "organ_pedal", gain=-2.0, role="bass")
+    # This is where the titan's weight comes from, and the samples do not give it away for free:
+    # the bowed basses have no fundamental below A1 and the organ's is weak. So the basses play
+    # in octaves wherever the lower one is on the instrument (C1 and up), and the organ pedal
+    # gets its 16-foot tone back with a low shelf (`sub`) and runs under the whole loop.
+    cb = base.add("basses", "basses", gain=4.0, sub=4.0, role="bass")
+    tuba = base.add("tuba", "tuba", gain=3.0, role="bass")
+    org = base.add("organ pedal", "organ_pedal", gain=7.0, sub=21.0, hp=20, role="bass")
     vc = base.add("cellos hammer", "cellos_marc", gain=2.0, role="ostinato")
     for bar, v in ((1, 100), (25, 110)):
-        hammer(cb, bar, bass(HARM_A, -1), v, fill=False, dur=0.9)
+        hammer(cb, bar, octaves(bass(HARM_A, -1)), v, fill=False, dur=0.9)
         hammer(vc, bar, bass(HARM_A), v - 4)
         sustain(tuba, bar, bass(HARM_A, -1), v - 6, rearticulate=4, gate=0.92)
         sustain(org, bar, bass(HARM_A, -2, "C1"), 90, gate=1.0)
-    cb.line(9, "G1:4_ | F1:4_ | Eb2:4_ | A1:4", 94, gate=0.97)
+    cb.line(9, "G1:4_ | F1:4_ | Eb1+Eb2:4_ | A1:4", 94, gate=0.97)
     hammer(cb, 13, bass(HARM_B, -1)[8:], 98, fill=False, dur=0.9, cresc=(94, 108))
     hammer(vc, 9, bass(HARM_B), 86, cresc=(80, 104))
     sustain(tuba, 13, bass(HARM_B, -1)[8:], 88, rearticulate=4, gate=0.92, cresc=(84, 100))
     sustain(org, 9, bass(HARM_B, -2, "C1"), 86, gate=1.0)
     cb.line(17, CANTUS, 108, tr=-12, gate=0.96)
+    cb.line(17, CANTUS_LOW, 100, tr=-24, gate=0.96)             # the cantus in octaves
     tuba.line(17, CANTUS, 100, tr=-12, gate=0.94)
     org.line(17, CANTUS, 92, tr=-24, gate=1.0)
     hammer(vc, 17, bass(HARM_C), 94, cresc=(90, 106))
@@ -170,7 +179,10 @@ def build() -> Cue:
             else:
                 tm.line(first + i, f"{r1}:1.5> {r1}:.5> r:.5 {r2}:.5 {r2}:.5> {r2}:.25 {r2}:.25", vel)
     timp(1, HARM_A, 102)
-    tm.line(9, "G2:1.5> G2:2.5> | F2:1.5> F2:2.5> | Eb3:1.5> Eb3:2.5> | A2:1.5> A2:1.5> A2:.5 A2:.5", 94)
+    # bars 9-12 (the strain starts quietly): the 3+3+2 goes on at reduced strength, so that the
+    # combat stem still says "fight" when it is faded in here
+    tm.line(9, "G2:1.5> G2:1.5> G2:1 | F2:1.5> F2:1.5> F2:1 | Eb3:1.5> Eb3:1.5> Eb3:1 | "
+               "A2:1.5> A2:1.5> A2:.5 A2:.5", 96)
     timp(9, HARM_B, 100, range(4, 7))
     tm.note(B(16), P("A2"), 0.9, 110)
     tm.roll(B(16, 2), 3.0, "A2", 60, 120, step=0.125, dur=0.5, curve=1.4)
@@ -185,10 +197,10 @@ def build() -> Cue:
     for bar in range(1, 33):
         quiet = 9 <= bar <= 12
         last = bar % 8 == 0
-        bd.hits(bar, "x.....o........." if quiet else "X.....X.....x...", BASS_DRUM, dur=0.5)
+        bd.hits(bar, "X.....X.....x...", BASS_DRUM, dur=0.5)
         if quiet:
-            sn.hits(bar, "x.g.g.x.g.g.x.gg", SNARE)
-            tk.hits(bar, "x...............", TAIKO_LONG, dur=0.8)
+            sn.hits(bar, "X.g.g.X.g.g.X.gg", SNARE, scale=1.05)
+            tk.hits(bar, "X.....x.....x...", TAIKO_LONG, dur=0.6)
             continue
         tk.hits(bar, "X..x..x.X..x..xx", TAIKO_LONG, dur=0.5)
         tk.hits(bar, ".g..g..g.g..g...", TAIKO_SHORT, dur=0.3)
@@ -221,6 +233,11 @@ def build() -> Cue:
                 chord = [P(n) for n in DYADS_C[i].split()]
             for pos in (0, 1.5) if i % 2 == 0 else (1.0,):
                 stab(tbs, B(first) + i * 2 + pos, chord, v + (6 if pos == 0 and i % 2 == 0 else 0), 0.4)
+    # bars 9-12: soft punches on the first two accents only (fifths, and an octave where the
+    # chord is D minor over F)
+    for i, dyad in enumerate(("G2 D3", "F2 F3", "Eb3 Bb3", "A2 E3")):
+        for pos, v in ((0, 88), (1.5, 82)):
+            stab(tbs, B(9 + i) + pos, [P(n) for n in dyad.split()], v, 0.4)
     for first, v in ((1, 100), (25, 110)):
         for i in range(1, 8):
             bar = first + i - 1

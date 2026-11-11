@@ -52,14 +52,52 @@
       "file": "sprites/fx.png",
       "frame": [64, 64],
       "worldHeight": 1,
+      "blend": "alpha",
       "anims": {
-        "play": {"rows": [4], "col": 0, "frames": 4, "fps": 1}
+        "play": {"rows": [4], "col": 0, "frames": 1, "fps": 1}
+      }
+    },
+    "fx_debris_1": {
+      "file": "sprites/fx.png",
+      "frame": [64, 64],
+      "worldHeight": 1,
+      "blend": "alpha",
+      "anims": {
+        "play": {"rows": [4], "col": 0, "frames": 1, "fps": 1}
+      }
+    },
+    "fx_debris_2": {
+      "file": "sprites/fx.png",
+      "frame": [64, 64],
+      "worldHeight": 1,
+      "blend": "alpha",
+      "anims": {
+        "play": {"rows": [4], "col": 1, "frames": 1, "fps": 1}
+      }
+    },
+    "fx_debris_3": {
+      "file": "sprites/fx.png",
+      "frame": [64, 64],
+      "worldHeight": 1,
+      "blend": "alpha",
+      "anims": {
+        "play": {"rows": [4], "col": 2, "frames": 1, "fps": 1}
+      }
+    },
+    "fx_debris_4": {
+      "file": "sprites/fx.png",
+      "frame": [64, 64],
+      "worldHeight": 1,
+      "blend": "alpha",
+      "anims": {
+        "play": {"rows": [4], "col": 3, "frames": 1, "fps": 1}
       }
     },
     "fx_dust": {
       "file": "sprites/fx.png",
       "frame": [64, 64],
       "worldHeight": 1,
+      "blend": "alpha",
       "anims": {
         "play": {"rows": [2], "col": 0, "frames": 6, "fps": 8}
       }
@@ -68,6 +106,7 @@
       "file": "sprites/fx.png",
       "frame": [64, 64],
       "worldHeight": 1,
+      "blend": "alpha",
       "anims": {
         "play": {"rows": [0], "col": 0, "frames": 8, "fps": 16}
       }
@@ -76,6 +115,7 @@
       "file": "sprites/fx.png",
       "frame": [64, 64],
       "worldHeight": 1,
+      "blend": "alpha",
       "anims": {
         "play": {"rows": [5], "col": 0, "frames": 8, "fps": 16}
       }
@@ -84,6 +124,7 @@
       "file": "sprites/fx.png",
       "frame": [64, 64],
       "worldHeight": 1,
+      "blend": "alpha",
       "anims": {
         "play": {"rows": [3], "col": 0, "frames": 6, "fps": 10}
       }
@@ -92,6 +133,7 @@
       "file": "sprites/fx.png",
       "frame": [64, 64],
       "worldHeight": 1,
+      "blend": "alpha",
       "anims": {
         "play": {"rows": [4], "col": 4, "frames": 3, "fps": 20}
       }
@@ -100,6 +142,7 @@
       "file": "sprites/fx.png",
       "frame": [64, 64],
       "worldHeight": 1,
+      "blend": "add",
       "anims": {
         "play": {"rows": [1], "col": 7, "frames": 1, "fps": 1}
       }
@@ -108,6 +151,7 @@
       "file": "sprites/fx.png",
       "frame": [64, 64],
       "worldHeight": 1,
+      "blend": "add",
       "anims": {
         "play": {"rows": [2], "col": 6, "frames": 1, "fps": 1}
       }
@@ -116,6 +160,7 @@
       "file": "sprites/fx.png",
       "frame": [64, 64],
       "worldHeight": 1,
+      "blend": "alpha",
       "anims": {
         "play": {"rows": [2], "col": 7, "frames": 1, "fps": 1}
       }
@@ -124,6 +169,7 @@
       "file": "sprites/fx.png",
       "frame": [64, 64],
       "worldHeight": 1,
+      "blend": "alpha",
       "anims": {
         "play": {"rows": [3], "col": 6, "frames": 1, "fps": 1}
       }
@@ -132,6 +178,7 @@
       "file": "sprites/fx.png",
       "frame": [64, 64],
       "worldHeight": 1,
+      "blend": "alpha",
       "anims": {
         "play": {"rows": [1], "col": 0, "frames": 6, "fps": 8}
       }
@@ -140,6 +187,7 @@
       "file": "sprites/fx.png",
       "frame": [64, 64],
       "worldHeight": 1,
+      "blend": "add",
       "anims": {
         "play": {"rows": [1], "col": 6, "frames": 1, "fps": 1}
       }
@@ -148,6 +196,7 @@
       "file": "sprites/fx.png",
       "frame": [64, 64],
       "worldHeight": 1,
+      "blend": "alpha",
       "anims": {
         "play": {"rows": [3], "col": 7, "frames": 1, "fps": 1}
       }
@@ -158,7 +207,7 @@
       "worldHeight": 2.2,
       "anims": {
         "idle": {"rows": [0, 1, 2, 3], "col": 7, "frames": 1, "fps": 1},
-        "walk": {"rows": [0, 1, 2, 3], "col": 8, "frames": 4, "fps": 8},
+        "walk": {"rows": [0, 1, 2, 3], "col": 8, "frames": 4, "fps": 12},
         "fire": {"rows": [0, 1, 2, 3], "col": 12, "frames": 2, "fps": 8},
         "die": {"rows": [1], "col": 14, "frames": 4, "fps": 6}
       }
@@ -169,15 +218,15 @@
       "worldHeight": 2.2,
       "anims": {
         "idle": {"rows": [0, 1, 2, 3], "col": 0, "frames": 1, "fps": 1},
-        "walk": {"rows": [0, 1, 2, 3], "col": 1, "frames": 4, "fps": 8},
+        "walk": {"rows": [0, 1, 2, 3], "col": 1, "frames": 4, "fps": 12},
         "fire": {"rows": [0, 1, 2, 3], "col": 5, "frames": 2, "fps": 8},
         "die": {"rows": [0], "col": 14, "frames": 4, "fps": 6}
       }
     }
   },
   "textures": {
-    "clouds_a": {"file": "textures/clouds_a.png", "tile": true},
-    "clouds_b": {"file": "textures/clouds_b.png", "tile": true},
+    "clouds_a": {"file": "textures/clouds_a.png", "ring": {"repeats": 4, "bottomDeg": -5.0, "sunGap": [258, 72]}},
+    "clouds_b": {"file": "textures/clouds_b.png", "ring": {"repeats": 3, "bottomDeg": -5.0, "sunGap": [414, 58]}},
     "ground_asphalt": {"file": "textures/ground_asphalt.png", "tile": true},
     "ground_grass": {"file": "textures/ground_grass.png", "tile": true},
     "ground_rubble": {"file": "textures/ground_rubble.png", "tile": true},

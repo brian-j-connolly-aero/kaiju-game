@@ -164,6 +164,68 @@ def roar_parts(x: np.ndarray, voiced_seconds: float, split: tuple[float, float])
     return out
 
 
+def band_map(x: np.ndarray, seconds: float, frames: int | None = None, bands: int = 28) -> np.ndarray:
+    """A coarse picture of a sound for comparing two sounds: energy in 28 bands (60 Hz to 12 kHz,
+    log spaced) over time, in dB, cut off 50 dB below its own loudest cell. Time is either
+    absolute (10 ms steps over `seconds`, the sound padded with silence) or, with `frames`, the
+    first `seconds` of the sound squeezed into that many steps (so a short and a long roar line up
+    part for part)."""
+    m = dsp.fit(mono(x), dsp.n_(seconds))
+    hop = 441
+    f, _, z = signal.stft(m, SR, nperseg=1024, noverlap=1024 - hop)
+    p = np.abs(z) ** 2
+    edges = np.geomspace(60.0, 12000.0, bands + 1)
+    b = np.stack([p[(f >= lo) & (f < hi)].sum(axis=0) for lo, hi in zip(edges, edges[1:])])
+    if frames:
+        te = np.linspace(0, b.shape[1], frames + 1).astype(int)
+        b = np.stack([b[:, i:max(j, i + 1)].mean(axis=1) for i, j in zip(te, te[1:])], axis=1)
+    d = 10 * np.log10(b + 1e-12)
+    return np.maximum(d, d.max() - 50.0)
+
+
+def likeness(a: np.ndarray, b: np.ndarray) -> float:
+    """Correlation of two band maps, -1..1. The same sound gives 1; two different sounds with a
+    similar outline (both swell and die away, both are darker at the end) still give about 0.5
+    to 0.8; unrelated sounds are near 0."""
+    a = a - a.mean()
+    b = b - b.mean()
+    return float(np.sum(a * b) / (np.sqrt(np.sum(a * a) * np.sum(b * b)) + 1e-30))
+
+
+def roar_plan() -> dict[str, dict]:
+    """Every kaiju's roar: where its three parts end, what they are called, and what must be
+    true of them (text, test) for the roar to be the one that was designed. In the tests `p`
+    holds the measured parts under the keys rise, tear and fall (first, middle, last)."""
+    from .kaiju import ROAR_PARTS
+    from .tier2 import ROAR_PART_NAMES, ROAR_SPLITS
+
+    def loudest_middle(p):
+        return p["tear"]["level_db"] > p["rise"]["level_db"] and p["tear"]["level_db"] > p["fall"]["level_db"]
+
+    plan = {
+        "lizard": {"split": ROAR_PARTS, "names": ("rise", "tear", "falling rumble"), "rules": [
+            ("the tear is the loudest part", loudest_middle),
+            ("the tear is the brightest part", lambda p: p["tear"]["centroid_hz"] > max(p["rise"]["centroid_hz"], p["fall"]["centroid_hz"])),
+            ("the fall carries more bass than the tear", lambda p: p["fall"]["low_share"] > p["tear"]["low_share"])]},
+        "crab": {"rules": [
+            ("the bellow is the loudest part", loudest_middle),
+            ("the hiss is the brightest part", lambda p: p["fall"]["centroid_hz"] > max(p["rise"]["centroid_hz"], p["tear"]["centroid_hz"])),
+            ("the clatter is the quietest part", lambda p: p["rise"]["level_db"] < p["fall"]["level_db"])]},
+        "burrower": {"rules": [
+            ("the bore is the loudest part", loudest_middle),
+            ("the rumble is the darkest part", lambda p: p["rise"]["centroid_hz"] < min(p["tear"]["centroid_hz"], p["fall"]["centroid_hz"])),
+            ("the rumble carries the most bass", lambda p: p["rise"]["low_share"] > max(p["tear"]["low_share"], p["fall"]["low_share"]))]},
+        "moth": {"rules": [
+            ("the shriek is the loudest part", loudest_middle),
+            ("the shriek is the brightest part", lambda p: p["tear"]["centroid_hz"] > max(p["rise"]["centroid_hz"], p["fall"]["centroid_hz"])),
+            ("the flutter is the darkest part", lambda p: p["rise"]["centroid_hz"] < p["fall"]["centroid_hz"])]},
+    }
+    for kind in ROAR_SPLITS:
+        plan[kind]["split"] = ROAR_SPLITS[kind]
+        plan[kind]["names"] = ROAR_PART_NAMES[kind]
+    return plan
+
+
 def spliced_view(x: np.ndarray, start: float, end: float, span: float) -> np.ndarray:
     a, b = dsp.n_(start), dsp.n_(end)
     k = min(b - a, dsp.n_(span))
@@ -308,7 +370,21 @@ ORDERED = {
     "roar": ["kaiju_roar_lizard_s1", "kaiju_roar_lizard_s2", "kaiju_roar_lizard_s3"],
     "explosion": ["explosion_s", "explosion_m", "explosion_l"],
     "crumble": ["crumble_s", "crumble_m", "crumble_l"],
+    "roar_crab": ["kaiju_roar_crab_s1", "kaiju_roar_crab_s2", "kaiju_roar_crab_s3"],
+    "roar_burrower": ["kaiju_roar_burrower_s1", "kaiju_roar_burrower_s2", "kaiju_roar_burrower_s3"],
+    "roar_moth": ["kaiju_roar_moth_s1", "kaiju_roar_moth_s2", "kaiju_roar_moth_s3"],
 }
+ROAR_GROUPS = {"lizard": "roar", "crab": "roar_crab", "burrower": "roar_burrower", "moth": "roar_moth"}
+
+# Cues that mean different things and are heard close together: they must not sound alike.
+# (pair, the highest likeness allowed; see likeness()). The two "ready" cues were once the same
+# two notes and measured 0.80.
+DISTINCT = [(("ui_ready", "volley_ready"), 0.6)]
+ROAR_LIKENESS_MAX = 0.93      # two kaiju at the same stage; one kaiju at two stages measures 0.9 or more
+
+# Sounds the game starts on the frame of their event, with nothing else to tell the player when
+# it happened: the loudest moment must come within this many milliseconds of the start.
+ON_TIME_MS = {"kaiju_molt_blast": 60.0}
 
 
 def _sub(m: dict, spec: Spec) -> str:
@@ -393,6 +469,9 @@ def run(specs: dict[str, Spec], only: list[str] | None = None, build_info: list[
                                         f"{m['start_vs_next_10ms_db']} dB re the next 10 ms (click)")
                     if m["end_db"] > -40:
                         problems.append(f"{tag}: ends at {m['end_db']} dB below peak (cut off)")
+                    if m["peak_at_ms"] > ON_TIME_MS.get(sid, 1e9):
+                        problems.append(f"{tag}: loudest {m['peak_at_ms']} ms after its start; it is triggered on the "
+                                        f"frame of its event and must peak within {ON_TIME_MS[sid]:.0f} ms")
             rec["files"][name] = frec
         report[sid] = rec
 
@@ -422,18 +501,46 @@ def run(specs: dict[str, Spec], only: list[str] | None = None, build_info: list[
             if not avg(a, "level_db") < avg(b, "level_db") + 0.01:
                 problems.append(f"{group}: {a} is louder than {b}")
 
-    # ---- the signature roar: its three parts, measured ----
-    from .kaiju import ROAR_PARTS, ROAR_SECONDS
-    for sid in ORDERED["roar"]:
-        if sid in ids and sid in decoded:
-            p = roar_parts(decoded[sid], ROAR_SECONDS[int(sid[-1])], ROAR_PARTS)
-            report[sid]["parts"] = p
-            if not (p["tear"]["level_db"] > p["rise"]["level_db"] and p["tear"]["level_db"] > p["fall"]["level_db"]):
-                problems.append(f"{sid}: the tear is not the loudest part {p}")
-            if not (p["tear"]["centroid_hz"] > p["rise"]["centroid_hz"] and p["tear"]["centroid_hz"] > p["fall"]["centroid_hz"]):
-                problems.append(f"{sid}: the tear is not the brightest part {p}")
-            if not p["fall"]["low_share"] > p["tear"]["low_share"]:
-                problems.append(f"{sid}: the fall does not carry more bass than the tear {p}")
+    def ogg(name: str) -> np.ndarray:
+        if name not in decoded:
+            decoded[name] = decode(OUT_DIR / f"{name}.ogg")
+        return decoded[name]
+
+    # ---- the signature roars: the three parts of each, measured ----
+    from .kaiju import ROAR_SECONDS
+    plan = roar_plan()
+    for kind, group in ROAR_GROUPS.items():
+        for sid in ORDERED[group]:
+            if sid in ids and sid in decoded:
+                p = roar_parts(decoded[sid], ROAR_SECONDS[int(sid[-1])], plan[kind]["split"])
+                report[sid]["parts"] = p
+                for text, test in plan[kind]["rules"]:
+                    if not test(p):
+                        problems.append(f"{sid}: it is not true that {text} {p}")
+
+    # ---- four kaiju, four voices: how alike are two roars of the same stage? ----
+    all_roars = [sid for group in ROAR_GROUPS.values() for sid in ORDERED[group]]
+    if any(sid in ids for sid in all_roars) and all(sid in report for sid in all_roars):
+        maps = {sid: band_map(ogg(sid), ROAR_SECONDS[int(sid[-1])], frames=40) for sid in all_roars}
+        for sid in all_roars:
+            mine, stage = sid[:-1], sid[-1]
+            report[sid]["likeness"] = {
+                other: round(likeness(maps[sid], maps[other]), 2) for other in all_roars
+                if other != sid and (other[-1] == stage or other[:-1] == mine)}
+            for other, v in report[sid]["likeness"].items():
+                if other[-1] == stage and other > sid and v > ROAR_LIKENESS_MAX:
+                    problems.append(f"{sid} and {other} sound alike (likeness {v}, limit {ROAR_LIKENESS_MAX})")
+
+    # ---- cues that must not be mistaken for each other ----
+    for (a, b), limit in DISTINCT:
+        if (a in ids or b in ids) and a in report and b in report:
+            xa, xb = ogg(specs[a].names()[0]), ogg(specs[b].names()[0])
+            sec = max(len(xa), len(xb)) / SR
+            v = round(likeness(band_map(xa, sec), band_map(xb, sec)), 2)
+            report[a].setdefault("likeness", {})[b] = v
+            report[b].setdefault("likeness", {})[a] = v
+            if v > limit:
+                problems.append(f"{a} and {b} sound alike (likeness {v}, limit {limit})")
 
     report_path.write_text(json.dumps(report, indent=1, sort_keys=True) + "\n")
 
@@ -486,10 +593,14 @@ def _sheets(specs: dict[str, Spec], report: dict, decoded: dict[str, np.ndarray]
                   "Decoded .ogg files. Each panel: waveform strip, then spectrogram, 25 Hz to 20 kHz (log); "
                   "time in seconds across each panel's own length.")
 
-    # the signature roar, large, with its three parts marked
-    roars = [s for s in ORDERED["roar"] if s in report and s in ids]
-    if len(roars) == 3:
-        from .kaiju import ROAR_PARTS, ROAR_SECONDS
+    # the signature roars, large, with their three parts marked
+    from .kaiju import ROAR_SECONDS
+    plan = roar_plan()
+    for kind, group in ROAR_GROUPS.items():
+        roars = [s for s in ORDERED[group] if s in report and s in ids]
+        if len(roars) != 3:
+            continue
+        split, names = plan[kind]["split"], plan[kind]["names"]
         panels = []
         for sid in roars:
             x = decoded[sid]
@@ -497,12 +608,17 @@ def _sheets(specs: dict[str, Spec], report: dict, decoded: dict[str, np.ndarray]
             d = ROAR_SECONDS[stage]
             m = report[sid]["files"][sid]["ogg"]
             panels.append({"x": mono(x), "title": sid, "sub": _sub(m, specs[sid]), "n_fft": 512,
-                           "marks": [(0.0, "rise"), (ROAR_PARTS[0] * d, "tear"), (ROAR_PARTS[1] * d, "falling rumble"),
-                                     (d, "tail")]})
-        sheet(panels, DOCS / "roar_contour.png", "The signature roar at stages 1, 2 and 3",
-              "Same three-part contour (rise, tear, falling rumble), longer and lower at each stage. The vertical "
-              "stripes in the tear are its pulses. Decoded .ogg, 25 Hz to 20 kHz (log), 12 ms analysis window.",
-              cols=1, pw=1180, ph=250)
+                           "marks": [(0.0, names[0]), (split[0] * d, names[1]), (split[1] * d, names[2]), (d, "tail")]})
+        if kind == "lizard":
+            sheet(panels, DOCS / "roar_contour.png", "The signature roar at stages 1, 2 and 3",
+                  "Same three-part contour (rise, tear, falling rumble), longer and lower at each stage. The vertical "
+                  "stripes in the tear are its pulses. Decoded .ogg, 25 Hz to 20 kHz (log), 12 ms analysis window.",
+                  cols=1, pw=1180, ph=250)
+        else:
+            sheet(panels, DOCS / f"roar_contour_{kind}.png", f"The {kind.capitalize()}'s roar at stages 1, 2 and 3",
+                  f"Three parts ({', '.join(names)}) in the same proportions at every stage, longer and lower each "
+                  "time. Decoded .ogg, 25 Hz to 20 kHz (log), 12 ms analysis window.",
+                  cols=1, pw=1180, ph=250)
 
     # loops: one second either side of the splice, as the game will play it
     loops = [s for s in specs if specs[s].loop and s in report and s in ids]

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Builds the voice lines: offline speech synthesis, radio / broadcast / hall processing,
-# loudness mastering, .ogg and .mp3 encoding, the partial manifest, speech-recognition checks,
-# measurements, pictures and docs/audio/VOICE.md.
+# Builds the voice lines: checks the script against its writing rules, then offline speech
+# synthesis, radio / broadcast / hall processing, loudness mastering, .ogg and .mp3 encoding, the
+# partial manifest, speech-recognition checks, measurements, pictures, docs/audio/VOICE.md and the
+# readable copy of the script, docs/VOICE_SCRIPT.md.
 #
 #   tools/audio/voice/build.sh                  build the lines whose text, voice or chain changed,
 #                                               then verify and regenerate the docs
@@ -10,6 +11,8 @@
 #   tools/audio/voice/build.sh --no-verify      skip measurements, pictures and docs
 #   tools/audio/voice/build.sh --verify-only    measure and document the files already built
 #   tools/audio/voice/build.sh --jobs 3         worker processes (default 2)
+#
+# To try a wording before it goes into the script: tools/audio/voice/tryline.py <Voice> "text" ..
 #
 # Inputs: shared/src/defs/voiceLines.json (the script, read-only), cast.json (who speaks with
 # which synthesizer voice and chain), pronounce.json (respellings fed to the synthesizer; the
