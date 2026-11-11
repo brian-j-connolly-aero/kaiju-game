@@ -727,13 +727,14 @@ def _arms(x, y, z, fore, hand=0.0) -> dict:
             "forearm_L": {"x": fore}, "forearm_R": {"x": fore}, "hand_L": {"x": hand}, "hand_R": {"x": hand}}
 
 
-# Claws up in front of the face: what the player sees of their own hands. The arms hang
-# down in the rest pose, so "reach forward" is mostly x (swing up), a little z (bring the
-# hands together) and a straighter elbow. Found by search for each stage's proportions.
+# Claws up in front of the face: what the player sees of their own hands. The head hangs
+# low and forward, so the hands only enter the view when the arms are thrown forward: swing
+# up (x), turn the elbow out (y), bring the hands together (z), straighten the elbow.
+# Found by inverse kinematics for each stage's proportions (left arm; the right mirrors).
 FP_POSE = {
-    1: _arms(-118, 0, -35, 42),
-    2: _arms(-108, -15, -25, 42),
-    3: _arms(-105, 0, -25, 50),
+    1: _arms(-112, 46, -9, 60, -25),
+    2: _arms(-75, 46, -24, 25, -25),
+    3: _arms(-59, 47, -40, 19, -25),
 }
 
 POSES = {

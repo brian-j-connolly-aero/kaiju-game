@@ -29,7 +29,7 @@ export interface AppOptions {
 }
 
 /** File names the bundler stamps with a content hash never change, so browsers may keep them. */
-const HASHED_ASSET = /-[A-Za-z0-9_-]{8,}\.(?:js|css|woff2?)$/;
+const HASHED_ASSET = /-[A-Za-z0-9_-]{8}\.(?:js|css|woff2?)$/;
 
 const NO_CLIENT_NOTE =
   'Monster Battle 9001: the game server is running, but the game page has not been built yet.\n' +
