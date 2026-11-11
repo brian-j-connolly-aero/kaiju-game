@@ -3182,6 +3182,18 @@
     "gp_dpad": {
       "file": "ui/gp_dpad.svg"
     },
+    "gp_dpad_down": {
+      "file": "ui/gp_dpad_down.svg"
+    },
+    "gp_dpad_left": {
+      "file": "ui/gp_dpad_left.svg"
+    },
+    "gp_dpad_right": {
+      "file": "ui/gp_dpad_right.svg"
+    },
+    "gp_dpad_up": {
+      "file": "ui/gp_dpad_up.svg"
+    },
     "gp_lb": {
       "file": "ui/gp_lb.svg"
     },
