@@ -192,21 +192,25 @@ Verify intelligibility by round-tripping samples through speech recognition (poc
 
 ## 7. Manifests
 
-Each family writes its own partial manifest in `client/public/assets/`; `npm run assets:manifest`
-merges them into `manifest.json`, which the client loads. Never hand-edit `manifest.json`.
+Each worker writes its own **partial** manifest, `client/public/assets/manifest.<family>.json`
+(for example `manifest.kaiju.json`, `manifest.army.json`, `manifest.music.json`), so nobody edits
+a shared file. A partial is an object with any of the sections below. `npm run assets:manifest`
+deep-merges every partial into `manifest.json`, which the client loads. Never hand-edit
+`manifest.json`.
 
-- `manifest.models.json`: `{ "<id>": { "file": "models/<id>.glb", "kind": "kaiju" | "vehicle" |
-  "projectile" | "structure" | "landmark" | "prop" | "misc", "nodes": [..], "size": [w, h, d],
-  "tris": n, "rig"?: "lizard" | .., "chunks"?: n } }`
-- `manifest.sprites.json`: `{ "<id>": { "file": "sprites/<sheet>.png", "frame": [w, h],
-  "worldHeight": meters, "anims": { "<name>": { "rows": [front, left, back, right] | [row],
+- `"models"`: `{ "<id>": { "file": "models/<id>.glb", "kind": "kaiju" | "vehicle" | "projectile"
+  | "structure" | "landmark" | "prop" | "misc", "nodes": [..], "size": [w, h, d], "tris": n,
+  "rig"?: "lizard" | .., "chunks"?: n } }`
+- `"sprites"`: `{ "<id>": { "file": "sprites/<sheet>.png", "frame": [w, h], "worldHeight":
+  meters, "anims": { "<name>": { "rows": [front, left, back, right] | [row], "col"?: n,
   "frames": n, "fps": n } } } }`
-- `manifest.audio.json`: `{ "music": { "<id>": { "base": "audio/music/<id>", "loop"?: [start,
-  end], "bpm"?: n, "group"?: "stage1" } }, "sfx": { "<id>": { "variants": ["audio/sfx/<id>_1",
-  ..], "gain": 1, "loop"?: [start, end] } }, "voice": { "<lineId>": { "base":
-  "audio/voice/<lineId>", "duration": seconds } } }`
-- `manifest.textures.json`: `{ "<id>": { "file": "textures/<id>.png", "tile"?: true,
-  "grid"?: [cols, rows] } }`
+- `"textures"`: `{ "<id>": { "file": "textures/<id>.png", "tile"?: true, "grid"?: [cols, rows] } }`
+- `"music"`: `{ "<id>": { "base": "audio/music/<id>", "loop"?: [start, end], "bpm"?: n,
+  "group"?: "stage1" } }`
+- `"sfx"`: `{ "<id>": { "variants": ["audio/sfx/<id>_1", ..], "gain": 1, "loop"?: [start, end] } }`
+- `"voice"`: `{ "<lineId>": { "base": "audio/voice/<lineId>", "duration": seconds } }`
+
+Audio `base` and `variants` paths have no extension; both `.ogg` and `.mp3` exist for each.
 
 ## 8. Review material
 

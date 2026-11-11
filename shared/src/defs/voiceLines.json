@@ -1,0 +1,4 @@
+[
+  { "id": "v_match_start_1", "cue": "match.start", "audience": "humans", "speaker": "Overlord", "text": "All squads, weapons free. Protect the city." },
+  { "id": "v_kaiju_spotted_1", "cue": "kaiju.spotted", "audience": "humans", "speaker": "Overlord", "text": "Contact. Target is in the open." }
+]
