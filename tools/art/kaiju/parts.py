@@ -13,10 +13,10 @@ import math
 import os
 import sys
 
-from mathutils import Matrix, Vector
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import mb  # noqa: E402
+from mathutils import Matrix, Vector  # noqa: E402  (available once bpy is loaded)
 
 V = mb.V
 UP, DOWN, FWD, BACK, LEFT, RIGHT = mb.UP, mb.DOWN, mb.FWD, mb.BACK, mb.LEFT, mb.RIGHT
@@ -127,17 +127,18 @@ def limb(p0, p1, s0, s1, n: int = 6, up=FWD, bulge: float = 0.0, bulge_at: float
 # small parts
 # =========================================================================================
 def spike(base, tip, w: float, h: float | None = None, n: int = 4, up=UP, color="bone",
-          root=None, root_at: float = 0.3, phase=None) -> mb.Geo:
+          root=None, root_at: float = 0.3, phase=None, closed: bool = False) -> mb.Geo:
     """A spike from `base` to `tip`: base cross-section w x h (n triangles). With `root`
     set, the lowest part gets that color (a darker root makes the spike read as growing
     out of the hide; 3n triangles)."""
     base, tip = V(base), V(tip)
     h = w if h is None else h
+    cap0 = "flat" if closed else "open"        # closed: for spikes whose base may show (elbows, plates)
     if root is None:
-        return tube([base], [(w, h)], n=n, up=up, phase=phase, cap0="open", tip=tip, color=color)
+        return tube([base], [(w, h)], n=n, up=up, phase=phase, cap0=cap0, tip=tip, color=color)
     mid = base.lerp(tip, root_at)
     k = 1.0 - root_at * 0.85
-    g = tube([base, mid], [(w, h), (w * k, h * k)], n=n, up=up, phase=phase, cap0="open", cap1="open",
+    g = tube([base, mid], [(w, h), (w * k, h * k)], n=n, up=up, phase=phase, cap0=cap0, cap1="open",
              color=root)
     g += tube([mid], [(w * k, h * k)], n=n, up=up, phase=phase, cap0="open", tip=tip, color=color)
     return g
@@ -174,9 +175,9 @@ def teeth(p0, p1, count: int, length: float, w: float, direction, color="bone", 
 
 
 def scute(center, normal, w: float, length: float, thick: float, along=UP, color="white", top=None,
-          taper: float = 0.55, sink: float = 0.35, closed: bool = False) -> mb.Geo:
+          taper: float = 0.55, sink: float = 0.35, closed: bool = True) -> mb.Geo:
     """An armor plate: a low frustum lying on a surface. `along` is its length direction.
-    closed=True adds the underside, for plates that overhang an edge."""
+    closed=False leaves the underside open (2 triangles less) where it can never be seen."""
     c, nrm = V(center), V(normal).normalized()
     g = mb.tapered_box((w, length), (w * taper, length * taper), 1.0, color=color, cap_bottom=closed)
     if top is not None:
@@ -193,13 +194,6 @@ def sliver(a, b, w: float, h: float, up=UP, color="scar", n: int = 3) -> mb.Geo:
     a, b = V(a), V(b)
     return tube([a, a.lerp(b, 0.5), b], [(w * 0.05, h * 0.05), (w, h), (w * 0.05, h * 0.05)], n=n, up=up,
                 cap0="open", cap1="open", color=color)
-
-
-def gem(center, radius, squash=(1.0, 1.0, 1.0), color="white", mat="vcol", n: int = 6) -> mb.Geo:
-    """A faceted double pyramid (crystal) around a center: 2n triangles."""
-    g = mb.lathe([(0.0, -1.0), (1.0, 0.0), (0.0, 1.0)], n=n, color=color, mat=mat)
-    r = radius
-    return g.scale(r * squash[0], r * squash[1], r * squash[2]).move(center)
 
 
 # =========================================================================================
@@ -230,34 +224,6 @@ def bands(g: mb.Geo, p0, p1, count: int, colors, where=None) -> mb.Geo:
         col = colors[k % len(colors)]
         if col is not None:
             g.col[i] = mb.palette.rgb(col)
-    return g
-
-
-def facet(g: mb.Geo) -> mb.Geo:
-    """Triangulate so every bent quad becomes two crisp facets (same triangle count)."""
-    return g.triangulate()
-
-
-def sawtooth(g: mb.Geo, where, color, which: int = 0) -> mb.Geo:
-    """Split the selected quads into two triangles and paint one of them: jagged stripes
-    for free. `which` (0 or 1) picks the diagonal half."""
-    chosen = set(g.select(where))
-    nf, ncol, nmat, nuv = [], [], [], []
-    c = mb.palette.rgb(color)
-    for i, f in enumerate(g.f):
-        if i in chosen and len(f) == 4:
-            tris = [(0, 1, 2), (0, 2, 3)] if which == 0 else [(0, 1, 3), (1, 2, 3)]
-            for k, t in enumerate(tris):
-                nf.append(tuple(f[j] for j in t))
-                ncol.append(c if k == 0 else g.col[i])
-                nmat.append(g.mat[i])
-                nuv.append(None)
-        else:
-            nf.append(f)
-            ncol.append(g.col[i])
-            nmat.append(g.mat[i])
-            nuv.append(g.uv[i])
-    g.f, g.col, g.mat, g.uv = nf, ncol, nmat, nuv
     return g
 
 

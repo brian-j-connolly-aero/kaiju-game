@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Kaiju verb: special. A beam from the mouth. -->
+  <path fill="currentColor" stroke="none" fill-rule="evenodd" d="M6 44V24Q6 9 21 8L27 8.5 30 12 37 12.5Q42.5 13 42 18.5L41.5 22Q41 24.5 38.5 25.5L20.5 33.5 35.5 47Q38 49.5 36.5 52.5 35 55.5 31 56L17 57Q6 57 6 44ZM17 17L25.5 20 18 22.5Z"/>
+  <path fill="currentColor" stroke="none" d="M38 24L33 26.3 37.3 29.3Z"/>
+  <path fill="currentColor" stroke="none" d="M26 37L61 27V47Z"/>
+  <path d="M47 21H58"/>
+  <path d="M47 53H58"/>
+</svg>

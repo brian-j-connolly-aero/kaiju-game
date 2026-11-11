@@ -77,6 +77,9 @@ export function movementSystem(world: World): void {
     const def = unitTypeDef(u.type);
     const squad = world.squads[u.squad];
     unitMoveParams(def, u, bounds, squad.mods, params);
+    // A sub-unit that has dropped behind its place in the formation closes up a little faster
+    // than the column moves (the orders system says when). Never the driven unit.
+    if (u.nav.hurry !== 1) params.topSpeed *= u.nav.hurry;
     stepMovement(u, u.control, DT, city, params, result);
     u.inWater = result.inWater;
     u.aimYaw = u.control.aimYaw;

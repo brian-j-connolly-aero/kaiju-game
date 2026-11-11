@@ -52,7 +52,8 @@ export function unitCapsule(u: Unit, out: VerticalCapsule): VerticalCapsule {
 
 /**
  * Casts a ray from (ox, oy, oz) along (yaw, pitch) and returns the first thing it meets within
- * `maxDist`: a standing structure, a living kaiju (when `kaijus` is given), or the ground.
+ * `maxDist`: a standing structure (bridge decks do not count: whoever aims may be standing on
+ * one), a living kaiju (when `kaijus` is given), or the ground.
  */
 export function resolveAimPoint(
   city: CityQuery,
@@ -84,7 +85,8 @@ export function resolveAimPoint(
       out.on = 'ground';
     }
   }
-  if (castRay(city, origin, dir, best, cityHit) && cityHit.t < best) {
+  // Bridge decks are road surface, not walls: the ray carries on to the ground on or under them.
+  if (castRay(city, origin, dir, best, cityHit, -1, true) && cityHit.t < best) {
     best = cityHit.t;
     out.on = 'structure';
     out.id = cityHit.structure;

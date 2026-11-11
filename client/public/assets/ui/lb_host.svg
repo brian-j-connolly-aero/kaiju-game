@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Lobby: the host. A crown. -->
+  <path fill="currentColor" d="M10.5 46L7.5 19 21 31 32 13 43 31 56.5 19 53.5 46Z"/>
+  <path d="M12 55.5H52"/>
+</svg>

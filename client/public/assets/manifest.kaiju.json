@@ -18,24 +18,24 @@
       "file": "models/kaiju_lizard_s1.glb",
       "kind": "kaiju",
       "nodes": ["root", "hips", "leg_L", "shin_L", "foot_L", "leg_R", "shin_R", "foot_R", "tail_1", "tail_2", "tail_3", "tail_4", "tail_5", "torso", "arm_L", "forearm_L", "hand_L", "arm_R", "forearm_R", "hand_R", "hold", "neck", "head", "cam_fp", "jaw", "mouth", "spines", "weak_point"],
-      "size": [4.176, 4.5, 6.102],
-      "tris": 2157,
+      "size": [4.173, 4.5, 6.102],
+      "tris": 2167,
       "rig": "lizard"
     },
     "kaiju_lizard_s2": {
       "file": "models/kaiju_lizard_s2.glb",
       "kind": "kaiju",
       "nodes": ["root", "hips", "leg_L", "shin_L", "foot_L", "leg_R", "shin_R", "foot_R", "tail_1", "tail_2", "tail_3", "tail_4", "tail_5", "torso", "arm_L", "forearm_L", "hand_L", "arm_R", "forearm_R", "hand_R", "hold", "neck", "head", "cam_fp", "jaw", "mouth", "spines", "weak_point"],
-      "size": [26.283, 32.0, 40.583],
-      "tris": 2295,
+      "size": [25.591, 32.0, 39.515],
+      "tris": 2339,
       "rig": "lizard"
     },
     "kaiju_lizard_s3": {
       "file": "models/kaiju_lizard_s3.glb",
       "kind": "kaiju",
       "nodes": ["root", "hips", "leg_L", "shin_L", "foot_L", "leg_R", "shin_R", "foot_R", "tail_1", "tail_2", "tail_3", "tail_4", "tail_5", "torso", "arm_L", "forearm_L", "hand_L", "arm_R", "forearm_R", "hand_R", "hold", "neck", "head", "cam_fp", "jaw", "mouth", "spines", "weak_point"],
-      "size": [109.404, 115.0, 146.147],
-      "tris": 3285,
+      "size": [108.416, 115.0, 144.827],
+      "tris": 3379,
       "rig": "lizard"
     }
   }

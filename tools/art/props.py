@@ -16,7 +16,7 @@ Writes, per docs/ASSETS.md section 3 "City" (props only), one mesh each:
     docs/art/concept/props_street.png, docs/art/concept/props_car_tints.png
 
 Sizes are real-world meters and match the height and crush radius the game uses for each
-prop (tools/art/data/archetypes.json): a sedan is 4.4 m long, the bus 12 m.
+prop (tools/art/data/archetypes.json): a sedan is 4.5 m long, the bus 12 m.
 
 COLOR VARIANTS ("tint"). Sedan, van, bus and truck are authored with near-white body paint so
 the game can multiply a paint color into it. Which faces are paint is stored in the file as
@@ -49,14 +49,15 @@ DECAL = 0.03                    # flat details sit this far proud of the surface
 
 # Paint colors the game may tint each vehicle with (sRGB hex). No kaiju orange, human cyan or
 # volley yellow: those belong to the color language.
-WRECK_NOTE = "use the paint color of the vehicle that was crushed"
 TINTS = {
     "prop_car_sedan": ["#e0372f", "#2f62c9", "#f5f5f0", "#3fa652", "#8f6fd0", "#f29b85", "#2a9d8f", "#aab2bc"],
     "prop_car_van": ["#f5f5f0", "#2f62c9", "#e0372f", "#9fe0c0", "#b9a6e0"],
     "prop_bus": ["#d7263d", "#2f62c9", "#3fa652", "#f3e3b3"],
     "prop_truck": ["#2f62c9", "#e0372f", "#3fa652", "#f5f5f0", "#aab2bc"],
 }
-TAXI_YELLOW = mb.palette.PALETTE["taxi_yellow"]
+# The wreck keeps scorched paint: tint it with whatever the crushed vehicle was painted.
+TINTS["prop_car_wreck"] = sorted({c for colors in TINTS.values() for c in colors} | {mb.palette.PALETTE["taxi_yellow"]})
+TINT_HINTS = {"prop_car_wreck": "use the paint color of the vehicle that was crushed (taxi: #f7c21a)"}
 TINT_NOTE = {
     "part": "body paint",
     "mask": "COLOR_0 alpha: 1 = paint (multiply the tint color in), 0 = never tint",
@@ -268,10 +269,15 @@ def prop_car_sedan():
     tint_node("prop_car_sedan", *sedan_parts())
 
 
+def taxi_geo() -> mb.Geo:
+    """The sedan as a cab: yellow, checker band, roof sign. Always yellow, so no tint mask."""
+    paint, fixed = sedan_parts(paint="taxi_yellow", taxi=True)
+    return paint + fixed
+
+
 @mb.asset("prop_car_taxi", sheet=dict(extra=["top"]), concept=dict(azimuth=35, elevation=14))
 def prop_car_taxi():
-    paint, fixed = sedan_parts(paint="taxi_yellow", taxi=True)
-    mb.node("prop_car_taxi", paint + fixed)                    # a taxi is always yellow: no tint mask
+    mb.node("prop_car_taxi", taxi_geo())
 
 
 @mb.asset("prop_car_van", sheet=dict(extra=["top"]), concept=dict(azimuth=35, elevation=14))
@@ -431,7 +437,7 @@ def trafficlight_geo() -> mb.Geo:
     g += mb.box((0.44, 0.44, 1.25), at=(0, 0, 3.45), color=housing, anchor="bottom")
     g += mb.pyramid((0.56, 0.56), 0.30, at=(0, 0, 4.70), color=post)
     lit(g, seed=9, amount=0.05)
-    for k, facing in enumerate(("front", "left", "back", "right")):
+    for facing in ("front", "left", "back", "right"):
         for z, color in ((4.44, "glow_red"), (4.07, "glow_amber"), (3.70, "glow_green")):
             at = {"front": (0, -0.22 - 0.02, z), "back": (0, 0.22 + 0.02, z), "left": (0.22 + 0.02, 0, z),
                   "right": (-0.22 - 0.02, 0, z)}[facing]
@@ -486,7 +492,7 @@ def busstop_geo() -> mb.Geo:
     g += drop(mb.box((2.7, 0.40, 0.08), at=(0.25, 0.40, 0.50), color="wood"), "bottom")  # bench
     lit(g, seed=12)
     # stop sign: a disc on a short pole on the roof corner, a bus pictogram on both faces
-    g += mb.rod((2.0, -0.60, 2.50), (2.0, -0.60, 2.58), 0.035, n=3, color="grey_dark", cap_start=False, cap_end=False)
+    g += mb.rod((2.0, -0.60, 2.48), (2.0, -0.60, 2.70), 0.035, n=3, color="grey_dark", cap_start=False, cap_end=False)
     g += mb.rod((2.0, -0.64, 2.86), (2.0, -0.56, 2.86), 0.31, n=6, color=frame).bake_light(1.05, 0.8)
     g += plate(0.34, 0.20, (2.0, -0.64 - 0.012, 2.87), "front", "white")
     g += plate(0.34, 0.20, (2.0, -0.56 + 0.012, 2.87), "back", "white")
@@ -565,8 +571,8 @@ def street_ground(length: float = 260.0) -> mb.Geo:
     for s in (1, -1):
         g += mb.box((length, 4.6, 0.2 + CURB), at=(0, s * 10.3, CURB), anchor="top", color="sidewalk")
         g += mb.box((length, 0.25, 0.2 + CURB), at=(0, s * 8.0, CURB - 0.005), anchor="top", color="grey_light")
-    g += mb.box((length, 46, 0.2 + CURB), at=(0, 35.6, CURB - 0.02), anchor="top", color="grass")
-    g += mb.box((3000, 3000, 0.01), at=(0, 1558.5, -0.02), anchor="top", color="water")     # the bay
+    g += mb.box((length, 96, 0.2 + CURB), at=(0, 60.6, CURB - 0.02), anchor="top", color="grass")
+    g += mb.box((3000, 3000, 0.01), at=(0, 1608.5, -0.02), anchor="top", color="water")     # the bay
     g += mb.box((length, 14, 0.2 + CURB), at=(0, -19.6, CURB - 0.02), anchor="top", color="grass")
     for x in range(-int(length / 2) + 2, int(length / 2), 6):                      # dashed center line
         g += mb.box((2.8, 0.18, 0.02), at=(x, 0, 0), anchor="bottom", color="white")
@@ -577,38 +583,48 @@ def street_ground(length: float = 260.0) -> mb.Geo:
     return g
 
 
+# Models this script does not build, placed in the street shot when their files exist:
+# (asset, x, y, heading, on the sidewalk). The stage 1 kaiju is there to show the scale.
+STREET_GUESTS = [("prop_hydrant", -11.2, 8.7, 0, True), ("kaiju_lizard_s1", 17.2, -2.2, 38, False)]
+
+
 def build_street() -> None:
     """Every prop along one street: the review picture for the whole family."""
     mb.reset()
-    sedan, van, bus, truck = sedan_parts, van_parts, bus_parts, truck_parts
-    taxi = lambda: mb.Geo().add(sedan_parts(paint="taxi_yellow", taxi=True)[0]).add(      # noqa: E731
-        sedan_parts(paint="taxi_yellow", taxi=True)[1])
     cars = mb.Geo()
     # far side: curb lane and driving lane head toward -X (heading -90)
-    cars += at(tinted(*sedan(), "#3fa652"), -21.0, 6.6, -90)
-    cars += at(taxi(), -13.5, 3.0, -90)
-    cars += at(tinted(*bus(), "#d7263d"), 10.0, 6.45, -90)
-    cars += at(tinted(*sedan(), "#8f6fd0"), 22.5, 3.1, -90)
+    cars += at(tinted(*sedan_parts(), "#3fa652"), -21.0, 6.6, -90)
+    cars += at(taxi_geo(), -13.5, 3.0, -90)
+    cars += at(tinted(*bus_parts(), "#d7263d"), 10.0, 6.45, -90)
+    cars += at(tinted(*sedan_parts(), "#8f6fd0"), 22.5, 3.1, -90)
     # near side: heads toward +X (heading 90)
-    cars += at(tinted(*sedan(), "#e0372f"), -20.0, -3.1, 90)
-    cars += at(tinted(*van(), "#9fe0c0"), -10.0, -3.0, 90)
-    cars += at(tinted(*truck(), "#2f62c9"), 6.0, -3.1, 90)
-    cars += at(tinted(*sedan(), "#f5f5f0"), 18.5, -3.0, 90)
-    cars += at(tinted(*sedan(), "#2f62c9"), -3.5, -6.7, 90)
-    cars += at(tinted(*van(), "#f5f5f0"), 24.5, -6.6, 90)
+    cars += at(tinted(*sedan_parts(), "#e0372f"), -20.0, -3.1, 90)
+    cars += at(tinted(*van_parts(), "#9fe0c0"), -10.0, -3.0, 90)
+    cars += at(tinted(*truck_parts(), "#2f62c9"), 6.0, -3.1, 90)
+    cars += at(tinted(*sedan_parts(), "#f5f5f0"), 25.0, -3.0, 90)
+    cars += at(tinted(*sedan_parts(), "#2f62c9"), -3.5, -6.7, 90)
+    cars += at(tinted(*van_parts(), "#f5f5f0"), 31.0, -6.6, 90)
     cars += at(tinted(*wreck_parts(), "#f29b85"), 13.0, -6.3, 68)
     furniture = mb.Geo()
+    for guest, x, y, heading, on_sidewalk in STREET_GUESTS:
+        try:
+            furniture += at(geo_from_glb(guest), x, y, heading, CURB if on_sidewalk else 0.0)
+        except Exception as err:           # not built yet, or being rewritten right now: leave it out
+            print(f"  street scene: left out {guest} ({type(err).__name__})")
     for x, y, make, heading in [
             (-22.5, 8.8, lamp_geo, 0), (-18.0, 10.9, kiosk_geo, 0), (-13.6, 11.6, bench_geo, 0),
             (-8.6, 11.4, tree_a_geo, 20), (-3.0, 10.1, busstop_geo, 0), (2.4, 8.8, trafficlight_geo, 0),
             (16.5, 8.8, lamp_geo, 0), (-0.4, -8.8, trafficlight_geo, 0), (-12.0, -8.8, lamp_geo, 0),
             (9.0, -10.6, bench_geo, 180)]:
         furniture += at(make(), x, y, heading, CURB)
-    furniture += at(geo_from_glb("prop_hydrant"), -11.2, 8.7, 0, CURB)
     for x, y, make, heading in [
             (-26.5, 15.0, tree_b_geo, 0), (-15.5, 17.5, tree_a_geo, 100), (-5.5, 16.5, tree_b_geo, 40),
             (3.0, 18.0, tree_a_geo, 200), (10.0, 14.6, billboard_geo, 0), (19.5, 16.5, tree_a_geo, 300),
-            (25.0, 14.0, tree_b_geo, 15), (31.0, 17.0, tree_a_geo, 60), (-33.0, 17.5, tree_a_geo, 150)]:
+            (25.0, 14.0, tree_b_geo, 15), (31.0, 17.0, tree_a_geo, 60), (-33.0, 17.5, tree_a_geo, 150),
+            (-38.0, 34.0, tree_b_geo, 0), (-24.0, 38.0, tree_a_geo, 70), (-9.0, 33.0, tree_a_geo, 10),
+            (6.0, 40.0, tree_b_geo, 20), (21.0, 34.0, tree_a_geo, 250), (36.0, 39.0, tree_b_geo, 5),
+            (48.0, 30.0, tree_a_geo, 120), (-50.0, 46.0, tree_a_geo, 30), (-30.0, 60.0, tree_b_geo, 0),
+            (-4.0, 62.0, tree_a_geo, 190), (30.0, 64.0, tree_b_geo, 0), (58.0, 58.0, tree_a_geo, 45)]:
         furniture += at(make(), x, y, heading, CURB - 0.02)
     lift = 0.03                                    # keeps the scene clear of the backdrop's own floor
     mb.node("ground", street_ground().move(0, 0, lift))
@@ -628,14 +644,13 @@ def build_tints() -> None:
         for i, color in enumerate(colors):
             g += at(tinted(*parts(), color), (i - (n - 1) / 2) * pitch, y, 0)
         if asset_id == "prop_car_sedan":
-            paint, fixed = sedan_parts(paint="taxi_yellow", taxi=True)
-            g += at(paint + fixed, (n - 1 - (n - 1) / 2) * pitch, y, 0)
+            g += at(taxi_geo(), (n - 1 - (n - 1) / 2) * pitch, y, 0)
     mb.node("vehicles", g)
 
 
 SCENE_OPTS = {
     "street": dict(backdrop="sky", size=(1600, 800), samples=16, sun_azimuth=-55, sun_elevation=48,
-                   view=mb.View("", eye=(7.0, -58.0, 15.5), target=(0.0, 6.0, 3.2), fov=46)),
+                   view=mb.View("", eye=(7.0, -56.0, 14.5), target=(0.0, 9.0, 4.2), fov=46)),
     "tints": dict(backdrop="studio", size=(1400, 900), samples=14, azimuth=22, elevation=34, fov=30),
 }
 
@@ -644,9 +659,10 @@ def render_scenes(force: bool = False) -> None:
     """The street scene and the paint-color sheet, skipped when up to date."""
     with open(os.path.abspath(__file__), "rb") as f:
         src = hashlib.sha1(f.read()).hexdigest()
-    hydrant = mb.contract.model_path("prop_hydrant")
-    if os.path.exists(hydrant):
-        src += mb._file_sha(hydrant)
+    for guest, *_ in STREET_GUESTS:                         # re-render when a guest model changes
+        path = mb.contract.model_path(guest)
+        if os.path.exists(path):
+            src += mb._file_sha(path)
     jobs = [("street", build_street, os.path.join(mb.CONCEPT, "props_street.png")),
             ("tints", build_tints, os.path.join(mb.CONCEPT, "props_car_tints.png"))]
     for name, build, out in jobs:
@@ -664,7 +680,10 @@ def write_tint_notes() -> None:
     man = mb.Manifest("props")
     for asset_id, colors in TINTS.items():
         if asset_id in man.data.get("models", {}):
-            man.data["models"][asset_id]["tint"] = dict(TINT_NOTE, colors=colors)
+            note = dict(TINT_NOTE, colors=colors)
+            if asset_id in TINT_HINTS:
+                note["hint"] = TINT_HINTS[asset_id]
+            man.data["models"][asset_id]["tint"] = note
     man.write()
 
 

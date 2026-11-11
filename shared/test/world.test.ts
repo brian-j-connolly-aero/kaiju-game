@@ -418,8 +418,11 @@ describe('movement under player input', () => {
     expect(Math.abs(unit.x - 500)).toBeLessThan(1e-6);
     expect(Math.hypot(unit.vx, unit.vz)).toBeCloseTo(6.5, 6);
     expect(bitGet(world.propAlive, 0)).toBe(true);
-    // Sub-units stay put (their AI is not built yet) and bots stand still.
-    expect(world.units[squad.units[1]].vx).toBe(0);
+    // The sub-units fall in behind their leader; the bot squads (whose leaders stand still) stay put.
+    const follower = world.units[squad.units[1]];
+    expect(follower.vz).toBeGreaterThan(3);
+    expect(follower.state).toBe('moving');
+    expect(Math.hypot(world.units[5].vx, world.units[5].vz)).toBe(0);
 
     // The same walk as a tank flattens the car.
     unit.type = 'army_tank';

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Device: gamepad left bumper (the flat shoulder button). -->
+  <path d="M19 27.5H45C52 27.5 55.5 31 56.5 38L58.3 50C59.2 57 53 60.5 49 55L45.5 50H18.5L15 55C11 60.5 4.8 57 5.7 50L7.5 38C8.5 31 12 27.5 19 27.5Z"/>
+  <path fill="currentColor" d="M10 18.5H26V20H10Z"/>
+</svg>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Status: crossfire. Fire from two angles meets on the kaiju (triangle). -->
+  <path fill="currentColor" d="M32 9L44 29H20Z"/>
+  <path d="M6 58L22 38"/>
+  <path d="M13.2 40.1L22 38 21.9 47"/>
+  <path d="M58 58L42 38"/>
+  <path d="M50.8 40.1L42 38 42.1 47"/>
+</svg>

@@ -99,6 +99,8 @@ export const COMBAT_RULES = {
   /** Scatter multipliers on aim error and artillery scatter. */
   scatterSlowedMult: 0.6,
   scatterSpottedMult: 0.7,
+  /** A kaiju counts as slowed once its accumulated nerve damage is this fraction of its capacity. */
+  scatterSlowedNerve: 0.3,
   /** A target is spotted when a player-driven unit has line of sight within this range. */
   spotRange: 150,
   /** Veteran sub-units: aim error multiplier. */
@@ -112,4 +114,47 @@ export const COMBAT_RULES = {
 
   /** Downward acceleration of thrown objects and falling shells, m/s^2. */
   gravity: 9.8,
+} as const;
+
+/**
+ * How squads move, aim and behave (DESIGN.md section 5). The numbers the design gives live in
+ * COMBAT_RULES and in the unit, weapon and call-in definitions; these are the ones it leaves
+ * to the build. All starting values.
+ */
+export const SQUAD_RULES = {
+  /** Formation: sub-units trail the leader in a staggered column, this far apart beyond two unit radii. */
+  formationGap: 2,
+  /** Formation: how far each sub-unit sits to the side of the leader's trail, in column spacings. */
+  formationStagger: 0.45,
+  /** The leader's trail is sampled every this many meters of travel. */
+  trailStep: 2,
+  /** A sub-unit is in its formation slot within this many of its radii, plus one meter. */
+  slotTolerance: 0.5,
+  /** A sub-unit that has fallen behind its formation slot moves this much faster until it is back in it. */
+  catchUpSpeed: 1.3,
+  /** Move-to: a sub-unit holds once it is this close to its hold point. */
+  arriveRadius: 1.2,
+  /** Sub-units ease off the throttle inside this many seconds of travel from where they are going. */
+  arriveSlowTime: 0.6,
+  /** Navigation: a blocked sub-unit plans again at most this often, seconds. */
+  repathInterval: 1.5,
+  /** Navigation: no progress for this long counts as stuck (the unit tries the other way round). Longer than a tank's about-turn. */
+  stuckTime: 2.5,
+  /** Navigation: how far ahead a sub-unit looks for walls, in its radii (and at least this many meters). */
+  probeRadii: 3,
+  probeMin: 10,
+  /** A shaken sub-unit backs away from a kaiju closer than this many kaiju body radii (and at least this many meters). */
+  backOffRadii: 10,
+  backOffMin: 60,
+  /** How fast a sub-unit swings its weapon round, radians per second; it fires once it is this close to on target. */
+  aimTurnRate: 270 * DEG,
+  aimFireTolerance: 3 * DEG,
+  /** How far the driven unit's aim ray reaches when it lands on nothing. */
+  aimRayRange: 1500,
+  /** Sub-units aim at these fractions of the kaiju's height, taking the first with a clear line of fire. */
+  aimHeights: [0.5, 0.8, 0.25],
+  /** Several projectiles of one unit leave from points spread this far apart, in unit radii. */
+  muzzleSpread: 0.6,
+  /** Call-in shells fall at this angle above the horizon, toward the marker from behind the caller. */
+  callInElevation: 75 * DEG,
 } as const;

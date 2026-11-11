@@ -20,7 +20,7 @@ import {
   type SimEvent,
   type World,
 } from '../src/index';
-import { eventsOf, input, KAIJU_PLAYER, makeTestCity, makeTestWorld, parkUnits, placeKaiju, valueDestroyed, type TestCityOptions } from './helpers';
+import { eventsOf, holdFire, input, KAIJU_PLAYER, makeTestCity, makeTestWorld, parkUnits, placeKaiju, valueDestroyed, type TestCityOptions } from './helpers';
 
 /**
  * A scripted kaiju: each call feeds the kaiju player's inputs for a while, the way a person at
@@ -340,6 +340,8 @@ describe('scripted scenario: a hatchling wrecks a block', () => {
 describe('scripted rampage in the real city', () => {
   it('a hatchling that keeps attacking the nearest building moves the bar by what it destroys', () => {
     const world = makeTestWorld({ realCity: true, people: 'kaiju', seed: 11 });
+    // The squads hold their fire, so every point on the bar is the kaiju's own work.
+    holdFire(world);
     const k = world.kaijus[0];
     const ids: number[] = [];
     let aimYaw = k.yaw;

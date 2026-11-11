@@ -57,7 +57,8 @@
       "kind": "prop",
       "nodes": ["prop_car_wreck"],
       "size": [2.429, 0.892, 4.964],
-      "tris": 94
+      "tris": 94,
+      "tint": {"part": "body paint", "mask": "COLOR_0 alpha: 1 = paint (multiply the tint color in), 0 = never tint", "blend": "multiply", "colors": ["#2a9d8f", "#2f62c9", "#3fa652", "#8f6fd0", "#9fe0c0", "#aab2bc", "#b9a6e0", "#d7263d", "#e0372f", "#f29b85", "#f3e3b3", "#f5f5f0", "#f7c21a"], "hint": "use the paint color of the vehicle that was crushed (taxi: #f7c21a)"}
     },
     "prop_kiosk": {
       "file": "models/prop_kiosk.glb",

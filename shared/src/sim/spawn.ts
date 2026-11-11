@@ -16,6 +16,7 @@ import { yawFromTo } from '../math/angle';
 import type { Bounds } from '../math/geom';
 import type { Vec2 } from '../math/vec';
 import type { PlayerSlot } from './config';
+import { createUnitNav, resetNav } from './nav';
 import type { Kaiju, KaijuActionMemory, Squad, Unit, World } from './types';
 
 /** How far inside the bounds line squads deploy. */
@@ -179,6 +180,8 @@ function createUnit(id: number, squad: number, slot: number): Unit {
     veteran: false,
     state: 'dead',
     rooted: false,
+    arcYaw: 0,
+    nav: createUnitNav(),
     inWater: false,
     wreck: false,
     control: { moveX: 0, moveZ: 0, aimYaw: 0, aimPitch: 0, fire: false },
@@ -211,6 +214,9 @@ export function createSquad(world: World, slot: PlayerSlot): Squad {
     mods: emptyMods(),
     eliminated: false,
     veteranSlots: new Array<boolean>(per).fill(false),
+    trail: [],
+    formed: false,
+    volleyReady: false,
   };
   world.squads.push(squad);
   return squad;
@@ -231,6 +237,9 @@ export function refillSquad(world: World, squad: Squad, stage: StageId): void {
   squad.moveOrder = 'follow';
   squad.fireMode = 'atWill';
   squad.callInCooldowns = levelDef.callIns.map(() => 0);
+  squad.trail.length = 0;
+  squad.formed = false;
+  squad.volleyReady = false;
   for (let s = 0; s < squad.units.length; s++) {
     const u = world.units[squad.units[s]];
     u.type = def.id;
@@ -249,6 +258,8 @@ export function refillSquad(world: World, squad: Squad, stage: StageId): void {
     u.veteran = squad.veteranSlots[s];
     u.state = 'idle';
     u.rooted = false;
+    u.arcYaw = 0;
+    resetNav(u.nav);
     u.inWater = false;
     u.wreck = false;
     u.control.moveX = 0;

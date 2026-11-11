@@ -17,6 +17,7 @@ import {
   type Prop,
   type PropKindId,
   PROP_KINDS,
+  queueCommand,
   type SimEvent,
   type Structure,
   type StructureClass,
@@ -178,6 +179,16 @@ export function parkUnits(world: World, except: number[] = []): void {
     u.vx = 0;
     u.vz = 0;
   }
+}
+
+/**
+ * Orders every squad to hold fire and charge, the way its player would with the command wheel,
+ * so that sub-units stand planted where a test puts them instead of following their leader and
+ * shooting at the kaiju. It takes effect on the next step. (A sub-unit that gets shaken still
+ * backs off; use a squad's driven unit, ids 0, 4, 8 and 12, for a target that must not move.)
+ */
+export function holdFire(world: World): void {
+  for (const p of world.players) if (p.role === 'human') queueCommand(world, p.id, { type: 'holdCharge' });
 }
 
 /** Unit vector pointing along a heading (the forward vector of that yaw). */

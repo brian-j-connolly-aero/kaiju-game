@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Kaiju verb: roar. A roaring maw with sound waves. -->
+  <path fill="currentColor" stroke="none" fill-rule="evenodd" d="M6 44V24Q6 9 21 8L27 8.5 30 12 37 12.5Q42.5 13 42 18.5L41.5 22Q41 24.5 38.5 25.5L20.5 33.5 35.5 47Q38 49.5 36.5 52.5 35 55.5 31 56L17 57Q6 57 6 44ZM17 17L25.5 20 18 22.5Z"/>
+  <path fill="currentColor" stroke="none" d="M38 24L32 26.7 37.4 31.7ZM30.5 27.3L25 29.8 29.9 34.4ZM34 46.5L28.6 41.6 35.6 39.2Z"/>
+  <path d="M45.7 28.3A13 13 0 0 1 45.7 45.7"/>
+  <path d="M53.1 21.6A23 23 0 0 1 53.1 52.4"/>
+</svg>

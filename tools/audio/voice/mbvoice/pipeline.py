@@ -123,6 +123,7 @@ def build_line(job: tuple[dict, dict]) -> dict:
     hyp_proc = asr.transcribe(y, SR)
     e_raw, n = asr.word_errors(line["text"], hyp_raw)
     e_proc, _ = asr.word_errors(line["text"], hyp_proc)
+    f0 = dsp.f0_track(raw, SR)
     return {
         "id": line["id"],
         "hash": plan["hash"],
@@ -130,6 +131,7 @@ def build_line(job: tuple[dict, dict]) -> dict:
         "duration": round(len(y) / SR, 3),
         "speech": [round(span[0], 3), round(span[1], 3)],
         "words": n,
+        "f0_median_hz": round(float(np.median(f0)), 1) if len(f0) else 0.0,
         "raw": {"hyp": hyp_raw, "errors": e_raw},
         "processed": {"hyp": hyp_proc, "errors": e_proc},
     }

@@ -425,6 +425,8 @@ const scratchHit: CastHit = createCastHit();
 /**
  * Casts origin + dir * t, t in [0, tMax], against every standing structure (as a box prism from
  * the ground to its height) and reports the nearest hit. `ignore` skips one structure id.
+ * `skipPassable` leaves out bridge decks: for everything that moves, shoots or looks along the
+ * ground a deck is road surface, not a wall (bodies on it stand at ground level, inside its box).
  */
 function castPath(
   q: CityQuery,
@@ -437,6 +439,7 @@ function castPath(
   tMax: number,
   out: CityCastHit | undefined,
   ignore: number,
+  skipPassable = false,
 ): boolean {
   const idx = q.index;
   const half = idx.half;
@@ -485,6 +488,7 @@ function castPath(
       if (idx.stamp[id] === now) continue;
       idx.stamp[id] = now;
       if (id === ignore || q.structureHp[id] <= 0) continue;
+      if (skipPassable && idx.spassable[id] === 1) continue;
       const hit = castBoxCS(
         ox,
         oy,
@@ -537,23 +541,35 @@ function castPath(
 
 /**
  * Segment a..b against standing structures. On a hit, `out.t` is the fraction along the segment
- * and `out.structure` the structure id. `ignore` skips one structure id (-1 for none).
+ * and `out.structure` the structure id. `ignore` skips one structure id (-1 for none);
+ * `skipPassable` skips every bridge deck (projectiles, sight lines and aim rays pass it).
  */
-export function castSegment(q: CityQuery, a: Vec3, b: Vec3, out?: CityCastHit, ignore = -1): boolean {
-  return castPath(q, a.x, a.y, a.z, b.x - a.x, b.y - a.y, b.z - a.z, 1, out, ignore);
+export function castSegment(q: CityQuery, a: Vec3, b: Vec3, out?: CityCastHit, ignore = -1, skipPassable = false): boolean {
+  return castPath(q, a.x, a.y, a.z, b.x - a.x, b.y - a.y, b.z - a.z, 1, out, ignore, skipPassable);
 }
 
 /**
  * Ray against standing structures. `dir` must be a unit vector. On a hit, `out.t` is the distance
  * along the ray and `out.structure` the structure id.
  */
-export function castRay(q: CityQuery, origin: Vec3, dir: Vec3, maxDist: number, out?: CityCastHit, ignore = -1): boolean {
-  return castPath(q, origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, maxDist, out, ignore);
+export function castRay(
+  q: CityQuery,
+  origin: Vec3,
+  dir: Vec3,
+  maxDist: number,
+  out?: CityCastHit,
+  ignore = -1,
+  skipPassable = false,
+): boolean {
+  return castPath(q, origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, maxDist, out, ignore, skipPassable);
 }
 
-/** True when no standing structure blocks the straight line between two points. */
-export function lineOfSight(q: CityQuery, a: Vec3, b: Vec3): boolean {
-  return !castPath(q, a.x, a.y, a.z, b.x - a.x, b.y - a.y, b.z - a.z, 1, undefined, -1);
+/**
+ * True when no standing structure blocks the straight line between two points. With
+ * `skipPassable` bridge decks do not count (a unit on a bridge can see and be seen).
+ */
+export function lineOfSight(q: CityQuery, a: Vec3, b: Vec3, skipPassable = false): boolean {
+  return !castPath(q, a.x, a.y, a.z, b.x - a.x, b.y - a.y, b.z - a.z, 1, undefined, -1, skipPassable);
 }
 
 /** Raw ground code (GROUND_*) at a point; land outside the city. */

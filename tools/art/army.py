@@ -32,7 +32,6 @@ import mb_preview  # noqa: E402
 
 OLIVE = "army_olive"
 OLIVE_DK = "army_olive_dk"
-OLIVE_LT = "army_olive_lt"
 KHAKI = "army_khaki"
 STEEL = "army_track"          # tracks, gun barrel, exhausts
 CYAN = "human_cyan"
@@ -335,7 +334,7 @@ def proj_arty():
 SCENE_OPTS = {
     "platoon": dict(backdrop="sunset", size=(1280, 720), samples=16, sun_azimuth=-68, sun_elevation=20,
                     view=mb.View("", eye=(-11.0, -29.0, 3.0), target=(0.6, 0.0, 1.9), fov=40)),
-    "portrait": dict(backdrop=None, azimuth=40, elevation=5, fov=40, size=(512, 512), samples=24,
+    "portrait": dict(backdrop=None, azimuth=38, elevation=4, fov=44, zoom=1.2, size=(512, 512), samples=24,
                      sun_azimuth=-72, sun_elevation=30),
 }
 # The portrait is lit harder than the review shots: warm key, strong cyan rim, little fill.
@@ -362,7 +361,21 @@ def build_platoon() -> None:
 
 def build_portrait() -> None:
     mb.reset()
-    mb.node("tank", posed_tank(4, 13))
+    mb.node("tank", posed_tank(17, 15))
+
+
+def review_copy(portrait: str, out: str) -> None:
+    """The transparent portrait over a dark card, for docs/art/concept (the game gets the cut-out)."""
+    from PIL import Image
+
+    fg = Image.open(portrait).convert("RGBA")
+    w, h = fg.size
+    card = Image.new("RGBA", (w, h))
+    top, bottom = mb.palette.hex_to_rgb("#1b2633"), mb.palette.hex_to_rgb("#0e5f73")
+    for y in range(h):
+        t = (y / (h - 1)) ** 1.6
+        card.paste(tuple(round(255 * (a + (b - a) * t)) for a, b in zip(top, bottom)) + (255,), (0, y, w, y + 1))
+    Image.alpha_composite(card, fg).convert("RGB").save(out)
 
 
 def render_scenes(force: bool = False) -> None:
@@ -385,6 +398,8 @@ def render_scenes(force: bool = False) -> None:
         finally:
             mb_preview.BACKDROPS["studio"] = dict(studio)
         print(f"  scene: {os.path.relpath(out, mb.REPO)}")
+        if name == "portrait":
+            review_copy(out, os.path.join(mb.CONCEPT, "portrait_army.png"))
 
 
 if __name__ == "__main__":

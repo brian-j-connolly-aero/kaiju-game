@@ -6,11 +6,16 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node ../tools/build-manifest.mjs --quiet && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json"
   },
   "dependencies": {
-    "@mb/shared": "0.1.0"
+    "@colyseus/sdk": "0.18.10",
+    "@mb/shared": "0.1.0",
+    "three": "0.187.0"
+  },
+  "devDependencies": {
+    "@types/three": "0.187.0"
   }
 }

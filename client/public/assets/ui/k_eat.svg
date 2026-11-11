@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Kaiju verb: eat. Jaws close on a car. -->
+  <path fill="currentColor" stroke="none" fill-rule="evenodd" d="M4 34V24Q4 8 20 6.5L29 6.5 32.5 10.5 50 11.5Q60 12.5 60 20.5L59.5 22.5Q59 25 56.5 25.5L14 34 49.5 52.5Q53 54.5 52 57.5 51 60.5 47 60.5H17Q4 60.5 4 47ZM21 15L30 18.5 22 21.5Z"/>
+  <path fill="currentColor" stroke="none" d="M31.5 30L25 31.3 29.2 37.1ZM56.5 25L50.5 26.2 54.4 32Z"/>
+  <g transform="translate(46 40) rotate(-8) scale(.7)">
+    <path fill="currentColor" stroke="none" fill-rule="evenodd" d="M-17 5V-1Q-17 -4 -14 -4.5L-9 -5.5 -5 -11.5Q-4 -13 -2 -13H7Q9 -13 10 -11.5L14 -5.5Q17 -5 17 -2V5ZM-6.5 -5.5L-3 -10.5H1.5V-5.5ZM4 -10.5H7.5L11 -5.5H4Z"/>
+    <circle cx="-9" cy="5.5" r="4.5" fill="currentColor" stroke="none"/>
+    <circle cx="9" cy="5.5" r="4.5" fill="currentColor" stroke="none"/>
+  </g>
+</svg>

@@ -20,7 +20,7 @@ from .dsp import butter, gain, peaking, shelf
 
 DEFAULTS = {
     "radio": {
-        "band_hz": [330.0, 3300.0],      # band-pass corners
+        "band_hz": [300.0, 3800.0],      # band-pass corners
         "hp_order": 4,
         "lp_order": 6,
         "presence_db": 4.0,              # small-speaker honk around presence_hz
@@ -29,8 +29,9 @@ DEFAULTS = {
         "comp_ratio": 6.0,
         "comp_attack_ms": 2.0,
         "comp_release_ms": 90.0,
-        "drive_db": 7.0,                 # into a soft clipper: light overdrive
-        "static_db": -30.0,              # static bed, relative to the speech level
+        "drive_db": 3.0,                 # into a soft clipper: light overdrive
+        "static_db": -30.0,              # static bed between the words, relative to the speech level
+        "static_duck_db": 10.0,          # how far the bed drops while a word is spoken (the set's gain control)
         "crackle_per_s": 5.0,
         "squelch_db": -5.0,              # squelch bursts, relative to the speech level
         "open_ms": 55.0,                 # key-up click and burst
@@ -61,8 +62,9 @@ DEFAULTS = {
         "predelay_ms": 28.0,
         "rt60_s": 1.9,                   # decay time of the room below 1 kHz
         "rt60_high_s": 1.0,              # decay time above 3 kHz (air and upholstery)
-        "early_db": -9.0,                # early reflections relative to the direct voice
-        "wet_db": -12.0,                 # late reverberation energy relative to the direct voice
+        "early_db": -18.0,               # early reflections relative to the direct voice
+        "wet_db": -14.0,                 # late reverberation energy relative to the direct voice
+        "duck_db": 10.0,                 # how far the reverberation drops while a word is spoken
         "ring_s": 1.3,                   # how long the room rings after the last word
         "lead_ms": 30.0,
     },
@@ -135,6 +137,28 @@ def compress(x: np.ndarray, threshold_db: float, ratio: float, attack_ms: float,
     return y / robust_peak(y)
 
 
+def presence(v: np.ndarray, attack_ms: float = 15.0, release_ms: float = 120.0) -> np.ndarray:
+    """0..1 per sample: how much voice there is right now (1 = a word is being spoken, 0 = a
+    pause). Rises within `attack_ms`, falls over `release_ms`."""
+    step = 64
+    n = int(np.ceil(len(v) / step))
+    padded = np.zeros(n * step)
+    padded[: len(v)] = v
+    p = np.sqrt(np.mean(padded.reshape(n, step) ** 2, axis=1))
+    level = speech_level(v)
+    lev_db = 20 * np.log10(np.maximum(p / level, 1e-6))
+    target = np.clip((lev_db + 30.0) / 15.0, 0.0, 1.0)          # -30 dB -> 0, -15 dB -> 1
+    att = np.exp(-1.0 / (SR / step * attack_ms / 1000))
+    rel = np.exp(-1.0 / (SR / step * release_ms / 1000))
+    out = np.empty(n)
+    cur = 0.0
+    for i in range(n):
+        t = target[i]
+        cur = att * cur + (1 - att) * t if t > cur else rel * cur + (1 - rel) * t
+        out[i] = cur
+    return np.interp(np.arange(len(v)), np.arange(n) * step + step / 2, out)
+
+
 def _noise(rng: np.random.Generator, n: int, lo: float, hi: float) -> np.ndarray:
     w = rng.standard_normal(n + 2000)
     w = butter(w, SR, "bandpass", [lo, hi], 2)[2000:]
@@ -184,7 +208,9 @@ def radio(x: np.ndarray, cfg: dict, rng: np.random.Generator) -> tuple[np.ndarra
         i = int(rng.integers(0, total - 200))
         k = int(rng.integers(20, 120))
         crack[i:i + k] += rng.standard_normal(k) * np.exp(-np.arange(k) / (k / 4)) * rng.uniform(1.5, 4.0)
-    fx = (bed + crack) * level * gain(cfg["static_db"])
+    duck = np.zeros(total)
+    duck[start:start + len(v)] = presence(v)
+    fx = (bed + crack) * level * gain(cfg["static_db"] - cfg["static_duck_db"] * duck)
 
     # 3. squelch: key-up click and a short falling burst; at the end a short squelch tail of
     #    receiver noise that is cut off, and the key-off click
@@ -281,11 +307,14 @@ def hall(x: np.ndarray, cfg: dict, rng: np.random.Generator) -> tuple[np.ndarray
     total = n_lead + len(v) + n_ring
     out = np.zeros((total, 2))
     out[n_lead:n_lead + len(v), :] = v[:, None]
+    duck = np.zeros(total - n_lead)
+    duck[: len(v)] = presence(v, 20.0, 220.0)
+    wet_gain = gain(-cfg["duck_db"] * duck)
     for ch in range(2):
         e = signal.fftconvolve(v, early_ir[:, ch])[: total - n_lead]
         l = signal.fftconvolve(v, late_ir[:, ch])[: total - n_lead]
-        out[n_lead:n_lead + len(e), ch] += gain(cfg["early_db"]) * e
-        out[n_lead:n_lead + len(l), ch] += gain(cfg["wet_db"]) * l
+        out[n_lead:n_lead + len(e), ch] += gain(cfg["early_db"]) * e * wet_gain[: len(e)]
+        out[n_lead:n_lead + len(l), ch] += gain(cfg["wet_db"]) * l * wet_gain[: len(l)]
     k = int(SR * min(0.5, cfg["ring_s"] * 0.5))           # let the room die away, then close
     out[-k:] *= (0.5 + 0.5 * np.cos(np.linspace(0, np.pi, k)))[:, None]
     return out, (n_lead / SR, (n_lead + len(v)) / SR)

@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   bitGet,
+  Btn,
   CALLINS,
   COMBAT_RULES,
+  createAimPoint,
   DT,
   LIZARD,
   PROJECTILE_TYPES,
+  resolveAimPoint,
   spawnProjectile,
   stepProjectile,
   throwAngle,
@@ -14,7 +17,7 @@ import {
   type Projectile,
   type World,
 } from '../src/index';
-import { eventsOf, HUMAN_PLAYER, KAIJU_PLAYER, makeTestWorld, parkUnits, placeKaiju, placeUnit, run, type TestWorldOptions } from './helpers';
+import { eventsOf, HUMAN_PLAYER, input, KAIJU_PLAYER, makeTestWorld, parkUnits, placeKaiju, placeUnit, run, type TestWorldOptions } from './helpers';
 
 const GUN = WEAPONS.army_tank_gun;
 const SHELL = PROJECTILE_TYPES.shell;
@@ -197,5 +200,65 @@ describe('projectile impacts', () => {
     expect(u.maxHp - u.hp).toBe(30);
     expect(u.nerve).toBeGreaterThan(0);
     expect(world.players[KAIJU_PLAYER].tally.damageDealt).toBe(30);
+  });
+});
+
+describe('bridge decks are road surface, not walls', () => {
+  /** A river along x with one bridge across it at x = 0 (a deck 16 m wide and 8 m tall, like the real ones). */
+  const river: TestWorldOptions = {
+    water: [[-300, 40, 300, 110]],
+    structures: [
+      { x: 0, z: 75, w: 16, d: 74, height: 8, hp: 1500, value: 150, passable: true },
+      { x: 0, z: 160, w: 30, d: 10, height: 12, hp: 1000 },
+    ],
+  };
+
+  it('lets a shot fly on across a deck, and takes the hit when a shot comes down on it', () => {
+    const world = arena(river);
+    placeKaiju(world, 150, -150, 0);
+    // Level, 2 m up, straight along the bridge from one bank to the other: it ends on the building beyond.
+    fireShell(world, 0, 20, 0, 1);
+    let events = run(world, TICK_RATE * 2);
+    expect(eventsOf(events, 'projectileHit')).toMatchObject([{ target: 'structure', targetId: 1 }]);
+    expect(world.structureHp[0]).toBe(1500);
+
+    // Plunging onto the middle of the deck: the bridge is what it hit, and what pays.
+    fireShell(world, 0, 60, 0, 1, { vy: -30, vz: 30 });
+    events = run(world, 10);
+    expect(eventsOf(events, 'projectileHit')).toMatchObject([{ target: 'structure', targetId: 0, y: 0 }]);
+    expect(1500 - world.structureHp[0]).toBe(GUN.structureDamage);
+    // (The first shell cost the building beyond 120 of its 1000 hp, worth 10.)
+    expect(world.players[HUMAN_PLAYER].tally.barPoints).toBeCloseTo((150 * GUN.structureDamage) / 1500 + (10 * GUN.structureDamage) / 1000, 6);
+
+    // With the deck gone the same shot lands in the river and costs nothing.
+    world.structureHp[0] = 0;
+    const bar = world.match.barPoints;
+    fireShell(world, 0, 60, 0, 1, { vy: -30, vz: 30, splash: 0 });
+    events = run(world, 10);
+    expect(eventsOf(events, 'projectileHit')).toMatchObject([{ target: 'water', targetId: -1 }]);
+    expect(world.match.barPoints).toBe(bar);
+  });
+
+  it('lets a unit on a bridge aim and shoot, and a kaiju on a bridge be hit', () => {
+    const world = arena(river);
+    const k = placeKaiju(world, 0, 60, 0);
+    const u = placeUnit(world, 0, 0, 100);
+    // Both stand on the deck, inside its box. The aim ray from the unit's eye finds the kaiju.
+    const aim = createAimPoint();
+    const yaw = Math.PI;
+    const pitch = Math.atan2(2 - 1.7, 40);
+    resolveAimPoint(world.cityQuery, u.x, 1.7, u.z, yaw, pitch, 500, aim, world.kaijus);
+    expect(aim).toMatchObject({ on: 'kaiju', id: 0 });
+    // Looking down at the deck, the ray lands on the road surface.
+    resolveAimPoint(world.cityQuery, u.x, 1.7, u.z, yaw, -0.2, 500, aim);
+    expect(aim.on).toBe('ground');
+    expect(aim.z).toBeCloseTo(100 - 1.7 / Math.tan(0.2), 6);
+
+    const events = run(world, 30, [null, input({ aimYaw: yaw, aimPitch: pitch, buttons: Btn.fire })]);
+    expect(eventsOf(events, 'projectileSpawn').length).toBe(3);
+    expect(eventsOf(events, 'kaijuHit').length).toBe(3);
+    expect(k.hp).toBeLessThan(k.maxHp);
+    // Explosions on a bridge are not free: the splash of each rocket reaches the deck under the kaiju.
+    expect(1500 - world.structureHp[0]).toBe(3 * WEAPONS.army_rocket_launchers.structureDamage);
   });
 });

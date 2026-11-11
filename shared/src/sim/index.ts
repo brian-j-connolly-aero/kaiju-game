@@ -9,6 +9,8 @@ export * from './aim';
 export * from './bar';
 export * from './spawn';
 export * from './spotting';
+export * from './nav';
+export * from './squads';
 export * from './pipeline';
 export * from './createWorld';
 export { applyInput, inputSystem } from './systems/inputs';
@@ -18,7 +20,7 @@ export { findEdible, findGrabTarget, shoveUnit, throwAngle, type ReachTarget } f
 export { unitOrderSystem } from './systems/unitOrders';
 export { botSystem } from './systems/bots';
 export { movementSystem } from './systems/movement';
-export { weaponSystem } from './systems/weapons';
+export { callInFallTime, weaponSystem } from './systems/weapons';
 export { projectileSystem, spawnProjectile, stepProjectile, type ProjectileBody } from './systems/projectiles';
 export { applyHit, damageSystem, healKaiju, hitFacing } from './systems/damage';
 export { applyStructureDamage, cityDamageSystem, takeProp, takePropWreck } from './systems/cityDamage';

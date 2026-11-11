@@ -47,6 +47,7 @@ import type { BotState } from './bots/types';
 import type { SquadCommand } from './commands';
 import type { MatchConfig, PlayerId } from './config';
 import type { HeldObject, PlayerTally, ProjectileOwner, SimEvent } from './events';
+import type { UnitNav } from './nav';
 
 // ---------------------------------------------------------------------------------------------
 // Players and input
@@ -232,6 +233,18 @@ export interface Squad {
   eliminated: boolean;
   /** Per slot: whether that unit comes back as a veteran at the next stage. */
   veteranSlots: boolean[];
+  /**
+   * Where the driven unit has been lately, oldest first (sampled every SQUAD_RULES.trailStep
+   * meters): sub-units on 'follow' string out along it. Server-side only.
+   */
+  trail: Vec2[];
+  /**
+   * The sub-units have been called into formation: set by a 'follow' command or once the leader
+   * moves. Until then (a fresh deployment) they stay where they were placed.
+   */
+  formed: boolean;
+  /** Every sub-unit that is charging has a full charge (the edge of this is the `volley.ready` cue). */
+  volleyReady: boolean;
 }
 
 /** What a unit is trying to do this tick; same meaning as the matching PlayerInput fields. */
@@ -283,6 +296,10 @@ export interface Unit {
   state: UnitState;
   /** Held in place by a hold-and-charge order. */
   rooted: boolean;
+  /** Center of the firing arc a rooted unit is locked to (its aim stays within COMBAT_RULES.chargeHalfArc of it). */
+  arcYaw: number;
+  /** Navigation memory of a sub-unit (where it is going and how). Server-side only; never in snapshots. */
+  nav: UnitNav;
   inWater: boolean;
   /** Dead vehicles only: its wreck is still lying where it died (a kaiju can grab or eat it). */
   wreck: boolean;
@@ -328,11 +345,14 @@ export interface CallInMission {
   player: PlayerId;
   x: number;
   z: number;
-  /** Seconds until the first shell lands. */
+  /** Seconds until the first shell lands; once every shell is on its way, seconds until the last one has landed. */
   timer: number;
   shellsLeft: number;
   /** Seconds until the next shell is released once the mission has begun. */
   nextShell: number;
+  /** Ground direction the shells travel along (unit vector): from behind the caller toward the marker. */
+  dirX: number;
+  dirZ: number;
 }
 
 // ---------------------------------------------------------------------------------------------

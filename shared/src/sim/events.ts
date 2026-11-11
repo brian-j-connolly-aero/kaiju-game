@@ -70,7 +70,13 @@ interface EventBase {
   tick: number;
 }
 
-/** A projectile now exists. Clients fly it locally with the same kinematics until `projectileHit`. */
+/**
+ * A projectile now exists. Clients fly it locally with the same kinematics until `projectileHit`:
+ * position(t) = (x, y, z) + (vx, vy, vz) * t - (0, gravity * t^2 / 2, 0), with t counted from
+ * this event's tick (`stepProjectile` does one tick of it). By the end of the spawn tick it has
+ * already flown one step. A unit's salvo is several of these on the same tick (one per launcher
+ * or tank); a call-in's shells arrive one event at a time over the barrage.
+ */
 export interface ProjectileSpawnEvent extends EventBase {
   type: 'projectileSpawn';
   id: number;
@@ -90,7 +96,7 @@ export interface ProjectileSpawnEvent extends EventBase {
   gravity: number;
   /** Seconds until it expires if it hits nothing. */
   ttl: number;
-  /** True when it was fired as part of a charged volley (drawn brighter). */
+  /** True when it was fired as part of a charged volley, the player's trigger shot included (drawn brighter). */
   volley: boolean;
   /** For thrown objects: what is flying. */
   payload?: HeldObject;
@@ -284,18 +290,21 @@ export interface TakeoverEvent extends EventBase {
   toUnit: number;
 }
 
-/** A squad fired a charged volley. */
+/**
+ * A squad fired a charged volley: its player's shot took at least one charged sub-unit with it.
+ * The projectiles themselves arrive as `projectileSpawn` events of the same tick.
+ */
 export interface VolleyEvent extends EventBase {
   type: 'volley';
   squad: number;
   player: PlayerId;
-  /** Units that fired. */
+  /** The charged sub-units that fired (the driven unit, whose shot was the trigger, is not listed). */
   units: number[];
-  /** The aim point. */
+  /** The aim point: where the player's aim ray landed. */
   x: number;
   y: number;
   z: number;
-  /** Average charge of the units that fired, 0..1. */
+  /** Average charge of those sub-units when they fired, 0..1. */
   charge: number;
 }
 
@@ -307,7 +316,12 @@ export interface RoarEvent extends EventBase {
   radius: number;
 }
 
-/** A call-in was requested ('marked'), its first shells are about to land ('inbound'), or it finished ('done'). */
+/**
+ * A call-in was requested and its marker is on the ground ('marked'), its first shell has been
+ * released and is falling ('inbound'), or its last shell has landed ('done': take the marker
+ * away). The shells are `projectileSpawn` events with owner 'callin' and this mission's id.
+ * A mission that is still running when a stage ends is dropped without a 'done'.
+ */
 export interface CallInEvent extends EventBase {
   type: 'callin';
   /** Mission id, unique per match. */
@@ -318,9 +332,9 @@ export interface CallInEvent extends EventBase {
   x: number;
   z: number;
   phase: 'marked' | 'inbound' | 'done';
-  /** Seconds until the first impact (for 'marked'). */
+  /** Seconds until the first impact ('marked' and 'inbound'); 0 for 'done'. */
   delay: number;
-  /** Scatter radius to draw on the ground. */
+  /** Scatter radius to draw on the ground, with the scatter multipliers as they stand at this moment. */
   radius: number;
 }
 

@@ -17,11 +17,11 @@ import os
 import sys
 
 import bpy
-from mathutils import Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import mb  # noqa: E402
+from mathutils import Vector  # noqa: E402  (available once bpy is loaded)
 import mb_preview  # noqa: E402
 import lizard  # noqa: E402
 
@@ -171,7 +171,7 @@ def lineup(force: bool = False) -> str:
     # height ticks for the two big ones
     for stage, h in ((2, 32.0), (3, 115.0)):
         x0, y0 = _project((spots[stage] + (16 if stage == 2 else 58), 0, 0), eye, target, fov, size)
-        x1, y1 = _project((spots[stage] + (16 if stage == 2 else 58), 0, h), eye, target, fov, size)
+        _, y1 = _project((spots[stage] + (16 if stage == 2 else 58), 0, h), eye, target, fov, size)
         x0, y0, y1 = round(x0), round(y0), round(y1)
         d.line([(x0, y0), (x0, y1)], fill=dim, width=2)
         for yy in (y0, y1):

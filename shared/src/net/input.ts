@@ -54,14 +54,21 @@
  * Human buttons
  *
  *   Btn.fire     Fires the driven unit's weapon whenever it is off cooldown: on the press and
- *                again for as long as the button stays down. Every shot the player fires is the
- *                volley trigger: each sub-unit with charge fires at the player's aim point.
+ *                again for as long as the button stays down. The shots go to the point where
+ *                the aim ray from the unit's eye lands. Every shot the player fires is the
+ *                volley trigger: each sub-unit with charge (and whose firing arc covers that
+ *                point) fires at it.
  *   Btn.callIn   On the press, requests the squad's call-in at `marker` if this input carries
- *                one, otherwise at the point where the aim ray meets the ground.
+ *                one, otherwise at the point where the aim ray meets the ground. Nothing happens
+ *                while the call-in is cooling down.
  *
- *   wheel        One-shot: the command picked on the wheel since the last input.
+ *   wheel        One-shot: the command picked on the wheel since the last input. 'follow' and
+ *                'moveTo' set the movement order, 'fireAtWill' and 'holdCharge' the fire mode;
+ *                picking the entry that is already set gives the order again (hold-and-charge
+ *                then plants the squad afresh). What each does: sim/systems/unitOrders.ts.
  *   marker       One-shot ground point that goes with `wheel: 'moveTo'` or with Btn.callIn. When
  *                'moveTo' has no marker the server uses the point where the aim ray lands.
+ *                Markers are pulled back inside the playable bounds.
  *
  *   The map view and the camera toggle are client-only. While the map is open the client sends
  *   zero movement and no buttons (the unit idles); markers placed on the map are sent either as

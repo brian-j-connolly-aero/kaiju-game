@@ -6,10 +6,10 @@
  * itself. Clients pick the actual line (see defs/voice.ts).
  *
  * Real today: every cue that follows directly from an event or from the clock, plus
- * `kaiju.spotted` / `kaiju.lost`, which sim/spotting.ts says when `kaiju.known` changes.
+ * `kaiju.spotted` / `kaiju.lost`, which sim/spotting.ts says when `kaiju.known` changes, and
+ * `volley.ready`, which the orders system says when every charging sub-unit of a squad is full.
  *
  * STUB(sim): cues that need state other systems do not track yet:
- * - `volley.ready`: when every charging sub-unit of a squad reaches full charge;
  * - `kaiju.lowhp`: when a kaiju first drops below about 25% hp in a stage;
  * - `bar.near`: when the bar passes about 85% of the way to the next mark.
  * Add them here with `say(world, cue, squad, player)`.

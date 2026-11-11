@@ -1,14 +1,16 @@
 /**
  * Who can see the kaiju (DESIGN.md section 5, "Scatter multipliers" and "Map view").
  *
- * - `kaiju.spotted`: a player-driven unit has line of sight to it within COMBAT_RULES.spotRange.
- *   Spotted targets are easier to hit (the scatter multiplier).
+ * - `kaiju.spotted`: a driven unit (the one a squad's player or bot drives, not a sub-unit) has
+ *   line of sight to it within COMBAT_RULES.spotRange. Spotted targets are easier to hit (the
+ *   scatter multiplier). Bot squads follow the same rules as players, so their leaders spot too.
  * - `kaiju.known`: the humans' map shows it. Always at stages 2 and 3. At stage 1 only while any
  *   living human unit has line of sight within MATCH_RULES.revealSightRange, or for
  *   MATCH_RULES.revealAfterNoise seconds after it made noise (see `noteKaijuNoise`).
  *
  * Line of sight runs from the unit's eye to the kaiju's upper body and is blocked by standing
- * structures only.
+ * structures only. Bridge decks do not block it: a unit or a kaiju on a bridge stands inside
+ * the deck's box.
  */
 
 import { lineOfSight } from '../city/spatialIndex';
@@ -36,7 +38,7 @@ export function unitSeesKaiju(world: World, unit: Unit, kaiju: Kaiju, range: num
   target.x = kaiju.x;
   target.y = kaiju.height * SIGHT_TARGET_HEIGHT;
   target.z = kaiju.z;
-  return lineOfSight(world.cityQuery, eye, target);
+  return lineOfSight(world.cityQuery, eye, target, true);
 }
 
 /**
@@ -63,7 +65,7 @@ export function updateSpotting(world: World): void {
       for (const id of squad.units) {
         const u = world.units[id];
         if (!u.alive) continue;
-        const driven = squad.driven === id && !world.players[squad.player].bot;
+        const driven = squad.driven === id;
         if (!spotted && driven && unitSeesKaiju(world, u, k, COMBAT_RULES.spotRange)) spotted = true;
         if (!seen && !alwaysKnown && unitSeesKaiju(world, u, k, MATCH_RULES.revealSightRange)) seen = true;
       }

@@ -15,11 +15,14 @@
  * of the tick that spawned it: at the end of tick T it is at position((T - spawnTick + 1) / 30).
  *
  * Each tick the step segment is swept against, nearest first:
- * - standing structures (box prisms up to their height);
+ * - standing structures (box prisms up to their height), bridge decks excepted;
  * - living kaiju (upright capsules), except the kaiju that threw it;
  * - units, only for projectiles thrown by a kaiju: there is no friendly fire between human
  *   units, so their own shells pass over each other;
  * - the ground (y = 0).
+ * A bridge deck is road surface: bodies on it stand at ground level, inside its box, so nothing
+ * in flight collides with the box (a unit on a bridge can shoot, and a kaiju on one can be
+ * hit). A projectile that comes down on a standing deck has hit the deck.
  * On impact: the structure that was hit and every standing structure within the splash radius
  * take `structureDamage`; kaiju within the splash (and units, for kaiju projectiles) take
  * `damage` and `nerve` through the hit queue; props within the splash are destroyed;
@@ -27,10 +30,11 @@
  * city, ends with target 'none'.
  *
  * Spawning is the launcher's job: `spawnProjectile` adds one and emits `projectileSpawn`. The
- * kaiju's throw uses it today; the weapon system (unit fire, volleys, call-ins) is still to come.
+ * kaiju's throw and the weapon system (unit fire, volleys, call-in shells) use it.
  */
 
 import {
+  bridgeAt,
   castSegment,
   createCityCastHit,
   inWater,
@@ -211,7 +215,7 @@ function fly(world: World, p: Projectile): boolean {
   let target: ProjectileTarget = 'none';
   let targetId = -1;
 
-  if (castSegment(world.cityQuery, segA, segB, cityHit)) {
+  if (castSegment(world.cityQuery, segA, segB, cityHit, -1, true)) {
     best = cityHit.t;
     target = 'structure';
     targetId = cityHit.structure;
@@ -249,6 +253,14 @@ function fly(world: World, p: Projectile): boolean {
     const x = segA.x + (segB.x - segA.x) * best;
     const y = target === 'ground' ? 0 : segA.y + (segB.y - segA.y) * best;
     const z = segA.z + (segB.z - segA.z) * best;
+    if (target === 'ground') {
+      // Coming down on a bridge is a hit on the bridge.
+      const deck = bridgeAt(world.cityQuery, x, z);
+      if (deck >= 0) {
+        target = 'structure';
+        targetId = deck;
+      }
+    }
     p.x = x;
     p.y = y;
     p.z = z;

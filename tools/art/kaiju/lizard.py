@@ -8,13 +8,27 @@ fractions of the creature's height, counts and sizes of spines, teeth, armor and
 The result is scaled to the true height (4.5, 32, 115 m) at the end.
 
 Design notes (so the three stay one character):
-  - silhouette: hunched brawler; shoulders and a row of bone spines are the high point, the
-    head hangs low and forward on a short neck, forearms are bigger than upper arms, the
-    legs are short, a thick tail balances the lot.
-  - face: heavy underbite jaw with two tusks, a V-shaped brow over glowing yellow eyes.
-  - colors: burnt orange hide, rust stripes across back, tail and limbs, cream belly plates,
-    bone claws, teeth and spines, and a cyan glowing organ in a dark socket on the chest
-    (the weak point; the socket stays visible when the game hides the glow).
+  - silhouette: hunched brawler; the shoulder hump and a row of bone spines are the high
+    point, the head hangs low and forward on a short neck, forearms are bigger than upper
+    arms, hands reach the knees, the legs are short, a thick tail balances the lot.
+  - face: heavy underbite jaw with two tusks, a V-shaped brow over glowing yellow eyes, a
+    flat-topped snout with two nostril mounds (that snout is the bottom of the player's
+    first-person view all game long).
+  - colors: burnt orange hide, rust zigzag bands around torso, tail and limbs, cream belly
+    plates and jaw, bone claws, teeth and spines, and a cyan crystal organ in a dark pit on
+    the chest gripped by four bone prongs (the weak point: a node of its own, so the pit
+    stays when the game hides the glow).
+  - growing up: the hatchling has a huge head, big eyes with pupils, nubs for spines and
+    soft stripes; the juvenile gets the hump, tusks and a mohawk of spines; the titan adds
+    a crown of spines, a nose horn, armor plates, cheek and chin spikes, a tail mace, and
+    old wounds (claw marks on the chest, a slash through the left brow, a snapped right
+    tusk, a broken spine).
+
+Rigging: every segment is a closed tube whose ends are faceted domes centered on its joints,
+so neighbors always overlap in a ball around the pivot and no gap opens when a joint turns
+(checked at 60 degrees on every joint). The rest pose has the jaw slightly open (a snarl);
+jaw.rotation.x of about -6 degrees closes it. FP_POSE and POSES at the bottom are in the
+game's axes and can be used as animation targets as they are.
 
 Authoring frame: +Z up, -Y forward, +X the creature's left. See tools/art/README.md.
 """
@@ -24,11 +38,10 @@ import math
 import os
 import sys
 
-from mathutils import Vector
-
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import mb  # noqa: E402
+from mathutils import Vector  # noqa: E402  (available once bpy is loaded)
 import parts  # noqa: E402
 from parts import BACK, DOWN, FWD, LEFT, UP, Local, Rig, V, tube, limb, spike, claw  # noqa: E402,F401
 
@@ -37,7 +50,7 @@ ORANGE = "gragnor_orange"
 ORANGE_LT = mb.mix("gragnor_orange", "gragnor_orange_lt", 0.45)
 ORANGE_DK = mb.mix("gragnor_orange", "gragnor_orange_dk", 0.55)
 RUST = "gragnor_rust"
-RUST_DK = "gragnor_rust_dk"
+STRIPE = mb.mix("gragnor_rust", "gragnor_rust_dk", 0.25)      # the stripes: rust, a touch deeper so they read at dusk
 CREAM = "gragnor_cream"
 CREAM_DK = mb.mix("gragnor_cream", "gragnor_cream_dk", 0.45)
 BONE = "bone"
@@ -69,21 +82,21 @@ STAGES = {
         spine=[(0, 0.045, 0.355), (0, 0.02, 0.44), (0, -0.015, 0.525), (0, -0.05, 0.60)],
         torso=[(0.37, 0.31), (0.43, 0.37), (0.44, 0.35), (0.30, 0.25)],
         hump=0.0,
-        shoulder=(0.245, -0.115, 0.59), elbow=(0.325, -0.06, 0.445), wrist=(0.31, -0.235, 0.335),
-        arm=(0.145, 0.11), forearm=(0.12, 0.105), fore_bulge=0.36, hand=0.125, hand_drop=18,
+        shoulder=(0.245, -0.115, 0.59), elbow=(0.32, -0.065, 0.46), wrist=(0.305, -0.225, 0.365),
+        arm=(0.16, 0.125), forearm=(0.14, 0.12), fore_bulge=0.36, hand=0.125, hand_drop=18,
         finger=0.065, hand_claw=0.085,
         neck=(0, -0.035, 0.60), neck_size=(0.27, 0.24),
         head=dict(at=(0, -0.055, 0.635), L=0.46, pitch=2, skull_w=0.90, skull_h=0.48, snout_w=0.68,
                   snout_h=0.27, brow_y=0.42, snout_y=0.56, jaw_w=1.04, jaw_h=0.23, underbite=0.04,
                   snarl=5.5, tusk=0.14, teeth_up=4, teeth_lo=3, tooth=0.055, eye=0.25, eye_slant=8,
                   pupil=True, brow=0.05, crown=[(0.30, 0.12, 62), (0.12, 0.10, 80)], cheek_spikes=0,
-                  chin_spikes=0, nose_horn=0.0, snout_scutes=1),
+                  chin_spikes=0, nose_horn=0.0, snout_scutes=1, cam_up=0.068),
         tail=[(0, 0.13, 0.305), (0, 0.25, 0.25), (0, 0.365, 0.195), (0, 0.47, 0.145), (0, 0.565, 0.11),
               (0, 0.65, 0.095)],
         tail_w=[0.29, 0.24, 0.185, 0.13, 0.085, 0.035],
         spines=[(0.45, 0.055), (0.66, 0.08), (0.86, 0.085), (1.04, 0.06)], spine_w=1.0, side_spines=0.0,
         tail_spines=[0.05, 0.04, 0.0, 0.0, 0.0], tail_club=0,
-        stripes=dict(torso=3, tail=2, limb=True), stripe_color=mb.mix("gragnor_rust", "gragnor_orange", 0.35),
+        stripes=dict(torso=True, tail=True, limb=True), stripe_color=mb.mix("gragnor_rust", "gragnor_orange", 0.35),
         weak=dict(t=0.42, r=0.058), armor=False, scars=False, elbow_spike=0.0, knee_spike=0.0,
     ),
     # ---------------------------------------------------------------- 2: juvenile
@@ -111,7 +124,7 @@ STAGES = {
         spines=[(0.22, 0.085), (0.40, 0.12), (0.58, 0.16), (0.76, 0.20), (0.93, 0.165), (1.06, 0.11)],
         spine_w=1.1, side_spines=0.0,
         tail_spines=[0.085, 0.07, 0.055, 0.04, 0.0], tail_club=0,
-        stripes=dict(torso=5, tail=2, limb=True), stripe_color=RUST,
+        stripes=dict(torso=True, tail=True, limb=True), stripe_color=STRIPE,
         weak=dict(t=0.50, r=0.048), armor=False, scars=False, elbow_spike=0.05, knee_spike=0.0,
     ),
     # ---------------------------------------------------------------- 3: titan
@@ -137,11 +150,11 @@ STAGES = {
         tail=[(0, 0.115, 0.375), (0, 0.25, 0.32), (0, 0.385, 0.255), (0, 0.515, 0.19), (0, 0.64, 0.135),
               (0, 0.76, 0.105)],
         tail_w=[0.30, 0.26, 0.21, 0.16, 0.115, 0.06],
-        spines=[(0.16, 0.10), (0.32, 0.14), (0.48, 0.19), (0.64, 0.24), (0.80, 0.27), (0.95, 0.22),
-                (1.08, 0.15)],
+        spines=[(0.16, 0.10), (0.32, 0.14), (0.48, 0.19), (0.64, 0.235), (0.80, 0.245), (0.95, 0.225),
+                (1.08, 0.16)],
         spine_w=1.15, side_spines=0.55,
         tail_spines=[0.12, 0.10, 0.085, 0.065, 0.05], tail_club=4,
-        stripes=dict(torso=5, tail=2, limb=True), stripe_color=RUST,
+        stripes=dict(torso=True, tail=True, limb=True), stripe_color=STRIPE,
         weak=dict(t=0.50, r=0.046), armor=True, scars=True, elbow_spike=0.09, knee_spike=0.065,
         broken_spine=2,
     ),
@@ -199,14 +212,6 @@ def _dorsal(tan: Vector) -> Vector:
     return y
 
 
-def _skin(g: mb.Geo, belly_dir=None, belly=(0.80, 0.42), seed=1) -> mb.Geo:
-    """Base hide colors: cream where the surface looks toward belly_dir, shaded cream on
-    the bevels next to it."""
-    if belly_dir is not None:
-        parts.paint_normal(g, belly_dir, [(belly[0], CREAM), (belly[1], CREAM_DK)])
-    return g
-
-
 # =========================================================================================
 # the builder
 # =========================================================================================
@@ -235,15 +240,10 @@ def build(stage: int) -> Rig:
     nb = (len(sp) - 1) * 2
     parts.bands(g, sp[0], sp[-1], nb, [None, mb.mix(CREAM, CREAM_DK, 0.55)],
                 where=lambda c, nr: nr.dot(front) > 0.84)
-    # stripes across the back
-    back = -front
-    count = p.stripes["torso"]
-    if count:
-        s0, s1 = sp[0] + (sp[0] - sp[1]) * 0.25, sp[-1]
-        parts.bands(g, s0, s1, count * 2, [None, stripe], where=lambda c, nr: nr.dot(back) > 0.30)
+    if p.stripes["torso"]:                      # a zigzag band at every ring, from belly edge to belly edge
         for k in range(1, len(sp) - 1):
             tan = (sp[k + 1] - sp[k - 1])
-            parts.zigzag(g, sp[k], tan, stripe, where=lambda c, nr: abs(nr.dot(back)) <= 0.30)
+            parts.zigzag(g, sp[k], tan, stripe, where=lambda c, nr: nr.dot(front) < 0.6)
     torso_g = g
 
     # trapezius hump between the shoulders: the brawler's hunch. A ridge that arches from
@@ -281,13 +281,13 @@ def build(stage: int) -> Rig:
     def on_chest(g):
         return g.along(wk_surface, wk_surface + ventral, side=LEFT, stretch=False)
 
-    rim = kite(mb.lathe([(r * 1.85, -r * 0.35), (r * 1.50, r * 0.26), (r * 1.08, r * 0.10)], n=4, phase=0,
+    rim = kite(mb.lathe([(r * 1.95, -r * 1.0), (r * 1.50, r * 0.26), (r * 1.08, r * 0.10)], n=4, phase=0,
                         color=CREAM_DK, cap_bottom=False, cap_top=True))
     rim.paint(SOCKET, where=lambda c, nr: nr.z > 0.9 or (c.x ** 2 + c.y ** 2) ** 0.5 < r * 1.2)
     for sx in (1, -1):
         for (bx, by, tx, ty) in ((1.30, 0.80, 0.30, 0.22), (1.05, -1.45, 0.26, -0.55)):
-            rim += spike((sx * bx * r, by * r, r * 0.05), (sx * tx * r, ty * r, r * 0.78), r * 0.62, r * 0.50, n=4,
-                         up=(0, 0, 1), color=BONE, root=BONE_DK, root_at=0.45)
+            rim += spike((sx * bx * r, by * r, -r * 0.15), (sx * tx * r, ty * r, r * 0.78), r * 0.62, r * 0.50, n=4,
+                         up=(0, 0, 1), color=BONE, root=BONE_DK, root_at=0.45, closed=True)
     torso_g += on_chest(rim)
     rig.add("torso", parts.finish(torso_g, seed=12), sp[0], "hips")
 
@@ -304,8 +304,8 @@ def build(stage: int) -> Rig:
         dz = _size_at(p.torso, sp, t)[1]
         dors = _dorsal(tan)
         lift = 0.0
-        if p.hump and abs(t - 0.80) < 0.16:                 # the ones that stand on the hump
-            lift = (0.05 + 0.05 * p.hump) * (1.0 - abs(t - 0.80) / 0.16)
+        if p.hump:                                          # the ones that stand on the hump
+            lift = (0.035 + 0.03 * p.hump) * max(0.0, 1.0 - ((t - 0.80) / 0.24) ** 2)
         base = c + dors * (dz * 0.5 - ln * 0.22) + V((0, 0, lift))
         lean = (dors * 0.80 + tan * -0.10 + V((0, 0.10, 0.50))).normalized()
         w = ln * 0.50 * p.spine_w
@@ -359,7 +359,7 @@ def build(stage: int) -> Rig:
         parts.zigzag(g, el.lerp(wr, 0.38), wr - el, stripe, where=lambda c, nr: nr.dot(topd) > -0.35)
     if p.elbow_spike:
         g += spike(el + topd * (f0 * 0.1), el - fdir * (f0 * 0.5 + p.elbow_spike) +
-                   topd * (p.elbow_spike * 0.45), f0 * 0.55, n=4, up=topd, color=BONE, root=BONE_DK)
+                   topd * (p.elbow_spike * 0.45), f0 * 0.55, n=4, up=topd, color=BONE, root=BONE_DK, closed=True)
     if p.armor:
         for k, t in enumerate((0.22, 0.48, 0.72)):
             c = el.lerp(wr, t)
@@ -380,9 +380,8 @@ def build(stage: int) -> Rig:
     if p.stripes["limb"]:
         parts.zigzag(g, hip.lerp(kn, 0.35), kn - hip, stripe, where=lambda c, nr: nr.dot(outl) > -0.25)
     if p.knee_spike:
-        kd = (kn - hip).normalized()
-        g += spike(kn + V((0, -ks * 0.35, 0.0)), kn + V((0, -ks * 0.5 - p.knee_spike, p.knee_spike * 0.25)),
-                   ks * 0.5, n=4, up=UP, color=BONE, root=BONE_DK)
+        g += spike(kn + V((0, -ks * 0.2, 0.0)), kn + V((0, -ks * 0.5 - p.knee_spike, p.knee_spike * 0.25)),
+                   ks * 0.5, n=4, up=UP, color=BONE, root=BONE_DK, closed=True)
     rig.add("leg_L", parts.finish(g, seed=31), hip, "hips")
 
     se = p.shin_end
@@ -409,9 +408,11 @@ def build(stage: int) -> Rig:
         g = tube([a, a.lerp(b, 0.5), b], [(w0, w0 * 0.98), ((w0 + w1) / 2,) * 2, (w1, w1)], n=n, up=UP,
                  cap0="dome", cap1="point" if last else "dome", d0=0.9, d1=1.6 if last else 0.75, color=ORANGE)
         parts.paint_normal(g, DOWN, [(0.80, CREAM)])
-        cnt = p.stripes["tail"]
-        if cnt:
-            parts.bands(g, a, b, cnt * 2, [None, stripe], where=lambda c, nr: nr.z > -0.2)
+        if p.stripes["tail"]:
+            if last:
+                g.paint(stripe, where=lambda c, nr: nr.z > -0.5 and (c - a).dot(b - a) > 0.5 * (b - a).length_squared)
+            else:
+                parts.zigzag(g, a.lerp(b, 0.5), b - a, stripe, where=lambda c, nr: nr.z > -0.5)
         tan = (b - a).normalized()
         up_t = (UP - tan * UP.dot(tan)).normalized()
         ln = p.tail_spines[i]
@@ -692,7 +693,8 @@ def _foot(p: P, an: Vector) -> mb.Geo:
                   n=4, color=BONE, up=UP, bend=0.22, root=BONE_DK)
     if p.heel_spur:
         b0 = V((x, y_heel + 0.005, hz * 0.42))
-        g += spike(b0 - V((0, 0.02, 0)), b0 + V((0, p.heel_spur, hz * 0.10)), tw * 0.8, n=4, up=UP, color=BONE)
+        g += spike(b0 - V((0, 0.02, 0)), b0 + V((0, p.heel_spur, hz * 0.10)), tw * 0.8, hz * 0.5, n=4, up=UP,
+                   color=BONE, closed=True)
     return g
 
 
@@ -708,7 +710,7 @@ def _pauldron(sh: Vector, a0: float, stripe) -> mb.Geo:
         g += parts.scute(c, (out + V((0.25 * k, 0, -0.3 * k))).normalized(), a0 * 0.95 * s, a0 * 1.0 * s, a0 * 0.20,
                          along=FWD, color=ARMOR, top=ARMOR_LT, taper=0.6, closed=True)
     g += spike(sh + out * (a0 * 0.50), sh + out * (a0 * 0.50) + (out * 0.9 + V((0.25, 0.1, 0.3))).normalized() * (a0 * 0.62),
-               a0 * 0.34, n=4, up=FWD, color=BONE, root=BONE_DK)
+               a0 * 0.34, n=4, up=FWD, color=BONE, root=BONE_DK, closed=True)
     return g
 
 
@@ -767,7 +769,7 @@ def _arms(x, y, z, fore, hand=0.0) -> dict:
 # up (x), turn the elbow out (y), bring the hands together (z), straighten the elbow.
 # Found by inverse kinematics for each stage's proportions (left arm; the right mirrors).
 FP_POSE = {
-    1: _arms(-112, 46, -9, 60, -25),
+    1: _arms(-100, 60, -15, 60, -25),      # the hatchling's arms are short: it has to stretch right out
     2: _arms(-75, 46, -24, 25, -25),
     3: _arms(-59, 47, -40, 19, -25),
 }
@@ -783,7 +785,7 @@ POSES = {
              "leg_R": {"x": 12}, "shin_R": {"x": 4}, "foot_R": {"x": -16}},
     # mid-swipe: the right claw comes across the front, the body turns into it, the left arm cocks back
     "swipe": {"hips": {"y": 8}, "torso": {"y": 24, "x": 8}, "neck": {"y": -8}, "head": {"y": -10, "x": -4},
-              "jaw": {"x": 18}, "arm_R": {"x": -72, "y": -30, "z": 34}, "forearm_R": {"x": 28},
+              "jaw": {"x": 18}, "arm_R": {"x": -50, "y": -34, "z": 30}, "forearm_R": {"x": 22},
               "hand_R": {"x": -22}, "arm_L": {"x": 34, "z": 24}, "forearm_L": {"x": -55}, "hand_L": {"x": -15},
               "tail_1": {"y": -14}, "tail_2": {"y": -14}, "tail_3": {"y": -14}, "tail_4": {"y": -12},
               "tail_5": {"y": -10}, "leg_L": {"x": -24}, "shin_L": {"x": 20}, "foot_L": {"x": 4},

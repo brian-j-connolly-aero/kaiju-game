@@ -38,55 +38,141 @@ def line_sets() -> dict:
     chair = [l for l in lines if l["speaker"] == "Chair"]
     return {
         "radio": radio,                              # all 93 military lines
+        "radio sample": radio[::3],                  # every third military line (31)
         "anchor": anchor,                            # all 82 news lines
         "chair": chair + anchor[::3],                # the 6 hearing lines plus 28 news lines
         **{s: [l for l in lines if l["speaker"] == s] for s in ("Overlord", "Granite", "Beacon", "Tempest")},
     }
 
 
+# The first-pass chains the casting experiments were run through (harsher than the final ones).
+RADIO_V1 = {"drive_db": 7.0, "static_db": -30.0, "static_duck_db": 0.0}
+HALL_V1 = {"wet_db": -12.0, "early_db": -9.0, "duck_db": 0.0}
+# The second-pass radio chain (what the defaults became).
+RADIO_V2 = {"drive_db": 3.0, "static_db": -30.0, "static_duck_db": 10.0}
+
 # group name -> list of (label, voice, chain, chain overrides, line set, max pause ms)
 GROUPS = {
     "radio_voices": [
-        ("bdl", V("rhvoice", "bdl"), "radio", {}, "radio", 320),
-        ("bdl rate 0.92 pitch 0.9", V("rhvoice", "bdl", rate=0.92, pitch=0.9), "radio", {}, "radio", 320),
-        ("bdl rate 0.88 pitch 0.82", V("rhvoice", "bdl", rate=0.88, pitch=0.82), "radio", {}, "radio", 320),
-        ("bdl rate 0.85 pitch 0.75", V("rhvoice", "bdl", rate=0.85, pitch=0.75), "radio", {}, "radio", 320),
-        ("bdl rate 0.8 pitch 0.68", V("rhvoice", "bdl", rate=0.8, pitch=0.68), "radio", {}, "radio", 320),
-        ("alan", V("rhvoice", "alan"), "radio", {}, "radio", 320),
-        ("alan rate 0.9 pitch 0.85", V("rhvoice", "alan", rate=0.9, pitch=0.85), "radio", {}, "radio", 320),
-        ("clb", V("rhvoice", "clb"), "radio", {}, "radio", 320),
-        ("clb rate 1.06", V("rhvoice", "clb", rate=1.06), "radio", {}, "radio", 320),
-        ("rhvoice slt", V("rhvoice", "slt"), "radio", {}, "radio", 320),
-        ("rms", V("flite", "rms"), "radio", {}, "radio", 320),
-        ("rms shift -1", V("flite", "rms", shift_st=-1.0), "radio", {}, "radio", 320),
-        ("rms shift -2", V("flite", "rms", shift_st=-2.0), "radio", {}, "radio", 320),
-        ("rms pitch only -2", V("flite", "rms", pitch_st=-2.0), "radio", {}, "radio", 320),
-        ("awb", V("flite", "awb"), "radio", {}, "radio", 320),
-        ("awb shift -1", V("flite", "awb", shift_st=-1.0), "radio", {}, "radio", 320),
-        ("flite slt", V("flite", "slt"), "radio", {}, "radio", 320),
-        ("kal16", V("flite", "kal16"), "radio", {}, "radio", 320),
-        ("pico en-GB", V("pico", "en-GB"), "radio", {}, "radio", 320),
-        ("pico en-US", V("pico", "en-US"), "radio", {}, "radio", 320),
-        ("festival slt", V("festival", "cmu_us_slt_arctic_hts"), "radio", {}, "radio", 320),
+        ("bdl", V("rhvoice", "bdl"), "radio", RADIO_V1, "radio", 320),
+        ("bdl rate 0.92 pitch 0.9", V("rhvoice", "bdl", rate=0.92, pitch=0.9), "radio", RADIO_V1, "radio", 320),
+        ("bdl rate 0.88 pitch 0.82", V("rhvoice", "bdl", rate=0.88, pitch=0.82), "radio", RADIO_V1, "radio", 320),
+        ("bdl rate 0.85 pitch 0.75", V("rhvoice", "bdl", rate=0.85, pitch=0.75), "radio", RADIO_V1, "radio", 320),
+        ("alan", V("rhvoice", "alan"), "radio", RADIO_V1, "radio", 320),
+        ("alan rate 0.92 pitch 0.9", V("rhvoice", "alan", rate=0.92, pitch=0.9), "radio", RADIO_V1, "radio", 320),
+        ("clb", V("rhvoice", "clb"), "radio", RADIO_V1, "radio", 320),
+        ("clb rate 1.06", V("rhvoice", "clb", rate=1.06), "radio", RADIO_V1, "radio", 320),
+        ("rhvoice slt", V("rhvoice", "slt"), "radio", RADIO_V1, "radio", 320),
+        ("rms", V("flite", "rms"), "radio", RADIO_V1, "radio", 320),
+        ("rms shift -1", V("flite", "rms", shift_st=-1.0), "radio", RADIO_V1, "radio", 320),
+        ("rms shift -2", V("flite", "rms", shift_st=-2.0), "radio", RADIO_V1, "radio", 320),
+        ("rms pitch only -2", V("flite", "rms", pitch_st=-2.0), "radio", RADIO_V1, "radio", 320),
+        ("awb", V("flite", "awb"), "radio", RADIO_V1, "radio", 320),
+        ("awb rate 0.92", V("flite", "awb", rate=0.92), "radio", RADIO_V1, "radio", 320),
+        ("pico en-US", V("pico", "en-US"), "radio", RADIO_V1, "radio", 320),
     ],
     "anchor_voices": [
-        ("pico en-US", V("pico", "en-US"), "broadcast", {}, "anchor", 380),
-        ("pico en-GB", V("pico", "en-GB"), "broadcast", {}, "anchor", 380),
         ("rhvoice slt", V("rhvoice", "slt"), "broadcast", {}, "anchor", 380),
+        ("rhvoice slt rate 0.94", V("rhvoice", "slt", rate=0.94), "broadcast", {}, "anchor", 380),
         ("rhvoice clb", V("rhvoice", "clb"), "broadcast", {}, "anchor", 380),
+        ("pico en-US", V("pico", "en-US"), "broadcast", {}, "anchor", 380),
+        ("pico en-US rate 0.92", V("pico", "en-US", rate=0.92), "broadcast", {}, "anchor", 380),
         ("festival slt", V("festival", "cmu_us_slt_arctic_hts"), "broadcast", {}, "anchor", 380),
-        ("rhvoice bdl", V("rhvoice", "bdl"), "broadcast", {}, "anchor", 380),
     ],
     "chair_voices": [
-        ("alan", V("rhvoice", "alan"), "hall", {}, "chair", 650),
-        ("alan rate 0.88 pitch 0.85", V("rhvoice", "alan", rate=0.88, pitch=0.85), "hall", {}, "chair", 650),
-        ("alan rate 0.84 pitch 0.8", V("rhvoice", "alan", rate=0.84, pitch=0.8), "hall", {}, "chair", 650),
-        ("alan rate 0.8 pitch 0.72", V("rhvoice", "alan", rate=0.8, pitch=0.72), "hall", {}, "chair", 650),
-        ("bdl rate 0.84 pitch 0.8", V("rhvoice", "bdl", rate=0.84, pitch=0.8), "hall", {}, "chair", 650),
-        ("rms rate 0.9", V("flite", "rms", rate=0.9), "hall", {}, "chair", 650),
-        ("awb rate 0.9", V("flite", "awb", rate=0.9), "hall", {}, "chair", 650),
+        ("alan", V("rhvoice", "alan"), "hall", HALL_V1, "chair", 650),
+        ("alan rate 0.88 pitch 0.85", V("rhvoice", "alan", rate=0.88, pitch=0.85), "hall", HALL_V1, "chair", 650),
+        ("alan rate 0.82 pitch 0.78", V("rhvoice", "alan", rate=0.82, pitch=0.78), "hall", HALL_V1, "chair", 650),
+        ("awb rate 0.88", V("flite", "awb", rate=0.88), "hall", HALL_V1, "chair", 650),
+        ("awb rate 0.88 shift -2", V("flite", "awb", rate=0.88, shift_st=-2.0), "hall", HALL_V1, "chair", 650),
+        ("pico en-US rate 0.9 pitch 0.78", V("pico", "en-US", rate=0.9, pitch=0.78), "hall", HALL_V1, "chair", 650),
+        ("pico en-GB rate 0.88 pitch 0.75", V("pico", "en-GB", rate=0.88, pitch=0.75), "hall", HALL_V1, "chair", 650),
+        ("bdl rate 0.84 pitch 0.8", V("rhvoice", "bdl", rate=0.84, pitch=0.8), "hall", HALL_V1, "chair", 650),
+        ("rms rate 0.9", V("flite", "rms", rate=0.9), "hall", HALL_V1, "chair", 650),
     ],
 }
+
+
+def _radio_sweep() -> list:
+    voices = [("rms", V("flite", "rms")), ("clb", V("rhvoice", "clb"))]
+    settings = [
+        ("first pass (drive 7, static -30, not ducked)", {}),
+        ("band 300 to 3800 Hz", {"band_hz": [300.0, 3800.0]}),
+        ("band 250 to 4200 Hz", {"band_hz": [250.0, 4200.0]}),
+        ("band 400 to 3000 Hz", {"band_hz": [400.0, 3000.0]}),
+        ("gentler filter slopes", {"hp_order": 2, "lp_order": 4}),
+        ("no presence peak", {"presence_db": 0.0}),
+        ("no compression", {"comp_ratio": 1.0}),
+        ("drive 0 dB", {"drive_db": 0.0}),
+        ("drive 12 dB", {"drive_db": 12.0}),
+        ("static -40 dB", {"static_db": -40.0}),
+        ("static -24 dB", {"static_db": -24.0}),
+    ]
+    return [(f"{vn}: {label}", v, "radio", {**RADIO_V1, **over}, "radio sample", 320)
+            for vn, v in voices for label, over in settings]
+
+
+GROUPS["sweep_radio"] = _radio_sweep()
+
+
+def _radio_sweep2() -> list:
+    voices = [("rms", V("flite", "rms")), ("clb", V("rhvoice", "clb")), ("alan", V("rhvoice", "alan"))]
+    settings = [
+        ("second pass (drive 3, static -30 ducked 10)", {}),
+        ("static not ducked", {"static_duck_db": 0.0}),
+        ("static ducked 16 dB", {"static_duck_db": 16.0}),
+        ("static -34 ducked 10", {"static_db": -34.0}),
+        ("drive 0 dB", {"drive_db": 0.0}),
+        ("drive 6 dB", {"drive_db": 6.0}),
+        ("band 300 to 3800 Hz", {"band_hz": [300.0, 3800.0]}),
+    ]
+    return [(f"{vn}: {label}", v, "radio", {**RADIO_V2, **over}, "radio sample", 320)
+            for vn, v in voices for label, over in settings]
+
+
+def _hall_sweep() -> list:
+    voice = V("rhvoice", "alan", rate=0.88, pitch=0.85)
+    settings = [
+        ("first pass (wet -12, early -9, no ducking)", {}),
+        ("ducked 8 dB", {"duck_db": 8.0}),
+        ("ducked 14 dB", {"duck_db": 14.0}),
+        ("wet -18, early -15", {"wet_db": -18.0, "early_db": -15.0}),
+        ("wet -18, early -15, ducked 8 dB", {"wet_db": -18.0, "early_db": -15.0, "duck_db": 8.0}),
+        ("wet -15, early -18, ducked 10 dB", {"wet_db": -15.0, "early_db": -18.0, "duck_db": 10.0}),
+        ("wet -24, early -20", {"wet_db": -24.0, "early_db": -20.0}),
+        ("decay 1.4 s", {"rt60_s": 1.4, "rt60_high_s": 0.8}),
+    ]
+    return [(f"alan: {label}", voice, "hall", {**HALL_V1, **over}, "chair", 650) for label, over in settings]
+
+
+def _radio_sweep3() -> list:
+    alan = V("rhvoice", "alan")
+    settings = [
+        ("band 300 to 4200 Hz", alan, {"band_hz": [300.0, 4200.0]}),
+        ("band 300 to 4800 Hz", alan, {"band_hz": [300.0, 4800.0]}),
+        ("band 200 to 3800 Hz", alan, {"band_hz": [200.0, 3800.0]}),
+        ("band 300 to 3800 Hz, no presence peak", alan, {"band_hz": [300.0, 3800.0], "presence_db": 0.0}),
+        ("band 300 to 3800 Hz, gentler low-pass", alan, {"band_hz": [300.0, 3800.0], "lp_order": 4}),
+        ("band 300 to 3800 Hz, rate 0.94", V("rhvoice", "alan", rate=0.94), {"band_hz": [300.0, 3800.0]}),
+    ]
+    return [(f"alan: {label}", v, "radio", {**RADIO_V2, **over}, "radio sample", 320) for label, v, over in settings]
+
+
+def _hall_sweep2() -> list:
+    voice = V("pico", "en-US", rate=0.9, pitch=0.78)
+    settings = [
+        ("wet -14, early -18, ducked 10 dB", {"wet_db": -14.0, "early_db": -18.0, "duck_db": 10.0}),
+        ("wet -11, early -18, ducked 12 dB", {"wet_db": -11.0, "early_db": -18.0, "duck_db": 12.0}),
+        ("wet -11, early -20, ducked 14 dB", {"wet_db": -11.0, "early_db": -20.0, "duck_db": 14.0}),
+        ("wet -8, early -20, ducked 16 dB", {"wet_db": -8.0, "early_db": -20.0, "duck_db": 16.0}),
+    ]
+    return [(f"pico low: {label}", voice, "hall", {**HALL_V1, **over}, "chair", 650) for label, over in settings]
+
+
+GROUPS["sweep_radio3"] = _radio_sweep3()
+GROUPS["sweep_hall2"] = _hall_sweep2()
+GROUPS["sweep_radio2"] = _radio_sweep2()
+GROUPS["sweep_hall"] = _hall_sweep()
 
 
 def key_of(exp) -> str:

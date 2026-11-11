@@ -16,13 +16,13 @@ import os
 import random
 import sys
 
-from mathutils import Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import mb  # noqa: E402
+from mathutils import Vector  # noqa: E402  (available once bpy is loaded)
 import parts  # noqa: E402
-from parts import V, tube, spike  # noqa: E402
+from parts import tube, spike  # noqa: E402
 
 CREAM = "gragnor_cream"
 CREAM_DK = mb.mix("gragnor_cream", "gragnor_cream_dk", 0.5)

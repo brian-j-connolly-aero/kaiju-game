@@ -1,5 +1,389 @@
 {
   "models": {
+    "army_tank": {
+      "file": "models/army_tank.glb",
+      "kind": "vehicle",
+      "nodes": [
+        "hull",
+        "track_L",
+        "track_R",
+        "turret",
+        "barrel",
+        "muzzle"
+      ],
+      "size": [
+        3.92,
+        3.301,
+        8.03
+      ],
+      "tris": 497
+    },
+    "army_tank_wreck": {
+      "file": "models/army_tank_wreck.glb",
+      "kind": "vehicle",
+      "nodes": [
+        "army_tank_wreck"
+      ],
+      "size": [
+        6.185,
+        2.768,
+        6.726
+      ],
+      "tris": 480
+    },
+    "kaiju_cocoon": {
+      "file": "models/kaiju_cocoon.glb",
+      "kind": "misc",
+      "nodes": [
+        "kaiju_cocoon",
+        "cocoon_glow"
+      ],
+      "size": [
+        0.921,
+        1,
+        0.949
+      ],
+      "tris": 447
+    },
+    "kaiju_egg": {
+      "file": "models/kaiju_egg.glb",
+      "kind": "misc",
+      "nodes": [
+        "kaiju_egg",
+        "egg_glow"
+      ],
+      "size": [
+        0.758,
+        1,
+        0.775
+      ],
+      "tris": 180
+    },
+    "kaiju_lizard_s1": {
+      "file": "models/kaiju_lizard_s1.glb",
+      "kind": "kaiju",
+      "nodes": [
+        "root",
+        "hips",
+        "leg_L",
+        "shin_L",
+        "foot_L",
+        "leg_R",
+        "shin_R",
+        "foot_R",
+        "tail_1",
+        "tail_2",
+        "tail_3",
+        "tail_4",
+        "tail_5",
+        "torso",
+        "arm_L",
+        "forearm_L",
+        "hand_L",
+        "arm_R",
+        "forearm_R",
+        "hand_R",
+        "hold",
+        "neck",
+        "head",
+        "cam_fp",
+        "jaw",
+        "mouth",
+        "spines",
+        "weak_point"
+      ],
+      "rig": "lizard",
+      "size": [
+        4.173,
+        4.5,
+        6.102
+      ],
+      "tris": 2167
+    },
+    "kaiju_lizard_s2": {
+      "file": "models/kaiju_lizard_s2.glb",
+      "kind": "kaiju",
+      "nodes": [
+        "root",
+        "hips",
+        "leg_L",
+        "shin_L",
+        "foot_L",
+        "leg_R",
+        "shin_R",
+        "foot_R",
+        "tail_1",
+        "tail_2",
+        "tail_3",
+        "tail_4",
+        "tail_5",
+        "torso",
+        "arm_L",
+        "forearm_L",
+        "hand_L",
+        "arm_R",
+        "forearm_R",
+        "hand_R",
+        "hold",
+        "neck",
+        "head",
+        "cam_fp",
+        "jaw",
+        "mouth",
+        "spines",
+        "weak_point"
+      ],
+      "rig": "lizard",
+      "size": [
+        25.591,
+        32,
+        39.515
+      ],
+      "tris": 2339
+    },
+    "kaiju_lizard_s3": {
+      "file": "models/kaiju_lizard_s3.glb",
+      "kind": "kaiju",
+      "nodes": [
+        "root",
+        "hips",
+        "leg_L",
+        "shin_L",
+        "foot_L",
+        "leg_R",
+        "shin_R",
+        "foot_R",
+        "tail_1",
+        "tail_2",
+        "tail_3",
+        "tail_4",
+        "tail_5",
+        "torso",
+        "arm_L",
+        "forearm_L",
+        "hand_L",
+        "arm_R",
+        "forearm_R",
+        "hand_R",
+        "hold",
+        "neck",
+        "head",
+        "cam_fp",
+        "jaw",
+        "mouth",
+        "spines",
+        "weak_point"
+      ],
+      "rig": "lizard",
+      "size": [
+        108.416,
+        115,
+        144.827
+      ],
+      "tris": 3379
+    },
+    "proj_arty": {
+      "file": "models/proj_arty.glb",
+      "kind": "projectile",
+      "nodes": [
+        "proj_arty"
+      ],
+      "size": [
+        0.36,
+        0.312,
+        1.52
+      ],
+      "tris": 74
+    },
+    "proj_rocket": {
+      "file": "models/proj_rocket.glb",
+      "kind": "projectile",
+      "nodes": [
+        "proj_rocket"
+      ],
+      "size": [
+        0.255,
+        0.255,
+        1.22
+      ],
+      "tris": 74
+    },
+    "proj_shell": {
+      "file": "models/proj_shell.glb",
+      "kind": "projectile",
+      "nodes": [
+        "proj_shell"
+      ],
+      "size": [
+        0.2,
+        0.173,
+        0.9
+      ],
+      "tris": 46
+    },
+    "prop_bench": {
+      "file": "models/prop_bench.glb",
+      "kind": "prop",
+      "nodes": [
+        "prop_bench"
+      ],
+      "size": [
+        1.72,
+        0.92,
+        0.7
+      ],
+      "tris": 64
+    },
+    "prop_billboard": {
+      "file": "models/prop_billboard.glb",
+      "kind": "prop",
+      "nodes": [
+        "prop_billboard"
+      ],
+      "size": [
+        6.6,
+        8.95,
+        0.645
+      ],
+      "tris": 52
+    },
+    "prop_bus": {
+      "file": "models/prop_bus.glb",
+      "kind": "prop",
+      "nodes": [
+        "prop_bus"
+      ],
+      "size": [
+        2.605,
+        3.2,
+        11.96
+      ],
+      "tint": {
+        "blend": "multiply",
+        "colors": [
+          "#d7263d",
+          "#2f62c9",
+          "#3fa652",
+          "#f3e3b3"
+        ],
+        "mask": "COLOR_0 alpha: 1 = paint (multiply the tint color in), 0 = never tint",
+        "part": "body paint"
+      },
+      "tris": 146
+    },
+    "prop_busstop": {
+      "file": "models/prop_busstop.glb",
+      "kind": "prop",
+      "nodes": [
+        "prop_busstop"
+      ],
+      "size": [
+        4.41,
+        3.128,
+        1.5
+      ],
+      "tris": 78
+    },
+    "prop_car_sedan": {
+      "file": "models/prop_car_sedan.glb",
+      "kind": "prop",
+      "nodes": [
+        "prop_car_sedan"
+      ],
+      "size": [
+        1.91,
+        1.5,
+        4.46
+      ],
+      "tint": {
+        "blend": "multiply",
+        "colors": [
+          "#e0372f",
+          "#2f62c9",
+          "#f5f5f0",
+          "#3fa652",
+          "#8f6fd0",
+          "#f29b85",
+          "#2a9d8f",
+          "#aab2bc"
+        ],
+        "mask": "COLOR_0 alpha: 1 = paint (multiply the tint color in), 0 = never tint",
+        "part": "body paint"
+      },
+      "tris": 128
+    },
+    "prop_car_taxi": {
+      "file": "models/prop_car_taxi.glb",
+      "kind": "prop",
+      "nodes": [
+        "prop_car_taxi"
+      ],
+      "size": [
+        1.91,
+        1.67,
+        4.46
+      ],
+      "tris": 150
+    },
+    "prop_car_van": {
+      "file": "models/prop_car_van.glb",
+      "kind": "prop",
+      "nodes": [
+        "prop_car_van"
+      ],
+      "size": [
+        2.25,
+        2.12,
+        5.14
+      ],
+      "tint": {
+        "blend": "multiply",
+        "colors": [
+          "#f5f5f0",
+          "#2f62c9",
+          "#e0372f",
+          "#9fe0c0",
+          "#b9a6e0"
+        ],
+        "mask": "COLOR_0 alpha: 1 = paint (multiply the tint color in), 0 = never tint",
+        "part": "body paint"
+      },
+      "tris": 150
+    },
+    "prop_car_wreck": {
+      "file": "models/prop_car_wreck.glb",
+      "kind": "prop",
+      "nodes": [
+        "prop_car_wreck"
+      ],
+      "size": [
+        2.429,
+        0.892,
+        4.964
+      ],
+      "tint": {
+        "blend": "multiply",
+        "colors": [
+          "#2a9d8f",
+          "#2f62c9",
+          "#3fa652",
+          "#8f6fd0",
+          "#9fe0c0",
+          "#aab2bc",
+          "#b9a6e0",
+          "#d7263d",
+          "#e0372f",
+          "#f29b85",
+          "#f3e3b3",
+          "#f5f5f0",
+          "#f7c21a"
+        ],
+        "hint": "use the paint color of the vehicle that was crushed (taxi: #f7c21a)",
+        "mask": "COLOR_0 alpha: 1 = paint (multiply the tint color in), 0 = never tint",
+        "part": "body paint"
+      },
+      "tris": 94
+    },
     "prop_hydrant": {
       "file": "models/prop_hydrant.glb",
       "kind": "prop",
@@ -12,10 +396,592 @@
         0.423
       ],
       "tris": 79
+    },
+    "prop_kiosk": {
+      "file": "models/prop_kiosk.glb",
+      "kind": "prop",
+      "nodes": [
+        "prop_kiosk"
+      ],
+      "size": [
+        2.8,
+        3.09,
+        3.02
+      ],
+      "tris": 80
+    },
+    "prop_lamp": {
+      "file": "models/prop_lamp.glb",
+      "kind": "prop",
+      "nodes": [
+        "prop_lamp"
+      ],
+      "size": [
+        1.16,
+        6,
+        0.381
+      ],
+      "tris": 66
+    },
+    "prop_trafficlight": {
+      "file": "models/prop_trafficlight.glb",
+      "kind": "prop",
+      "nodes": [
+        "prop_trafficlight"
+      ],
+      "size": [
+        0.56,
+        5,
+        0.56
+      ],
+      "tris": 68
+    },
+    "prop_tree_a": {
+      "file": "models/prop_tree_a.glb",
+      "kind": "prop",
+      "nodes": [
+        "prop_tree_a"
+      ],
+      "size": [
+        3.719,
+        6.941,
+        3.403
+      ],
+      "tris": 70
+    },
+    "prop_tree_b": {
+      "file": "models/prop_tree_b.glb",
+      "kind": "prop",
+      "nodes": [
+        "prop_tree_b"
+      ],
+      "size": [
+        4.5,
+        9,
+        3.897
+      ],
+      "tris": 50
+    },
+    "prop_truck": {
+      "file": "models/prop_truck.glb",
+      "kind": "prop",
+      "nodes": [
+        "prop_truck"
+      ],
+      "size": [
+        2.59,
+        3.3,
+        8.59
+      ],
+      "tint": {
+        "blend": "multiply",
+        "colors": [
+          "#2f62c9",
+          "#e0372f",
+          "#3fa652",
+          "#f5f5f0",
+          "#aab2bc"
+        ],
+        "mask": "COLOR_0 alpha: 1 = paint (multiply the tint color in), 0 = never tint",
+        "part": "body paint"
+      },
+      "tris": 146
     }
   },
-  "sprites": {},
-  "textures": {},
+  "sprites": {
+    "civilian_1": {
+      "anims": {
+        "run": {
+          "col": 0,
+          "fps": 10,
+          "frames": 4,
+          "rows": [
+            0,
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "file": "sprites/civilians.png",
+      "frame": [
+        24,
+        32
+      ],
+      "worldHeight": 2.2
+    },
+    "civilian_2": {
+      "anims": {
+        "run": {
+          "col": 4,
+          "fps": 10,
+          "frames": 4,
+          "rows": [
+            0,
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "file": "sprites/civilians.png",
+      "frame": [
+        24,
+        32
+      ],
+      "worldHeight": 2.2
+    },
+    "civilian_3": {
+      "anims": {
+        "run": {
+          "col": 8,
+          "fps": 10,
+          "frames": 4,
+          "rows": [
+            0,
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "file": "sprites/civilians.png",
+      "frame": [
+        24,
+        32
+      ],
+      "worldHeight": 2.2
+    },
+    "civilian_4": {
+      "anims": {
+        "run": {
+          "col": 0,
+          "fps": 10,
+          "frames": 4,
+          "rows": [
+            4,
+            5,
+            6,
+            7
+          ]
+        }
+      },
+      "file": "sprites/civilians.png",
+      "frame": [
+        24,
+        32
+      ],
+      "worldHeight": 2.2
+    },
+    "civilian_5": {
+      "anims": {
+        "run": {
+          "col": 4,
+          "fps": 10,
+          "frames": 4,
+          "rows": [
+            4,
+            5,
+            6,
+            7
+          ]
+        }
+      },
+      "file": "sprites/civilians.png",
+      "frame": [
+        24,
+        32
+      ],
+      "worldHeight": 2.2
+    },
+    "civilian_6": {
+      "anims": {
+        "run": {
+          "col": 8,
+          "fps": 10,
+          "frames": 4,
+          "rows": [
+            4,
+            5,
+            6,
+            7
+          ]
+        }
+      },
+      "file": "sprites/civilians.png",
+      "frame": [
+        24,
+        32
+      ],
+      "worldHeight": 2.2
+    },
+    "fx_debris": {
+      "anims": {
+        "play": {
+          "col": 0,
+          "fps": 1,
+          "frames": 4,
+          "rows": [
+            4
+          ]
+        }
+      },
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_dust": {
+      "anims": {
+        "play": {
+          "col": 0,
+          "fps": 8,
+          "frames": 6,
+          "rows": [
+            2
+          ]
+        }
+      },
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_explosion": {
+      "anims": {
+        "play": {
+          "col": 0,
+          "fps": 16,
+          "frames": 8,
+          "rows": [
+            0
+          ]
+        }
+      },
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_explosion_ground": {
+      "anims": {
+        "play": {
+          "col": 0,
+          "fps": 16,
+          "frames": 8,
+          "rows": [
+            5
+          ]
+        }
+      },
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_fire": {
+      "anims": {
+        "play": {
+          "col": 0,
+          "fps": 10,
+          "frames": 6,
+          "rows": [
+            3
+          ]
+        }
+      },
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_flash": {
+      "anims": {
+        "play": {
+          "col": 4,
+          "fps": 20,
+          "frames": 3,
+          "rows": [
+            4
+          ]
+        }
+      },
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_glow": {
+      "anims": {
+        "play": {
+          "col": 7,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            1
+          ]
+        }
+      },
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_laserdot": {
+      "anims": {
+        "play": {
+          "col": 6,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            2
+          ]
+        }
+      },
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_ring": {
+      "anims": {
+        "play": {
+          "col": 7,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            2
+          ]
+        }
+      },
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_shadow": {
+      "anims": {
+        "play": {
+          "col": 6,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            3
+          ]
+        }
+      },
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_smoke": {
+      "anims": {
+        "play": {
+          "col": 0,
+          "fps": 8,
+          "frames": 6,
+          "rows": [
+            1
+          ]
+        }
+      },
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_spark": {
+      "anims": {
+        "play": {
+          "col": 6,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            1
+          ]
+        }
+      },
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_white": {
+      "anims": {
+        "play": {
+          "col": 7,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            3
+          ]
+        }
+      },
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "soldier_army_rifle": {
+      "anims": {
+        "die": {
+          "col": 14,
+          "fps": 6,
+          "frames": 4,
+          "rows": [
+            1
+          ]
+        },
+        "fire": {
+          "col": 12,
+          "fps": 8,
+          "frames": 2,
+          "rows": [
+            0,
+            1,
+            2,
+            3
+          ]
+        },
+        "idle": {
+          "col": 7,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            0,
+            1,
+            2,
+            3
+          ]
+        },
+        "walk": {
+          "col": 8,
+          "fps": 8,
+          "frames": 4,
+          "rows": [
+            0,
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "file": "sprites/army.png",
+      "frame": [
+        24,
+        32
+      ],
+      "worldHeight": 2.2
+    },
+    "soldier_army_rocket": {
+      "anims": {
+        "die": {
+          "col": 14,
+          "fps": 6,
+          "frames": 4,
+          "rows": [
+            0
+          ]
+        },
+        "fire": {
+          "col": 5,
+          "fps": 8,
+          "frames": 2,
+          "rows": [
+            0,
+            1,
+            2,
+            3
+          ]
+        },
+        "idle": {
+          "col": 0,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            0,
+            1,
+            2,
+            3
+          ]
+        },
+        "walk": {
+          "col": 1,
+          "fps": 8,
+          "frames": 4,
+          "rows": [
+            0,
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "file": "sprites/army.png",
+      "frame": [
+        24,
+        32
+      ],
+      "worldHeight": 2.2
+    }
+  },
+  "textures": {
+    "clouds_a": {
+      "file": "textures/clouds_a.png",
+      "tile": true
+    },
+    "clouds_b": {
+      "file": "textures/clouds_b.png",
+      "tile": true
+    },
+    "ground_asphalt": {
+      "file": "textures/ground_asphalt.png",
+      "tile": true
+    },
+    "ground_grass": {
+      "file": "textures/ground_grass.png",
+      "tile": true
+    },
+    "ground_rubble": {
+      "file": "textures/ground_rubble.png",
+      "tile": true
+    },
+    "ground_sidewalk": {
+      "file": "textures/ground_sidewalk.png",
+      "tile": true
+    },
+    "ground_water": {
+      "file": "textures/ground_water.png",
+      "tile": true
+    }
+  },
   "music": {
     "briefing": {
       "base": "audio/music/briefing",
@@ -125,6 +1091,732 @@
       "duration": 14.9
     }
   },
-  "sfx": {},
-  "voice": {}
+  "sfx": {
+    "amb_day_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        16.25
+      ],
+      "variants": [
+        "audio/sfx/amb_day_loop"
+      ]
+    },
+    "amb_night_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        16.25
+      ],
+      "variants": [
+        "audio/sfx/amb_night_loop"
+      ]
+    },
+    "amb_sunset_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        16.25
+      ],
+      "variants": [
+        "audio/sfx/amb_sunset_loop"
+      ]
+    },
+    "arty_distant": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/arty_distant"
+      ]
+    },
+    "arty_incoming": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/arty_incoming"
+      ]
+    },
+    "camera_shutter": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/camera_shutter"
+      ]
+    },
+    "car_crush": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/car_crush_1",
+        "audio/sfx/car_crush_2",
+        "audio/sfx/car_crush_3"
+      ]
+    },
+    "crowd_panic_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        6.25
+      ],
+      "variants": [
+        "audio/sfx/crowd_panic_loop"
+      ]
+    },
+    "crumble_l": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/crumble_l_1",
+        "audio/sfx/crumble_l_2",
+        "audio/sfx/crumble_l_3"
+      ]
+    },
+    "crumble_m": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/crumble_m_1",
+        "audio/sfx/crumble_m_2",
+        "audio/sfx/crumble_m_3"
+      ]
+    },
+    "crumble_s": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/crumble_s_1",
+        "audio/sfx/crumble_s_2",
+        "audio/sfx/crumble_s_3"
+      ]
+    },
+    "explosion_l": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/explosion_l_1",
+        "audio/sfx/explosion_l_2",
+        "audio/sfx/explosion_l_3"
+      ]
+    },
+    "explosion_m": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/explosion_m_1",
+        "audio/sfx/explosion_m_2",
+        "audio/sfx/explosion_m_3"
+      ]
+    },
+    "explosion_s": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/explosion_s_1",
+        "audio/sfx/explosion_s_2",
+        "audio/sfx/explosion_s_3"
+      ]
+    },
+    "fire_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        4.25
+      ],
+      "variants": [
+        "audio/sfx/fire_loop"
+      ]
+    },
+    "glass": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/glass_1",
+        "audio/sfx/glass_2",
+        "audio/sfx/glass_3"
+      ]
+    },
+    "kaiju_beam_charge": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_beam_charge"
+      ]
+    },
+    "kaiju_beam_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        2.25
+      ],
+      "variants": [
+        "audio/sfx/kaiju_beam_loop"
+      ]
+    },
+    "kaiju_brace": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_brace"
+      ]
+    },
+    "kaiju_death": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_death"
+      ]
+    },
+    "kaiju_eat": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_eat"
+      ]
+    },
+    "kaiju_grab": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_grab"
+      ]
+    },
+    "kaiju_heartbeat_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        1.93
+      ],
+      "variants": [
+        "audio/sfx/kaiju_heartbeat_loop"
+      ]
+    },
+    "kaiju_hurt": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_hurt_1",
+        "audio/sfx/kaiju_hurt_2",
+        "audio/sfx/kaiju_hurt_3"
+      ]
+    },
+    "kaiju_molt_blast": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_molt_blast"
+      ]
+    },
+    "kaiju_roar_lizard_s1": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_roar_lizard_s1"
+      ]
+    },
+    "kaiju_roar_lizard_s2": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_roar_lizard_s2"
+      ]
+    },
+    "kaiju_roar_lizard_s3": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_roar_lizard_s3"
+      ]
+    },
+    "kaiju_stagger": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_stagger"
+      ]
+    },
+    "kaiju_step_s1": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_step_s1_1",
+        "audio/sfx/kaiju_step_s1_2",
+        "audio/sfx/kaiju_step_s1_3"
+      ]
+    },
+    "kaiju_step_s2": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_step_s2_1",
+        "audio/sfx/kaiju_step_s2_2",
+        "audio/sfx/kaiju_step_s2_3"
+      ]
+    },
+    "kaiju_step_s3": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_step_s3_1",
+        "audio/sfx/kaiju_step_s3_2",
+        "audio/sfx/kaiju_step_s3_3"
+      ]
+    },
+    "kaiju_stomp_s1": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_stomp_s1"
+      ]
+    },
+    "kaiju_stomp_s2": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_stomp_s2"
+      ]
+    },
+    "kaiju_stomp_s3": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_stomp_s3"
+      ]
+    },
+    "kaiju_swipe_s1": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_swipe_s1"
+      ]
+    },
+    "kaiju_swipe_s2": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_swipe_s2"
+      ]
+    },
+    "kaiju_swipe_s3": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_swipe_s3"
+      ]
+    },
+    "kaiju_throw": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_throw"
+      ]
+    },
+    "laser_charge_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        1.25
+      ],
+      "variants": [
+        "audio/sfx/laser_charge_loop"
+      ]
+    },
+    "march_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        2.25
+      ],
+      "variants": [
+        "audio/sfx/march_loop"
+      ]
+    },
+    "member_down": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/member_down_1",
+        "audio/sfx/member_down_2",
+        "audio/sfx/member_down_3"
+      ]
+    },
+    "prop_break": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/prop_break_1",
+        "audio/sfx/prop_break_2",
+        "audio/sfx/prop_break_3"
+      ]
+    },
+    "radio_close": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/radio_close"
+      ]
+    },
+    "radio_open": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/radio_open"
+      ]
+    },
+    "rocket_launch": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/rocket_launch_1",
+        "audio/sfx/rocket_launch_2",
+        "audio/sfx/rocket_launch_3"
+      ]
+    },
+    "shaken": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/shaken"
+      ]
+    },
+    "shell_whoosh": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/shell_whoosh"
+      ]
+    },
+    "siren_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        3.25
+      ],
+      "variants": [
+        "audio/sfx/siren_loop"
+      ]
+    },
+    "splash": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/splash"
+      ]
+    },
+    "sting_bar_mark": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/sting_bar_mark"
+      ]
+    },
+    "sting_crossfire": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/sting_crossfire"
+      ]
+    },
+    "sting_molt_ready": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/sting_molt_ready"
+      ]
+    },
+    "sting_nerve_break": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/sting_nerve_break"
+      ]
+    },
+    "structure_hit": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/structure_hit_1",
+        "audio/sfx/structure_hit_2",
+        "audio/sfx/structure_hit_3"
+      ]
+    },
+    "takeover": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/takeover"
+      ]
+    },
+    "tank_engine_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        2.25
+      ],
+      "variants": [
+        "audio/sfx/tank_engine_loop"
+      ]
+    },
+    "tank_fire": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/tank_fire_1",
+        "audio/sfx/tank_fire_2",
+        "audio/sfx/tank_fire_3"
+      ]
+    },
+    "ui_click": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/ui_click"
+      ]
+    },
+    "ui_error": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/ui_error"
+      ]
+    },
+    "ui_hover": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/ui_hover"
+      ]
+    },
+    "ui_join": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/ui_join"
+      ]
+    },
+    "ui_match_start": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/ui_match_start"
+      ]
+    },
+    "ui_ready": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/ui_ready"
+      ]
+    },
+    "ui_tick": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/ui_tick"
+      ]
+    },
+    "ui_wheel_open": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/ui_wheel_open"
+      ]
+    },
+    "ui_wheel_select": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/ui_wheel_select"
+      ]
+    },
+    "unit_destroyed": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/unit_destroyed_1",
+        "audio/sfx/unit_destroyed_2",
+        "audio/sfx/unit_destroyed_3"
+      ]
+    },
+    "volley_fire": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/volley_fire"
+      ]
+    },
+    "volley_ready": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/volley_ready"
+      ]
+    },
+    "wind_high_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        10.25
+      ],
+      "variants": [
+        "audio/sfx/wind_high_loop"
+      ]
+    }
+  },
+  "voice": {},
+  "ui": {
+    "cmd_fireatwill": {
+      "file": "ui/cmd_fireatwill.svg"
+    },
+    "cmd_follow": {
+      "file": "ui/cmd_follow.svg"
+    },
+    "cmd_holdcharge": {
+      "file": "ui/cmd_holdcharge.svg"
+    },
+    "cmd_moveto": {
+      "file": "ui/cmd_moveto.svg"
+    },
+    "fac_air": {
+      "file": "ui/fac_air.svg"
+    },
+    "fac_army": {
+      "file": "ui/fac_army.svg"
+    },
+    "fac_faith": {
+      "file": "ui/fac_faith.svg"
+    },
+    "fac_science": {
+      "file": "ui/fac_science.svg"
+    },
+    "gp_a": {
+      "file": "ui/gp_a.svg"
+    },
+    "gp_b": {
+      "file": "ui/gp_b.svg"
+    },
+    "gp_back": {
+      "file": "ui/gp_back.svg"
+    },
+    "gp_dpad": {
+      "file": "ui/gp_dpad.svg"
+    },
+    "gp_lb": {
+      "file": "ui/gp_lb.svg"
+    },
+    "gp_ls": {
+      "file": "ui/gp_ls.svg"
+    },
+    "gp_lt": {
+      "file": "ui/gp_lt.svg"
+    },
+    "gp_rb": {
+      "file": "ui/gp_rb.svg"
+    },
+    "gp_rs": {
+      "file": "ui/gp_rs.svg"
+    },
+    "gp_rt": {
+      "file": "ui/gp_rt.svg"
+    },
+    "gp_start": {
+      "file": "ui/gp_start.svg"
+    },
+    "gp_x": {
+      "file": "ui/gp_x.svg"
+    },
+    "gp_y": {
+      "file": "ui/gp_y.svg"
+    },
+    "k_brace": {
+      "file": "ui/k_brace.svg"
+    },
+    "k_eat": {
+      "file": "ui/k_eat.svg"
+    },
+    "k_grab": {
+      "file": "ui/k_grab.svg"
+    },
+    "k_molt": {
+      "file": "ui/k_molt.svg"
+    },
+    "k_roar": {
+      "file": "ui/k_roar.svg"
+    },
+    "k_special": {
+      "file": "ui/k_special.svg"
+    },
+    "k_stomp": {
+      "file": "ui/k_stomp.svg"
+    },
+    "k_swipe": {
+      "file": "ui/k_swipe.svg"
+    },
+    "k_throw": {
+      "file": "ui/k_throw.svg"
+    },
+    "kb_key": {
+      "file": "ui/kb_key.svg"
+    },
+    "lb_back": {
+      "file": "ui/lb_back.svg"
+    },
+    "lb_bot": {
+      "file": "ui/lb_bot.svg"
+    },
+    "lb_create": {
+      "file": "ui/lb_create.svg"
+    },
+    "lb_host": {
+      "file": "ui/lb_host.svg"
+    },
+    "lb_human": {
+      "file": "ui/lb_human.svg"
+    },
+    "lb_join": {
+      "file": "ui/lb_join.svg"
+    },
+    "lb_kaiju": {
+      "file": "ui/lb_kaiju.svg"
+    },
+    "lb_link": {
+      "file": "ui/lb_link.svg"
+    },
+    "lb_play": {
+      "file": "ui/lb_play.svg"
+    },
+    "lb_ready": {
+      "file": "ui/lb_ready.svg"
+    },
+    "ms_left": {
+      "file": "ui/ms_left.svg"
+    },
+    "ms_middle": {
+      "file": "ui/ms_middle.svg"
+    },
+    "ms_move": {
+      "file": "ui/ms_move.svg"
+    },
+    "ms_right": {
+      "file": "ui/ms_right.svg"
+    },
+    "portrait_army": {
+      "file": "ui/portrait_army.png"
+    },
+    "portrait_lizard": {
+      "file": "ui/portrait_lizard.png"
+    },
+    "skyline": {
+      "file": "ui/skyline.svg"
+    },
+    "st_callin": {
+      "file": "ui/st_callin.svg"
+    },
+    "st_camera": {
+      "file": "ui/st_camera.svg"
+    },
+    "st_charge": {
+      "file": "ui/st_charge.svg"
+    },
+    "st_crossfire": {
+      "file": "ui/st_crossfire.svg"
+    },
+    "st_health": {
+      "file": "ui/st_health.svg"
+    },
+    "st_map": {
+      "file": "ui/st_map.svg"
+    },
+    "st_moon": {
+      "file": "ui/st_moon.svg"
+    },
+    "st_nerve": {
+      "file": "ui/st_nerve.svg"
+    },
+    "st_rage": {
+      "file": "ui/st_rage.svg"
+    },
+    "st_shaken": {
+      "file": "ui/st_shaken.svg"
+    },
+    "st_spotted": {
+      "file": "ui/st_spotted.svg"
+    },
+    "st_sun": {
+      "file": "ui/st_sun.svg"
+    },
+    "st_veteran": {
+      "file": "ui/st_veteran.svg"
+    },
+    "tl_apartment": {
+      "file": "ui/tl_apartment.svg"
+    },
+    "tl_bridge": {
+      "file": "ui/tl_bridge.svg"
+    },
+    "tl_car": {
+      "file": "ui/tl_car.svg"
+    },
+    "tl_factory": {
+      "file": "ui/tl_factory.svg"
+    },
+    "tl_house": {
+      "file": "ui/tl_house.svg"
+    },
+    "tl_kiosk": {
+      "file": "ui/tl_kiosk.svg"
+    },
+    "tl_landmark": {
+      "file": "ui/tl_landmark.svg"
+    },
+    "tl_office": {
+      "file": "ui/tl_office.svg"
+    },
+    "tl_shop": {
+      "file": "ui/tl_shop.svg"
+    },
+    "tl_tower": {
+      "file": "ui/tl_tower.svg"
+    }
+  }
 }

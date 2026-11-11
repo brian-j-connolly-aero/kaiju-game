@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Tally: a car. -->
+  <path fill="currentColor" stroke="none" fill-rule="evenodd" d="M4 43V37Q4 32 9 31L17 29.5 23 21Q24.5 18.5 28 18.5H41Q44.5 18.5 46 21L52 29.5 55.5 31Q60 32.5 60 37V43Q60 46 57 46H7Q4 46 4 43ZM22 29L26.5 22.5H32V29ZM35.5 22.5H41.5L46.5 29H35.5Z"/>
+  <path fill="currentColor" stroke="none" fill-rule="evenodd" d="M10 48a7.5 7.5 0 1 0 15 0a7.5 7.5 0 1 0-15 0ZM15 48a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0-5 0Z"/>
+  <path fill="currentColor" stroke="none" fill-rule="evenodd" d="M39 48a7.5 7.5 0 1 0 15 0a7.5 7.5 0 1 0-15 0ZM44 48a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0-5 0Z"/>
+</svg>

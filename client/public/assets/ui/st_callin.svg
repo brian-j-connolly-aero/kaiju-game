@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Status: call-in. Shells fall on a ground marker. -->
+  <g transform="translate(26 26) rotate(25) scale(1.2)">
+    <path fill="currentColor" stroke="none" d="M0 13C3.5 9 4.5 6 4.5 2V-6L2 -9.5H5V-14H-5V-9.5H-2L-4.5 -6V2C-4.5 6 -3.5 9 0 13Z"/>
+  </g>
+  <g transform="translate(47 22) rotate(25) scale(.9)">
+    <path fill="currentColor" stroke="none" d="M0 13C3.5 9 4.5 6 4.5 2V-6L2 -9.5H5V-14H-5V-9.5H-2L-4.5 -6V2C-4.5 6 -3.5 9 0 13Z"/>
+  </g>
+  <ellipse cx="30" cy="52.5" rx="22" ry="6"/>
+</svg>

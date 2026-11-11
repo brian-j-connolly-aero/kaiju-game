@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Kaiju verb: stomp. A clawed foot comes down; shock rings spread over the ground. -->
+  <path fill="currentColor" stroke="none" d="M13 3H31L32 18Q33 20 35 20.5L46 23.5Q50 24.5 50 28.5V35Q50 38 47 38H16Q12 38 12 34V32.5Q12 28 14.5 25.5 16 24 15.5 21Z"/>
+  <path fill="currentColor" stroke="none" d="M48 24.5L59 27 49 29ZM49.5 29L61 32.5 50 34ZM49.5 33.5L60 38H48.5Z"/>
+  <path d="M12 43A20 5 0 0 0 52 43"/>
+  <path d="M4 45A28 13 0 0 0 60 45"/>
+</svg>

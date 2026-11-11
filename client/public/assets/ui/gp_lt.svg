@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Device: gamepad left trigger (the tall one behind the bumper). -->
+  <path d="M19 27.5H45C52 27.5 55.5 31 56.5 38L58.3 50C59.2 57 53 60.5 49 55L45.5 50H18.5L15 55C11 60.5 4.8 57 5.7 50L7.5 38C8.5 31 12 27.5 19 27.5Z"/>
+  <path d="M10 19.25H26"/>
+  <path fill="currentColor" d="M12 11V8.5Q12 5 15.5 5H19.5Q23 5 23 8.5V11Z"/>
+</svg>

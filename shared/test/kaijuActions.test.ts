@@ -18,7 +18,7 @@ import {
   type StageId,
   type World,
 } from '../src/index';
-import { eventsOf, input, KAIJU_PLAYER, makeTestWorld, parkUnits, placeKaiju, placeUnit, run, type TestWorldOptions } from './helpers';
+import { eventsOf, holdFire, input, KAIJU_PLAYER, makeTestWorld, parkUnits, placeKaiju, placeUnit, run, type TestWorldOptions } from './helpers';
 
 const A = LIZARD.actions;
 
@@ -38,6 +38,8 @@ function arena(options: TestWorldOptions = {}, stage: StageId = 1): World {
   if (stage > 1) beginStage(world, stage);
   placeKaiju(world, 0, 0, 0);
   parkUnits(world);
+  // These tests are about the kaiju: the squads stand as targets and do not shoot back.
+  holdFire(world);
   return world;
 }
 
@@ -677,8 +679,9 @@ describe('roar', () => {
     const world = arena();
     const k = world.kaijus[0];
     const reach = A.roar.radius[0];
+    // Two driven units (0 and 4): the orders system leaves their charge alone, so only the roar can change it.
     const inside = placeUnit(world, 0, 0, reach - 2);
-    const outside = placeUnit(world, 1, 0, reach + 2);
+    const outside = placeUnit(world, 4, 0, reach + 2);
     inside.charge = 0.9;
     outside.charge = 0.9;
 
@@ -828,11 +831,12 @@ describe('the beam special', () => {
     const world = arena();
     const range = beam.range[0];
     const reachSide = beam.width[0] / 2 + world.units[0].radius;
+    // The two that burn are driven units (0 and 4): a sub-unit would be shaken by the beam and back out of it.
     const inBeam = placeUnit(world, 0, 0, 30);
-    const grazed = placeUnit(world, 1, reachSide - 0.3, 20);
-    const beside = placeUnit(world, 2, reachSide + 1.5, 20);
-    const beyond = placeUnit(world, 3, 0, range + world.units[3].radius + beam.width[0] + 2);
-    const behind = placeUnit(world, 4, 0, -10);
+    const grazed = placeUnit(world, 4, reachSide - 0.3, 20);
+    const beside = placeUnit(world, 1, reachSide + 1.5, 20);
+    const beyond = placeUnit(world, 2, 0, range + world.units[2].radius + beam.width[0] + 2);
+    const behind = placeUnit(world, 3, 0, -10);
     for (const id of [0, 1, 2, 3, 4]) toughen(world, id);
     const events = fire(world);
     expect(inBeam.maxHp - inBeam.hp).toBeCloseTo(beam.unitDps * beam.timing.active, 6);

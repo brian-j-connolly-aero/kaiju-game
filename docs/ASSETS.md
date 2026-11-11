@@ -39,6 +39,11 @@ ochre and purple-brown; Vespera amber and pink with glowing eyespots.
 - Materials by name only, no embedded textures: `vcol` (lit, uses vertex color `COLOR_0`), `glow`
   (unlit emissive, vertex color: eyes, weak points, lights), `city_atlas` (lit, UVs into the
   shared city atlas). The client swaps in its own shared materials by these names.
+- Paint mask (only on models whose manifest entry has `"tint"`: `prop_car_sedan`, `prop_car_van`,
+  `prop_bus`, `prop_truck`, `prop_car_wreck`): the body paint is authored near-white and the
+  **alpha of `COLOR_0`** says where it is: 1 = paint (multiply the tint color in), 0 = glass,
+  tires, lights, trim (leave alone). It is a mask, not opacity: draw these with an opaque
+  material. Every other model has alpha 1 throughout.
 - Animation is done in code. Models are **rigid segments under named nodes with pivots at the
   joints**; no armatures, no baked animation. Rest pose: neutral stance.
 - Triangle budgets: kaiju stage 1 and 2 up to 2500, stage 3 up to 4000; vehicles up to 500;
@@ -200,7 +205,9 @@ deep-merges every partial into `manifest.json`, which the client loads. Never ha
 
 - `"models"`: `{ "<id>": { "file": "models/<id>.glb", "kind": "kaiju" | "vehicle" | "projectile"
   | "structure" | "landmark" | "prop" | "misc", "nodes": [..], "size": [w, h, d], "tris": n,
-  "rig"?: "lizard" | .., "chunks"?: n } }`
+  "rig"?: "lizard" | .., "chunks"?: n, "tint"?: { "part": "body paint", "mask": "..", "blend":
+  "multiply", "colors": ["#rrggbb", ..], "hint"?: ".." } } }` (`tint`: suggested paint colors for
+  the vehicles with a paint mask, see section 3)
 - `"sprites"`: `{ "<id>": { "file": "sprites/<sheet>.png", "frame": [w, h], "worldHeight":
   meters, "anims": { "<name>": { "rows": [front, left, back, right] | [row], "col"?: n,
   "frames": n, "fps": n } } } }`
