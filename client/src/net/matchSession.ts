@@ -106,7 +106,7 @@ export class MatchSession {
   aimPitch = 0;
   hint: ActionHint | null = null;
   /** Counters for the debug overlay and the automation hook. */
-  stats = { snapshots: 0, events: 0, inputs: 0, lastSnapshotAt: 0 };
+  stats = { snapshots: 0, snapshotBytes: 0, events: 0, inputs: 0, lastSnapshotAt: 0 };
 
   private readonly callbacks: SessionCallbacks;
   private queue: QueuedEvent[] = [];
@@ -159,6 +159,7 @@ export class MatchSession {
     this.latest = newestSnapshot(this.buffer);
     clockSample(this.clock, snap.tick, now);
     this.stats.snapshots++;
+    this.stats.snapshotBytes += bytes.length;
     this.stats.lastSnapshotAt = now;
     this.reconcileFrom(snap);
   }

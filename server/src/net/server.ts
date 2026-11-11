@@ -12,7 +12,7 @@ import type { AddressInfo } from 'node:net';
 import { performance } from 'node:perf_hooks';
 import type { ServerConfig } from '../config';
 import { configureApp, type HealthInfo } from '../http/app';
-import { configureRooms, MatchRoom, openRoomCodes, roomStats } from './matchRoom';
+import { configureRooms, MatchRoom, openRoomCodes, roomPerf, roomStats } from './matchRoom';
 
 export interface GameServer {
   /** The port actually bound (useful when the configuration asked for port 0). */
@@ -37,6 +37,7 @@ export async function startGameServer(config: ServerConfig): Promise<GameServer>
     uptime: Math.round((performance.now() - startedAt) / 1000),
     ...roomStats(),
     fast: config.fast,
+    perf: roomPerf(),
   });
 
   configureRooms({

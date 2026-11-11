@@ -122,6 +122,14 @@ describe('real time', () => {
     await until(() => solo.pongs.length === 1, 'the pong');
     expect(solo.pongs[0].t).toBe(4242);
     expect(solo.pongs[0].tick).toBeGreaterThan(tick0);
+
+    // The health check carries the loop's own timing: it has measured this match.
+    const perf = ts.server.health().perf;
+    expect(perf.samples).toBeGreaterThan(30);
+    expect(perf.updateMs.mean).toBeGreaterThan(0);
+    expect(perf.updateMs.max).toBeGreaterThanOrEqual(perf.updateMs.p99);
+    expect(perf.ticksPerSecond).toBeGreaterThanOrEqual(TICK_RATE * 0.6);
+    expect(perf.ticksPerSecond).toBeLessThanOrEqual(TICK_RATE * 1.1);
     await solo.leave();
   });
 });

@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
-  <!-- Faction: Coalition of Faiths. Hands pressed together, with light around them. -->
-  <path fill="currentColor" d="M28.5 10C26 14 24 22 23.5 30L22.5 40 28.5 43.5Z"/>
-  <path fill="currentColor" d="M35.5 10C38 14 40 22 40.5 30L41.5 40 35.5 43.5Z"/>
-  <path fill="currentColor" d="M21.5 44.5L28 48.5 16 58.5 8.5 54Z"/>
-  <path fill="currentColor" d="M42.5 44.5L36 48.5 48 58.5 55.5 54Z"/>
-  <path d="M13 13L17 18M51 13L47 18M6.5 28H12M57.5 28H52"/>
+  <!-- Faction: Coalition of Faiths. Two hands pressed together, a cuff on each wrist, light fanning out above the fingertips. -->
+  <path fill="currentColor" d="M28 22V44H23.5V32.5Q23.5 26.5 28 22Z"/>
+  <path fill="currentColor" d="M36 22V44H40.5V32.5Q40.5 26.5 36 22Z"/>
+  <path fill="currentColor" d="M22 52H28V54.5L26 59H18.5Z"/>
+  <path fill="currentColor" d="M42 52H36V54.5L38 59H45.5Z"/>
+  <path d="M32 13.5V4.5M19.7 18.5L14.4 11.2M44.3 18.5L49.6 11.2M13 29.3L4.9 26.7M51 29.3L59.1 26.7"/>
 </svg>

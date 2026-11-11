@@ -6,7 +6,7 @@ from typing import Callable
 
 import numpy as np
 
-FAMILIES = ("kaiju", "humans", "world", "ui")
+FAMILIES = ("kaiju", "humans", "world", "ui", "tier2")
 
 
 @dataclass
@@ -46,4 +46,5 @@ def sfx(id: str, family: str, *, variants: int = 1, loop: float = 0.0, level: fl
 
 def load_all() -> dict[str, Spec]:
     from . import humans, kaiju, ui, world  # noqa: F401  (importing registers the sounds)
+    from . import tier2  # noqa: F401  (last, so the Tier 2 sounds follow the others in the manifest)
     return REGISTRY

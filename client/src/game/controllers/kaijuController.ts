@@ -10,6 +10,7 @@
 
 import type * as THREE from 'three';
 import { Btn, clamp, clampAngleAround, DEG, kaijuStageDef, lerpAngle, wrapAngle } from '@mb/shared';
+import { clearOfWalls, easeClearance } from './cameraClearance';
 import { aimCamera, setLens, type ControlContext, type Controller, type InputSample } from './types';
 
 /** How far the desired heading may run ahead of the body: enough to ask for a turn-around. */
@@ -25,6 +26,9 @@ export class KaijuController implements Controller {
   private started = false;
   private chaseYaw = 0;
   private orbit = 0;
+  /** How much of the way from the body to the wanted camera position is free of walls (eased). */
+  private clear = 1;
+  private readonly pivot = { x: 0, y: 0, z: 0 };
 
   constructor(thirdPerson = false) {
     this.thirdPerson = thirdPerson;
@@ -86,7 +90,18 @@ export class KaijuController implements Controller {
       const anchor = ctx.renderer.kaijuCamAnchor(k.id);
       if (anchor) camera.position.copy(anchor);
       else camera.position.set(k.x, st.eyeHeight, k.z);
-      setLens(camera, 72, Math.max(0.08, st.height * 0.02), 9000);
+      const near = Math.max(0.08, st.height * 0.02);
+      // From stage 2 on the head reaches past the body's collision circle: against a tower the
+      // eye would be inside it. Hold it back, level with itself, short of the wall.
+      this.pivot.x = k.x;
+      this.pivot.y = camera.position.y;
+      this.pivot.z = k.z;
+      this.clear = easeClearance(this.clear, clearOfWalls(ctx.session.mirror.query, this.pivot, camera.position, near * 2.5), ctx.dt);
+      if (this.clear < 1) {
+        camera.position.x = k.x + (camera.position.x - k.x) * this.clear;
+        camera.position.z = k.z + (camera.position.z - k.z) * this.clear;
+      }
+      setLens(camera, 72, near, 9000);
       aimCamera(camera, k.aimYaw, k.aimPitch);
     } else {
       // Chase camera: behind and above, turning with the wanted heading a little lazily.
@@ -96,7 +111,18 @@ export class KaijuController implements Controller {
       const cp = Math.cos(this.aimPitch * 0.6);
       camera.position.set(k.x - Math.sin(this.chaseYaw) * back * cp, up - Math.sin(this.aimPitch * 0.6) * back * 0.5, k.z - Math.cos(this.chaseYaw) * back * cp);
       camera.position.y = Math.max(st.height * 0.25, camera.position.y);
-      setLens(camera, 60, Math.max(0.3, st.height * 0.05), 9000);
+      const near = Math.max(0.3, st.height * 0.05);
+      // A wall between the kaiju's shoulders and the camera: come in to this side of it.
+      this.pivot.x = k.x;
+      this.pivot.y = st.height * 0.85;
+      this.pivot.z = k.z;
+      this.clear = easeClearance(this.clear, clearOfWalls(ctx.session.mirror.query, this.pivot, camera.position, near * 2), ctx.dt);
+      if (this.clear < 1) {
+        camera.position.x = this.pivot.x + (camera.position.x - this.pivot.x) * this.clear;
+        camera.position.y = this.pivot.y + (camera.position.y - this.pivot.y) * this.clear;
+        camera.position.z = this.pivot.z + (camera.position.z - this.pivot.z) * this.clear;
+      }
+      setLens(camera, 60, near, 9000);
       camera.up.set(0, 1, 0);
       camera.lookAt(k.x + Math.sin(this.chaseYaw) * st.height * 1.5, st.height * 0.7, k.z + Math.cos(this.chaseYaw) * st.height * 1.5);
     }

@@ -206,8 +206,20 @@ deep-merges every partial into `manifest.json`, which the client loads. Never ha
 - `"models"`: `{ "<id>": { "file": "models/<id>.glb", "kind": "kaiju" | "vehicle" | "projectile"
   | "structure" | "landmark" | "prop" | "misc", "nodes": [..], "size": [w, h, d], "tris": n,
   "rig"?: "lizard" | .., "chunks"?: n, "tint"?: { "part": "body paint", "mask": "..", "blend":
-  "multiply", "colors": ["#rrggbb", ..], "hint"?: ".." } } }` (`tint`: suggested paint colors for
-  the vehicles with a paint mask, see section 3)
+  "multiply", "colors": ["#rrggbb", ..], "hint"?: ".." }, "poses"?: { "<name>": { "<node>":
+  [x, y, z] } } } }` (`tint`: suggested paint colors for the vehicles with a paint mask, see
+  section 3; `poses`: see below)
+  - `"poses"` (optional, kaiju only): pose targets the animator blends toward instead of fixed
+    joint angles, because each stage has its own proportions. Angles are degrees relative to the
+    rest pose, in the game's axes, to be set as `node.rotation.set(x, y, z)` (three.js Euler
+    order XYZ). Nodes a pose does not name are left to the animator (walk cycle, look,
+    breathing). The lizard stages carry `fp_claws` (both claws out either side of the snout:
+    the first-person carry), `grab`, `hold`, `eat`, `brace`, `throw_windup`, `throw_release`
+    and `stagger` (reeling back, chest and weak point open). The first seven are built for the
+    first-person lens (camera on `cam_fp`, level, vertical field of view 72 degrees, 16:9):
+    there the acting hand sits in the lower third of the frame, clear of the head. The art
+    build checks this on the exported file (`tools/art/kaiju/poses.py`) and fails if a target
+    stops holding.
 - `"sprites"`: `{ "<id>": { "file": "sprites/<sheet>.png", "frame": [w, h], "worldHeight":
   meters, "anims": { "<name>": { "rows": [front, left, back, right] | [row], "col"?: n,
   "frames": n, "fps": n } } } }`

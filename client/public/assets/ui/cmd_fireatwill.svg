@@ -1,10 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
-  <!-- Command: fire at will. Shots fan out from a unit (circle) to scattered bursts: everyone picks their own target. -->
-  <circle cx="9" cy="57" r="2.5" fill="currentColor"/>
-  <path d="M11.3 45.2L14 31.5"/>
-  <path d="M17.5 48.5L32 34"/>
-  <path d="M20.8 55L34 52.7"/>
-  <path fill="currentColor" stroke="none" d="M15.4 6.6L18 11.4L21 10.2L20.8 13.6L26.4 14.4L21.8 17.1L22.9 20.1L19.5 19.8L18.6 25.4L16 20.6L13 21.8L13.2 18.4L7.6 17.6L12.2 14.9L10.9 11.7L14.5 12.2Z"/>
-  <path fill="currentColor" stroke="none" d="M47.2 8.7L48.1 15.6L52.3 14.9L50.5 19L57 21L51.1 23.2L52.1 26.9L48 26.2L47.2 33.3L43.9 27.2L40.1 29.4L40.2 25L33.8 25.1L39.1 21L36.3 17.8L40 16.8L38.7 10.2L44 15.1Z"/>
-  <path fill="currentColor" stroke="none" d="M54.8 41.8L53.8 47.1L56.9 48.2L54.5 50.6L58.2 54.8L53 53.9L51.9 57.1L49.4 54.4L45.3 58.2L46.2 52.9L43.2 51.8L45.5 49.4L41.8 45.3L47 46.1L48.1 43L50.6 45.6Z"/>
+  <!-- Command: fire at will. Three shells in flight, each on its own time: everyone shoots when they can. -->
+  <g transform="translate(30.2 14) rotate(-135) scale(1.05)">
+    <path fill="currentColor" stroke="none" d="M0 13C3.5 9 4.5 6 4.5 2V-6L2 -9.5H5V-14H-5V-9.5H-2L-4.5 -6V2C-4.5 6 -3.5 9 0 13Z"/>
+  </g>
+  <g transform="translate(25.6 38.4) rotate(-135) scale(1.05)">
+    <path fill="currentColor" stroke="none" d="M0 13C3.5 9 4.5 6 4.5 2V-6L2 -9.5H5V-14H-5V-9.5H-2L-4.5 -6V2C-4.5 6 -3.5 9 0 13Z"/>
+  </g>
+  <g transform="translate(44.4 38.7) rotate(-135) scale(1.05)">
+    <path fill="currentColor" stroke="none" d="M0 13C3.5 9 4.5 6 4.5 2V-6L2 -9.5H5V-14H-5V-9.5H-2L-4.5 -6V2C-4.5 6 -3.5 9 0 13Z"/>
+  </g>
+  <path d="M15.9 28.3L10.3 33.9"/>
+  <path d="M11.3 52.7L5.7 58.3"/>
+  <path d="M30.1 53L24.5 58.6"/>
 </svg>

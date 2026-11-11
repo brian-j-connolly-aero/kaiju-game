@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
-  <!-- Device: gamepad left trigger (the tall one behind the bumper). -->
-  <path d="M19 27.5H45C52 27.5 55.5 31 56.5 38L58.3 50C59.2 57 53 60.5 49 55L45.5 50H18.5L15 55C11 60.5 4.8 57 5.7 50L7.5 38C8.5 31 12 27.5 19 27.5Z"/>
-  <path d="M10 19.25H26"/>
-  <path fill="currentColor" d="M12 11V8.5Q12 5 15.5 5H19.5Q23 5 23 8.5V11Z"/>
+  <!-- Device: gamepad left trigger (the tall one behind the bumper): a solid tab above the thin bumper line. -->
+  <path d="M19 36.5H45C52 36.5 55.5 38.9 56.5 43.6L58.3 51.7C59.2 56.5 53 58.9 49 55.1L45.5 51.7H18.5L15 55.1C11 58.9 4.8 56.5 5.7 51.7L7.5 43.6C8.5 38.9 12 36.5 19 36.5Z"/>
+  <path d="M8 26.5H29"/>
+  <path fill="currentColor" d="M12 16.5V10.5Q12 6.5 16 6.5H21Q25 6.5 25 10.5V16.5Z"/>
 </svg>

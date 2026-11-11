@@ -20,7 +20,17 @@
       "nodes": ["root", "hips", "leg_L", "shin_L", "foot_L", "leg_R", "shin_R", "foot_R", "tail_1", "tail_2", "tail_3", "tail_4", "tail_5", "torso", "arm_L", "forearm_L", "hand_L", "arm_R", "forearm_R", "hand_R", "hold", "neck", "head", "cam_fp", "jaw", "mouth", "spines", "weak_point"],
       "size": [4.256, 4.5, 6.102],
       "tris": 2253,
-      "rig": "lizard"
+      "rig": "lizard",
+      "poses": {
+        "fp_claws": {"arm_R": [-124, -15, 20], "forearm_R": [82, -33, 10], "hand_R": [-8, 21, -13], "arm_L": [-124, 15, -20], "forearm_L": [82, 33, -10], "hand_L": [-8, -21, 13]},
+        "grab": {"torso": [14, 8, 0], "arm_R": [-127, 42, 34], "forearm_R": [64, -30, 13], "hand_R": [23, -10, 70]},
+        "hold": {"arm_R": [-122, -12, 19], "forearm_R": [84, -31, 15], "hand_R": [-4, -13, 15]},
+        "eat": {"torso": [8, 0, 0], "head": [8, 0, 0], "jaw": [22, 0, 0], "arm_R": [-122, 20, 31], "forearm_R": [71, -19, -4], "hand_R": [4, -6, 43], "arm_L": [-122, -20, -31], "forearm_L": [71, 19, 4], "hand_L": [4, 6, -43]},
+        "brace": {"torso": [16, 0, 0], "neck": [4, 0, 0], "head": [4, 0, 0], "arm_R": [-128, -8, 21], "forearm_R": [84, -31, 20], "hand_R": [11, -1, 17], "arm_L": [-128, 8, -21], "forearm_L": [84, 31, -20], "hand_L": [11, 1, -17]},
+        "throw_windup": {"torso": [-8, -10, 0], "arm_R": [-114, 17, 28], "forearm_R": [71, -15, -7], "hand_R": [-5, -37, 40]},
+        "throw_release": {"torso": [12, 12, 0], "arm_R": [-126, 24, 26], "forearm_R": [66, -13, 2], "hand_R": [-5, -14, 28]},
+        "stagger": {"torso": [-17, 0, 0], "neck": [-11, 0, 0], "head": [-20, 0, 0], "jaw": [20, 0, 0], "arm_L": [12, 0, 32], "arm_R": [12, 0, -32], "forearm_L": [-10, 0, 0], "forearm_R": [-10, 0, 0], "leg_L": [-8, 0, 0], "leg_R": [10, 0, 0]}
+      }
     },
     "kaiju_lizard_s2": {
       "file": "models/kaiju_lizard_s2.glb",
@@ -28,7 +38,17 @@
       "nodes": ["root", "hips", "leg_L", "shin_L", "foot_L", "leg_R", "shin_R", "foot_R", "tail_1", "tail_2", "tail_3", "tail_4", "tail_5", "torso", "arm_L", "forearm_L", "hand_L", "arm_R", "forearm_R", "hand_R", "hold", "neck", "head", "cam_fp", "jaw", "mouth", "spines", "weak_point"],
       "size": [23.289, 32.0, 39.515],
       "tris": 2413,
-      "rig": "lizard"
+      "rig": "lizard",
+      "poses": {
+        "fp_claws": {"arm_R": [-97, 2, 11], "forearm_R": [53, -15, -9], "hand_R": [-36, 3, 25], "arm_L": [-97, -2, -11], "forearm_L": [53, 15, 9], "hand_L": [-36, -3, -25]},
+        "grab": {"torso": [14, 8, 0], "arm_R": [-106, -5, 18], "forearm_R": [53, -9, -9], "hand_R": [-7, -22, 0]},
+        "hold": {"arm_R": [-96, -16, 14], "forearm_R": [52, -22, -6], "hand_R": [-16, -23, 22]},
+        "eat": {"torso": [8, 0, 0], "head": [8, 0, 0], "jaw": [22, 0, 0], "arm_R": [-100, -60, 4], "forearm_R": [63, 9, -26], "hand_R": [-2, -36, 33], "arm_L": [-100, 60, -4], "forearm_L": [63, -9, 26], "hand_L": [-2, 36, -33]},
+        "brace": {"torso": [16, 0, 0], "neck": [4, 0, 0], "head": [4, 0, 0], "arm_R": [-106, 47, 32], "forearm_R": [33, -13, -23], "hand_R": [-5, -26, 35], "arm_L": [-106, -47, -32], "forearm_L": [33, 13, 23], "hand_L": [-5, 26, -35]},
+        "throw_windup": {"torso": [-8, -10, 0], "arm_R": [-90, 9, 19], "forearm_R": [40, 0, -16], "hand_R": [-2, 6, -40]},
+        "throw_release": {"torso": [12, 12, 0], "arm_R": [-103, -2, 20], "forearm_R": [54, -7, -20], "hand_R": [-31, -18, -10]},
+        "stagger": {"torso": [-17, 0, 0], "neck": [-11, 0, 0], "head": [-20, 0, 0], "jaw": [20, 0, 0], "arm_L": [12, 0, 32], "arm_R": [12, 0, -32], "forearm_L": [-10, 0, 0], "forearm_R": [-10, 0, 0], "leg_L": [-8, 0, 0], "leg_R": [10, 0, 0]}
+      }
     },
     "kaiju_lizard_s3": {
       "file": "models/kaiju_lizard_s3.glb",
@@ -36,7 +56,17 @@
       "nodes": ["root", "hips", "leg_L", "shin_L", "foot_L", "leg_R", "shin_R", "foot_R", "tail_1", "tail_2", "tail_3", "tail_4", "tail_5", "torso", "arm_L", "forearm_L", "hand_L", "arm_R", "forearm_R", "hand_R", "hold", "neck", "head", "cam_fp", "jaw", "mouth", "spines", "weak_point"],
       "size": [95.583, 115.0, 145.71],
       "tris": 3485,
-      "rig": "lizard"
+      "rig": "lizard",
+      "poses": {
+        "fp_claws": {"arm_R": [-97, -2, 20], "forearm_R": [55, -31, -8], "hand_R": [-28, 5, 9], "arm_L": [-97, 2, -20], "forearm_L": [55, 31, 8], "hand_L": [-28, -5, -9]},
+        "grab": {"torso": [14, 8, 0], "arm_R": [-101, -16, 22], "forearm_R": [51, -24, 3], "hand_R": [-14, 1, -22]},
+        "hold": {"arm_R": [-98, -11, 18], "forearm_R": [64, -37, 10], "hand_R": [-24, -10, 16]},
+        "eat": {"torso": [8, 0, 0], "head": [8, 0, 0], "jaw": [22, 0, 0], "arm_R": [-97, -23, 20], "forearm_R": [62, -22, 1], "hand_R": [10, -43, 47], "arm_L": [-97, 23, -20], "forearm_L": [62, 22, -1], "hand_L": [10, 43, -47]},
+        "brace": {"torso": [16, 0, 0], "neck": [4, 0, 0], "head": [4, 0, 0], "arm_R": [-103, -19, 23], "forearm_R": [55, -29, -1], "hand_R": [-11, 45, -10], "arm_L": [-103, 19, -23], "forearm_L": [55, 29, 1], "hand_L": [-11, -45, 10]},
+        "throw_windup": {"torso": [-8, -10, 0], "arm_R": [-102, 44, 32], "forearm_R": [51, 18, -37], "hand_R": [18, 67, -48]},
+        "throw_release": {"torso": [12, 12, 0], "arm_R": [-97, 1, 25], "forearm_R": [44, -28, 0], "hand_R": [-27, -2, -13]},
+        "stagger": {"torso": [-17, 0, 0], "neck": [-11, 0, 0], "head": [-20, 0, 0], "jaw": [20, 0, 0], "arm_L": [12, 0, 32], "arm_R": [12, 0, -32], "forearm_L": [-10, 0, 0], "forearm_R": [-10, 0, 0], "leg_L": [-8, 0, 0], "leg_R": [10, 0, 0]}
+      }
     }
   }
 }

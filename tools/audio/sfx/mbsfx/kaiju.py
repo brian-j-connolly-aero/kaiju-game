@@ -98,6 +98,17 @@ def voice(rng: np.random.Generator, dur: float, *, f0, growl, scream, screech, s
     return dsp.fade(y, 0.004, 0.01)
 
 
+def roar_space(rng: np.random.Generator, y: np.ndarray, stage: int, size: float) -> np.ndarray:
+    """The space every roar goes out into: a street, a district, the whole night city. Shared
+    by all four kaiju (see tier2.py), so a roar's size is heard the same way whoever makes it."""
+    t60 = {1: 0.5, 2: 1.1, 3: 2.0}[stage]
+    echoes = {1: ((0.09, 0.25, 3000.0),), 2: ((0.16, 0.3, 2400.0), (0.29, 0.2, 1500.0)),
+              3: ((0.24, 0.34, 2000.0), (0.41, 0.26, 1300.0), (0.66, 0.16, 800.0))}[stage]
+    ir = dsp.space_ir(rng, t60, pre=0.015 * stage, bright=6000.0 / size, dark=700.0, echoes=echoes, stereo=True,
+                      low_cut=90.0)
+    return dsp.reverb(y, ir, {1: 0.16, 2: 0.24, 3: 0.32}[stage])
+
+
 def _roar(rng: np.random.Generator, stage: int) -> np.ndarray:
     dur = ROAR_SECONDS[stage]
     a, b = ROAR_PARTS
@@ -122,13 +133,7 @@ def _roar(rng: np.random.Generator, stage: int) -> np.ndarray:
         sub={1: 0.35, 2: 0.55, 3: 0.7}[stage],
     )
     y = dsp.hp(y, {1: 60.0, 2: 38.0, 3: 24.0}[stage])
-    # the space it roars into: a street, a district, the whole night city
-    t60 = {1: 0.5, 2: 1.1, 3: 2.0}[stage]
-    echoes = {1: ((0.09, 0.25, 3000.0),), 2: ((0.16, 0.3, 2400.0), (0.29, 0.2, 1500.0)),
-              3: ((0.24, 0.34, 2000.0), (0.41, 0.26, 1300.0), (0.66, 0.16, 800.0))}[stage]
-    ir = dsp.space_ir(rng, t60, pre=0.015 * stage, bright=6000.0 / size, dark=700.0, echoes=echoes, stereo=True,
-                      low_cut=90.0)
-    return dsp.reverb(y, ir, {1: 0.16, 2: 0.24, 3: 0.32}[stage])
+    return roar_space(rng, y, stage, size)
 
 
 for _s in (1, 2, 3):

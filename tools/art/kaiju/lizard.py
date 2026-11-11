@@ -4,31 +4,45 @@
 
 The three stages are the same character at three ages: the same construction code runs for
 each, driven by the proportion table STAGES below (joint positions and thicknesses in
-fractions of the creature's height, counts and sizes of spines, teeth, armor and scars).
+fractions of the creature's height, counts and sizes of spines, teeth, plates and scars).
 The result is scaled to the true height (4.5, 32, 115 m) at the end.
 
 Design notes (so the three stay one character):
   - silhouette: hunched brawler; the shoulder hump and a row of bone spines are the high
     point, the head hangs low and forward on a short neck, forearms are bigger than upper
-    arms, hands reach the knees, the legs are short, a thick tail balances the lot.
-  - face: heavy underbite jaw with two tusks, a V-shaped brow over glowing yellow eyes, a
-    flat-topped snout with two nostril mounds (that snout is the bottom of the player's
-    first-person view all game long).
+    arms, hands reach the knees, the legs are short, a thick tail balances the lot. Legs
+    and trunk stay inside the body radius the simulation uses (2.4 / 9 / 26 m); arms, tail
+    and spines may overhang it.
+  - face: heavy underbite jaw with two tusks, a V-shaped brow over glowing yellow eyes, and
+    a snout that narrows to the nose between two bevels, with a keeled ridge down the middle
+    and two rust bands across it (that snout is the bottom of the player's first-person
+    view all game long). Nothing stands on the center line above the snout: it would cover
+    the crosshair.
   - colors: burnt orange hide, rust zigzag bands around torso, tail and limbs, cream belly
-    plates and jaw, bone claws, teeth and spines, and a cyan crystal organ in a dark pit on
-    the chest gripped by four bone prongs (the weak point: a node of its own, so the pit
-    stays when the game hides the glow).
+    plates and jaw, bone claws, teeth and spines. The weak point is violet-white (never
+    cyan, the humans' color): a triangular crystal, point down, in a dark pit on the chest
+    gripped by four bone prongs, and two shards of the same light that push out through
+    slits at the shoulder blades, so it shows from behind and above too. It is a node of
+    its own: the pit and the slits stay when the game hides the light.
   - growing up: the hatchling has a huge head, big eyes with pupils, nubs for spines and
     soft stripes; the juvenile gets the hump, tusks and a mohawk of spines; the titan adds
-    a crown of spines, a nose horn, armor plates, cheek and chin spikes, a tail mace, and
-    old wounds (claw marks on the chest, a slash through the left brow, a snapped right
-    tusk, a broken spine).
+    a crown of spines, cheek and chin spikes, grown plates on shoulders, forearms, shins
+    and back (hide-colored scales, not worn armor), embers glowing at the roots of its
+    spines (its own light at night), and old wounds (claw marks on the chest, a slash
+    through the left brow, a snapped right tusk, a broken spine). No nose horn and no tail
+    mace: the tail club is a mutation the kaiju drafts, and must be readable when it is.
 
 Rigging: every segment is a closed tube whose ends are faceted domes centered on its joints,
 so neighbors always overlap in a ball around the pivot and no gap opens when a joint turns
-(checked at 60 degrees on every joint). The rest pose has the jaw slightly open (a snarl);
-jaw.rotation.x of about -6 degrees closes it. FP_POSE and POSES at the bottom are in the
-game's axes and can be used as animation targets as they are.
+(checked at 90 degrees on every joint). The rest pose has the jaw slightly open (a snarl);
+jaw.rotation.x of about -6 degrees closes it. POSE_TARGETS at the bottom are the angles
+the game's animator blends toward (they ship in the manifest); poses.py checks them.
+
+First person: cam_fp sits between the eyes, 0.10 to 0.12 head lengths above the snout. The
+game clips at 0.02 body heights and keeps the camera level while the head pitches, so
+nothing of the head may come closer than about 0.03 body heights to cam_fp. Look at any
+change through the game's lens (the FIRST PERSON cells of the contact sheet), not from
+outside.
 
 Authoring frame: +Z up, -Y forward, +X the creature's left. See tools/art/README.md.
 """
@@ -69,6 +83,7 @@ WEAK, WEAK_HOT, WEAK_DEEP = parts.WEAK, parts.WEAK_HOT, parts.WEAK_DEEP    # vio
 EMBER = "glow_ember"
 SOCKET = mb.mix("maw_dk", "#1b1d24", 0.4)
 VENT = mb.mix("gragnor_rust_dk", "maw_dk", 0.45)      # the slits on the back: dark, but not two black eyes
+#                                                       (weak["slit"] fades them toward the stripe color)
 
 HEIGHT = {1: 4.5, 2: 32.0, 3: 115.0}
 
@@ -103,7 +118,7 @@ STAGES = {
         spines=[(0.45, 0.055), (0.66, 0.08), (0.86, 0.085), (1.04, 0.06)], spine_w=1.0, side_spines=0.0,
         tail_spines=[0.05, 0.04, 0.0, 0.0, 0.0], tail_club=0,
         stripes=dict(torso=True, tail=True, limb=True), stripe_color=mb.mix("gragnor_rust", "gragnor_orange", 0.35),
-        weak=dict(t=0.42, r=0.058, back=0.72), armor=False, scars=False, elbow_spike=0.0, knee_spike=0.0,
+        weak=dict(t=0.42, r=0.058, back=0.72, slit=0.45), armor=False, scars=False, elbow_spike=0.0, knee_spike=0.0,
     ),
     # ---------------------------------------------------------------- 2: juvenile
     2: dict(
@@ -326,8 +341,8 @@ def build(stage: int) -> Rig:
         ln2 = (out_pt - wk_surface).length
         weak_g += spike(wk_surface + d2 * (ln2 * 0.62), wk_surface + d2 * (ln2 * 1.20), r * 3.0, r * 3.0, n=4,
                         up=btan, color=WEAK_HOT, root=WEAK, root_at=0.72, phase=90)
-        torso_g += parts.scute(out_pt, d2, r * 1.6, r * 2.7, r * 0.18, along=btan, color=ORANGE_DK, top=VENT,
-                               taper=0.60, sink=4.0, closed=False)
+        torso_g += parts.scute(out_pt, d2, r * 1.15, r * 3.1, r * 0.18, along=btan, color=ORANGE_DK,
+                               top=mb.mix(stripe, VENT, p.weak.get("slit", 1.0)), taper=0.60, sink=4.0, closed=False)
     rig.add("torso", parts.finish(torso_g, seed=12), sp[0], "hips")
     rig.add("weak_point", weak_g.material("glow").triangulate(), wk_surface, "torso")
 
@@ -579,7 +594,7 @@ def _head(rig: Rig, p: P, stripe) -> None:
     # The first starts well ahead of the camera (scute_from, head lengths) so the game's near
     # plane never cuts it. No nose horn: it would stand on the player's crosshair.
     ns = hd["snout_scutes"]
-    cam_y = y3 + 0.01
+    cam_y = y3 + 0.03                         # just ahead of the stop: 0.03 body heights clear of it
     y0 = cam_y + hd.get("scute_from", 0.12)
     span = 0.795 - y0
     lens = [0.42, 0.34, 0.27][:ns]
@@ -848,26 +863,83 @@ def _scars(rig: Rig, p: P, sp) -> None:
 
 
 # =========================================================================================
-# poses (degrees, in the game's axes: x+ nose down, y+ turn left, z+ left side up)
+# poses (degrees, in the game's axes: x+ nose down, y+ turn left, z+ left side up; three.js
+# Euler order XYZ, relative to the rest pose)
 # =========================================================================================
-def _arms(x, y, z, fore, hand=0.0) -> dict:
-    """Both arms raised the same way (y and z mirror for the right arm)."""
-    return {"arm_L": {"x": x, "y": y, "z": z}, "arm_R": {"x": x, "y": -y, "z": -z},
-            "forearm_L": {"x": fore}, "forearm_R": {"x": fore}, "hand_L": {"x": hand}, "hand_R": {"x": hand}}
+def _right(base: dict, arm, forearm, hand) -> dict:
+    """A pose for the right arm on top of body angles."""
+    return {**base, "arm_R": arm, "forearm_R": forearm, "hand_R": hand}
 
 
-# Claws up in front of the face: what the player sees of their own hands. The head hangs
-# low and forward, so the hands only enter the view when the arms are thrown forward: swing
-# up (x), turn the elbow out (y), bring the hands together (z), straighten the elbow.
-# Found by inverse kinematics for each stage's proportions (left arm; the right mirrors).
-FP_POSE = {
-    1: _arms(-100, 60, -15, 60, -25),      # the hatchling's arms are short: it has to stretch right out
-    2: _arms(-75, 46, -24, 25, -25),
-    3: _arms(-59, 47, -40, 19, -25),
+def _both(base: dict, arm, forearm, hand) -> dict:
+    """The same for both arms: the left mirrors the right (y and z change sign)."""
+    mirror = lambda v: (v[0], -v[1], -v[2])  # noqa: E731
+    return {**_right(base, arm, forearm, hand), "arm_L": mirror(arm), "forearm_L": mirror(forearm),
+            "hand_L": mirror(hand)}
+
+
+# Reeling back, chest out, arms dropped wide: the stagger that shows the weak point. (A
+# stagger that slumps forward hides the chest behind the drooping head.)
+STAGGER = {"torso": (-17, 0, 0), "neck": (-11, 0, 0), "head": (-20, 0, 0), "jaw": (20, 0, 0),
+           "arm_L": (12, 0, 32), "arm_R": (12, 0, -32), "forearm_L": (-10, 0, 0), "forearm_R": (-10, 0, 0),
+           "leg_L": (-8, 0, 0), "leg_R": (10, 0, 0)}
+
+# The pose targets that ship in the manifest ("poses", docs/ASSETS.md section 7): what the
+# game's animator blends toward, per stage. Generic angles do not work on this character:
+# the head hangs low and far forward of the shoulders and the elbows rest bent, so the arms
+# have to be thrown almost straight out before a hand enters the player's view, and each
+# stage has its own proportions. Found with poses.solve() (run tools/art/kaiju/poses.py),
+# checked on every build by poses.check(): through the game's first-person lens the acting
+# hand is in the lower third of the frame and no arm touches the head.
+#   fp_claws        both claws out either side of the snout (the first-person carry)
+#   grab            the right hand reaches forward and down
+#   hold            the right hand carries, palm in, low on the right
+#   eat             both hands bring the meal to the open mouth
+#   brace           both forearms up in front of chest and throat, head tucked
+#   throw_windup    the right hand drawn back to the edge of the view, body turned away
+#   throw_release   the right arm thrust out toward the crosshair
+#   stagger         reeling back, chest and weak point open (no hand needs to show)
+POSE_TARGETS = {
+    1: {
+        "fp_claws": _both({}, (-124, -15, 20), (82, -33, 10), (-8, 21, -13)),
+        "grab": _right({"torso": (14, 8, 0)}, (-127, 42, 34), (64, -30, 13), (23, -10, 70)),
+        "hold": _right({}, (-122, -12, 19), (84, -31, 15), (-4, -13, 15)),
+        "eat": _both({"torso": (8, 0, 0), "head": (8, 0, 0), "jaw": (22, 0, 0)}, (-122, 20, 31), (71, -19, -4), (4, -6, 43)),
+        "brace": _both({"torso": (16, 0, 0), "neck": (4, 0, 0), "head": (4, 0, 0)}, (-128, -8, 21), (84, -31, 20), (11, -1, 17)),
+        "throw_windup": _right({"torso": (-8, -10, 0)}, (-114, 17, 28), (71, -15, -7), (-5, -37, 40)),
+        "throw_release": _right({"torso": (12, 12, 0)}, (-126, 24, 26), (66, -13, 2), (-5, -14, 28)),
+        "stagger": STAGGER,
+    },
+    2: {
+        "fp_claws": _both({}, (-97, 2, 11), (53, -15, -9), (-36, 3, 25)),
+        "grab": _right({"torso": (14, 8, 0)}, (-106, -5, 18), (53, -9, -9), (-7, -22, 0)),
+        "hold": _right({}, (-96, -16, 14), (52, -22, -6), (-16, -23, 22)),
+        "eat": _both({"torso": (8, 0, 0), "head": (8, 0, 0), "jaw": (22, 0, 0)}, (-100, -60, 4), (63, 9, -26), (-2, -36, 33)),
+        "brace": _both({"torso": (16, 0, 0), "neck": (4, 0, 0), "head": (4, 0, 0)}, (-106, 47, 32), (33, -13, -23), (-5, -26, 35)),
+        "throw_windup": _right({"torso": (-8, -10, 0)}, (-90, 9, 19), (40, 0, -16), (-2, 6, -40)),
+        "throw_release": _right({"torso": (12, 12, 0)}, (-103, -2, 20), (54, -7, -20), (-31, -18, -10)),
+        "stagger": STAGGER,
+    },
+    3: {
+        "fp_claws": _both({}, (-97, -2, 20), (55, -31, -8), (-28, 5, 9)),
+        "grab": _right({"torso": (14, 8, 0)}, (-101, -16, 22), (51, -24, 3), (-14, 1, -22)),
+        "hold": _right({}, (-98, -11, 18), (64, -37, 10), (-24, -10, 16)),
+        "eat": _both({"torso": (8, 0, 0), "head": (8, 0, 0), "jaw": (22, 0, 0)}, (-97, -23, 20), (62, -22, 1), (10, -43, 47)),
+        "brace": _both({"torso": (16, 0, 0), "neck": (4, 0, 0), "head": (4, 0, 0)}, (-103, -19, 23), (55, -29, -1), (-11, 45, -10)),
+        "throw_windup": _right({"torso": (-8, -10, 0)}, (-102, 44, 32), (51, 18, -37), (18, 67, -48)),
+        "throw_release": _right({"torso": (12, 12, 0)}, (-97, 1, 25), (44, -28, 0), (-27, -2, -13)),
+        "stagger": STAGGER,
+    },
 }
 
+
+def as_pose(target: dict) -> dict:
+    """A pose target as mb.pose() takes it."""
+    return {node: {"x": v[0], "y": v[1], "z": v[2]} for node, v in target.items()}
+
+
+# Poses for the review pictures only (not shipped): what the game's own animator does.
 POSES = {
-    "fp": FP_POSE[2],
     # mid-roar: chest out, head thrown up, jaw wide, arms flung back, tail lashing
     "roar": {"hips": {"x": -3}, "torso": {"x": -9}, "neck": {"x": -12}, "head": {"x": -16}, "jaw": {"x": 32},
              "arm_L": {"x": 22, "z": 32}, "arm_R": {"x": 22, "z": -32}, "forearm_L": {"x": -42},

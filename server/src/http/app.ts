@@ -10,6 +10,7 @@
 import { existsSync } from 'node:fs';
 import { extname, join } from 'node:path';
 import express, { type Application, type NextFunction, type Request, type Response } from 'express';
+import type { PerfReport } from '../room/perf';
 
 export interface HealthInfo {
   ok: true;
@@ -20,6 +21,8 @@ export interface HealthInfo {
   rooms: number;
   players: number;
   fast: boolean;
+  /** Timing of the room loop over the most recent match updates (room/perf.ts). */
+  perf: PerfReport;
 }
 
 export interface AppOptions {

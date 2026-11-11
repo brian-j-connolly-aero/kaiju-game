@@ -143,6 +143,16 @@ export class GameRoom {
     return n;
   }
 
+  /** True while a match is being simulated (not in the lobby, not on the end screen). */
+  get matchRunning(): boolean {
+    return this.lobby.phase === 'match' && this.match !== null;
+  }
+
+  /** The simulation tick of the current match, or 0. */
+  get matchTick(): number {
+    return this.match ? this.match.world.tick : 0;
+  }
+
   /** The seat number a connection holds, or -1. */
   seatOfPeer(peerId: string): number {
     return this.byPeer.get(peerId)?.seat ?? -1;

@@ -25,6 +25,7 @@ import {
   type VerticalCapsule,
 } from '@mb/shared';
 import type { ActionState } from '../input/actions';
+import { clearOfWalls, easeClearance } from './cameraClearance';
 import { aimCamera, setLens, type ControlContext, type Controller, type InputSample } from './types';
 
 const PITCH_LIMIT = 80 * DEG;
@@ -69,6 +70,9 @@ export class HumanController implements Controller {
   private kick = 0;
   private wasFiring = false;
   private readonly eye = { x: 0, y: 0, z: 0 };
+  /** How much of the way from the unit to the chase camera is free of walls (eased). */
+  private clear = 1;
+  private readonly pivot = { x: 0, y: 0, z: 0 };
 
   constructor(thirdPerson = false) {
     this.thirdPerson = thirdPerson;
@@ -179,6 +183,7 @@ export class HumanController implements Controller {
 
     const def = unitTypeDef(u.type);
     const eyeY = u.y + def.eyeHeight;
+    this.updateClearance(ctx);
     if (this.thirdPerson && !input.aimOverride) {
       // Aim from the unit at what the camera's center ray lands on.
       this.cameraPosition(ctx, this.eye);
@@ -237,6 +242,42 @@ export class HumanController implements Controller {
     return this.kick;
   }
 
+  /** Where the chase camera wants to be, walls or no walls. */
+  private chasePosition(ctx: ControlContext, out: { x: number; y: number; z: number }): void {
+    const u = ctx.frame.localUnit;
+    if (!u) return;
+    const def = unitTypeDef(u.type);
+    const back = def.body === 'infantry' ? 9 : 15 + def.radius;
+    const up = def.body === 'infantry' ? 4.2 : 7.5 + def.radius * 0.4;
+    const cp = Math.cos(this.viewPitch);
+    out.x = u.x - Math.sin(this.viewYaw) * back * cp;
+    out.y = Math.max(1, u.y + up - Math.sin(this.viewPitch) * back * 0.6);
+    out.z = u.z - Math.cos(this.viewYaw) * back * cp;
+  }
+
+  /** The point above the unit that the chase camera hangs from (always in the open). */
+  private chasePivot(ctx: ControlContext): { x: number; y: number; z: number } {
+    const u = ctx.frame.localUnit;
+    const p = this.pivot;
+    if (u) {
+      const def = unitTypeDef(u.type);
+      p.x = u.x;
+      p.y = u.y + def.eyeHeight + (def.body === 'vehicle' ? 0.6 : 0);
+      p.z = u.z;
+    }
+    return p;
+  }
+
+  /** Once per frame: how far out the chase camera may go before it meets a wall. */
+  private updateClearance(ctx: ControlContext): void {
+    if (!this.thirdPerson || !ctx.frame.localUnit) {
+      this.clear = 1;
+      return;
+    }
+    this.chasePosition(ctx, this.eye);
+    this.clear = easeClearance(this.clear, clearOfWalls(ctx.session.mirror.query, this.chasePivot(ctx), this.eye, 0.6), ctx.dt);
+  }
+
   private cameraPosition(ctx: ControlContext, out: { x: number; y: number; z: number }): void {
     const u = ctx.frame.localUnit;
     if (!u) return;
@@ -247,12 +288,14 @@ export class HumanController implements Controller {
       out.z = u.z;
       return;
     }
-    const back = def.body === 'infantry' ? 9 : 15 + def.radius;
-    const up = def.body === 'infantry' ? 4.2 : 7.5 + def.radius * 0.4;
-    const cp = Math.cos(this.viewPitch);
-    out.x = u.x - Math.sin(this.viewYaw) * back * cp;
-    out.y = Math.max(1, u.y + up - Math.sin(this.viewPitch) * back * 0.6);
-    out.z = u.z - Math.cos(this.viewYaw) * back * cp;
+    this.chasePosition(ctx, out);
+    if (this.clear < 1) {
+      // A wall behind the unit: the camera comes in to this side of it.
+      const pivot = this.chasePivot(ctx);
+      out.x = pivot.x + (out.x - pivot.x) * this.clear;
+      out.y = pivot.y + (out.y - pivot.y) * this.clear;
+      out.z = pivot.z + (out.z - pivot.z) * this.clear;
+    }
   }
 
   applyCamera(ctx: ControlContext, camera: THREE.PerspectiveCamera): void {

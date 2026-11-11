@@ -35,7 +35,7 @@ export interface MbState {
   me: { x: number; z: number; hp: number; alive: boolean } | null;
   unitsAlive: number;
   events: Record<string, number>;
-  net: { snapshots: number; events: number; inputs: number; pending: number; correction: number; predicting: boolean } | null;
+  net: { snapshots: number; snapshotBytes: number; events: number; inputs: number; pending: number; correction: number; predicting: boolean } | null;
   /** `ms`: script time per frame, smoothed; `fps`: frames actually shown per second. */
   frame: { ms: number; maxMs: number; count: number; fps: number };
   result: { winner: string; reason: string; duration: number } | null;
@@ -118,6 +118,7 @@ export function installHook(source: HookSource): MbHook {
         net: session
           ? {
               snapshots: session.stats.snapshots,
+              snapshotBytes: session.stats.snapshotBytes,
               events: session.stats.events,
               inputs: session.stats.inputs,
               pending: session.predictor.pending.length,

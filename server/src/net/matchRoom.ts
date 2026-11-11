@@ -30,6 +30,7 @@ import {
 import { performance } from 'node:perf_hooks';
 import { GameRoom } from '../room/gameRoom';
 import { JoinRefused, type Peer } from '../room/peer';
+import { createPerfMeter, perfReport, perfSample, type PerfReport } from '../room/perf';
 import { startTicker, type Ticker } from '../room/ticker';
 
 /** What every room on this server shares; set once by the server before any room exists. */
@@ -72,6 +73,13 @@ export function configureRooms(next: RoomRuntime): void {
 /** The codes of the rooms that are open right now. */
 export function openRoomCodes(): string[] {
   return [...liveRooms.keys()];
+}
+
+/** Timing of the room loop while matches run, over every room of this server (see room/perf.ts). */
+const perf = createPerfMeter();
+
+export function roomPerf(): PerfReport {
+  return perfReport(perf);
 }
 
 export function roomStats(): { rooms: number; players: number } {
@@ -133,9 +141,18 @@ export class MatchRoom extends Room {
       game.message(client.sessionId, String(type), message);
     });
 
+    let lastUpdate = 0;
     this.ticker = startTicker(
       TICK_RATE,
-      () => game.update(),
+      () => {
+        const began = performance.now();
+        const running = game.matchRunning;
+        const tick = game.matchTick;
+        game.update();
+        // Only updates of a running match are measured: the lobby does next to nothing.
+        if (running && lastUpdate > 0) perfSample(perf, performance.now() - began, began - lastUpdate, Math.max(0, game.matchTick - tick));
+        lastUpdate = running ? began : 0;
+      },
       (err) => rt.log?.(`[room ${code}] update failed: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}`),
     );
   }

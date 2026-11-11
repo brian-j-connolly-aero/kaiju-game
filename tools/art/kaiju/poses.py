@@ -296,7 +296,7 @@ def solve(body: Body, base: dict, goal: dict, seed: int = 1, starts: int = 10, b
                 t["torso"] += float((np.maximum(0, 0.006 * h - sd) ** 2).mean()) / (0.001 * h) ** 2
                 if goal.get("low"):
                     px, py, pd = body.project(w, pw)
-                    t["high"] += float((np.maximum(0, py[pd > 0] + 0.25) ** 2).sum() / len(pw)) * 100
+                    t["high"] += float((np.maximum(0, py[pd > 0.05] + 0.25) ** 2).sum() / len(pw)) * 100
                 if both:                                               # mirrored arms must not meet
                     t["mid"] += float((np.maximum(0, 0.014 * h + pw[:, 0]) ** 2).mean()) / (0.0005 * h) ** 2
         # joints: the elbow neither locks out nor folds flat, the wrist does not snap
@@ -332,3 +332,79 @@ def solve(body: Body, base: dict, goal: dict, seed: int = 1, starts: int = 10, b
     info: dict = {}
     c = cost(q, info)
     return pose_of(q), c, info
+
+
+def goals(stage: int) -> dict:
+    """What each first-person pose target should look like: name -> (body angles, goal for the
+    right hand as solve() takes it, both arms?). Depths are body heights from the camera; the
+    hatchling's big head keeps its hands a little farther out."""
+    near = {1: 0.19, 2: 0.16, 3: 0.16}[stage]
+    return {
+        # claws out either side of the snout: backs of the hands up, claws forward and a little in
+        "fp_claws": ({}, dict(x=0.64, y=-0.62, depth=(near + 0.01, near + 0.12), fingers=(-0.3, 0.5, 0.8),
+                              back=(0.1, 0.9, -0.4), low=True), True),
+        # reach forward and down for something on the ground ahead
+        "grab": ({"torso": (14, 8, 0)}, dict(x=0.30, y=-0.62, depth=(0.30, 0.50), fingers=(-0.15, -0.45, 0.88),
+                                             back=(0, 0.9, 0.4), low=True), False),
+        # carry: the hand up in the lower right, palm in, so the thing it holds sits toward the middle
+        "hold": ({}, dict(x=0.58, y=-0.68, depth=(near, near + 0.12), fingers=(-0.3, 0.45, 0.85),
+                          back=(0.8, -0.3, -0.5), low=True), False),
+        # both hands bring the meal to the mouth, either side of the snout tip
+        "eat": ({"torso": (8, 0, 0), "head": (8, 0, 0), "jaw": (22, 0, 0)},
+                dict(x=0.36, y=-0.74, depth=(near - 0.04, near + 0.06), fingers=(-0.75, 0.35, 0.55),
+                     back=(0.6, -0.2, 0.75), low=True), True),
+        # guard: forearms up in front of the chest and throat, palms toward the body
+        "brace": ({"torso": (16, 0, 0), "neck": (4, 0, 0), "head": (4, 0, 0)},
+                  dict(x=0.38, y=-0.68, depth=(near - 0.01, near + 0.11), fingers=(-0.65, 0.45, 0.6),
+                       back=(0.4, 0.3, 0.85), low=True), True),
+        # cocked: the hand drawn back to the edge of the view, palm forward, the body turned away
+        "throw_windup": ({"torso": (-8, -10, 0)}, dict(x=0.80, y=-0.64, depth=(near - 0.04, near + 0.06),
+                                                       fingers=(0.1, 0.8, 0.6), back=(0.2, 0.0, -1.0)), False),
+        # thrust: the arm straight out toward the crosshair
+        "throw_release": ({"torso": (12, 12, 0)}, dict(x=0.30, y=-0.58, depth=(0.30, 0.60), fingers=(-0.1, 0.1, 1.0),
+                                                       back=(0, 1, 0.1), low=True), False),
+    }
+
+
+def main(argv=None) -> int:
+    """Re-solve pose targets after the proportions changed:
+
+        /opt/mbtools/venv/bin/python tools/art/kaiju/poses.py [stage ...] [--only grab,eat]
+
+    Prints lines to paste into lizard.POSE_TARGETS and what check() says about them. The
+    current targets seed the search, so an answer that still works is kept or improved.
+    Then rebuild (tools/art/kaiju_lizard.py) and look at the FIRST PERSON cells and at the
+    poses from outside: the solver only knows where the hand should be, not what reads well.
+    About 20 seconds per pose."""
+    import argparse
+
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import lizard
+    ap = argparse.ArgumentParser(description="Solve the lizard's first-person pose targets.")
+    ap.add_argument("stages", nargs="*", type=int, default=[1, 2, 3])
+    ap.add_argument("--only", default="", help="comma-separated pose names")
+    args = ap.parse_args(argv)
+    only = {s for s in args.only.split(",") if s}
+    code = 0
+    for stage in args.stages:
+        asset = f"kaiju_lizard_s{stage}"
+        body = Body(asset)
+        found = {}
+        print(f"    {stage}: {{")
+        for name, (base, goal, both) in goals(stage).items():
+            if only and name not in only:
+                continue
+            seeds = [t[name] for t in (lizard.POSE_TARGETS.get(stage, {}), *lizard.POSE_TARGETS.values()) if name in t]
+            pose, cost, _ = solve(body, base, goal, both=both, starts=14, init=seeds)
+            found[name] = pose
+            a, f, h = (tuple(int(v) for v in pose[k]) for k in RIGHT_ARM)
+            print(f'        "{name}": {"_both" if both else "_right"}({base}, {a}, {f}, {h}),    # cost {cost:.1f}')
+        print("    },")
+        for line in check(asset, found):
+            print("  PROBLEM", line)
+            code = 1
+    return code
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

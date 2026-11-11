@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { KAIJU_ACTION_IDS, KAIJU_PHASES, unitTypeDef } from '@mb/shared';
+import { CITY_SEED, createCityQuery, createCityState, getCity, KAIJU_ACTION_IDS, KAIJU_PHASES, structureAt, unitTypeDef } from '@mb/shared';
+import { clearOfWalls, easeClearance } from '../src/game/controllers/cameraClearance';
 import { defaultBindings, glyphFor, keyGlyph, mergeBindings, BUTTON_ACTIONS } from '../src/game/input/actions';
 import { computeKaijuPose, createKaijuPose } from '../src/render/kaijuAnimator';
 import { memberOffset } from '../src/render/unitsView';
@@ -94,5 +95,59 @@ describe('manifest and placeholder art', () => {
       expect(art).not.toContain('<text');
     }
     expect(skylinePath(400, 44)).toMatch(/^M0 44 .* Z$/);
+  });
+});
+
+describe('camera clearance', () => {
+  const { city, index } = getCity(CITY_SEED);
+  const query = createCityQuery(index, createCityState(city));
+  // A tall, unrotated block with open street in front of its +Z face.
+  const tower = city.structures.find((s) => s.height > 40 && !s.passable && s.yaw === 0 && structureAt(query, s.x, s.z + s.hz + 12) < 0);
+  if (!tower) throw new Error('the test city has no tower with a street in front of it');
+  const face = tower.z + tower.hz;
+
+  it('lets the camera be when nothing is in the way', () => {
+    const pivot = { x: tower.x, y: 20, z: face + 10 };
+    const eye = { x: tower.x, y: 20, z: face + 4 };
+    expect(clearOfWalls(query, pivot, eye, 1)).toBe(1);
+  });
+
+  it('stops a camera that would be inside a building a margin short of the wall', () => {
+    const pivot = { x: tower.x, y: 20, z: face + 9 };
+    const eye = { x: tower.x, y: 20, z: face - 2 };
+    const f = clearOfWalls(query, pivot, eye, 1.5);
+    expect(f).toBeGreaterThan(0);
+    expect(f).toBeLessThan(1);
+    const z = pivot.z + (eye.z - pivot.z) * f;
+    expect(z - face).toBeCloseTo(1.5, 5);
+    // A camera still outside, but closer to the wall than the margin, is pulled back too.
+    const close = { x: tower.x, y: 20, z: face + 0.5 };
+    const g = clearOfWalls(query, pivot, close, 1.5);
+    expect(pivot.z + (close.z - pivot.z) * g - face).toBeCloseTo(1.5, 5);
+  });
+
+  it('looks over a building that is lower than the camera, and ignores rubble', () => {
+    const pivot = { x: tower.x, y: tower.height + 5, z: face + 9 };
+    const eye = { x: tower.x, y: tower.height + 5, z: face - 2 };
+    expect(clearOfWalls(query, pivot, eye, 1.5)).toBe(1);
+    const rubble = createCityQuery(index, createCityState(city));
+    rubble.structureHp[tower.id] = 0;
+    expect(clearOfWalls(rubble, { x: tower.x, y: 20, z: face + 9 }, { x: tower.x, y: 20, z: face - 2 }, 1.5)).toBe(1);
+  });
+
+  it('gives up when the body itself is inside a building (a titan wading through a tower)', () => {
+    const pivot = { x: tower.x, y: 20, z: tower.z };
+    const eye = { x: tower.x, y: 20, z: tower.z + 1 };
+    expect(clearOfWalls(query, pivot, eye, 1.5)).toBe(1);
+  });
+
+  it('gives way to a wall at once and comes back out gradually', () => {
+    expect(easeClearance(1, 0.4, 0.016)).toBe(0.4);
+    const back = easeClearance(0.4, 1, 0.1);
+    expect(back).toBeGreaterThan(0.4);
+    expect(back).toBeLessThan(1);
+    let v = 0.4;
+    for (let i = 0; i < 120; i++) v = easeClearance(v, 1, 1 / 60);
+    expect(v).toBeGreaterThan(0.99);
   });
 });
