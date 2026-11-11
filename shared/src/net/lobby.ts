@@ -58,7 +58,10 @@ export interface LobbyState {
   host: number;
   players: LobbyPlayer[];
   options: LobbyOptions;
-  /** Seat that played the kaiju in the previous match, or -1. */
+  /**
+   * Seat that played the kaiju in the most recent match, or -1 (nobody yet, or a bot). The
+   * server sets it when a match starts, so during a match it is the current kaiju's seat.
+   */
   lastKaijuSeat: number;
 }
 

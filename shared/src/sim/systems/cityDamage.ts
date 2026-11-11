@@ -61,10 +61,11 @@ function addBarPoints(world: World, points: number, by: PlayerId): void {
   player.tally.barPoints += points;
   if (player.kaijuId >= 0) {
     // Rage for wrecking: filling one whole stage segment of the bar is worth ragePerBarSegment.
+    // What the special itself wrecks earns none, so a beam can never pay for the next beam.
     const k = world.kaijus[player.kaijuId];
     const lo = m.stage > 1 ? m.marks[m.stage - 2] : 0;
     const segment = m.marks[m.stage - 1] - lo;
-    if (segment > 0) {
+    if (segment > 0 && k.action !== 'special') {
       const gain = (COMBAT_RULES.ragePerBarSegment * points * modMult(k.mods, 'rageGain')) / segment;
       k.rage = Math.min(COMBAT_RULES.rageMax, k.rage + gain);
     }

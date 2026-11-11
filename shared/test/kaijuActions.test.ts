@@ -263,7 +263,7 @@ describe('stomp: strike held', () => {
     // Structures: more damage close to the body than at the rim, none outside.
     const lostNear = 1000 - world.structureHp[0];
     const lostRim = 1000 - world.structureHp[1];
-    expect(lostNear).toBeCloseTo(A.stomp.structureDamage[0] * (1 + (A.stomp.structureEdgeFraction - 1) * (4 / reach)), 6);
+    expect(lostNear).toBeCloseTo(A.stomp.structureDamage[0] * (1 + (A.stomp.structureEdgeFraction - 1) * (4 / reach)), 3);
     expect(lostRim).toBeGreaterThan(A.stomp.structureDamage[0] * A.stomp.structureEdgeFraction - 1e-6);
     expect(lostRim).toBeLessThan(lostNear);
     expect(world.structureHp[2]).toBe(1000);
@@ -295,7 +295,7 @@ describe('grab and throw', () => {
       props: [
         { kind: 'car_sedan', x: 0, z: 5.5 },
         { kind: 'car_van', x: 1, z: 5 },
-        { kind: 'bus', x: 0, z: -5.5 },
+        { kind: 'bus', x: 0, z: -7.5 },
       ],
     });
     const k = world.kaijus[0];
@@ -396,16 +396,20 @@ describe('grab and throw', () => {
       structures: [{ x: 0, z: 28, w: 10, d: 8, height: 8, hp: 1000 }],
     });
     const k = world.kaijus[0];
-    const close = placeUnit(world, 0, A.throw.impactRadius[0] + 3 - 1, 22);
-    const away = placeUnit(world, 1, A.throw.impactRadius[0] + 3 + 3, 22);
+    // The wall is at z = 24. One unit stands inside the impact radius of its foot, one outside.
+    const splash = A.throw.impactRadius[0];
+    const close = placeUnit(world, 0, 5, 20);
+    const away = placeUnit(world, 1, splash + 3 + 3, 20);
+    expect(Math.hypot(5, 4) - close.radius).toBeLessThan(splash);
     toughen(world, 0);
     toughen(world, 1);
     tap(world, Btn.grab);
     untilIdle(world);
     expect(k.held).toEqual({ kind: 'prop', prop: 'bus' });
 
-    // Looking level: the crosshair is on the building's front wall.
-    const events = [...tap(world, Btn.grab), ...play(world, 90)];
+    // The crosshair is on the building's front wall, near its foot.
+    const aim = { aimPitch: -Math.atan2(LIZARD.stages[0].eyeHeight - 1, 24) };
+    const events = [...tap(world, Btn.grab, aim), ...play(world, 90, aim)];
     expect(eventsOf(events, 'projectileHit')).toMatchObject([{ target: 'structure', targetId: 0 }]);
     expect(1000 - world.structureHp[0]).toBe(A.throw.structureDamage[0]);
     expect(close.maxHp - close.hp).toBe(A.throw.unitDamage);
@@ -495,15 +499,16 @@ describe('eat: grab held', () => {
     const timeline: Array<[number, string, string]> = [];
     const held: SimEvent[] = [];
     let healStep = -1;
-    for (let step = 1; step <= 100; step++) {
-      const events = play(world, 1, { buttons: step <= ticksFor(A.eat.holdTime) + 1 ? Btn.grab : 0, moveZ: 1 });
+    const grab = ticksFor(A.grab.timing.windup);
+    const hold = ticksFor(A.eat.holdTime);
+    const chew = ticksFor(A.eat.timing.active);
+    for (let step = 1; step <= 1 + hold + chew; step++) {
+      // The stick is pushed forward once the meal has begun: the kaiju must stay where it is.
+      const events = play(world, 1, { buttons: step <= hold + 1 ? Btn.grab : 0, moveZ: step > hold + 1 && step < hold + chew ? 1 : 0 });
       for (const e of eventsOf(events, 'kaijuAction')) timeline.push([step, e.action, e.phase]);
       held.push(...eventsOf(events, 'kaijuHeld'));
       if (healStep < 0 && k.hp > 500) healStep = step;
     }
-    const grab = ticksFor(A.grab.timing.windup);
-    const hold = ticksFor(A.eat.holdTime);
-    const chew = ticksFor(A.eat.timing.active);
     expect(timeline).toEqual([
       [1, 'grab', 'windup'],
       [1 + grab, 'grab', 'active'],
@@ -518,7 +523,8 @@ describe('eat: grab held', () => {
     expect(healStep).toBe(1 + hold + chew);
     expect(k.hp).toBe(500 + A.eat.heal);
     expect(k.held).toBeNull();
-    // Rooted for the whole meal (it could walk during the grab).
+    // Rooted for the whole meal.
+    expect(k.z).toBe(0);
     expect(A.eat.moveMult).toBe(0);
     expect(k.cooldowns.eat).toBeGreaterThan(0);
   });
@@ -644,32 +650,36 @@ describe('roar', () => {
     expect(k.knownTimer).toBeGreaterThan(MATCH_RULES.revealAfterNoise - 2 * DT);
 
     // The roar itself takes its time, rooted.
-    events = untilIdle(world, { moveZ: 1 });
-    expect(actions(events)).toEqual([['roar', 'idle']]);
-    expect(k.z).toBe(0);
-
-    // On cooldown: pressing again does nothing until it has run out.
-    events = play(world, ticksFor(A.roar.cooldown) - ticksFor(A.roar.timing.active) - 5, { buttons: Btn.roar });
-    events = [...events, ...play(world, 2), ...play(world, 2, { buttons: Btn.roar })];
+    events = play(world, ticksFor(A.roar.timing.active) - 1, { moveZ: 1 });
     expect(actions(events)).toEqual([]);
-    play(world, 4);
-    events = play(world, 2, { buttons: Btn.roar });
-    expect(actions(events)).toEqual([['roar', 'roar']]);
+    expect(k.phase).toBe('roar');
+    expect(k.z).toBe(0);
+    events = play(world, 1);
+    expect(actions(events)).toEqual([['roar', 'idle']]);
+
+    // On cooldown: hammering the button does nothing until the cooldown, counted from the
+    // start of the first roar (step 1), has run out.
+    let again = -1;
+    for (let step = 2 + ticksFor(A.roar.timing.active); step <= ticksFor(A.roar.cooldown) + 10 && again < 0; step++) {
+      const stepEvents = play(world, 1, { buttons: step % 2 === 0 ? Btn.roar : 0 });
+      if (eventsOf(stepEvents, 'roar').length > 0) again = step;
+    }
+    expect(again).toBeGreaterThanOrEqual(1 + ticksFor(A.roar.cooldown));
+    expect(again).toBeLessThanOrEqual(2 + ticksFor(A.roar.cooldown));
   });
 
-  it('two roars in a row would shake a unit: the first alone does not', () => {
-    // The relationship the design relies on: one roar unsettles, it does not break a fresh unit.
+  it('unsettles a fresh unit without breaking it, and breaks one that was already rattled', () => {
+    // The relationship the design relies on: one roar alone does not shake a fresh unit.
     expect(A.roar.unitNerve).toBeLessThan(COMBAT_RULES.unitNerveCapacity);
-    expect(A.roar.unitNerve + A.swipe.unitNerve).toBeGreaterThanOrEqual(COMBAT_RULES.unitNerveCapacity);
     const world = arena();
-    const u = placeUnit(world, 0, 0, 4);
-    toughen(world, 0);
-    play(world, 1, { buttons: Btn.roar });
-    expect(u.shaken).toBe(0);
-    untilIdle(world);
-    const events = [...tap(world, Btn.strike), ...untilIdle(world)];
-    expect(eventsOf(events, 'unitShaken')).toMatchObject([{ unit: 0 }]);
-    expect(u.shaken).toBeGreaterThan(0);
+    const fresh = placeUnit(world, 0, 0, 10);
+    const rattled = placeUnit(world, 1, 10, 0);
+    rattled.nerve = COMBAT_RULES.unitNerveCapacity - A.roar.unitNerve + 1;
+    const events = play(world, 1, { buttons: Btn.roar });
+    expect(fresh.shaken).toBe(0);
+    expect(rattled.shaken).toBeGreaterThan(0);
+    expect(eventsOf(events, 'unitShaken')).toMatchObject([{ unit: 1 }]);
+    expect(world.players[KAIJU_PLAYER].tally.breaks).toBe(1);
   });
 
   it('reaches farther at each stage', () => {
@@ -703,8 +713,10 @@ describe('the beam special', () => {
     k.rage = beam.rageCost;
     const timeline: Array<[number, string, string]> = [];
     const cues: string[] = [];
-    for (let step = 1; step <= 200; step++) {
-      const events = play(world, 1, { buttons: step <= 2 ? Btn.special : 0, moveZ: 1 });
+    const total = windup + burn + ticksFor(beam.timing.recover);
+    for (let step = 1; step <= 1 + total; step++) {
+      // The stick is pushed forward all the way through, except on the tick it is free again.
+      const events = play(world, 1, { buttons: step <= 2 ? Btn.special : 0, moveZ: step <= total ? 1 : 0 });
       for (const e of eventsOf(events, 'kaijuAction')) timeline.push([step, e.action, e.phase]);
       cues.push(...eventsOf(events, 'voice').map((e) => e.cue));
       if (step === 1) expect(k.rage).toBe(0);

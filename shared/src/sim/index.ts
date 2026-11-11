@@ -14,7 +14,7 @@ export * from './createWorld';
 export { applyInput, inputSystem } from './systems/inputs';
 export { kaijuActionSystem } from './systems/kaijuActions';
 export * from './beam';
-export { findEdible, findGrabTarget, throwAngle, type ReachTarget } from './kaijuEffects';
+export { findEdible, findGrabTarget, shoveUnit, throwAngle, type ReachTarget } from './kaijuEffects';
 export { unitOrderSystem } from './systems/unitOrders';
 export { botSystem } from './systems/bots';
 export { movementSystem } from './systems/movement';

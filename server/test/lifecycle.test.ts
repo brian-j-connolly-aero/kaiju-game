@@ -19,8 +19,13 @@ import {
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { options, Player, startTestServer, token, until, type TestServer } from './netHelpers';
 
-/** Simulation speed for this file: a fast match (150 s on the clock) takes about 12 s. */
-const SPEED = 12;
+/**
+ * Simulation speed for this file: at 12 a fast match (150 s on the clock) takes about 12 s.
+ * Set MB_TEST_SPEED=1 to run the very same test in real time (about three minutes).
+ */
+const SPEED = Number(process.env.MB_TEST_SPEED ?? '') > 0 ? Number(process.env.MB_TEST_SPEED) : 12;
+/** How long the match may take to end, with room to spare on a busy machine. */
+const MATCH_END_TIMEOUT_MS = Math.round((200 / SPEED) * 1000) + 45_000;
 
 let ts: TestServer;
 const players: Player[] = [];
@@ -73,6 +78,18 @@ describe('a room from creation to the last player leaving', () => {
     expect(players.map((p) => p.seat)).toEqual([0, 1, 2, 3, 4]);
     expect(host.lobby.players.map((p) => p.name)).toEqual(['Tester 0', 'Tester 1', 'Tester 2', 'Tester 3', 'Tester 4']);
     expect((await (await fetch(`${ts.url}/healthz`)).json()) as object).toMatchObject({ ok: true, rooms: 1, players: 5 });
+
+    // The code is the only way in: nobody can ask to be put into "any room".
+    for (const method of ['join', 'joinOrCreate']) {
+      const res = await fetch(`${ts.url}/matchmake/${method}/mb`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(options(8)),
+      });
+      expect(res.ok).toBe(false);
+      expect(((await res.json()) as { code?: number }).code).toBe(520);
+    }
+    expect(ts.server.health()).toMatchObject({ rooms: 1, players: 5 });
 
     const sixth = await Player.join(ts.url, host.code, options(5)).then(
       () => null,
@@ -171,7 +188,7 @@ describe('a room from creation to the last player leaving', () => {
     expect(host.lobby.players[4].connected).toBe(true);
 
     // --- match end -----------------------------------------------------------------------
-    await until(() => players.every((p) => p.events.some((e) => e.type === 'matchEnd')), 'the match to end for everyone', 60_000);
+    await until(() => players.every((p) => p.events.some((e) => e.type === 'matchEnd')), 'the match to end for everyone', MATCH_END_TIMEOUT_MS);
     await until(() => players.every((p) => p.lobby.phase === 'end'), 'the lobby to show the end screen');
     for (const p of players) {
       const end = p.events.find((e) => e.type === 'matchEnd');
@@ -211,5 +228,5 @@ describe('a room from creation to the last player leaving', () => {
       (e: unknown) => e,
     );
     expect(await codeOf(gone)).toBe(522);
-  }, 120_000);
+  }, MATCH_END_TIMEOUT_MS + 60_000);
 });

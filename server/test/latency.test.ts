@@ -1,8 +1,10 @@
 /**
  * The simulated latency option (MB_LATENCY): a server that delays every message, to test
- * clients against a slow connection without one.
+ * clients against a slow connection without one. The same server runs with a room limit of
+ * one, to check what happens when the server is full.
  */
 
+import { JOIN_ERROR } from '@mb/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { configFromEnv } from '../src/config';
 import { options, Player, startTestServer, until, type TestServer } from './netHelpers';
@@ -16,7 +18,7 @@ beforeAll(async () => {
   // Configured the way the command line does it.
   const fromEnv = configFromEnv({ MB_LATENCY: String(LATENCY_MS), MB_FAST: '1' });
   expect(fromEnv.latencyMs).toBe(LATENCY_MS);
-  ts = await startTestServer({ latencyMs: fromEnv.latencyMs, fast: fromEnv.fast });
+  ts = await startTestServer({ latencyMs: fromEnv.latencyMs, fast: fromEnv.fast, maxRooms: 1 });
 });
 
 afterAll(async () => {
@@ -41,6 +43,14 @@ describe('simulated latency', () => {
     expect(best).toBeGreaterThanOrEqual(LATENCY_MS * 0.9);
     expect(best).toBeLessThan(LATENCY_MS + 250);
 
+    // The server is at its room limit: creating another room is refused with a clear code.
+    const refused = await Player.create(ts.url, options(51)).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect((refused as { code?: number } | null)?.code).toBe(JOIN_ERROR.serverFull);
+    expect(ts.server.health().rooms).toBe(1);
+
     // A match over the slow link: inputs are acknowledged, late but in order.
     p.client.send('start', {});
     await until(() => p.welcomes.length === 1, 'the welcome');
@@ -51,5 +61,12 @@ describe('simulated latency', () => {
     // What the server has applied trails what was sent by at least the latency.
     expect(p.lastSeq - p.snapshot.ackSeq).toBeGreaterThanOrEqual(Math.floor((LATENCY_MS / 1000) * 30) - 2);
     await p.leave();
+
+    // With the room closed there is space again.
+    await until(() => ts.server.health().rooms === 0, 'the room to close');
+    const next = await Player.create(ts.url, options(52));
+    await until(() => next.lobbies.length > 0, 'the new room to open');
+    expect(next.code).not.toBe(p.code);
+    await next.leave();
   });
 });

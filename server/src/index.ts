@@ -43,6 +43,13 @@ try {
       (notes.length > 0 ? ` [${notes.join(', ')}]` : ''),
   );
 } catch (err) {
-  console.error(`The server could not start: ${err instanceof Error ? err.message : String(err)}`);
+  const code = (err as { code?: unknown } | null)?.code;
+  const reason =
+    code === 'EADDRINUSE'
+      ? 'the port is already in use. Is another copy of the server running? Set PORT to use a different one.'
+      : err instanceof Error
+        ? err.message
+        : String(err);
+  console.error(`The server could not start: ${reason}`);
   process.exit(1);
 }

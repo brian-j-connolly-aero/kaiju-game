@@ -5,7 +5,7 @@ win_humans: "Port Meridian Stands". The head motif turned to D major as a trumpe
 win_kaiju:  "The City Falls Silent". The head motif and the theme's last two bars (the
             flat-second close) for the whole choir, low brass, organ pedal and a tolling bell.
 """
-from ..orchestra import BASS_DRUM, CRASH, SNARE
+from ..orchestra import BASS_DRUM, CRASH, SNARE, SNARE_ALT
 from ..patterns import swell_into
 from ..score import B, Cue, pitch
 
@@ -57,10 +57,10 @@ def build_humans() -> Cue:
     sn = s.add("snare", "snare", gain=1.0, role="perc")
     sn.hits(1, "X.gxX.ggX.gxXgxx", SNARE)
     sn.hits(2, "X.gxX.ggX...", SNARE)
-    sn.roll(B(2, 4), 1.0, SNARE, 60, 110)
+    sn.roll(B(2, 4), 1.0, SNARE, 60, 110, alt=SNARE_ALT)
     sn.hits(3, "X..XxxX.X..XxxXx", SNARE)
     sn.note(B(4), SNARE, 0.2, 124)
-    sn.roll(B(4, 2), 5.4, SNARE, 60, 112, curve=0.8)
+    sn.roll(B(4, 2), 5.4, SNARE, 60, 112, curve=0.8, alt=SNARE_ALT)
     bd = s.add("bass drum", "bass_drum", gain=2.0, role="perc")
     for t, v in ((B(1), 118), (B(2), 100), (B(3), 104), (B(3, 3), 104), (B(4), 124)):
         bd.note(t, BASS_DRUM, 0.6, v)

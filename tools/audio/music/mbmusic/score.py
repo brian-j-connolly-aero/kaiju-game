@@ -151,14 +151,18 @@ class Part:
             i += 1
 
     def roll(self, start: float, beats: float, key: int | str, v0: int, v1: int, *,
-             step: float = 1 / 12, dur: float = 0.2, curve: float = 1.0) -> None:
-        """Drum roll written out as single strokes with a crescendo or diminuendo."""
+             step: float = 1 / 12, dur: float = 0.2, curve: float = 1.0, alt: int | None = None) -> None:
+        """Drum roll written out as single strokes with a crescendo or diminuendo. `alt` is a
+        second sample of the same drum for every other stroke (left hand, right hand), which
+        keeps the roll from sounding like one sample repeated."""
         if isinstance(key, str):
             key = pitch(key)
         n = max(1, int(round(beats / step)))
         for i in range(n):
             f = (i / max(1, n - 1)) ** curve
-            self.note(start + i * step, key, dur, v0 + (v1 - v0) * f)
+            v = v0 + (v1 - v0) * f
+            self.note(start + i * step, alt if (alt is not None and i % 2) else key, dur,
+                      v - (5 if i % 2 else 0))
 
     def expr(self, points: list[tuple[float, int]], cc: int = 11, step: float = 0.125) -> None:
         """Expression (volume swell) curve: linear ramps between (absolute beat, 0..127)."""

@@ -1,7 +1,7 @@
 """lobby: "The Long Watch", a brooding march. 32 bars, 80 s loop.
 
-    bars  1-4   vamp: pizzicato march bass, soft field drum, a held open fifth with a sighing
-                B flat above it, the theme's rhythm as a timpani signal
+    bars  1-4   vamp: pizzicato march bass, soft field drum, a held D with the violas on the
+                fifth above it, sighing up to B flat; the theme's rhythm as a timpani signal
     bars  5-12  the theme, low and plain: horns, cellos and bassoon in unison over the bass
     bars 13-20  second strain: violins and clarinet, warm string harmony, drums swell back in
     bars 21-28  the theme, tutti: trumpets, horns and men's voices, tremolo violins, low brass
@@ -49,12 +49,14 @@ def build() -> Cue:
     tuba = s.add("tuba", "tuba", gain=0.0, role="bass")
     tuba.line(21, TUTTI_BASS, 96, gate=0.85)
 
-    # ---- held fifth under the vamp, with the violas sighing B flat to A above it ------------
-    vc_p = s.add("cellos pedal", "cellos", gain=7.0, role="pad")
+    # ---- held D under the vamp; the violas supply the fifth above it and sigh up to B flat.
+    # (The cellos do not hold the A as well: a suspension must not sound against its own
+    # resolution in the same octave.)
+    vc_p = s.add("cellos pedal", "cellos", gain=9.5, role="pad")
     for bar in (1, 29):
-        vc_p.line(bar, "D3+A3:8_ D3+A3:8_", 74)
+        vc_p.line(bar, "D3:8_ D3:8_", 78)
     vc_p.expr([(B(1), 84), (B(3), 112), (B(5), 78), (B(29), 90), (B(31), 116), (B(33), 84)])
-    va_s = s.add("violas sigh", "violas", gain=4.0, role="pad")
+    va_s = s.add("violas sigh", "violas", gain=6.5, role="pad")
     for bar in (1, 29):
         va_s.line(bar, "A3:4_ | Bb3:2_ A3:2_ | A3:4_ | Bb3:3_ A3:1", 70, gate=1.0)
     va_s.expr([(B(1), 80), (B(2), 110), (B(3), 84), (B(4), 116), (B(5), 70),
@@ -127,12 +129,12 @@ def build() -> Cue:
             pat = bar_a if (bar - first) % 2 == 0 else bar_b
             if (bar - first) % roll_every == roll_every - 1:
                 pat = pat[:12] + "...."                       # make room for the roll on beat 4
-                sn.roll(B(bar, 4), 1.0, SNARE, 40 * scale, 96 * scale, curve=1.4)
+                sn.roll(B(bar, 4), 1.0, SNARE, 40 * scale, 96 * scale, curve=1.4, alt=SNARE_ALT)
             sn.hits(bar, pat, SNARE, scale=scale)
     march(1, 4, 0.82)
     march(5, 12, 0.86)
     march(15, 20, 0.8)
-    sn.roll(B(20, 3), 2.0, SNARE, 44, 112, curve=1.3)
+    sn.roll(B(20, 3), 2.0, SNARE, 44, 112, curve=1.3, alt=SNARE_ALT)
     march(21, 28, 1.0, roll_every=2)
     march(29, 32, 0.8)
     # alternate the two snare samples on soft strokes so repeats are not identical

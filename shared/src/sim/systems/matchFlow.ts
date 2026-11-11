@@ -6,11 +6,15 @@
  * the clock runs out: humans win). `endMatch` and `beginStage` are the entry points the rest of
  * the flow should use.
  *
- * STUB(sim): Worker 3 (match flow) fills in the molt (DESIGN.md section 2, "The molt"):
- * - when this tick's events contain `barMark` 1 or 2, set `kaiju.moltAvailable` and emit
- *   `moltAvailable` (the kaiju action system starts the cocoon when the player holds Molt);
- * - cocoon: phase 'cocoon' for `config.tuning.cocoon` seconds, emit `cocoon`; the clock keeps
- *   running and the kaiju takes full damage;
+ * Already done elsewhere: the city damage system sets `kaiju.moltAvailable` and emits
+ * `moltAvailable` while the bar is past the current stage's mark; the kaiju action system starts
+ * the cocoon when the player holds Molt (phase 'cocoon', action 'molt', `phaseDuration` =
+ * `config.tuning.cocoon`, the `cocoon` event) and keeps counting `phaseTime`; the damage system
+ * gives a cocooned kaiju full damage. Nothing ends the cocoon yet: the kaiju stays in it.
+ *
+ * STUB(sim): Worker 3 (match flow) fills in the rest of the molt (DESIGN.md section 2, "The molt"):
+ * - the cocoon is over when a kaiju has `phase === 'cocoon'` and
+ *   `phaseTime >= phaseDuration`; the clock keeps running until then;
  * - blast wave: destroy units within blastKillRadius, shove and shake units within
  *   blastShoveRadius (multiples of the NEW body radius), emit `moltBlast`; no building damage;
  * - intermission: phase 'intermission' for `config.tuning.intermission` seconds (the clock is
@@ -117,5 +121,5 @@ export function matchFlowSystem(world: World): void {
     return;
   }
 
-  // STUB(sim): molt prompt, cocoon, blast wave, intermission and stage change; see the file header.
+  // STUB(sim): the end of the cocoon: blast wave, intermission and stage change; see the file header.
 }

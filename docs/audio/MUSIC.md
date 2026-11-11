@@ -1,7 +1,8 @@
 # Monster Battle 9001: the soundtrack
 
 Choir and orchestra that swell with each stage, written as code and rendered from a General MIDI
-(Musical Instrument Digital Interface) soundfont. Thirteen files, one theme, one key, one tempo.
+(Musical Instrument Digital Interface) soundfont. Thirteen cues (26 files), one theme, one key,
+one tempo.
 
 - Files: `client/public/assets/audio/music/<id>.ogg` and `.mp3` (44.1 kHz stereo).
 - Manifest: `client/public/assets/manifest.music.json` (the `"music"` section).
@@ -55,25 +56,26 @@ section 4).
 
 | id | title | kind | bars | file length | loop [start, end] | group | loudness (LUFS) |
 | --- | --- | --- | ---: | ---: | --- | --- | ---: |
-| `lobby` | The Long Watch (brooding march) | loop | 32 | 80.5 s | [0.25, 80.25] | | -16.0 |
-| `briefing` | Situation Room (tense bed) | loop | 8 | 20.5 s | [0.25, 20.25] | | -18.1 |
-| `stage1_base` | Something in the Streets | loop | 32 | 80.5 s | [0.25, 80.25] | `stage1` | -18.9 |
-| `stage1_combat` | (combat stem) | loop | 32 | 80.5 s | [0.25, 80.25] | `stage1` | -19.8 |
+| `lobby` | The Long Watch (brooding march) | loop | 32 | 80.5 s | [0.25, 80.25] | | -16.1 |
+| `briefing` | Situation Room (tense bed) | loop | 8 | 20.5 s | [0.25, 20.25] | | -18.0 |
+| `stage1_base` | Something in the Streets | loop | 32 | 80.5 s | [0.25, 80.25] | `stage1` | -19.0 |
+| `stage1_combat` | (combat stem) | loop | 32 | 80.5 s | [0.25, 80.25] | `stage1` | -19.9 |
 | `stage2_base` | Steel Against Scale | loop | 32 | 80.5 s | [0.25, 80.25] | `stage2` | -17.1 |
 | `stage2_combat` | (combat stem) | loop | 32 | 80.5 s | [0.25, 80.25] | `stage2` | -20.3 |
 | `stage3_base` | Colossus over Port Meridian | loop | 32 | 80.5 s | [0.25, 80.25] | `stage3` | -16.9 |
-| `stage3_combat` | (combat stem) | loop | 32 | 80.5 s | [0.25, 80.25] | `stage3` | -19.2 |
+| `stage3_combat` | (combat stem) | loop | 32 | 80.5 s | [0.25, 80.25] | `stage3` | -19.3 |
 | `cocoon` | Chrysalis | one-shot | 4 | 12.5 s | | | -16.1 |
-| `intermission` | Redeploy (build) | one-shot | 8 | 23.5 s | | | -16.1 |
-| `win_humans` | Port Meridian Stands (fanfare) | one-shot | 5 | 14.5 s | | | -16.1 |
+| `intermission` | Redeploy (build) | one-shot | 8 | 23.5 s | | | -16.0 |
+| `win_humans` | Port Meridian Stands (fanfare) | one-shot | 5 | 14.5 s | | | -16.0 |
 | `win_kaiju` | The City Falls Silent | one-shot | 5 | 14.9 s | | | -16.1 |
-| `hearing` | For the Record (somber, bureaucratic) | loop | 12 | 30.5 s | [0.25, 30.25] | | -18.0 |
+| `hearing` | For the Record (somber, bureaucratic) | loop | 12 | 30.5 s | [0.25, 30.25] | | -17.9 |
 
 LUFS is Loudness Units relative to Full Scale (integrated loudness, EBU R128). Full mixes are
 mastered to -16. The two beds that sit under speech (`briefing`, `hearing`) are 2 lower on
 purpose. Stage stems are mastered as a pair: **base plus combat together** is -16.5 (stage 1),
 -15.5 (stage 2), -15.0 (stage 3), so the music really does get a little louder with each stage,
-and each base stem alone is 2 to 2.5 lower than its pair.
+and each base stem alone is 1.5 to 2.5 lower than its pair. The table gives the `.ogg`
+figures; the `.mp3` files measure within 0.1 of them.
 
 Total size: about 10 MB of `.ogg` and 10 MB of `.mp3` (the client loads one format).
 
@@ -90,24 +92,25 @@ One-shots have no `loop`.
 
 ## 3. What is in each cue
 
-Every part is written within the real range of the instrument or voice (the build refuses to
-run otherwise), and nothing but octaves and fifths sounds below F2.
+Every part is written within the real range of the instrument or voice, no third or second is
+held below C3, and nothing but octaves and fifths is held below F2 (the build refuses to run
+otherwise; clashes that pass in under a beat are allowed).
 
 **`lobby`, The Long Watch.** 32 bars.
 Bars 1 to 4, vamp: plucked basses and cellos (D and A, a slow march), field drum, bass drum, a
-held open fifth in the cellos with the violas sighing B flat to A, and the theme's rhythm as a
-timpani signal. Bars 5 to 12, the theme low and plain: horns, cellos and bassoon in unison over
-the plucked bass, violins holding a high A. Bars 13 to 20, second strain: violins and clarinet
-with violas an octave below, string harmony, bowed basses, the drum swelling back in, trombones
-and a timpani roll into the return. Bars 21 to 28, the theme tutti: trumpets, horns, men's voices
-(joined by the altos for the second half), tremolo violins, pulsing violas, trombones in open
-fifths, tuba, timpani, cymbals. Bars 29 to 32, codetta: clarinet and bassoon echo the head motif
-and the texture winds down into the vamp.
+held D in the cellos with the violas on the fifth above it, sighing up to B flat and back, and
+the theme's rhythm as a timpani signal. Bars 5 to 12, the theme low and plain: horns, cellos
+and bassoon in unison over the plucked bass, violins holding a high A. Bars 13 to 20, second
+strain: violins and clarinet with violas an octave below, string harmony, bowed basses, the drum
+swelling back in, trombones and a timpani roll into the return. Bars 21 to 28, the theme tutti:
+trumpets, horns, men's voices (joined by the altos for the second half), tremolo violins,
+pulsing violas, trombones in open fifths, tuba, timpani, cymbals. Bars 29 to 32, codetta:
+clarinet and bassoon echo the head motif and the texture winds down into the vamp.
 
 **`briefing`, Situation Room.** 8 bars over a D pedal, written to stay out of the way of speech:
-held basses and cellos, tremolo violas (the same B flat to A sigh), a very high violin line, a
-timpani pulse on beats 1 and 3, soft field drum, and the head motif once on English horn in
-bars 5 and 6.
+held basses and cellos, tremolo violas (the same B flat to A sigh), a held violin line and a
+very high one, a timpani pulse on beats 1 and 3, soft field drum, and the head motif once on
+English horn in bars 5 and 6. In bar 7 the harmony darkens to E flat over the pedal.
 
 **`stage1`, Something in the Streets (the hatchling).** Sparse and nervous. 32 bars.
 - *Base:* a stop-and-start cello figure on D with a flat-second twitch (E flat), sparse plucked
@@ -256,10 +259,14 @@ tools/audio/music/
     analyze.py          verification, spectrograms, MEASUREMENTS.md
 ```
 
-`build.sh` with no arguments rebuilds everything (about six minutes from an empty cache);
+`build.sh` with no arguments rebuilds everything (about seven minutes from an empty cache, one
+to two when only a few parts changed, because rendered parts are cached by content);
 `build.sh lobby stage2` rebuilds only those cues; `build.sh --review` prints the score review;
-`--no-verify` skips the measurements. Intermediate MIDI and WAV files go to
-`/tmp/mb-scratch/music` (set `MB_SCRATCH` to move it), never into the repository.
+`--no-verify` skips the measurements. `build.py --verify-only` re-measures the files already
+built, and `build.py --measure-tuning` re-measures the soundfont's intonation (only needed if
+the soundfont changes). Intermediate MIDI and WAV files go to `/tmp/mb-scratch/music` (set
+`MB_SCRATCH` to move it), never into the repository. A rebuild from an empty cache produces
+byte-identical `.ogg` and `.mp3` files (checked by hash).
 
 1. **Score.** Each cue is Python that writes notes into named parts
    (`part.line(5, "D4:1.5 D4:.5 F4:2 | E4:1.5 D4:.5 C4:2", 92)`: bar 5, pitches with lengths in
@@ -269,7 +276,9 @@ tools/audio/music/
 2. **Score review** (`build.sh --review`, also run before every build, which stops on a finding):
    every note inside the instrument's real range; no thirds or seconds sounding below C3 and
    nothing but octaves and fifths below F2, checked across all parts and both stems of a cue;
-   one-shots not running past their end. It also prints who plays in which bar and how loud.
+   one-shots not running past their end. It also prints who plays in which bar and how loud,
+   and lists every minor second held between two parts for a beat or more, so that each one is
+   a decision (the only ones left are the cocoon's deliberate clusters).
 3. **Render.** Each part is rendered on its own with fluidsynth and `FluidR3_GM.sf2`, no synth
    effects. Two things are done to the samples:
    - *Intonation.* The soundfont is not in tune with itself: measured against equal temperament
@@ -303,16 +312,17 @@ are in `docs/audio/music/MEASUREMENTS.md` (regenerated by every build) and `meas
 
 - **Decodes, right length.** All 26 files decode; every decoded length matches the score to the
   sample (0.00 ms error), and decoded audio lines up with the master at offset 0 in both formats.
-- **Not silent, not clipped.** True peak of every file is between -5.8 and -1.0 dBTP.
-- **Loudness.** Full mixes -16.0 to -16.1 LUFS; beds -18.0 and -18.1; stage pairs -16.5, -15.5,
-  -15.0 (base alone -18.9, -17.1, -16.9).
+- **Not silent, not clipped.** True peak of every file is between -5.4 and -1.3 dBTP, and the
+  loudest 0.4 s of every file is above -19 dBFS.
+- **Loudness.** Full mixes -16.0 to -16.1 LUFS; beds -18.0 and -17.9; stage pairs -16.5, -15.5,
+  -15.0 (base alone -19.0, -17.1, -16.9).
 - **Stems sum without clipping.** Base plus combat, decoded and added at full level: true peak
-  -1.0 to -1.7 dBTP in both formats.
+  -1.1 to -1.7 dBTP in both formats.
 - **Loops are continuous.** In the master the loop is exactly periodic. In the encoded files the
   200 ms around the loop end repeat the 200 ms around the loop start as closely as the codec
-  allows (within 3 dB of the codec's own error), the sample step across the splice is ordinary
-  (0.01 to 1.5 times the 99th percentile of the steps around it; a click would be many times
-  that), and the jump adds no onset energy (within 0.7 dB of playing straight through).
+  allows (within about 3 dB of the codec's own error), the sample step across the splice is
+  ordinary (0.01 to 1.5 times the 99th percentile of the steps around it; a click would be many
+  times that), and the jump adds no onset energy (within 0.5 dB of playing straight through).
   Pictures: `docs/audio/music/<id>_seam_ogg.png` and `_seam_mp3.png` show the last 2 s before the
   loop end followed by the first 2 s after the loop start, with a 20 ms waveform across the
   splice.
@@ -320,10 +330,13 @@ are in `docs/audio/music/MEASUREMENTS.md` (regenerated by every build) and `meas
   spectrograms with the sections marked; the bar-by-bar loudness table in `MEASUREMENTS.md` shows
   each build (for example the lobby goes -21, -18, -18 rising to -14, -13 for the tutti, back to
   -21).
-- **Beat grid.** The strongest onsets of every loop sit within 13 ms (median) of the
-  sixteenth-note grid counted from the loop start.
+- **Beat grid.** The strongest onsets of every loop sit within 16 ms (median) of the
+  sixteenth-note grid counted from the loop start; most of that is instrument attack time.
 - **Stereo and mono.** Left and right are within 1.5 dB of each other in every file; summing to
-  mono loses 1.1 to 2.3 dB (no cancellation).
+  mono loses 1 to 2.5 dB of loudness (no cancellation).
+- **Intonation.** After correction, spot checks of choir, strings, timpani, plucked strings,
+  horns and woodwind are within 1 cent of equal temperament (they were up to 48 cents out).
+- **Repeatable.** Two builds from an empty cache gave byte-identical files.
 
 ## 7. Known weaknesses
 

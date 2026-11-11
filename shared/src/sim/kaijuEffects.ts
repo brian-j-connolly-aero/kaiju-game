@@ -22,11 +22,10 @@ import { hasModFlag, modMult } from '../defs/upgrades';
 import { projectileTypeDef } from '../defs/weapons';
 import { PI } from '../math/angle';
 import { bitGet } from '../math/bits';
-import { circleInArc, createCastHit, obbInArc, rayVsCapsule, type VerticalCapsule } from '../math/geom';
+import { circleInArc, obbInArc } from '../math/geom';
 import { lerp } from '../math/scalar';
-import type { Vec3 } from '../math/vec';
-import { createAimPoint, kaijuCapsule, resolveAimPoint, unitCapsule } from './aim';
-import { beamPath, createBeamPath } from './beam';
+import { createAimPoint, resolveAimPoint } from './aim';
+import { beamPath, beamTouches, createBeamPath } from './beam';
 import type { HeldObject, HeldSource } from './events';
 import { noteKaijuNoise } from './spotting';
 import { takeProp, takePropWreck } from './systems/cityDamage';
@@ -47,10 +46,6 @@ const GRAB_HP_SLACK = 1e-6;
 const ids: number[] = [];
 const aim = createAimPoint();
 const beam = createBeamPath();
-const capHit = createCastHit();
-const capsule: VerticalCapsule = { x: 0, z: 0, r: 0, y0: 0, y1: 0 };
-const rayOrigin: Vec3 = { x: 0, y: 0, z: 0 };
-const rayDir: Vec3 = { x: 0, y: 0, z: 0 };
 
 /** A hit dealt by a kaiju's own body or breath, in raw numbers; `fromDir` points from the target to the kaiju. */
 function kaijuHit(k: Kaiju, tx: number, tz: number, damage: number, nerve: number, kind: DamageKind): Hit {
@@ -66,6 +61,19 @@ function kaijuHit(k: Kaiju, tx: number, tz: number, damage: number, nerve: numbe
     kind,
     atWill: false,
   };
+}
+
+/**
+ * Knocks a unit about `distance` meters along the unit direction (dirX, dirZ). It is a velocity
+ * kick, not a teleport: the movement system carries the unit there and stops it at walls and at
+ * the bounds. (A body braking at `accel` from speed v travels v^2 / (2 accel).) Used by the
+ * stomp; the molt's blast wave can use it too.
+ */
+export function shoveUnit(u: Unit, dirX: number, dirZ: number, distance: number): void {
+  if (!u.alive || !(distance > 0)) return;
+  const speed = Math.sqrt(2 * unitTypeDef(u.type).accel * distance);
+  u.vx = dirX * speed;
+  u.vz = dirZ * speed;
 }
 
 /** Units a kaiju's ground attacks can reach: alive and not flying above its head. */
@@ -133,16 +141,10 @@ export function stompEffect(world: World, k: Kaiju, def: KaijuKindDef): void {
     const nerve = lerp(a.unitNerveCenter, a.unitNerveEdge, t) * nerveMult;
     world.hits.push({ target: { entity: 'unit', id: u.id }, hit: kaijuHit(k, u.x, u.z, damage, nerve, 'stomp') });
 
-    // Knockback as a velocity kick: the movement system carries the unit outward and stops it
-    // at walls and at the bounds. A body braking at `accel` from v travels v^2 / (2 accel).
+    // Thrown outward, farthest at the center; a unit right underfoot goes the way the kaiju faces.
     const shove = a.knockback * k.radius * (1 - t);
-    if (shove > 0) {
-      const speed = Math.sqrt(2 * unitTypeDef(u.type).accel * shove);
-      const nx = d > 1e-6 ? dx / d : Math.sin(k.yaw);
-      const nz = d > 1e-6 ? dz / d : Math.cos(k.yaw);
-      u.vx = nx * speed;
-      u.vz = nz * speed;
-    }
+    if (d > 1e-6) shoveUnit(u, dx / d, dz / d, shove);
+    else shoveUnit(u, Math.sin(k.yaw), Math.cos(k.yaw), shove);
   }
   for (const other of world.kaijus) {
     if (other === k || !other.alive) continue;
@@ -436,8 +438,8 @@ export function eatFinish(k: Kaiju, def: KaijuKindDef): void {
  * One tick of the beam. It leaves the mouth along the head's aim and ends at the first standing
  * structure, at the ground, or at its range. That one structure takes the structure damage
  * (when it falls, the beam reaches the next one on the following tick); every unit the beam
- * passes within half its width of takes the unit damage. Units behind a standing building are
- * safe until it has burnt through.
+ * touches (`beamTouches`) takes the unit damage. Units behind a standing building are safe
+ * until it has burnt through.
  */
 export function beamTick(world: World, k: Kaiju, a: BeamSpecialDef): void {
   beamPath(world.cityQuery, k, a, beam);
@@ -450,24 +452,16 @@ export function beamTick(world: World, k: Kaiju, a: BeamSpecialDef): void {
     world.structureHits.push({ id: beam.blocker, damage, by: k.player, cause: 'beam' });
   }
 
-  rayOrigin.x = beam.ox;
-  rayOrigin.y = beam.oy;
-  rayOrigin.z = beam.oz;
-  rayDir.x = beam.dx;
-  rayDir.y = beam.dy;
-  rayDir.z = beam.dz;
   const damage = a.unitDps * modMult(k.mods, 'unitDamage') * DT;
   const nerve = a.unitNervePerSecond * modMult(k.mods, 'nerveDamage') * DT;
   for (const u of world.units) {
     if (!u.alive) continue;
-    unitCapsule(u, capsule).r += halfWidth;
-    if (!rayVsCapsule(rayOrigin, rayDir, beam.length, capsule, capHit)) continue;
+    if (!beamTouches(beam, halfWidth, u.x, u.z, u.radius, u.y, u.y + unitTypeDef(u.type).height)) continue;
     world.hits.push({ target: { entity: 'unit', id: u.id }, hit: kaijuHit(k, u.x, u.z, damage, nerve, 'beam') });
   }
   for (const other of world.kaijus) {
     if (other === k || !other.alive) continue;
-    kaijuCapsule(other, capsule).r += halfWidth;
-    if (!rayVsCapsule(rayOrigin, rayDir, beam.length, capsule, capHit)) continue;
+    if (!beamTouches(beam, halfWidth, other.x, other.z, other.radius, 0, other.height)) continue;
     world.hits.push({ target: { entity: 'kaiju', id: other.id }, hit: kaijuHit(k, other.x, other.z, damage, nerve, 'beam') });
   }
 

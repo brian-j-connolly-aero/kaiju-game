@@ -104,3 +104,52 @@ export function beamPath(city: CityQuery, k: BeamSource, action: BeamSpecialDef,
   out.ez = out.oz + out.dz * length;
   return out;
 }
+
+/** The beam's heat reaches this far above and below its edge, so it need not be aimed at the ankles. */
+export const BEAM_HEIGHT_SLACK = 1;
+
+/**
+ * True when the beam touches an upright body: a cylinder of `radius` around (x, z) from `y0` up
+ * to `y1`. Taken at the point where the beam's center line passes closest to the body's axis:
+ * the beam must come within `radius + halfWidth` of the axis on the ground plane and within
+ * `halfWidth + BEAM_HEIGHT_SLACK` of the body's height span.
+ */
+export function beamTouches(path: BeamPath, halfWidth: number, x: number, z: number, radius: number, y0: number, y1: number): boolean {
+  // Closest points between the beam segment (origin + dir * s, s in 0..length) and the body's
+  // vertical axis (the standard clamped segment-to-segment solution, specialized to a vertical axis).
+  const L = path.length;
+  const h = Math.max(0, y1 - y0);
+  const rx = path.ox - x;
+  const ry = path.oy - y0;
+  const rz = path.oz - z;
+  const c = (path.dx * rx + path.dy * ry + path.dz * rz) * L;
+  const a = L * L;
+  const b = path.dy * L * h;
+  const e = h * h;
+  const f = h * ry;
+  let s = 0;
+  let t = 0;
+  if (a > 1e-12) {
+    if (e <= 1e-12) {
+      s = Math.min(1, Math.max(0, -c / a));
+    } else {
+      const denom = a * e - b * b;
+      s = denom > 1e-12 ? Math.min(1, Math.max(0, (b * f - c * e) / denom)) : 0;
+      t = (b * s + f) / e;
+      if (t < 0) {
+        t = 0;
+        s = Math.min(1, Math.max(0, -c / a));
+      } else if (t > 1) {
+        t = 1;
+        s = Math.min(1, Math.max(0, (b - c) / a));
+      }
+    }
+  } else if (e > 1e-12) {
+    t = Math.min(1, Math.max(0, f / e));
+  }
+  const px = path.ox + path.dx * L * s - x;
+  const pz = path.oz + path.dz * L * s - z;
+  const gap = Math.abs(path.oy + path.dy * L * s - (y0 + h * t));
+  const reach = radius + halfWidth;
+  return px * px + pz * pz <= reach * reach && gap <= halfWidth + BEAM_HEIGHT_SLACK;
+}

@@ -58,10 +58,13 @@ export function configureApp(app: Application, options: AppOptions): void {
     );
   }
 
-  // Any other page address opens the game. A request for a missing file (it has an extension)
-  // stays a 404, so a missing model or sound is reported as missing instead of as a web page.
+  // The root, and any other address a browser navigates to, opens the game. A request for a
+  // missing file (it has an extension) and a request that does not ask for a page stay a 404,
+  // so a missing model or sound is reported as missing instead of as a web page.
   app.use((req: Request, res: Response, next: NextFunction) => {
-    if ((req.method !== 'GET' && req.method !== 'HEAD') || extname(req.path) !== '' || !req.accepts('html')) {
+    const isRead = req.method === 'GET' || req.method === 'HEAD';
+    const asksForPage = extname(req.path) === '' && (req.headers.accept ?? '').includes('text/html');
+    if (!isRead || !(req.path === '/' || asksForPage)) {
       next();
       return;
     }

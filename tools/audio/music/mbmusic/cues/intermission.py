@@ -6,7 +6,7 @@ its home pitch in bar 4), E, F, G, and finally A with the major third. More of t
 joins every two bars. The hit at 20.0 s is the D the next stage starts on.
 For a shorter intermission, start playback on a bar line (bar n starts at (n - 1) * 2.5 s).
 """
-from ..orchestra import BASS_DRUM, CRASH, SNARE
+from ..orchestra import BASS_DRUM, CRASH, SNARE, SNARE_ALT
 from ..patterns import pulse, swell_into
 from ..score import B, Cue, pitch
 
@@ -55,7 +55,9 @@ def build() -> Cue:
     vam = s.add("violas pulse", "violas_marc", gain=-2.0, role="ostinato")
     pulse(vam, 3, [P("A3")] * 4, 70, step=0.25, dur=0.16, accent=12, every=4, cresc=(64, 84))
     v2m = s.add("violins 2 pulse", "violins2_marc", gain=-4.0, role="ostinato")
-    pulse(v2m, 5, [[P("A4"), P("E5")]] * 8, 80, step=0.25, dur=0.16, accent=12, every=4, cresc=(72, 104))
+    # the violins' pulse stays consonant with the climbing cell: A-E, A-D, B flat-D, A-E
+    dyads = [["A4", "E5"]] * 2 + [["A4", "D5"]] * 2 + [["Bb4", "D5"]] * 2 + [["A4", "E5"]] * 2
+    pulse(v2m, 5, [[P(a), P(b)] for a, b in dyads], 80, step=0.25, dur=0.16, accent=12, every=4, cresc=(72, 104))
     tuba = s.add("tuba", "tuba", gain=0.0, role="bass")
     tuba.line(5, "A1:8_ A1:8", 90, gate=1.0)
     tuba.expr([(16, 80), (31.5, 127)])
@@ -64,7 +66,7 @@ def build() -> Cue:
     tm = s.add("timpani", "timpani", gain=1.0, role="perc")
     tm.roll(0, 32, "A2", 54, 122, step=0.125, dur=0.5, curve=1.6)
     sn = s.add("snare", "snare", gain=0.0, role="perc")
-    sn.roll(16, 16, SNARE, 30, 122, curve=1.5)
+    sn.roll(16, 16, SNARE, 30, 122, curve=1.5, alt=SNARE_ALT)
     bd = s.add("bass drum", "bass_drum", gain=2.0, role="perc")
     for bar in range(1, 9):
         bd.note(B(bar), BASS_DRUM, 0.5, 84 + 4 * bar)

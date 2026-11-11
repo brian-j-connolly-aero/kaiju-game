@@ -118,7 +118,26 @@ at the center falling to 10 at the edge. A friendly unit destroyed within 40 m: 
 is **shaken** for 4 s: it cannot fire, loses its charge, and bot or sub-unit AI backs off.
 
 **Rage (kaiju):** 0..100. Gains 1 per 12 hp of post-multiplier damage taken, and a stage-scaled
-amount per bar point, tuned so a special is ready about every 60 to 80 s of active play.
+amount per bar point, tuned so a special is ready about every 60 to 80 s of active play. What the
+special itself wrecks earns no rage, so one special can never pay for the next.
+
+**Details the rules above leave open** (as built; `shared/src/sim/systems/damage.ts`):
+
+- The facing multiplier applies in every state, staggered and cocooned included. A hit with no
+  direction (a blast) counts as frontal and gets nothing from a brace.
+- Crossfire is judged between hits from two different units (a hit knows its source unit). The
+  later hit gets the multiplier, so once two units are firing from 60° apart every shot from
+  both counts. One unit that drives around is not crossfire with itself, and call-in shells
+  (no source unit) neither make nor take crossfire.
+- Nerve does not build while the kaiju is staggered or cocooned. A stagger cuts whatever the
+  kaiju was doing short (a beam, a meal: the heal is lost, and so is rage already spent); it
+  keeps what it holds.
+- A shaken unit cannot be shaken further; when it steadies its nerve starts again from 0.
+- Trample needs the kaiju to be moving (at least 1 m/s) and the unit's circle to overlap its
+  body circle. It deals no nerve damage.
+- Units standing on a bridge deck when it collapses fall into the river: 40 damage and shaken.
+- A squad that carries the insurance rider upgrade insures the first landmark that takes damage
+  after its policy is free: all damage to that landmark adds nothing to the bar.
 
 ## 4. The kaiju
 
@@ -141,6 +160,38 @@ Action timings are the tells. `r` = body radius for the stage.
 
 Walking over units deals trample damage (40 per second inside the body radius while moving).
 Dead at 0 hp. The kaiju sees the yellow targeting lasers of charging units.
+
+**How the verbs resolve** (as built; `shared/src/sim/systems/kaijuActions.ts` and
+`shared/src/sim/kaijuEffects.ts`). Per-action movement and turn multipliers are in the kind's
+definition.
+
+- Every verb is committed: nothing cancels it but a stagger or death. A press made during
+  another action is remembered for 0.2 s. Bracing is exclusive (release Block to act). When
+  several inputs compete the order is molt, brace, special, roar, strike, throw, eat, grab.
+- Attacks are aimed along the head (the view), which leads the body by up to 50°. The effect
+  lands once, at the end of the wind-up.
+- **Swipe:** every unit, structure and prop touching the arc takes the full hit.
+- **Stomp:** values fall off linearly from the body center to the rim (structures to 30% at the
+  rim). Knockback shoves units outward by up to 1.5 r, less toward the rim; walls stop them.
+- **Grab:** the nearest loose object in the arc wins (car, wreck, live vehicle); only when there
+  is none does the hand tear a chunk from the nearest building (150 / 1000 structure damage at
+  stages 2 / 3). A grabbed car leaves the city at once and counts for the bar. Grabbing from a
+  tank troop takes one tank; the unit dies when its last tank is taken and leaves no wreck.
+- **Throw:** a flat ballistic arc that lands on what the crosshair is on; beyond reach it flies
+  at 45°; with the crosshair on the sky it flies where the head points. The object hits the
+  first structure, unit or ground it meets (never its thrower) and damages everything inside
+  the impact radius.
+- **Eat:** the meal is taken at the first bite and the heal lands when the 2 s are over. Edible
+  off the ground (when the grab found nothing to pick up): cars, kiosks, car wrecks, tank
+  wrecks. Anything in the hand can be eaten. The cooldown counts from the first bite.
+- **Roar:** the nerve hit and the charge reset land at the start of the roar.
+- **Beam:** leaves the mouth along the head's aim, pitch included, so it is aimed like a
+  weapon: level it burns what stands at mouth height, pointed down it ends on the ground.
+  While it is on, the head only turns at the beam's reduced rate. It stops at the first
+  standing structure its center or either edge touches and burns only that one; units behind
+  a standing building are safe. Units within the beam's width (plus 1 m of slack above and
+  below) take the unit damage and 60 nerve per second.
+- **Molt:** holding Molt for 1 s starts the cocoon where the kaiju stands; it drops what it holds.
 
 **Tier 2 kaiju (same verbs, different numbers and one special each):**
 

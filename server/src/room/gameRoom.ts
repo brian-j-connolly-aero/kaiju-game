@@ -31,7 +31,6 @@ import {
   createRng,
   encodeSnapshot,
   JOIN_ERROR,
-  MATCH_RULES,
   pickKaijuSeat,
   PLAYABLE_FACTIONS,
   PLAYABLE_KAIJU_KINDS,
@@ -543,5 +542,3 @@ function describeError(err: unknown): string {
   return err instanceof Error ? (err.stack ?? err.message) : String(err);
 }
 
-/** The most people a room seats (DESIGN.md section 2). */
-export const ROOM_SEATS: number = MATCH_RULES.maxPlayers;

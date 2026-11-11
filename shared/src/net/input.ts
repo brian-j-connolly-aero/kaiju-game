@@ -43,6 +43,12 @@
  *   A press that arrives while another action is still running is remembered for
  *   INPUT_BUFFER_TICKS and starts as soon as the kaiju is free.
  *
+ *   Nothing cancels an action once it has begun. Bracing is exclusive: while Block is down no
+ *   other button starts anything. When several things are wanted on the same tick the order is
+ *   molt, brace, special, roar, strike, throw, eat, grab. Each hold of Grab is judged once: if
+ *   nothing can be eaten when it reaches the hold time, nothing happens, and letting go after
+ *   that does not throw.
+ *
  * ---------------------------------------------------------------------------------------------
  * Human buttons
  *

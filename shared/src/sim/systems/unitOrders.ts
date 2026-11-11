@@ -11,10 +11,12 @@
  * - hold-and-charge: root the unit (`unit.rooted`), lock its aim to the firing arc
  *   (COMBAT_RULES.chargeHalfArc), build `unit.charge` over COMBAT_RULES.chargeTime; a new
  *   movement order un-roots it;
- * - shaken units back off and cannot fire; tick `unit.shaken` down here or in the damage system
- *   (pick one place and say so in docs/STATUS.md);
+ * - shaken units (`unit.shaken > 0`, state 'shaken') back off and cannot fire. The damage
+ *   system already shakes them, clears their charge, counts `unit.shaken` down and puts the
+ *   state back to 'idle'; what a shaken unit DOES is decided here (it stays `rooted` if it was);
  * - lives: when a squad's driven unit dies, hand the player the next living unit (emit
- *   `takeover`); when none is left set `squad.eliminated` and `squad.driven = -1`;
+ *   `takeover`). The damage system already sets `squad.eliminated` and `squad.driven = -1` on
+ *   the tick the last unit dies;
  * - keep `unit.state` current for animation ('idle' | 'moving' | 'charging' | 'shaken' | 'dead').
  *
  * Real today: perception. `updateSpotting` (sim/spotting.ts) refreshes `kaiju.spotted` and

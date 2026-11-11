@@ -4,18 +4,19 @@ Living status file. Keep it short and true: when you finish a task, update what 
 the stubs you filled in, and add any decision the docs left open. Contracts live in
 `ARCHITECTURE.md`; numbers live in `DESIGN.md` and `shared/src/defs/`.
 
-Last updated by: the workspace scaffold and shared contracts task.
+Last updated by: the game server task (everything about `server/`; the rest is from the scaffold task).
 
 ## 1. How to run things
 
 | Command | What it does today |
 | --- | --- |
-| `npm install` | Installs the pinned toolchain (47 packages). |
+| `npm install` | Installs the pinned toolchain and the server's dependencies (Express, the room library). |
 | `npm run check` | Type checks all three workspaces, runs `scripts/lint.mjs`, runs every test. The gate. |
-| `npm test` | `vitest run`: 164 tests in `shared/test`, about 2 seconds. |
+| `npm test` | `vitest run`: every test in `shared/test` and `server/test`, about 20 seconds (the server's integration tests take most of it). |
 | `npm run sim` | Headless all-bot match with metrics. Options after `--`: `--seed N --matches N --anchor N --fast --max-minutes N`. |
-| `npm run dev` | Starts the server and client `dev` scripts side by side (placeholders today). |
-| `npm run build`, `npm start` | Bundles the server, builds the client, runs the server bundle (placeholders today). |
+| `npx vitest run server/test` | Only the server tests: 62 tests, about 15 seconds (three files start a real server on a free port and connect real clients). `MB_TEST_SPEED=1 npx vitest run server/test/lifecycle.test.ts` plays the full five-client match in real time (about 3 minutes). |
+| `npm run dev` | Starts the server (`tsx watch`, port 2567) and the client `dev` script side by side (the client is still a placeholder). |
+| `npm run build`, `npm start` | Bundles the server to `server/dist/index.js`, builds the client to `client/dist`; `npm start` runs the bundle, which serves the built client and the game on one port (`PORT`, default 2567). Environment variables: `ARCHITECTURE.md` section 4.4. |
 | `npm run export:defs` | Rewrites `tools/art/data/archetypes.json` from the code (`-- --check` only verifies). A test fails when the file is stale. |
 | `npm run assets:manifest` | Merges `client/public/assets/manifest.*.json` into `manifest.json`. |
 
@@ -57,7 +58,25 @@ Everything below is in `shared/` (`@mb/shared`) unless it says otherwise, is cov
   - spotting: `kaiju.spotted` and `kaiju.known` from line of sight and noise;
   - voice cues for everything that follows from an event or the clock, with throttling;
   - `resolveAimPoint` (where an aim ray lands), `computeBarMarks`, `barDisplayFraction`.
-- **`server/`, `client/`:** placeholder packages only (see section 3).
+- **`server/` (`@mb/server`):** the complete game server (`ARCHITECTURE.md` section 4). One
+  process, one port: Express 5 (`/healthz`, the built client, the page fallback) and the room
+  library (`@colyseus/core` 0.18.28 with `@colyseus/ws-transport` 0.18.5) for matchmaking and
+  the WebSocket. Covered by `server/test/`.
+  - `src/room/` has no library in it and is unit tested with a fake clock and fake connections:
+    `gameRoom.ts` (lobby, seats, session tokens, grace period, host handoff, late joiners, match
+    start and end, return to the lobby), `match.ts` (one input per player per tick, the
+    acknowledgement, events, snapshot rhythm), `fixedStep.ts` (the accumulator),
+    `inputQueue.ts`, `ticker.ts` (drift-free timer).
+  - `src/net/` is the only place that imports the room library: `server.ts`
+    (`startGameServer(config)`), `matchRoom.ts` (the adapter), `nodeClient.ts` (a typed headless
+    client for tests and tools).
+  - Integration tests over a real socket: five clients create, join by code, start, send inputs,
+    receive snapshots and events, one drops and rejoins with its token, the match runs to its
+    end, the host returns everyone to the lobby and the next match rotates the kaiju role, then
+    the room closes; plus real-time rhythm (30 ticks and 15 snapshots a second), the library's
+    automatic reconnection, seat takeover, grace period expiry, simulated latency, the room
+    limit and the HTTP side.
+- **`client/`:** placeholder package only (see section 3).
 - **Root scripts:** `scripts/dev.mjs`, `scripts/lint.mjs`, `scripts/merge-manifests.mjs`.
 
 ## 3. What is stubbed
@@ -77,16 +96,18 @@ which fields and helpers to use. `npm run lint` prints how many markers remain (
 | `sim/systems/bots.ts`, `sim/bots/types.ts` | Bot behavior for squads and for the kaiju. Today bots stand still. `BotState` is a starting shape. | Simulation 3 |
 | `sim/systems/voice.ts` | Three cues that need other systems: `volley.ready`, `kaiju.lowhp`, `bar.near`. | Simulation 2 and 3 |
 | `shared/scripts/sim.ts` | The balance report beyond the basics. With stub bots every match is a clock win for the humans. | Simulation 3 |
+| `server/src/room/gameRoom.ts` | `STUB(server)`: the `draftPick` message is accepted and ignored. When the simulation has upgrade drafts, pass the pick on (and add a draft step to the intermission). | Tier 2 |
 
 Placeholders (not `STUB`-tagged; each file says so at the top):
 
 - `shared/src/city/generateCity.ts`: a plain grid city (2592 structures, 4303 props, 10 anchors,
   a straight river with 5 bridges, 8 park and plaza blocks, 2 landmark stand-ins). The city task replaces this
   one file behind `generateCity(seed?): CityData` and extends `archetypes.ts`.
-- `server/src/index.ts`, `client/src/main.ts`, `client/index.html`, `client/vite.config.ts`:
-  a few lines each that prove the wiring. Replace them freely. Neither package has runtime
-  dependencies yet (no Express, Colyseus or three.js): add them with exact versions and commit
-  the updated `package-lock.json`.
+- `client/src/main.ts`, `client/index.html`, `client/vite.config.ts`: a few lines each that
+  prove the wiring. Replace them freely. The client has no runtime dependencies yet (no
+  three.js, no `@colyseus/sdk`): add them with exact versions and commit the updated
+  `package-lock.json`. Use `@colyseus/sdk` 0.18.10, the version the server's tests already run
+  against (it is a development dependency of `server/`).
 
 ## 4. Decisions made here (where the docs left it open)
 
@@ -141,6 +162,37 @@ Match
   (host) leaves the end screen. A lone player who does not volunteer plays a squad against a bot
   kaiju.
 
+Server
+
+- Additive changes to the shared contract, made with the server: `ROOM_NAME`, `JoinOptions`,
+  `SESSION_TOKEN_PATTERN`, `JOIN_ERROR`, `CLOSE_REPLACED` and `CLOSE_SEAT_RELEASED` in
+  `shared/src/net/protocol.ts`, and the optional `LobbyPlayer.slot` in `lobby.ts`.
+- The room code is the room library's room id, so joining by code is the library's "join by
+  id". Rooms cannot be found any other way.
+- The session token is made by the client and sent in the join options; the server never sends
+  it anywhere. The newest connection with a token wins its seat (two tabs of one browser are
+  one player).
+- A dropped seat is kept 45 s (`MB_GRACE`), in the lobby as well as in a match. When the room
+  is full, a newcomer takes the seat of whoever has been disconnected the longest.
+- The host role moves to a connected player after the host has been disconnected for 8 s; a
+  host who returns later is an ordinary player.
+- Someone who joins during a match takes over a bot squad (never the kaiju) and plays at once;
+  with no squad free they watch. A player who was disconnected when the match started is
+  treated the same way when they return.
+- `lastKaijuSeat` is set when a match starts, not when it ends.
+- The end screen returns to the lobby by itself after 120 s (20 s with `MB_FAST`) so nobody is
+  stuck behind an absent host.
+- `MB_FAST=1` only shortens game timers (and the end screen). It does not shorten the grace
+  period, so a playtest that reloads a page still gets its seat back on a slow machine.
+- `MB_SPEED` (simulation speed) exists for headless tests: the full-match integration test runs
+  at 12 times real speed so it takes about 12 s instead of 150 s. Real clients must use speed 1.
+- The server depends on `@colyseus/core` and `@colyseus/ws-transport`, not the umbrella
+  `colyseus` package (Redis drivers, monitor, playground: none of it wanted offline).
+- If the simulation throws during a match, the room logs the error and returns to the lobby
+  instead of taking the server down.
+- At most 50 rooms at once (`MB_MAX_ROOMS`); a room whose creator never connects is closed by
+  the library after 15 s.
+
 ## 5. Notes for whoever is next
 
 - **Simulation workers:** build inside the stub files; the system signatures are all
@@ -150,19 +202,48 @@ Match
   `test/soak.test.ts` hammers the whole pipeline with random inputs and must keep passing.
   Extend `World` by adding fields; if you add something a client must see, add it to the
   snapshot (bump `SNAPSHOT_VERSION`) or to an event, and update `ARCHITECTURE.md`.
-- **Server worker:** the loop is `createWorld`, then each tick `world.step(inputs)`; every second
-  tick `encodeSnapshot(snapshotOfWorld(world))` once, `setSnapshotAck(bytes, player.input.seq)`
-  per client, and send the accumulated events. Use `sanitizeInput`, `sanitizeCommand`,
-  `queueCommand`, `setPlayerBot`, `welcomeFor`, and the lobby helpers in `net/lobby.ts`. A
-  disconnected player's last input keeps repeating until you call `setPlayerBot` or feed a
-  neutral input. Stop stepping once `world.match.phase` is `'ended'`.
+- **Anyone changing the server:** game rules never go in `server/src/net`; that folder only
+  adapts the room library. Put behavior in `server/src/room` and test it in
+  `server/test/gameRoom.test.ts` with `makeRoom()` and `FakePeer` (no network, no real time).
+  The acknowledgement in a snapshot is the server's own count per connection (`match.acks`),
+  not `world.players[i].input.seq`, because a bot may have driven the slot in between. Only one
+  server can run per process (the library keeps its matchmaker in module state), so each
+  integration test file starts exactly one; do not turn off vitest's per-file isolation.
+- **Client net worker (`client/src/net`):** the recipe is `server/src/net/nodeClient.ts`.
+  - `new Client(origin)` from `@colyseus/sdk`, then `client.create(ROOM_NAME, options)` or
+    `client.joinById(CODE.toUpperCase(), options)` with `options = { name, token, protocol:
+    PROTOCOL_VERSION }`. A refusal rejects with `error.code` (522 no such room, `JOIN_ERROR.*`).
+  - `room.onMessage('snap', bytes => decodeSnapshot(bytes))`; `lobby`, `welcome`, `events` and
+    `pong` arrive as plain objects (`welcome.cityState` is a `Uint8Array`). Register all five
+    handlers right after the join resolves; nothing arrives before that.
+  - Send `input` every 33 ms with `seq` counting up from 1 on each page load.
+  - The library reconnects a dropped socket by itself (`room.onDrop`, `room.onReconnect`); it
+    only tries when the room has been joined for 5 s (`room.reconnection.minUptime`). When
+    `room.onLeave(code)` fires with a code other than 4000 (you left) or `CLOSE_REPLACED`, join
+    again by code with the same token; 522 then means the room is gone.
+  - Keep the token per browser in `localStorage`. Two tabs then share one seat (the newer tab
+    wins), which is right for players; for testing several players in one browser use separate
+    profiles or private windows, or let a query parameter pick a different storage key.
+  - Do not call `room.leave()` when the page unloads: that gives the seat up at once.
+  - A second `welcome` in the same match (after a reconnection) means "resync the city state",
+    not "start over". Snapshots can come at any tick spacing; never assume two.
+- **Dev origins:** in dev the page (Vite, port 5173) and the game server (2567) are different
+  origins. Either point the SDK at the server directly in dev
+  (`${location.protocol}//${location.hostname}:2567`; the server allows any origin), or proxy
+  in `vite.config.ts`: `'/matchmake'` and `'/healthz'` to `http://localhost:2567`, and the
+  WebSocket path (`/<process id>/<room code>?sessionId=...`) with the regular-expression key
+  `'^/[A-Za-z0-9_-]+/[A-Z]{4}(\\?|$)'` to `ws://localhost:2567` with `ws: true` (checked
+  against the real server with Vite 8.3.8). In production the page and the game share one
+  origin and need nothing.
+- **Playtest and deploy workers:** `MB_FAST=1 PORT=<port> npm start` after `npm run build` is
+  the server for automated playtests; `GET /healthz` says when it is up and how many rooms and
+  players it has. `SIGINT` and `SIGTERM` close every room and exit cleanly. A port already in
+  use makes the server exit with code 1 and a plain message.
 - **Client workers:** `test/prediction.test.ts` is the recipe for prediction: build the city with
   `getCity(config.citySeed)`, compare `cityChecksum` with the welcome, mirror the live state with
   `cityStateFromWire`, keep it current from `structureStage` / `propsDestroyed` / `kaijuHeld`
   events (`hpForStage`), and run `stepMovement` with `kaijuMoveParams` or `unitMoveParams` from
   snapshot data. Bounds come from `stageBounds(city, welcome.anchor, snapshot.match.stage)`.
-  In dev the page (Vite, port 5173) and the game server (2567) are different origins: decide in
-  one place (a Vite proxy is the simplest) so client code always talks to its own origin.
 - **City worker:** keep `validateCity` clean and the generator engine-independent (see the
   header of `generateCity.ts`). After changing `archetypes.ts` or `props.ts`, run
   `npm run export:defs`. Tests that hard-code facts about the placeholder (counts, the straight
@@ -182,3 +263,16 @@ Match
   for the 8-squad future (32).
 - Balance numbers added here (action move multipliers, wade damage, rage per bar segment, prop
   values, archetype hp and value) are untested starting values.
+- The server has only been driven by Node clients so far, never by a browser and never through
+  an actual Cloudflare Tunnel. The single-origin design and the plain HTTP statuses are there
+  for the tunnel, but the first real tunnel test is still to come.
+- Colyseus 0.18 is young and moves fast; the adapter leans on three of its behaviors that a
+  version bump could change: `allowReconnection(client, 'manual')`, the room id being settable
+  in `onCreate`, and `matchMaker.controller.exposedMethods` / `standardHttpStatus`. The
+  integration tests cover all three; rerun them after any upgrade and keep `@colyseus/sdk` on
+  the same minor version as the server.
+- The three integration test files use real timers. They are written with wide margins, but on
+  a machine that is starved of CPU a timing assertion in `server/test/realtime.test.ts` could
+  fail without the server being wrong; rerun before digging.
+- Every refused join prints one `ServerError` line from the room library on the server's
+  standard error. It is noise, not a fault.

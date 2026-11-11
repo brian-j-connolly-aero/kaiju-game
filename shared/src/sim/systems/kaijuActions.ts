@@ -298,13 +298,14 @@ function updateKaiju(world: World, k: Kaiju): void {
   const input = world.players[k.player].input;
   const mem = k.act;
 
-  // A new press of a button makes it count again.
-  mem.usedPress &= ~input.pressed;
-  mem.usedHold &= ~input.pressed;
   if (mem.throwBuffer > 0) mem.throwBuffer--;
 
   for (const verb of VERBS) {
-    if (k.cooldowns[verb] > 0) k.cooldowns[verb] = Math.max(0, k.cooldowns[verb] - DT);
+    if (k.cooldowns[verb] > 0) {
+      // Snap to 0 so that rounding never costs an extra tick of waiting.
+      const left = k.cooldowns[verb] - DT;
+      k.cooldowns[verb] = left > TIME_EPS ? left : 0;
+    }
   }
   k.phaseTime += DT;
   if (k.phase !== 'idle') k.actionTime += DT;
@@ -327,8 +328,13 @@ function updateKaiju(world: World, k: Kaiju): void {
 }
 
 export function kaijuActionSystem(world: World): void {
-  if (world.match.phase !== 'playing') return;
+  const playing = world.match.phase === 'playing';
   for (const k of world.kaijus) {
-    if (k.alive) updateKaiju(world, k);
+    // A new press of a button makes it count again. Tracked in every phase, so a press made
+    // during an intermission is not mistaken for one that was already used.
+    const pressed = world.players[k.player].input.pressed;
+    k.act.usedPress &= ~pressed;
+    k.act.usedHold &= ~pressed;
+    if (playing && k.alive) updateKaiju(world, k);
   }
 }

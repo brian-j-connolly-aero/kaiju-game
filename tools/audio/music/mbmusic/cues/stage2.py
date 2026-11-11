@@ -118,7 +118,7 @@ def build() -> Cue:
             pat = "x.g.o.g.x.g.o.gg"                   # held back with the strings
         if section_end:
             pat = groove[:8] + "x.gg...."
-            sn.roll(B(bar, 4), 1.0, SNARE, 52, 118, curve=1.3)
+            sn.roll(B(bar, 4), 1.0, SNARE, 52, 118, curve=1.3, alt=SNARE_ALT)
         sn.hits(bar, pat, SNARE)
     sn.notes = [(st, d, SNARE_ALT if (i % 3 == 1 and v < 80) else p, v)
                 for i, (st, d, p, v) in enumerate(sorted(sn.notes))]

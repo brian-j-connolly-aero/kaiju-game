@@ -69,6 +69,11 @@ export function configureRooms(next: RoomRuntime): void {
   codeRng = createRng(next.seed);
 }
 
+/** The codes of the rooms that are open right now. */
+export function openRoomCodes(): string[] {
+  return [...liveRooms.keys()];
+}
+
 export function roomStats(): { rooms: number; players: number } {
   let players = 0;
   for (const room of liveRooms.values()) players += room.connectedPlayers;
@@ -104,6 +109,8 @@ export class MatchRoom extends Room {
     this.maxMessagesPerSecond = MAX_MESSAGES_PER_SECOND;
     // No library state sync: the game sends its own snapshots.
     this.patchRate = null;
+    // Never offered to someone looking for "any room" (the server also refuses to look).
+    void this.setPrivate(true);
 
     const game = new GameRoom({
       code,
@@ -195,8 +202,13 @@ export class MatchRoom extends Room {
     return {
       id,
       send: <K extends ServerMessageType>(type: K, payload: ServerMessages[K]): void => {
-        if (payload instanceof Uint8Array) client.sendBytes(type, payload);
-        else client.send(type, payload);
+        // One connection in a bad state must never stop a frame from reaching the others.
+        try {
+          if (payload instanceof Uint8Array) client.sendBytes(type, payload);
+          else client.send(type, payload);
+        } catch (err) {
+          runtime?.log?.(`[room ${this.roomId}] could not send "${type}": ${err instanceof Error ? err.message : String(err)}`);
+        }
       },
       close: (code: number, reason: string): void => this.release(id, client, code, reason),
     };
@@ -208,7 +220,8 @@ export class MatchRoom extends Room {
     if (link && link.held) {
       // Dropped and waiting: stop holding its place. The library then calls onLeave.
       this.links.delete(sessionId);
-      link.held.reject(new Error(reason));
+      // A session that never finished joining gets a plain rejected promise, not a hold.
+      if (typeof link.held.reject === 'function') link.held.reject(new Error(reason));
       return;
     }
     // Only forget the link when it still belongs to this connection (a reconnected session

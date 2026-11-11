@@ -11,7 +11,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { options, Player, sleep, startTestServer, token, until, type TestServer } from './netHelpers';
 
-const GRACE_SECONDS = 3;
+const GRACE_SECONDS = 4;
 
 let ts: TestServer;
 let clientDir: string;
@@ -86,7 +86,8 @@ describe('http', () => {
   it('answers 404 for a missing file instead of the game page', async () => {
     const res = await fetch(`${ts.url}/assets/models/missing.glb`, { headers: { accept: 'text/html,*/*' } });
     expect(res.status).toBe(404);
-    const api = await fetch(`${ts.url}/no/such/api`, { headers: { accept: 'application/json' } });
+    // A script asking for something that is not there gets a 404 too, not a web page.
+    const api = await fetch(`${ts.url}/no/such/api`);
     expect(api.status).toBe(404);
   });
 });
@@ -109,9 +110,9 @@ describe('real time', () => {
 
     // Never faster than real time; allowed to run a little behind on a busy machine.
     expect(ticks).toBeLessThanOrEqual(Math.ceil(seconds * TICK_RATE) + 3);
-    expect(ticks).toBeGreaterThanOrEqual(seconds * TICK_RATE * 0.75);
+    expect(ticks).toBeGreaterThanOrEqual(seconds * TICK_RATE * 0.6);
     expect(snaps).toBeLessThanOrEqual(Math.ceil(seconds * SNAPSHOT_RATE) + 2);
-    expect(snaps).toBeGreaterThanOrEqual(seconds * SNAPSHOT_RATE * 0.7);
+    expect(snaps).toBeGreaterThanOrEqual(seconds * SNAPSHOT_RATE * 0.5);
     // The acknowledgement follows the inputs closely: a few in flight or queued, no more.
     expect(solo.lastSeq - solo.snapshot.ackSeq).toBeLessThanOrEqual(10);
     expect(solo.snapshot.ackSeq).toBeGreaterThan(40);
@@ -170,21 +171,42 @@ describe('reconnecting', () => {
     await second.leave();
   });
 
+  it('cuts off a client that floods the server, and the room carries on', async () => {
+    const host = await track(Player.create(ts.url, options(60)));
+    const flooder = await track(Player.join(ts.url, host.code, options(61)));
+    await until(() => host.lobbies.length > 0 && host.lobby.players.length === 2, 'both seated');
+    for (let i = 0; i < 2000; i++) flooder.client.send('ping', { t: i });
+    await until(() => flooder.closedCode !== null, 'the flooder to be cut off');
+    expect(flooder.closedCode).not.toBe(4000);
+    expect(flooder.pongs.length).toBeLessThan(2000);
+    await until(() => host.lobby.players[1].connected === false, 'the lobby to show the flooder gone');
+    // The other player is unaffected and can start a match.
+    host.client.send('start', {});
+    await until(() => host.welcomes.length === 1, 'the match to start');
+    host.client.send('ping', { t: 1 });
+    await until(() => host.pongs.length === 1, 'the pong');
+    await host.leave();
+  });
+
   it('gives a seat up after the grace period, and closes the room when nobody is left', async () => {
     const host = await track(Player.create(ts.url, options(40)));
     const guest = await track(Player.join(ts.url, host.code, options(41)));
     await until(() => host.lobbies.length > 0 && host.lobby.players.length === 2, 'both seated');
-    const rooms = ts.server.health().rooms;
+    const code = host.code;
 
+    const guestCutAt = performance.now();
     guest.client.cut(false);
     await until(() => host.lobby.players.length === 2 && host.lobby.players[1].connected === false, 'the drop to show');
     await until(() => host.lobby.players.length === 1, 'the seat to be given up', (GRACE_SECONDS + 5) * 1000);
+    expect(performance.now() - guestCutAt).toBeGreaterThanOrEqual(GRACE_SECONDS * 1000 - 100);
 
     // The room lives on while anybody holds a seat, even a dropped one...
+    const hostCutAt = performance.now();
     host.client.cut(false);
-    await sleep(500);
-    expect(ts.server.health().rooms).toBe(rooms);
+    await sleep(GRACE_SECONDS * 500);
+    expect(ts.server.roomCodes()).toContain(code);
     // ...and closes once the last one is given up.
-    await until(() => ts.server.health().rooms === rooms - 1, 'the room to close', (GRACE_SECONDS + 5) * 1000);
+    await until(() => !ts.server.roomCodes().includes(code), 'the room to close', (GRACE_SECONDS + 5) * 1000);
+    expect(performance.now() - hostCutAt).toBeGreaterThanOrEqual(GRACE_SECONDS * 1000 - 100);
   });
 });

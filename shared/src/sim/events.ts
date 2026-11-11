@@ -168,7 +168,10 @@ export interface KaijuHitEvent extends EventBase {
   braced: boolean;
 }
 
-/** The kaiju started or stopped being staggered. */
+/**
+ * The kaiju started or stopped being staggered. A stagger cuts whatever action was running
+ * short: no further `kaijuAction` event is sent for that action.
+ */
 export interface KaijuStaggerEvent extends EventBase {
   type: 'kaijuStagger';
   kaiju: number;

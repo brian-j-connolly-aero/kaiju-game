@@ -5,7 +5,8 @@ Checks every cue for:
   - muddy low intervals: thirds or seconds sounding below C3, anything but octaves and fifths
     below F2, counted across all parts and stems of the cue together
   - stems of one cue that are not the same length
-and prints the score at a glance: who plays in which bar and how loud (0-9, from velocity).
+and prints the score at a glance: who plays in which bar and how loud (0-9, from velocity),
+plus a list of minor seconds held between parts, for the composer to confirm each is meant.
 """
 from __future__ import annotations
 
@@ -97,6 +98,39 @@ def _low_interval_errors(cue: Cue) -> list[str]:
     return out
 
 
+def _semitone_notes(cue: Cue) -> list[str]:
+    """Minor seconds (adjacent pitches) held between parts for a beat or more in total. Some are
+    meant (the cocoon's cluster, the cello twitch in stage 1); the list is here so that each one
+    is a decision and not an accident."""
+    notes = []
+    for stem in cue.stems:
+        for part in stem.parts:
+            if not part.inst.pitched:
+                continue
+            short = part.inst.key.startswith("pizz") or part.inst.key in (
+                "timpani", "harp", "harpsichord", "celesta", "tubular_bells", "church_bell", "glockenspiel")
+            for s, d, p, v in part.notes:
+                notes.append((s, s + (min(d, 0.75) if short else d), p, f"{stem.name[-6:]}/{part.name}"))
+    found: dict[tuple, float] = defaultdict(float)
+    first: dict[tuple, float] = {}
+    for i in range(int(round((cue.beats + 8) / STEP))):
+        t = i * STEP + STEP / 2
+        sounding = [(p, who) for s, e, p, who in notes if s <= t < e - 0.06]
+        pitches = {p for p, _ in sounding}
+        for p in pitches:
+            if p + 1 in pitches:
+                who = tuple(sorted({w for q, w in sounding if q in (p, p + 1)}))
+                found[(p, who)] += STEP
+                first.setdefault((p, who), t)
+    out = []
+    for (p, who), beats in sorted(found.items(), key=lambda kv: first[kv[0]]):
+        if beats >= 1.0:
+            bar = int(first[(p, who)] // BEATS_PER_BAR) + 1
+            out.append(f"  note  {pitch_name(p)}+{pitch_name(p + 1)} held {beats:g} beats in all, first in bar {bar}: "
+                       + ", ".join(who))
+    return out
+
+
 def review_cue(cue: Cue) -> tuple[list[str], list[str]]:
     errors = _range_errors(cue) + _low_interval_errors(cue)
     for stem in cue.stems:
@@ -117,6 +151,9 @@ def run(cues: list[Cue]) -> int:
         print(f"  {'':6s} {'':20s} {'bar':13s}  {ruler}")
         print("\n".join(glance))
         print("\n".join(errors) if errors else "  review: ranges ok, no muddy low intervals")
+        semis = _semitone_notes(cue)
+        if semis:
+            print("\n".join(semis))
         total += len(errors)
     print(f"\n{total} finding(s)")
     return 1 if total else 0

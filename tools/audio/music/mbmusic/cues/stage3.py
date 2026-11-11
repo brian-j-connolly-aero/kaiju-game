@@ -194,7 +194,7 @@ def build() -> Cue:
         tk.hits(bar, ".g..g..g.g..g...", TAIKO_SHORT, dur=0.3)
         if last:
             sn.hits(bar, "XggXggXgXggX....", SNARE)
-            sn.roll(B(bar, 4), 1.0, SNARE, 60, 124, curve=1.2)
+            sn.roll(B(bar, 4), 1.0, SNARE, 60, 124, curve=1.2, alt=SNARE_ALT)
         else:
             sn.hits(bar, "XggXggXgXggXggXx" if bar % 2 else "XggXggXgXgXgXXXX", SNARE)
     sn.notes = [(st, d, SNARE_ALT if (i % 3 == 1 and v < 80) else p, v)

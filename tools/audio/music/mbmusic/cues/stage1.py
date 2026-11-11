@@ -115,7 +115,7 @@ def build() -> Cue:
     # ---- hint of choir ------------------------------------------------------------------------------
     wo = base.add("women ooh", "women_ooh", gain=5.5, role="pad")
     wo.line(13, "Bb4+D5:8_ | A4+C#5:8", 76, gate=1.0)
-    wo.line(25, "A4:16", 80)
+    wo.line(25, "A4:4_ | G4:4_ | D5:4_ | C#5:4", 80, gate=1.0)     # clear of the tune's B flat
     wo.expr([(B(1), 50), (B(13), 50), (B(15), 104), (B(16.5), 120), (B(17), 60),
              (B(25), 60), (B(27), 110), (B(28.5), 118), (B(29), 50)])
 
@@ -129,7 +129,7 @@ def build() -> Cue:
     sn0 = base.add("snare tic", "snare", gain=3.0, role="perc")
     for bar in range(2, 33, 2):
         if bar in (8, 16, 24, 32):
-            sn0.roll(B(bar, 3.5), 0.5, SNARE, 36, 60, step=1 / 12)
+            sn0.roll(B(bar, 3.5), 0.5, SNARE, 36, 60, step=1 / 12, alt=SNARE_ALT)
             sn0.hits(bar, "............x...", SNARE, scale=0.8)
         else:
             sn0.hits(bar, ".............ggo", SNARE)
@@ -144,7 +144,7 @@ def build() -> Cue:
             pat = "x...g.g.x...g.gg"                     # under the tune: a plain march
         if last:
             pat = pat[:10] + "......"
-            sn.roll(B(bar, 3.5), 1.5, SNARE, 44, 108, curve=1.3)
+            sn.roll(B(bar, 3.5), 1.5, SNARE, 44, 108, curve=1.3, alt=SNARE_ALT)
         sn.hits(bar, pat, SNARE, scale=0.92)
     sn.notes = [(st, d, SNARE_ALT if (i % 3 == 1 and v < 80) else p, v)
                 for i, (st, d, p, v) in enumerate(sorted(sn.notes))]

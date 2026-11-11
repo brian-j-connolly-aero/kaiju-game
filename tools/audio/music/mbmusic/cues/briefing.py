@@ -1,6 +1,6 @@
 """briefing: "Situation Room", a tense bed under the voiced briefing. 8 bars, 20 s loop.
 
-Everything sits on a D pedal and stays out of the way of speech: a low held fifth, a slow
+Everything sits on a D pedal and stays out of the way of speech: a low held D, a slow
 timpani pulse like a second hand, a soft field-drum figure, tremolo violas sighing B flat to A,
 and the head motif once, on English horn, in bars 5 and 6.
 """
@@ -18,7 +18,7 @@ def build() -> Cue:
     cb.line(1, "D2:16_ D2:16", 78, gate=1.0)
     cb.expr([(B(1), 96), (B(3), 116), (B(5), 100), (B(7), 122), (B(9), 96)])
     vc = s.add("cellos", "cellos", gain=4.0, role="pad")
-    vc.line(1, "D3+A3:16_ D3+A3:16", 70, gate=1.0)
+    vc.line(1, "D3:16_ D3:16", 74, gate=1.0)             # the violas have the fifth (and the sigh)
     vc.expr([(B(1), 90), (B(3), 112), (B(5), 96), (B(7), 120), (B(9), 90)])
 
     # the sigh: A, up to B flat when the harmony darkens, back to A
@@ -26,7 +26,7 @@ def build() -> Cue:
     va.line(1, "A3:8_ | Bb3:4_ | A3:4_ | A3:8_ | Bb3:4_ | A3:4", 68, gate=1.0)
     va.expr([(B(1), 80), (B(3), 112), (B(4), 88), (B(7), 118), (B(8), 96), (B(9), 80)])
     v2 = s.add("violins held", "violins2", gain=2.0, role="pad")
-    v2.line(1, "F4:8_ | G4:4_ | F4:4_ | F4:8_ | G4+Eb4:4_ | F4:4", 62, gate=1.0)
+    v2.line(1, "F4:8_ | G4:4_ | F4:4_ | F4:4_ A4:4_ | G4+Eb4:4_ | F4:4", 62, gate=1.0)
     v2.expr([(B(1), 70), (B(3), 104), (B(4), 76), (B(7), 110), (B(8), 84), (B(9), 70)])
     hi = s.add("violins high", "violins1", gain=-1.0, role="pad")
     hi.line(1, "D6:16_ D6:16", 50, gate=1.0)

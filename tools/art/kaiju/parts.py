@@ -150,8 +150,9 @@ def claw(base, tip, w: float, hook, n: int = 4, color="bone", up=UP, bend: float
     hook = V(hook).normalized()
     length = (tip - base).length
     mid = base.lerp(tip, 0.5) - hook * (length * bend)
-    g = tube([base, mid], [w, w * 0.66], n=n, up=up, cap0="flat", cap1="open", color=root or color)
-    g += tube([mid], [w * 0.66], n=n, up=up, cap0="open", tip=tip, color=color)
+    g = tube([base, mid], [w, w * 0.66], n=n, up=up, cap0="flat", tip=tip, color=color)
+    if root is not None:
+        g.paint(root, where=list(range(n)) + [len(g.f) - 1])       # the thick band and the base cap
     return g
 
 
@@ -252,6 +253,39 @@ def sawtooth(g: mb.Geo, where, color, which: int = 0) -> mb.Geo:
                 nmat.append(g.mat[i])
                 nuv.append(None)
         else:
+            nf.append(f)
+            ncol.append(g.col[i])
+            nmat.append(g.mat[i])
+            nuv.append(g.uv[i])
+    g.f, g.col, g.mat, g.uv = nf, ncol, nmat, nuv
+    return g
+
+
+def zigzag(g: mb.Geo, center, axis, color, where=None) -> mb.Geo:
+    """A zigzag stripe around a tube, centered on the ring that passes through `center`
+    (a point on the tube's axis; `axis` is the tube's direction there). Every quad that
+    touches that ring is split in two and the half that sits on the ring is painted, so
+    the stripe is a row of teeth pointing both ways: a tribal band for free."""
+    c0, ax = V(center), V(axis).normalized()
+    chosen = set(g.select(where))
+    col = mb.palette.rgb(color)
+    nf, ncol, nmat, nuv = [], [], [], []
+    for i, f in enumerate(g.f):
+        done = False
+        if i in chosen and len(f) == 4:
+            t = [abs((g.v[k] - c0).dot(ax)) for k in f]
+            far = max(t)
+            on = [k for k in range(4) if t[k] < 0.2 * far]
+            if far > 1e-9 and len(on) == 2 and (on[1] - on[0]) in (1, 3):
+                a, b = (on[0], on[1]) if on[1] - on[0] == 1 else (on[1], on[0])     # a -> b follows the winding
+                c, d = (b + 1) % 4, (b + 2) % 4
+                for tri, paint in (((a, b, c), True), ((a, c, d), False)):
+                    nf.append(tuple(f[j] for j in tri))
+                    ncol.append(col if paint else g.col[i])
+                    nmat.append(g.mat[i])
+                    nuv.append(None)
+                done = True
+        if not done:
             nf.append(f)
             ncol.append(g.col[i])
             nmat.append(g.mat[i])
