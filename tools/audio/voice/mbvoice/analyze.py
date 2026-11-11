@@ -52,8 +52,8 @@ def measure_line(job: tuple[dict, dict, dict]) -> dict:
             "first_ms_db": round(dsp.db(np.max(np.abs(x[:44])) / peak), 1),
             "last_ms_db": round(dsp.db(np.max(np.abs(x[-44:])) / peak), 1),
             "share_300_3600": round(dsp.band_share(x, SR, 300, 3600), 4),
-            "share_below_250": round(dsp.band_share(x, SR, 0, 250), 4),
-            "share_above_4200": round(dsp.band_share(x, SR, 4200, SR / 2), 4),
+            "share_below_200": round(dsp.band_share(x, SR, 0, 200), 4),
+            "share_above_4500": round(dsp.band_share(x, SR, 4500, SR / 2), 4),
             "centroid_hz": round(dsp.spectral_centroid(x, SR)),
             "rolloff99_hz": round(dsp.rolloff(x, SR)),
         }
@@ -76,9 +76,9 @@ def measure_line(job: tuple[dict, dict, dict]) -> dict:
             fail.append(f"{i}.{ext}: starts abruptly ({m['first_ms_db']} dB in the first millisecond)")
         if ext == "ogg" and m["last_ms_db"] > EDGE_DB:
             fail.append(f"{i}.{ext}: ends abruptly ({m['last_ms_db']} dB in the last millisecond)")
-        if plan["chain"] == "radio" and (m["share_below_250"] > 0.02 or m["share_above_4200"] > 0.02):
+        if plan["chain"] == "radio" and (m["share_below_200"] > 0.02 or m["share_above_4500"] > 0.01):
             fail.append(f"{i}.{ext}: radio line is not band-limited "
-                        f"({100 * m['share_below_250']:.1f}% below 250 Hz, {100 * m['share_above_4200']:.1f}% above 4.2 kHz)")
+                        f"({100 * m['share_below_200']:.1f}% below 200 Hz, {100 * m['share_above_4500']:.1f}% above 4.5 kHz)")
     limit = MAX_SECONDS_HALL if plan["chain"] == "hall" else MAX_SECONDS
     if rec["duration"] > limit:
         fail.append(f"{i}: {rec['duration']} s is longer than the {limit} s limit")

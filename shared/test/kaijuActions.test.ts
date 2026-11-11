@@ -191,6 +191,42 @@ describe('swipe', () => {
   });
 });
 
+describe('buttons held through another action', () => {
+  it('start their action as soon as the kaiju is free, however long ago the press was', () => {
+    const world = arena({ props: [{ kind: 'car_sedan', x: 0, z: clearOf('car_sedan') }] });
+    const k = world.kaijus[0];
+    k.hp = 500;
+    // Roar, then press and keep holding Grab while the roar is still going.
+    play(world, 2, { buttons: Btn.roar });
+    const roarLeft = ticksFor(A.roar.timing.active) - 1;
+    expect(roarLeft).toBeGreaterThan(INPUT_BUFFER_TICKS + 5);
+    let events = play(world, roarLeft - 1, { buttons: Btn.grab });
+    expect(actions(events)).toEqual([]);
+    // The roar ends: the hand reaches at once, and since Grab is still down it goes on to eat.
+    events = play(world, 1, { buttons: Btn.grab });
+    expect(actions(events)).toEqual([
+      ['roar', 'idle'],
+      ['grab', 'windup'],
+    ]);
+    events = [...play(world, ticksFor(A.grab.timing.windup) + 2, { buttons: Btn.grab }), ...untilIdle(world)];
+    expect(actions(events)).toEqual([
+      ['grab', 'active'],
+      ['grab', 'idle'],
+      ['eat', 'eat'],
+      ['eat', 'idle'],
+    ]);
+    expect(k.hp).toBe(500 + A.eat.heal);
+
+    // A button that was let go again long before the kaiju was free is forgotten.
+    k.cooldowns.roar = 0;
+    play(world, 2, { buttons: Btn.strike });
+    play(world, 3, { buttons: Btn.roar });
+    events = untilIdle(world);
+    events = [...events, ...play(world, 10)];
+    expect(actions(events).map((a) => a[0])).not.toContain('roar');
+  });
+});
+
 describe('stomp: strike held', () => {
   it('turns the swipe into a stomp when strike is still down at the hold time, keeping the elapsed time', () => {
     const hold = ticksFor(A.stomp.holdTime);

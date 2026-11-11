@@ -21,9 +21,10 @@
  * - Block: Brace for as long as it is down. Bracing is exclusive: release it to act.
  * - Roar, Special: on the press, when off cooldown and (Special) rage covers the cost.
  * - Molt: held for `molt.holdTime` while `moltAvailable`.
- * - A press made while another action runs is remembered for INPUT_BUFFER_TICKS.
+ * - A press made while another action runs is remembered for INPUT_BUFFER_TICKS, and for as
+ *   long as the button stays down.
  * When several are wanted on the same tick the order is: molt, brace, special, roar, strike,
- * throw, eat, grab.
+ * throw, grab, eat.
  *
  * Effects (who gets hit) live in sim/kaijuEffects.ts. Timings: a phase of d seconds ends on the
  * first tick at which d has fully passed (0.45 s is 14 ticks at 30 Hz).
@@ -72,9 +73,13 @@ function isDown(input: InputState, button: KaijuButton): boolean {
   return (input.buttons & Btn[button]) !== 0;
 }
 
-/** A press of this button is waiting to be used: made within the buffer and not yet spent. */
+/**
+ * A press of this button is waiting to be used: not yet spent, and either made within the
+ * buffer or still held down (holding a button through another action means "as soon as I can").
+ */
 function freshPress(k: Kaiju, input: InputState, button: KaijuButton): boolean {
-  return input.sincePressTicks[BtnIndex[button]] <= INPUT_BUFFER_TICKS && (k.act.usedPress & Btn[button]) === 0;
+  if ((k.act.usedPress & Btn[button]) !== 0) return false;
+  return input.sincePressTicks[BtnIndex[button]] <= INPUT_BUFFER_TICKS || isDown(input, button);
 }
 
 function announce(world: World, k: Kaiju, action: KaijuVerb, phase: KaijuPhase, duration: number, elapsed = 0): void {
@@ -278,18 +283,17 @@ function startFromInput(world: World, k: Kaiju, def: KaijuKindDef, input: InputS
     startAction(world, k, def, input, 'throw', a.throw.button);
     return;
   }
+  // Empty hands reach first; the hold that follows a grab is judged once the grab is over.
+  if (!k.held && freshPress(k, input, a.grab.button)) {
+    startAction(world, k, def, input, 'grab', a.grab.button);
+    return;
+  }
   const grabBit = Btn[a.eat.button];
   if ((mem.usedHold & grabBit) === 0 && heldSeconds(input, a.eat.button) >= a.eat.holdTime - TIME_EPS) {
     // A hold is judged once. Whatever comes of it, letting go afterwards does not throw.
     mem.usedHold |= grabBit;
     mem.usedPress |= grabBit;
-    if (k.cooldowns.eat <= 0 && canEat(world, k, def)) {
-      startAction(world, k, def, input, 'eat', a.eat.button);
-      return;
-    }
-  }
-  if (!k.held && freshPress(k, input, a.grab.button)) {
-    startAction(world, k, def, input, 'grab', a.grab.button);
+    if (k.cooldowns.eat <= 0 && canEat(world, k, def)) startAction(world, k, def, input, 'eat', a.eat.button);
   }
 }
 

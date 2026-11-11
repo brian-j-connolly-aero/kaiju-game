@@ -166,8 +166,9 @@ Dead at 0 hp. The kaiju sees the yellow targeting lasers of charging units.
 definition.
 
 - Every verb is committed: nothing cancels it but a stagger or death. A press made during
-  another action is remembered for 0.2 s. Bracing is exclusive (release Block to act). When
-  several inputs compete the order is molt, brace, special, roar, strike, throw, eat, grab.
+  another action is remembered for 0.2 s, and for as long as the button stays down. Bracing
+  is exclusive (release Block to act). When several inputs compete the order is molt, brace,
+  special, roar, strike, throw, grab, eat.
 - Attacks are aimed along the head (the view), which leads the body by up to 50°. The effect
   lands once, at the end of the wind-up.
 - **Swipe:** every unit, structure and prop touching the arc takes the full hit.

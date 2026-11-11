@@ -149,7 +149,8 @@ Input and actions
 Kaiju combat (simulation part 1; the rules as built are written out in `DESIGN.md` sections 3 and 4)
 
 - Every verb is committed; bracing is exclusive; input priority is molt, brace, special, roar,
-  strike, throw, eat, grab; each Grab hold is judged once.
+  strike, throw, grab, eat; each Grab hold is judged once. A press is remembered for 0.2 s and
+  for as long as the button stays down.
 - Attacks follow the head's aim, not the body heading. A swipe hits everything in its arc once,
   for full damage each.
 - Grab prefers loose objects over building chunks. Taking a tank from a troop removes one tank,
@@ -322,8 +323,9 @@ Server
 - **Client workers (kaiju and effects):** `ARCHITECTURE.md` section 4 lists what the kaiju and
   city events guarantee. Draw the beam with `beamPath(cityQuery, snapshotKaiju,
   kaijuKindDef(kind).actions.special)` while the kaiju's phase is 'special'. Fly projectiles
-  with `stepProjectile` from `projectileSpawn` until `projectileHit`. Start a wind-up animation
-  from `kaijuAction` (phase 'windup', `duration`, optional `elapsed`).
+  with `stepProjectile` from `projectileSpawn` until `projectileHit`; `beginStage` clears the
+  server's projectiles without events, so drop all local ones on `stageChange`. Start a
+  wind-up animation from `kaijuAction` (phase 'windup', `duration`, optional `elapsed`).
 - **Client workers:** `test/prediction.test.ts` is the recipe for prediction: build the city with
   `getCity(config.citySeed)`, compare `cityChecksum` with the welcome, mirror the live state with
   `cityStateFromWire`, keep it current from `structureStage` / `propsDestroyed` / `kaijuHeld`
