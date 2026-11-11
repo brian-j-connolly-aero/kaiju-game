@@ -721,7 +721,8 @@ unfinished work. Scratch logs, screenshots and the probe scripts are in
 - **The last commit plus the integration task's own changes passes**: `git archive` of
   `bbaefc5` with `tools/playtest/smoke.mjs`, `scripted.mjs`, `driver.mjs`, `docs/STATUS.md` and
   `docs/ARCHITECTURE.md` laid over it, after a clean `npm ci`: `npm run check` exits 0, 39 test
-  files, 461 tests. `npm run sim` passes.
+  files, 461 tests. (No check reads the two documents, which were reworded afterwards.)
+  `npm run sim` was run once, at the start, on the same simulation code: 5 matches, no errors.
 
 ### 8.2 What was played, and how each run ended
 
