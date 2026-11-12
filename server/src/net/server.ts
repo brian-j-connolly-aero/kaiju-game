@@ -65,7 +65,7 @@ export async function startGameServer(config: ServerConfig): Promise<GameServer>
     maxRooms: config.maxRooms,
     joinTimeoutSeconds: config.joinTimeoutSeconds,
     reservationSeconds: config.reservationSeconds,
-    build,
+    build: config.checkBuild ? build : null,
     log: config.log,
     logError: config.logError,
   });

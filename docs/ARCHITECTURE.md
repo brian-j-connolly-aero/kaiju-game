@@ -367,7 +367,9 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
     when a `welcome` describes a city the page cannot build: it leaves the room instead of
     sitting in the lobby. The server prints one line per refusal: if every page is refused,
     the server is the one that is out of date.
-  - `/healthz` and the start-up line show the server's stamp.
+  - `/healthz` and the start-up line show the server's stamp. `MB_ANY_BUILD=1` switches the
+    check off: a way out for an evening if a browser is ever refused wrongly (the rules part
+    relies on every browser building the same city, to the millimeter).
 - A person in the room has a **seat** (0..4, stable while they stay); the first is the host. In
   a match every connected seat gets a **slot** (player id; slot 0 is the kaiju): `pickKaijuSeat`
   applies the volunteer and rotation rules and `buildMatchConfig` turns the lobby into the
@@ -554,6 +556,7 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
   `MB_SPEED` (simulation speed multiplier for headless tests; real clients cannot predict at
   any speed but 1), `MB_GRACE` (seconds a dropped seat is kept), `MB_END_SCREEN`,
   `MB_MAX_ROOMS` (50 rooms with somebody in them), `MB_NO_LIMITS=1` (no per-visitor limits),
+  `MB_ANY_BUILD=1` (pages from any build are let in),
   `MB_CLIENT_DIR` (the built client, default `client/dist`), `MB_QUIET=1` (no room chatter;
   failures are still printed). When the tunnel is the only way in, set `HOST=127.0.0.1` so
   that nothing else on the network can reach the port.

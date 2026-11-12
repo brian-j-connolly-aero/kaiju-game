@@ -13,6 +13,11 @@ describe('server configuration', () => {
     expect(c.graceSeconds).toBeGreaterThanOrEqual(30);
     expect(c.endScreenSeconds).toBeGreaterThan(FAST_END_SCREEN_SECONDS);
     expect(c.clientDir).toBeNull();
+    // The seat belts are on unless somebody takes them off.
+    expect(c.checkBuild).toBe(true);
+    expect(c.limits.createsPerMinute).toBeGreaterThan(0);
+    expect(c.limits.joinsPerMinute).toBeGreaterThan(0);
+    expect(c.limits.missesPerMinute).toBeGreaterThan(0);
   });
 
   it('reads every variable', () => {
@@ -25,6 +30,8 @@ describe('server configuration', () => {
       MB_GRACE: '12',
       MB_END_SCREEN: '0',
       MB_MAX_ROOMS: '3',
+      MB_NO_LIMITS: '1',
+      MB_ANY_BUILD: '1',
       MB_CLIENT_DIR: '/srv/game',
     });
     expect(c).toMatchObject({
@@ -36,6 +43,8 @@ describe('server configuration', () => {
       graceSeconds: 12,
       endScreenSeconds: 0,
       maxRooms: 3,
+      limits: { createsPerMinute: 0, joinsPerMinute: 0, missesPerMinute: 0 },
+      checkBuild: false,
       clientDir: '/srv/game',
     });
   });

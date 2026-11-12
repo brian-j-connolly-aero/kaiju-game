@@ -16,6 +16,7 @@ npm run sim -- --seeds 20 --seed 21            # the next 20
 npm run sim -- --seeds 10 --unopposed          # no squads: how fast a kaiju fills the bar alone
 npm run sim -- --seeds 10 --kaiju-handicap 0.3 # the kaiju bot hesitates 30% of the time
 npm run sim -- --seeds 10 --human-handicap 0.3 # the same for the squads
+npm run sim -- --seeds 20 --trigger-happy      # squads that hold the trigger instead of charging volleys
 npm run sim -- --seeds 8 --fast                # the short MB_FAST timers and bar
 npm run sim -- --seeds 3 --events --json       # event counts; reports as JSON
 ```
@@ -24,6 +25,9 @@ Columns: winner and why, match length, time per stage, kaiju nerve breaks (stagg
 units lost per stage, the bar at the end of each stage (as a percentage of the skyline, where
 the three marks sit at 21, 57 and 100), kaiju health lost per stage. The summary adds, per
 stage, how long the kaiju took to fill its segment, volleys, healing and the squads' collateral.
+
+"Volleys" counts charged volleys only (sub-units fired with at least 60% charge); a trigger
+pulled on less is ragged fire and is not counted.
 
 The harness is deterministic: the same seed and the same code give the same match
 (`shared/test/determinism.test.ts`; the tables in section 4 were run twice and came out
@@ -35,11 +39,12 @@ plus or minus 11 points of noise; the three batches in section 4 show it.
 
 | Target | Measured with |
 | --- | --- |
-| A kaiju left alone fills a stage's segment of the bar in 100 to 130 s | `--unopposed`, "segment filled after" |
+| A kaiju left alone fills a stage's segment of the bar in 100 to 130 s (stage 3 is allowed more since the second pass: section 7) | `--unopposed`, "segment filled after" |
 | A contested stage lasts roughly 200 to 230 s | default run, "stage time when completed" |
 | A match ends in 10 to 12 minutes | default run, "mean match length" |
 | Neither side wins more than about 65% with equal bots, over about 20 seeds | default run |
 | Scattered fire alone rarely kills; coordinated volleys do | health lost in and out of staggers; kills |
+| Undisciplined fire is clearly worse than charged, coordinated volleys at breaking the kaiju's nerve | `--trigger-happy` against the default run: staggers, wins |
 
 ## 3. Before
 
@@ -116,9 +121,12 @@ What that showed:
   80-point houses; the squads' collateral at stage 1 (362 points) was most of the segment, so
   a contested stage 1 was *shorter* than an uncontested one.
 
-## 4. After
+## 4. After the first pass
 
-20 matches, seeds 1 to 20, with the numbers now in `shared/src/defs/`:
+(History. The rules changed after this pass and the numbers were tuned again: the current
+tables are in section 7.)
+
+20 matches, seeds 1 to 20, with the numbers that were in `shared/src/defs/` at the time:
 
 ```
 20 bot matches
@@ -212,7 +220,7 @@ Sensitivity, 10 matches each: a kaiju bot that hesitates 30% of the time wins 0 
 (`kaiju wins 0/10 (0%)   human wins 10 (100%): 4 by kill, 6 by the clock`); squads that hesitate 30% of the time win 0 of 10
 (`kaiju wins 10/10 (100%)   human wins 0 (0%): 0 by kill, 0 by the clock`). With no rubber banding, skill decides: the balance above is for equal play.
 
-## 5. What changed, and why
+## 5. What changed in the first pass, and why
 
 | Number (file) | Before | After | Why |
 | --- | --- | --- | --- |
@@ -262,3 +270,232 @@ Things tried and dropped:
   positions, waiting for the kaiju to commit to an attack) is the way to go.
 - **Variance is high**: single matches run from 7 to 12 minutes, and a batch of 20 can land
   anywhere from 35% to 60% for the kaiju with the same numbers.
+
+## 7. Second pass: charged, coordinated volleys (after the rules inspection)
+
+An inspection of the rules found that the bots had been hiding two things from the harness,
+because they never play that way:
+
+- **Holding the trigger beat charging a volley.** A sub-unit joined a volley with any charge
+  and the bonus was linear, so a parked squad whose player simply held Fire got a "volley"
+  every reload at 43 to 53% charge: more nerve per second than waiting for a full charge.
+- **One squad could break the kaiju alone**: with one volley from behind whose shots also
+  crossed (103 to 133 nerve of 100), or with volley after volley against the leak.
+
+On open ground, with four squads standing round a kaiju that never moves (the script is
+`shared/test/volleyRules.test.ts` in test form), it looked like this before:
+
+| Four squads, kaiju standing still | first stagger | staggers a minute | killed after |
+| --- | --- | --- | --- |
+| Synchronized full-charge volleys | 6.8 / 7.3 / 8.5 s | 5.0 / 4.5 / 4.4 | 48 / 53 / 55 s |
+| Hold-and-charge, everybody holds Fire | 0.8 / 1.3 / 2.5 s | 4.5 / 3.9 / 3.8 | 40 / 46 / 47 s |
+| Fire at will, everybody holds Fire | 3.4 / 1.6 / 2.8 s | 4.2 / 4.4 / 3.9 | 72 / 69 / 76 s |
+
+(Stages 1 / 2 / 3. One squad alone holding Fire from the front broke it after 14 / 21 / 28 s.)
+
+### The rules now (DESIGN.md sections 3 and 5)
+
+- **A volley needs a charge.** Below 60% charge (`COMBAT_RULES.volleyMinCharge`) a sub-unit
+  still fires with the trigger, but raggedly: half nerve and the at-will aim error, exactly
+  what fire at will is worth. From 60% to full the nerve multiplier rises from x0.5 to x3 and
+  the aim error falls to the volley value. The damage bonus is unchanged, x(1 + charge), so
+  holding Fire stays a reasonable way to do plain damage. The guns reload in 2.6 to 3.2 s of
+  the 6 s charge, so a held trigger never gets past 53%.
+- **It takes two squads to break the kaiju.** Nerve at capacity breaks only while charged
+  volleys from two different squads have hit it within 5 s (`breakSquads`,
+  `volleyBreakWindow`). Otherwise it stays at capacity, "on the brink". Artillery never counts.
+- **Range limits every shot**: a projectile gives out after 1.1 times its weapon's range
+  (shells used to fly 990 m against a listed 600).
+
+The same four squads after:
+
+| Four squads, kaiju standing still | first stagger | staggers a minute | killed after | health a second outside staggers |
+| --- | --- | --- | --- | --- |
+| Synchronized full-charge volleys | 6.8 / 7.3 / 8.5 s | 5.0 / 4.5 / 4.4 | 48 / 53 / 55 s | 5.0 / 0 / 3.3 |
+| Hold-and-charge, everybody holds Fire | never | 0 | 84 / 94 / 92 s | 11.9 / 10.6 / 10.9 |
+| Fire at will, everybody holds Fire | never | 0 | 126 / 130 / 131 s | 8.0 / 7.7 / 7.7 |
+
+Two squads whose fire crosses, volleying together, break it after 6.8 / 7.3 / 8.5 s and kill
+it in 120 to 139 s; the same two holding Fire never break it and have not killed it after
+three minutes; one squad alone never breaks it, whatever it does. (A kaiju that stands
+still, never eats and never fights back is the best case for lazy fire there is.)
+
+### What that did to the balance, and the tuning
+
+With the rules changed and nothing else, the kaiju won 18 of 20 (seeds 1 to 20): staggers
+per stage went from 1.4 / 2.9 / 6.7 to 1.6 / 1.8 / 1.8. Stages 1 and 2 hardly moved; the
+titan's staggers had mostly been artillery alone. Squads deploy 800 to 1300 m from a titan
+and need about a minute and a half to get into range; until then four batteries (40 nerve a
+barrage, more from the side) used to break it from across the map every 35 s. Now artillery
+only brings it to the brink, and a titan that needs two minutes alone is done before the
+squads have fought it.
+
+Two rounds, one knob:
+
+| Tried (20 matches each unless said) | Kaiju wins | Notes |
+| --- | --- | --- |
+| Rules only, `p3` 0.31 | 18 of 20 | no kills |
+| Letting a barrage count as its squad's volley | 14 of 20 | rejected: trigger-happy squads then still broke a titan 4.8 times a stage and killed it 3 times in 20 |
+| Squad bots that wait longer for each other (`syncCharge` 0, `syncWait` 4 or 8) | 16 of 20 | no gain: once in range they already fire together |
+| `p3` 0.40 | 7 of 20 | stage 3 takes 5:06 |
+| `p3` 0.40 and `helplessMult` 0.65 | 2 of 20 | |
+| `p3` 0.34 / 0.35 / 0.36, all fixes in, 60 matches each | 37 / 34 / 26 of 60 | chosen: 0.35 |
+
+| Number (file) | Before | After | Why |
+| --- | --- | --- | --- |
+| Third bar mark fraction `p3` (`defs/rules.ts`) | 0.31 | 0.35 | The titan's segment has to last until the squads can fight it with volleys. Contested stage 3 is 3:16 to 3:32 again. The price: alone, a titan now needs 2:44 instead of 2:00 (it runs out of cheap blocks: 0.34 gives 2:31, 0.36 gives 3:00). |
+| Volley nerve below 60% charge (`COMBAT_RULES.volleyMinCharge`, new) | x(1 + 2 x charge) | x0.5, then rising to x3 at full charge | See above. |
+| Squads needed to break nerve (`breakSquads`, `volleyBreakWindow`, new) | none | 2 within 5 s | See above. |
+| Projectile lifetime (`SQUAD_RULES.rangeSlack`, new) | 7 s rockets, 9 s shells | 1.1 x range / speed | Range now limits a person's shots and volleys. Stray shots also stop short of far houses: squad collateral at stage 1 fell from 58 to about 41 points. |
+| Kaiju eye and mouth (`defs/kaiju/lizard.ts`) | 3.8 / 28 / 100 and 3.3 / 24 / 88 m up, on the body's axis | 4.2 / 27.5 / 90.7 and 2.9 / 22 / 72 m up, 1.7 / 11 / 38.5 and 2.5 / 15 / 51.4 m ahead | Where the model has them, so that the beam burns where it is drawn. Alone, the bot's pace did not change (stage 3 at `p3` 0.31 is still 2:00). |
+
+### Current tables
+
+20 matches, seeds 1 to 20:
+
+```
+20 bot matches
+seed  start         winner          length          stage time    staggers  units lost  bar % at stage end     kaiju hp lost
+----  ------------  --------------  ------  ------------------  ----------  ----------  ------------------  ----------------
+1     Gull Point    kaiju (bar)       8:04  2:30 / 2:03 / 3:31   3 / 1 / 0   4 / 6 / 1       21 / 57 / 100   250 / 109 / 268
+2     Harrow Lane   kaiju (bar)       9:00  2:10 / 3:49 / 3:01   0 / 4 / 0   3 / 8 / 3       21 / 57 / 100    45 / 498 / 176
+3     Bellhaven     kaiju (bar)      10:51  4:47 / 2:33 / 3:31   3 / 0 / 3   6 / 4 / 1       21 / 57 / 100    385 / 77 / 588
+4     Dovecote      humans (kill)     6:39     4:29 / 2:10 / -   0 / 6 / -   5 / 3 / -         21 / 31 / -     239 / 999 / -
+5     Cinder Flats  kaiju (bar)      11:47  2:28 / 5:48 / 3:31   0 / 7 / 1   4 / 7 / 1       21 / 57 / 100    50 / 999 / 364
+6     Easter Green  humans (clock)   12:00  4:09 / 3:16 / 4:35   1 / 0 / 7   8 / 8 / 2        21 / 57 / 84   219 / 46 / 1522
+7     Cinder Flats  kaiju (bar)      11:02  3:02 / 4:52 / 3:08   1 / 4 / 0   3 / 6 / 0       21 / 57 / 100   229 / 676 / 229
+8     Alder Row     humans (clock)   12:00  2:22 / 4:14 / 5:24  1 / 5 / 10   3 / 7 / 2        21 / 57 / 95  132 / 786 / 1861
+9     Ivy Court     kaiju (bar)      10:25  4:26 / 3:13 / 2:45   3 / 0 / 0   5 / 0 / 3       21 / 57 / 100    316 / 92 / 181
+10    Bellhaven     humans (clock)   12:00  5:05 / 3:53 / 3:02   4 / 3 / 2   7 / 7 / 2        21 / 57 / 97   452 / 429 / 412
+11    Dovecote      humans (clock)   12:00  3:26 / 3:19 / 5:15   2 / 1 / 8   0 / 4 / 2        21 / 57 / 99  515 / 218 / 1394
+12    Easter Green  kaiju (bar)      10:45  3:47 / 3:48 / 3:10   1 / 4 / 0   3 / 3 / 4       21 / 57 / 100   235 / 831 / 253
+13    Alder Row     kaiju (bar)       9:52  2:45 / 3:53 / 3:14   1 / 4 / 1   3 / 9 / 3       22 / 57 / 100   174 / 590 / 473
+14    Fennel Hill   kaiju (bar)      11:31  2:00 / 5:00 / 4:31  1 / 10 / 3  4 / 10 / 6       21 / 57 / 100  169 / 1286 / 666
+15    Bellhaven     humans (clock)   12:00  4:28 / 3:12 / 4:20   2 / 0 / 2   6 / 0 / 1        21 / 57 / 98    308 / 98 / 549
+16    Dovecote      kaiju (bar)      10:45  4:02 / 2:22 / 4:21   2 / 1 / 4   5 / 3 / 2       21 / 57 / 100   249 / 120 / 975
+17    Juniper Bay   humans (clock)   12:00  2:51 / 3:26 / 5:42   0 / 1 / 9   4 / 0 / 4        21 / 57 / 91  102 / 161 / 1622
+18    Harrow Lane   kaiju (bar)       8:31  2:10 / 3:14 / 3:07   0 / 1 / 1  3 / 10 / 0       21 / 57 / 100    51 / 203 / 309
+19    Alder Row     kaiju (bar)       9:59  2:55 / 3:19 / 3:44   2 / 5 / 4   4 / 0 / 3       21 / 57 / 100  200 / 1073 / 806
+20    Dovecote      humans (kill)    11:00  4:09 / 2:03 / 4:49  4 / 1 / 11   5 / 0 / 3        21 / 57 / 83  464 / 178 / 1798
+
+kaiju wins 12/20 (60%)   human wins 8 (40%): 2 by kill, 6 by the clock
+mean match length 10:36   shortest 6:39   longest 12:00
+stage 1: reached 20, completed 20, segment filled after 3:03, stage time when completed 3:24; per match: staggers 1.6, volleys 31.6, units lost 4.3, kaiju hp lost 239 (healed 32), collateral 43 points
+stage 2: reached 20, completed 19, segment filled after 3:13, stage time when completed 3:32; per match: staggers 2.9, volleys 30.4, units lost 4.8, kaiju hp lost 474 (healed 200), collateral 316 points
+stage 3: reached 19, completed 12, segment filled after 3:28, stage time when completed 3:28; per match: staggers 3.5, volleys 28.9, units lost 2.3, kaiju hp lost 760 (healed 345), collateral 948 points
+voice: 13.3 cues per minute, at most 8 in any 10 s   simulated 397271 ticks in 31.4 s (422x real time)
+```
+
+Seeds 21 to 40, then 41 to 60:
+
+```
+kaiju wins 10/20 (50%)   human wins 10 (50%): 2 by kill, 8 by the clock
+mean match length 10:34   shortest 5:12   longest 12:00
+stage 1: reached 20, completed 20, segment filled after 2:46, stage time when completed 3:08; per match: staggers 1.7, volleys 30.8, units lost 4.8, kaiju hp lost 266 (healed 68), collateral 41 points
+stage 2: reached 20, completed 19, segment filled after 3:49, stage time when completed 4:10; per match: staggers 3.8, volleys 43.6, units lost 5.5, kaiju hp lost 599 (healed 324), collateral 349 points
+stage 3: reached 19, completed 10, segment filled after 3:16, stage time when completed 3:16; per match: staggers 2.2, volleys 20.4, units lost 2.6, kaiju hp lost 550 (healed 253), collateral 874 points
+voice: 13.3 cues per minute, at most 8 in any 10 s   simulated 395893 ticks in 29.5 s (448x real time)
+```
+
+```
+kaiju wins 12/20 (60%)   human wins 8 (40%): 2 by kill, 6 by the clock
+mean match length 10:37   shortest 7:59   longest 12:00
+stage 1: reached 20, completed 20, segment filled after 2:49, stage time when completed 3:12; per match: staggers 1.6, volleys 29.8, units lost 3.6, kaiju hp lost 307 (healed 36), collateral 39 points
+stage 2: reached 20, completed 20, segment filled after 3:06, stage time when completed 3:27; per match: staggers 2.9, volleys 29.1, units lost 4.0, kaiju hp lost 430 (healed 184), collateral 339 points
+stage 3: reached 20, completed 12, segment filled after 3:32, stage time when completed 3:32; per match: staggers 3.7, volleys 28.4, units lost 2.4, kaiju hp lost 812 (healed 371), collateral 889 points
+voice: 13.3 cues per minute, at most 7 in any 10 s   simulated 397706 ticks in 39.3 s (337x real time)
+```
+
+The same 20 seeds with squads that play the lazy way (`--trigger-happy`: parked, they fire
+every time the guns have loaded and never wait for a charge):
+
+```
+20 bot matches [trigger-happy squads]
+seed  start         winner       length          stage time   staggers  units lost  bar % at stage end    kaiju hp lost
+----  ------------  -----------  ------  ------------------  ---------  ----------  ------------------  ---------------
+1     Gull Point    kaiju (bar)    7:36  1:57 / 2:10 / 3:29  0 / 0 / 0   5 / 4 / 3       21 / 57 / 100   42 / 115 / 430
+2     Harrow Lane   kaiju (bar)    8:05  1:48 / 3:15 / 3:02  0 / 0 / 0  3 / 12 / 2       22 / 57 / 100   84 / 313 / 359
+3     Bellhaven     kaiju (bar)    9:15  3:37 / 2:23 / 3:15  0 / 0 / 0   5 / 0 / 3       21 / 57 / 100  170 / 102 / 423
+4     Dovecote      kaiju (bar)    8:59  2:27 / 3:42 / 2:50  0 / 0 / 0   4 / 3 / 0       21 / 57 / 100  110 / 616 / 242
+5     Cinder Flats  kaiju (bar)    7:22  1:52 / 2:12 / 3:18  0 / 0 / 0   2 / 5 / 4       21 / 57 / 100   83 / 106 / 383
+6     Easter Green  kaiju (bar)    6:53  2:07 / 2:19 / 2:26  0 / 0 / 0   0 / 3 / 2       21 / 57 / 100   54 / 201 / 194
+7     Cinder Flats  kaiju (bar)    7:23  1:54 / 2:37 / 2:53  0 / 0 / 0   2 / 6 / 0       21 / 57 / 100   55 / 133 / 248
+8     Alder Row     kaiju (bar)    8:15  1:53 / 2:56 / 3:27  0 / 0 / 0   0 / 6 / 3       21 / 57 / 100   48 / 322 / 304
+9     Ivy Court     kaiju (bar)    8:31  2:51 / 3:00 / 2:39  0 / 0 / 0   2 / 3 / 1       21 / 57 / 100  190 / 279 / 271
+10    Bellhaven     kaiju (bar)    8:54  3:29 / 2:38 / 2:47  0 / 0 / 0   4 / 0 / 1       22 / 57 / 100   125 / 82 / 304
+11    Dovecote      kaiju (bar)    7:31  2:11 / 2:39 / 2:41  0 / 0 / 0   2 / 5 / 1       22 / 57 / 100  177 / 307 / 268
+12    Easter Green  kaiju (bar)    7:06  2:09 / 2:12 / 2:45  0 / 0 / 0   2 / 4 / 2       21 / 57 / 100   65 / 136 / 267
+13    Alder Row     kaiju (bar)    7:46  1:30 / 2:54 / 3:21  0 / 0 / 0   0 / 7 / 1       21 / 57 / 100   49 / 247 / 401
+14    Fennel Hill   kaiju (bar)    7:37  1:37 / 2:27 / 3:32  0 / 0 / 0   2 / 3 / 3       21 / 57 / 100   36 / 201 / 444
+15    Bellhaven     kaiju (bar)    9:33  3:24 / 2:24 / 3:46  0 / 0 / 0   4 / 0 / 5       21 / 57 / 100    85 / 50 / 848
+16    Dovecote      kaiju (bar)    7:56  2:17 / 2:59 / 2:40  0 / 0 / 0   3 / 6 / 0       21 / 57 / 100   47 / 274 / 305
+17    Juniper Bay   kaiju (bar)    8:35  1:53 / 4:04 / 2:38  0 / 0 / 0   1 / 5 / 3       21 / 57 / 100   56 / 216 / 224
+18    Harrow Lane   kaiju (bar)    7:13  1:39 / 2:47 / 2:46  0 / 0 / 0   1 / 7 / 3       21 / 57 / 100   47 / 222 / 247
+19    Alder Row     kaiju (bar)    7:29  2:00 / 2:39 / 2:51  0 / 0 / 0   2 / 8 / 1       21 / 57 / 100   55 / 244 / 198
+20    Dovecote      kaiju (bar)    8:11  2:40 / 1:52 / 3:39  0 / 0 / 0   3 / 0 / 2       21 / 57 / 100   108 / 80 / 655
+
+kaiju wins 20/20 (100%)   human wins 0 (0%): 0 by kill, 0 by the clock
+mean match length 8:00   shortest 6:53   longest 9:33
+stage 1: reached 20, completed 20, segment filled after 1:54, stage time when completed 2:16; per match: staggers 0.0, volleys 1.3, units lost 2.4, kaiju hp lost 84 (healed 0), collateral 102 points
+stage 2: reached 20, completed 20, segment filled after 2:20, stage time when completed 2:42; per match: staggers 0.0, volleys 1.9, units lost 4.3, kaiju hp lost 212 (healed 16), collateral 545 points
+stage 3: reached 20, completed 20, segment filled after 3:02, stage time when completed 3:02; per match: staggers 0.0, volleys 1.8, units lost 2.0, kaiju hp lost 351 (healed 96), collateral 1629 points
+voice: 11.2 cues per minute, at most 6 in any 10 s   simulated 303890 ticks in 25.2 s (402x real time)
+```
+
+And the kaiju alone (`--unopposed`, seeds 1 to 10):
+
+```
+10 bot matches [unopposed]
+seed  start         winner       length          stage time   staggers  units lost  bar % at stage end  kaiju hp lost
+----  ------------  -----------  ------  ------------------  ---------  ----------  ------------------  -------------
+1     Gull Point    kaiju (bar)    6:26  1:45 / 1:55 / 2:45  0 / 0 / 0   0 / 0 / 0       21 / 57 / 100      0 / 0 / 0
+2     Harrow Lane   kaiju (bar)    6:52  1:50 / 2:02 / 2:59  0 / 0 / 0   0 / 0 / 0       21 / 57 / 100      0 / 0 / 0
+3     Bellhaven     kaiju (bar)    8:29  3:24 / 2:21 / 2:44  0 / 0 / 0   0 / 0 / 0       21 / 57 / 100      0 / 0 / 0
+4     Dovecote      kaiju (bar)    7:02  2:17 / 2:05 / 2:40  0 / 0 / 0   0 / 0 / 0       21 / 57 / 100      0 / 0 / 0
+5     Cinder Flats  kaiju (bar)    6:34  1:44 / 2:06 / 2:43  0 / 0 / 0   0 / 0 / 0       21 / 57 / 100      0 / 0 / 0
+6     Easter Green  kaiju (bar)    7:26  2:32 / 2:09 / 2:45  0 / 0 / 0   0 / 0 / 0       21 / 57 / 100      0 / 0 / 0
+7     Cinder Flats  kaiju (bar)    6:34  1:44 / 2:06 / 2:43  0 / 0 / 0   0 / 0 / 0       21 / 57 / 100      0 / 0 / 0
+8     Alder Row     kaiju (bar)    6:43  1:44 / 2:24 / 2:35  0 / 0 / 0   0 / 0 / 0       21 / 57 / 100      0 / 0 / 0
+9     Ivy Court     kaiju (bar)    8:36  2:36 / 3:18 / 2:42  0 / 0 / 0   0 / 0 / 0       21 / 57 / 100      0 / 0 / 0
+10    Bellhaven     kaiju (bar)    8:29  3:24 / 2:21 / 2:44  0 / 0 / 0   0 / 0 / 0       21 / 57 / 100      0 / 0 / 0
+
+kaiju wins 10/10 (100%)   human wins 0 (0%): 0 by kill, 0 by the clock
+mean match length 7:19   shortest 6:26   longest 8:36
+stage 1: reached 10, completed 10, segment filled after 2:07, stage time when completed 2:18; per match: staggers 0.0, volleys 0.0, units lost 0.0, kaiju hp lost 0 (healed 0), collateral 0 points
+stage 2: reached 10, completed 10, segment filled after 2:06, stage time when completed 2:17; per match: staggers 0.0, volleys 0.0, units lost 0.0, kaiju hp lost 0 (healed 0), collateral 0 points
+stage 3: reached 10, completed 10, segment filled after 2:44, stage time when completed 2:44; per match: staggers 0.0, volleys 0.0, units lost 0.0, kaiju hp lost 0 (healed 0), collateral 0 points
+voice: 7.9 cues per minute, at most 4 in any 10 s   simulated 139479 ticks in 1.4 s (3323x real time)
+```
+
+Against the targets, over the 60 contested matches:
+
+| Target | Result |
+| --- | --- |
+| Alone, a segment in 100 to 130 s | 2:07 / 2:06 / 2:44. Stage 3 is over the window on purpose (see `p3` above). |
+| Contested stage 200 to 230 s | Stage 1: 3:08 to 3:24. Stage 2: 3:27 to 4:10. Stage 3: 3:16 to 3:32. |
+| Match 10 to 12 minutes | Mean 10:34 to 10:37 per batch. |
+| Neither side above about 65% | Kaiju 34 of 60 (57%): 60%, 50% and 60% in the three batches. |
+| Scattered fire rarely kills, coordinated volleys do | 6 kills in 60 matches (the humans' other 20 wins are the clock). Trigger-happy squads: no kill and no win in 20. |
+| Undisciplined fire is clearly worse at breaking nerve | Disciplined squads break the kaiju 1.6 / 2.9 / 3.5 times a stage (seeds 1 to 20); trigger-happy squads never do, cost it a third to a half of the health (84 / 212 / 351 against 239 / 474 / 760), and add twice the collateral (102 / 545 / 1629 points against 43 / 316 / 948). Their matches are 2:36 shorter. |
+
+Sensitivity, 10 matches each: a kaiju bot that hesitates 30% of the time wins 0 of 10
+(`kaiju wins 0/10 (0%)   human wins 10 (100%): 1 by kill, 9 by the clock`); squads that hesitate 30% of the time win 5 of 10
+(`kaiju wins 5/10 (50%)   human wins 5 (50%): 1 by kill, 4 by the clock`). The squads' side has become less sensitive to hesitation than it was
+(they used to lose 10 of 10): more of their wins are the clock, which a slower kaiju hands
+them either way. How they fire matters far more than how often.
+
+### Limits of the second pass
+
+- **Kills are rare now** (6 in 60 against 17 in 60 before): a titan is staggered 2 to 4 times
+  a stage instead of 7, and the humans mostly win on the clock. If the owner wants more kills,
+  the levers are `helplessMult` (0.5; what a stagger costs) and the squads' deployment at
+  stage 3 (how soon they can fight), in that order. Raising nerve numbers would not help: a
+  pair of volleys already breaks it.
+- **Alone at stage 3 the titan is slow against the target** (2:44 for a 100 to 130 s window).
+  When the real city lands, tune `p3` again; a city with more value in reach of a titan will
+  move this more than anything here.
+- **The bots fire at full charge only.** A person who fires at 60 to 90% charge gets a
+  weaker volley sooner; the harness has no profile for that middle ground.
+- **Four idle people no longer stagger anything**: squads start on fire at will, which never
+  breaks nerve now. The client's autopilot squad (`client/src/game/autoplay.ts`) holds the
+  trigger too, so browser smoke runs will see fewer staggers and kills than before.

@@ -47,6 +47,7 @@ try {
   const hasClient = config.clientDir !== null && existsSync(join(config.clientDir, 'index.html'));
   const notes = [
     `build ${server.build()}`,
+    config.checkBuild ? '' : 'pages from any build are let in (MB_ANY_BUILD)',
     config.fast ? 'fast timers (MB_FAST)' : '',
     config.latencyMs > 0 ? `${config.latencyMs} ms simulated latency` : '',
     config.speed !== 1 ? `simulation speed x${config.speed}` : '',

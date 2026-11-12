@@ -15,6 +15,9 @@
  *   MB_MAX_ROOMS    rooms with somebody in them that the server will run at once (default 50)
  *   MB_NO_LIMITS=1  switches off the per-visitor limits on creating rooms, joining and wrong
  *                   room codes (http/guard.ts); the size and sanity checks stay on
+ *   MB_ANY_BUILD=1  lets in pages from any build of the game (shared/src/net/build.ts). A way
+ *                   out for an evening when a browser is wrongly refused; expect a stale page
+ *                   to misbehave
  *   MB_CLIENT_DIR   folder with the built client (default: client/dist next to the server)
  *   MB_QUIET=1      no log lines for room events; failures are always printed
  */
@@ -53,6 +56,8 @@ export interface ServerConfig {
    * in `clientDir`). Tests set it to play a server that was rebuilt.
    */
   build: string | null;
+  /** False lets in pages from any build (MB_ANY_BUILD=1). */
+  checkBuild: boolean;
   /** Folder with the built client, or null to serve no page. */
   clientDir: string | null;
   /** Install SIGINT / SIGTERM handlers that shut the server down cleanly and exit. */
@@ -85,6 +90,7 @@ export function defaultConfig(overrides: Partial<ServerConfig> = {}): ServerConf
     reservationSeconds: DEFAULT_RESERVATION_SECONDS,
     limits: { ...DEFAULT_RATE_LIMITS },
     build: null,
+    checkBuild: true,
     clientDir: null,
     handleSignals: false,
     log: undefined,
@@ -129,6 +135,7 @@ export function configFromEnv(env: Record<string, string | undefined>, overrides
   const maxRooms = numberFrom(env, 'MB_MAX_ROOMS');
   if (maxRooms !== undefined) fromEnv.maxRooms = Math.max(1, Math.floor(maxRooms));
   if (flag(env.MB_NO_LIMITS)) fromEnv.limits = { createsPerMinute: 0, joinsPerMinute: 0, missesPerMinute: 0 };
+  if (flag(env.MB_ANY_BUILD)) fromEnv.checkBuild = false;
   if (env.MB_CLIENT_DIR) fromEnv.clientDir = env.MB_CLIENT_DIR;
   return defaultConfig({ ...overrides, ...fromEnv });
 }

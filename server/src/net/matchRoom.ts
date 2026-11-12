@@ -57,8 +57,8 @@ export interface RoomRuntime {
    * default of 15 s only kept dead requests around.
    */
   reservationSeconds: number;
-  /** The build stamp a joining page must carry, asked at every join. */
-  build: () => string;
+  /** The build stamp a joining page must carry, asked at every join; null lets any page in. */
+  build: (() => string) | null;
   log: ((line: string) => void) | undefined;
   logError: (line: string) => void;
 }
@@ -204,7 +204,7 @@ export class MatchRoom extends Room {
       startWaitSeconds: rt.startWaitSeconds,
       speed: rt.speed,
       seed: randomInt(0x100000000),
-      build: rt.build,
+      build: rt.build ?? undefined,
       now: () => performance.now(),
       log: rt.log,
       logError: rt.logError,
