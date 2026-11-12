@@ -17,7 +17,8 @@ import {
   TICK_RATE,
 } from '@mb/shared';
 import { describe, expect, it } from 'vitest';
-import { MAX_CATCH_UP_STEPS, STARVED_TICKS } from '../src/room/match';
+import { MAX_CATCH_UP_STEPS, STARVED_BUTTON_TICKS, STARVED_TICKS } from '../src/room/match';
+import { INPUT_QUEUE_MAX } from '../src/room/inputQueue';
 import { JoinRefused } from '../src/room/peer';
 import { FakePeer, input, makeRoom, seatPlayers, startMatch, TICK_MS, tokenOf } from './helpers';
 
@@ -443,6 +444,10 @@ describe('match loop', () => {
     expect(state.moveZ).toBe(1);
     run((STARVED_TICKS + 1) * (TICK_MS / 1000));
     expect(state.moveZ).toBe(0);
+    // A held button is kept a little longer (a hiccup must not cut a hold), then let go too.
+    expect(state.buttons).toBe(Btn.fire);
+    run((STARVED_BUTTON_TICKS - STARVED_TICKS) * (TICK_MS / 1000));
+    expect(state.moveZ).toBe(0);
     expect(state.buttons).toBe(0);
     expect(state.aimYaw).toBeCloseTo(0.7);
     expect(peers[0].lastSnapshot.ackSeq).toBe(1);
@@ -506,6 +511,40 @@ describe('match loop', () => {
       expect(actions()).toEqual(['swipe/windup', 'stomp/windup', 'stomp/active']);
       // The guessed ticks were paid back: the player is not left a third of a second behind.
       expect(room.match!.queues[0].items.length).toBeLessThanOrEqual(2);
+    });
+
+    it('keeps a brace a brace through a stall longer than half a second', () => {
+      const { tick, actions, world, room } = kaijuRoom();
+      tick(Btn.block);
+      tick(Btn.block);
+      // 0.8 s with nothing arriving (more than the half second after which the kaiju stops
+      // walking), then the late inputs: the player held Space all along.
+      for (let i = 0; i < 24; i++) tick();
+      expect(world.kaijus[0].phase).toBe('brace');
+      tick(...new Array<number>(25).fill(Btn.block));
+      for (let i = 0; i < 5; i++) tick(Btn.block);
+      expect(world.kaijus[0].phase).toBe('brace');
+      for (let i = 0; i < 10; i++) tick(0);
+      // One brace, not one cut short by the stall and a second one started by the late inputs.
+      expect(actions()).toEqual(['brace/brace']);
+      // The guessed ticks were paid back: what is left is the queue's usual few inputs of slack
+      // (it only skips once it holds more than INPUT_QUEUE_MAX), not 0.8 s of delay.
+      expect(room.match!.queues[0].items.length).toBeLessThan(INPUT_QUEUE_MAX);
+    });
+
+    it('keeps a hold to eat whole through a stall in the middle of it', () => {
+      const { tick, actions, world } = kaijuRoom();
+      const k = world.kaijus[0];
+      // Something to eat in the hand, so the hold has something to eat.
+      k.held = { kind: 'wreck', wreck: 'car' };
+      tick(Btn.grab);
+      // The line stalls for 0.7 s right after the press; the player keeps holding.
+      for (let i = 0; i < 21; i++) tick();
+      tick(...new Array<number>(22).fill(Btn.grab));
+      for (let i = 0; i < 3; i++) tick(0);
+      for (let i = 0; i < 80; i++) tick(0);
+      expect(actions()).toContain('eat/eat');
+      expect(actions().filter((a) => a.startsWith('throw'))).toEqual([]);
     });
 
     it('lets go of a held button as soon as the late inputs show it was released', () => {

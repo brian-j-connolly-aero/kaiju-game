@@ -170,8 +170,8 @@ marks). No text inside icons. No third-party icon sets.
   `ui_outdated` (this page is from an older build than the server: reload it).
 - Settings and the drone: `ui_settings` (the settings panel: a cog), `ui_invert` (turn the
   up-down look around), `ui_fullscreen`, `ui_lowres` (lower resolution for slow computers),
-  `ui_rise` and `ui_sink` (the news drone up and down). `ui_controls` (the controls card) is
-  still drawn in code (`client/src/ui/iconArt.ts`).
+  `ui_rise` and `ui_sink` (the news drone up and down), `ui_controls` (open the controls card:
+  a card with a key and a directional cross).
 - `skyline.svg`: the destruction-bar skyline with three taller towers at 21%, 57% and 100%.
   viewBox 400 × 64, drawn to be stretched into the bar (560 × 46 px; the root carries
   `preserveAspectRatio="none"`). Two paths: `sky-city` (clip it from the left as the bar fills)

@@ -29,7 +29,10 @@
  *
  * Only `pass` means the action works. The run exits 0 only when nothing failed AND nothing
  * was left unattempted; otherwise it exits 1 and says which. It never retries a failed check
- * until it turns green.
+ * until it turns green. The one exception is not a retry of a failure: the bot squads fight on
+ * throughout, and when their volleys stagger the kaiju (five seconds in which it cannot act) in
+ * the middle of a hold, the server's kaijuStagger event shows the attempt never tested the
+ * button, and the hold is given once more.
  *
  * Options
  *   --only kaiju|human   play one session
@@ -184,11 +187,24 @@ async function startMatch(page, driver, report, { kaiju, practice, guest }) {
     return false;
   }
   // Everything below needs a click in the open view to reach the canvas, not the HUD overlay.
-  const hit = await page.evaluate(({ x, y }) => {
-    const at = document.elementFromPoint(x, y);
-    return at ? `${at.tagName.toLowerCase()}${at.id ? `#${at.id}` : ''}` : 'nothing';
-  }, { x: driver.width / 2, y: driver.height / 2 });
-  if (hit === 'canvas#view') report.pass('the view takes the mouse', 'the element under the middle of the screen is the game canvas');
+  // Asked again for up to two seconds: what matters is that the match view takes the clicks,
+  // and the answer says what was in the way and for how long if it was not there at once.
+  const hitAt = () =>
+    page.evaluate(({ x, y }) => {
+      const at = document.elementFromPoint(x, y);
+      if (!at) return 'nothing';
+      const path = [];
+      for (let n = at; n && n !== document.body && path.length < 4; n = n.parentElement) path.push(`${n.tagName.toLowerCase()}${n.id ? `#${n.id}` : ''}${n.className && typeof n.className === 'string' ? `.${n.className.trim().split(/\s+/).join('.')}` : ''}`);
+      return path.join(' in ');
+    }, { x: driver.width / 2, y: driver.height / 2 });
+  const first = await hitAt();
+  let hit = first;
+  const askedAt = Date.now();
+  while (hit !== 'canvas#view' && Date.now() - askedAt < 2000) {
+    await sleep(100);
+    hit = await hitAt();
+  }
+  if (hit === 'canvas#view') report.pass('the view takes the mouse', `the element under the middle of the screen is the game canvas${first !== hit ? ` (after ${Date.now() - askedAt} ms; at first it was ${first})` : ''}`);
   else report.fail('the view takes the mouse', `the element under the middle of the screen is ${hit}, not the canvas: clicks would not reach the game`);
   return true;
 }
@@ -206,6 +222,35 @@ async function playKaiju(origin, opts, errors) {
     await shot('00-start');
     let p = await driver.probe();
     const start = { x: p.kaiju.x, z: p.kaiju.z, yaw: p.kaiju.yaw };
+    // The bot squads keep fighting the whole time. When two of their volleys land together the
+    // server staggers the kaiju for five seconds, and a staggered kaiju cannot act: a hold given
+    // then proves nothing either way. So a hold is only given to a kaiju the server shows free
+    // (idle, not staggered), and an attempt the server interrupted with a stagger (the
+    // kaijuStagger event says so) is given once more. It is never repeated for any other reason.
+    const free = () => driver.until((q) => (q.kaiju && q.kaiju.phase === 'idle' ? q : null), 12000);
+    const staggeredSince = (from) => driver.eventsSince(from, 'kaijuStagger', (e) => e.on).length > 0;
+    // Before reaching for something: the server's kaiju has stopped and faces it. walkTo stops
+    // on the PREDICTED position while the body is still moving, so the kaiju often ends up a
+    // couple of meters further on, beside or past the thing; the head can lead the body by only
+    // 50 degrees, and the grab arc is 100 degrees wide around the head. A reach given before the
+    // body has turned back finds nothing, and that says nothing about the button.
+    const faceOnServer = async (x, z) => {
+      for (let i = 0; i < 4; i++) {
+        await driver.lookAt(x, z);
+        let last = null;
+        const q = await driver.until((s) => {
+          if (!s.kaiju) return null;
+          const still = last !== null && Math.hypot(s.kaiju.x - last.x, s.kaiju.z - last.z) < 0.05;
+          last = { x: s.kaiju.x, z: s.kaiju.z };
+          const toward = Math.atan2(x - s.kaiju.x, z - s.kaiju.z);
+          const close = Math.hypot(x - s.kaiju.x, z - s.kaiju.z) < 1.5;
+          const facing = close || (Math.abs(wrapAngle(s.kaiju.yaw - toward)) < 0.4 && Math.abs(wrapAngle(s.kaiju.aimYaw - toward)) < 0.4);
+          return still && facing ? s : null;
+        }, 3000);
+        if (q) return q;
+      }
+      return null;
+    };
 
     // --- look ----------------------------------------------------------------------------------
     {
@@ -264,19 +309,25 @@ async function playKaiju(origin, opts, errors) {
     }
 
     // --- brace ---------------------------------------------------------------------------------
-    {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      await free();
+      const from = driver.events.length;
       await driver.keyDown('Space');
       const braced = await driver.until((q) => (q.kaiju && q.kaiju.phase === 'brace' ? q : null), 3000);
       await shot('04-brace');
       await driver.keyUp('Space');
       const released = await driver.until((q) => (q.kaiju && q.kaiju.phase !== 'brace' ? q : null), 3000);
-      if (braced && released) report.pass('brace (hold Space)', 'held Space: the snapshots show phase brace; released: the snapshots show it ended');
-      else report.fail('brace (hold Space)', `snapshot showed brace while held: ${!!braced}; ended after release: ${!!released}`);
+      const again = attempt === 1 && staggeredSince(from);
+      if (braced && released) report.pass('brace (hold Space)', `held Space: the snapshots show phase brace; released: the snapshots show it ended${attempt > 1 ? ' (second attempt: the army staggered the kaiju during the first)' : ''}`);
+      else if (again) continue;
+      else report.fail('brace (hold Space)', `snapshot showed brace while held: ${!!braced}; ended after release: ${!!released}${staggeredSince(from) ? ' (the army staggered the kaiju during this attempt too)' : ''}`);
+      break;
     }
 
     // --- grab and throw ------------------------------------------------------------------------
     let grabbed = false;
     {
+      await free();
       p = await driver.probe();
       const around = await driver.surroundings(p.kaiju.x, p.kaiju.z, 70, 40);
       // What a hatchling's hand can take: a car (the grab picks the nearest loose object in its arc).
@@ -289,7 +340,7 @@ async function playKaiju(origin, opts, errors) {
         // Stop short of it: a hatchling crushes a car it walks onto, and would then pick up the
         // wreck instead. The grab reaches 2.5 body radii (6 m at stage 1).
         await driver.walkTo(car.x, car.z, 5, { timeoutMs: 15000 });
-        await driver.lookAt(car.x, car.z);
+        await faceOnServer(car.x, car.z);
         const from = driver.events.length;
         await driver.click('right', 110);
         const held = await driver.until((q) => (q.kaiju && q.kaiju.held ? q : null), 4000);
@@ -323,8 +374,8 @@ async function playKaiju(origin, opts, errors) {
     }
 
     // --- eat -----------------------------------------------------------------------------------
-    {
-      await driver.until((q) => (q.kaiju && q.kaiju.phase === 'idle' ? q : null), 4000);
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      await free();
       p = await driver.probe();
       const around = await driver.surroundings(p.kaiju.x, p.kaiju.z, 90, 40);
       const meals = around.props.filter((c) => /car|van|taxi|bus|truck|kiosk/.test(String(c.kind)));
@@ -333,16 +384,18 @@ async function playKaiju(origin, opts, errors) {
       else {
         const meal = meals[0];
         await driver.walkTo(meal.x, meal.z, 5, { timeoutMs: 15000 });
-        await driver.lookAt(meal.x, meal.z);
+        await faceOnServer(meal.x, meal.z);
         const from = driver.events.length;
         await driver.click('right', 950);
         const eating = await driver.until(() => driver.eventsSince(from, 'kaijuAction', (e) => e.action === 'eat')[0], 5000);
         p = await driver.probe();
-        if (eating && p.kaiju.cooldowns.eat > 0) report.pass('eat (hold right button)', `held the right button 0.95 s next to a ${meal.kind}; the server sent kaijuAction eat and the snapshot shows the eat cooldown at ${fmt(p.kaiju.cooldowns.eat)} s`);
-        else report.fail('eat (hold right button)', `kaijuAction eat ${eating ? 'seen' : 'NOT seen'}; snapshot eat cooldown ${fmt(p.kaiju.cooldowns.eat)}; actions: ${driver.eventsSince(from, 'kaijuAction').map((e) => `${e.action}/${e.phase}`).join(', ') || 'none'}`);
+        if (eating && p.kaiju.cooldowns.eat > 0) report.pass('eat (hold right button)', `held the right button 0.95 s next to a ${meal.kind}; the server sent kaijuAction eat and the snapshot shows the eat cooldown at ${fmt(p.kaiju.cooldowns.eat)} s${attempt > 1 ? ' (second attempt: the army staggered the kaiju during the first)' : ''}`);
+        else if (!eating && attempt === 1 && staggeredSince(from)) continue;
+        else report.fail('eat (hold right button)', `kaijuAction eat ${eating ? 'seen' : 'NOT seen'}; snapshot eat cooldown ${fmt(p.kaiju.cooldowns.eat)}; actions: ${driver.eventsSince(from, 'kaijuAction').map((e) => `${e.action}/${e.phase}`).join(', ') || 'none'}${staggeredSince(from) ? ' (the army staggered the kaiju during this attempt)' : ''}`);
         await shot('07-eat');
         await driver.until((q) => (q.kaiju && q.kaiju.phase === 'idle' ? q : null), 5000);
       }
+      break;
     }
 
     // --- wreck until the bar offers the molt, then molt -----------------------------------------
@@ -371,15 +424,20 @@ async function playKaiju(origin, opts, errors) {
       } else {
         report.pass('wreck the city to the first mark', `swipes and trampling by real input took the server's bar to ${fmt(p.match.barPoints, 0)} (mark ${fmt(p.match.marks[0], 0)}); the server offers the molt`);
         await shot('08-molt-offered');
-        const from = driver.events.length;
-        await driver.keyDown('KeyF');
-        const cocoon = await driver.until(() => driver.eventsSince(from, 'cocoon')[0], 5000);
-        await driver.keyUp('KeyF');
-        await shot('09-cocoon');
-        const blast = cocoon ? await driver.until(() => driver.eventsSince(from, 'moltBlast')[0], 15000) : null;
-        const grown = blast ? await driver.until((q) => (q.match.stage === 2 && q.match.phase === 'playing' && q.kaiju.stage === 2 ? q : null), 15000) : null;
-        if (cocoon && blast && grown) report.pass('molt (hold F)', 'held F: the server sent cocoon, then moltBlast, then stage 2 with the kaiju at its new size');
-        else report.fail('molt (hold F)', `cocoon ${cocoon ? 'seen' : 'NOT seen'}, moltBlast ${blast ? 'seen' : 'NOT seen'}, stage 2 playing ${grown ? 'reached' : 'NOT reached'}`);
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          await free();
+          const from = driver.events.length;
+          await driver.keyDown('KeyF');
+          const cocoon = await driver.until(() => driver.eventsSince(from, 'cocoon')[0], 5000);
+          await driver.keyUp('KeyF');
+          await shot('09-cocoon');
+          const blast = cocoon ? await driver.until(() => driver.eventsSince(from, 'moltBlast')[0], 15000) : null;
+          const grown = blast ? await driver.until((q) => (q.match.stage === 2 && q.match.phase === 'playing' && q.kaiju.stage === 2 ? q : null), 15000) : null;
+          if (cocoon && blast && grown) report.pass('molt (hold F)', `held F: the server sent cocoon, then moltBlast, then stage 2 with the kaiju at its new size${attempt > 1 ? ' (second attempt: the army staggered the kaiju during the first)' : ''}`);
+          else if (!cocoon && attempt === 1 && staggeredSince(from)) continue;
+          else report.fail('molt (hold F)', `cocoon ${cocoon ? 'seen' : 'NOT seen'}, moltBlast ${blast ? 'seen' : 'NOT seen'}, stage 2 playing ${grown ? 'reached' : 'NOT reached'}${staggeredSince(from) ? ' (the army staggered the kaiju during this attempt)' : ''}`);
+          break;
+        }
         await sleep(600);
         await shot('10-stage2');
       }

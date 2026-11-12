@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { invitePrompt } from '../src/app/screens/home';
 import { inviteLink } from '../src/app/screens/lobby';
 
 // Addresses are test data, never loaded. They are put together from the scheme so that the
@@ -24,5 +25,18 @@ describe('inviteLink (the lobby link button)', () => {
     expect(inviteLink('BCDF', 'javascript:alert(1)', localPage)).toBe('http://localhost:2567/#BCDF');
     expect(inviteLink('BCDF', `${ownDomain}/path`, localPage)).toBe('http://localhost:2567/#BCDF');
     expect(inviteLink('BCDF', 'kaiju.example.com', localPage)).toBe('http://localhost:2567/#BCDF');
+  });
+});
+
+describe('invitePrompt (a friend arriving by the invite link)', () => {
+  it('asks a first-time visitor for a callsign before joining the room in the address', () => {
+    expect(invitePrompt('BCDF', '', false)).toBe(true);
+    expect(invitePrompt('BCDF', '   ', false)).toBe(true);
+  });
+
+  it('joins at once for someone with a callsign, the autopilot, or no room in the address', () => {
+    expect(invitePrompt('BCDF', 'Rook', false)).toBe(false);
+    expect(invitePrompt('BCDF', '', true)).toBe(false);
+    expect(invitePrompt('', '', false)).toBe(false);
   });
 });

@@ -17,11 +17,12 @@ chatter tells you what is going on. A voice chat beside the game helps a lot.
 
 ## Joining
 
-1. Open the invite link the host sent you. The game loads (a few seconds) and puts you straight
-   into the host's room.
-2. You appear as "Player 2" (or 3, 4, 5). For your own name: press the curved back arrow, type your
-   name in the top box, type the room's four-letter code in the lower box and press the arrow
-   button beside it. The game remembers your name next time.
+1. Open the invite link the host sent you. The game loads (a few seconds).
+2. The first time, the game shows one box for your name: type it and press Enter (or the arrow
+   button beside the box). You are then in the host's room. If you leave the box empty you
+   join as "Player 2" (or 3, 4, 5). The game remembers your name, so next time the link takes
+   you straight in. To change your name later, click it in the room (it has a frame around it),
+   type the new one and press Enter.
 3. In the room, the button with the monster or the soldier picks the side you would like.
    Only one person can be the monster; if nobody asks, it takes turns.
 4. Press the tick to say you are ready. The host starts the match.

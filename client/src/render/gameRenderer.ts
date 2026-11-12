@@ -132,6 +132,11 @@ export class GameRenderer {
   private lastView: RenderView | null = null;
   private time = 0;
   private shownStage: StageId | 0 = 0;
+  /**
+   * False from `beginMatch` until the first frame of the match: that frame's stage is shown at
+   * once, so joining (or a sandbox starting) at stage 3 never opens on a fading afternoon sky.
+   */
+  private stageSeen = false;
   private readonly marks: GroundMark[] = [];
   private readonly ringUv = [0, 0, 0, 0];
   private readonly triangleUv = [0, 0, 0, 0];
@@ -214,6 +219,7 @@ export class GameRenderer {
     this.city?.syncFrom(mirror);
     this.clearTransient();
     this.applyStage(stage, true);
+    this.stageSeen = false;
     this.boundary.set(bounds, CURTAIN[stage], true);
   }
 
@@ -604,7 +610,8 @@ export class GameRenderer {
       }
 
       this.projectiles.update(frame.tick, dt, this.effects, this.camera);
-      this.applyStage(frame.match.stage, false);
+      this.applyStage(frame.match.stage, !this.stageSeen);
+      this.stageSeen = true;
     }
 
     this.stats.chunks = this.city ? this.city.update(dt) : 0;

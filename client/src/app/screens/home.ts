@@ -111,7 +111,7 @@ export class HomeScreen implements Screen {
     });
     name.addEventListener('change', commitName);
     // The invite's join button, beside the callsign: only shown while asking for a callsign.
-    const go = el('button', 'btn btn-big invite-join hidden', [icon('lb_join')]);
+    const go = el('button', 'btn invite-join hidden', [icon('lb_join')]);
     go.addEventListener('click', tryJoin);
     name.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !go.classList.contains('hidden')) tryJoin();

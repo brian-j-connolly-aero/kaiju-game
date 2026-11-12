@@ -491,7 +491,8 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
 - Each tick takes **one input per connected player** from that player's short queue and echoes
   its `seq` as the snapshot acknowledgement. An empty queue means the tick is played on a
   guess, the previous input again with held buttons still held; after 15 such ticks (0.5 s) a
-  connected but silent player is brought to a stop. The acknowledgement starts again from 0
+  connected but silent player is brought to a stop, and after 30 (1 s) their held buttons are
+  let go too (so a hiccup in the middle of a brace, an eat or the molt does not cut it short). The acknowledgement starts again from 0
   for a new page (token rejoin) and carries on for an automatic reconnection.
 - **After a stall** the late inputs arrive all at once. When the queue then holds more than 5,
   it skips inputs back down to 2 to return the player to real time, but only inputs that carry
@@ -500,7 +501,7 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
   input in which a button goes down or comes up, and every input of a hold in progress, is
   kept and played in order, so a tap inside the stall still happens and a hold is as long as
   the player made it. A command wheel pick in a skipped input is carried over. Only a queue of
-  more than 20 is cut back regardless (a press is still carried over). What this cannot mend:
+  more than 32 is cut back regardless (a press is still carried over). What this cannot mend:
   a tap whose release is itself stuck behind a stall of about 0.4 s or more has by then been
   guessed into a hold (`docs/STATUS.md`, known risks).
 - If the simulation throws, the match is abandoned and the room returns to the lobby; the

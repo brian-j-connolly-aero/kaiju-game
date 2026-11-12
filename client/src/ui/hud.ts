@@ -252,6 +252,11 @@ export class Hud {
       this.status,
       this.capture,
     );
+    // Nothing is shown until the first `update` has said what this player is and has: before
+    // that every group (the kaiju's, the squad's and the drone's actions) would be on screen at
+    // once, which a slow first frame of a match let people see.
+    this.root.classList.add('hidden');
+    for (const group of [this.hintsKaiju, this.hintsHuman, this.hintsDrone]) group.classList.add('hidden');
   }
 
   /** Lights a status picture for a moment (crossfire, a nerve break, a volley). */
@@ -312,6 +317,7 @@ export class Hud {
 
   update(frame: FrameState, session: MatchSession, view: HudView, now: number): void {
     const match = frame.match;
+    setClass(this.root, 'hidden', false);
 
     // Destruction bar: the city left of the fill line lies in ruins.
     const f = Math.round(barDisplayFraction(match.barPoints, match.marks) * 1000) / 1000;

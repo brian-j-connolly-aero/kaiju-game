@@ -83,7 +83,8 @@ the internet (to download the building blocks). Every later start takes seconds.
 7. In the game, enter your name and **create a room**. The room has a **four-letter code**.
    - The **link button** next to the code copies an invite link that opens your room directly.
      It works for your friends, even though you are playing on `localhost`. Paste it into your
-     group chat.
+     group chat. A friend who has never played is first asked for a name (one box; Enter joins),
+     and anyone can change their name in the room by clicking it.
    - The **code** works too: friends open the link from step 4, enter their name, choose
      **join** and type the code.
 8. Five players in total: one plays the monster, four play the army squads. Empty seats are

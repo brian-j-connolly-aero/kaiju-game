@@ -5693,6 +5693,9 @@
     "ui_clock": {
       "file": "ui/ui_clock.svg"
     },
+    "ui_controls": {
+      "file": "ui/ui_controls.svg"
+    },
     "ui_copy": {
       "file": "ui/ui_copy.svg"
     },

@@ -7,7 +7,7 @@
  *     with nothing queued is played on a guess (the previous input again, held buttons
  *     included), and the queue is told, so that it can skip the late inputs the guess already
  *     stood in for (inputQueue.ts). A player who stays silent is brought to a stop rather than
- *     left walking;
+ *     left walking (after 0.5 s), and lets go of held buttons after 1 s;
  *   - the sequence number of the last input applied per slot (the snapshot acknowledgement);
  *   - the events since the last flush, sent together with each snapshot;
  *   - a snapshot every second tick at normal speed, and never more than one per update, so a
@@ -45,6 +45,13 @@ export const MAX_FRAME_MS = 250;
 export const STEP_SLOP_MS = 2;
 /** Ticks without a fresh input after which a connected player's unit stops moving (0.5 s). */
 export const STARVED_TICKS = 15;
+/**
+ * Ticks without a fresh input after which a connected player's held buttons are let go too
+ * (1 s, as long as the queue remembers guessed ticks: INPUT_OWED_MAX). Buttons are kept longer
+ * than movement so that a hiccup on the line in the middle of a hold (a brace, an eat, a stomp,
+ * the molt) does not cut the hold short and then start it again when the late inputs arrive.
+ */
+export const STARVED_BUTTON_TICKS = 30;
 
 export interface MatchSession {
   world: World;
@@ -154,13 +161,16 @@ export function stepMatch(m: MatchSession): void {
     // Nothing arrived for this tick: it is played on a guess, the last input again.
     const last = world.players[slot].input;
     let buttons = last.buttons;
-    if (++m.starved[slot] === STARVED_TICKS) {
-      // Still connected but silent: let go of the controls, keep looking the same way.
+    const starved = ++m.starved[slot];
+    if (starved === STARVED_TICKS || starved === STARVED_BUTTON_TICKS) {
+      // Still connected but silent: stop walking, keep looking the same way; a little later let
+      // go of the buttons as well.
       const stop = neutralInput(last.seq);
       stop.aimYaw = last.aimYaw;
       stop.aimPitch = last.aimPitch;
+      if (starved < STARVED_BUTTON_TICKS) stop.buttons = last.buttons;
       inputs[slot] = stop;
-      buttons = 0;
+      buttons = stop.buttons;
     }
     noteGuessedTick(m.queues[slot], buttons);
   }

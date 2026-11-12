@@ -4,7 +4,7 @@ Monster Battle 9001 has a no-reading rule: apart from names and subtitles, nothi
 text. These user interface (UI) pictograms are therefore the game's whole language. Each one has
 to be understood in under a second by someone who has never played.
 
-- **Files:** `client/public/assets/ui/<name>.svg`, 89 icons and `skyline.svg`. The names are the
+- **Files:** `client/public/assets/ui/<name>.svg`, 90 icons and `skyline.svg`. The names are the
   contract in `docs/ASSETS.md` section 5.
 - **Format:** hand-written SVG (Scalable Vector Graphics, a drawing written as text). No drawing
   program is involved: to change an icon, edit its file.
@@ -234,6 +234,7 @@ Notes for whoever wires the glyphs:
 | File | Meaning | What is drawn |
 | --- | --- | --- |
 | `ui_settings` | Open the settings panel | A cog wheel |
+| `ui_controls` | Open the controls card (every button of your side) | A card with a solid key on the left and a directional cross on the right |
 | `ui_invert` | Turn the up-down look around | An arrow up and an arrow down, side by side |
 | `ui_fullscreen` | Full screen | Four corners pushed out to the edges around a solid screen |
 | `ui_lowres` | Lower resolution, for slow computers | A ball drawn with big, blocky pixels |

@@ -193,6 +193,12 @@ body {
   padding: 10px 26px;
 }
 
+/* The join button beside the callsign when a friend arrives by invite (home screen). */
+.invite-join {
+  font-size: 36px;
+  padding: 6px 20px;
+}
+
 .btn.on,
 .btn.done {
   border-color: var(--human);

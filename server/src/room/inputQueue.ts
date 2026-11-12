@@ -28,11 +28,12 @@ export const INPUT_QUEUE_MAX = 5;
 /** Inputs the queue is brought back to when it skips. */
 export const INPUT_QUEUE_KEEP = 2;
 /**
- * Inputs a queue may hold at all: over this the oldest are discarded outright. Two thirds of a
- * second of play: more than the longest stall the match loop sits through before it stops a
- * silent player, so a hold that arrives after such a stall still fits in whole.
+ * Inputs a queue may hold at all: over this the oldest are discarded outright. A little over a
+ * second of play: more than the longest stall during which the match loop keeps a silent
+ * player's buttons held (STARVED_BUTTON_TICKS in match.ts), so a hold that arrives after such a
+ * stall still fits in whole.
  */
-export const INPUT_QUEUE_HARD_MAX = 20;
+export const INPUT_QUEUE_HARD_MAX = 32;
 /** The most guessed ticks that are remembered as owed. */
 export const INPUT_OWED_MAX = 30;
 /**

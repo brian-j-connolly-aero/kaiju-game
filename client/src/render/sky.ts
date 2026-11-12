@@ -86,6 +86,48 @@ const PRESETS: Record<TimeOfDay, Preset> = {
   },
 };
 
+/**
+ * The middle of the sunset-to-night change. Blending the warm sunset straight into the blue
+ * night mixes orange light with blue light, and on the way the whole view went pink-magenta
+ * (the sun's light passed through #d5aec4, the horizon and fog through mauve). The change goes
+ * through this dusk instead: a deep blue-violet sky over a slate horizon, a pale low sun. Orange
+ * fades toward slate (never pink: slate has more green than red), then slate deepens into the
+ * night blue (never pink: red stays the weakest). client/test/sky.test.ts holds it to that.
+ */
+const DUSK: Preset = {
+  top: 0x1c1f5a,
+  horizon: 0x566a74,
+  ground: 0x384650,
+  fog: 0x485864,
+  sun: 0xb4b8b8,
+  sunIntensity: 1.3,
+  sunDir: [-0.56, 0.46, 0.03],
+  hemiSky: 0x7078b0,
+  hemiGround: 0x34383c,
+  hemiIntensity: 1.1,
+  cloud: 0x8a9098,
+  night: 0.7,
+  sunset: 0.35,
+  disc: 0xf2e6d0,
+  discSize: 300,
+};
+
+/** The preset a change of time passes through halfway, if it has one (sunset and night, either way). */
+export function middlePreset(from: Preset, to: Preset): Preset | null {
+  const pair = (a: Preset, b: Preset): boolean => (from === a && to === b) || (from === b && to === a);
+  return pair(PRESETS.sunset, PRESETS.night) ? DUSK : null;
+}
+
+/** Where a blend `t` of 0..1 stands: the two presets to mix and how far between them. */
+export function blendLeg(from: Preset, to: Preset, middle: Preset | null, t: number): [Preset, Preset, number] {
+  if (!middle) return [from, to, t];
+  return t < 0.5 ? [from, middle, t * 2] : [middle, to, t * 2 - 1];
+}
+
+/** The time-of-day presets (exported for tests). */
+export const SKY_PRESETS: Readonly<Record<TimeOfDay, Preset>> = PRESETS;
+export type { Preset as SkyPreset };
+
 /** Radius of the cloud rings: the taller ring's far corner stays inside the 9000 m far plane. */
 const RING_RADIUS = 6000;
 interface CloudRing {
@@ -155,6 +197,8 @@ export class Sky {
   private readonly clouds: THREE.Mesh[] = [];
   private from: Preset;
   private to: Preset;
+  /** What the current change passes through halfway (`middlePreset`), or null. */
+  private middle: Preset | null = null;
   private blend = 1;
   private fogFrom: FogRange = { near: 200, far: 1600 };
   private fogTo: FogRange = { near: 200, far: 1600 };
@@ -226,6 +270,7 @@ export class Sky {
     this.from = this.blend >= 1 ? this.to : this.snapshotPreset();
     this.fogFrom = { near: this.fog.near, far: this.fog.far };
     this.to = target;
+    this.middle = middlePreset(this.from, target);
     this.fogTo = fog;
     this.blend = seconds <= 0 ? 1 : 0;
     this.speed = seconds <= 0 ? 0 : 1 / seconds;
@@ -236,11 +281,9 @@ export class Sky {
 
   /** The current mix frozen as a preset, so a change that interrupts another starts from what is on screen. */
   private snapshotPreset(): Preset {
-    const t = this.blend;
+    const [f, g, t] = blendLeg(this.from, this.to, this.middle, this.blend);
     const mixColor = (a: number, b: number): number => this.colorA.set(a).lerp(this.colorB.set(b), t).getHex();
     const mix = (a: number, b: number): number => a + (b - a) * t;
-    const f = this.from;
-    const g = this.to;
     return {
       top: mixColor(f.top, g.top),
       horizon: mixColor(f.horizon, g.horizon),
@@ -260,9 +303,8 @@ export class Sky {
     };
   }
 
-  private apply(t: number): void {
-    const f = this.from;
-    const g = this.to;
+  private apply(blend: number): void {
+    const [f, g, t] = blendLeg(this.from, this.to, this.middle, blend);
     const u = this.domeMaterial.uniforms;
     const mixInto = (target: THREE.Color, a: number, b: number): void => {
       target.set(a).lerp(this.colorB.set(b), t);
@@ -283,8 +325,8 @@ export class Sky {
     const size = f.discSize + (g.discSize - f.discSize) * t;
     // The disc's angular radius, from a nominal size at the dome's nominal 6000 m distance.
     u.discCos.value = Math.cos(Math.atan2(size, 6000));
-    this.fog.near = this.fogFrom.near + (this.fogTo.near - this.fogFrom.near) * t;
-    this.fog.far = this.fogFrom.far + (this.fogTo.far - this.fogFrom.far) * t;
+    this.fog.near = this.fogFrom.near + (this.fogTo.near - this.fogFrom.near) * blend;
+    this.fog.far = this.fogFrom.far + (this.fogTo.far - this.fogFrom.far) * blend;
     this.night = f.night + (g.night - f.night) * t;
     this.sunset = f.sunset + (g.sunset - f.sunset) * t;
     for (const plane of this.clouds) {

@@ -109,7 +109,7 @@ const GROUPS = [
     id: 'settings',
     title: 'Settings and the drone',
     tint: 'plain',
-    icons: ['ui_settings', 'ui_invert', 'ui_fullscreen', 'ui_lowres', 'ui_rise', 'ui_sink'],
+    icons: ['ui_settings', 'ui_controls', 'ui_invert', 'ui_fullscreen', 'ui_lowres', 'ui_rise', 'ui_sink'],
   },
 ];
 

@@ -1379,3 +1379,92 @@ game` exactly as the scripts do (no tunnel), and a second one with `MB_FAST=1` f
   computer it should be a single frame. Not chased.
 - From earlier rounds and unchanged: the halfway sunset-to-night magenta moment, the flaky
   kaiju holds in `scripted.mjs`, and no district roof colors.
+
+
+## 14. Last fixes before the first playtest (12 November, the last-fixes task)
+
+Scratch log, scripts and every picture named here: `/tmp/mb-scratch/last-fixes/` (`PROGRESS.md`).
+
+### 14.1 What changed
+
+- **Names.** A friend who opens the invite link for the first time (no name stored in that
+  browser) now sees only a name box and a join arrow; Enter joins, and an empty box joins as
+  "Player N" (`invitePrompt` in `client/src/app/screens/home.ts`). In the lobby your own name
+  is a box you can click and change; Enter or clicking away sends it (the server already had a
+  `setName` message that cleans names with `cleanPlayerName`, so no server change). The new
+  name is remembered for next time. `docs/PLAYING.md` (Joining, step 2) and `docs/HOSTING.md`
+  (step 7) describe it.
+- **The magenta moment.** The sky, fog and light colors were blended in a straight line from
+  the orange sunset to the blue night, and orange plus blue light makes pink: halfway, the
+  sunlight itself was #d5aec4. The change now passes through a dusk (`DUSK` in
+  `client/src/render/sky.ts`: a deep blue-violet sky over a slate horizon, a pale low sun).
+  `client/test/sky.test.ts` checks every blended color in both directions for pink.
+  Before and after, seven frames each: `docs/progress/sunset-to-night.png` (top row old,
+  bottom row new). The sunset's own pink glow around the sun still fades out over the first
+  third of the change; that is the sunset, not the blend.
+- **Afternoon sky after jumping to stage 3.** The renderer showed the first frame of a match
+  (a sandbox started at stage 2 or 3, or a player joining a match in progress) by fading from
+  the afternoon. That first stage is now shown at once (`stageSeen` in `gameRenderer.ts`).
+- **First-frame flash.** The heads-up display (HUD) was put on the page with all three sets of
+  action pictures (monster, squad, drone) visible and only sorted out on its first update; when
+  the match screen appeared before the first frame of the match, one frame showed them all.
+  It now starts hidden and shows itself on its first update (`client/src/ui/hud.ts`).
+- **Held buttons.** See 14.3. One real fix in the server: a connected player who goes silent
+  (a stalled connection) used to have their held buttons let go after 0.5 s, so a hiccup in the
+  middle of a brace, an eat or the molt cut it short and the late inputs then started it again.
+  Movement still stops after 0.5 s; held buttons are now kept for 1 s (`STARVED_BUTTON_TICKS`
+  in `server/src/room/match.ts`), and the input queue's hard limit went from 20 to 32 so that
+  such a hold still fits in whole. Two new tests in `server/test/gameRoom.test.ts` (a brace and
+  an eat through a 0.7 to 0.8 s stall) fail with the old rule and pass with the new.
+- **The controls card icon.** `client/public/assets/ui/ui_controls.svg`, hand-written in the
+  set's style (a card with a solid key and a directional cross), in the manifest, in the
+  preview tool's settings group and in `docs/art/UI_ICONS.md` and `docs/ASSETS.md`. The icon
+  sheets in `docs/art/previews/` were redrawn. The game uses the file (lobby, briefing, the HUD
+  hint, the card itself); the drawing in `iconArt.ts` stays as the fallback, like every other.
+
+### 14.2 Measured
+
+| What | Figure |
+| --- | --- |
+| `npm run check` | passed: 57 test files, 742 tests (6 new) |
+| Pink in the sunset-to-night blend (chroma of the most pink color, 0 to 255) | old: 51 (the sunlight), 37 (the horizon); new: at most 9 on any color |
+| Sandbox started at stage 3 | the night sky from the first frame photographed |
+| HUD on the page when the match screen appears | 0 of 17 action pictures visible; on the next frame the 8 that belong to the monster |
+| Names, three browsers against a real server | first visit by invite: asked, typed "Gertrude", Enter, the host's lobby shows Gertrude; renamed in the lobby to "Gerti the Bold": the host sees it, it is stored; emptied: "Player 2"; a third visitor who only pressed Enter: "Player 3"; no console errors |
+| `smoke.mjs`, five pages, `--idle-humans --expect-stage 3` | passed: stage 3, humans won on the clock, zero console errors and warnings on all pages; at most 132 draw calls and 456,672 triangles |
+| `shots.mjs` | passed: all three stages, both sides, zero console errors; 100 to 122 draw calls, 385,000 to 437,000 triangles |
+| `scripted.mjs` | both sessions twice (37 of 37 the second time; the first time the human page's "the view takes the mouse" check once found a div in the way, see 14.4), the kaiju side three times more: 16 of 16 twice, and with three extra processes eating the processor 15 of 15 (the beam not attempted: rage 66 of 100 at that point, as in earlier runs) |
+
+### 14.3 The flaky held buttons: what it was
+
+Measured with a copy of the script that logged every input message the page sent and every
+press and release, over eight kaiju runs with three extra busy processes on the four cores:
+
+- The page kept sending its 30 inputs a second through every hold (the longest gap during a
+  hold was 0.2 to 0.58 s), so in these runs neither the client's input queue nor its prediction
+  shortened a held button.
+- The brace failure from section 12 was the army: its screenshot shows the kaiju staggered (the
+  nerve bar at its limit, every action picture greyed out). A staggered kaiju cannot act for five
+  seconds; two of the molt failures here were the same (the news line "a glowing weak point").
+- The other failures (an eat, and once a grab) were the reach, not the button: the script stops
+  walking when the page's predicted position is within 5 m, but the server's body is still
+  moving and ends 1 to 2.7 m further on, beside or past the car; the head can only turn 50
+  degrees ahead of the body, so a grab given at once can miss. The server's events show the grab
+  happening with nothing in reach and the hold then judged with nothing to eat.
+
+So the test now: waits until the server shows the kaiju free (not mid-action, not staggered)
+before each hold; waits until the server's kaiju has stopped and faces the car before the grab
+and the eat; and gives a hold once more only when the server's own `kaijuStagger` event shows
+the army staggered the kaiju during the attempt (said in the result). Everything is still
+judged only by what the server sent. The server fix in 14.1 is separate: it is what a player on
+a bad connection would have felt, and it was found while looking.
+
+### 14.4 Still open
+
+- In one of the two full `scripted.mjs` runs, the human page's check that the match view takes
+  the mouse found a `div` under the middle of the screen the moment the match began; seven more
+  runs of that session never repeated it. The check now asks again for up to 2 s and, if
+  something is in the way, says which element it was.
+- Someone who empties their name keeps being asked for one when they open an invite link.
+- From earlier rounds and unchanged: district roof colors, the real tunnel and Windows scripts,
+  a real controller and graphics card.
