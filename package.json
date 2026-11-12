@@ -17,6 +17,7 @@
     "dev": "node scripts/dev.mjs",
     "build": "npm run build --workspaces --if-present",
     "start": "npm run start --workspace @mb/server",
+    "host": "npm run build && npm start",
     "test": "vitest run",
     "check": "npm run typecheck && npm run lint && npm run test",
     "typecheck": "npm run typecheck --workspaces --if-present",

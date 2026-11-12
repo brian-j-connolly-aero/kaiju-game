@@ -177,7 +177,9 @@ export class MatchRoom extends Room {
     if (waitingRooms.size >= MAX_WAITING_ROOMS) {
       const oldest = waitingRooms.values().next().value;
       if (oldest) {
+        // Out of the books at once; the library takes a moment to close it.
         waitingRooms.delete(oldest);
+        if (liveRooms.get(oldest.roomId) === oldest) liveRooms.delete(oldest.roomId);
         rt.log?.(`[room ${oldest.roomId}] closed: its creator never connected and newer rooms are waiting`);
         void oldest.disconnect().catch(() => undefined);
       }
@@ -337,7 +339,7 @@ export class MatchRoom extends Room {
             }
           });
         } catch (err) {
-          runtime?.logError(`[room ${this.roomId}] could not send "${type}": ${err instanceof Error ? err.message : String(err)}`);
+          runtime?.log?.(`[room ${this.roomId}] could not send "${type}": ${err instanceof Error ? err.message : String(err)}`);
         }
       },
       close: (code: number, reason: string): void => this.release(id, client, code, reason),

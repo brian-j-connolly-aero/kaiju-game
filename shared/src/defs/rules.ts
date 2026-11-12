@@ -42,7 +42,7 @@ export const MATCH_RULES = {
   bar: {
     p1: 0.13,
     p2: 0.088,
-    p3: 0.36,
+    p3: 0.35,
     growth: 1.6,
     /** Where the three marks sit along the skyline display, 0..1. */
     display: [0.21, 0.57, 1] as PerStage<number>,

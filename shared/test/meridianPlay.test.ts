@@ -25,6 +25,9 @@ import {
   type StageId,
 } from '../src/index';
 
+/** Whole matches and city-wide rasters run here, on a machine that may be busy. */
+const LONG = 180_000;
+
 const data = generatePortMeridian();
 const built: BuiltCity = { city: data, index: buildCityIndex(data) };
 
@@ -136,7 +139,7 @@ describe('Port Meridian: deployment', () => {
       // Measured: 0%, 2% (the bay edge of the Gull Point district), 11% (the sea side of the city).
       expect(wet / total, `stage ${stage}`).toBeLessThanOrEqual([0, 0.04, 0.14][stage - 1]);
     }
-  });
+  }, LONG);
 
   it('has no yard along the edge of the city that would trap a troop of tanks', () => {
     // The last stage deploys troops (9 m radius, 0.75 m of room round them) along the city edge,
@@ -156,7 +159,7 @@ describe('Port Meridian: deployment', () => {
     }
     expect(spots).toBeGreaterThan(150000);
     expect(trapped, 'spots where a troop fits and cannot leave').toEqual([]);
-  });
+  }, LONG);
 
   it('deploys four whole squads at every start and stage, clear of walls, inside the line and free to leave', () => {
     const reach = [reachMap(data, 3.25), reachMap(data, 4.25), reachMap(data, 9.25)];
@@ -183,7 +186,7 @@ describe('Port Meridian: deployment', () => {
         expect(alive).toBe(16);
       }
     }
-  });
+  }, LONG);
 });
 
 describe('Port Meridian: bot matches', () => {
@@ -199,7 +202,7 @@ describe('Port Meridian: bot matches', () => {
       expect(watch.giveUps, `seed ${seed}`).toBe(0);
       expect(watch.stuckSeconds / Math.max(1, watch.unitSeconds), `seed ${seed}`).toBeLessThan(0.02);
     }
-  });
+  }, LONG);
 
   it('plays one full-length match, the same way twice', () => {
     const first = runBotMatch({ seed: 5, city: built });
@@ -213,5 +216,5 @@ describe('Port Meridian: bot matches', () => {
     expect(first.report.marks[0]).toBeGreaterThan(150);
     expect(first.report.marks[1]).toBeGreaterThan(first.report.marks[0] * 1.6 - 1e-6);
     expect(first.report.marks[2]).toBeGreaterThan(first.report.marks[1] * 1.6 - 1e-6);
-  });
+  }, LONG);
 });

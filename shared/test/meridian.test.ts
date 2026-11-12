@@ -434,6 +434,10 @@ describe('Port Meridian: the level', () => {
 describe('Port Meridian: identical on every machine', () => {
   it('comes out the same twice, and differently for another seed', () => {
     const again = generatePortMeridian(CITY_SEED);
+    // The city as delivered (docs/CITY.md). Chromium computes the same two numbers. When the city
+    // is changed on purpose, these change: update them here and in docs/CITY.md.
+    expect(cityChecksum(city)).toBe(1744768440);
+    expect(meridianChecksum(city)).toBe(2227442450);
     expect(cityChecksum(again)).toBe(cityChecksum(city));
     expect(meridianChecksum(again)).toBe(meridianChecksum(city));
     expect(JSON.stringify(again)).toBe(JSON.stringify(city));
@@ -500,9 +504,10 @@ describe('Port Meridian: identical on every machine', () => {
   });
 
   it('builds, with its spatial index, in well under 200 ms', () => {
-    // The best of three: a busy machine or a cold start must not fail the build.
+    // The best of five: a busy machine or a cold start must not fail the build. (Measured on a
+    // quiet machine: about 45 ms once the engine is warm; the first, cold build is in docs/CITY.md.)
     let best = Infinity;
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 5; i++) {
       const t0 = performance.now();
       buildCityIndex(generatePortMeridian());
       best = Math.min(best, performance.now() - t0);

@@ -200,7 +200,8 @@ export class InputManager {
     this.keys.add(e.code);
     this.tapped.add(e.code);
     this.state.device = 'keyboard';
-    if (typeof e.key === 'string') noteKeyLabel(e.code, e.key);
+    // What the key prints, for the keycap glyphs (not what it types with AltGr or Ctrl held).
+    if (typeof e.key === 'string' && !e.ctrlKey && !e.altKey && !e.metaKey) noteKeyLabel(e.code, e.key);
     // Keys the game uses must not scroll the page or move focus.
     if (this.gameKeys && (e.code === 'Tab' || e.code === 'Space' || e.code.startsWith('Arrow'))) e.preventDefault();
   };

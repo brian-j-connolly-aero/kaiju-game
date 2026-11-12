@@ -9,6 +9,7 @@ __pycache__/
 *.pyc
 .env
 .env.*
+!.env.example
 coverage/
 /tmp/
 test-results/

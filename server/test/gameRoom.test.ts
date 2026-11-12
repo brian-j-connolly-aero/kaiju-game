@@ -64,14 +64,18 @@ describe('lobby', () => {
   });
 
   it('refuses a page from another build of the game, or from before pages said which build they are', () => {
-    const { room, log } = makeRoom({ build: 'aaaaaaaa.index-AAAAAAAA.js' });
+    const { room, log, skip } = makeRoom({ build: 'aaaaaaaa.index-AAAAAAAA.js' });
     for (const build of ['bbbbbbbb.index-AAAAAAAA.js', 'aaaaaaaa.index-BBBBBBBB.js', undefined, 7, '']) {
       const err = refusal(() => room.join(new FakePeer('stale'), { name: 'Stale', protocol: PROTOCOL_VERSION, build }));
       expect(err.code).toBe(JOIN_ERROR.version);
     }
     expect(room.empty).toBe(true);
-    // The host is told in plain words, once per refusal.
-    expect(log.filter((line) => line.includes('another build')).length).toBe(5);
+    // The host is told in plain words, but not once per refusal: one line a minute is enough.
+    const told = (): number => log.filter((line) => line.includes('another build') && line.includes('restart the server')).length;
+    expect(told()).toBe(1);
+    skip(61_000);
+    refusal(() => room.join(new FakePeer('stale'), { build: 'bbbbbbbb.' }));
+    expect(told()).toBe(2);
     expect(room.join(new FakePeer('same'), { build: 'aaaaaaaa.index-AAAAAAAA.js' })).toBe(0);
     // A development page and a command-line client know only the rules they were built from.
     expect(room.join(new FakePeer('dev'), { build: 'aaaaaaaa.' })).toBe(1);

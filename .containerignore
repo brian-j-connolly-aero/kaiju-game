@@ -1,0 +1,29 @@
+# Kept out of the container build context (also used as .dockerignore).
+# The image builds from the source files only; everything else is built or installed inside.
+.git
+.github
+**/node_modules
+**/dist
+**/build
+**/.vite
+**/coverage
+**/test-results
+**/playwright-report
+.ruff_cache
+**/__pycache__
+**/*.pyc
+**/*.blend
+**/*.blend1
+**/*.log
+.env
+.env.*
+tmp
+docs
+host
+tools/art
+tools/audio
+tools/playtest
+Containerfile
+compose.yaml
+.containerignore
+.dockerignore

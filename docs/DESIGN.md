@@ -46,7 +46,11 @@ Phases: `lobby` → `briefing` (voiced, about 10 s) → `playing` (stage 1) → 
 - **Kaiju win:** the destruction bar reaches the third mark. **Human win:** kaiju health reaches 0
   at any stage (including in the cocoon), or the clock expires.
 - **No rubber banding** of any kind.
-- A dropped player is replaced by a bot and can rejoin their slot with the same link.
+- A dropped player is replaced by a bot and can rejoin their slot with the same link, the
+  kaiju player included, for as long as the match runs and a bot still plays that slot. Their
+  seat in the room is kept for them alone for 45 s; after that a newcomer may take the seat.
+- The host can start when everybody else in the room is ready, or has had 20 s in the lobby to
+  get ready. Somebody the host starts without still leads a squad, but is never the kaiju.
 
 ### Stages
 
@@ -71,7 +75,7 @@ squares clamped to the city, drawn as a thin glowing quarantine line; nobody can
   that land on it cost nothing.
 - Marks are computed per match from the value actually present, so every neighborhood is fair:
   `P1 = 0.13 × V(stage 1 bounds)`, `P2 = max(1.6 × P1, 0.088 × V(stage 2 bounds))`,
-  `P3 = max(1.6 × P2, 0.36 × V(whole city))`. The three fractions are the pace knob; they were
+  `P3 = max(1.6 × P2, 0.35 × V(whole city))`. The three fractions are the pace knob; they were
   tuned with the balance harness (`docs/BALANCE.md`).
 - Display: a skyline with three towers. Points 0..P1 map to the first 21% of its width, P1..P2 to
   21..57%, P2..P3 to 57..100% (these are the doc's 15 / 40 / 70 marks, rescaled so the third

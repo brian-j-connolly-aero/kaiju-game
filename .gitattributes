@@ -1,0 +1,10 @@
+# Line endings that must survive a checkout on Windows.
+# Shell scripts and container files run inside Linux: always LF.
+*.sh            text eol=lf
+Containerfile   text eol=lf
+compose.yaml    text eol=lf
+.env.example    text eol=lf
+# Windows scripts: always CRLF (cmd.exe misreads some LF-only batch files).
+*.cmd           text eol=crlf
+*.bat           text eol=crlf
+*.ps1           text eol=crlf

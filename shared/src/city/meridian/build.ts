@@ -424,6 +424,8 @@ export const INFANTRY_CLEAR = 3.75;
 export const TROOP_DEPLOY = 9.75;
 export const TROOP_CLEAR = 9.25;
 const TROOP_NEARLY = 8;
+/** The troop's round looks at the buildings this far inside the band as well (unmarked ground beyond counts as open). */
+const POCKET_BEYOND = 140;
 export const TROOP_BAND = 200;
 const POCKET_CELL = 2.5;
 /** Smaller specks of enclosed ground than this many cells (about 19 m2) are left alone. */
@@ -729,19 +731,16 @@ function troopSpotIn(job: PocketJob, cc: number, r: number): boolean {
  * as an enclosed yard of its own.
  */
 function bandSweep(job: PocketJob, band: number): void {
-  const { b, n, cells } = job;
-  const half = b.half;
-  const inner = half - band;
+  const { n, cells } = job;
+  const deep = Math.ceil(band / POCKET_CELL);
   for (let r = 1; r < n - 1; r++) {
-    const z = -half + (r + 0.5) * POCKET_CELL;
-    const az = z < 0 ? -z : z;
+    const whole = r < deep || r >= n - deep;
     for (let cc = 1; cc < n - 1; cc++) {
+      // Rows that are not in the band themselves: only their two ends are.
+      if (!whole && cc === deep) cc = n - deep;
       const k = r * n + cc;
       const v = cells[k];
       if (v !== 0 && v !== TIGHT) continue;
-      const x = -half + (cc + 0.5) * POCKET_CELL;
-      const ax = x < 0 ? -x : x;
-      if (ax < inner && az < inner) continue;
       if (v === TIGHT) {
         let roomy = false;
         for (let dr = -1; dr <= 1 && !roomy; dr++) {
@@ -782,7 +781,13 @@ function runPockets(b: Builder, gone: Uint8Array, roomy: number, tight: number, 
   };
   const cells = job.cells;
   const count = b.structures.length;
-  for (let id = 0; id < count; id++) if (!b.structures[id].passable && !gone[id]) pocketMark(job, id);
+  // The troop's round needs the buildings of the band and a good way beyond it, not the middle of the city.
+  const inner = band > 0 ? half - band - POCKET_BEYOND : 0;
+  for (let id = 0; id < count; id++) {
+    if (b.structures[id].passable || gone[id]) continue;
+    if (inner > 0 && Math.abs(b.boxes[id].x) < inner && Math.abs(b.boxes[id].z) < inner) continue;
+    pocketMark(job, id);
+  }
   // The streets are open ground by definition.
   for (const st of b.streets) {
     const l = len(st.bx - st.ax, st.bz - st.az);

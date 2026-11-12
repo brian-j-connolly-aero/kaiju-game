@@ -265,9 +265,13 @@ export function keyLayoutVersion(): number {
   return layoutVersion;
 }
 
-/** Records the character a key position produces on this keyboard. Ignores anything that is not one printable character. */
+/**
+ * Records the character a letter key's position produces on this keyboard. Ignores anything
+ * that is not one printable character, and the digit row: its keys carry their digit on every
+ * layout, also where the digit is the shifted character (a French "1" key types "&").
+ */
 export function noteKeyLabel(code: string, key: string): void {
-  if (!(code.startsWith('Key') || code.startsWith('Digit')) || key.length !== 1 || key.trim() === '') return;
+  if (!code.startsWith('Key') || key.length !== 1 || key.trim() === '') return;
   const label = key.toUpperCase();
   // One character only: some letters grow when capitalized, and a keycap has room for one.
   if (label.length !== 1 || layoutLabels.get(code) === label) return;

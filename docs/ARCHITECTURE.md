@@ -64,9 +64,11 @@ shared/                   @mb/shared: pure TypeScript, no DOM and no Node APIs
 server/                   @mb/server: Express + Colyseus room that owns a World
   src/index.ts            entry point: reads the environment, starts the server
   src/config.ts           ServerConfig and every environment variable
+  src/crashGuard.ts       the process's safety net: an error nobody caught is logged, not fatal
   src/room/               the room logic, free of any library: lobby, seats, match loop
   src/net/                the only place that imports Colyseus: server, room adapter, Node test client
-  src/http/               Express app: /healthz, the built client, the page fallback
+  src/http/               guard.ts (the front door: size and sanity checks, per-visitor limits) and
+                          app.ts (Express: /healthz, the built client, the page fallback)
   test/                   unit tests (fake clock, fake connections) and real-network integration tests
 client/                   @mb/client
   src/app/                screen state machine: boot, home, lobby, briefing, match, end
@@ -82,7 +84,9 @@ tools/playtest/           Playwright scripts: smoke.mjs (multi-client match on a
                           screenshots), scripted.mjs (two sessions played with real key and mouse events,
                           every action judged by what the server sent back), driver.mjs (the hands it uses)
 tools/build-manifest.mjs  the `assets:manifest` script: merges partial manifests, checks files
-deploy/                   Containerfile, compose file with cloudflared, Windows and WSL scripts
+Containerfile             the container image (self-hosting; owner's guide: docs/HOSTING.md)
+compose.yaml              the game + Cloudflare Tunnel services; settings in .env (.env.example)
+host/                     one-command start, stop, update, logs: .cmd + .ps1 for Windows, .sh for Linux and WSL
 docs/                     requirements.md, DESIGN.md, ARCHITECTURE.md, ASSETS.md, art previews
 ```
 
@@ -335,11 +339,35 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
   lobby → match → end → lobby. `LobbyState.phase` is `lobby`, `match` or `end`.
 - The room is registered with the room library under `ROOM_NAME` (`'mb'`). A client creates a
   room with that name and joins an existing one **by id, where the id is the room code** (in
-  capitals; codes use the letters `BCDFGHJKLMNPQRSTVWXZ`). Both calls take `JoinOptions`
-  `{ name?, token?, protocol? }`. There is no other way in: "join any room" is switched off.
+  capitals; codes use the letters `BCDFGHJKLMNPQRSTVWXZ`, each drawn from the system's random
+  generator, so one code says nothing about the next). Both calls take `JoinOptions`
+  `{ name?, token?, protocol?, build? }`. There is no other way in: "join any room" is switched
+  off.
 - A refused create or join fails with an error `code`: 522 (the library's "no such room"),
-  `JOIN_ERROR.roomFull` 4401, `JOIN_ERROR.version` 4402 (the client sent a different
-  `PROTOCOL_VERSION`: reload), `JOIN_ERROR.serverFull` 4403 (room limit reached).
+  `JOIN_ERROR.roomFull` 4401 (every seat is taken, dropped players' seats included),
+  `JOIN_ERROR.version` 4402 (the page is from another build of the game than the server, see
+  "Build stamp" below), `JOIN_ERROR.serverFull` 4403 (room limit reached), `JOIN_ERROR.busy`
+  4404 (this visitor sent too many matchmaking requests in a minute: wait and try again; the
+  client's rejoin loop treats it like a network failure and retries). The front door answers
+  400 and 413 with those numbers as the code (section 4.4).
+- **Build stamp** (`shared/src/net/build.ts`). `JoinOptions.build` is `<rules>.<page>`:
+  - `rules` is a fingerprint both sides work out for themselves when first asked: every data
+    export of `shared/src/defs` (tuning, id lists, voice lines), the checksum of the generated
+    city, `PROTOCOL_VERSION` and `SNAPSHOT_VERSION`. Nobody bumps it; it is the same in
+    development, in tests and in the production build, and changes when any of those change.
+  - `page` is the file name of the script the page was started from, which in the production
+    build carries a hash of all client and shared code. The server reads it from the
+    `index.html` it serves (afresh at every join, so a rebuilt client is noticed without a
+    restart); the page reads it from its own document. In development it is empty on the
+    page's side, and then only the rules are compared.
+  - A page whose stamp does not match (`buildsMatch`), or that sends none, is refused with
+    `JOIN_ERROR.version`. The page then reloads itself once (remembered in `sessionStorage`
+    until a join succeeds, so it cannot loop; the room code is kept in the address) and, if it
+    is refused again, fails like any other join (`ClosedReason` `'version'`). The same happens
+    when a `welcome` describes a city the page cannot build: it leaves the room instead of
+    sitting in the lobby. The server prints one line per refusal: if every page is refused,
+    the server is the one that is out of date.
+  - `/healthz` and the start-up line show the server's stamp.
 - A person in the room has a **seat** (0..4, stable while they stay); the first is the host. In
   a match every connected seat gets a **slot** (player id; slot 0 is the kaiju): `pickKaijuSeat`
   applies the volunteer and rotation rules and `buildMatchConfig` turns the lobby into the
@@ -347,13 +375,16 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
   message carries each seat's slot (`LobbyPlayer.slot`, -1 in the lobby and for a spectator) and
   `lastKaijuSeat` (set when a match starts, so during a match it names the current kaiju seat).
 - Someone who joins while a match is running takes over a bot squad if one is free (their name
-  replaces the bot's on that slot) and otherwise watches (`welcome.playerId` is -1; this also
-  happens to the fifth person when the practice option gives the kaiju to a bot). Someone who
-  joins on the end screen watches and is sent the result.
+  replaces the bot's on that slot; a squad nobody has played in this match before one whose
+  player is away) and otherwise watches (`welcome.playerId` is -1; this also happens to the
+  fifth person when the practice option gives the kaiju to a bot). A newcomer is never given
+  the kaiju. Someone who joins on the end screen watches and is sent the result.
 - **Session token and reconnecting.** The client makes a random token once (8 to 64 characters
   of `A-Z a-z 0-9 _ -`), keeps it in `localStorage` and sends it with every create and join.
   - A lost connection keeps its seat for a grace period (45 s by default, `MB_GRACE`); in a
-    match a bot plays the slot meanwhile and `LobbyPlayer.connected` is false.
+    match a bot plays the slot meanwhile and `LobbyPlayer.connected` is false. The seat is kept
+    for its owner alone: while all five seats are taken, dropped ones included, a newcomer is
+    refused (`JOIN_ERROR.roomFull`), however briefly the owner has been gone.
   - The room library reconnects a dropped socket by itself while the page is alive; the server
     then sends `lobby` and a fresh `welcome` on the same connection.
   - After a page reload, or when the automatic reconnection gives up, the client joins again by
@@ -361,19 +392,32 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
     holds a seat always wins it: the older connection is closed with `CLOSE_REPLACED` (4101), so
     two tabs of one browser are one player.
   - After the grace period the seat is given up (`CLOSE_SEAT_RELEASED`, 4102, if that connection
-    ever returns); in a match the bot keeps the slot to the end. The room lives as long as
-    anybody holds a seat, connected or not.
+    ever returns) and a newcomer may take it. In a match the bot keeps the slot, but the match
+    remembers which token played which slot: a player who comes back later with the same token
+    gets a new seat and, while a bot still plays it, their old slot, the kaiju included (if
+    somebody else took their squad meanwhile they get another free squad, or watch). The room
+    lives as long as anybody holds a seat, connected or not.
   - A client must not leave on purpose when the page unloads: an intentional leave gives the
     seat up at once.
 - The host role passes to the lowest remaining seat when the host leaves, and to the lowest
   connected seat once the host has been disconnected for 8 s.
+- **Starting.** The host may start when everybody else who is connected is ready, or has been
+  in the lobby for 20 s without getting ready: the server then sets `LobbyPlayer.waited` on
+  them (and sends the lobby again), and `canStartMatch(lobby)` no longer waits for them. The
+  20 s start over when a player joins, reconnects, or the room returns from a match. Somebody
+  the host starts without is in the match all the same (their squad is there when they come
+  back to the keyboard) but is never chosen as the kaiju. A lobby screen should mark a player
+  who is connected, not ready and not `waited` as the one being waited for.
+- Other close codes a client may see: `CLOSE_JOIN_TIMEOUT` 4103 (the connection never finished
+  joining) and `CLOSE_BACKLOG` 4104 (it stopped reading what it was sent). Both mean "join
+  again", which the client's rejoin with its token does.
 
 ### 4.2 Messages
 
 - Client → server (plain data): lobby actions `setName { name }`, `setRole { wantsKaiju,
   kaijuKind? }`, `setFaction { faction }`, `ready { ready }`, `setOptions { botKaiju? }` (host),
-  `start {}` (host; everyone else connected must be ready), `toLobby {}` (host, on the end
-  screen); in a match `input` (30 Hz):
+  `start {}` (host; everyone else connected must be ready or `waited`, section 4.1), `toLobby {}`
+  (host, on the end screen); in a match `input` (30 Hz):
   `{ seq, moveX, moveZ, aimYaw, aimPitch, buttons, wheel?, marker? }` and `command`
   (`SquadCommand`); any time `ping { t }`. `draftPick { card }` is accepted and ignored until
   drafts exist. Payload types: `ClientMessages` in `shared/src/net/protocol.ts`. The server
@@ -414,9 +458,15 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
 - Structure changes are events (`structureStage { id, stage }` with stage 0 intact, 1 damaged,
   2 heavily damaged, 3 rubble), one message per state change.
 - The client predicts its own body with `stepMovement`, replays unacknowledged inputs on each
-  snapshot, and smooths small corrections. Everything else is interpolated about 100 ms in the
-  past. Attack wind-ups start instantly on the local client (the server remains the judge of
-  hits).
+  snapshot, and smooths small corrections. The body is drawn between its last two predicted
+  poses, so it moves on every frame and not only on every tick. Everything else is
+  interpolated about 100 ms in the past, on a clock that never runs backwards. Attack
+  wind-ups start instantly on the local client (the server remains the judge of hits).
+- The buttons of an input are everything that was down at any moment since the previous
+  input was built, so a click shorter than the gap between two inputs is in exactly one.
+- Events that could not be shown for more than two seconds (a hidden tab) are handed to the
+  client's own listeners with `MatchSession.catchingUp` set: lasting state is taken over and
+  nothing is played back.
 
 ### 4.3 The server loop (`server/src/room`)
 
@@ -425,11 +475,20 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
   at most 250 ms, one update runs at most 4 ticks, and anything owed beyond that is dropped (the
   match runs slow for a moment instead of catching up forever).
 - Each tick takes **one input per connected player** from that player's short queue and echoes
-  its `seq` as the snapshot acknowledgement. An empty queue repeats the previous input; after
-  15 empty ticks (0.5 s) a connected but silent player is brought to a stop. A queue that grows
-  past 5 inputs is cut back to the newest 2, which returns the player to real time (a command
-  wheel pick in a discarded input is carried over). The acknowledgement starts again from 0 for
-  a new page (token rejoin) and carries on for an automatic reconnection.
+  its `seq` as the snapshot acknowledgement. An empty queue means the tick is played on a
+  guess, the previous input again with held buttons still held; after 15 such ticks (0.5 s) a
+  connected but silent player is brought to a stop. The acknowledgement starts again from 0
+  for a new page (token rejoin) and carries on for an automatic reconnection.
+- **After a stall** the late inputs arrive all at once. When the queue then holds more than 5,
+  it skips inputs back down to 2 to return the player to real time, but only inputs that carry
+  no news (`inputQueue.ts`): one whose buttons are the same as in the input before it, and that
+  either stands for a tick that was guessed or has none of Strike, Grab and Molt down. An
+  input in which a button goes down or comes up, and every input of a hold in progress, is
+  kept and played in order, so a tap inside the stall still happens and a hold is as long as
+  the player made it. A command wheel pick in a skipped input is carried over. Only a queue of
+  more than 20 is cut back regardless (a press is still carried over). What this cannot mend:
+  a tap whose release is itself stuck behind a stall of about 0.4 s or more has by then been
+  guessed into a hold (`docs/STATUS.md`, known risks).
 - If the simulation throws, the match is abandoned and the room returns to the lobby; the
   server keeps running.
 - The end screen returns to the lobby when the host sends `toLobby`, or by itself after 120 s
@@ -437,9 +496,11 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
 
 ### 4.4 Running the server
 
-- HTTP on the same port: `GET /healthz` (JSON: `ok`, `protocol`, `uptime`, `rooms`, `players`,
-  `fast`, `perf`), the built client from `client/dist` when it exists, and the game page for any
-  other page address. `perf` is the room loop's own timing over the most recent updates of
+- HTTP on the same port: `GET /healthz` (JSON: `ok`, `protocol`, `build`, `uptime`, `rooms`,
+  `players`, `fast`, `perf`), the built client from `client/dist` when it exists, and the game
+  page at the root. Any other page address is redirected (302) to the root, because the page
+  finds its script and assets relative to its own address; one that ends in a room code
+  (`/BCDF`, `/join/bcdf/`) is redirected to `/#BCDF`, which joins that room. `perf` is the room loop's own timing over the most recent updates of
   running matches, all rooms together (`server/src/room/perf.ts`; a ring of 3000 updates, about
   100 s): `samples`, `updateMs` and `gapMs` (each `mean`, `p99`, `max`, in milliseconds: the time
   inside one update, and the time between two updates, which the timer aims to keep at 33.3) and
@@ -452,11 +513,50 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
   hostname behind a tunnel or reverse proxy is enough. Failed matchmaking answers with ordinary
   HTTP statuses (404, 500) and the error code in the body, because Cloudflare replaces the
   library's default 52x statuses with its own pages.
+- **The front door** (`server/src/http/guard.ts`) stands before everything else on the port,
+  the room library's matchmaking included, because the library reads and parses whatever it
+  is sent:
+  - A request body over 4096 bytes, or one that does not announce its length (chunked), is
+    answered 413 before any of it is read. Matchmaking sends three short fields.
+  - A `Host` header or request address that is not a plain one is answered 400; a WebSocket
+    upgrade like that is dropped; an `X-Forwarded-Proto` other than `http` or `https` is
+    removed. The library builds web addresses from these and fails on anything else.
+  - Per visitor and minute: 20 rooms created, 60 join requests, 12 wrong room codes (after
+    which every join by that visitor is refused for the rest of the minute, so sweeping the
+    160,000 codes finds nothing). Over a limit the answer is 429 with `JOIN_ERROR.busy`. A
+    visitor is the `CF-Connecting-IP` header when present (behind a Cloudflare Tunnel every
+    request arrives from the same local address), otherwise the socket's address; requests
+    from the machine itself with no such header (the host's own browser, the development
+    proxy, tests) are never limited. `MB_NO_LIMITS=1` switches these three limits off.
+- **Things with nobody behind them** are short-lived (`server/src/net/matchRoom.ts`):
+  - A room waits 5 s for its creator's connection and a join request 5 s for its own. Rooms
+    still waiting for their creator do not count against `MB_MAX_ROOMS`; at most 5 wait at a
+    time, a sixth closes the one that has waited longest.
+  - The library locks a room at 256 connections and unused join requests together (it was
+    12), so requests with no connection behind them cannot shut players out of their room.
+  - A connection that has not finished the library's join handshake after 10 s is closed
+    (4103) and its seat is free at once.
+  - A connection with more than 1 MB waiting to be sent has stopped reading: it is cut
+    (4104); the seat is kept for the usual grace period.
+  - Every connection is pinged once a second and cut after two unanswered pings, so one that
+    died without a word is noticed after 2 to 3 s (the library's defaults: 6 to 9 s).
+- **Staying up** (`server/src/crashGuard.ts`, `server/src/index.ts`): an error nobody caught
+  and a rejected promise nobody handled are written down, with a plain sentence in front, and
+  the server keeps running (the library's own handler, which ends the process on any uncaught
+  error, is switched off). `SIGINT` and `SIGTERM` close every room and exit with code 0.
+  Failures are printed whatever `MB_QUIET` says; log lines carry the host's local time.
+- Hosting: the container image (`Containerfile`: Node 22 on Alpine, non-root, only the server bundle,
+  the built client and the server's run-time packages; health check on `/healthz`) and
+  `compose.yaml` (the game plus `cloudflared`, quick tunnel by default, named tunnel with a
+  token in `.env`) are started by the scripts in `host/`. The owner's guide is `docs/HOSTING.md`.
 - Environment (`server/src/config.ts`): `PORT` (2567), `HOST`, `MB_FAST=1` (short match timers
   and a small bar, set as `LobbyOptions.fast`), `MB_LATENCY` (simulated round-trip milliseconds),
   `MB_SPEED` (simulation speed multiplier for headless tests; real clients cannot predict at
   any speed but 1), `MB_GRACE` (seconds a dropped seat is kept), `MB_END_SCREEN`,
-  `MB_MAX_ROOMS` (50), `MB_CLIENT_DIR` (the built client, default `client/dist`), `MB_QUIET=1`.
+  `MB_MAX_ROOMS` (50 rooms with somebody in them), `MB_NO_LIMITS=1` (no per-visitor limits),
+  `MB_CLIENT_DIR` (the built client, default `client/dist`), `MB_QUIET=1` (no room chatter;
+  failures are still printed). When the tunnel is the only way in, set `HOST=127.0.0.1` so
+  that nothing else on the network can reach the port.
 - `server/src/net/nodeClient.ts` is a typed headless client for Node (`createRoom`, `joinRoom`),
   used by the integration tests and available to tools. The browser wrapper in
   `client/src/net` follows the same recipe with `@colyseus/sdk`.
@@ -529,7 +629,18 @@ layout, requires bumping `SNAPSHOT_VERSION` / `PROTOCOL_VERSION`.
   Collapse is a client-only effect: spawn that archetype's pre-made chunks, tumble them with
   cheap fake physics, dust, then show rubble.
 - UI is DOM over the canvas. The no-reading rule in `DESIGN.md` §8 is binding.
-- Input: keyboard and mouse, and gamepad; button glyphs follow the last device used.
+- Input: keyboard and mouse, and gamepad; button glyphs follow the last device used, and a
+  keycap shows the letter the player's own keyboard layout prints on that key. Rules that are
+  contracts (how they are kept: `docs/STATUS.md` section 7.4):
+  - During a match the mouse is captured (pointer lock). The click that captures it is never
+    also a game action, and mouse buttons count only while it is captured. Whatever frees
+    the pointer (the map, the settings panel) takes it back when it closes.
+  - The default keyboard map binds no modifier key and no function key: a page cannot cancel
+    the browser shortcuts they make with the game's other keys (`browserShortcutRisk` in
+    `client/src/game/input/actions.ts`; a test holds the defaults to it).
+  - The player's settings (master volume, mouse speed, inverted look) live in browser storage
+    under `mb.settings`, next to the session token (`mb.token`), the callsign (`mb.name`) and
+    stored bindings (`mb.bindings`).
 - Sound (`client/src/audio`; as built: `docs/STATUS.md` section 7.6). What the rest of the
   client may call on the `AudioEngine`: `play` and `loop` (effects by manifest id), `playMusic`,
   `say` and `clearVoice` (voice lines), `preload` / `preloadMusic` / `preloadVoice`, `unlock`

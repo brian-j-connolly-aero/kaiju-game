@@ -232,6 +232,8 @@ export function installFrontGuard(server: HttpServer, options: GuardOptions): vo
   };
 
   const onRequest = server.listeners('request') as Array<(req: IncomingMessage, res: ServerResponse) => void>;
+  // Installed too early there would be nothing to guard, and every request would hang unanswered.
+  if (onRequest.length === 0) throw new Error('the front guard was installed before anything listens for requests');
   server.removeAllListeners('request');
   server.on('request', (req: IncomingMessage, res: ServerResponse) => {
     const refusal = checkRequest(req) ?? limit(req, res);

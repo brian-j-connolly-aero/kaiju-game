@@ -462,10 +462,16 @@ describe('keycap letters', () => {
     expect(keyLayoutVersion()).toBeGreaterThan(before);
     // The position still does the same thing: bindings are by position.
     expect(input.poll(FRAME).down.roar).toBe(true);
-    // Named keys keep their symbol; a key that types nothing printable teaches nothing.
+    // Named keys keep their symbol; a key that types nothing printable teaches nothing; the
+    // digit row keeps its digits (on this keyboard the "1" key types "&" without Shift).
     browser.keyDown('Space', ' ');
     browser.keyDown('KeyE', 'Dead');
+    browser.keyDown('Digit1', '&');
     expect(keyGlyph('Space').label).toBe('␣');
+    expect(keyGlyph('KeyE').label).toBe('E');
+    expect(glyphFor(input.bindings, 'cmdFollow', 'keyboard')).toEqual({ icon: 'kb_key', label: '1' });
+    // A character typed with AltGr or Ctrl held is not what the keycap shows.
+    browser.window.dispatch('keydown', { code: 'KeyE', key: '€', target: browser.other, ...({ ctrlKey: true, altKey: true } as object) });
     expect(keyGlyph('KeyE').label).toBe('E');
     input.detach();
     uninstall();

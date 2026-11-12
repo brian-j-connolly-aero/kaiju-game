@@ -23,9 +23,10 @@ what is still wrong); the rest is from the scaffold task.
 | `npm run check` | Type checks all three workspaces, runs `scripts/lint.mjs`, runs every test. The gate. |
 | `npm test` | `vitest run`: every test in `shared/test`, `server/test` and `client/test`, about 40 seconds (the server's integration tests and the whole-match simulation tests take most of it). |
 | `npm run sim` | The balance harness: full bot-versus-bot matches, headless, a few hundred times real speed, one table row per match plus a summary. Options after `--`: `--seeds N` (default 5), `--seed N`, `--unopposed` (no squads), `--kaiju-handicap H`, `--human-handicap H` (0 best, 1 stands still), `--fast`, `--anchor N`, `--max-minutes N`, `--events`, `--json`. 20 matches take 25 to 50 s depending on what else the machine is doing. How to read it: `docs/BALANCE.md`. |
-| `npx vitest run server/test` | Only the server tests: 62 tests, about 15 seconds (three files start a real server on a free port and connect real clients). `MB_TEST_SPEED=1 npx vitest run server/test/lifecycle.test.ts` plays the full five-client match in real time (about 3 minutes). |
+| `npx vitest run server/test` | Only the server tests: 115 tests, about 18 seconds (four files start a real server on a free port and connect real clients; `process.test.ts` starts the entry point as a process of its own). `MB_TEST_SPEED=1 npx vitest run server/test/lifecycle.test.ts` plays the full five-client match in real time (about 3 minutes). |
 | `npm run dev` | Starts the server (`tsx watch`, port 2567) and the client (Vite, port 5173) side by side with hot reload; open the Vite address. Vite forwards matchmaking and the WebSocket to the server, so the page talks to its own origin exactly as in production. |
 | `npm run build`, `npm start` | Bundles the server to `server/dist/index.js`, builds the client to `client/dist`; `npm start` runs the bundle, which serves the built client and the game on one port (`PORT`, default 2567). Environment variables: `ARCHITECTURE.md` section 4.4. |
+| Hosting (`host/start.cmd`, `host/start.sh`, `npm run host`) | Self-hosting for playtests: `Containerfile` and `compose.yaml` (game plus a Cloudflare Tunnel) at the root, one-command start, stop, update and logs scripts in `host/`, and `npm run host` (build, then start) without containers. The owner's guide: `docs/HOSTING.md`. |
 | `npm run export:defs` | Rewrites `tools/art/data/archetypes.json` from the code (`-- --check` only verifies). A test fails when the file is stale. |
 | `npm run assets:manifest` | `tools/build-manifest.mjs`: merges `client/public/assets/manifest.*.json` into `manifest.json`, lists the files in `ui/`, and leaves out (and reports) entries whose files are missing. `-- --check` only says whether the file is stale. The client build runs it first. |
 | `npx vitest run client/test` | Only the client tests: 20 tests, about 1 second (prediction against a real simulation through latency, the mirrored city, interpolation, the clock, the action map, the animator, the manifest tool). |
@@ -121,7 +122,9 @@ Everything below is in `shared/` (`@mb/shared`) unless it says otherwise, is cov
 - **`server/` (`@mb/server`):** the complete game server (`ARCHITECTURE.md` section 4). One
   process, one port: Express 5 (`/healthz`, the built client, the page fallback) and the room
   library (`@colyseus/core` 0.18.28 with `@colyseus/ws-transport` 0.18.5) for matchmaking and
-  the WebSocket. Covered by `server/test/`.
+  the WebSocket, both behind the front door in `src/http/guard.ts` (request size and sanity
+  checks, per-visitor limits). `src/crashGuard.ts` keeps the process up when an error escapes.
+  Covered by `server/test/`.
   - `src/room/` has no library in it and is unit tested with a fake clock and fake connections:
     `gameRoom.ts` (lobby, seats, session tokens, grace period, host handoff, late joiners, match
     start and end, return to the lobby), `match.ts` (one input per player per tick, the
@@ -136,7 +139,11 @@ Everything below is in `shared/` (`@mb/shared`) unless it says otherwise, is cov
     end, the host returns everyone to the lobby and the next match rotates the kaiju role, then
     the room closes; plus real-time rhythm (30 ticks and 15 snapshots a second), the library's
     automatic reconnection, seat takeover, grace period expiry, simulated latency, the room
-    limit and the HTTP side.
+    limit and the HTTP side; the front door (`guard.test.ts`: oversized and malformed
+    requests, rooms and join requests with nobody behind them, a connection that never
+    finishes joining, the per-visitor limits), pages from another build, a connection that
+    dies without a word, and the real process (`process.test.ts`: bad requests, stray
+    errors, a stop signal).
 - **`client/` (`@mb/client`):** the playable client core: Vite + TypeScript + three.js 0.187,
   `@colyseus/sdk` 0.18.10. Screens, net layer with prediction, AssetStore with procedural
   fallbacks, renderer, controllers, HUD, audio, automation hooks. Module map, placeholders and
@@ -349,13 +356,42 @@ Server
 - The session token is made by the client and sent in the join options; the server never sends
   it anywhere. The newest connection with a token wins its seat (two tabs of one browser are
   one player).
-- A dropped seat is kept 45 s (`MB_GRACE`), in the lobby as well as in a match. When the room
-  is full, a newcomer takes the seat of whoever has been disconnected the longest.
+- A dropped seat is kept 45 s (`MB_GRACE`), in the lobby as well as in a match, and only for
+  its owner: a newcomer is refused while all five seats are taken, dropped ones included.
+  (Until the fix pass a newcomer took the seat of whoever had been gone longest, at once,
+  which locked a reloading player out of their own match.) The cost: somebody whose browser
+  cannot keep the session token (storage blocked) and who reloads in a full room waits out
+  their own old seat's grace period.
+- The match remembers which token played which slot. A player who returns after the grace
+  period gets their slot back while a bot still plays it, the kaiju included. If the room has
+  filled up again meanwhile (a sixth person took the seat), they are refused: the seat, not
+  the slot, is what ran out.
 - The host role moves to a connected player after the host has been disconnected for 8 s; a
   host who returns later is an ordinary player.
 - Someone who joins during a match takes over a bot squad (never the kaiju) and plays at once;
   with no squad free they watch. A player who was disconnected when the match started is
-  treated the same way when they return.
+  treated the same way when they return. A newcomer is given a squad nobody has played in
+  this match before one whose player is away.
+- The host can start without somebody who has been in the lobby for 20 s and is not ready
+  (`LobbyPlayer.waited`, `canStartMatch`). That person is in the match (their sub-units fight
+  on their own) but is never made the kaiju. Changing role or faction does not buy more time.
+  The lobby screen enables Start through `canStartMatch` already; it does not yet show who
+  is being waited for (connected, not ready, not `waited`).
+- Build stamp (`shared/src/net/build.ts`, ARCHITECTURE.md section 4.1): the rules part is
+  worked out at run time from the shared data and the city, the page part is the hashed
+  script name. A page from another build is refused, reloads itself once, then shows the
+  join error. A change to shared logic that changes no data is only caught by the page part,
+  that is, in the production build.
+- Player names: composed form, no control, invisible or direction-changing characters, at
+  most two combining marks per letter, 16 whole characters; "Player N" when nothing visible
+  is left. Two players may still carry the same name.
+- Input queue after a stall: only inputs with no news are skipped (ARCHITECTURE.md section
+  4.3). Measured on simulated links with 1 to 4% of messages held back 100 to 700 ms
+  (990 taps and 990 holds each, `/tmp/mb-scratch/fix-server/n6probe.mts`): taps that did
+  nothing went from 8 to 22% to 0 to 0.3%; holds cut short into a Swipe from 6 to 15% to 0
+  to 0.3%. Letting go of a guessed "still held" button early, as the inspection suggested,
+  was tried and dropped: it saved the 0 to 3% of taps that become Stomps and cost 7 to 19
+  points of Stomps.
 - `lastKaijuSeat` is set when a match starts, not when it ends.
 - The end screen returns to the lobby by itself after 120 s (20 s with `MB_FAST`) so nobody is
   stuck behind an absent host.
@@ -367,8 +403,16 @@ Server
   `colyseus` package (Redis drivers, monitor, playground: none of it wanted offline).
 - If the simulation throws during a match, the room logs the error and returns to the lobby
   instead of taking the server down.
-- At most 50 rooms at once (`MB_MAX_ROOMS`); a room whose creator never connects is closed by
-  the library after 15 s.
+- At most 50 rooms with somebody in them at once (`MB_MAX_ROOMS`). A room whose creator never
+  connects is closed after 5 s, does not count against the limit, and at most 5 such rooms
+  wait at a time. A join request waits 5 s for its connection.
+- An error nobody caught no longer ends the process (it did, through the room library's own
+  handler): it is logged and the server keeps running. Failures are printed even with
+  `MB_QUIET=1`, with the host's local time.
+- Per-visitor limits on matchmaking (20 rooms, 60 joins, 12 wrong codes a minute) go by the
+  `CF-Connecting-IP` header; the machine itself is exempt. Behind a reverse proxy other than
+  the tunnel that does not set that header, every visitor looks like the machine itself and
+  nothing is limited.
 
 ## 5. Notes for whoever is next
 
@@ -413,6 +457,10 @@ Server
   not `world.players[i].input.seq`, because a bot may have driven the slot in between. Only one
   server can run per process (the library keeps its matchmaker in module state), so each
   integration test file starts exactly one; do not turn off vitest's per-file isolation.
+  Anything about raw web requests belongs in `server/src/http/guard.ts`, which runs before the
+  library sees a request; the library's own request handler lets a rejected promise escape on
+  input it does not expect. A test that needs a visitor other than the machine itself sends a
+  `CF-Connecting-IP` header (`server/test/guard.test.ts`).
 - **Client net worker (`client/src/net`):** the recipe is `server/src/net/nodeClient.ts`.
   - `new Client(origin)` from `@colyseus/sdk`, then `client.create(ROOM_NAME, options)` or
     `client.joinById(CODE.toUpperCase(), options)` with `options = { name, token, protocol:
@@ -511,12 +559,30 @@ Server
 - The server has only been driven by Node clients so far, never by a browser and never through
   an actual Cloudflare Tunnel. The single-origin design and the plain HTTP statuses are there
   for the tunnel, but the first real tunnel test is still to come.
-- Colyseus 0.18 is young and moves fast; the adapter leans on three of its behaviors that a
-  version bump could change: `allowReconnection(client, 'manual')`, the room id being settable
-  in `onCreate`, and `matchMaker.controller.exposedMethods` / `standardHttpStatus`. The
-  integration tests cover all three; rerun them after any upgrade and keep `@colyseus/sdk` on
-  the same minor version as the server.
-- The three integration test files use real timers. They are written with wide margins, but on
+- Colyseus 0.18 is young and moves fast; the adapter leans on behaviors that a version bump
+  could change: `allowReconnection(client, 'manual')`, the room id being settable in
+  `onCreate`, `matchMaker.controller.exposedMethods` / `standardHttpStatus`, and since the fix
+  pass also `seatReservationTimeout`, `maxClients` counting unused join requests,
+  `client.state` staying `JOINING` until the handshake, the transport's `pingInterval` /
+  `pingMaxRetries` and `server` options, and the library attaching its request and upgrade
+  handlers to the HTTP server during `listen` (the front door wraps them right after). The
+  integration tests cover all of them; rerun them after any upgrade and keep `@colyseus/sdk`
+  on the same minor version as the server.
+- **Every client is sent the kaiju's true position**, also at stage 1 and in the cocoon,
+  when the rules say the humans do not know it: `known` is only a flag beside the position in
+  the snapshot, and `window.__mb.state()` prints it. A squad player who opens the browser
+  console can drive straight to a hidden hatchling or cocoon. Among friends that spoils a
+  match and nothing more; it was left as it is. The mend would be to send humans the last
+  known position while `known` is false (and a distance for the cocoon's heartbeat).
+- A tap whose release is held up by a network stall of about 0.4 s or more is played as a
+  hold (a Swipe becomes a Stomp, a Grab an Eat): the server has to guess while nothing
+  arrives and guesses "still held". On simulated bad links that was 0 to 3% of taps
+  (section 4, "Server"). Mending it needs the simulation to take a late release back, which
+  it cannot do today.
+- Nothing restarts the server if the process does end (a power cut, an out-of-memory kill):
+  the start script or container of the self-hosting package should, and should set
+  `HOST=127.0.0.1` when the tunnel is the way in.
+- The integration test files use real timers. They are written with wide margins, but on
   a machine that is starved of CPU a timing assertion in `server/test/realtime.test.ts` could
   fail without the server being wrong; rerun before digging.
 - Every refused join prints one `ServerError` line from the room library on the server's
@@ -696,9 +762,9 @@ rigs are posed, so the kaiju camera sits exactly on `cam_fp`) -> audio -> `rende
   with one of those held, a movement key becomes a browser shortcut that a page cannot cancel
   (Ctrl+W closes the tab; Shift+Escape opens the browser's task manager). The drone came down
   with Ctrl and brace had Shift as a second key; both are gone. A test holds the defaults to it.
-- **Keycap letters** are what the player's own keyboard prints on the key in that position:
-  from the browser's layout map where it has one, otherwise learned from each key press (until
-  then the US letter is shown).
+- **Keycap letters** are what the player's own keyboard prints on the letter key in that
+  position: from the browser's layout map where it has one, otherwise learned from each key
+  press (until then the US letter is shown). The digit row always shows its digits.
 - **Command wheel layout.** Follow up, move-to right, fire-at-will down, hold-and-charge left.
 - **Map.** North is up: +Z up the screen, +X to the left (a true view from above). The kaiju
   player's map shows only units whose lasers are on.
@@ -966,7 +1032,10 @@ the client engineer (that list itself was not read here).
   the subtitle band they are drawn over it, and the last voice line cannot be read. Seen at
   640 by 360 with a long kaiju tally, where the back button also covers part of the last row
   (`scripted-all/human-10-end-screen.png`); not seen at 800 by 450 with short rows
-  (`kill/kill-attempt1-end-kill.png`).
+  (`kill/kill-attempt1-end-kill.png`). *Since changed:* subtitles are drawn over every
+  screen, the end screen keeps a band at the bottom free for them, a long tally scrolls in
+  its own box and the back button sits at the top left. Checked at 640 by 360, 800 by 450
+  and 1280 by 720 with a kaiju tally of all ten classes and a two-line subtitle.
 - **Hit flashes wash out the kaiju's own view.** Under fire in first person, each hit draws
   a large pale square over much of the screen, with its straight edge showing
   (`kill/kill-attempt1-low-health.png`: the right third of the view is blanked). It happens
@@ -989,6 +1058,12 @@ the client engineer (that list itself was not read here).
   the server keeping real time, one page's probe (12 frames a second, about 3 s) saw no jump,
   no reversal and no backward step. Not investigated further, and there is no measurement yet
   with a kaiju page and a human page on a healthy server, nor at 60 frames a second.
+  *Since changed:* the drawn clock can no longer run backwards (section 7.4; tested with
+  stalled links, a server that stops for 1.3 s and a server that keeps losing time). The
+  jumps of the player's own body in those runs were not the clock: a page at 2 to 3 frames a
+  second sends its inputs in bursts of eight, the server keeps the newest two of a burst, and
+  the prediction is then corrected by more than its 12 m snap distance. That rule is the
+  server's (section 4.3 of ARCHITECTURE.md) and was not changed here.
 
 ### 8.6 Left by the interrupted first attempt at this task, and their state
 

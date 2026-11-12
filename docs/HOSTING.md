@@ -1,0 +1,229 @@
+# Hosting Monster Battle 9001 for your friends
+
+This guide is for the person who runs the game on their own computer so that friends can play
+over the internet. You do not need to know how to program. You will double-click a file, wait,
+and send a link.
+
+How it works, in one paragraph: the game runs inside a **container** (a sealed box that holds
+the game and everything it needs, so nothing else on your computer is changed). A free service
+from Cloudflare (a large internet company) called a **tunnel** gives your game a public web
+address, without you opening anything on your home router. Your friends open that address in
+their web browser. The game itself never contacts any other outside service.
+
+## 1. What you need
+
+- A computer with **Windows 10 or Windows 11**. (Linux also works; see section 9.)
+- One of these two free programs, which run containers:
+  - **Podman Desktop** (from podman-desktop.io), or
+  - **Docker Desktop** (from docker.com).
+
+  Either is fine. If you already have one, use that one.
+- About **5 GB of free disk space** (the container program itself plus about 1 GB for the game
+  while it is being built; the finished game is much smaller).
+- About **4 GB of memory (RAM)** free while hosting. A computer with 8 GB or more is comfortable.
+- A normal home internet connection. Five friends playing use very little of it.
+- Your friends need: a computer (not a phone or tablet) with a **keyboard and mouse**, and an
+  up-to-date **Chrome, Edge or Firefox** browser. Nothing to install.
+
+## 2. First-time setup (once)
+
+1. Install **Podman Desktop** or **Docker Desktop**. Accept what the installer suggests. If it
+   asks to restart the computer, restart.
+2. Open the program once.
+   - **Podman Desktop:** it walks you through a short setup. Say yes when it offers to
+     **create a Podman machine** (a small hidden Linux computer that runs the containers) and to
+     set up **Compose** (the part that starts several containers together). Wait until the
+     machine says **Running**.
+   - **Docker Desktop:** wait until the bottom-left corner says **Engine running**. You do not
+     need a Docker account; you can skip signing in.
+3. Put the game folder somewhere easy to find, for example `Documents\monster-battle`. (You may
+   have received it as a zip file: right-click it, choose **Extract All**.)
+4. Open the game folder, then the **host** folder inside it. You will use four files there:
+   - `start.cmd`: start the game and show the link for your friends;
+   - `stop.cmd`: stop the game;
+   - `update.cmd`: get a newer version and start it;
+   - `logs.cmd`: show the game's recent messages (useful when something goes wrong).
+
+The first start builds the game from its source files. That takes **5 to 15 minutes** and needs
+the internet (to download the building blocks). Every later start takes seconds.
+
+## 3. Hosting a play session
+
+1. Make sure Podman Desktop or Docker Desktop is open and running. (The start file tries to
+   start it for you, but it is quicker if it is already running.)
+2. In the **host** folder, double-click **start.cmd**.
+   - Windows may ask "Do you want to run this file?" or show a blue "Windows protected your PC"
+     box. Choose **More info**, then **Run anyway**. This happens because the file came from
+     the internet.
+3. A black window opens and shows progress. When it is ready it shows a box like this:
+
+   ```
+     MONSTER BATTLE 9001 IS RUNNING
+
+     Send this link to your friends (it is already copied, just paste it):
+         https://some-random-words.trycloudflare.com
+
+     Open this one yourself (on this computer):
+         http://localhost:2567
+   ```
+
+4. Paste the first link (the one ending in **trycloudflare.com**) into your group chat. It is
+   already copied: just press Ctrl+V.
+5. The game also opens in your own browser at **http://localhost:2567**. Use that address
+   yourself: it is faster for you because it does not travel through the internet.
+6. You can close the black window. The game keeps running.
+7. In the game, enter your name and **create a room**. The room has a **four-letter code**.
+   - Send your friends the **four-letter code**. They open the link from step 4, enter their
+     name, choose **join** and type the code.
+   - The **link button** in the room copies an invite link that opens the room directly. But it
+     copies the address *you* are using. If you opened the game at `localhost`, that invite link
+     only works on your computer, so send the code instead. (Or open the trycloudflare.com link
+     yourself and use the link button there.)
+8. Five players in total: one plays the monster, four play the army squads.
+
+## 4. Stopping
+
+Double-click **stop.cmd** in the host folder. Everyone in a game is disconnected and the public
+link stops working.
+
+If you do not stop it, the game keeps running in the background until you shut down the
+computer, and **starts again by itself** the next time Podman or Docker starts. Stop it when you
+are done if you do not want that.
+
+## 5. Updating to a newer version
+
+- **If you received a new zip file:** double-click **stop.cmd**. Extract the new zip **over**
+  the old game folder (say yes to replacing files). Your `.env` settings file, if you made one,
+  is kept. Then double-click **start.cmd**. It notices the changes and rebuilds the game (a few
+  minutes).
+- **If your game folder was copied with Git** (a tool developers use to share code): double-click
+  **update.cmd**. It fetches the newest version, rebuilds and starts.
+
+`update.cmd` also clears away old builds of the game so they do not fill up your disk.
+
+## 6. If something goes wrong
+
+Read the last lines in the black window first: they say in plain words what the problem is.
+
+1. **"Podman is installed but not running" or "Docker is installed but not running".**
+   Open Podman Desktop (start the Podman machine) or Docker Desktop (wait for "Engine running"),
+   then double-click start.cmd again.
+2. **"Neither Podman Desktop nor Docker Desktop is installed".**
+   Install one of them (section 2). If you just installed it, restart the computer.
+3. **The port is already in use** (the messages mention "port" or "address already in use").
+   Another program, or an older copy of the game, uses the number 2567. First double-click
+   stop.cmd, then start.cmd. If that does not help: in the game folder, make a copy of
+   `.env.example` named `.env` (see section 7, step 4), change the line `MB_PORT=2567` to
+   `MB_PORT=2568`, save, and start again. Your own address is then http://localhost:2568.
+4. **The public link does not appear** ("The public link is not ready yet").
+   Wait one minute and double-click start.cmd again: it shows the link once Cloudflare has handed
+   it out. If it still does not appear, double-click logs.cmd and look at the lines that start
+   with "tunnel". Some company or school networks block tunnels; try at home.
+5. **Your friends cannot connect, but you can play on localhost.**
+   - Check they used the newest link: **the link changes every time you start the game**.
+   - The link must start with `https://` and end with `trycloudflare.com`.
+   - If the page opens but joining fails, double-click stop.cmd and start.cmd, and send the new
+     link.
+   - Ask them to use Chrome, Edge or Firefox on a computer.
+6. **The game feels laggy** (things jump or react late).
+   - Close other heavy programs on the host computer (games, video calls, many browser tabs).
+   - The host should play on `http://localhost:2567`, not on the public link.
+   - The quick tunnel routes everyone through Cloudflare; friends far away (another continent)
+     will feel some delay. A named tunnel (section 7) is usually a little steadier.
+   - If one friend's connection is weak, a wired connection instead of Wi-Fi helps.
+7. **The link changes every time.** That is how the free quick tunnel works. If you want an
+   address that never changes, use your own domain (section 7).
+
+If none of this helps, double-click **logs.cmd**, select everything in the window, copy it and
+send it to whoever gave you the game.
+
+## 7. Using your own domain (a named tunnel; optional)
+
+You only need this if you want a fixed address such as `https://kaiju.example.com`. It needs a
+free **Cloudflare account** and a **domain** (a web address you own) that is managed by
+Cloudflare.
+
+1. Sign in at dash.cloudflare.com.
+2. Go to **Zero Trust**, then **Networks**, then **Tunnels** (the names in Cloudflare's menus
+   change from time to time; look for "Tunnels"). Choose **Create a tunnel**, type **Cloudflared**,
+   and give it a name such as `monster-battle`.
+3. Cloudflare shows install commands containing a long code after the word `--token` (or
+   `run`). Copy only that long code. This is your **tunnel token**. Treat it like a password.
+4. In the game folder, find the file `.env.example`. Make a copy of it in the same folder and
+   name the copy `.env` (just ".env", nothing before the dot). Open it with Notepad.
+   (If Windows hides the file extension, turn on **View, Show, File name extensions** in File
+   Explorer so the file is not called `.env.txt` by mistake.)
+5. Fill in two lines and save:
+   ```
+   TUNNEL_TOKEN=the-long-code-you-copied
+   MB_PUBLIC_URL=https://kaiju.example.com
+   ```
+6. Back in Cloudflare, add a **public hostname** to the tunnel: choose your subdomain and
+   domain (for example `kaiju` and `example.com`), service type **HTTP**, address
+   **game:2567**. Save.
+7. Double-click start.cmd. The box now shows your own address.
+
+To go back to the quick tunnel, empty the `TUNNEL_TOKEN=` line in `.env` and start again.
+
+Never send your `.env` file to anyone, and never upload it. It is already excluded from the
+game's shared files.
+
+## 8. About the quick tunnel (the trycloudflare.com link)
+
+- It is free and needs no account. Cloudflare offers it for testing and trying things out.
+- **The address changes on every start.** Send the new one each time.
+- There is **no guarantee it stays up**. It usually works for an evening of play; if it drops,
+  stop and start again and send the new link.
+- **Anyone who has the link can open the game page.** The address is long and random, so
+  strangers are unlikely to find it, but do not post it publicly. The game holds no personal
+  data; at worst a stranger could join an empty room.
+- It works only while your computer is on, awake and connected. Turn off sleep mode for the
+  evening.
+
+## 9. Linux, and WSL (Windows Subsystem for Linux)
+
+The same steps work from a Linux terminal, in the game folder:
+
+```
+host/start.sh       start, and print the links
+host/stop.sh        stop
+host/update.sh      get the newest version (Git) and start again
+host/logs.sh        recent messages
+host/mb.sh link     print the links again
+```
+
+The scripts use Podman if it works, otherwise Docker. On Ubuntu (also inside WSL) Podman is
+installed with `sudo apt install podman podman-compose`. Docker Desktop on Windows also works
+from WSL once its WSL integration is turned on.
+
+## 10. Without containers (for people who have Node.js)
+
+If the computer has **Node.js 22** (a program that runs JavaScript) installed:
+
+1. In a terminal in the game folder, run `npm ci` once (installs the building blocks).
+2. Run `npm run host`. It builds the game and starts it on http://localhost:2567. Leave the
+   terminal open; press Ctrl+C to stop.
+3. For friends, run Cloudflare's tunnel program **cloudflared** in a second terminal (download
+   it from Cloudflare's website, "cloudflared downloads"):
+   ```
+   cloudflared tunnel --url http://localhost:2567
+   ```
+   It prints the trycloudflare.com link to send. Ctrl+C stops it.
+
+## 11. What was tested, and what was not
+
+Honest status of this hosting package, as of its first version:
+
+- **Tested on a Linux test machine:** building the container image with Podman, running it,
+  the health check, and opening the game page in a headless browser (a browser without a
+  window, driven by a program) through the container, including creating a room. The Linux
+  start and stop script was run against Podman there. The settings file for compose was checked
+  for errors.
+- **Not tested yet:** the Windows files (start.cmd and the others) have **not been run on
+  Windows**; they were only checked by reading them carefully. Podman Desktop and Docker Desktop
+  on Windows have not been tried. **The tunnel itself could not be tested** (the test machine
+  is not allowed to make that kind of connection), so the first real check of the public link
+  is your first start. Docker (as opposed to Podman) was not run either.
+
+So for the first time, try it a day before the play session: start it, open the public link on
+your phone (just to see the page load; the game itself needs a computer), and stop it.

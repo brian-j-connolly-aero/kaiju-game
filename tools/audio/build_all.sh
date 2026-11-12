@@ -183,6 +183,21 @@ if [ "$clean" = 1 ]; then
   esac
 fi
 
+# The voice builder keeps the measurements of a line for as long as its words, voice and
+# processing stay the same, even when --force has just rebuilt its files. A full build has to
+# measure the files it built, so the kept measurements are set aside for the voice step, which
+# then measures all the lines again. If the builder stops before it has written new ones, the
+# old ones are put back (also when this script is interrupted).
+voice_measurements="$repo/docs/audio/voice/measurements.json"
+voice_kept=""
+restore_voice_measurements() {
+  if [ -n "$voice_kept" ] && [ -f "$voice_kept" ]; then
+    if [ -f "$voice_measurements" ]; then rm -f -- "$voice_kept"; else mv -- "$voice_kept" "$voice_measurements"; fi
+  fi
+  voice_kept=""
+}
+trap restore_voice_measurements EXIT
+
 # ---- run ------------------------------------------------------------------------------------
 t_start=$SECONDS
 results=()
@@ -193,8 +208,13 @@ for s in "${steps[@]}"; do
   echo
   printf '=== %s:' "$s"; printf ' %q' "${cmd[@]}"; printf '\n'
   t0=$SECONDS
+  if [ "$s" = voice ] && [ "$changed" = 0 ] && [ "$verify" = 1 ] && [ -f "$voice_measurements" ]; then
+    voice_kept="$logs/voice-measurements.kept.json"
+    mv -- "$voice_measurements" "$voice_kept" || voice_kept=""
+  fi
   "${cmd[@]}" 2>&1 | tee "$log"
   rc=${PIPESTATUS[0]}
+  restore_voice_measurements
   if [ "$rc" = 0 ]; then
     state="ok"
   else

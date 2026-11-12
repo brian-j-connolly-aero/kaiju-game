@@ -162,7 +162,6 @@ describe('the local body between input ticks', () => {
           last = { x: me.x, z: me.z };
         });
         expect(frames.length).toBeGreaterThan(fps);
-        if (process.env.MB_DEBUG) console.log(fps, roundTripMs, frames.slice(0, 40).map((f) => f.moved.toFixed(3)).join(' '));
         // The tank does drive at its top speed (most of the time: a river slows it).
         const ideal = speed / fps;
         const sorted = frames.map((f) => f.moved).sort((a, b) => a - b);

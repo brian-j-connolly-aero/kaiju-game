@@ -145,6 +145,8 @@ export class GameRoom {
    * or null. It outlives their seat, so that they can have the slot back.
    */
   private slotOwners: Array<string | null> = [];
+  /** When a page from another build was last reported (the report is rationed). */
+  private buildRefusalLoggedAt = Number.NEGATIVE_INFINITY;
 
   constructor(options: GameRoomOptions) {
     this.options = options;
@@ -198,11 +200,16 @@ export class GameRoom {
     }
     const build = typeof this.options.build === 'function' ? this.options.build() : this.options.build;
     if (build !== undefined && !buildsMatch(build, raw.build)) {
-      // Worth a line even in a quiet window: if every page is refused, it is the server that is old.
-      this.logError(
-        `refused a page from another build of the game (it has "${typeof raw.build === 'string' ? raw.build.slice(0, 60) : 'none'}", ` +
-          `this server "${build}"). The page reloads itself; if people still cannot join, restart the server.`,
-      );
+      // Worth a line even in a quiet window: if every page is refused, it is the server that is
+      // old. One line a minute per room says it; more would only bury it.
+      const now = this.options.now();
+      if (now - this.buildRefusalLoggedAt >= 60_000) {
+        this.buildRefusalLoggedAt = now;
+        this.logError(
+          `refused a page from another build of the game (it has "${typeof raw.build === 'string' ? raw.build.slice(0, 60) : 'none'}", ` +
+            `this server "${build}"). The page reloads itself; if people still cannot join, restart the server.`,
+        );
+      }
       throw new JoinRefused(JOIN_ERROR.version, 'this page is from a different build of the game than the server: reload it');
     }
     const token = typeof raw.token === 'string' && SESSION_TOKEN_PATTERN.test(raw.token) ? raw.token : null;
