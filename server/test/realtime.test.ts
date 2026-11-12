@@ -87,6 +87,34 @@ describe('http', () => {
     expect(await deep.text()).toContain('Monster Battle 9001');
   });
 
+  it('sends every deeper page address to the root, where the page can find its own files', async () => {
+    const where = async (path: string): Promise<[number, string | null]> => {
+      const res = await fetch(`${ts.url}${path}`, { headers: { accept: 'text/html' }, redirect: 'manual' });
+      return [res.status, res.headers.get('location')];
+    };
+    // The page loads "./assets/..." relative to its own address: served at /join/BCDF/ it would
+    // look for /join/BCDF/assets/... and stay blank. So it is only ever served at the root.
+    expect(await where('/lobby/')).toEqual([302, '/']);
+    expect(await where('/some/deep/address')).toEqual([302, '/']);
+    expect(await where('/assets/')).toEqual([302, '/']);
+    // A room code typed as a path becomes the room code the page reads.
+    expect(await where('/BCDF')).toEqual([302, '/#BCDF']);
+    expect(await where('/join/bcdf/')).toEqual([302, '/#BCDF']);
+    expect(await where('/BCDF?debug=1')).toEqual([302, '/?debug=1#BCDF']);
+    // Four letters that are not a room code (it has vowels) are just an address.
+    expect(await where('/play')).toEqual([302, '/']);
+    // The root itself and real files are served, not redirected.
+    expect((await where('/'))[0]).toBe(200);
+    expect((await where('/?debug=1'))[0]).toBe(200);
+    expect((await where(`/assets/${PAGE_SCRIPT}`))[0]).toBe(200);
+    // And following the redirect ends on a page whose script address resolves.
+    const followed = await fetch(`${ts.url}/join/BCDF/`, { headers: { accept: 'text/html' } });
+    expect(followed.redirected).toBe(true);
+    expect(new URL(followed.url).pathname).toBe('/');
+    const script = /src="([^"]+)"/.exec(await followed.text())?.[1] ?? '';
+    expect((await fetch(new URL(script, followed.url))).status).toBe(200);
+  });
+
   it('lets browsers keep hashed build files and revalidate everything else', async () => {
     const hashed = await fetch(`${ts.url}/assets/index-Bq3xK9pZ.js`);
     expect(hashed.status).toBe(200);

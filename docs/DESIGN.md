@@ -71,7 +71,7 @@ squares clamped to the city, drawn as a thin glowing quarantine line; nobody can
   that land on it cost nothing.
 - Marks are computed per match from the value actually present, so every neighborhood is fair:
   `P1 = 0.13 × V(stage 1 bounds)`, `P2 = max(1.6 × P1, 0.088 × V(stage 2 bounds))`,
-  `P3 = max(1.6 × P2, 0.31 × V(whole city))`. The three fractions are the pace knob; they were
+  `P3 = max(1.6 × P2, 0.36 × V(whole city))`. The three fractions are the pace knob; they were
   tuned with the balance harness (`docs/BALANCE.md`).
 - Display: a skyline with three towers. Points 0..P1 map to the first 21% of its width, P1..P2 to
   21..57%, P2..P3 to 57..100% (these are the doc's 15 / 40 / 70 marks, rescaled so the third
@@ -105,7 +105,10 @@ squares clamped to the city, drawn as a thin glowing quarantine line; nobody can
   are shaken, lose their charge and are thrown just clear of the shove radius (walls and the
   bounds stop them). Everything in flight is gone and running fire missions are called off.
 - The kaiju stands up at once at its new size, with full health and nerve, where the cocoon
-  was (kept inside the bounds). Rage and what it has wrecked are untouched.
+  was (kept inside the bounds). When that spot is too tight for the new body (a cocoon tucked
+  between two tall buildings), it stands up on the nearest ground clear of every wall it
+  cannot walk through; what is low enough to trample does not count. Rage and what it has
+  wrecked are untouched.
 - Intermission: nobody can move, act or give orders; units the blast threw slide to a stop.
   The stage number and the bounds are still the old ones until it is over.
 - Then the new stage: every unit alive at that moment is marked a veteran (aim error ×0.7),
@@ -132,9 +135,16 @@ Every combatant (kaiju, human unit) has `hp` and `nerve`. All damage goes throug
   Bracing: ×0.25 nerve on the front arc. Fire-at-will hits from sub-units and bots: ×0.5 nerve.
 - While nerve damage is building, speed is reduced by up to 30% (this is "scattered fire only
   slows it").
-- At 100 accumulated: **stagger** for 5 s (helpless, weak point glows, the ×0.5 multiplier: four
-  times what it otherwise takes), then nerve clears and the kaiju cannot take nerve damage for
-  8 s (long enough that four squads cannot keep it stunned).
+- At 100 accumulated, **and only under the charged volleys of two squads** (below): **stagger**
+  for 5 s (helpless, weak point glows, the ×0.5 multiplier: four times what it otherwise
+  takes), then nerve clears and the kaiju cannot take nerve damage for 8 s (long enough that
+  four squads cannot keep it stunned).
+- **It takes two squads to break it.** Nerve at 100 breaks only while charged volleys (section
+  5: sub-units fired with at least 60% charge) from two different squads have hit the kaiju
+  within the last 5 s. Until then the nerve stays at 100, "on the brink": the kaiju is as
+  slow as nerve damage makes it and easier to hit, and the next pair of volleys breaks it at
+  once. Scattered fire, a held trigger, artillery, or one squad's volleys (however many, from
+  whatever side, crossed or not) never break it by themselves.
 - After any freeze or trip ends (Tier 2), 6 s immunity to both.
 
 **Human units:** hp per the tables below, nerve capacity 100, nerve leaks at 8 per second.
@@ -157,6 +167,10 @@ special itself wrecks earns no rage, so one special can never pay for the next.
 - Nerve does not build while the kaiju is staggered or cocooned. A stagger cuts whatever the
   kaiju was doing short (a beam, a meal: the heal is lost, and so is rage already spent); it
   keeps what it holds.
+- The two-squad rule counts squads, not hits: each squad's latest charged volley hit is
+  remembered for 5 s, volleys that land during a stagger or the immunity included. The hit
+  that takes the nerve to 100 need not be a volley's own, as long as two squads' volleys have
+  landed in the last 5 s. A match with a single squad asks for that squad's volley only.
 - A shaken unit cannot be shaken further; when it steadies its nerve starts again from 0.
 - Trample needs the kaiju to be moving (at least 1 m/s) and the unit's circle to overlap its
   body circle. It deals no nerve damage.
@@ -203,8 +217,10 @@ definition.
   is none does the hand tear a chunk from the nearest building (150 / 1000 structure damage at
   stages 2 / 3). A grabbed car leaves the city at once and counts for the bar. Grabbing from a
   tank troop takes one tank; the unit dies when its last tank is taken and leaves no wreck.
-- **Throw:** a flat ballistic arc that lands on what the crosshair is on; beyond reach it flies
-  at 45°; with the crosshair on the sky it flies where the head points. The object hits the
+- **Throw:** a flat ballistic arc that lands on what the crosshair is on (the aim ray starts at
+  the eye, which sits in the head: 1.7 / 11 / 38.5 m ahead of the body's axis and 4.2 / 27.5 /
+  90.7 m up, where the model has its camera); beyond reach it flies at 45°; with the
+  crosshair on the sky it flies where the head points. The object hits the
   first structure, unit or ground it meets (never its thrower) and damages everything inside
   the impact radius.
 - **Eat:** the meal is taken at the first bite and the heal lands when the 2 s are over. Edible
@@ -213,6 +229,8 @@ definition.
 - **Roar:** the nerve hit and the charge reset land at the start of the roar.
 - **Beam:** leaves the mouth along the head's aim, pitch included, so it is aimed like a
   weapon: level it burns what stands at mouth height, pointed down it ends on the ground.
+  The mouth is where the model has it: 2.5 / 15 / 51.4 m ahead of the body's axis along the
+  aim and 2.9 / 22 / 72 m up, so what stands under a titan's chin is not in the beam.
   While it is on, the head only turns at the beam's reduced rate. It stops at the first
   standing structure its center or either edge touches and burns only that one; units behind
   a standing building are safe. Units within the beam's width (plus 1 m of slack above and
@@ -239,10 +257,11 @@ Arcade handling: cooldowns, no ammo.
 ### Army (Tier 1)
 
 Damage is normalized so a squad's full salvo is about 38 raw damage at every level, and about
-20 raw nerve (19 to 22, tuned per level). The nerve numbers obey one rule: a single squad's
-full-charge volley stays under the kaiju's nerve capacity from any side, and as a one-player
-crossfire (54 from the front, 92 from behind or crossed for infantry and tanks), so it takes
-two squads to break it.
+20 raw nerve (19 to 22, tuned per level). A single squad's full-charge volley is 54 nerve from
+the front and 92 from behind or as a one-player crossfire (infantry and tanks): most of the
+way, never all of it. It takes two squads to break the kaiju, and the rule in section 3 holds
+that line whatever one squad does (a volley from behind that also crosses, or volley after
+volley, only brings it to the brink).
 
 | | Level 1: rocket infantry | Level 2: tank platoon | Level 3: tank company |
 | --- | --- | --- | --- |
@@ -251,15 +270,16 @@ two squads to break it.
 | Shot | up to 3 rockets (one per 3.4 members) | 1 shell | up to 3 shells (one per tank) |
 | Per projectile: damage / nerve | 3.2 / 1.8 | 9.5 / 5.4 | 3.2 / 1.6 |
 | Projectile speed, flight | 55 m/s, flat | 110 m/s, flat | 110 m/s, flat |
-| Range / cooldown | 160 m / 2.6 s | 420 m / 3.2 s | 600 m / 3.2 s |
+| Range / cooldown (a projectile gives out after 1.1 × range) | 160 m / 2.6 s | 420 m / 3.2 s | 600 m / 3.2 s |
 | Splash radius / structure damage | 3 m / 3 | 5 m / 25 | 5 m / 25 |
 | Sub-unit aim error (fire at will / volley) | 3.5° / 1.2° | 2.5° / 0.9° | 2.5° / 0.9° |
 | Extra | | | Artillery call-in |
 
 **Artillery call-in (level 3):** place a ground marker (crosshair or map). After 4 s, 8 arcing
 shells land over 2 s within a 28 m scatter radius: each 9 damage, 5 nerve, 14 m splash, 300
-structure damage. 35 s cooldown, per player. A whole barrage on target is half a stagger: it
-sets up a volley, it does not replace one.
+structure damage. 35 s cooldown, per player. A whole barrage on target is half a stagger's
+worth of nerve: it sets up a volley, it does not replace one (artillery never counts toward
+the two squads it takes to break the kaiju).
 
 ### Commands (radial wheel of four pictograms)
 
@@ -273,8 +293,16 @@ Movement order (follow / move to) and fire mode (at will / charge) are independe
 units are rooted until they fire or get a new movement order.
 
 **Volley:** when the player fires, every sub-unit with charge fires at the player's aim point
-(where the player's aim ray lands). Damage ×(1 + charge), nerve ×(1 + 2 × charge), volley aim
-error. Charge resets and starts rebuilding.
+(where the player's aim ray lands), and its charge resets and starts rebuilding. Damage
+×(1 + charge). Nerve is what the charge is for, and it only pays when nearly complete:
+
+- Below 60% charge the shot is **ragged**: nerve ×0.5 and the at-will aim error, exactly what
+  fire at will is worth. The guns reload in 2.6 to 3.2 s of the 6 s charge, so a player who
+  simply holds Fire only ever fires ragged shots: plain damage on one target, no volley.
+- From 60% to a full charge it is a **charged volley**: nerve rises evenly from ×0.5 to ×3
+  and the aim error falls from the at-will to the volley value. Only charged volleys count
+  toward breaking the kaiju's nerve (section 3), so waiting for the charge, and firing
+  together with another squad, is how it is broken.
 
 **Backstop:** projectiles are real objects. A miss keeps flying and hits whatever is behind:
 structures (adds to the bar), ground, or nothing. No friendly fire between human units.
@@ -299,6 +327,8 @@ photos for the front page).
   ray from the unit's eye lands (a kaiju, a structure, the ground, or far out along the ray); a
   person's own shots have no aim error. A salvo is one projectile per launcher or tank still
   standing, leaving from points spread across the unit.
+- **Range** is how far a projectile flies: every shot of a unit, the player's own and a
+  volley's as much as fire at will, gives out in the air after 1.1 times the weapon's range.
 - **Follow me.** Sub-units string out behind the leader along the path it took, in a staggered
   column one unit width plus 2 m apart; where a street is too narrow for the stagger they close
   up into single file. A fresh deployment stays where it was placed until the leader moves or
@@ -308,6 +338,18 @@ photos for the front page).
   the nearest such ground). They get there by the straight line when it is clear, otherwise
   along the streets, feeling their way round walls; rubble, the river and bridge decks are all
   passable. Markers are pulled back inside the playable bounds.
+- **Markers placed with the crosshair** (move-to and artillery; a map marker is used as it is).
+  With the crosshair on a kaiju's body the marker is the ground under it: from a unit's eye
+  nearly all of a kaiju is above the horizon, so pointing at it has to work. Otherwise it is
+  where the aim ray meets the ground or the foot of a wall, up to 1500 m away. With the
+  crosshair on the sky: a kaiju on the map within two of its body radii of the line of the
+  crosshair is what was meant; failing that a move-to goes 100 m ahead, and an artillery
+  press does nothing (the battery is not spent on the sky).
+- **Orders are carried out a few a second.** A squad acts on up to 6 wheel orders at once and
+  then 3 a second; a newer movement order (or fire mode) replaces one that is still waiting,
+  and one move-to is planned per tick in the whole match. Nobody gives orders that fast; it
+  keeps a flood of commands from a broken or hostile client from costing the server more
+  than a few honest ones.
 - **Fire at will.** A sub-unit shoots when a kaiju is inside its weapon's range and its line of
   fire (to the middle of the body, or else higher or lower on it) is clear. It leads a moving
   target by the flight time, swings its weapon at 270° per second, and fires with the at-will
@@ -326,20 +368,23 @@ photos for the front page).
   - Giving the hold command again plants the squad afresh: new arcs, charge from 0.
 - **The volley.** Every shot of the driven unit is the trigger. Each sub-unit that has charge,
   is not shaken, has its weapon off cooldown and whose arc covers the aim point fires at it
-  with the charge multipliers and the volley aim error. One whose arc does not reach keeps
-  charging and does not fire (the kaiju can walk out of an arc; plant the squad again). With the
-  crosshair on a kaiju the sub-units aim for the middle of its body at that height, so shots
-  from every side connect. Firing spends the charge; the unit stays planted, its arc is aimed
-  afresh, and the charge builds again. Nothing checks range or line of sight for a volley: a
-  building in the way is the player's problem, and the bar's gain.
+  with the multipliers and aim error its charge has earned (ragged below 60%, a charged
+  volley from there up). One whose arc does not reach keeps charging and does not fire (the
+  kaiju can walk out of an arc; plant the squad again). With the crosshair on a kaiju the
+  sub-units aim for the middle of its body at that height, so shots from every side connect.
+  Firing spends the charge; the unit stays planted, its arc is aimed afresh, and the charge
+  builds again. Only a charged volley is announced (the `volley` event, "volley away" on the
+  radio, the player's tally). Nothing checks line of sight for a volley, and range only
+  through how far the shots fly: a building in the way is the player's problem, and the
+  bar's gain.
 - **Aim error** is one sigma on heading and on elevation, drawn for every projectile, times the
   scatter multipliers of the kaiju being shot at, ×0.7 for veterans. "Slowed" means staggered,
   cocooned, or carrying at least 30% of its nerve capacity in accumulated nerve damage. The
   spotter is the unit somebody drives: a bot squad's leader counts, sub-units do not.
 - **Shaken** units cannot fire, let go of a hold, and back away from a kaiju within 10 of its
   body radii (at least 60 m). When they steady they go back to their spot and plant again.
-- **Artillery.** The marker is placed with the call-in button (crosshair, or a map marker). The
-  shells are real projectiles that fall from 400 m at 75° above the horizon, coming over the
+- **Artillery.** The marker is placed with the call-in button (crosshair, as above, or a map
+  marker). The shells are real projectiles that fall from 400 m at 75° above the horizon, coming over the
   caller's shoulder, timed so the first lands 4 s after the marker and the last 2 s later. Each
   lands inside the scatter radius times the scatter multipliers of the kaiju nearest the
   marker. They can hit a tall building or the kaiju's head on the way down. A mission already
@@ -391,10 +436,13 @@ tick behind what it saw, and plays any slot it is handed at any moment.
   roars at guns charging inside its roar, braces when four charged lasers are on it (2.5 s at
   most, then not again for 6 s), throws what is at hand at a squad in range, turns the beam on
   units in reach (else on something big), eats below 70% health, and when the molt is offered
-  looks for ground where fewer guns can see it, for 16 s at most, then cocoons.
+  looks for ground where fewer guns can see it and where its next body will have room, for
+  16 s at most, then cocoons.
 - **Handicap.** `MatchConfig.bots` handicaps either side from 0 (its best) to 1 (stands still):
   in between, the bot idles that share of the time. For the balance harness, tests and
-  practice options.
+  practice options. `MatchConfig.bots.triggerHappy` makes the squad bots play the lazy way
+  (parked, they fire every time the guns have loaded and never wait for a charge), so that the
+  harness can measure what undisciplined fire is worth (`npm run sim -- --trigger-happy`).
 
 ### Tier 2 factions
 

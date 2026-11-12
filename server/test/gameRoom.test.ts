@@ -565,6 +565,25 @@ describe('match loop', () => {
     startMatch(room, peers);
     expect(room.lobby.phase).toBe('match');
   });
+
+  it('reports a failed match even when the room log is switched off', () => {
+    // MB_QUIET=1: no room chatter at all, but failures have their own way out.
+    const failures: string[] = [];
+    const { room, run } = makeRoom({ log: undefined, logError: (line) => failures.push(line) });
+    const peers = seatPlayers(room, 1);
+    startMatch(room, peers);
+    run(0.5);
+    expect(failures).toEqual([]);
+    room.match!.world.step = () => {
+      throw new Error('boom');
+    };
+    run(0.2);
+    expect(room.lobby.phase).toBe('lobby');
+    expect(failures.length).toBe(1);
+    expect(failures[0]).toContain('[room BCDF]');
+    expect(failures[0]).toContain('the simulation failed');
+    expect(failures[0]).toContain('boom');
+  });
 });
 
 describe('dropped players', () => {

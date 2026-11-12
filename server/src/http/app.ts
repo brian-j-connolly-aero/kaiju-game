@@ -7,7 +7,7 @@
  * localhost, on a LAN address and behind a tunnel or reverse proxy on a single hostname.
  */
 
-import { pageIdOf } from '@mb/shared';
+import { pageIdOf, ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH } from '@mb/shared';
 import { existsSync, readFileSync } from 'node:fs';
 import { extname, join } from 'node:path';
 import express, { type Application, type NextFunction, type Request, type Response } from 'express';
@@ -61,6 +61,15 @@ export function servedPageId(clientDir: string | null): string {
   return '';
 }
 
+/** The room code a page address ends in ("/BCDF", "/join/bcdf/"), or '' when it does not end in one. */
+export function roomCodeInPath(path: string): string {
+  const last = path.split('/').filter(Boolean).pop() ?? '';
+  const code = last.toUpperCase();
+  if (code.length !== ROOM_CODE_LENGTH) return '';
+  for (const letter of code) if (!ROOM_CODE_ALPHABET.includes(letter)) return '';
+  return code;
+}
+
 export function configureApp(app: Application, options: AppOptions): void {
   app.disable('x-powered-by');
 
@@ -94,12 +103,22 @@ export function configureApp(app: Application, options: AppOptions): void {
       next();
       return;
     }
+    if (req.path !== '/') {
+      // The page finds its script and assets relative to its own address, so it only works at
+      // the root: send every deeper address there. Somebody who typed the room code as a path
+      // ("host/BCDF" instead of "host/#BCDF") still lands in that room.
+      const query = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
+      const code = roomCodeInPath(req.path);
+      res.set('Cache-Control', 'no-store');
+      res.redirect(302, `/${query}${code ? `#${code}` : ''}`);
+      return;
+    }
     if (dir && existsSync(join(dir, 'index.html'))) {
       res.set('Cache-Control', 'no-cache');
       // Relative to `root`, so a dot folder somewhere above the client is not mistaken for a hidden file.
       res.sendFile('index.html', { root: dir });
     } else {
-      res.status(req.path === '/' ? 200 : 404).type('text/plain').send(NO_CLIENT_NOTE);
+      res.type('text/plain').send(NO_CLIENT_NOTE);
     }
   });
 }

@@ -138,7 +138,28 @@ describe('Port Meridian: deployment', () => {
     }
   });
 
-  it('deploys four whole squads at every start and stage, clear of walls and inside the line', () => {
+  it('has no yard along the edge of the city that would trap a troop of tanks', () => {
+    // The last stage deploys troops (9 m radius, 0.75 m of room round them) along the city edge,
+    // lined up to some tens of meters inside it. Anywhere there a troop can be put, it must be
+    // able to drive out to a street. (Tanks and infantry are covered city-wide by the test above.)
+    const q = createCityQuery(built.index, createCityState(data));
+    const drive = reachMap(data, 9.25);
+    let spots = 0;
+    const trapped: string[] = [];
+    for (let z = -data.half + 11; z < data.half - 10; z += 2) {
+      for (let x = -data.half + 11; x < data.half - 10; x += 2) {
+        if (Math.max(Math.abs(x), Math.abs(z)) < data.half - 185) continue;
+        if (circleHitsStructure(q, x, z, 9.75)) continue;
+        spots++;
+        if (drive(x, z) !== 2) trapped.push(`E ${-x} N ${z}`);
+      }
+    }
+    expect(spots).toBeGreaterThan(150000);
+    expect(trapped, 'spots where a troop fits and cannot leave').toEqual([]);
+  });
+
+  it('deploys four whole squads at every start and stage, clear of walls, inside the line and free to leave', () => {
+    const reach = [reachMap(data, 3.25), reachMap(data, 4.25), reachMap(data, 9.25)];
     for (const a of data.anchors) {
       const world = createWorld({ seed: 11 + a.id, config: createMatchConfig({ anchor: a.id, bots: idleBots() }), city: built });
       expect(world.city).toBe(data);
@@ -153,6 +174,8 @@ describe('Port Meridian: deployment', () => {
           if (!u.alive) continue;
           alive++;
           expect(circleHitsStructure(world.cityQuery, u.x, u.z, u.radius), `${a.name} stage ${stage} unit ${u.id}`).toBe(false);
+          // Every unit, not only the one at the deploy point, can drive out to the streets.
+          expect(reach[stage - 1](u.x, u.z), `${a.name} stage ${stage} unit ${u.id} at E ${(-u.x).toFixed(0)} N ${u.z.toFixed(0)} is walled in`).toBe(2);
           expect(u.x >= b.minX + u.radius && u.x <= b.maxX - u.radius && u.z >= b.minZ + u.radius && u.z <= b.maxZ - u.radius).toBe(true);
           // Not on top of the kaiju: at least 150 m out even in the small stage 1 square.
           expect(Math.hypot(u.x - world.kaijus[0].x, u.z - world.kaijus[0].z)).toBeGreaterThan(150);

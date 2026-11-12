@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyHit,
+  beamPath,
   beginStage,
   bitGet,
   Btn,
@@ -8,6 +9,7 @@ import {
   DEG,
   DT,
   INPUT_BUFFER_TICKS,
+  kaijuEyePoint,
   LIZARD,
   MATCH_RULES,
   PROP_KINDS,
@@ -403,9 +405,9 @@ describe('grab and throw', () => {
       untilIdle(world);
       expect(k.held).not.toBeNull();
 
-      // Look at a point on the ground 20 m ahead.
+      // Look at a point on the ground 20 m ahead (the eye is in the head, a little ahead of the body's axis).
       const eye = LIZARD.stages[0].eyeHeight;
-      const aim = { aimPitch: -Math.atan2(eye, 20) };
+      const aim = { aimPitch: -Math.atan2(eye, 20 - LIZARD.stages[0].eyeForward) };
       let events = tap(world, button, aim);
       expect(actions(events)).toEqual([['throw', 'windup']]);
       events = [...events, ...play(world, 120, aim)];
@@ -453,7 +455,7 @@ describe('grab and throw', () => {
     expect(k.held).toEqual({ kind: 'prop', prop: 'bus' });
 
     // The crosshair is on the building's front wall, near its foot.
-    const aim = { aimPitch: -Math.atan2(LIZARD.stages[0].eyeHeight - 1, 24) };
+    const aim = { aimPitch: -Math.atan2(LIZARD.stages[0].eyeHeight - 1, 24 - LIZARD.stages[0].eyeForward) };
     const events = [...tap(world, Btn.grab, aim), ...play(world, 90, aim)];
     expect(eventsOf(events, 'projectileHit')).toMatchObject([{ target: 'structure', targetId: 0 }]);
     expect(1000 - world.structureHp[0]).toBe(A.throw.structureDamage[0]);
@@ -847,6 +849,30 @@ describe('the beam special', () => {
     expect(reports.length).toBeGreaterThan(5);
     expect(reports.length).toBeLessThan(burn / 2);
     expect(reports.every((e) => e.cause === 'beam')).toBe(true);
+  });
+
+  it('leaves the mouth where the model has it: ahead of the body along the aim, at mouth height', () => {
+    // The art's anchors (docs/art/client-notes-kaiju-lizard.md, section 7): eye and mouth, height / forward.
+    expect(LIZARD.stages.map((s) => [s.eyeHeight, s.eyeForward])).toEqual([[4.2, 1.73], [27.5, 10.95], [90.7, 38.5]]);
+    expect(LIZARD.stages.map((s) => [s.mouthHeight, s.mouthForward])).toEqual([[2.9, 2.5], [22, 15], [72, 51.4]]);
+    for (const stage of [1, 2, 3] as const) {
+      const st = LIZARD.stages[stage - 1];
+      const world = arena({}, stage);
+      const k = world.kaijus[0];
+      const yaw = 0.7;
+      const pitch = -0.3;
+      const path = beamPath(world.cityQuery, { kind: k.kind, stage, x: k.x, z: k.z, aimYaw: yaw, aimPitch: pitch }, beam);
+      expect(path.ox).toBeCloseTo(k.x + Math.sin(yaw) * st.mouthForward, 9);
+      expect(path.oy).toBe(st.mouthHeight);
+      expect(path.oz).toBeCloseTo(k.z + Math.cos(yaw) * st.mouthForward, 9);
+      // Pointed down it ends on the ground, as far ahead of the mouth as its height and the pitch say.
+      expect(path.end).toBe('ground');
+      const ahead = st.mouthForward + st.mouthHeight / Math.tan(-pitch);
+      expect(Math.hypot(path.ex - k.x, path.ez - k.z)).toBeCloseTo(ahead, 6);
+      // The eye, for the throw's aim and the camera.
+      const eye = kaijuEyePoint({ kind: k.kind, stage, x: k.x, z: k.z, aimYaw: yaw }, { x: 0, y: 0, z: 0 });
+      expect([eye.x - k.x, eye.y, eye.z - k.z]).toEqual([expect.closeTo(Math.sin(yaw) * st.eyeForward, 9), st.eyeHeight, expect.closeTo(Math.cos(yaw) * st.eyeForward, 9)]);
+    }
   });
 
   it('follows the aim: look down and it ends on the ground, look up and it clears a low building', () => {

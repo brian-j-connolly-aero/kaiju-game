@@ -6,7 +6,7 @@
  * a stranger's script would make them.
  */
 
-import { CLOSE_JOIN_TIMEOUT, JOIN_ERROR, ROOM_NAME } from '@mb/shared';
+import { buildStamp, CLOSE_JOIN_TIMEOUT, JOIN_ERROR, ROOM_NAME } from '@mb/shared';
 import { connect } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { checkRequest, createLimiter, DEFAULT_RATE_LIMITS, MAX_BODY_BYTES, senderOf } from '../src/http/guard';
@@ -191,7 +191,7 @@ describe('rooms and join requests with nobody behind them', () => {
 
   it('closes a connection that never finishes joining and takes its seat back', async () => {
     const host = await track(Player.create(ts.url, options(40)));
-    const seatOffer = await bare('joinById', host.code, { name: 'Zombie', token: token(41) });
+    const seatOffer = await bare('joinById', host.code, { name: 'Zombie', token: token(41), build: buildStamp() });
     expect(seatOffer.status).toBe(200);
     const { processId, roomId, sessionId } = seatOffer.data as { processId: string; roomId: string; sessionId: string };
 
