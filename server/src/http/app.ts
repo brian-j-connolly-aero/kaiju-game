@@ -8,7 +8,7 @@
  */
 
 import { pageIdOf, ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH } from '@mb/shared';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { extname, join } from 'node:path';
 import express, { type Application, type NextFunction, type Request, type Response } from 'express';
 import type { PerfReport } from '../room/perf';
@@ -46,6 +46,70 @@ export interface AppOptions {
 
 /** File names the bundler stamps with a content hash never change, so browsers may keep them. */
 const HASHED_ASSET = /-[A-Za-z0-9_-]{8}\.(?:js|css|woff2?)$/;
+
+/**
+ * Kinds of file the client build also ships gzip-compressed, as `<name>.gz` next to the original
+ * (scripts/precompress.mjs). The models, the code and the data shrink to about a quarter, so a
+ * friend's first load over the tunnel is four times lighter. Pictures and sounds are already
+ * compressed and are always sent as they are.
+ */
+const PRECOMPRESSED = new Set(['.js', '.css', '.json', '.glb', '.svg']);
+
+function cacheControlFor(filePath: string): string {
+  return HASHED_ASSET.test(filePath) ? 'public, max-age=31536000, immutable' : 'no-cache';
+}
+
+/**
+ * Sends `<file>.gz` with `Content-Encoding: gzip` when the browser accepts gzip and the build
+ * made one; otherwise passes the request on to the plain file. `X-File-Size` carries the
+ * original size, which the model loader reads to draw an honest loading bar.
+ */
+function precompressed(dir: string) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if ((req.method !== 'GET' && req.method !== 'HEAD') || !PRECOMPRESSED.has(extname(req.path))) {
+      next();
+      return;
+    }
+    // Whichever file is sent, caches must keep the two versions apart.
+    res.vary('Accept-Encoding');
+    if (!req.acceptsEncodings('gzip')) {
+      next();
+      return;
+    }
+    let rel: string;
+    try {
+      rel = decodeURIComponent(req.path).replace(/^\/+/, '');
+    } catch {
+      next();
+      return;
+    }
+    // Only plain paths inside the client folder; sendFile refuses ".." as well.
+    if (rel === '' || rel.includes('\0') || rel.split('/').some((part) => part === '..' || part.startsWith('.'))) {
+      next();
+      return;
+    }
+    let size: number;
+    try {
+      const plain = statSync(join(dir, rel));
+      if (!plain.isFile() || !statSync(join(dir, `${rel}.gz`)).isFile()) throw new Error('no pair');
+      size = plain.size;
+    } catch {
+      next();
+      return;
+    }
+    res.type(extname(rel));
+    res.setHeader('Content-Encoding', 'gzip');
+    res.setHeader('X-File-Size', String(size));
+    res.setHeader('Cache-Control', cacheControlFor(rel));
+    res.sendFile(`${rel}.gz`, { root: dir }, (err) => {
+      if (!err || res.headersSent) return;
+      res.removeHeader('Content-Encoding');
+      res.removeHeader('X-File-Size');
+      res.removeHeader('Content-Type');
+      next();
+    });
+  };
+}
 
 const NO_CLIENT_NOTE =
   'Monster Battle 9001: the game server is running, but the game page has not been built yet.\n' +
@@ -100,14 +164,12 @@ export function configureApp(app: Application, options: AppOptions): void {
 
   const dir = options.clientDir;
   if (dir) {
+    app.use(precompressed(dir));
     app.use(
       express.static(dir, {
         index: false,
         setHeaders(res, filePath) {
-          res.setHeader(
-            'Cache-Control',
-            HASHED_ASSET.test(filePath) ? 'public, max-age=31536000, immutable' : 'no-cache',
-          );
+          res.setHeader('Cache-Control', cacheControlFor(filePath));
         },
       }),
     );

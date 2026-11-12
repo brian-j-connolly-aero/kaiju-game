@@ -512,7 +512,12 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
 
 - HTTP on the same port: `GET /healthz` (JSON: `ok`, `protocol`, `build`, `uptime`, `rooms`,
   `players`, `fast`, `perf`, `publicUrl`), the built client from `client/dist` when it exists, and the game
-  page at the root. Any other page address is redirected (302) to the root, because the page
+  page at the root. Files of the built client: names with a content hash (the code, the style
+  sheet) are cached for a year (`immutable`), everything else is `no-cache` (revalidated by
+  ETag). Models, code, data and vector icons are also sent gzip-compressed (`Content-Encoding:
+  gzip`, `Vary: Accept-Encoding`, `X-File-Size` with the original size for the loading bar) from
+  the `<file>.gz` copies the client build writes (`scripts/precompress.mjs`); a first load is
+  about 2.2 MB instead of 8.7 MB. Any other page address is redirected (302) to the root, because the page
   finds its script and assets relative to its own address; one that ends in a room code
   (`/BCDF`, `/join/bcdf/`) is redirected to `/#BCDF`, which joins that room. `perf` is the room loop's own timing over the most recent updates of
   running matches, all rooms together (`server/src/room/perf.ts`; a ring of 3000 updates, about

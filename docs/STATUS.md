@@ -12,7 +12,9 @@ tuning: `docs/BALANCE.md`), the city switch (section 10: the game now plays in P
 the client core task (everything in `client/`, `tools/playtest/`, `tools/build-manifest.mjs`:
 section 7), the integration task (section 8: what was run end to end, what was measured,
 what is still wrong) and the client's city task (section 11: Port Meridian drawn from its art,
-the last client follow-ups); the rest is from the scaffold task.
+the last client follow-ups), the client polish (section 12) and the release round (section 13:
+the image rebuilt and played against, compressed downloads, the player guide); the rest is
+from the scaffold task.
 
 **Read section 11.1 first: it says whether `npm run check` passes right now.**
 
@@ -26,12 +28,13 @@ the last client follow-ups); the rest is from the scaffold task.
 | `npm run sim` | The balance harness: full bot-versus-bot matches, headless, a few hundred times real speed, one table row per match plus a summary. Options after `--`: `--seeds N` (default 5), `--seed N`, `--unopposed` (no squads), `--kaiju-handicap H`, `--human-handicap H` (0 best, 1 stands still), `--trigger-happy` (squads hold the trigger instead of charging volleys), `--fast`, `--anchor N`, `--every-anchor` (every start in turn), `--bar P1,P2,P3` (other bar fractions for one run), `--nav` (how the bots got about), `--city placeholder` (the old grid city), `--max-minutes N`, `--events`, `--json`. 20 matches take 25 to 50 s depending on what else the machine is doing. How to read it: `docs/BALANCE.md`. |
 | `npx vitest run server/test` | Only the server tests: 115 tests, about 18 seconds (four files start a real server on a free port and connect real clients; `process.test.ts` starts the entry point as a process of its own). `MB_TEST_SPEED=1 npx vitest run server/test/lifecycle.test.ts` plays the full five-client match in real time (about 3 minutes). |
 | `npm run dev` | Starts the server (`tsx watch`, port 2567) and the client (Vite, port 5173) side by side with hot reload; open the Vite address. Vite forwards matchmaking and the WebSocket to the server, so the page talks to its own origin exactly as in production. |
-| `npm run build`, `npm start` | Bundles the server to `server/dist/index.js`, builds the client to `client/dist`; `npm start` runs the bundle, which serves the built client and the game on one port (`PORT`, default 2567). Environment variables: `ARCHITECTURE.md` section 4.4. |
+| `npm run build`, `npm start` | Bundles the server to `server/dist/index.js`, builds the client to `client/dist` (and writes a gzip copy, `<file>.gz`, of every model, script, style sheet, data file and vector icon there: `scripts/precompress.mjs`; the server sends it to browsers that accept gzip); `npm start` runs the bundle, which serves the built client and the game on one port (`PORT`, default 2567). Environment variables: `ARCHITECTURE.md` section 4.4. |
 | Hosting (`host/start.cmd`, `host/start.sh`, `npm run host`) | Self-hosting for playtests: `Containerfile` and `compose.yaml` (game plus a Cloudflare Tunnel) at the root, one-command start, stop, update and logs scripts in `host/`, and `npm run host` (build, then start) without containers. The start scripts check the public link through the tunnel, which also tells the server its public address; the lobby's link button then copies an invite that works for friends even when the host plays on localhost (`MB_PUBLIC_URL` for a named tunnel; `ARCHITECTURE.md` section 4.4). The owner's guide: `docs/HOSTING.md`. |
+| Player guide, readme | `README.md` at the root (what this is, where to start); `docs/PLAYING.md`, the guide the host sends to friends (joining, both sides, the controls from `actions.ts`, the pictures on screen, tips). Keep its controls tables in step with `actions.ts` and `DESIGN.md` section 8. |
 | `npm run export:defs` | Rewrites `tools/art/data/archetypes.json` from the code (`-- --check` only verifies). A test fails when the file is stale. |
 | `npm run assets:manifest` | `tools/build-manifest.mjs`: merges `client/public/assets/manifest.*.json` into `manifest.json`, lists the files in `ui/`, and leaves out (and reports) entries whose files are missing. `-- --check` only says whether the file is stale. The client build runs it first. |
 | `npx vitest run client/test` | Only the client tests: 20 tests, about 1 second (prediction against a real simulation through latency, the mirrored city, interpolation, the clock, the action map, the animator, the manifest tool). |
-| `node tools/playtest/smoke.mjs` | The browser smoke playtest: starts the server with `MB_FAST=1` on a free port against the production build, opens 5 headless Chromium pages on autoplay (one creates a room, four join by code), plays one match to its end, fails on any console error or page crash, saves screenshots to `/tmp/mb-scratch/playtest/` and prints, per page, draw calls and triangles (peak, and peak at stage 3), bytes over the WebSocket, snapshot size, a smoothness probe, and the server's own timing from `/healthz`. About 4 minutes on this machine. Options in the file header (`--players N`, `--role human`, `--no-assets`, `--reconnect`, `--debug`, `--idle-humans`, `--expect kaiju\|humans`, `--expect-stage N`). Five software-rendered pages take the whole machine: the server then runs at about 21 ticks a second, so this run's timing and bandwidth figures describe the test rig, not the game (section 8.3). |
+| `node tools/playtest/smoke.mjs` | The browser smoke playtest: starts the server with `MB_FAST=1` on a free port against the production build, opens 5 headless Chromium pages on autoplay (one creates a room, four join by code), plays one match to its end, fails on any console error or page crash, saves screenshots to `/tmp/mb-scratch/playtest/` and prints, per page, draw calls and triangles (peak, and peak at stage 3), bytes over the WebSocket, snapshot size, a smoothness probe, and the server's own timing from `/healthz`. About 4 minutes on this machine. Options in the file header (`--url URL` plays against a server that is already running, such as the game container started with `MB_FAST=1`, and starts nothing; `--players N`, `--role human`, `--no-assets`, `--reconnect`, `--debug`, `--idle-humans`, `--expect kaiju\|humans`, `--expect-stage N`). Five software-rendered pages take the whole machine: the server then runs at about 21 ticks a second, so this run's timing and bandwidth figures describe the test rig, not the game (section 8.3). |
 | `node tools/playtest/scripted.mjs` | The scripted playtest with real inputs: no autopilot. One headless page plays the kaiju, then another plays a squad in a practice match, with real key presses, mouse buttons, mouse movement and clicks on the real lobby buttons (`tools/playtest/driver.mjs`). Each action is judged only by what the server sent back (its newest snapshot and its events) and ends as pass, FAIL or not attempted; the run passes only if everything was attempted and confirmed. Screenshots and `report.json` in `/tmp/mb-scratch/playtest/scripted/`. About 5 minutes. `--only kaiju\|human`, `--out DIR`. It switches pointer lock off (headless Chromium reports garbage mouse movement under it), so mouse look under pointer lock is NOT covered by it. |
 | `node tools/playtest/shots.mjs` | Stage screenshots with no server: opens the built client in sandbox mode (`?sandbox=<stage>`, the simulation runs in the page) for stages 1 to 3 on both sides, plus scripted extras (command wheel, charging lasers, two molts, the beam, a stagger). Pictures in `/tmp/mb-scratch/playtest/shots/`; fails on console errors. |
 
@@ -1318,3 +1321,61 @@ Scratch logs, scripts and every picture named here: `/tmp/mb-scratch/client-poli
   goes magenta for a few seconds. Neither is new, both are short.
 - The card's own icon is drawn in code; the art team may want to replace `ui_controls`.
 
+
+## 13. Release round before the first playtest (12 November, the release task)
+
+Scratch log, measuring scripts and pictures: `/tmp/mb-scratch/release/` (`PROGRESS.md`).
+
+### 13.1 What changed
+
+- **Last hookups** from the art polish notes: `ground_plaza` and `ground_far` are in the
+  client's texture list (a missing file is reported like the other ground tiles); two stale
+  comments about stand-ins fixed (`procedural/sprites.ts`, `ui/iconArt.ts`). No stand-in is
+  left where an art file exists; only `ui_controls` is still drawn in code (it has no file).
+- **Compressed downloads.** The client build now ends with `scripts/precompress.mjs`, which
+  writes a gzip copy (`<file>.gz`) of every model, script, style sheet, data file and vector
+  icon in `client/dist` (173 files, 8.4 MB to 1.7 MB). The server (`server/src/http/app.ts`)
+  sends that copy to browsers that accept gzip, with `Content-Encoding: gzip`,
+  `Vary: Accept-Encoding`, the same cache rule as the plain file, and `X-File-Size` (the
+  original size, which the model loader reads, so the loading bar stays honest). Pictures and
+  sounds are sent as before. Nothing is compressed at run time and nothing new is installed.
+  Covered by a new test in `server/test/realtime.test.ts`.
+- **`smoke.mjs --url URL`** plays against a server that is already running (the container)
+  and starts nothing.
+- **Documents:** `README.md` (new, at the root), `docs/PLAYING.md` (new: the guide the host
+  sends to friends), `docs/HOSTING.md` (sizes, the first-load note, the controller, the guide,
+  section 11 updated with this round), `docs/ARCHITECTURE.md` section 4.4 (cache and
+  compression rules).
+
+### 13.2 Measured (the container image built from this tree)
+
+| What | Figure |
+| --- | --- |
+| Image | 256 MB (254 MB before the compressed copies) |
+| `npm run check` | passed: 56 test files, 736 tests (1 new) |
+| In the image and served | 65 models (40 buildings and landmarks), 11 textures, 31 sprites in 4 sheets, 92 icons, 13 music pieces, 129 sound effect files, 221 voice lines (every sound as MP3 and OGG: 726 files, none missing) |
+| Cold first load (fresh browser, until the home screen) | 2.16 MB in 88 requests (was 8.71 MB); local: 1.1 s; over a simulated 10 megabit per second line: 2.8 s (was 8.1 s). No console errors or warnings. |
+| Cache rules | hashed code and style sheet: one year, `immutable`; everything else `no-cache` with an ETag (a repeat visit only revalidates) |
+| Five-page match against the container (`MB_FAST=1`, `--idle-humans --expect-stage 3`) | passed: stage 3 reached, humans won on the clock, zero console errors and zero warnings on all five pages, about 50 kbit/s down per page |
+
+### 13.3 How the image was built here, and why it differs from the host scripts
+
+`podman compose build game` (what `host/start.sh` runs) needs Podman's service socket, which
+this machine does not run by default: it was started for the test and stopped afterwards (Podman
+Desktop provides it on Windows). Inside the build, `npm ci` could not reach the package registry
+through this machine's intercepting network proxy without its certificate, so the image was
+built with `podman build --network host` from a scratch copy of the `Containerfile` that only
+adds `ARG NODE_EXTRA_CA_CERTS` to the two install stages. The runtime image is the same; the
+owner's machine needs none of this. The container was then started with `podman compose up
+game` exactly as the scripts do (no tunnel), and a second one with `MB_FAST=1` for the match.
+
+### 13.4 Still open
+
+- The real tunnel, the Windows scripts, Docker, and a real controller and graphics card:
+  untested, as before (`HOSTING.md` section 11).
+- In this run the screenshot meant to show a guest's lobby caught the first frame of the
+  match instead, with every action hint (monster, squad and drone) on screen at once. The
+  machine was overloaded, so this frame lasted long enough to be photographed; on a normal
+  computer it should be a single frame. Not chased.
+- From earlier rounds and unchanged: the halfway sunset-to-night magenta moment, the flaky
+  kaiju holds in `scripted.mjs`, and no district roof colors.

@@ -19,11 +19,12 @@ their web browser. The game itself never contacts any other outside service.
 
   Either is fine. If you already have one, use that one.
 - About **5 GB (gigabytes) of free disk space**: the container program itself, plus about 1.5 GB for the
-  game and the building blocks it is built from. (The finished game is about 250 MB, megabytes.)
+  game and the building blocks it is built from. (The finished game is about 260 MB, megabytes.)
 - About **4 GB of free memory** while hosting. A computer with 8 GB or more is comfortable.
 - A normal home internet connection. Five friends playing use very little of it.
-- Your friends need: a computer (not a phone or tablet) with a **keyboard and mouse**, and an
-  up-to-date **Chrome, Edge or Firefox** browser. Nothing to install.
+- Your friends need: a computer (not a phone or tablet) with a **keyboard and mouse** (a game
+  controller works too), and an up-to-date **Chrome, Edge or Firefox** browser. Nothing to
+  install. Send them the player guide, **docs/PLAYING.md**, before the evening.
 
 ## 2. First-time setup (once)
 
@@ -85,7 +86,12 @@ the internet (to download the building blocks). Every later start takes seconds.
      group chat.
    - The **code** works too: friends open the link from step 4, enter their name, choose
      **join** and type the code.
-8. Five players in total: one plays the monster, four play the army squads.
+8. Five players in total: one plays the monster, four play the army squads. Empty seats are
+   played by the computer, so you can also start with fewer friends.
+9. Opening the game the first time downloads about 2 MB (megabytes) for the game and its city;
+   on an ordinary home connection that takes a few seconds, and a bar shows how far it is.
+   Sounds and voices follow in the background. If you update the game while friends still have
+   the old page open, their page reloads itself when they next join.
 
 ## 4. Stopping
 
@@ -226,13 +232,20 @@ If the computer has **Node.js 22** (a program that runs JavaScript) installed:
 
 ## 11. What was tested, and what was not
 
-Honest status of this hosting package, as of its first version. It was tried on a Linux test
-machine, not on Windows.
+Honest status of this hosting package, as of the release round before the first five-player
+playtest. It was tried on a Linux test machine, not on Windows.
 
 **Tested there, and working:**
 
 - Building the container image with Podman, from a clean copy of the game. The finished image
-  is about 250 MB.
+  is about 260 MB (measured: 256 MB).
+- In the release round, the image was built again from the final game and run on the test
+  machine: the health check answered, the page, all 65 models (40 of them buildings), the
+  pictures, the music, the sound effects and the 221 voice lines were all in it and served,
+  and five browser windows played a whole match against it (the monster grew to stage 3)
+  with no errors. A first visit downloads about 2.2 MB and showed the home screen in under
+  3 seconds over a simulated 10 megabit-per-second connection. (Before this round the game
+  sent its files uncompressed: 8.7 MB and about 8 seconds.)
 - Running it: the health check answers, the game page loads, and a browser without a window
   (driven by a program) reached the home screen and created a room with no errors.
 - Stopping it: the game shuts down cleanly in under a second.

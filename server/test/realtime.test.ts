@@ -8,6 +8,7 @@ import { buildStamp, CLOSE_REPLACED, JOIN_ERROR, rulesStamp, SNAPSHOT_RATE, TICK
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { connect, createServer, type AddressInfo, type Server, type Socket } from 'node:net';
 import { tmpdir } from 'node:os';
+import { gzipSync } from 'node:zlib';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PING_INTERVAL_MS, PING_MAX_MISSED } from '../src/net/server';
@@ -18,6 +19,8 @@ const PAGE = (script: string): string => `<!doctype html><title>Monster Battle 9
 const PAGE_SCRIPT = 'index-Bq3xK9pZ.js';
 
 const GRACE_SECONDS = 4;
+/** Stand-in model bytes that compress well, like the real models do. */
+const KAIJU_MODEL = Buffer.from('glTF'.repeat(2000));
 
 let ts: TestServer;
 let clientDir: string;
@@ -51,6 +54,9 @@ beforeAll(async () => {
   writeFileSync(join(clientDir, 'index.html'), PAGE(PAGE_SCRIPT));
   writeFileSync(join(clientDir, 'assets', PAGE_SCRIPT), 'console.log("game")');
   writeFileSync(join(clientDir, 'assets', 'models', 'army_tank.glb'), 'glb');
+  // A model the build also compressed (scripts/precompress.mjs).
+  writeFileSync(join(clientDir, 'assets', 'models', 'kaiju_gragnor.glb'), KAIJU_MODEL);
+  writeFileSync(join(clientDir, 'assets', 'models', 'kaiju_gragnor.glb.gz'), gzipSync(KAIJU_MODEL));
   ts = await startTestServer({ graceSeconds: GRACE_SECONDS, clientDir });
 });
 
@@ -122,6 +128,32 @@ describe('http', () => {
     const model = await fetch(`${ts.url}/assets/models/army_tank.glb`);
     expect(model.status).toBe(200);
     expect(model.headers.get('cache-control')).toBe('no-cache');
+  });
+
+  it('sends the compressed copy of a file to browsers that accept it, and the plain one otherwise', async () => {
+    const url = `${ts.url}/assets/models/kaiju_gragnor.glb`;
+    const packed = await fetch(url, { headers: { 'accept-encoding': 'gzip, deflate, br' } });
+    expect(packed.status).toBe(200);
+    expect(packed.headers.get('content-encoding')).toBe('gzip');
+    expect(packed.headers.get('content-type')).toBe('model/gltf-binary');
+    expect(packed.headers.get('x-file-size')).toBe(String(KAIJU_MODEL.length));
+    expect(packed.headers.get('vary')).toContain('Accept-Encoding');
+    expect(packed.headers.get('cache-control')).toBe('no-cache');
+    expect(Number(packed.headers.get('content-length'))).toBeLessThan(KAIJU_MODEL.length / 10);
+    // fetch undoes the compression: the bytes are the model's own.
+    expect(Buffer.from(await packed.arrayBuffer()).equals(KAIJU_MODEL)).toBe(true);
+    const plain = await fetch(url, { headers: { 'accept-encoding': 'identity' } });
+    expect(plain.status).toBe(200);
+    expect(plain.headers.get('content-encoding')).toBeNull();
+    expect(Number(plain.headers.get('content-length'))).toBe(KAIJU_MODEL.length);
+    expect(plain.headers.get('vary')).toContain('Accept-Encoding');
+    // A file without a compressed copy is sent as it is, even to a browser that accepts gzip.
+    const tank = await fetch(`${ts.url}/assets/models/army_tank.glb`, { headers: { 'accept-encoding': 'gzip' } });
+    expect(tank.headers.get('content-encoding')).toBeNull();
+    expect(await tank.text()).toBe('glb');
+    // A missing file stays a 404.
+    const missing = await fetch(`${ts.url}/assets/models/missing.glb`, { headers: { 'accept-encoding': 'gzip' } });
+    expect(missing.status).toBe(404);
   });
 
   it('answers 404 for a missing file instead of the game page', async () => {

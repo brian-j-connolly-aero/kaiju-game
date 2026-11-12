@@ -18,6 +18,9 @@
  *   --width W --height H   page size (default 800 x 450; small keeps software rendering fast)
  *   --no-assets      run the client on procedural fallbacks only (?assets=none)
  *   --no-build       do not build when client/dist or server/dist is missing; fail instead
+ *   --url URL        play against a server that is already running at URL (for example the
+ *                    game container: http://127.0.0.1:PORT) instead of starting one. Nothing is
+ *                    built or started. Start that server with MB_FAST=1 for the short clock.
  *   --headed         show the browser windows
  *   --reconnect      drop one human's connection mid-match and expect it to come back
  *   --debug          show the ?debug=1 overlay on every page (default: on the last page only)
@@ -82,7 +85,7 @@ export const CHROMIUM_ARGS = [
 const NAMES = ['Rex', 'Ada', 'Bo', 'Cy', 'Di'];
 
 function parseArgs(argv) {
-  const opts = { players: 5, role: 'kaiju', out: '/tmp/mb-scratch/playtest', timeout: 300, width: 800, height: 450, noAssets: false, build: true, headed: false, reconnect: false, debug: false, idleHumans: false, expect: '', expectStage: 0 };
+  const opts = { url: '', players: 5, role: 'kaiju', out: '/tmp/mb-scratch/playtest', timeout: 300, width: 800, height: 450, noAssets: false, build: true, headed: false, reconnect: false, debug: false, idleHumans: false, expect: '', expectStage: 0 };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const next = () => argv[++i];
@@ -94,6 +97,7 @@ function parseArgs(argv) {
     else if (a === '--height') opts.height = Number(next()) || 450;
     else if (a === '--no-assets') opts.noAssets = true;
     else if (a === '--no-build') opts.build = false;
+    else if (a === '--url') opts.url = String(next() || '').replace(/\/+$/, '');
     else if (a === '--headed') opts.headed = true;
     else if (a === '--reconnect') opts.reconnect = true;
     else if (a === '--debug') opts.debug = true;
@@ -141,7 +145,7 @@ async function main() {
   // --- builds --------------------------------------------------------------------------------
   const serverEntry = join(root, 'server', 'dist', 'index.js');
   const clientIndex = join(root, 'client', 'dist', 'index.html');
-  if (!existsSync(serverEntry) || !existsSync(clientIndex)) {
+  if (!opts.url && (!existsSync(serverEntry) || !existsSync(clientIndex))) {
     if (!opts.build) throw new Error('client/dist or server/dist is missing: run `npm run build` first');
     console.log('smoke: no production build found, running `npm run build`...');
     const built = spawnSync('npm', ['run', 'build'], { cwd: root, stdio: 'inherit' });
@@ -149,24 +153,27 @@ async function main() {
   }
 
   // --- server --------------------------------------------------------------------------------
-  const port = await freePort();
-  const origin = `http://127.0.0.1:${port}`;
+  // With --url the server is somebody else's (a container, say): it is neither started nor stopped here.
+  const origin = opts.url || `http://127.0.0.1:${await freePort()}`;
   const serverLog = [];
-  const server = spawn(process.execPath, ['--enable-source-maps', serverEntry], {
-    cwd: join(root, 'server'),
-    env: { ...process.env, PORT: String(port), HOST: '127.0.0.1', MB_FAST: '1', MB_CLIENT_DIR: join(root, 'client', 'dist') },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  const keep = (chunk) => {
-    for (const line of String(chunk).split('\n')) if (line.trim()) serverLog.push(line);
-    if (serverLog.length > 400) serverLog.splice(0, serverLog.length - 400);
-  };
-  server.stdout.on('data', keep);
-  server.stderr.on('data', keep);
   let serverExit = null;
-  server.on('exit', (code) => {
-    serverExit = code ?? -1;
-  });
+  let server = null;
+  if (!opts.url) {
+    server = spawn(process.execPath, ['--enable-source-maps', serverEntry], {
+      cwd: join(root, 'server'),
+      env: { ...process.env, PORT: new URL(origin).port, HOST: '127.0.0.1', MB_FAST: '1', MB_CLIENT_DIR: join(root, 'client', 'dist') },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const keep = (chunk) => {
+      for (const line of String(chunk).split('\n')) if (line.trim()) serverLog.push(line);
+      if (serverLog.length > 400) serverLog.splice(0, serverLog.length - 400);
+    };
+    server.stdout.on('data', keep);
+    server.stderr.on('data', keep);
+    server.on('exit', (code) => {
+      serverExit = code ?? -1;
+    });
+  }
 
   // One browser per page: pages of one browser share a single GPU process, and with software
   // rendering that process becomes the bottleneck (five pages crawl at two frames a second).
@@ -182,7 +189,7 @@ async function main() {
         }),
       ),
     );
-    if (serverExit === null) {
+    if (server && serverExit === null) {
       server.kill('SIGTERM');
       await Promise.race([new Promise((r) => server.once('exit', r)), sleep(4000)]);
       if (serverExit === null) server.kill('SIGKILL');

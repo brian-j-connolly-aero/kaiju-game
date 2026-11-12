@@ -56,6 +56,8 @@ const TEXTURE_IDS = [
   'ground_grass',
   'ground_water',
   'ground_rubble',
+  'ground_plaza',
+  'ground_far',
   'clouds_a',
   'clouds_b',
   'city_atlas',

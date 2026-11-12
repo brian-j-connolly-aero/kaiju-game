@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node ../tools/build-manifest.mjs --quiet && vite build",
+    "build": "node ../tools/build-manifest.mjs --quiet && vite build && node ../scripts/precompress.mjs dist",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json"
   },

@@ -117,7 +117,7 @@ const ART: Record<string, string> = {
   // This page is from an older build than the server: a page with a turning arrow (reload it).
   ui_outdated: `<path d="M10 8 L42 8 L54 20 L54 56 L10 56 Z" ${S} stroke-width="4"/><path d="M42 8 L42 20 L54 20" ${S} stroke-width="4"/><path d="M42 38 A10 10 0 1 1 36 29" ${S}/><path d="M33 22 L37 29 L30 32" ${S} stroke-width="4"/>`,
   ui_newspaper: `<rect x="8" y="10" width="48" height="44" ${S} stroke-width="4"/><path d="M14 20 L50 20" ${S} stroke-width="6"/>`,
-  // --- settings and the drone (drawn here only; no art file yet) ---
+  // --- settings and the drone (fallbacks; the art files are in public/assets/ui) ---
   // The controls card: a card with a keycap and a directional pad on it.
   ui_controls: `<rect x="4" y="12" width="56" height="40" rx="7" ${S} stroke-width="4"/><rect x="13" y="23" width="17" height="17" rx="3" ${F}/><path d="M46 21 L46 43 M35 32 L57 32" ${S} stroke-width="6" stroke-linecap="butt"/>`,
   ui_settings: `<path d="${cogPath(32, 32, 28, 20, 9, 8)}" fill="currentColor" fill-rule="evenodd" stroke="none"/>`,

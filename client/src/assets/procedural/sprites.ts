@@ -288,7 +288,7 @@ export function fxSheet(): ProceduralSheet {
 /**
  * World markers in the game's shape language (DESIGN.md section 8): circles for humans,
  * triangles for the kaiju, diamonds for charging volleys. White, tinted per instance. These are
- * the client's own and are always drawn by this function.
+ * stand-ins for the art in sprites/markers.png (same sizes).
  */
 export function markerSheet(): ProceduralSheet {
   const S = 32;
