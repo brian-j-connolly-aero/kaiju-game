@@ -175,7 +175,7 @@ export class Hud {
     this.nerve = meter('st_nerve', 'own-nerve');
     this.rage = meter('st_rage', 'own-rage');
     this.charge = meter('st_charge', 'own-charge');
-    this.reload = meter('cmd_fireatwill', 'own-reload');
+    this.reload = meter('st_reload', 'own-reload');
     const meters = el('div', 'meters', [this.health.root, this.nerve.root, this.rage.root, this.charge.root, this.reload.root]);
 
     // --- squads ---
@@ -193,7 +193,7 @@ export class Hud {
       camera: hint('st_camera', 'camera'),
     };
     this.humanHints = {
-      fire: hint('cmd_fireatwill', 'fire'),
+      fire: hint('st_reload', 'fire'),
       wheel: hint('cmd_holdcharge', 'wheel'),
       callIn: hint('st_callin', 'callIn'),
       map: hint('st_map', 'map'),

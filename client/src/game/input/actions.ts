@@ -231,10 +231,10 @@ const PAD_ICONS: Record<number, string> = {
   [PAD.start]: 'gp_start',
   [PAD.ls]: 'gp_ls',
   [PAD.rs]: 'gp_rs',
-  [PAD.up]: 'gp_dpad',
-  [PAD.down]: 'gp_dpad',
-  [PAD.left]: 'gp_dpad',
-  [PAD.right]: 'gp_dpad',
+  [PAD.up]: 'gp_dpad_up',
+  [PAD.down]: 'gp_dpad_down',
+  [PAD.left]: 'gp_dpad_left',
+  [PAD.right]: 'gp_dpad_right',
 };
 
 const KEY_LABELS: Record<string, string> = {

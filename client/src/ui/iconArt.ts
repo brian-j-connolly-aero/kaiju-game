@@ -43,6 +43,7 @@ const ART: Record<string, string> = {
   st_health: `<path d="M32 54 L10 32 Q4 18 18 14 Q28 12 32 24 Q36 12 46 14 Q60 18 54 32 Z" ${F}/>`,
   st_nerve: `<path d="M6 34 L18 34 L24 14 L34 50 L42 26 L46 34 L58 34" ${S}/>`,
   st_rage: `<path d="M32 6 Q46 22 44 32 Q52 28 50 20 Q60 36 52 48 Q44 60 30 58 Q14 54 14 40 Q14 28 24 20 Q24 30 30 30 Q26 18 32 6 Z" ${F}/>`,
+  st_reload: `<path d="M32 6 Q42 18 42 30 L42 46 L22 46 L22 30 Q22 18 32 6 Z M22 52 L42 52 L42 58 L22 58 Z" ${F}/>`,
   st_charge: `<path d="M32 8 L52 32 L32 56 L12 32 Z" ${F}/>`,
   st_veteran: `<path d="M12 26 L32 10 L52 26 M12 44 L32 28 L52 44" ${S}/>`,
   st_spotted: `<path d="M4 32 Q32 6 60 32 Q32 58 4 32 Z" ${S}/><circle cx="32" cy="32" r="8" ${F}/>`,
@@ -97,6 +98,10 @@ const ART: Record<string, string> = {
   gp_ls: `<circle cx="32" cy="32" r="24" ${S} stroke-width="4"/><circle cx="26" cy="32" r="10" ${F}/>`,
   gp_rs: `<circle cx="32" cy="32" r="24" ${S} stroke-width="4"/><circle cx="38" cy="32" r="10" ${F}/>`,
   gp_dpad: `<path d="M24 6 L40 6 L40 24 L58 24 L58 40 L40 40 L40 58 L24 58 L24 40 L6 40 L6 24 L24 24 Z" ${S} stroke-width="4"/>`,
+  gp_dpad_up: `<path d="M24 6 L40 6 L40 24 L58 24 L58 40 L40 40 L40 58 L24 58 L24 40 L6 40 L6 24 L24 24 Z" ${S} stroke-width="4"/><rect x="24" y="6" width="16" height="18" ${F}/>`,
+  gp_dpad_right: `<path d="M24 6 L40 6 L40 24 L58 24 L58 40 L40 40 L40 58 L24 58 L24 40 L6 40 L6 24 L24 24 Z" ${S} stroke-width="4"/><rect x="40" y="24" width="18" height="16" ${F}/>`,
+  gp_dpad_down: `<path d="M24 6 L40 6 L40 24 L58 24 L58 40 L40 40 L40 58 L24 58 L24 40 L6 40 L6 24 L24 24 Z" ${S} stroke-width="4"/><rect x="24" y="40" width="16" height="18" ${F}/>`,
+  gp_dpad_left: `<path d="M24 6 L40 6 L40 24 L58 24 L58 40 L40 40 L40 58 L24 58 L24 40 L6 40 L6 24 L24 24 Z" ${S} stroke-width="4"/><rect x="6" y="24" width="18" height="16" ${F}/>`,
   gp_start: `<path d="M14 22 L50 22 M14 32 L50 32 M14 42 L50 42" ${S}/>`,
   gp_back: `<rect x="10" y="18" width="30" height="22" rx="3" ${S} stroke-width="4"/><rect x="24" y="28" width="30" height="22" rx="3" ${S} stroke-width="4"/>`,
   // --- client extras (not in the art list) ---

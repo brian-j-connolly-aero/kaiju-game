@@ -80,7 +80,8 @@ body {
 
 .glyph-label {
   position: absolute;
-  inset: 0;
+  /* Centered on the keycap's top face (41.5% down), not on the whole picture. */
+  inset: 0 0 17% 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -505,6 +506,23 @@ body {
   filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.6));
 }
 
+/* The finished skyline (assets/ui/skyline.svg), inlined over the procedural one. */
+.bar {
+  color: #e9edf7;
+}
+
+.bar .sky-rubble {
+  color: var(--rubble);
+}
+
+.bar-edge-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--kaiju);
+}
+
 .bar-city {
   fill: #e9edf7;
 }
@@ -520,7 +538,7 @@ body {
 .bar-mark {
   position: absolute;
   top: 100%;
-  transform: translateX(-100%);
+  transform: translateX(-50%);
   font-size: 18px;
   color: rgba(255, 255, 255, 0.55);
 }
@@ -566,6 +584,14 @@ body {
   bottom: -10px;
   font-size: 20px;
   color: #c9d6ff;
+}
+
+/* Icons that stand straight on the sky get a thin dark edge (orange on a sunset vanishes). */
+.meter-icon,
+.bar-mark,
+.stage-pip,
+.clock-moon {
+  filter: drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000) drop-shadow(0 1px 1px #000);
 }
 
 .clock.late .clock-arc {
@@ -667,7 +693,6 @@ body {
 
 .meter-icon {
   font-size: 20px;
-  filter: drop-shadow(0 1px 1px #000);
 }
 
 .meter-track {
@@ -972,7 +997,7 @@ body {
 }
 
 .status-spotted {
-  color: var(--human);
+  color: var(--kaiju);
   font-size: 30px;
   animation: none !important;
 }
@@ -1067,7 +1092,7 @@ body {
 }
 
 .wheel-glyph {
-  font-size: 18px;
+  font-size: 22px;
   color: #fff;
 }
 
@@ -1264,7 +1289,7 @@ body[data-screen='end'] .subtitles {
 
 .tally-icon {
   font-size: 22px;
-  margin-right: -8px;
+  margin-right: 2px;
 }
 
 .tally-more {
@@ -1552,7 +1577,7 @@ body[data-screen='end'] .subtitles {
 
   .tally-icon {
     font-size: 17px;
-    margin-right: -6px;
+    margin-right: 2px;
   }
 
   .tally-row {
