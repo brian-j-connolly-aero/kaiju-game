@@ -2225,7 +2225,7 @@
         "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
         "part": "wall plaster"
       },
-      "tris": 900
+      "tris": 904
     },
     "lm_city_hall": {
       "chunks": 9,

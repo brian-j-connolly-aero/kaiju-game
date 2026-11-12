@@ -265,8 +265,14 @@ class Building:
                 n /= np.linalg.norm(n)
                 along_v = (b - a) / np.linalg.norm(b - a)
                 ww, wh = style.WINDOW
-                zc = z0 + rise * 0.18
-                if zc + wh < zr - rise * 0.25 or rise >= 2.6:
+                # the window must sit inside the gable triangle: its top corners stay under the
+                # verge boards (0.22 m below the slope) with a little margin. It may drop a
+                # little below the wall top (into the wall plate) to fit a low gable; if it
+                # still does not fit, the gable has no window.
+                half = np.linalg.norm(b - a) / 2
+                limit = z0 + rise * (1.0 - (ww / 2) / half) - 0.22 - 0.1
+                zc = min(z0 + rise * 0.18, limit - wh)
+                if zc >= z0 - 0.35:
                     c0 = mid + n * 0.03 + UP * (zc - mid[2])
                     q = [c0 - along_v * ww / 2, c0 + along_v * ww / 2, c0 + along_v * ww / 2 + UP * wh,
                          c0 - along_v * ww / 2 + UP * wh]

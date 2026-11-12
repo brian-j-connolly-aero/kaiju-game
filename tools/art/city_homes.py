@@ -530,6 +530,8 @@ def shrine_a(b):
     def hook(b, m):
         tidy(b, m)
         m.faces = [f for f in m.faces if not (f.tag == "interior" and f.center[2] > 9.2)]
+        # the top tier is gone: no sliver of its brim may be left hanging in the air
+        m.faces = [f for f in m.faces if f.center[2] < 8.5]
     b.damage_hook = hook
 
 

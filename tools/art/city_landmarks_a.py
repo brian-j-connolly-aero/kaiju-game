@@ -692,6 +692,11 @@ def anchor_field(b):
         face(b, [p - inward / np.linalg.norm(inward) * 0.04 for p in fq], SEA, want=-inward)
         oq = [q[0], q[1], q[1] - UP * 0.6, q[0] - UP * 0.6]
         face(b, oq, WHITE, want=-inward)
+        # close the two ends of the canopy (no slit between its top and its underside)
+        for e, (ea, eb), tt in ((k == ks[0], (0, 3), t0), (k == ks[-1], (1, 2), t1)):
+            if e:
+                tang = _ell(A0, B0, tt + (0.01 if tt == t1 else -0.01), 0) - _ell(A0, B0, tt, 0)
+                face(b, [q[ea], q[eb], q[eb] - UP * 0.35, q[ea] - UP * 0.35], WHITE, want=tang)
     for k in list(ks) + [3]:
         t = 2 * math.pi * k / n
         top = _ell(A0 - 0.6, B0 - 0.6, t, 27.8)

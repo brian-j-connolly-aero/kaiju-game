@@ -452,7 +452,11 @@ def tank_a(b):
         i1 = (ri * math.cos(a1), ri * math.sin(a1), z1)
         o1 = (ro * math.cos(a1), ro * math.sin(a1), z1)
         quad(b, [o0, o1, i1, i0], color="#5b6270")                                   # flight, top
-        quad(b, [i0, i1, o1, o0], color="#3a3f4a", tag="underside")                  # flight, below
+        # the underside keeps the top's diagonal (o0-i1) so the two never cross, and sits 3 cm
+        # below it so they never fight for the same pixels
+        nz = np.cross(np.subtract(o1, o0), np.subtract(i1, o0))
+        nz = nz / np.linalg.norm(nz) * 0.03
+        quad(b, [tuple(np.subtract(p, nz)) for p in (o0, i0, i1, o1)], color="#3a3f4a", tag="underside")
         rail = [o0, o1, (o1[0], o1[1], z1 + 1.0), (o0[0], o0[1], z0 + 1.0)]
         quad(b, rail, color=CRANE_YELLOW, two_sided=True)                            # handrail band
     remember_intact(b)
