@@ -75,7 +75,13 @@ export class App {
       saveSettings(store, settings);
     };
     const panel = new SettingsPanel({
-      values: () => ({ volume: settings.volume, mouse: sliderFromSensitivity(settings.sensitivity), invertY: settings.invertY, fullscreen: document.fullscreenElement !== null }),
+      values: () => ({
+        volume: settings.volume,
+        mouse: sliderFromSensitivity(settings.sensitivity),
+        invertY: settings.invertY,
+        fullscreen: document.fullscreenElement !== null,
+        lowRes: settings.lowRes,
+      }),
       setVolume: (volume) => {
         change({ volume });
         audio.setMasterVolume(settings.volume);
@@ -87,6 +93,10 @@ export class App {
       setInvertY: (invertY) => {
         change({ invertY });
         input.invertY = settings.invertY;
+      },
+      setLowRes: (lowRes) => {
+        change({ lowRes });
+        this.ctx.renderer?.setQuality(settings.lowRes ? LOW_RES : 1);
       },
       setFullscreen: (on) => {
         try {
@@ -231,6 +241,7 @@ export class App {
     // Let the bar paint before the city is built (a few tens of milliseconds of solid work).
     await new Promise((resolve) => setTimeout(resolve, 0));
     const renderer = new GameRenderer(this.canvas, ctx.assets, ctx.params.resolution);
+    renderer.setQuality(ctx.settings.lowRes ? LOW_RES : 1);
     renderer.setCity(getCity().city);
     ctx.renderer = renderer;
     this.resize();

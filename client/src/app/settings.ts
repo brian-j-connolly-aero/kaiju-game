@@ -1,5 +1,6 @@
 /**
- * The player's settings: master volume, mouse sensitivity and inverted look. They are kept in
+ * The player's settings: master volume, mouse sensitivity, inverted look and a lower 3D
+ * resolution. They are kept in
  * the browser's storage, so they are still there the next time the game is opened, and anything
  * unreadable in there falls back to the defaults. (Fullscreen is a setting on the panel too,
  * but a browser only enters it in answer to a click, so it is never restored by itself.)
@@ -14,10 +15,12 @@ export interface Settings {
   sensitivity: number;
   /** Pushing the mouse or the stick forward looks down. */
   invertY: boolean;
+  /** Draw the 3D view at half resolution (for weak graphics hardware). */
+  lowRes: boolean;
 }
 
 export const SETTINGS_KEY = 'mb.settings';
-export const DEFAULT_SETTINGS: Readonly<Settings> = { volume: 0.9, sensitivity: 1, invertY: false };
+export const DEFAULT_SETTINGS: Readonly<Settings> = { volume: 0.9, sensitivity: 1, invertY: false, lowRes: false };
 /** The slowest and fastest mouse the slider offers: a quarter of the default speed up to four times it. */
 export const SENSITIVITY_MIN = 0.25;
 export const SENSITIVITY_MAX = 4;
@@ -33,6 +36,7 @@ export function cleanSettings(raw: unknown): Settings {
     volume: clampNumber(r.volume, 0, 1, DEFAULT_SETTINGS.volume),
     sensitivity: clampNumber(r.sensitivity, SENSITIVITY_MIN, SENSITIVITY_MAX, DEFAULT_SETTINGS.sensitivity),
     invertY: typeof r.invertY === 'boolean' ? r.invertY : DEFAULT_SETTINGS.invertY,
+    lowRes: typeof r.lowRes === 'boolean' ? r.lowRes : DEFAULT_SETTINGS.lowRes,
   };
 }
 

@@ -1,7 +1,8 @@
 /**
  * The settings panel: pictures only (DESIGN.md section 8). A speaker with a slider is the master
  * volume, a mouse with a slider is how fast the mouse turns the view, two opposed arrows switch
- * inverted look, four corners switch fullscreen, and the check mark closes the panel. Clicking
+ * inverted look, four corners switch fullscreen, a grid of big pixels switches the 3D view to
+ * half resolution (for weak graphics hardware), and the check mark closes the panel. Clicking
  * anywhere outside the panel closes it too.
  *
  * It is opened from the gear button on the home screen and in the lobby, and with Escape (or
@@ -18,6 +19,8 @@ export interface SettingsValues {
   mouse: number;
   invertY: boolean;
   fullscreen: boolean;
+  /** The 3D view is drawn at half resolution. */
+  lowRes: boolean;
 }
 
 export interface SettingsHost {
@@ -25,6 +28,7 @@ export interface SettingsHost {
   setVolume(volume: number): void;
   setMouse(position: number): void;
   setInvertY(on: boolean): void;
+  setLowRes(on: boolean): void;
   /** Asks the browser to enter or leave fullscreen; always called from inside a click. */
   setFullscreen(on: boolean): void;
   /** A click sound, so a volume change can be heard. */
@@ -60,6 +64,7 @@ export class SettingsPanel {
   private readonly mouse = slider('mouse speed');
   private readonly invert = el('button', 'btn settings-toggle settings-invert', [icon('ui_invert')]);
   private readonly fullscreen = el('button', 'btn settings-toggle settings-fullscreen', [icon('ui_fullscreen')]);
+  private readonly lowRes = el('button', 'btn settings-toggle settings-lowres', [icon('ui_lowres')]);
   private readonly done = el('button', 'btn settings-done', [icon('lb_ready')]);
 
   constructor(host: SettingsHost) {
@@ -67,7 +72,7 @@ export class SettingsPanel {
     const panel = el('div', 'settings-panel', [
       el('div', 'settings-row', [icon('ui_sound', 'settings-icon'), this.volume]),
       el('div', 'settings-row', [icon('ms_move', 'settings-icon'), this.mouse]),
-      el('div', 'settings-row settings-buttons', [this.invert, this.fullscreen, this.done]),
+      el('div', 'settings-row settings-buttons', [this.invert, this.fullscreen, this.lowRes, this.done]),
     ]);
     this.root.append(panel);
 
@@ -83,6 +88,11 @@ export class SettingsPanel {
     });
     this.invert.addEventListener('click', () => {
       host.setInvertY(!host.values().invertY);
+      host.click();
+      this.sync();
+    });
+    this.lowRes.addEventListener('click', () => {
+      host.setLowRes(!host.values().lowRes);
       host.click();
       this.sync();
     });
@@ -124,5 +134,6 @@ export class SettingsPanel {
     setFill(this.mouse);
     this.invert.classList.toggle('on', v.invertY);
     this.fullscreen.classList.toggle('on', v.fullscreen);
+    this.lowRes.classList.toggle('on', v.lowRes);
   }
 }

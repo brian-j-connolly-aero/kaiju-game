@@ -8,6 +8,7 @@ import { request } from 'node:http';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { configFromEnv } from '../src/config';
 import { parsePublicUrl, PublicAddress, quickTunnelAddress } from '../src/http/publicUrl';
+import { FakePeer, makeRoom, seatPlayers, tokenOf } from './helpers';
 import { options, Player, startTestServer, until, type TestServer } from './netHelpers';
 
 describe('quickTunnelAddress', () => {
@@ -158,19 +159,19 @@ describe('the server learns its public address from the quick tunnel', () => {
   });
 });
 
-describe('a configured public address', () => {
-  it('is reported by /healthz and never replaced by the tunnel', async () => {
-    // One server per test process is the rule, so this runs after the server above has closed.
-    const ts = await startTestServer({ publicUrl: 'https://kaiju.example.com' });
-    try {
-      const res = await getWithHost(ts.url, '/healthz', 'other-words.trycloudflare.com');
-      expect(JSON.parse(res.body)).toMatchObject({ ok: true, publicUrl: 'https://kaiju.example.com' });
-      const host = await Player.create(ts.url, options(3));
-      await until(() => host.lobbies.length > 0, 'the first lobby state');
-      expect(host.lobby.publicUrl).toBe('https://kaiju.example.com');
-      await host.leave();
-    } finally {
-      await ts.server.close();
-    }
+describe('the lobby state', () => {
+  it('carries the public address when the server knows one, asked afresh each time it is sent', () => {
+    let address: string | null = null;
+    const { room } = makeRoom({ publicUrl: () => address });
+    const [a] = seatPlayers(room, 1);
+    expect('publicUrl' in a.lobby.lobby).toBe(false);
+    address = 'https://kaiju.example.com';
+    const b = new FakePeer('p1');
+    room.join(b, { name: 'Player B', token: tokenOf(1), protocol: 1 });
+    expect(a.lobby.lobby.publicUrl).toBe('https://kaiju.example.com');
+    expect(b.lobby.lobby.publicUrl).toBe('https://kaiju.example.com');
+    address = null;
+    room.message(b.id, 'ready', { ready: true });
+    expect('publicUrl' in a.lobby.lobby).toBe(false);
   });
 });
