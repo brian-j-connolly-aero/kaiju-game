@@ -25,8 +25,11 @@ export interface Materials {
    */
   kaiju: THREE.MeshLambertMaterial;
   byKind(kind: MaterialKind): THREE.Material;
-  /** 0 by day, 1 at night: lights the windows. */
-  setNight(amount: number): void;
+  /**
+   * 0 by day, 1 at night: lights the windows and the kaiju's rim. `insideKaiju`: the camera is
+   * in the kaiju's head, and its own claws keep the art's colors (no rim on them).
+   */
+  setNight(amount: number, insideKaiju?: boolean): void;
 }
 
 /**
@@ -72,7 +75,7 @@ function addRimLight(material: THREE.MeshLambertMaterial): { rimColor: { value: 
           '{',
           '  float facing = clamp( dot( normal, normalize( vViewPosition ) ), 0.0, 1.0 );',
           '  float rim = 1.0 - facing;',
-          '  totalEmissiveRadiance += rimColor * ( rimStrength * rim * rim ) + diffuseColor.rgb * selfLift;',
+          '  totalEmissiveRadiance += rimColor * ( rimStrength * rim * rim * rim ) + diffuseColor.rgb * selfLift;',
           '}',
         ].join('\n'),
       );
@@ -110,6 +113,8 @@ export function createMaterials(assets: AssetStore): Materials {
   const kaiju = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
   kaiju.name = 'kaiju';
   const rim = addRimLight(kaiju);
+  // Kept where a console or a screenshot tool can reach them (to compare with the rim off).
+  kaiju.userData.rim = rim;
 
   return {
     vcol,
@@ -121,13 +126,13 @@ export function createMaterials(assets: AssetStore): Materials {
     byKind(kind) {
       return kind === 'glow' ? glow : kind === 'city_atlas' ? cityAtlas : vcol;
     },
-    setNight(amount) {
+    setNight(amount, insideKaiju = false) {
       cityAtlas.emissiveIntensity = amount;
       building.emissiveIntensity = amount * 0.9;
       // Sunset (0.35): a warm edge; night (1): moonlight round the silhouette and the body's own
       // orange lifted out of the dark.
-      rim.rimStrength.value = 0.25 + amount * 0.75;
-      rim.selfLift.value = amount * 0.3;
+      rim.rimStrength.value = insideKaiju ? 0 : 0.2 + amount * 0.5;
+      rim.selfLift.value = insideKaiju ? 0 : amount * 0.15;
       rim.rimColor.value.setHex(amount > 0.6 ? 0xa8c4ff : 0xffc49a);
     },
   };

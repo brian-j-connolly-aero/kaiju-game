@@ -258,14 +258,17 @@ export class Effects {
     const uv = [0, 0, 0, 0];
     for (let i = 0; i < list.length; i++) {
       const p = list[i];
+      // Every particle is drawn at least once, however long the frame (a glow that is
+      // spawned every frame for a frame's length must not vanish at a low frame rate).
+      const fresh = p.age === 0;
       p.age += dt;
-      if (p.age >= p.life) {
+      if (p.age >= p.life && !fresh) {
         list[i] = list[list.length - 1];
         list.pop();
         i--;
         continue;
       }
-      const t = p.age / p.life;
+      const t = Math.min(fresh ? 0.4 : 1, p.age / p.life);
       if (p.drag > 0) {
         const keep = Math.exp(-p.drag * dt);
         p.vx *= keep;

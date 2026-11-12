@@ -607,7 +607,7 @@ client/src/app/
   context.ts        AppContext (the services) and the Screen interface
   params.ts         the page address flags (?autoplay, ?debug, ?sandbox, ... listed in the file header)
   matchRuntime.ts   one match: 30 Hz input ticks, session sampling, controller, renderer, audio, event routing
-  settings.ts       the player's settings (volume, mouse speed, inverted look) and their place in browser storage
+  settings.ts       the player's settings (volume, mouse speed, inverted look, half resolution) in browser storage
   screens/          boot, home, lobby, briefing, match, end: one small module each (overlay + camera choice)
   debugOverlay.ts   ?debug=1: frames per second, script time split, draw calls, triangles, ping, net counters
   mbHook.ts         window.__mb: state(), renderer.info(), assets(), helpers, internals
@@ -627,14 +627,16 @@ client/src/assets/
 client/src/render/
   gameRenderer.ts   scene, per-frame update from a FrameState, simulation events -> visuals, stats
   materials.ts      vcol / glow / city_atlas shared materials, paint-mask tint, placeholder building material
-  sky.ts            gradient dome, sun or moon disc, cloud layers, fog and lights for afternoon / sunset / night
+  sky.ts            gradient dome, sun or moon disc, two cloud rings on the horizon, fog and lights per time of day
   ground.ts         land, roads, parks, plazas, water, far plain from CityData
   cityView.ts       instanced structures per archetype and state, props near the camera, collapse chunks
   structureGeometry.ts  an archetype's three states from its .glb, or painted boxes
   sceneRig.ts, instancedRig.ts   the rig abstraction: one posable copy, or many instanced copies, of a RigModel
-  kaijuAnimator.ts, kaijuView.ts procedural animation from the action state; cocoon, held object, beam
+  kaijuAnimator.ts, kaijuView.ts animation from the action state toward the manifest's pose targets;
+                    first-person head lock; cocoon, held object, weak point halo, embers, beam
   unitsView.ts, crowd.ts         vehicles, soldier sprites, lasers, markers; fleeing civilians
-  projectilesView.ts, effects.ts projectiles flown from events; explosions, dust, rings, flashes
+  projectilesView.ts, effects.ts projectiles flown from events; explosions, dust, rings, flashes (four
+                    batches: added light, alpha-blended bursts, smoke, ground)
   quadBatch.ts, lineBatch.ts, boundary.ts   instanced sprite quads; glowing lines; the quarantine line
 client/src/game/
   input/actions.ts, inputManager.ts   the bindable action map, glyph lookup; keyboard, mouse (and when it is
@@ -649,7 +651,8 @@ client/src/audio/   audioEngine.ts (effects with voice limits, staged music, voi
 client/test/        net.test.ts, game.test.ts, manifestTool.test.ts, audioEngine.test.ts, matchAudio.test.ts
                     (both on fakeAudio.ts, a silent stand-in for Web Audio that records what was started),
                     input.test.ts (on fakeBrowser.ts: a window, a document and a browser's side of pointer
-                    lock), session.test.ts (a real simulation and a real MatchSession over a delayed link)
+                    lock), session.test.ts (a real simulation and a real MatchSession over a delayed link),
+                    view.test.ts (pose targets, the chase camera's rise, cloud rings, pixel cap, icons)
 tools/build-manifest.mjs            the assets:manifest script
 tools/playtest/smoke.mjs, shots.mjs the multi-client smoke playtest; stage screenshots from the sandbox
 tools/playtest/scripted.mjs, driver.mjs   two sessions played with real inputs; the hands and eyes it uses
@@ -688,9 +691,9 @@ rigs are posed, so the kaiju camera sits exactly on `cam_fp`) -> audio -> `rende
 | --- | --- | --- |
 | `render/structureGeometry.ts` | No `bld_*` / `lm_*` models exist yet, so every structure is a painted box: repeating window tile, gable roofs on houses, a scorched version, a grey heap. The loader for real files (nodes `intact`, `damaged`, `rubble`, `chunk_NN`) is written but has never met a real file. `STUB(render)`: collapse draws every chunk as a box of the chunk's size. | Real building art through the same function; draw the real `chunk_NN` meshes. |
 | `render/cityView.ts` | One instanced mesh per archetype, state and material, never culled; props are repacked around the camera (radius grows with camera height). Bridges are drawn as a low road slab with side trusses. | District chunking or level of detail if the real models push triangles past the budget. |
-| `render/kaijuAnimator.ts` | One pose function for the lizard node list; reads well, tuned by eye on stage 1 to 3 art. | Per-kind animation sets for the Tier 2 kaiju; footfall timing against the art. |
-| `render/effects.ts`, `projectilesView.ts` | Sparkler bursts, dust, rings and flashes from `fx.png`; capped at 520 particles. No fire that lingers on ruins, no searchlights or tracers at night. | The effects pass (night fires, tracers, searchlights, water splashes, beam scorch). |
-| `render/sky.ts` | Three presets, two scrolling cloud planes, a sun or moon disc; windows light up at sunset and night through the placeholder building material. | Per-stage polish; emissive city atlas when it exists. |
+| `render/kaijuAnimator.ts` | One pose function for the lizard node list; the arms blend toward the art's pose targets (`poses` in the manifest; the box stand-in has the old numbers as its fallback). Swipe wind-up, stomp, roar, beam and death arms are still built-in numbers. | Per-kind animation sets for the Tier 2 kaiju; footfall timing against the art. |
+| `render/effects.ts`, `projectilesView.ts` | Sparkler bursts, dust, rings and flashes from `fx.png`; capped at 520 particles, and a bright particle is never drawn wider than 0.6 of its distance from the camera. `fx_debris_1..4` and lingering fire are drawn by nothing yet. No searchlights or tracers at night. | The effects pass (night fires, tracers, searchlights, water splashes, beam scorch, debris). |
+| `render/sky.ts` | Three presets, the two cloud panoramas on horizon rings (sun gap at the sunset sun), a sun or moon disc; windows light up at sunset and night through the placeholder building material. | Per-stage polish; emissive city atlas when it exists. |
 | `render/crowd.ts` | 260 civilians near the kaiju who run from it and wander otherwise; they do not follow streets. | Street-following crowds, panic sound. |
 | `ui/hud.ts`, `styles.css` | Functional HUD: skyline bar with three marks, sun-and-moon arc, meters, squad pips, verb hints with glyphs, crosshair, status pictures. Cramped below about 700 px wide. | The designed HUD (skyline that crumbles, portraits, stat bars). |
 | `ui/iconArt.ts` | Stand-in drawings for every icon id; the 69 real SVG files in `assets/ui/` already replace them at run time. | Delete entries once the art list is complete. |
@@ -699,7 +702,7 @@ rigs are posed, so the kaiju camera sits exactly on `cam_fp`) -> audio -> `rende
 | `audio/matchAudio.ts` | Every event has a sound, and the audio directors' notes for the client are applied (7.6); combat stem follows a simple "shots or lasers recently" heat. No tank engine, march or crowd loops; none of the Tier 2 unit sounds (their units do not exist yet). Nobody has listened to any of it: all checks are counts and measured levels. | A listening pass, unit loops, per-stage ambience balance, the Tier 2 wiring in `docs/audio/client-notes-sfx.md` section 4. |
 | `game/autoplay.ts` | Plays both sides well enough to finish a match; no pathfinding for the kaiju, street routing for humans. | Nothing: it is a test tool. |
 | `game/input/actions.ts` | Default bindings only; bindings are data and are stored, but there is no rebinding screen (the settings panel has volume, mouse speed, inverted look and fullscreen). Gamepad: standard mapping, never tried on real hardware; the menus cannot be worked with a gamepad (Tab, Space and Enter do work on their buttons). | Key rebinding; gamepad focus in the menus; controller tuning. |
-| `ui/settingsPanel.ts`, `ui/iconArt.ts` | The panel's gear, inverted-look and fullscreen pictures, and the drone's up and down arrows (`ui_settings`, `ui_invert`, `ui_fullscreen`, `ui_rise`, `ui_sink`) are drawn in code; there is no art file for them. | Five icons from the art team, under those names. |
+| `ui/settingsPanel.ts`, `ui/iconArt.ts` | The panel's gear, inverted-look, fullscreen and half-resolution pictures, and the drone's up and down arrows (`ui_settings`, `ui_invert`, `ui_fullscreen`, `ui_lowres`, `ui_rise`, `ui_sink`) are drawn in code; there is no art file for them. | Six icons from the art team, under those names. |
 
 ### 7.4 Decisions (where the docs left it open)
 
@@ -743,18 +746,32 @@ rigs are posed, so the kaiju camera sits exactly on `cam_fp`) -> audio -> `rende
   gets buttons that act at once and a view that turns while a button is held; the scripted
   playtest uses that path.
 - **Settings.** A panel of pictures: master volume, mouse speed (a quarter to four times the
-  default), inverted look, fullscreen. The gear on the home screen and in the lobby opens it;
+  default), inverted look, fullscreen, half resolution for the 3D view (the drawing buffer is
+  also never larger than a 1080p screen's worth of pixels). The gear on the home screen and in the lobby opens it;
   Escape (Start on a gamepad) opens and closes it anywhere, a match included, where the body
   idles as with the map. Kept in browser storage under `mb.settings` (fullscreen is not: a
   browser enters it only on a click).
 - **Kaiju view.** The mouse sets the desired heading, which may run up to 150 degrees ahead of
   the body (enough to ask for a turn-around); the camera is the head and shows at most the 50
-  degree lead. In the cocoon and when dead the camera circles outside. Third person is a chase
-  camera with no wall avoidance.
-- **Human view.** First person hides the player's own infantry section (it stands all around
-  the camera) and the vehicle the camera sits in. In third person the aim sent to the server is
-  from the unit's eye to what the camera's center ray lands on, and the stick is turned into
-  that frame. After a redeploy or a takeover the view turns toward the middle of the zone.
+  degree lead. In first person the head is locked to the aim and both arms ride on it, so the
+  snout and the claws (the `fp_claws` pose) keep their place on screen whatever the body does;
+  a held thing is shrunk to 0.16 body heights in that view only; the kaiju's own hit flashes
+  are not drawn there. In the cocoon and when dead the camera circles outside and comes in to
+  this side of any building in the way. Third person is a chase camera; a wall behind the
+  kaiju makes it rise over the wall (up to two body heights, looking down past the shoulders)
+  instead of closing in on the back. In third person the aim sent to the server runs from the
+  kaiju's eye (its mouth during the beam) to what the crosshair is on.
+- **Night readability.** The kaiju's body has its own material: a rim of light (warm at
+  sunset, moonlight at night) and a little of its own color at night, never on its own claws
+  in first person. Its eyes and embers heat up with rage and the beam; a staggered kaiju's
+  weak point gets a violet halo toward the viewer; the cocoon's light beats.
+- **Human view.** First person hides all of the player's own unit (the section stands all
+  around the camera, a troop's three tanks 5 to 6 m from it). In third person the aim sent to
+  the server is from the unit's eye to what the camera's center ray lands on, and the stick is
+  turned into that frame. After a redeploy for a new stage the view turns toward the middle of
+  the zone; after a takeover it stays where it was, or turns to the kaiju if it is known.
+- **The crowd** of civilians is kept around the kaiju only where the viewer may know where it
+  is; a squad that has lost it sees its crowd around its own camera, with nobody fleeing.
 - **Default controls.** Keyboard and mouse: WASD move, mouse look, left button strike / fire,
   right button grab / hold for the command wheel (also Q), Space brace, Q roar, E
   special / call-in, F molt (hold), 1 to 4 direct commands, M or Tab map, V camera, Escape
@@ -809,7 +826,9 @@ rigs are posed, so the kaiju camera sits exactly on `cam_fp`) -> audio -> `rende
   browser does on Escape, on switching windows and in the second after Escape (when it
   refuses the lock) is reasoned from the browsers' documented behavior, not seen. Smoothness
   at 60 and 144 frames a second is from tests of the real session, not from a screen.
-- Measured: at stage 3 in the sandbox, from the titan's eye with the whole city in view, 92
+- Measured after the art was wired in (development server, sandbox, 12 November): from the
+  titan's eye over the whole city 102 draw calls and 148,000 triangles; from its chase camera
+  100 and 123,000. Earlier: at stage 3 in the sandbox, from the titan's eye with the whole city in view, 92
   draw calls and about 195,000 triangles; the highest seen in a 5-page match was 104 draw calls
   and 390,000 triangles (an intermission's pulled-back camera draws more props). The budget is
   350 and 1.5 million. Building art will add to the triangles; props are already limited to
@@ -1024,10 +1043,12 @@ the client engineer (that list itself was not read here).
 - **A held object blocks the hatchling's view.** While the stage 1 kaiju holds a vehicle, the
   object fills the middle and right of the first-person view; the player cannot see what the
   throw is aimed at (`scripted-k/kaiju-05-grab.png`). The art manifest has a `hold` pose made
-  for this camera; the animator does not use the manifest poses yet.
+  for this camera; the animator does not use the manifest poses yet. *Since changed:* the
+  animator uses the manifest's poses and the held thing is shrunk in that view (section 7.4).
 - **Bracing shows nothing in first person.** With the server reporting the brace, no arm is in
   view, although the pose is meant to cross the arms in front of the face (the roar, taken a
-  moment earlier, does put the arms in view) (`scripted-k/kaiju-04-brace.png`).
+  moment earlier, does put the arms in view) (`scripted-k/kaiju-04-brace.png`). *Since
+  changed:* the arms cross in front of the view in a brace.
 - A brown slab across the top of the hatchling's view in one early frame
   (`smoke-a/04-early-kaiju.png`) is either the kaiju's own head or a roof at close range. Not
   determined.
@@ -1043,15 +1064,19 @@ the client engineer (that list itself was not read here).
   a large pale square over much of the screen, with its straight edge showing
   (`kill/kill-attempt1-low-health.png`: the right third of the view is blanked). It happens
   on every hit, and there were 578 in that match. It may be the same thing as the daylight
-  blending of explosions said to be on the art director's list.
+  blending of explosions said to be on the art director's list. *Since changed:* the kaiju's
+  own hit flash is not drawn in its first-person view, explosions are alpha blended, and no
+  bright particle is drawn wider than 0.6 of its distance from the camera.
 - **Third person with a tall building close behind the kaiju**: the wall clearance brings the
   chase camera in to this side of the wall, which at stage 2 is 11 m behind a creature 32 m
   tall: the view is its back and spines, edge to edge
   (`clearance/chase-back-to-wall.png`). The camera is where the code means it to be; the view
   is unusable until the player walks clear. A chase camera that rose over the wall instead
-  would be a design change; none was made.
+  would be a design change; none was made. *Since changed:* the chase camera rises over the
+  wall (section 7.4).
 - The kaiju player's cocoon camera circles at a fixed distance with no regard for walls: a
-  building next to the cocoon hides it for part of each turn. Cosmetic. (The cocoon itself is
+  building next to the cocoon hides it for part of each turn. Cosmetic. *Since changed:* it
+  comes in to this side of the building. (The cocoon itself is
   drawn correctly; a first reading of one such frame as "a building drawn in place of the
   cocoon" was wrong and was checked in the sandbox.)
 - **When the server stutters, the view jumps.** In the two five-page runs, with the server

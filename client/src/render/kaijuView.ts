@@ -329,7 +329,7 @@ export class KaijuView {
       if (!rig.worldPosition('weak_point', tmp)) tmp.set(k.x, stage.height * 0.6, k.z);
       tmp2.copy(view.camera).sub(tmp).setY(0);
       const toward = tmp2.length();
-      if (toward > 1e-3) tmp.addScaledVector(tmp2, (stage.bodyRadius * 0.6) / toward);
+      if (toward > 1e-3) tmp.addScaledVector(tmp2, Math.min(toward * 0.5, stage.bodyRadius * 1.3) / toward);
       effects.glowAt(tmp.x, tmp.y, tmp.z, stage.bodyRadius * 2.4 * throb, WEAK_GLOW, 0.06, 0.85);
     }
 

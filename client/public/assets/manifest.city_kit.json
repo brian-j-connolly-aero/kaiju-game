@@ -1,0 +1,10 @@
+{
+  "textures": {
+    "city_atlas": {
+      "file": "textures/city_atlas.png"
+    },
+    "city_atlas_emissive": {
+      "file": "textures/city_atlas_emissive.png"
+    }
+  }
+}

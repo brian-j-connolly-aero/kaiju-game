@@ -91,6 +91,25 @@ export function inStartSquare(half: number, x: number, z: number): boolean {
   return false;
 }
 
+/**
+ * True when (x, z) lies in the stage 2 square of some anchor: the same square stageBounds gives
+ * (the stage 1 square slid toward downtown as far as it can while still holding it).
+ */
+export function inStageTwoSquare(half: number, x: number, z: number): boolean {
+  const h1 = STAGES[0].boundsHalfSize;
+  const h2 = STAGES[1].boundsHalfSize;
+  const slack = h2 - h1 > 0 ? h2 - h1 : 0;
+  const clampTo = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > hi ? hi : v);
+  for (const a of ANCHORS) {
+    const c1x = clampTo(-a.at[0], -half + h1, half - h1);
+    const c1z = clampTo(a.at[1], -half + h1, half - h1);
+    const cx = clampTo(c1x + clampTo(-DOWNTOWN[0] - c1x, -slack, slack), -half + h2, half - h2);
+    const cz = clampTo(c1z + clampTo(DOWNTOWN[1] - c1z, -slack, slack), -half + h2, half - h2);
+    if (x >= cx - h2 && x <= cx + h2 && z >= cz - h2 && z <= cz + h2) return true;
+  }
+  return false;
+}
+
 /** The patch a point lies in (the first in layout order), or null. */
 export function patchAt(patches: readonly PatchInfo[], x: number, z: number): PatchInfo | null {
   for (const p of patches) {
@@ -112,6 +131,8 @@ export interface Builder {
   /** Scratch for visiting each box once in a neighborhood query. */
   boxStamp: number[];
   patches: PatchInfo[];
+  /** Footprints of the landmarks a juvenile can reach: no tall building stands within APRON of them. */
+  aprons: Box[];
   stamp: number[];
   stampNow: number;
 }
@@ -129,7 +150,7 @@ export function createBuilder(g: Ground, streets: Street[]): Builder {
     streetCells.push([]);
     boxCells.push([]);
   }
-  const b: Builder = { g, half: g.half, cols, streets, streetCells, structures: [], boxes: [], boxCells, boxStamp: [], patches: patchInfos(), stamp: [], stampNow: 0 };
+  const b: Builder = { g, half: g.half, cols, streets, streetCells, structures: [], boxes: [], boxCells, boxStamp: [], patches: patchInfos(), aprons: [], stamp: [], stampNow: 0 };
   // A street is listed in every cell a building near it could fall in.
   const reach = 26;
   for (const s of streets) {
@@ -219,7 +240,11 @@ export function addStructure(b: Builder, a: ArchetypeDef, box: Box): number {
   return id;
 }
 
-/** The deck of every bridge, first, so their ids are small and stable. */
+/**
+ * The deck of every bridge, first, so their ids are small and stable. A deck is as long as its
+ * street and at least as wide as the roadway plus a meter each side (the client stretches the
+ * bridge model to the deck).
+ */
 export function buildDecks(b: Builder): void {
   for (const s of b.streets) {
     if (s.spec.kind !== 'bridge' || !s.spec.deck) continue;
@@ -229,7 +254,8 @@ export function buildDecks(b: Builder): void {
     const box: Box = {
       x: quant((s.ax + s.bx) / 2),
       z: quant((s.az + s.bz) / 2),
-      hx: a.footprint[0] / 2,
+      // Never narrower than the road it carries, with a meter of curb and railing each side.
+      hx: quant(Math.max(a.footprint[0] / 2, s.spec.width / 2 + 1)),
       hz: quant(len(dx, dz) / 2),
       dir: nearestDir(dx, dz),
     };
@@ -243,8 +269,23 @@ export function buildLandmarks(b: Builder): void {
   for (const lm of LANDMARKS) {
     const a = archetypeDef(lm.archetype);
     const p = toWorld(lm.at);
-    addStructure(b, a, { x: p.x, z: p.z, hx: a.footprint[0] / 2, hz: a.footprint[1] / 2, dir: FACE[lm.face] });
+    const box: Box = { x: p.x, z: p.z, hx: a.footprint[0] / 2, hz: a.footprint[1] / 2, dir: FACE[lm.face] };
+    addStructure(b, a, box);
+    if (inStageTwoSquare(b.half, p.x, p.z)) b.aprons.push(box);
   }
+}
+
+/**
+ * A juvenile (18 m wide) goes for the landmarks in its square. A tall building it cannot
+ * trample, standing closer to one than this, makes a notch the body wedges into: so none does.
+ */
+const APRON = 20;
+
+/** True unless the box is a building a juvenile cannot trample standing within APRON of a reachable landmark. */
+function clearOfAprons(b: Builder, box: Box, height: number): boolean {
+  if (height <= TALL) return true;
+  for (let i = 0; i < b.aprons.length; i++) if (boxesTouch(box, b.aprons[i], APRON)) return false;
+  return true;
 }
 
 /** 0 far from downtown, 1 in the middle of it. */
@@ -347,6 +388,7 @@ function frontSide(b: Builder, s: Street, side: number, seed: number): void {
     const fits =
       (lowRise || !inStartSquare(b.half, box.x, box.z)) &&
       clearOfStreets(b, box, tall) &&
+      clearOfAprons(b, box, a.height) &&
       boxOnGround(b.g, box, SHORE, false, BUILD_LIMIT) &&
       clearOfBuildings(b, box, gapMin);
     if (!fits) {
@@ -402,6 +444,7 @@ export function buildYards(b: Builder, seed: number): void {
         if (patchAt(b.patches, px, pz) !== patch) continue;
         if (a.cls !== 'house' && a.cls !== 'shop' && inStartSquare(b.half, px, pz)) continue;
         const box: Box = { x: px, z: pz, hx: a.footprint[0] / 2, hz: a.footprint[1] / 2, dir: turn < 0.5 ? 0 : 32 };
+        if (!clearOfAprons(b, box, a.height)) continue;
         if (!boxOnGround(b.g, box, SHORE, false, BUILD_LIMIT)) continue;
         if (!clearOfStreets(b, box, fill.offStreet - SIDEWALK)) continue;
         if (!clearOfBuildings(b, box, a.height > TALL ? Math.max(fill.gap, TALL_APART) : fill.gap)) continue;
@@ -763,14 +806,15 @@ function bandSweep(job: PocketJob, band: number): void {
  * One round of yard opening for one or two sizes of body. `band` > 0 keeps it to the buildings
  * within that many meters of the edge of the city. Removed buildings are noted in `gone`.
  */
-function runPockets(b: Builder, gone: Uint8Array, roomy: number, tight: number, band: number): number {
+function runPockets(b: Builder, gone: Uint8Array, raster: Uint8Array, queue: Int32Array, roomy: number, tight: number, band: number): number {
   const half = b.half;
   const n = Math.ceil((half * 2) / POCKET_CELL);
+  raster.fill(0);
   const job: PocketJob = {
     b,
     n,
-    cells: new Uint8Array(n * n),
-    queue: new Int32Array(POCKET_OPEN_CELLS + 8),
+    cells: raster,
+    queue,
     gone,
     removed: 0,
     roomy,
@@ -828,9 +872,13 @@ function runPockets(b: Builder, gone: Uint8Array, roomy: number, tight: number, 
  */
 export function openPockets(b: Builder): number {
   const gone = new Uint8Array(b.structures.length);
+  // One raster and one queue serve both rounds (allocated once: the first build is the one that counts).
+  const n = Math.ceil((b.half * 2) / POCKET_CELL);
+  const raster = new Uint8Array(n * n);
+  const queue = new Int32Array(POCKET_OPEN_CELLS + 8);
   // The troop's round comes last: a house taken out for a tank leaves a hole a troop could be put in.
-  let removed = runPockets(b, gone, TANK_CLEAR, INFANTRY_CLEAR, 0);
-  removed += runPockets(b, gone, TROOP_CLEAR, TROOP_NEARLY, TROOP_BAND);
+  let removed = runPockets(b, gone, raster, queue, TANK_CLEAR, INFANTRY_CLEAR, 0);
+  removed += runPockets(b, gone, raster, queue, TROOP_CLEAR, TROOP_NEARLY, TROOP_BAND);
   if (removed === 0) return 0;
   // Rebuild the lists without the removed buildings (ids stay equal to indexes).
   const structures = b.structures;

@@ -7,12 +7,17 @@
 import type { Vec2 } from '../../math/vec';
 import type { Area, AreaKind } from '../types';
 import { DIR_COS, DIR_COUNT, DIR_SIN } from './dirs';
-import { chaikinOpen } from './geo';
+import { chaikinOpen, quant } from './geo';
 import { OPEN, RIVER, SEA, type Pt } from './layout';
 
 /** Map point [east, north] to world: +X is west on the map. */
 export function toWorld(p: Pt): Vec2 {
   return { x: -p[0], z: p[1] };
+}
+
+/** A point snapped to 1/8 m, like every other final coordinate of the city. */
+function snapped(x: number, z: number): Vec2 {
+  return { x: quant(x), z: quant(z) };
 }
 
 export function rectPolygon(r: readonly [number, number, number, number]): Vec2[] {
@@ -29,7 +34,7 @@ export function discPolygon(e: number, n: number, radius: number): Vec2[] {
   const out: Vec2[] = [];
   for (let k = 0; k < 16; k++) {
     const i = k * (DIR_COUNT / 16);
-    out.push({ x: -e + DIR_SIN[i] * radius, z: n + DIR_COS[i] * radius });
+    out.push(snapped(-e + DIR_SIN[i] * radius, n + DIR_COS[i] * radius));
   }
   return out;
 }
@@ -94,10 +99,10 @@ export function buildRiver(): River {
     const outer = p.half + p.isle;
     // With an island the dividing line follows its shores; without one the channels overlap a little.
     const inner = p.isle > 2 ? p.isle : -1.5;
-    bankA.push({ x: p.x + nx * outer, z: p.z + nz * outer });
-    bankB.push({ x: p.x - nx * outer, z: p.z - nz * outer });
-    midA.push({ x: p.x + nx * inner, z: p.z + nz * inner });
-    midB.push({ x: p.x - nx * inner, z: p.z - nz * inner });
+    bankA.push(snapped(p.x + nx * outer, p.z + nz * outer));
+    bankB.push(snapped(p.x - nx * outer, p.z - nz * outer));
+    midA.push(snapped(p.x + nx * inner, p.z + nz * inner));
+    midB.push(snapped(p.x - nx * inner, p.z - nz * inner));
   }
   const channel = (bank: Vec2[], mid: Vec2[]): Vec2[] => {
     const poly = bank.map((p) => ({ x: p.x, z: p.z }));
@@ -108,7 +113,7 @@ export function buildRiver(): River {
   return {
     west: channel(bankA, midA),
     east: channel(bankB, midB),
-    center: pts.map((p) => ({ x: p.x, z: p.z })),
+    center: pts.map((p) => snapped(p.x, p.z)),
     bankWest: bankA,
     bankEast: bankB,
   };
@@ -119,7 +124,7 @@ export function buildSea(): Vec2[] {
   for (const run of SEA) {
     let pts = run.pts.map(toWorld);
     if (run.smooth) pts = chaikinOpen(chaikinOpen(pts));
-    for (const p of pts) out.push(p);
+    for (const p of pts) out.push(snapped(p.x, p.z));
   }
   return out;
 }
@@ -128,7 +133,8 @@ export function buildSea(): Vec2[] {
 export function buildAreas(): Area[] {
   const areas: Area[] = [];
   const add = (kind: AreaKind, name: string, polygon: Vec2[]): void => {
-    areas.push({ id: areas.length, kind, name, polygon });
+    // Every outline point on the 1/8 m grid (the hand-made ones already are; this is the guarantee).
+    areas.push({ id: areas.length, kind, name, polygon: polygon.map((p) => snapped(p.x, p.z)) });
   };
   const river = buildRiver();
   add('water', 'Meridian Bay', buildSea());

@@ -255,7 +255,7 @@ describe('Port Meridian: the level', () => {
   it('is fair: the value in the stage 1 and stage 2 squares is about the same for every start', () => {
     const v1 = city.anchors.map((a) => valueInBounds(city, stageBounds(city, a.id, 1)));
     const v2 = city.anchors.map((a) => valueInBounds(city, stageBounds(city, a.id, 2)));
-    // Measured: 1.02 and 1.15. The design allows about 25%.
+    // Measured: 1.04 and 1.14. The design allows about 25%.
     expect(Math.max(...v1) / Math.min(...v1)).toBeLessThanOrEqual(1.12);
     expect(Math.max(...v2) / Math.min(...v2)).toBeLessThanOrEqual(1.25);
     expect(Math.min(...v1)).toBeGreaterThan(1200);
@@ -286,14 +286,18 @@ describe('Port Meridian: the level', () => {
     expect(new Set(landmarks.map((s) => s.landmark)).size).toBe(landmarks.length);
     expect(new Set(landmarks.map((s) => s.archetype)).size).toBe(landmarks.length);
     for (const s of landmarks) expect(s.cls).toBe('landmark');
-    // Spread out: nowhere on dry land is further than 700 m from one (measured: 678 m, in the far north-west corner).
-    for (let x = -1000; x <= 1000; x += 100) {
-      for (let z = -1000; z <= 1000; z += 100) {
+    // Spread out: nowhere on dry land inside the beltway (25 m grid) is further than 760 m from
+    // one (measured: 748 m, in the far north-west corner).
+    let worst = 0;
+    for (let x = -1050; x <= 1050; x += 25) {
+      for (let z = -1050; z <= 1050; z += 25) {
         if (inWaterExact(x, z)) continue;
-        const d = Math.min(...landmarks.map((s) => Math.hypot(s.x - x, s.z - z)));
-        expect(d, `(${x}, ${z})`).toBeLessThan(700);
+        let d = Infinity;
+        for (const s of landmarks) d = Math.min(d, Math.hypot(s.x - x, s.z - z));
+        worst = Math.max(worst, d);
       }
     }
+    expect(worst).toBeLessThan(760);
   });
 
   it('has a connected street network that reaches every anchor', () => {
@@ -378,6 +382,33 @@ describe('Port Meridian: the level', () => {
     }
   });
 
+  it('makes every bridge deck at least as wide as the road it carries', () => {
+    for (const e of edges.filter((x) => x.kind === 'bridge')) {
+      const deck = city.structures[e.bridge];
+      // A meter of curb and railing each side of the roadway.
+      expect(e.width + 2, `bridge road ${e.id}`).toBeLessThanOrEqual(2 * deck.hx);
+      expect(deck.hx).toBeGreaterThanOrEqual(archetypeDef(deck.archetype).footprint[0] / 2);
+    }
+  });
+
+  it('keeps a 20 m apron round every landmark a juvenile can reach: no tall building wedges it in', () => {
+    const reachable = city.structures.filter((s) => s.landmark !== null && city.anchors.some((a) => inBounds(stageBounds(city, a.id, 2), s.x, s.z)));
+    expect(reachable.length).toBeGreaterThanOrEqual(8);
+    const gapBetween = (a: Structure, b: Structure): number => {
+      let d = Infinity;
+      for (const c of obbCorners(a)) d = Math.min(d, distPointObb(c.x, c.z, b));
+      for (const c of obbCorners(b)) d = Math.min(d, distPointObb(c.x, c.z, a));
+      return d;
+    };
+    for (const lm of reachable) {
+      for (const s of city.structures) {
+        if (s.height <= 12 || s.passable || s.landmark !== null) continue;
+        if (Math.abs(s.x - lm.x) > 150 || Math.abs(s.z - lm.z) > 150) continue;
+        expect(gapBetween(lm, s), `${lm.landmark} and ${s.archetype} ${s.id}`).toBeGreaterThanOrEqual(20 - 1e-6);
+      }
+    }
+  });
+
   it('crosses the river on at least 4 bridges, with a ford between them', () => {
     const q = createCityQuery(index, createCityState(city));
     const bridges = edges.filter((e) => e.kind === 'bridge');
@@ -436,8 +467,8 @@ describe('Port Meridian: identical on every machine', () => {
     const again = generatePortMeridian(CITY_SEED);
     // The city as delivered (docs/CITY.md). Chromium computes the same two numbers. When the city
     // is changed on purpose, these change: update them here and in docs/CITY.md.
-    expect(cityChecksum(city)).toBe(1744768440);
-    expect(meridianChecksum(city)).toBe(2227442450);
+    expect(cityChecksum(city)).toBe(1739170986);
+    expect(meridianChecksum(city)).toBe(1876286051);
     expect(cityChecksum(again)).toBe(cityChecksum(city));
     expect(meridianChecksum(again)).toBe(meridianChecksum(city));
     expect(JSON.stringify(again)).toBe(JSON.stringify(city));
@@ -457,18 +488,30 @@ describe('Port Meridian: identical on every machine', () => {
     for (const s of city.structures) expect(snapped(s.x) && snapped(s.z) && snapped(s.hx) && snapped(s.hz), `structure ${s.id}`).toBe(true);
     for (const p of city.props) expect(snapped(p.x) && snapped(p.z), `prop ${p.id}`).toBe(true);
     for (const n of nodes) expect(snapped(n.x) && snapped(n.z), `node ${n.id}`).toBe(true);
+    // Water, parks and plazas (the city's own ground lookup is built from these) and districts.
+    for (const a of city.areas) for (const p of a.polygon) expect(snapped(p.x) && snapped(p.z), `area ${a.name}`).toBe(true);
+    for (const d of city.districts) for (const p of d.polygon) expect(snapped(p.x) && snapped(p.z), `district ${d.name}`).toBe(true);
     const step = (Math.PI * 2) / 128;
     for (const s of city.structures) expect(Math.abs(s.yaw / step - Math.round(s.yaw / step)), `structure ${s.id}`).toBeLessThan(1e-6);
   });
 
   it('never calls a function whose last bit may differ between engines', () => {
-    const dir = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'city', 'meridian');
-    const files = readdirSync(dir).filter((f) => f.endsWith('.ts'));
-    expect(files.length).toBeGreaterThanOrEqual(10);
+    const src = join(dirname(fileURLToPath(import.meta.url)), '..', 'src');
+    const dir = join(src, 'city', 'meridian');
+    const own = readdirSync(dir).filter((f) => f.endsWith('.ts'));
+    expect(own.length).toBeGreaterThanOrEqual(10);
+    // The generator's own files, then the shared files it imports (checked for the same things;
+    // the seeded generator also uses Math.imul, which is exact integer math, and names Math.PI).
+    const helpers = ['math/rng.ts', 'city/archetypes.ts', 'city/props.ts', 'city/types.ts', 'defs/stages.ts', 'defs/ids.ts'];
+    const files = [...own.map((f) => join(dir, f)), ...helpers.map((f) => join(src, f))];
     // Math may only be used for these (all exact, or correctly rounded by the language standard).
-    const allowed = new Set(['sqrt', 'floor', 'ceil', 'round', 'abs', 'min', 'max']);
-    for (const file of files) {
-      const text = readFileSync(join(dir, file), 'utf8');
+    const allowedOwn = new Set(['sqrt', 'floor', 'ceil', 'round', 'abs', 'min', 'max']);
+    const allowedHelper = new Set([...allowedOwn, 'imul', 'PI']);
+    for (const path of files) {
+      const helper = !path.startsWith(dir);
+      const file = helper ? path.slice(src.length + 1) : path.slice(dir.length + 1);
+      const allowed = helper ? allowedHelper : allowedOwn;
+      const text = readFileSync(path, 'utf8');
       // Blank out comments and strings: only code counts.
       const code = text
         .replace(/\/\*[\s\S]*?\*\//g, ' ')
@@ -483,6 +526,13 @@ describe('Port Meridian: identical on every machine', () => {
       expect(/\.sort\s*\(|\.toSorted\s*\(|\blocaleCompare\b|\btoLocale/.test(code), `${file}: engine-dependent ordering`).toBe(false);
       expect(/\bfor\s*\([^)]*\bin\b/.test(code), `${file}: for-in`).toBe(false);
       expect(/\b(parseFloat|toFixed|toPrecision|toExponential)\b/.test(code), `${file}: number formatting`).toBe(false);
+      // Helpers: only type imports, besides defs/stages using defs/ids (both scanned here).
+      if (helper) {
+        for (const m of text.matchAll(/import\s+(type\s+)?\{[^}]*\}\s+from '([^']+)'/g)) {
+          expect(m[1] !== undefined || (file === 'defs/stages.ts' && m[2] === './ids'), `${file} imports ${m[2]}`).toBe(true);
+        }
+        continue;
+      }
       // Only the seeded generator, plain data and each other: no trigonometry helpers from math/.
       for (const m of text.matchAll(/from '([^']+)'/g)) {
         const from = m[1];

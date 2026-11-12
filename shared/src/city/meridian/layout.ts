@@ -458,6 +458,25 @@ export const DISTRICTS: readonly DistrictSpec[] = [
   { zone: 'suburb', name: 'Bellhaven', poly: rect(-1100, -405, -740, 200) },
 ];
 
+/**
+ * Building tint per district (District.tint, docs/CITY.md section 2): light multipliers, so
+ * models authored in light neutral colors take each district's color family.
+ */
+export const DISTRICT_TINTS: Readonly<Record<string, number>> = {
+  Downtown: 0xd8e0ec,
+  'Old Town': 0xf4e2c2,
+  'Temple Hill': 0xf2dad2,
+  Hollowmere: 0xf4f2e6,
+  Northgate: 0xf4f0e4,
+  'Easter Green': 0xf6f2e6,
+  Bellhaven: 0xf6efe4,
+  University: 0xf0d2c4,
+  'Halcyon Science Park': 0xeef2f6,
+  'The Cinder Works': 0xdccec2,
+  'The Docks': 0xd6dee2,
+  'The Boardwalk': 0xfcf6ee,
+};
+
 // ---------------------------------------------------------------------------------------------
 // Patches: the procedural part is told what to grow where
 // ---------------------------------------------------------------------------------------------

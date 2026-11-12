@@ -64,26 +64,47 @@ The city is a level first. Three distances shape it:
 
 ## 2. The districts
 
-Colors are the map tint; the 3D buildings should follow the same color family so a district is
-recognizable from a kaiju's eye and on the map view.
+Colors are the map tint. So that a district is recognizable from a kaiju's eye as well as on the
+map, every district also carries a **building tint** (`District.tint` in the city data, a color
+the client multiplies each building's color by: one color per building instance, no extra draw
+calls). Each ordinary building type has **one** model for the whole city, made in light, neutral
+colors (pale stone, white render, light grey roofs, plain glass); the tint gives it the district's
+color family. A white model shows the tint exactly; a dark one hardly changes.
+
+| District | Building tint | Effect on a white wall |
+|---|---|---|
+| Downtown | `#d8e0ec` | cool blue-grey glass and stone |
+| Old Town | `#f4e2c2` | warm sand and ochre |
+| Temple Hill | `#f2dad2` | dusty rose plaster |
+| Hollowmere, Northgate, Easter Green, Bellhaven | `#f4f2e6`, `#f4f0e4`, `#f6f2e6`, `#f6efe4` | almost white: the pastel suburbs keep their own mixed colors |
+| University | `#f0d2c4` | red-brick warmth |
+| Halcyon Science Park | `#eef2f6` | clean white and glass |
+| The Cinder Works | `#dccec2` | soot brown-grey |
+| The Docks | `#d6dee2` | harbor blue-grey |
+| The Boardwalk | `#fcf6ee` | whitewash |
+
+The client does not apply the tint yet (it draws real models in plain white today, see
+`client/src/render/cityView.ts`); that is a request to the client owner, listed in section 9.
+Landmarks are one-offs and are modeled in their final colors; the tint is for ordinary buildings
+only.
 
 | District | Map tint | Street pattern | Buildings | Structures | Value |
 |---|---|---|---|---|---|
-| Downtown | slate blue | regular grid | towers, offices, big apartments | 182 | 42 084 |
+| Downtown | slate blue | regular grid | towers, offices, big apartments | 183 | 42 104 |
 | Old Town | warm sand | crooked, irregular | row houses, shops, small apartment blocks | 202 | 7 972 |
 | Temple Hill | dusty rose | rings and spokes round the temple | houses, shrines, cloister halls | 322 | 8 426 |
 | Hollowmere | pale green | curving suburban streets | detached houses | 285 | 2 349 |
 | Northgate | pale green | grid with a diagonal avenue | houses, row houses, the television mast | 372 | 5 394 |
 | Easter Green | pale green | garden suburb round a green | houses, a few apartments | 177 | 2 844 |
 | Bellhaven | pale green | small grid | houses, high street shops | 195 | 2 645 |
-| University | lavender | quads | lecture halls, row houses, clock tower | 105 | 7 351 |
+| University | lavender | quads | lecture halls, row houses, clock tower | 103 | 7 331 |
 | Halcyon Science Park | lavender | grid cut by the diagonal Harrow Road | offices, labs, observatory | 114 | 8 882 |
 | The Cinder Works | warm grey-brown | big lots | factories, tanks, power station, workers' rows | 169 | 5 362 |
-| The Docks | blue-grey | big lots and a crooked fishing quarter | cranes, containers, warehouses, gasworks | 388 | 11 876 |
-| The Boardwalk | peach | small grid and a seafront strip | pavilions, hotels, stadium, ferris wheel | 188 | 5 713 |
+| The Docks | blue-grey | big lots and a crooked fishing quarter | cranes, containers, warehouses, gasworks | 388 | 11 664 |
+| The Boardwalk | peach | small grid and a seafront strip | pavilions, hotels, stadium, ferris wheel | 187 | 5 693 |
 
-(Structures and value counted inside each district polygon. Totals: 2697 structures worth
-111 128 points. The Farewell Light stands on the harbor mole, outside every district.)
+(Structures and value counted inside each district polygon. Totals: 2695 structures worth
+110 896 points. The Farewell Light stands on the harbor mole, outside every district.)
 
 **Downtown.** The prize of stage 3. A tight grid of 14 m streets between the 22 m ring avenues,
 blocks filled edge to edge with offices and towers (12 to 165 m), Meridian Tower in the middle
@@ -117,7 +138,11 @@ pale stone at the university, white and glass in the science park.
 
 **The Cinder Works.** East of downtown. Big lots: sawtooth factories, warehouses, round storage
 tanks, and the Kiln Point Power Station with its chimneys at the east edge; workers' row houses
-around Cinder Flats in the south-east. Soot brown, rust, grey concrete.
+around Cinder Flats in the south-east. Soot brown, rust, grey concrete. The big lots look sparse
+on the map (one to five buildings on a 100 x 130 m block): that is deliberate. Their yards must
+stay open (section 10: no yard may trap a squad, and buildings a juvenile cannot trample keep
+19.5 m apart), and a trial that packed them with container stacks lost almost all of them again
+to the yard opener. In 3D the sheds, tanks and chimneys still read as heavy industry.
 
 **The Docks.** The east shore of the bay. A row of gantry cranes along the quay, container stacks,
 warehouses, the Number Three Gasworks, and a crooked fishing quarter of small houses around Gull
@@ -187,8 +212,8 @@ Rubble: a broken ring with the green pitch still showing.
 
 **The Tidewheel** (faces south, onto the beach). A giant ferris wheel, 76 m, on two A-frame legs,
 with about 24 candy-striped gondolas (red, white, sea blue) and a ring of bulbs. A small ticket
-pavilion at its foot. The footprint is long and thin (64 x 14) because the wheel stands edge on
-to the sea. Damaged: wheel tilted and buckled, gondolas hanging. Rubble: the wheel on its side,
+pavilion at its foot. The footprint is long and thin (64 x 14): the wheel's face runs east-west,
+so from the beach and the sea you see the whole round wheel. Damaged: wheel tilted and buckled, gondolas hanging. Rubble: the wheel on its side,
 half rolled.
 
 **Halcyon Observatory** (faces south, on Halcyon Hill). Low and wide: a round white drum with a
@@ -205,11 +230,12 @@ four square chimneys rising to 82 m at the corners, a boiler house and a row of 
 Dark red-brown brick, black soot streaks on the chimneys. Damaged: a chimney snapped mid-height,
 roof holed with steam. Rubble: two chimneys still standing out of the heap.
 
-**Sevenfold Temple** (faces east, at the top of Temple Hill). A square stepped temple of seven
-narrowing tiers, each with an overhanging roof turned up at the corners, terracotta and cream,
-on a broad stone platform with stairs on all four sides. Fictional; not modeled on any real
-tradition, and no symbols. Damaged: top three tiers gone. Rubble: the lowest roof tier on the
-platform.
+**Sevenfold Temple** (faces east, at the top of Temple Hill). Seven round drums stacked on a
+broad square stone platform with stairs on all four sides, each drum narrower than the one below
+and each capped by a flat, wide brim roof (like a stack of hat brims), terracotta and cream, with
+thick ropes hung with big bronze bells looping between the brims. Clearly invented: no upturned
+eaves, no pagoda or real temple shape, and no symbols. Damaged: top three drums gone, bells
+hanging loose. Rubble: the lowest brim on the platform with a bell beside it.
 
 **Grand Meridian Station** (faces south onto Station Square). A long hall of iron and glass: a
 barrel-vaulted train shed behind a stone front with a big round clock window over the entrance
@@ -229,14 +255,20 @@ twisted, the holder deflated. Rubble: the iron rings.
 62 m, with four big white clock faces near the top, a copper pyramid roof and a small lantern.
 Damaged: clock faces shattered, roof gone. Rubble: one clock face leaning on the heap.
 
-**Grand Harbor Bridge** (the river mouth). The one tall bridge, a road deck 22 m wide under two
-steel truss arches 36 m high, painted rust red, joining Old Town and downtown along the
+**Grand Harbor Bridge** (the river mouth). The one tall bridge, a road deck 24 m wide (the 22 m
+River Drive plus a curb each side) under two steel truss arches 36 m high, painted rust red, joining Old Town and downtown along the
 waterfront. It is a bridge archetype (passable, it carries roads), not a landmark class.
 Damaged: one arch broken. Rubble: the deck sagging into the river.
 
 Spread: every part of the city has one in sight. The tall ones (tower, mast, wheel, chimneys,
 cathedral spire, clock tower) are visible across the city; each stage 2 square holds at least one
-landmark (section 6).
+landmark (section 6). On a 25 m grid of dry land inside the beltway, no point is further than
+748 m from a landmark (the far north-west corner, near Alder Row).
+
+Every landmark a juvenile can reach (those in some stage 2 square: all but Meridian Tower, City
+Hall and the Farewell Light) has a 20 m apron: no building taller than 12 m (one the juvenile
+cannot trample) stands within 20 m of it, so the 18 m wide juvenile never wedges itself into a
+notch between a landmark and a block of flats.
 
 ---
 
@@ -250,17 +282,24 @@ Rules of thumb for gameplay: houses (5 to 9 m) are the hatchling's food; shops a
 (up to 12 m) get trampled by the juvenile; apartments and offices stop the juvenile; towers above
 70 m stop even the titan's trample.
 
+For the artists: one model per id, made in **light, neutral colors** (the district tint in
+section 2 adds the color family), with **at most two materials** per model, taken from the shared
+ones in `docs/ASSETS.md` (the draw-call budget in section 8 depends on it). Bridge models are
+stretched to fit their crossing (section 5): put the piers at the two ends of the deck and make
+the middle spans and railings plain and repeating along the length, so a stretch from 57 to
+82 m (`bridge_a`) or to 104 m (`bridge_b`) and a little extra width does not look wrong.
+
 | id | Class | Size | Where | Look |
 |---|---|---|---|---|
-| `house_a` | house | 9 x 10 x 6 | suburbs, Old Town edge | Two-story detached house, pitched gable roof, pastel render, white trim, grey slate. |
-| `house_b` | house | 11 x 9 x 7 | suburbs, Temple Hill | Wider house with a hipped roof and a porch, terracotta roof on Temple Hill, red tile elsewhere. |
-| `house_c` | house | 8 x 8 x 5 | suburbs, Boardwalk, Docks | Small cottage, one and a half stories, steep roof, clapboard in sea colors near the water. |
-| `rowhouse_a` | house | 7 x 11 x 9 | Old Town, University, Cinder Works | Three-story narrow terraced house, flat front with a parapet, brick or ochre plaster, chimney stack. Placed in rows. |
+| `house_a` | house | 9 x 10 x 6 | suburbs, Old Town edge | Two-story detached house, pitched gable roof, white render, white trim, light grey slate. |
+| `house_b` | house | 11 x 9 x 7 | suburbs, Temple Hill | Wider house with a hipped roof and a porch, pale render, light clay-tile roof (the tint makes it terracotta on Temple Hill). |
+| `house_c` | house | 8 x 8 x 5 | suburbs, Boardwalk, Docks | Small cottage, one and a half stories, steep roof, pale clapboard walls, light grey roof. |
+| `rowhouse_a` | house | 7 x 11 x 9 | Old Town, University, Cinder Works | Three-story narrow terraced house, flat front with a parapet, light sandstone-colored brick, chimney stack. Placed in rows (the tint turns the rows ochre, brick red or soot brown by district). |
 | `shop_a` | shop | 11 x 10 x 5 | suburbs, Boardwalk | One-story corner shop, flat roof, striped awning, big window. |
 | `shop_b` | shop | 14 x 11 x 8 | Old Town, Docks, University | Two-story shop with a flat over it, shopfront and awning below, brick above. |
 | `shop_c` | shop | 12 x 12 x 10 | Downtown, Old Town | Three-story shop block with a cornice, stone ground floor, sign band. |
 | `apartment_a` | apartment | 18 x 14 x 20 | Old Town, suburbs, University | Six-story walk-up, flat roof with water tank, brick, balconies. |
-| `apartment_b` | apartment | 16 x 16 x 28 | Old Town, Downtown, Boardwalk | Eight-story block, square, plaster with balconies; on the Boardwalk a white seafront hotel. |
+| `apartment_b` | apartment | 16 x 16 x 28 | Old Town, Downtown, Boardwalk | Eight-story block, square, white plaster with balconies and big windows (it reads as a seafront hotel on the Boardwalk). |
 | `apartment_c` | apartment | 24 x 14 x 36 | Downtown, Docks | Ten-story slab, long and narrow, concrete with strip windows. |
 | `office_a` | office | 20 x 20 x 42 | Downtown, University | Twelve-story office, stone grid facade, flat roof with plant room. |
 | `office_b` | office | 24 x 18 x 55 | Downtown | Glass office slab with a setback at the top. |
@@ -271,14 +310,14 @@ Rules of thumb for gameplay: houses (5 to 9 m) are the hatchling's food; shops a
 | `factory_a` | factory | 36 x 24 x 14 | Cinder Works, Docks | Sawtooth-roof factory shed, brick and corrugated metal, one short chimney. |
 | `factory_b` | factory | 44 x 30 x 18 | Cinder Works | Big steel hall with a gantry, rusty cladding, roof vents. |
 | `warehouse_a` | factory | 30 x 20 x 11 | Cinder Works, Docks | Plain warehouse with a curved roof and loading doors. |
-| `bridge_a` | bridge | 16 x 74 x 8 | river crossings | Ordinary road bridge: concrete deck on two piers, railings, lamps. Passable. |
+| `bridge_a` | bridge | 16 x 74 x 8 | river crossings | Ordinary road bridge: concrete deck on piers at both ends, railings, lamps. Passable. Stretched to each crossing: 16 to 24 m wide, 57.5 to 81.5 m long. |
 | `tank_a` *(new)* | factory | 18 x 18 x 14 | Cinder Works, Docks | Round storage tank, white or silver, with a spiral stair and a ring walkway. |
 | `crane_a` *(new)* | factory | 16 x 26 x 46 | Docks quay | Gantry crane on four legs straddling the quay edge, boom raised, harbor red or yellow. |
 | `container_a` *(new)* | factory | 13 x 26 x 8 | Docks, Cinder Works | A stack of shipping containers three high in mixed colors. The one low industrial piece (a juvenile walks through it), so it is cheap. |
-| `campus_a` *(new)* | office | 44 x 16 x 16 | University, Temple Hill | Long hall with a pitched roof: a lecture hall (red brick, tall windows) at the university, a cloister or pilgrim hall (pale plaster, arcade) on Temple Hill. |
+| `campus_a` *(new)* | office | 44 x 16 x 16 | University, Temple Hill | Long hall with a pitched roof, tall windows above a ground-floor arcade, pale stone walls, light slate roof (lecture hall at the university, pilgrim hall on Temple Hill: the tint does the rest). |
 | `pavilion_a` *(new)* | shop | 16 x 12 x 7 | Boardwalk | Striped seaside pavilion (arcade, bandstand, bathhouse) with a canvas roof and flags. |
-| `shrine_a` *(new)* | shop | 10 x 10 x 11 | Temple Hill, Old Town | Small tiered shrine: three little upturned roofs stacked, terracotta and cream, no symbols. |
-| `bridge_b` *(new)* | bridge | 22 x 110 x 36 | river mouth | The Grand Harbor Bridge (section 3). |
+| `shrine_a` *(new)* | shop | 10 x 10 x 11 | Temple Hill, Old Town | Small wayside shrine in the Sevenfold Temple's invented style: three stacked round drums with flat brim roofs and one bronze bell on a rope, cream and terracotta, no symbols, no upturned eaves. |
+| `bridge_b` *(new)* | bridge | 22 x 110 x 36 | river mouth | The Grand Harbor Bridge (section 3). Placed 24 x 103.5 m. |
 
 Ids are append-only: never rename or reorder. Art files are named after them.
 
@@ -295,7 +334,9 @@ Ids are append-only: never rename or reorder. Art files are named after them.
   (the Northgate bridge at the north edge, two on the Temple Hill / University reach, two either
   side of Chapter Island, and the Grand Harbor Bridge at the mouth), plus **Tanners Ford**, a
   marked road through the water below Temple Hill. Bridges are the fast choke points; wading is
-  the slow way round.
+  the slow way round. Every deck is the road's width plus a meter each side (never narrower than
+  the bridge model): 18, 24, 24, 22, 16 and 16 m wide, so no vehicle drives off the edge into the
+  water.
 - **The sea**: the bay, a working harbor along the east side with two piers, the Long Mole out to
   the Farewell Light, the Boardwalk pier and beach on the west side.
 - **Parks and plazas** (27 in all, named on the map): a green or plaza at every starting
@@ -303,7 +344,7 @@ Ids are append-only: never rename or reorder. Art files are named after them.
   the river, Founders Plaza, Exchange Square, Station Square, Market Square, the Stadium
   Concourse, Wheel Plaza, the Embankment Promenade along the downtown waterfront and Juniper
   Strand (the beach).
-- **Props** (5540): parked and moving cars, taxis, vans, trucks, buses at stops, kiosks on plazas
+- **Props** (5541): parked and moving cars, taxis, vans, trucks, buses at stops, kiosks on plazas
   and high streets, trees in parks and along avenues, lamps, traffic lights at junctions,
   benches, hydrants and billboards.
 
@@ -319,126 +360,196 @@ of the value inside these squares, so the value inside them is kept close for ev
 
 | Anchor | Position (E, N) | Value in stage 1 square | Value in stage 2 square | Landmarks in the stage 2 square |
 |---|---|---|---|---|
-| Alder Row | -920, 920 | 1369 | 17 377 | Sevenfold Temple |
-| Bellhaven | -920, -240 | 1379 | 18 014 | Tidewater Cathedral |
+| Alder Row | -920, 920 | 1372 | 17 361 | Sevenfold Temple |
+| Bellhaven | -920, -240 | 1379 | 18 088 | Tidewater Cathedral |
 | Cinder Flats | 920, -235 | 1383 | 18 651 | Kiln Point Power Station |
-| Dovecote | -540, 920 | 1384 | 17 933 | Sevenfold Temple, Grand Meridian Station, Founders Clock Tower |
-| Easter Green | 920, 380 | 1351 | 18 712 | Kiln Point Power Station |
-| Fennel Hill | -928, 328 | 1375 | 19 244 | Tidewater Cathedral, Sevenfold Temple |
-| Gull Point | 920, -720 | 1376 | 17 106 | Number Three Gasworks |
-| Harrow Lane | 920, 920 | 1391 | 17 261 | Halcyon Observatory, Signal Hill Mast |
-| Ivy Court | 240, 920 | 1407 | 18 399 | Halcyon Observatory, Grand Meridian Station, Founders Clock Tower |
-| Juniper Bay | -920, -600 | 1388 | 17 189 | Tidewater Cathedral, Anchor Field, The Tidewheel |
+| Dovecote | -540, 920 | 1384 | 17 942 | Sevenfold Temple, Grand Meridian Station, Founders Clock Tower |
+| Easter Green | 920, 380 | 1352 | 18 713 | Kiln Point Power Station |
+| Fennel Hill | -928, 328 | 1369 | 19 244 | Tidewater Cathedral, Sevenfold Temple |
+| Gull Point | 920, -720 | 1384 | 16 932 | Number Three Gasworks |
+| Harrow Lane | 920, 920 | 1397 | 17 268 | Halcyon Observatory, Signal Hill Mast |
+| Ivy Court | 240, 920 | 1407 | 18 397 | Halcyon Observatory, Grand Meridian Station, Founders Clock Tower |
+| Juniper Bay | -920, -600 | 1380 | 17 163 | Tidewater Cathedral, Anchor Field, The Tidewheel |
 
-Spread: stage 1 within 4% (1351 to 1407), stage 2 within 13% (17 106 to 19 244); the target was
+Spread: stage 1 within 4% (1352 to 1407), stage 2 within 14% (16 932 to 19 244); the target was
 about 25%. No stage 2 square reaches the downtown core.
 
 ---
 
 ## 7. What was measured
 
-All numbers below were measured on the shared 4-core machine while other work was running.
+All numbers below were measured on the shared 4-core machine while other work was running
+(load average 2.3 to 4.7; another program's headless browser used up to 3.6 cores at times). The
+machine was never idle.
 
-**Size**: 2697 structures, 5540 props, 40 archetypes, 13 landmarks plus the landmark bridge,
-6 bridge decks, 12 districts, 10 anchors.
+**Size**: 2695 structures, 5541 props, 40 archetypes, 13 landmarks plus the landmark bridge,
+6 bridge decks, 12 districts, 10 anchors, 27 parks and plazas.
 
-**Same everywhere**: city checksum 1744768440 (full checksum 2227442450), the same in Node 22
-and in headless Chromium 153 (script `/tmp/mb-scratch/city/browser/check.cjs`, bundle built with
-esbuild). Another seed gives 763826977. The placeholder city is unchanged: 1340881825.
+**Same everywhere**: city checksum (seed 9001, the game's seed) 1739170986, full checksum
+(`meridianChecksum`, which also covers streets, areas, districts and their tints) 1876286051.
+Node 22 and headless Chromium 153 compute exactly the same numbers (an esbuild bundle of the
+generator, run in both). For seed 9002 the city checksum is 2320056143 and the full checksum
+424900319. The placeholder city is unchanged: 1340881825 from both `generateCity()` and
+`getCity()`.
 
-**Build time** (generation plus spatial index): about 45 ms in a warm engine (the test takes the
-best of five and requires under 200 ms). The very first, cold build in a fresh Node process
-takes 180 to 230 ms of processor time (the placeholder: 10 to 20 ms), 370 ms in Chromium on the
-busy machine. It happens once, when the server starts or the page loads.
+**Build time** (generation plus spatial index):
+- Warm engine: 41 to 61 ms (best of five; the test asks under 200 ms).
+- First, cold build in a fresh Node process: 166 to 212 ms of processor time on the main thread
+  (`process.threadCpuUsage`, 12 runs); on the clock 230 to 580 ms on the busy machine, because
+  the build waits for a core. The spatial index is 10 to 20 ms of that. The placeholder: 10 to
+  13 ms. Chromium: 270 ms on the clock, busy machine. Sharing one raster between the yard
+  passes (done) and a one-sweep flood of the open ground (tried, gave the identical city, saved
+  nothing measurable, not kept) did not move the cold number: it is the engine compiling about
+  4000 lines of generator code the first time, spread across all steps (yard opening about 80 ms,
+  street fronts about 45 ms, props about 23 ms, streets about 15 ms, ground about 14 ms).
+- So the cold build is **at the 200 ms budget, not reliably under it**. It happens once, when the
+  server starts or the page loads (behind the loading screen). `shared/test/meridianCold.test.ts`
+  times that first build on its own and fails over 400 ms of main-thread processor time. If the
+  budget must hold cold, the next step is to cache: build once on the server and send the client
+  the checksum only, or keep a prebuilt city in the client bundle and check it against the
+  checksum (a city's JSON is about 1 MB).
 
-**Bot matches** (`npm run sim -- --city meridian --nav`, today's bar fractions 0.13 / 0.088 / 0.35):
+**Bot matches** (`npm run sim -- --city meridian --nav`):
 
-| Run | Kaiju wins | Mean length | Stage times (stage 1 / 2 / 3, when completed) | Navigation |
-|---|---|---|---|---|
-| Meridian, 20 contested, seeds 1-20 | 5 of 20 (25%) | 9:28 | 2:09 / 2:09 / 6:21 | units stuck 0.01% of time (longest 2.5 s), 0 give-ups, at most 4 units on one bridge deck, kaiju stuck 0.18% (longest 9.7 s) |
-| Meridian, 20 contested, seeds 21-40 | 2 of 20 (10%) | 10:00 | 2:07 / 2:18 / 7:22 | units stuck 0.01%, 0 give-ups, at most 4 on one deck |
-| Meridian, 10 unopposed | 10 of 10 | 7:55 | segment filled after 1:29 / 1:34 / 4:29 | no stuck units |
-| Placeholder, 20 contested (same day, for comparison) | 7 of 20 (35%) | 10:57 | 3:24 / 3:32 / 3:57 | units stuck 0.00% |
-| Placeholder, 10 unopposed | 10 of 10 | 7:35 | segment filled after 2:07 / 2:06 / 3:00 | |
+| Run | Bar fractions | Kaiju wins | Mean length | Stage times (stage 1 / 2 / 3, when completed) | Navigation |
+|---|---|---|---|---|---|
+| 20 contested, seeds 101-120 | today's 0.13 / 0.088 / 0.35 | 5 of 20 (25%) | 10:12 | 2:13 / 2:02 / 6:16 | units stuck 0.02% (longest 3.2 s), 2 give-ups in 20 matches, at most 4 units on one bridge deck, kaiju stuck 0.08% (longest 10.5 s) |
+| 10 unopposed | 0.18 / 0.13 / 0.30 | 10 of 10 | 7:33 | segment filled after 2:02 / 2:11 / 2:57 | no stuck units |
+| 30 contested, seeds 401-430 | 0.18 / 0.13 / 0.30 | 22 of 30 (73%) | 9:13 | 2:48 / 2:47 / 3:38 (seeds 411-430) | units stuck 0.04% (longest 7.5 s), 6 give-ups in 20 matches, kaiju stuck 0.34% (longest 8.5 s) |
+| Earlier: placeholder, 20 contested | today's | 7 of 20 (35%) | 10:57 | 3:24 / 3:32 / 3:57 | units stuck 0.00% |
+| Earlier: placeholder, 10 unopposed | today's | 10 of 10 | 7:35 | segment filled after 2:07 / 2:06 / 3:00 | |
 
-Bots navigate the city: no stuck squads, no give-ups, no pile-ups at bridges (units wade about
-7 to 8% of their time, which is the river doing its job). What moved against `docs/BALANCE.md`:
-stages 1 and 2 are faster than on the placeholder (the starting neighborhoods are denser), and
-stage 3 is much longer (the titan starts stage 3 about 720 m from downtown, and the last mark is a
-fraction of a city whose value is concentrated in the core). The kaiju wins too rarely.
+(The `--bar P1,P2,P3` option of the harness tries other fractions for one run without changing
+the rules file. Unopposed matches repeat exactly per start, so 10 unopposed runs cover 8 distinct
+starts here.)
 
-A trial with other fractions (scratch only, nothing in the repository changed): p1 0.18, p2 0.13,
-p3 0.30 gives 12 of 20 kaiju wins (60%), mean 9:47, stages 3:04 / 3:23 / 3:21 contested, and
-unopposed the segments fill after 2:02 / 2:11 / 2:56 (mean match 7:31). That is the starting
-point I would recommend for the retune, then a few more batches to settle the win rate near the
-target.
+What this says:
+- Bots navigate the city: no stuck squads, no pile-ups at bridges; units wade 6 to 10% of their
+  time, which is the river doing its job. A few route give-ups (0.1 to 0.3 per match) appeared in
+  these batches; none were seen in the review's 30 matches. Not investigated.
+- At today's fractions the kaiju wins too rarely (25%): stages 1 and 2 are short (about 2:05),
+  stage 3 is long (6:16), because the titan starts stage 3 about 720 m from downtown and only
+  20% of the city's value lies within 200 m of downtown (placeholder: 23%).
+- At 0.18 / 0.13 / 0.30 the kaiju wins too often (73% over 30 matches). Unopposed, stage 3 still
+  fills in 2:57, against the 100 to 130 s target. The 408 s kaiju freeze the review found at
+  seed 419 (a notch between Anchor Field and a block of flats) is gone: the 20 m landmark apron
+  (section 3) removed that building, and seed 419 now plays a normal 7:14 match. The kaiju bot
+  itself still has no "back out when stuck" rule (section 9).
+- So the retune is still open. The likely direction: p1 and p2 between today's and the trial's,
+  p3 near 0.27 to 0.28, then batches of 20 contested and 10 unopposed until the win rate settles.
 
 ---
 
 ## 8. Budget
 
 - **Archetypes**: 40 of 40. The client draws one instanced batch per archetype, per damage state
-  (intact, damaged, rubble) and per material part of its model, and only batches that have
-  instances are drawn. One more archetype costs up to 3 draw calls (6 if its model has two
-  materials) once buildings of it exist in every state. Estimate for stage 3 with everything in
-  play: about 120 to 180 calls for buildings plus about 15 to 30 for props: well under the 350
-  budget. This is an estimate from reading `client/src/render/cityView.ts`, not a measurement.
-- **Counts**: 2697 structures (allowed 2500 to 3200), 5540 props (4000 to 6000).
+  (intact, damaged, rubble) and per material of its model, and only batches that have instances
+  are drawn (`client/src/render/cityView.ts`). So: 40 x 3 = 120 calls at most with one material
+  per model, up to about 240 with two, plus about 15 to 45 for props. That stays under the 350
+  budget **only if every building model uses at most two of the shared materials** (section 4).
+  One more archetype would cost 3 to 6 calls. This is an estimate from reading the code, not a
+  measurement: at switch-over, read `renderer.info.render.calls` in headless Chromium at stage 3
+  with buildings in all three damage states, and write the number here.
+- **District tint**: free in draw calls (one color per instance, set once at load).
+- **Counts**: 2695 structures (allowed 2500 to 3200), 5541 props (4000 to 6000).
 
 ---
 
 ## 9. How to switch the game over to Port Meridian
 
-1. **The one-line change**, in `shared/src/city/cache.ts`: build the city with
+Do these in order; each item names who owns the file.
+
+1. **Fix the two bot and spawn problems first** (they show up on this city, and they skew any
+   balance numbers taken before they are fixed):
+   - *Kaiju bot* (`shared/src/sim` bots): when the kaiju has made no progress for 3 s, back it
+     out and choose another target, or smash the building in the way. The city's 20 m landmark
+     apron removed the one notch the review found (seed 419, a 408 s freeze), but the city still
+     has gaps between tall buildings narrower than a juvenile, so the bot must not depend on the
+     city. Add a soak check that fails if the kaiju is stuck for more than 20 s.
+   - *Stage 3 deployment* (`shared/src/sim/spawn.ts`): along the south edge the deploy line is
+     open sea, and the search for dry ground walks inland to the Long Mole, about 1 km from the
+     kaiju (measured from Bellhaven, Cinder Flats and Juniper Bay: one squad leader each on the
+     mole at N -954, one unit in the water). Skip a deploy candidate whose dry spot is more than
+     about 40 m from its point on the line, or whose nearest street junction is a dead end on the
+     mole or a pier, so the squad's sector takes its next point. Add a test that deploys stage 3
+     from every start and checks that no squad leader lands more than 40 m inside the line or on
+     the mole or the piers.
+2. **The one-line change**, in `shared/src/city/cache.ts`: build the city with
    `generatePortMeridian(seed)` (import it from `./meridian/generate`) instead of
    `generateCity(seed)`. `generateCity` itself stays, as the placeholder.
-2. **Run `npm run export:defs`** (only needed if archetypes changed since; today it is in sync).
-3. **Tests that assume the placeholder** (a dry run of the whole suite with the city swapped in
-   memory, `/tmp/mb-scratch/city/switch/vitest.config.ts`, gave 12 failures in 8 files):
-   - `shared/test/meridian.test.ts`: "the placeholder is untouched" (expects `getCity()` to be the
-     placeholder; change it to expect Port Meridian, keep the `generateCity` half).
-   - `shared/test/city.test.ts`: the checksum, "knows water, parks and bridges" (probes a
-     placeholder water spot), "routes across the river over a bridge" and "respects closed edges"
-     (placeholder bridge positions). Rewrite against Port Meridian's river and bridge decks.
-   - `shared/test/flow.test.ts`: squads redeployed at stage 2 came 239.3 m from the kaiju (the test
-     asks 240). Check `sim/spawn.ts` perimeter points on the new city; probably a test tolerance
-     or one spawn point.
+3. **Run `npm run export:defs`** (only needed if archetypes changed since; today
+   `tools/art/data/archetypes.json` is in sync).
+4. **Tests that assume the placeholder.** A dry run of the whole suite with the city swapped in
+   memory (`/tmp/mb-scratch/city-fix/switch/vitest.config.ts`) gave **10 failures in 7 files**
+   (the review's earlier dry run gave 11; the extra one, `client/test/session.test.ts`, passed
+   this time and looks load-dependent, not city-dependent):
+   - `shared/test/meridian.test.ts`: "the placeholder is untouched" expects `getCity()` to be the
+     placeholder. Change that half to expect Port Meridian (1739170986); keep the
+     `generateCity()` half.
+   - `shared/test/city.test.ts`, four tests:
+     - "is deterministic, and the seed matters" compares `getCity()` with `generateCity()`
+       (not a stored checksum): compare `getCity()` with `generatePortMeridian()` instead.
+     - "knows water, parks and bridges" probes a placeholder water spot.
+     - "routes across the river over a bridge" and "respects closed edges and reports no route"
+       use the placeholder's bridge positions.
+     Rewrite the last three against Port Meridian's river and its six bridge decks.
+   - `shared/test/flow.test.ts`: squads redeployed at stage 2 came 239.3 m from the kaiju (the
+     test asks at least 240). Check `sim/spawn.ts` perimeter points on the new city; probably
+     one spawn point or the tolerance.
    - `shared/test/molt.test.ts`: "never leaves a juvenile shaking between walls" fails because
-     Port Meridian has no such gaps for the test to try (it requires at least one). Keep the
-     test for the placeholder or make it pass when no gap exists.
+     the test finds no gap of the kind it tries on Port Meridian (it requires at least one).
+     Keep it on the placeholder, or let it pass when no such gap exists.
    - `shared/test/nav.test.ts`: "gets every sub-unit to markers dropped anywhere": a sub-unit did
-     not arrive at a random marker. **A real issue to look at**: probably a marker dropped in a
-     yard the squad cannot reach; check the marker clamping or the yard.
-   - `shared/test/prediction.test.ts`: the scripted walk never bumped a wall in the new city;
+     not arrive at a random marker. **A real issue, not tracked down**: probably a marker dropped
+     somewhere the squad cannot reach; check the marker clamping first.
+   - `shared/test/prediction.test.ts`: the scripted walk never bumps a wall on the new city;
      move the walk so it does.
-   - `shared/test/matchSoak.test.ts`: a match ran 150.03 s against a 150 s cap; the cap needs
-     the new stage times.
-   - `client/test/session.test.ts`: the hidden-tab backlog test (9 ticks against a limit of 9);
-     not investigated, check whether it depends on the city.
-   - `shared/test/meridian.test.ts` timing test failed once in the dry run (236 ms) because the
-     whole suite ran in parallel on a busy machine; it passes on its own.
-4. **Documents that assume the placeholder**: `docs/STATUS.md` (the city section, the bots and
+   - `shared/test/matchSoak.test.ts`: a match ran 150.033 s against its 150 s clock, exactly one
+     tick over (the assertion is that a match never outlasts the clock). That is a clock-end bug
+     in the simulation or its report, which the simulation owner must fix; **do not loosen the
+     test**. It shows up on this city only because a match happened to end on that tick.
+5. **Client** (`client/src/render/cityView.ts`, client owner):
+   - Tint each building by its district: once at load, find the district each structure's center
+     lies in (point in polygon over `CityData.districts`) and multiply its instance color by
+     `District.tint` (absent means white). No extra draw calls.
+   - Measure draw calls at stage 3 with buildings in all three damage states
+     (`renderer.info.render.calls` in headless Chromium) and write the number in section 8.
+6. **Documents that assume the placeholder**: `docs/STATUS.md` (the city section, the bots and
    balance notes), `docs/BALANCE.md` (every measurement and the bar fractions),
    `docs/ARCHITECTURE.md` (the city paragraph names `generateCity`), and this file's status line.
-5. **Re-tune**: the bar fractions in `shared/src/defs/rules.ts` (section 7: start from 0.18 /
-   0.13 / 0.30), then rerun `npm run sim -- --seeds 20` in several batches and
-   `--unopposed`. The bots' tuning for stage 3 (how far the titan walks to downtown) is the next
-   knob if stage 3 stays long.
-6. **Known bot issue** found while playing this city (not a city bug): a hungry kaiju bot can
-   walk at food behind a breakable wall and never smash it (seed 18, about 300 s stuck in one
-   earlier run). Worth fixing in the kaiju bot.
+7. **Re-tune** (after item 1): the bar fractions in `shared/src/defs/rules.ts`. Section 7 has the
+   numbers: today's fractions give the kaiju 25% of contested matches, the trial 0.18 / 0.13 /
+   0.30 gives it 73%, and unopposed stage 3 still takes 2:57 against 100 to 130 s. Try p3 near
+   0.27 to 0.28 with p1 and p2 between the two, using `npm run sim -- --city meridian --bar
+   P1,P2,P3` (contested, `--seeds 20`, several batches) and `--unopposed --seeds 10`; then write
+   the chosen fractions into `rules.ts` and every batch into `docs/BALANCE.md`. The bots' stage 3
+   plan (how far the titan walks to downtown) is the next knob if stage 3 stays long.
 
 ---
 
 ## 10. Where things are (for engineers)
 
 - `shared/src/city/meridian/layout.ts`: the hand-made plan (coast, river, parks, arterial
-  streets, landmarks, anchors, districts, and the patches that tell the generator what to grow).
+  streets, landmarks, anchors, districts and their building tints, and the patches that tell the
+  generator what to grow).
 - `shared/src/city/meridian/*.ts`: the generator (`generate.ts` is the entry,
-  `generatePortMeridian(seed)`); `palettes.ts` sets which buildings each patch uses.
-- `shared/test/meridian.test.ts`, `shared/test/meridianPlay.test.ts`: the tests (25).
+  `generatePortMeridian(seed)`); `palettes.ts` sets which buildings each patch uses; `build.ts`
+  places bridge decks (as wide as their road plus a meter each side), landmarks (with the 20 m
+  apron), street fronts and yards, then opens every yard that would trap a squad.
+- Tests: `shared/test/meridian.test.ts` (the data, the level, identical on every machine),
+  `shared/test/meridianPlay.test.ts` (deployment and bot matches), `shared/test/meridianCold.test.ts`
+  (the first build's time).
 - `shared/scripts/cityMap.ts`: the pictures. `shared/scripts/sim.ts --city meridian`: the
-  balance harness on this city (`--nav` adds the navigation summary).
+  balance harness on this city (`--nav` adds the navigation summary, `--bar` tries other bar
+  fractions).
 - Same on every machine: the generator uses only + - * /, `Math.sqrt`, rounding and the
-  project's seeded generator; headings come from a fixed table; positions snap to 1/8 m. A test
-  scans the source for forbidden math functions.
+  project's seeded generator; headings come from a fixed table; every final coordinate
+  (structures, props, street junctions, and every point of every water, park, plaza and district
+  outline) snaps to 1/8 m. A test scans the generator and the shared files it imports
+  (`math/rng`, `city/archetypes`, `city/props`, `city/types`, `defs/stages`, `defs/ids`) for
+  forbidden math functions.
+- Names: all invented, but a few match real places (Signal Hill, Harrow Road, Kingsway,
+  Northgate, Temple Hill), and Bellhaven is close to Belhaven, a Scottish town and beer brand.
+  Renaming is the owner's call; if Bellhaven goes, "Bellmere" is a ready replacement (the anchor,
+  district, common and high street names are in `layout.ts`; the placeholder city has its own
+  Bellhaven anchor in `generateCity.ts`).

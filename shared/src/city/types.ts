@@ -136,6 +136,12 @@ export interface District {
   zone: ZoneTag;
   name: string;
   polygon: Vec2[];
+  /**
+   * Optional building tint, 0xRRGGBB: the client may multiply the color of every building whose
+   * center lies in this district by it (one instance color, no extra draw calls), so one light,
+   * neutral model per archetype takes the district's color family. Absent means white (no tint).
+   */
+  tint?: number;
 }
 
 /** A low-rise spot where a match can start (stage 1 bounds are centered on one of these). */

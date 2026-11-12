@@ -639,11 +639,16 @@ layout, requires bumping `SNAPSHOT_VERSION` / `PROTOCOL_VERSION`.
   and a missing file is a console warning, never a crash.
 - Rendering style: flat-shaded low-poly, saturated palette, nearest-filtered low-resolution
   textures, fog and haze for scale, no dynamic shadow maps (blob shadows only), additive glow
-  sprites for projectiles and lasers. Budget at stage 3 with the whole city in view: under 350
+  sprites for projectiles and lasers (white light only: full-color effect pictures such as
+  explosions and fire are alpha blended, as the manifest's `blend` field says). The drawing
+  buffer never holds more pixels than a 1080p screen. Budget at stage 3 with the whole city in view: under 350
   draw calls and under 1.5 million triangles; use `InstancedMesh` per structure archetype and
   one instanced quad batch for all sprites (soldiers, civilians): 2000 sprites must be cheap.
 - Kaiju and vehicles are rigid segmented models (named nodes, see `ASSETS.md`) animated in code:
   walk cycles, wind-ups and recoveries are procedural, driven by the action state and timers.
+  The kaiju's arms blend toward the pose targets the manifest gives each model (`poses`); in the
+  player's own first-person view the head is locked to the aim and the arms ride on it, so
+  snout and claws stay in one place on screen (`docs/art/client-notes-kaiju-lizard.md`).
 - Structures: per archetype one instanced mesh per visual state (intact, damaged, rubble).
   Collapse is a client-only effect: spawn that archetype's pre-made chunks, tumble them with
   cheap fake physics, dust, then show rubble.
@@ -657,7 +662,8 @@ layout, requires bumping `SNAPSHOT_VERSION` / `PROTOCOL_VERSION`.
   - The default keyboard map binds no modifier key and no function key: a page cannot cancel
     the browser shortcuts they make with the game's other keys (`browserShortcutRisk` in
     `client/src/game/input/actions.ts`; a test holds the defaults to it).
-  - The player's settings (master volume, mouse speed, inverted look) live in browser storage
+  - The player's settings (master volume, mouse speed, inverted look, half-resolution 3D view)
+    live in browser storage
     under `mb.settings`, next to the session token (`mb.token`), the callsign (`mb.name`) and
     stored bindings (`mb.bindings`).
 - Sound (`client/src/audio`; as built: `docs/STATUS.md` section 7.6). What the rest of the

@@ -18,7 +18,7 @@ import { buildAreas, buildRiver, toWorld } from './areas';
 import { buildDecks, buildFronts, buildLandmarks, buildYards, createBuilder, openPockets, type Street } from './build';
 import { furnish } from './furnish';
 import { buildGround } from './ground';
-import { ANCHORS, DISTRICTS, DOWNTOWN } from './layout';
+import { ANCHORS, DISTRICT_TINTS, DISTRICTS, DOWNTOWN } from './layout';
 import { planStreets } from './streets';
 
 export function generatePortMeridian(seed: number = CITY_SEED): CityData {
@@ -72,7 +72,7 @@ export function generatePortMeridian(seed: number = CITY_SEED): CityData {
   const props = furnish(builder, nodePoints, nodeStreets, areas, river, seed);
 
   // --- Districts, anchors ----------------------------------------------------------------------
-  const districts: District[] = DISTRICTS.map((d, id) => ({ id, zone: d.zone, name: d.name, polygon: d.poly.map(toWorld) }));
+  const districts: District[] = DISTRICTS.map((d, id) => ({ id, zone: d.zone, name: d.name, polygon: d.poly.map(toWorld), tint: DISTRICT_TINTS[d.name] ?? 0xffffff }));
   const anchors: NeighborhoodAnchor[] = ANCHORS.map((a, id) => ({ id, name: a.name, x: -a.at[0], z: a.at[1] }));
 
   return {
@@ -107,7 +107,7 @@ export function meridianChecksum(city: CityData): number {
     for (const p of a.polygon) h = hash32(h, mm(p.x), mm(p.z));
   }
   for (const d of city.districts) {
-    h = hash32(h, d.zone.length, d.polygon.length);
+    h = hash32(h, d.zone.length, d.polygon.length, d.tint ?? 0xffffff);
     for (const p of d.polygon) h = hash32(h, mm(p.x), mm(p.z));
   }
   for (const a of city.anchors) h = hash32(h, mm(a.x), mm(a.z));

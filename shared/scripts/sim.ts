@@ -16,6 +16,8 @@
  *   --unopposed          no squads at all: how fast does a kaiju fill the bar when left alone
  *   --max-minutes N      give up on a match after this many simulated minutes (default 20)
  *   --city NAME          'placeholder' (default: the city the game ships with today) or 'meridian'
+ *   --bar P1,P2,P3       try other destruction bar fractions (MATCH_RULES.bar.p1/p2/p3) in this run
+ *                        only; the rules file is not changed
  *                        (Port Meridian, docs/CITY.md), built once and handed to every match
  *   --nav                also print how the squads got about: stuck time, wading, bridge crowding
  *   --events             also print each match's event counts
@@ -28,6 +30,7 @@
  * the kaiju took to fill its segment of the bar, volleys, healing and the squads' collateral.
  */
 
+import { MATCH_RULES } from '../src/defs/rules';
 import { buildCityIndex, generatePortMeridian, type BuiltCity } from '../src/index';
 import { runBotMatch, type BotMatchReport } from './botMatch';
 import { createNavWatch, navSummary, type NavWatch } from './navWatch';
@@ -46,6 +49,7 @@ interface Options {
   json: boolean;
   city: string;
   nav: boolean;
+  bar: [number, number, number] | null;
 }
 
 function parseArgs(argv: string[]): Options {
@@ -63,6 +67,7 @@ function parseArgs(argv: string[]): Options {
     json: false,
     city: 'placeholder',
     nav: false,
+    bar: null,
   };
   for (let i = 0; i < argv.length; i++) {
     const next = (): number => {
@@ -112,6 +117,12 @@ function parseArgs(argv: string[]): Options {
         o.city = argv[++i] ?? '';
         if (o.city !== 'placeholder' && o.city !== 'meridian') throw new Error("--city needs 'placeholder' or 'meridian'");
         break;
+      case '--bar': {
+        const v = (argv[++i] ?? '').split(',').map(Number);
+        if (v.length !== 3 || !v.every((x) => Number.isFinite(x) && x > 0)) throw new Error('--bar needs three fractions, like 0.18,0.13,0.30');
+        o.bar = [v[0], v[1], v[2]];
+        break;
+      }
       default:
         throw new Error(`unknown option ${argv[i]} (see the header of shared/scripts/sim.ts)`);
     }
@@ -149,7 +160,7 @@ function printTable(reports: BotMatchReport[], o: Options): void {
     per(r, (s) => s.kaijuHpLost.toFixed(0)),
   ]);
   const widths = head.map((h, i) => Math.max(h.length, ...rows.map((c) => c[i].length)));
-  const tags = [o.city !== 'placeholder' ? `city: ${o.city}` : '', o.fast ? 'fast tuning' : '', o.kaijuHandicap > 0 ? `kaiju handicap ${o.kaijuHandicap}` : '', o.humanHandicap > 0 ? `human handicap ${o.humanHandicap}` : '', o.triggerHappy ? 'trigger-happy squads' : '', o.squads === 0 ? 'unopposed' : ''].filter(Boolean);
+  const tags = [o.city !== 'placeholder' ? `city: ${o.city}` : '', o.bar ? `bar ${o.bar.join(' / ')}` : '', o.fast ? 'fast tuning' : '', o.kaijuHandicap > 0 ? `kaiju handicap ${o.kaijuHandicap}` : '', o.humanHandicap > 0 ? `human handicap ${o.humanHandicap}` : '', o.triggerHappy ? 'trigger-happy squads' : '', o.squads === 0 ? 'unopposed' : ''].filter(Boolean);
   console.log(`${reports.length} bot matches${tags.length > 0 ? ` [${tags.join(', ')}]` : ''}`);
   console.log(row(head, widths));
   console.log(widths.map((w) => '-'.repeat(w)).join('  '));
@@ -197,6 +208,11 @@ function printTable(reports: BotMatchReport[], o: Options): void {
 }
 
 const options = parseArgs(process.argv.slice(2));
+if (options.bar) {
+  // A trial for this run only (the rules object is plain data, read when each match starts).
+  const bar = MATCH_RULES.bar as { p1: number; p2: number; p3: number };
+  [bar.p1, bar.p2, bar.p3] = options.bar;
+}
 let city: BuiltCity | undefined;
 if (options.city === 'meridian') {
   const data = generatePortMeridian();

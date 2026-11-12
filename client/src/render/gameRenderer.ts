@@ -596,7 +596,7 @@ export class GameRenderer {
     this.effects.update(dt, this.camera);
     this.boundary.update(dt, time);
     this.sky.update(dt, this.camera);
-    this.materials.setNight(this.sky.night);
+    this.materials.setNight(this.sky.night, view?.kaijuFirstPerson === true);
     this.lines.setFog(this.sky.fog.near, this.sky.fog.far);
 
     this.stats.sprites = this.sprites.size;
