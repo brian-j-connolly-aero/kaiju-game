@@ -1,6 +1,8 @@
 /**
  * Home: pick a callsign, then create a room or join one by its four-letter code. A code in the
- * page address (#BCDF) is joined at once. Problems are shown as a picture, never a sentence.
+ * page address (#BCDF) is joined at once, except for a first-time visitor with no callsign:
+ * they see only the callsign field and the join button (Enter joins; an empty field joins as
+ * "Player N"). Problems are shown as a picture, never a sentence.
  */
 
 import { JOIN_ERROR, MAX_NAME_LENGTH, ROOM_CODE_LENGTH } from '@mb/shared';
@@ -8,6 +10,14 @@ import { ERROR_NO_ROOM, JoinFailure } from '../../net/connection';
 import { cleanRoomCode, roomCodeFromHash, storeName } from '../../net/session';
 import { el, icon } from '../../ui/icons';
 import type { AppContext, Screen } from '../context';
+
+/**
+ * Whether the home screen asks for a callsign before joining the room in the address: only for
+ * a person (not the autopilot) who arrives by an invite link and has never set a callsign.
+ */
+export function invitePrompt(hashCode: string, name: string, autoplay: boolean): boolean {
+  return hashCode !== '' && name.trim() === '' && !autoplay;
+}
 
 export class HomeScreen implements Screen {
   readonly id = 'home' as const;
@@ -45,6 +55,8 @@ export class HomeScreen implements Screen {
     if (ctx.notice) showNotice(ctx.notice);
     ctx.notice = '';
 
+    // Set once the rows exist: brings back the full panel after a failed invite join.
+    let showAll = (): void => undefined;
     const commitName = (): string => {
       ctx.name = name.value.trim().slice(0, MAX_NAME_LENGTH);
       storeName(ctx.store, ctx.name, ctx.params.profile);
@@ -57,6 +69,7 @@ export class HomeScreen implements Screen {
       ctx.audio.play('ui_click');
       create.disabled = true;
       join.disabled = true;
+      go.disabled = true;
       showNotice('');
       try {
         await action();
@@ -65,6 +78,8 @@ export class HomeScreen implements Screen {
         // No such room, a full room, an old page, or no server at all.
         showNotice(failure === ERROR_NO_ROOM ? 'lb_join' : failure === JOIN_ERROR.roomFull || failure === JOIN_ERROR.serverFull ? 'lb_human' : failure === JOIN_ERROR.version ? 'ui_outdated' : 'ui_offline');
         ctx.audio.play('ui_error');
+        // Whatever went wrong, the whole panel is there again to try something else.
+        showAll();
         if (failure === ERROR_NO_ROOM) {
           code.classList.add('bad');
           // Do not keep trying a room that is gone every time the page is opened.
@@ -74,6 +89,7 @@ export class HomeScreen implements Screen {
         this.busy = false;
         create.disabled = false;
         join.disabled = false;
+        go.disabled = false;
       }
     };
     create.addEventListener('click', () => void run(() => ctx.client.create(commitName())));
@@ -94,6 +110,19 @@ export class HomeScreen implements Screen {
       if (e.key === 'Enter') tryJoin();
     });
     name.addEventListener('change', commitName);
+    // The invite's join button, beside the callsign: only shown while asking for a callsign.
+    const go = el('button', 'btn btn-big invite-join hidden', [icon('lb_join')]);
+    go.addEventListener('click', tryJoin);
+    name.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !go.classList.contains('hidden')) tryJoin();
+    });
+    const createRow = el('div', 'row', [create]);
+    const codeRow = el('div', 'row', [code, join]);
+    showAll = (): void => {
+      go.classList.add('hidden');
+      createRow.classList.remove('hidden');
+      codeRow.classList.remove('hidden');
+    };
 
     const gear = el('button', 'btn settings-open', [icon('ui_settings')]);
     gear.addEventListener('click', () => {
@@ -105,18 +134,19 @@ export class HomeScreen implements Screen {
     this.root = el('div', 'screen home', [
       gear,
       el('div', 'title', ['MONSTER BATTLE 9001']),
-      el('div', 'panel', [
-        el('div', 'row', [icon('lb_human', 'row-icon'), name]),
-        el('div', 'row', [create]),
-        el('div', 'row', [code, join]),
-        notice,
-      ]),
+      el('div', 'panel', [el('div', 'row', [icon('lb_human', 'row-icon'), name, go]), createRow, codeRow, notice]),
     ]);
     ctx.ui.append(this.root);
 
     // A code in the address joins at once; the autopilot also creates a room when there is none.
+    // Someone arriving by invite with no callsign yet is asked for one first (`invitePrompt`).
     const hashCode = roomCodeFromHash(window.location.hash);
-    if (hashCode || ctx.params.autoplay) {
+    if (invitePrompt(hashCode, ctx.name, ctx.params.autoplay)) {
+      createRow.classList.add('hidden');
+      codeRow.classList.add('hidden');
+      go.classList.remove('hidden');
+      name.focus();
+    } else if (hashCode || ctx.params.autoplay) {
       this.autoTimer = setTimeout(() => {
         if (hashCode) tryJoin();
         else create.click();
