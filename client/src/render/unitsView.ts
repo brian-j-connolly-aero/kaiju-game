@@ -39,7 +39,7 @@ export interface UnitsViewContext {
   localUnit: number;
   /** The local player's squad, or -1. */
   localSquad: number;
-  /** First person: the lead member of the local unit is not drawn (the camera is inside it). */
+  /** First person: the local unit's own members are not drawn (the camera is among them). */
   hideLocalLead: boolean;
   city: CityQuery | null;
   kaijus: SnapKaiju[];
@@ -194,13 +194,15 @@ export class UnitsView {
       if (def.visual.kind === 'model') {
         const rig = this.rig(def.visual.model);
         const tint = shaken && Math.floor(time * 10) % 2 === 0 ? 0xffb0a0 : 0xffffff;
-        for (let i = 0; i < u.members; i++) {
+        // First person: none of the local unit's vehicles is drawn. The camera sits at the
+        // unit's center, where the server aims from, and a troop's tanks stand around it 5 to 6
+        // meters away: drawn, they would fill the lower third of the view.
+        const hidden = local && ctx.hideLocalLead;
+        for (let i = 0; i < u.members && !hidden; i++) {
           memberOffset(def, u.id, i, u.members, this.offset);
           const x = u.x + this.offset.x * cos + this.offset.z * sin;
           const z = u.z - this.offset.x * sin + this.offset.z * cos;
           this.decals.push(x, 0.12, z, 7, 9, this.shadowUv, 0, 0, 0, 0, 0.55, u.yaw);
-          // First person: the vehicle the camera sits in is not drawn (a troop's others are).
-          if (local && ctx.hideLocalLead && Math.hypot(this.offset.x, this.offset.z) < 2.5) continue;
           rig.pose('turret', 0, u.aimYaw - u.yaw, 0);
           rig.pose('barrel', -Math.max(-0.2, Math.min(0.6, u.aimPitch)), 0, 0);
           rig.add(x, 0, z, u.yaw, 1, tint);

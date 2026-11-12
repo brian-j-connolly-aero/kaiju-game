@@ -67,6 +67,7 @@ export class HumanController implements Controller {
   private lastX = 0;
   private lastZ = 0;
   private lastUnit = -1;
+  private lastStage = 0;
   private kick = 0;
   private wasFiring = false;
   private readonly eye = { x: 0, y: 0, z: 0 };
@@ -158,17 +159,32 @@ export class HumanController implements Controller {
       this.viewYaw = u.aimYaw;
       this.aimYaw = u.aimYaw;
     }
-    // Redeployed (a new stage) or took over another unit: look toward the middle of the zone,
-    // which is where the kaiju is, instead of wherever the old view happened to point.
-    const jumped = Math.hypot(u.x - this.lastX, u.z - this.lastZ) > 40 || u.id !== this.lastUnit;
-    if (jumped && this.lastUnit >= 0) {
-      const b = ctx.frame.bounds;
-      this.viewYaw = Math.atan2((b.minX + b.maxX) / 2 - u.x, (b.minZ + b.maxZ) / 2 - u.z);
-      this.viewPitch = 0;
+    // Took over another unit of the squad (the leader fell): keep looking the way the player
+    // was looking, or at the kaiju when the squads know where it is. Redeployed for a new
+    // stage: look toward the middle of the new zone.
+    const stage = ctx.frame.match.stage;
+    if (this.lastUnit >= 0) {
+      const tookOver = u.id !== this.lastUnit && stage === this.lastStage;
+      const jumped = Math.hypot(u.x - this.lastX, u.z - this.lastZ) > 40 || stage !== this.lastStage;
+      const k = ctx.frame.kaijus[0];
+      if (tookOver) {
+        if (k && k.alive && k.known) {
+          const def = unitTypeDef(u.type);
+          const st = kaijuStageDef(k.kind, k.stage);
+          const flat = Math.max(1, Math.hypot(k.x - u.x, k.z - u.z));
+          this.viewYaw = Math.atan2(k.x - u.x, k.z - u.z);
+          this.viewPitch = clamp(Math.atan2(st.height * 0.5 - (u.y + def.eyeHeight), flat), -PITCH_LIMIT, PITCH_LIMIT);
+        }
+      } else if (jumped) {
+        const b = ctx.frame.bounds;
+        this.viewYaw = Math.atan2((b.minX + b.maxX) / 2 - u.x, (b.minZ + b.maxZ) / 2 - u.z);
+        this.viewPitch = 0;
+      }
     }
     this.lastX = u.x;
     this.lastZ = u.z;
     this.lastUnit = u.id;
+    this.lastStage = stage;
     if (input.pressed.camera) this.thirdPerson = !this.thirdPerson;
     if (!ctx.mapOpen) this.updateWheel(input);
     else this.wheel.open = false;
