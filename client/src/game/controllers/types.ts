@@ -1,7 +1,7 @@
 /** What every local player controller shares. */
 
 import type * as THREE from 'three';
-import type { CommandId, GroundMarker } from '@mb/shared';
+import type { CommandId, GroundMarker, SnapSquad } from '@mb/shared';
 import type { FrameState, MatchSession } from '../../net/matchSession';
 import type { GameRenderer } from '../../render/gameRenderer';
 import type { ActionState } from '../input/actions';
@@ -14,8 +14,18 @@ export interface ControlContext {
   dt: number;
   /** Local time, seconds. */
   now: number;
-  /** The map is open: the view does not turn and the body idles. */
+  /** The map or the settings panel is open: the view does not turn and the body idles. */
   mapOpen: boolean;
+}
+
+/**
+ * Whether a squad has nothing left to drive (so its player flies the news drone until the next
+ * stage). A dead leader alone does not count: the simulation puts the player in a surviving unit
+ * on the next tick, and for the snapshot in between the view should stay where it is.
+ */
+export function squadIsOut(squads: readonly SnapSquad[], squadId: number): boolean {
+  const squad = squads[squadId];
+  return !squad || squad.eliminated || squad.driven < 0;
 }
 
 /** One input sample, before the session stamps its sequence number. */

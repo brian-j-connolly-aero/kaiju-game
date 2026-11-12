@@ -13,6 +13,9 @@
   --ink: #f4f6fb;
   --panel: rgba(14, 18, 30, 0.78);
   --panel-edge: rgba(255, 255, 255, 0.16);
+  /* The subtitle line: its text size, and the room three lines of it need (the end screen keeps that free). */
+  --subs-font: clamp(15px, 2.2vw, 24px);
+  --subs-band: calc(var(--subs-font) * 3.9 + 16px);
   font-family: 'Trebuchet MS', 'Segoe UI', Verdana, sans-serif;
 }
 
@@ -245,6 +248,18 @@ body {
   width: 0;
   background: var(--kaiju);
   transition: width 0.15s;
+}
+
+/* The game could not start (no 3D view in this browser, or a broken download). */
+.boot-failed {
+  font-size: 84px;
+  color: var(--danger);
+  animation: pulse 1.2s infinite;
+}
+
+.boot.failed .boot-icon {
+  filter: grayscale(1);
+  opacity: 0.5;
 }
 
 /* --- lobby ---------------------------------------------------------------------------------- */
@@ -558,14 +573,44 @@ body {
   animation: pulse 0.5s infinite;
 }
 
+.hud-top-right {
+  flex: none;
+  width: 110px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
 .stage {
   display: flex;
   align-items: flex-end;
   gap: 3px;
-  flex: none;
-  width: 110px;
   justify-content: flex-end;
   color: rgba(255, 255, 255, 0.3);
+}
+
+/* The way to the settings panel: a small gear with the button that opens it. */
+.hint-menu {
+  flex-direction: row;
+  gap: 4px;
+  opacity: 0.6;
+}
+
+.hint-menu .hint-icon {
+  width: 24px;
+  height: 24px;
+  font-size: 16px;
+  border: none;
+  background: none;
+}
+
+.hint-menu .hint-glyph {
+  font-size: 18px;
+}
+
+.hud.cinematic .hint-menu {
+  display: none;
 }
 
 .stage-pip.on {
@@ -942,6 +987,29 @@ body {
   animation: none !important;
 }
 
+/* "Click": the mouse is free and a click on the view captures it. */
+.capture {
+  position: absolute;
+  left: 50%;
+  top: 62%;
+  transform: translateX(-50%);
+  width: 76px;
+  height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 46px;
+  border-radius: 50%;
+  background: rgba(8, 10, 18, 0.6);
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  filter: drop-shadow(0 2px 3px #000);
+  animation: pulse 0.9s infinite;
+}
+
+.hud.cinematic .capture {
+  display: none;
+}
+
 /* --- command wheel -------------------------------------------------------------------------- */
 
 .wheel {
@@ -1049,13 +1117,21 @@ body {
   left: 50%;
   bottom: 13vh;
   transform: translateX(-50%);
+  width: max-content;
   max-width: min(820px, 92vw);
   padding: 8px 16px;
   border-radius: 10px;
   background: rgba(8, 10, 18, 0.72);
-  font-size: clamp(15px, 2.2vw, 24px);
+  font-size: var(--subs-font);
   text-align: center;
   line-height: 1.3;
+  /* Subtitles are the one thing that must be read: no screen is ever drawn over them. */
+  z-index: 6;
+}
+
+/* On the end screen the subtitle has the bottom of the page to itself (the screen keeps it free). */
+body[data-screen='end'] .subtitles {
+  bottom: 2vh;
 }
 
 .subtitles-speaker {
@@ -1070,7 +1146,8 @@ body {
 
 .end {
   justify-content: flex-start;
-  padding: 3vh 3vw;
+  /* The band at the bottom belongs to the subtitles of the hearing. */
+  padding: 3vh 3vw calc(2vh + var(--subs-band));
   gap: 2vh;
   background: rgba(8, 10, 18, 0.45);
   overflow: hidden;
@@ -1126,6 +1203,15 @@ body {
   flex-direction: column;
   gap: 6px;
   min-width: min(480px, 52vw);
+  /* A long tally scrolls inside its own box instead of running down over the subtitles. */
+  max-height: 100%;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  pointer-events: auto;
+}
+
+.tallies > .tally {
+  flex: none;
 }
 
 .tally {
@@ -1264,7 +1350,103 @@ body {
 .end-back {
   position: absolute;
   left: 3vw;
-  bottom: 3vh;
+  top: 3vh;
+}
+
+/* --- settings ------------------------------------------------------------------------------- */
+
+.settings {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 10, 18, 0.45);
+  pointer-events: auto;
+  z-index: 8;
+}
+
+.settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 24px;
+  background: var(--panel);
+  border: 2px solid var(--panel-edge);
+  border-radius: 16px;
+  min-width: min(420px, 86vw);
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.settings-icon {
+  font-size: 38px;
+  flex: none;
+}
+
+.settings-slider {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  margin: 0;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  --fill: 50%;
+}
+
+.settings-slider::-webkit-slider-runnable-track {
+  height: 10px;
+  border-radius: 5px;
+  background: linear-gradient(90deg, var(--human) var(--fill), rgba(255, 255, 255, 0.18) var(--fill));
+}
+
+.settings-slider::-moz-range-track {
+  height: 10px;
+  border-radius: 5px;
+  background: linear-gradient(90deg, var(--human) var(--fill), rgba(255, 255, 255, 0.18) var(--fill));
+}
+
+.settings-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  margin-top: -6px;
+  border-radius: 50%;
+  border: 2px solid #0e121e;
+  background: var(--ink);
+}
+
+.settings-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #0e121e;
+  background: var(--ink);
+}
+
+.settings-buttons {
+  justify-content: space-between;
+}
+
+.settings-done {
+  color: var(--human);
+  border-color: var(--human);
+  padding: 8px 26px;
+}
+
+/* The gear that opens the panel from the home screen and the lobby. */
+.settings-open {
+  position: absolute;
+  top: 2vh;
+  right: 2vw;
+  font-size: 28px;
+  padding: 8px 10px;
 }
 
 /* --- debug overlay -------------------------------------------------------------------------- */
@@ -1339,13 +1521,41 @@ body {
   }
 
   .end {
-    padding: 2vh 2vw;
+    padding: 2vh 2vw calc(2vh + var(--subs-band));
     gap: 1vh;
+  }
+
+  .end-banner {
+    font-size: 34px;
+    padding: 2px 18px;
+  }
+
+  .end-back {
+    top: 2vh;
+    left: 2vw;
   }
 
   .tally {
     padding: 2px 10px;
     font-size: 14px;
+  }
+
+  .tally-icon {
+    font-size: 17px;
+    margin-right: -6px;
+  }
+
+  .tally-row {
+    gap: 4px 8px;
+  }
+
+  .settings-panel {
+    gap: 8px;
+    padding: 10px 16px;
+  }
+
+  .settings-icon {
+    font-size: 28px;
   }
 
   .paper {

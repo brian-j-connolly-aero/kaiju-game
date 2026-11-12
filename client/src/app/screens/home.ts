@@ -95,7 +95,15 @@ export class HomeScreen implements Screen {
     });
     name.addEventListener('change', commitName);
 
+    const gear = el('button', 'btn settings-open', [icon('ui_settings')]);
+    gear.addEventListener('click', () => {
+      ctx.audio.unlock();
+      ctx.audio.play('ui_click');
+      ctx.settings.setOpen(true);
+    });
+
     this.root = el('div', 'screen home', [
+      gear,
       el('div', 'title', ['MONSTER BATTLE 9001']),
       el('div', 'panel', [
         el('div', 'row', [icon('lb_human', 'row-icon'), name]),

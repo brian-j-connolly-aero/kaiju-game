@@ -13,6 +13,7 @@
 
 import { Client, type Room } from '@colyseus/sdk';
 import {
+  buildStamp,
   PROTOCOL_VERSION,
   ROOM_NAME,
   type ClientMessages,
@@ -51,6 +52,8 @@ export interface NodeGameClient {
 export interface ConnectOptions extends JoinOptions {
   /** Leave out the protocol version (to test a client that does not send one). */
   omitProtocol?: boolean;
+  /** Leave out the build stamp (to test a page from before there was one). */
+  omitBuild?: boolean;
 }
 
 function wrap(room: Room): NodeGameClient {
@@ -92,6 +95,8 @@ function joinOptions(options: ConnectOptions): JoinOptions {
   if (options.name !== undefined) out.name = options.name;
   if (options.token !== undefined) out.token = options.token;
   if (!options.omitProtocol) out.protocol = options.protocol ?? PROTOCOL_VERSION;
+  // A Node client is built from the same shared code as the server it talks to and has no page.
+  if (!options.omitBuild) out.build = options.build ?? buildStamp();
   return out;
 }
 

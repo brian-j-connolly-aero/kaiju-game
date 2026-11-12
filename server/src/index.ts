@@ -8,6 +8,7 @@ import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { configFromEnv } from './config';
+import { installCrashGuard } from './crashGuard';
 import { startGameServer } from './net/server';
 
 // This file sits one folder below the server package both as source (src/) and as the bundle
@@ -16,21 +17,36 @@ const here = dirname(fileURLToPath(import.meta.url));
 const defaultClientDir = resolve(here, '..', '..', 'client', 'dist');
 
 const quiet = process.env.MB_QUIET === '1';
+/** The time on the host's own clock, as hh:mm:ss. */
+function clock(): string {
+  const d = new Date();
+  const two = (n: number): string => String(n).padStart(2, '0');
+  return `${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`;
+}
 const log = (line: string): void => {
-  console.log(`${new Date().toISOString().slice(11, 19)} ${line}`);
+  console.log(`${clock()} ${line}`);
 };
+/** Failures are printed whatever MB_QUIET says: they are what the host is asked to copy. */
+const logError = (line: string): void => {
+  console.error(`${clock()} ${line}`);
+};
+
+// From here on an error nobody caught is written down and the server keeps running.
+installCrashGuard(process, logError);
 
 try {
   const config = configFromEnv(process.env, {
     clientDir: defaultClientDir,
     handleSignals: true,
     log: quiet ? undefined : log,
+    logError,
   });
   if (config.clientDir) config.clientDir = resolve(config.clientDir);
   const server = await startGameServer(config);
 
   const hasClient = config.clientDir !== null && existsSync(join(config.clientDir, 'index.html'));
   const notes = [
+    `build ${server.build()}`,
     config.fast ? 'fast timers (MB_FAST)' : '',
     config.latencyMs > 0 ? `${config.latencyMs} ms simulated latency` : '',
     config.speed !== 1 ? `simulation speed x${config.speed}` : '',

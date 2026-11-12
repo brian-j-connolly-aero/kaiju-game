@@ -13,10 +13,11 @@ import { createRng, hash32, rngFloat, rngRange, type Rng } from '../../math/rng'
 import type { Vec2 } from '../../math/vec';
 import type { Structure } from '../types';
 import { toWorld } from './areas';
-import { DIR_COS, DIR_SIN, DIR_YAW, nearestDir } from './dirs';
+import { DIR_COS, DIR_QUARTER, DIR_SIN, DIR_YAW, nearestDir } from './dirs';
 import { boxExtentX, boxExtentZ, boxesTouch, distSqPointBox, distSqPointSeg, distSqSegBox, len, pointInPolygon, quant, type Box } from './geo';
 import { boxOnGround, type Ground } from './ground';
-import { BUILD_LIMIT, DOWNTOWN, LANDMARKS, PATCHES, type PatchSpec } from './layout';
+import { STAGES } from '../../defs/stages';
+import { ANCHORS, BUILD_LIMIT, DOWNTOWN, LANDMARKS, PATCHES, type PatchSpec } from './layout';
 import { INFILLS, PALETTES, type PaletteItem } from './palettes';
 import type { RoadSpec } from './roadnet';
 import { patchPolygon } from './streets';
@@ -71,6 +72,23 @@ export function patchInfos(): PatchInfo[] {
     }
     return { spec, index, polygon, minX, maxX, minZ, maxZ };
   });
+}
+
+/**
+ * True when (x, z) lies in the stage 1 square of some neighborhood anchor (the same square
+ * stageBounds gives). Only houses and shops may stand there: a hatchling cannot bring down
+ * anything bigger, yet it would count toward the first mark of the bar.
+ */
+export function inStartSquare(half: number, x: number, z: number): boolean {
+  const h = STAGES[0].boundsHalfSize;
+  for (const a of ANCHORS) {
+    const ax = -a.at[0];
+    const az = a.at[1];
+    const cx = ax < -half + h ? -half + h : ax > half - h ? half - h : ax;
+    const cz = az < -half + h ? -half + h : az > half - h ? half - h : az;
+    if (x >= cx - h && x <= cx + h && z >= cz - h && z <= cz + h) return true;
+  }
+  return false;
 }
 
 /** The patch a point lies in (the first in layout order), or null. */
@@ -300,7 +318,7 @@ function frontSide(b: Builder, s: Street, side: number, seed: number): void {
     // Which patch is this lot in? Looked up a little way along and well back from the street.
     const patch = patchAt(b.patches, px + ux * 5 + nx * (half + 15), pz + uz * 5 + nz * (half + 15));
     if (!patch) {
-      at += 6;
+      at += 12;
       continue;
     }
     const pal = PALETTES[patch.spec.palette];
@@ -314,7 +332,8 @@ function frontSide(b: Builder, s: Street, side: number, seed: number): void {
     if (!a) break;
     const w = a.footprint[0];
     const d = a.footprint[1];
-    const tall = a.height > TALL ? TALL_SETBACK : 0;
+    // (Downtown is outside every stage 2 square: no juvenile walks its streets, so the towers stand at the pavement.)
+    const tall = a.height > TALL && !core ? TALL_SETBACK : 0;
     const front = clear + pal.setback + tall;
     const mx = px + ux * (w / 2) + nx * front;
     const mz = pz + uz * (w / 2) + nz * front;
@@ -324,11 +343,15 @@ function frontSide(b: Builder, s: Street, side: number, seed: number): void {
     box.hx = w / 2;
     box.hz = d / 2;
     box.dir = facing;
+    const lowRise = a.cls === 'house' || a.cls === 'shop';
     const fits =
-      clearOfStreets(b, box, tall) && boxOnGround(b.g, box, SHORE, false, BUILD_LIMIT) && clearOfBuildings(b, box, gapMin);
+      (lowRise || !inStartSquare(b.half, box.x, box.z)) &&
+      clearOfStreets(b, box, tall) &&
+      boxOnGround(b.g, box, SHORE, false, BUILD_LIMIT) &&
+      clearOfBuildings(b, box, gapMin);
     if (!fits) {
       // Slide along and try again (the corner of a block, a park, the shore): a little at first, then in strides.
-      at += blocked < 2 ? 3 : blocked < 5 ? 6 : 10;
+      at += blocked < 2 ? 4 : blocked < 4 ? 7 : 12;
       blocked++;
       continue;
     }
@@ -377,6 +400,7 @@ export function buildYards(b: Builder, seed: number): void {
         const px = quant(x + jx);
         const pz = quant(z + jz);
         if (patchAt(b.patches, px, pz) !== patch) continue;
+        if (a.cls !== 'house' && a.cls !== 'shop' && inStartSquare(b.half, px, pz)) continue;
         const box: Box = { x: px, z: pz, hx: a.footprint[0] / 2, hz: a.footprint[1] / 2, dir: turn < 0.5 ? 0 : 32 };
         if (!boxOnGround(b.g, box, SHORE, false, BUILD_LIMIT)) continue;
         if (!clearOfStreets(b, box, fill.offStreet - SIDEWALK)) continue;
@@ -387,97 +411,258 @@ export function buildYards(b: Builder, seed: number): void {
   }
 }
 
-/** A tank (radius 4 m) is deployed with this much clear ground round it (sim/spawn.ts). */
-const POCKET_CLEAR = 4.75;
-const POCKET_CELL = 2;
-/** Smaller specks of unreached ground than this many cells are left alone. */
+/** A tank (radius 4 m) is deployed with this much clear ground round it (sim/spawn.ts), an infantry section (3 m) with this much. */
+export const TANK_CLEAR = 4.75;
+export const INFANTRY_CLEAR = 3.75;
+const POCKET_CELL = 2.5;
+/** Smaller specks of enclosed ground than this many cells (about 19 m2) are left alone. */
 const POCKET_MIN_CELLS = 3;
+/** Ground that goes on for this many cells is not a yard: it is the open city. */
+const POCKET_OPEN_CELLS = 1600;
+
+// Cell codes of the pocket raster: the low two bits say what fits (0 a tank, 1 only infantry,
+// 2 nothing), the flags say who can get out to the streets from there.
+const FITS = 3;
+const TIGHT = 1;
+const WALL = 2;
+const TANK_OPEN = 4;
+const FOOT_OPEN = 8;
+const IN_POCKET = 16;
+
+interface PocketJob {
+  b: Builder;
+  n: number;
+  cells: Uint8Array;
+  queue: Int32Array;
+  gone: Uint8Array;
+  removed: number;
+}
+
+/** Classes the cells near a box (flags are kept). */
+function pocketMark(job: PocketJob, id: number): void {
+  const { b, n, cells } = job;
+  const half = b.half;
+  const box = b.boxes[id];
+  const c = DIR_COS[box.dir];
+  const s = DIR_SIN[box.dir];
+  const hx = box.hx;
+  const hz = box.hz;
+  const ex = boxExtentX(box) + TANK_CLEAR;
+  const ez = boxExtentZ(box) + TANK_CLEAR;
+  const c0 = Math.max(0, Math.floor((box.x - ex + half) / POCKET_CELL));
+  const c1 = Math.min(n - 1, Math.floor((box.x + ex + half) / POCKET_CELL));
+  const r0 = Math.max(0, Math.floor((box.z - ez + half) / POCKET_CELL));
+  const r1 = Math.min(n - 1, Math.floor((box.z + ez + half) / POCKET_CELL));
+  const tankSq = TANK_CLEAR * TANK_CLEAR;
+  const footSq = INFANTRY_CLEAR * INFANTRY_CLEAR;
+  if (box.dir % DIR_QUARTER === 0) {
+    // Square to the axes: the same test in whole eighths of a meter (every number here is one),
+    // which costs the engine nothing to compute before it has warmed up.
+    const turned = (box.dir / DIR_QUARTER) % 2 === 1;
+    const ihx = Math.round((turned ? hz : hx) * 8);
+    const ihz = Math.round((turned ? hx : hz) * 8);
+    const bx = Math.round((box.x + half) * 8);
+    const bz = Math.round((box.z + half) * 8);
+    const step = POCKET_CELL * 8;
+    const tank = TANK_CLEAR * 8;
+    const foot = INFANTRY_CLEAR * 8;
+    for (let r = r0; r <= r1; r++) {
+      let lz = r * step + step / 2 - bz;
+      if (lz < 0) lz = -lz;
+      lz -= ihz;
+      if (lz >= tank) continue;
+      const oz = lz > 0 ? lz : 0;
+      const row = r * n;
+      for (let cc = c0; cc <= c1; cc++) {
+        const v = cells[row + cc];
+        if ((v & FITS) === WALL) continue;
+        let lx = cc * step + step / 2 - bx;
+        if (lx < 0) lx = -lx;
+        lx -= ihx;
+        if (lx >= tank) continue;
+        const ox = lx > 0 ? lx : 0;
+        const d = ox * ox + oz * oz;
+        if (d < foot * foot) cells[row + cc] = (v & ~FITS) | WALL;
+        else if (d < tank * tank) cells[row + cc] = (v & ~FITS) | TIGHT;
+      }
+    }
+    return;
+  }
+  for (let r = r0; r <= r1; r++) {
+    const z = -half + (r + 0.5) * POCKET_CELL - box.z;
+    const row = r * n;
+    for (let cc = c0; cc <= c1; cc++) {
+      const v = cells[row + cc];
+      if ((v & FITS) === WALL) continue;
+      const x = -half + (cc + 0.5) * POCKET_CELL - box.x;
+      const lx = Math.abs(x * c - z * s) - hx;
+      const lz = Math.abs(x * s + z * c) - hz;
+      if (lx >= TANK_CLEAR || lz >= TANK_CLEAR) continue;
+      const ox = lx > 0 ? lx : 0;
+      const oz = lz > 0 ? lz : 0;
+      const d = ox * ox + oz * oz;
+      if (d < footSq) cells[row + cc] = (v & ~FITS) | WALL;
+      else if (d < tankSq) cells[row + cc] = (v & ~FITS) | TIGHT;
+    }
+  }
+}
 
 /**
- * Opens every enclosed yard. Squads are deployed wherever the stage bounds happen to run, on any
- * clear spot big enough for the unit; a yard walled in by buildings would trap a tank there for
- * the whole stage. So: flood the ground a tank can stand on from the streets, and wherever a
- * patch of it (12 m2 or more) is left unreached, take out the cheapest building of its wall and
- * flood on from there, until it joins the rest. Returns how many buildings were removed. Bridge
- * decks and landmarks are never removed.
+ * Floods from queue[head..tail) through cells a body of class `fits` can stand on that are not
+ * yet known to be open. Returns the new tail; negative when the ground turned out to be open
+ * (it met ground flagged `open`, or went on for POCKET_OPEN_CELLS).
  */
-export function openPockets(b: Builder): number {
+function pocketFlood(job: PocketJob, head: number, tailIn: number, fits: number, open: number): number {
+  const { n, cells, queue } = job;
+  let tail = tailIn;
+  for (let q = head; q < tail; q++) {
+    const k = queue[q];
+    const c = k % n;
+    for (let side = 0; side < 4; side++) {
+      const j = side === 0 ? (c + 1 < n ? k + 1 : -1) : side === 1 ? (c > 0 ? k - 1 : -1) : side === 2 ? (k + n < n * n ? k + n : -1) : k - n;
+      if (j < 0) continue;
+      const v = cells[j];
+      if ((v & FITS) > fits || (v & IN_POCKET) !== 0) continue;
+      if ((v & open) !== 0) return -tail;
+      cells[j] = v | IN_POCKET;
+      queue[tail++] = j;
+      if (tail >= POCKET_OPEN_CELLS) return -tail;
+    }
+  }
+  return tail;
+}
+
+/**
+ * Looks at the ground from one cell: if it is an enclosed pocket for a body of class `fits`,
+ * takes walls out (cheapest building first) until it is not. Either way the ground visited ends
+ * up flagged `flag`.
+ */
+function pocketProbe(job: PocketJob, seed: number, fits: number, open: number, flag: number): void {
+  const { b, n, cells, queue, gone } = job;
   const half = b.half;
-  const n = Math.ceil((half * 2) / POCKET_CELL);
-  // 0 free, 1 too close to a wall for a tank, 2 reached from the streets, 3 in the pocket at hand.
-  const cells = new Uint8Array(n * n);
-  const queue = new Int32Array(n * n);
-  const gone = new Uint8Array(b.structures.length);
-  const reach = POCKET_CLEAR;
-  const reachSq = reach * reach;
-  const mark = (id: number): void => {
-    const box = b.boxes[id];
-    const c = DIR_COS[box.dir];
-    const s = DIR_SIN[box.dir];
-    const hx = box.hx;
-    const hz = box.hz;
-    const ex = boxExtentX(box) + reach;
-    const ez = boxExtentZ(box) + reach;
+  cells[seed] |= IN_POCKET;
+  queue[0] = seed;
+  let end = pocketFlood(job, 0, 1, fits, open);
+  let isOpen = end < 0;
+  if (isOpen) end = -end;
+  const near = TANK_CLEAR + POCKET_CELL * 1.5;
+  for (let tries = 0; tries < 6 && !isOpen && end >= POCKET_MIN_CELLS; tries++) {
+    let best = -1;
+    for (let q = 0; q < end; q++) {
+      const cellId = queue[q];
+      const x = -half + ((cellId % n) + 0.5) * POCKET_CELL;
+      const z = -half + (Math.floor(cellId / n) + 0.5) * POCKET_CELL;
+      const c = cellOf(b, x);
+      const r = cellOf(b, z);
+      for (let rr = r - 1; rr <= r + 1; rr++) {
+        for (let cc = c - 1; cc <= c + 1; cc++) {
+          if (rr < 0 || cc < 0 || rr >= b.cols || cc >= b.cols) continue;
+          const list = b.boxCells[rr * b.cols + cc];
+          for (let i = 0; i < list.length; i++) {
+            const id = list[i];
+            const st = b.structures[id];
+            if (gone[id] || st.passable || st.landmark !== null) continue;
+            if (distSqPointBox(x, z, b.boxes[id]) > near * near) continue;
+            if (best < 0 || st.value < b.structures[best].value || (st.value === b.structures[best].value && id > best)) best = id;
+          }
+        }
+      }
+    }
+    if (best < 0) break;
+    gone[best] = 1;
+    job.removed++;
+    // Free the ground it stood on, except what its neighbors still cover.
+    const box = b.boxes[best];
+    const ex = boxExtentX(box) + TANK_CLEAR;
+    const ez = boxExtentZ(box) + TANK_CLEAR;
     const c0 = Math.max(0, Math.floor((box.x - ex + half) / POCKET_CELL));
     const c1 = Math.min(n - 1, Math.floor((box.x + ex + half) / POCKET_CELL));
     const r0 = Math.max(0, Math.floor((box.z - ez + half) / POCKET_CELL));
     const r1 = Math.min(n - 1, Math.floor((box.z + ez + half) / POCKET_CELL));
+    for (let r = r0; r <= r1; r++) for (let cc = c0; cc <= c1; cc++) cells[r * n + cc] &= ~FITS;
+    const h0 = cellOf(b, box.x - ex - TANK_CLEAR);
+    const h1 = cellOf(b, box.x + ex + TANK_CLEAR);
+    const v0 = cellOf(b, box.z - ez - TANK_CLEAR);
+    const v1 = cellOf(b, box.z + ez + TANK_CLEAR);
+    const now = ++b.stampNow;
+    for (let r = v0; r <= v1; r++) {
+      for (let cc = h0; cc <= h1; cc++) {
+        const list = b.boxCells[r * b.cols + cc];
+        for (let i = 0; i < list.length; i++) {
+          const id = list[i];
+          if (gone[id] || b.structures[id].passable || b.boxStamp[id] === now) continue;
+          b.boxStamp[id] = now;
+          pocketMark(job, id);
+        }
+      }
+    }
+    // Flood on from the whole pocket through the gap.
+    end = pocketFlood(job, 0, end, fits, open);
+    isOpen = end < 0;
+    if (isOpen) end = -end;
+  }
+  for (let q = 0; q < end; q++) cells[queue[q]] = (cells[queue[q]] & ~IN_POCKET) | flag;
+}
+
+/**
+ * Probes the ground within reach of a building: every cell a tank can stand on that is not yet
+ * known to be open, then every cell an infantry section can stand on. When a building had to go
+ * for the infantry the tank check is repeated, in case the hole is a new trap for a tank.
+ */
+function pocketSweep(job: PocketJob, id: number): void {
+  const { b, n, cells } = job;
+  const half = b.half;
+  const box = b.boxes[id];
+  const pad = TANK_CLEAR + POCKET_CELL;
+  const ex = boxExtentX(box) + pad;
+  const ez = boxExtentZ(box) + pad;
+  const c0 = Math.max(0, Math.floor((box.x - ex + half) / POCKET_CELL));
+  const c1 = Math.min(n - 1, Math.floor((box.x + ex + half) / POCKET_CELL));
+  const r0 = Math.max(0, Math.floor((box.z - ez + half) / POCKET_CELL));
+  const r1 = Math.min(n - 1, Math.floor((box.z + ez + half) / POCKET_CELL));
+  for (let pass = 0; pass < 2; pass++) {
+    const before = job.removed;
     for (let r = r0; r <= r1; r++) {
-      const z = -half + (r + 0.5) * POCKET_CELL - box.z;
-      const row = r * n;
       for (let cc = c0; cc <= c1; cc++) {
-        if (cells[row + cc] === 1) continue;
-        const x = -half + (cc + 0.5) * POCKET_CELL - box.x;
-        const lx = Math.abs(x * c - z * s) - hx;
-        const lz = Math.abs(x * s + z * c) - hz;
-        if (lx >= reach || lz >= reach) continue;
-        if (lx <= 0 || lz <= 0 || lx * lx + lz * lz < reachSq) cells[row + cc] = 1;
+        const k = r * n + cc;
+        const v = cells[k];
+        if (v === 0) pocketProbe(job, k, 0, TANK_OPEN, TANK_OPEN | FOOT_OPEN);
+        else if (v === TIGHT || v === FOOT_OPEN) {
+          // Tight ground, or roomy ground only the infantry is known to get out of.
+          if (v === TIGHT) pocketProbe(job, k, TIGHT, TANK_OPEN | FOOT_OPEN, FOOT_OPEN);
+          else pocketProbe(job, k, 0, TANK_OPEN, TANK_OPEN | FOOT_OPEN);
+        }
       }
     }
-  };
-  for (let id = 0; id < b.structures.length; id++) if (!b.structures[id].passable) mark(id);
+    if (job.removed === before) break;
+  }
+}
 
-  /** Floods free cells from queue[head..tail) with `tag`; returns the new tail, negated when it met reached ground. */
-  const flood = (head: number, tailIn: number, tag: number): number => {
-    let tail = tailIn;
-    let met = false;
-    for (let q = head; q < tail; q++) {
-      const k = queue[q];
-      const c = k % n;
-      if (c + 1 < n) {
-        const v = cells[k + 1];
-        if (v === 0) {
-          cells[k + 1] = tag;
-          queue[tail++] = k + 1;
-        } else if (v === 2 && tag !== 2) met = true;
-      }
-      if (c > 0) {
-        const v = cells[k - 1];
-        if (v === 0) {
-          cells[k - 1] = tag;
-          queue[tail++] = k - 1;
-        } else if (v === 2 && tag !== 2) met = true;
-      }
-      if (k + n < n * n) {
-        const v = cells[k + n];
-        if (v === 0) {
-          cells[k + n] = tag;
-          queue[tail++] = k + n;
-        } else if (v === 2 && tag !== 2) met = true;
-      }
-      if (k >= n) {
-        const v = cells[k - n];
-        if (v === 0) {
-          cells[k - n] = tag;
-          queue[tail++] = k - n;
-        } else if (v === 2 && tag !== 2) met = true;
-      }
-    }
-    return met ? -tail : tail;
+/**
+ * Opens every enclosed yard. Squads are deployed wherever the stage bounds happen to run, on
+ * any clear spot big enough for the unit, and a yard walled in by buildings would trap the
+ * unit there for the whole stage. So, round every building: is the ground a tank can stand on
+ * there connected to a street (or simply to a lot more open ground)? Where a patch of it (about
+ * 20 m2 or more) is not, the cheapest building of its wall is taken out, and the next, until it
+ * is. Then the same for the narrower ground an infantry section can stand on, checking again
+ * that a hole made for the infantry is no new trap for a tank. Returns how many buildings were
+ * removed. Bridge decks and landmarks are never removed.
+ */
+export function openPockets(b: Builder): number {
+  const half = b.half;
+  const n = Math.ceil((half * 2) / POCKET_CELL);
+  const job: PocketJob = {
+    b,
+    n,
+    cells: new Uint8Array(n * n),
+    queue: new Int32Array(POCKET_OPEN_CELLS + 8),
+    gone: new Uint8Array(b.structures.length),
+    removed: 0,
   };
-
-  // Flood from the streets, a whole run of free cells at a time (most of the city is open ground).
-  let top = 0;
+  const { cells, gone } = job;
+  const count = b.structures.length;
+  for (let id = 0; id < count; id++) if (!b.structures[id].passable) pocketMark(job, id);
+  // The streets are open ground by definition.
   for (const st of b.streets) {
     const l = len(st.bx - st.ax, st.bz - st.az);
     const steps = Math.max(1, Math.ceil(l / POCKET_CELL));
@@ -485,100 +670,13 @@ export function openPockets(b: Builder): number {
       const x = st.ax + ((st.bx - st.ax) * i) / steps;
       const z = st.az + ((st.bz - st.az) * i) / steps;
       const k = Math.floor((z + half) / POCKET_CELL) * n + Math.floor((x + half) / POCKET_CELL);
-      if (k >= 0 && k < n * n && cells[k] === 0 && top < queue.length) queue[top++] = k;
+      if (k >= 0 && k < n * n && (cells[k] & FITS) === 0) cells[k] |= TANK_OPEN | FOOT_OPEN;
     }
   }
-  while (top > 0) {
-    const k = queue[--top];
-    if (cells[k] !== 0) continue;
-    const row = k - (k % n);
-    let x0 = k;
-    while (x0 > row && cells[x0 - 1] === 0) x0--;
-    let x1 = k;
-    while (x1 + 1 < row + n && cells[x1 + 1] === 0) x1++;
-    for (let x = x0; x <= x1; x++) cells[x] = 2;
-    for (let side = -1; side <= 1; side += 2) {
-      const base = row + side * n;
-      if (base < 0 || base >= n * n) continue;
-      const shift = base - row;
-      let open = false;
-      for (let x = x0; x <= x1; x++) {
-        const free = cells[x + shift] === 0;
-        if (free && !open && top < queue.length) queue[top++] = x + shift;
-        open = free;
-      }
-    }
+  for (let id = 0; id < count; id++) {
+    if (!b.structures[id].passable) pocketSweep(job, id);
   }
-
-  let removed = 0;
-  const near = reach + POCKET_CELL * 1.5;
-  for (let k = 0; k < n * n; k++) {
-    if (cells[k] !== 0) continue;
-    cells[k] = 3;
-    queue[0] = k;
-    let end = flood(0, 1, 3);
-    let joined = end < 0;
-    if (joined) end = -end;
-    // Take walls out, cheapest first, until the pocket runs into ground that is already reached.
-    for (let tries = 0; tries < 6 && !joined && end >= POCKET_MIN_CELLS; tries++) {
-      let best = -1;
-      for (let q = 0; q < end; q++) {
-        const cellId = queue[q];
-        const x = -half + ((cellId % n) + 0.5) * POCKET_CELL;
-        const z = -half + (Math.floor(cellId / n) + 0.5) * POCKET_CELL;
-        const c = cellOf(b, x);
-        const r = cellOf(b, z);
-        for (let rr = r - 1; rr <= r + 1; rr++) {
-          for (let cc = c - 1; cc <= c + 1; cc++) {
-            if (rr < 0 || cc < 0 || rr >= b.cols || cc >= b.cols) continue;
-            const list = b.boxCells[rr * b.cols + cc];
-            for (let i = 0; i < list.length; i++) {
-              const id = list[i];
-              const st = b.structures[id];
-              if (gone[id] || st.passable || st.landmark !== null) continue;
-              if (distSqPointBox(x, z, b.boxes[id]) > near * near) continue;
-              if (best < 0 || st.value < b.structures[best].value || (st.value === b.structures[best].value && id > best)) best = id;
-            }
-          }
-        }
-      }
-      if (best < 0) break;
-      gone[best] = 1;
-      removed++;
-      // Free the ground it stood on, except what its neighbors still cover.
-      const box = b.boxes[best];
-      const ex = boxExtentX(box) + reach;
-      const ez = boxExtentZ(box) + reach;
-      const c0 = Math.max(0, Math.floor((box.x - ex + half) / POCKET_CELL));
-      const c1 = Math.min(n - 1, Math.floor((box.x + ex + half) / POCKET_CELL));
-      const r0 = Math.max(0, Math.floor((box.z - ez + half) / POCKET_CELL));
-      const r1 = Math.min(n - 1, Math.floor((box.z + ez + half) / POCKET_CELL));
-      for (let r = r0; r <= r1; r++) for (let cc = c0; cc <= c1; cc++) if (cells[r * n + cc] === 1) cells[r * n + cc] = 0;
-      const h0 = cellOf(b, box.x - ex - reach);
-      const h1 = cellOf(b, box.x + ex + reach);
-      const v0 = cellOf(b, box.z - ez - reach);
-      const v1 = cellOf(b, box.z + ez + reach);
-      const now = ++b.stampNow;
-      for (let r = v0; r <= v1; r++) {
-        for (let cc = h0; cc <= h1; cc++) {
-          const list = b.boxCells[r * b.cols + cc];
-          for (let i = 0; i < list.length; i++) {
-            const id = list[i];
-            if (gone[id] || b.structures[id].passable || b.boxStamp[id] === now) continue;
-            b.boxStamp[id] = now;
-            mark(id);
-          }
-        }
-      }
-      // Flood on from the whole pocket through the gap.
-      end = flood(0, end, 3);
-      joined = end < 0;
-      if (joined) end = -end;
-    }
-    // Whatever happened, this ground is dealt with.
-    for (let q = 0; q < end; q++) cells[queue[q]] = 2;
-  }
-  if (removed === 0) return 0;
+  if (job.removed === 0) return 0;
   // Rebuild the lists without the removed buildings (ids stay equal to indexes).
   const structures = b.structures;
   const boxes = b.boxes;
@@ -590,5 +688,5 @@ export function openPockets(b: Builder): number {
     if (gone[id]) continue;
     addStructure(b, archetypeDef(structures[id].archetype), boxes[id]);
   }
-  return removed;
+  return job.removed;
 }

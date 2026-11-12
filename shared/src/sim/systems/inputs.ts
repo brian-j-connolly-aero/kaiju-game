@@ -13,15 +13,13 @@
 import { factionLevelDef } from '../../defs/factions';
 import { unitTypeDef } from '../../defs/units';
 import { Btn, BUTTON_COUNT, neutralInput, type PlayerInput } from '../../net/input';
-import { createAimPoint, resolveAimPoint } from '../aim';
+import { SQUAD_RULES } from '../../defs/rules';
+import { resolveMarkerPoint } from '../aim';
 import type { SquadCommand } from '../commands';
 import type { InputsByPlayer, InputState, PlayerState, Squad, World } from '../types';
 import { drivenUnit, NEVER_PRESSED_TICKS } from '../worldOps';
 
-/** How far a crosshair-placed marker can be from the unit. */
-const MARKER_MAX_DIST = 1500;
-
-const aim = createAimPoint();
+const marker = { x: 0, z: 0 };
 
 /** Applies one input sample to a player's input state and derives edges and hold timers. */
 export function applyInput(state: InputState, input: PlayerInput | null | undefined): void {
@@ -52,13 +50,29 @@ export function applyInput(state: InputState, input: PlayerInput | null | undefi
   }
 }
 
-/** The ground point a squad leader's aim ray lands on (for markers placed with the crosshair). */
-function aimGround(world: World, squad: Squad, state: InputState): { x: number; z: number } | null {
+/**
+ * The ground point a squad leader's crosshair marks (`resolveMarkerPoint`): under the kaiju it
+ * is on, else where the aim ray lands, else a kaiju on the map it is just beside. With the
+ * crosshair on nothing at all the marker goes `skyReach` meters ahead, or nowhere (null) when
+ * that is 0.
+ */
+function aimGround(world: World, squad: Squad, state: InputState, skyReach: number): { x: number; z: number } | null {
   const unit = drivenUnit(world, squad);
   if (!unit || !unit.alive) return null;
-  const eye = unitTypeDef(unit.type).eyeHeight;
-  resolveAimPoint(world.cityQuery, unit.x, unit.y + eye, unit.z, state.aimYaw, state.aimPitch, MARKER_MAX_DIST, aim);
-  return { x: aim.x, z: aim.z };
+  const eye = unit.y + unitTypeDef(unit.type).eyeHeight;
+  const found = resolveMarkerPoint(
+    world.cityQuery,
+    world.kaijus,
+    unit.x,
+    eye,
+    unit.z,
+    state.aimYaw,
+    state.aimPitch,
+    SQUAD_RULES.markerRange,
+    skyReach,
+    marker,
+  );
+  return found ? { x: marker.x, z: marker.z } : null;
 }
 
 function collectCommands(world: World, p: PlayerState, input: PlayerInput | null | undefined): void {
@@ -74,7 +88,7 @@ function collectCommands(world: World, p: PlayerState, input: PlayerInput | null
   if (input?.wheel) {
     let command: SquadCommand | null = null;
     if (input.wheel === 'moveTo') {
-      const at = input.marker ?? aimGround(world, squad, p.input);
+      const at = input.marker ?? aimGround(world, squad, p.input, SQUAD_RULES.markerSkyReach);
       if (at) command = { type: 'moveTo', x: at.x, z: at.z };
     } else {
       command = { type: input.wheel };
@@ -84,7 +98,8 @@ function collectCommands(world: World, p: PlayerState, input: PlayerInput | null
   if (p.input.pressed & Btn.callIn) {
     const callIns = factionLevelDef(squad.faction, world.match.stage).callIns;
     if (callIns.length > 0) {
-      const at = input?.marker ?? aimGround(world, squad, p.input);
+      // The crosshair on the empty sky marks nothing: the battery is not spent on it.
+      const at = input?.marker ?? aimGround(world, squad, p.input, 0);
       if (at) p.commands.push({ type: 'callIn', callIn: callIns[0], x: at.x, z: at.z });
     }
   }

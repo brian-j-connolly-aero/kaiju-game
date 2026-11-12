@@ -92,6 +92,12 @@ const ART: Record<string, string> = {
   ui_clock: `<circle cx="32" cy="32" r="24" ${S}/><path d="M32 16 L32 32 L44 38" ${S}/>`,
   ui_trophy: `<path d="M18 8 L46 8 L46 24 Q46 38 32 38 Q18 38 18 24 Z" ${F}/><path d="M32 38 L32 50 M20 54 L44 54" ${S}/><path d="M18 12 L8 12 Q8 26 18 26 M46 12 L56 12 Q56 26 46 26" ${S}/>`,
   ui_newspaper: `<rect x="8" y="10" width="48" height="44" ${S} stroke-width="4"/><path d="M14 20 L50 20" ${S} stroke-width="6"/>`,
+  // --- settings and the drone (drawn here only; no art file yet) ---
+  ui_settings: `<circle cx="32" cy="32" r="13" ${S} stroke-width="7"/><path d="M32 6 L32 12 M32 52 L32 58 M6 32 L12 32 M52 32 L58 32 M13.6 13.6 L17.9 17.9 M46.1 46.1 L50.4 50.4 M50.4 13.6 L46.1 17.9 M17.9 46.1 L13.6 50.4" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="butt"/>`,
+  ui_invert: `<path d="M20 54 L20 10 M8 22 L20 10 L32 22" ${S}/><path d="M44 10 L44 54 M32 42 L44 54 L56 42" ${S}/>`,
+  ui_fullscreen: `<path d="M8 22 L8 8 L22 8 M42 8 L56 8 L56 22 M56 42 L56 56 L42 56 M22 56 L8 56 L8 42" ${S}/><rect x="22" y="24" width="20" height="16" rx="2" ${F}/>`,
+  ui_rise: `<path d="M32 46 L32 8 M16 24 L32 8 L48 24" ${S} stroke-width="7"/><path d="M12 57 L52 57" ${S}/>`,
+  ui_sink: `<path d="M32 6 L32 44 M16 28 L32 44 L48 28" ${S} stroke-width="7"/><path d="M12 57 L52 57" ${S}/>`,
 };
 
 /** A generic stand-in for ids this file does not draw: a rounded tile with a mark that depends on the id. */

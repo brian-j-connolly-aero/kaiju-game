@@ -306,7 +306,7 @@ WEAK_POINTS = """\
 - **Tempest's accent costs words.** The recognizer scored Tempest's first set of lines at about
   20% word errors, more than twice Overlord. The lines were then rewritten around the words the
   accent loses ("fire", "hurt", "count", "flank"), which brought the same voice and the same
-  radio to {tempest_wer:g}% on the shipped files (section 4). The other way out was measured too
+  radio to {tempest_wer:.1f}% on the shipped `.ogg` files (section 4). The other way out was measured too
   and not taken: RHVoice `bdl` at a higher pitch scores 6.1% on Tempest's lines against 9.1% for
   `alan` (finished masters, three draws of the radio noise each), but `bdl` is Overlord's
   speaker, and a third squad that sounds like nobody else is worth more than three words in a
@@ -351,24 +351,41 @@ ENCODING = """\
 
 The build encodes at Vorbis quality {ogg_q} and MP3 variable-bit-rate quality {mp3_q}.
 `tools/audio/voice/encode_test.py` encoded every finished master ({lines} lines) at four
-settings of each encoder and measured the results. "Signal to noise" compares the decoded file
-with its master sample by sample (higher is closer); the two recognizer columns are word error
-rates on the decoded files, for all lines and for the radio lines alone; "highest true peak" is
-the loudest decoded peak of any line (the masters are limited to {ceiling} dBTP and the checks
-allow {peak_limit} dBTP).
+settings of each encoder and measured the results against the masters:
+
+- the two recognizer columns are word error rates on the decoded files, for all lines and for
+  the radio lines alone;
+- "signal to noise" compares the decoded file with its master sample by sample (higher is
+  closer; the two encoders work differently, so compare within one encoder);
+- "spectrum lost" is the share of the master's audible spectrum (every moment and pitch within
+  70 dB of the loudest, 300 Hz to 12 kHz) that comes back more than 20 dB quieter, in other
+  words left empty by the encoder; the second such column is for the anchor's lines alone, the
+  only voice that fills the band up to 12 kHz;
+- "highest true peak" is the loudest decoded peak of any line (the masters are limited to
+  {ceiling} dBTP and the checks allow {peak_limit} dBTP).
 """
 
 ENCODING_AFTER = """\
-What decided the settings. The smallest files are not free once the whole script is measured:
+What decided the settings. The review tried the lowest settings in this table on 46 lines, found
+no change in the recognizer's errors and suggested them. Measured on every line, with two more
+measures, they are not free:
 
-- **Vorbis 0 overshoots.** With so few bits its coding noise pushes decoded peaks past the limit
-  of the checks, so a build at that setting fails.
+- **Vorbis 0 overshoots.** With so few bits its coding noise pushes the loudest decoded peak to
+  {ogg0_peak:.2f} dBTP, against {ogg_peak:.2f} dBTP at the setting in use and a limit of
+  {peak_limit} dBTP in the checks.
 - **The radio lines pay first.** They are band-limited and overdriven on purpose, and coding
-  noise comes on top: the recognizer's errors on the radio voices creep up as the bit rate goes
-  down, while the anchor's clean lines hardly change.
-- **One step down is free.** From the first build's settings (Vorbis 3, MP3 5) to the present
-  ones the recognizer's numbers move by less than their own scatter and the files shrink by
-  about a tenth.
+  noise comes on top: the recognizer's errors on the radio voices go from {ogg3_radio:.1f}% at
+  Vorbis 3 to {ogg0_radio:.1f}% at Vorbis 0, and from {mp35_radio:.1f}% at MP3 5 to
+  {mp38_radio:.1f}% at MP3 8.
+- **MP3 switches parts of the spectrum off.** Between the loud sounds a low-rate MP3 leaves
+  whole bands empty, which is heard as a watery edge on the anchor's clean voice. The recognizer
+  does not mind, which is why the word error rate alone cannot see it. On the anchor's lines
+  MP3 loses {mp35_anchor:.1f}% of the audible spectrum at 5, {mp36_anchor:.1f}% at 6 and
+  {mp37_anchor:.1f}% at 7; Vorbis loses {ogg_anchor:.1f}% at the setting in use.
+- **So the settings of the first build stay.** One step down for Vorbis (3 to 2) would save
+  {ogg_saving:.0f}% of the `.ogg` files and cost the recognizer {ogg_cost:.1f} more words in a
+  hundred; one step down for MP3 (5 to 6) would save {mp3_saving:.0f}% and cost {mp3_cost:.1f},
+  and nearly double the spectrum lost. Clarity is what these voices are short of; space is not.
 
 Voice files are fetched one at a time when a line is first spoken, {kb_per_line:.0f} kB each on
 average, so the total matters more to the size of the repository than to a player.
@@ -394,13 +411,16 @@ are in `docs/audio/client-notes-voice.md`.)
   shot; the cues that come round every minute have a third line per side. {new_lines} lines were
   added, {lines} in all.
 - **The lines the recognizer lost were reworded,** using `tryline.py` to hear candidates through
-  each voice's own radio first. Tempest went from 21.3% to {tempest_wer:g}% word errors and
-  Granite from 20.9% to {granite_wer:g}% on the decoded `.ogg` files.
+  each voice's own radio first: the six the review named and five more from further down the
+  list. Tempest went from 21.3% to {tempest_wer:.1f}% word errors and Granite from 20.9% to
+  {granite_wer:.1f}% on the decoded `.ogg` files; the whole script from 10.9% to {all_wer:.1f}%.
 - **The briefing fits its ten seconds.** The humans' three lines took 10.6 s before the gaps
   between them; they take {brief_h:.1f} s now, and the build fails above {brief_max:g} s.
 - **"One of ours" means one thing.** It was used both for a lost unit and for a stray shot; the
   stray-shot line now says "That shot was ours."
-- **Smaller files,** one encoder step down (section 6).
+- **Encoder settings were measured and kept.** The review suggested lower ones to save space;
+  on the whole script every step down costs words on the radio voices, and the lowest fail a
+  peak check or hollow out the anchor's voice (section 6).
 - **The hearing lines may run to twenty words;** `docs/ASSETS.md` now says so.
 """
 

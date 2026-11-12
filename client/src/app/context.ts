@@ -7,6 +7,7 @@ import type { InputManager } from '../game/input/inputManager';
 import type { GameClient } from '../net/gameClient';
 import type { KeyValueStore } from '../net/session';
 import type { GameRenderer } from '../render/gameRenderer';
+import type { SettingsPanel } from '../ui/settingsPanel';
 import type { MatchRuntime } from './matchRuntime';
 import type { PageParams } from './params';
 
@@ -22,6 +23,8 @@ export interface AppContext {
   input: InputManager;
   /** Null when the page was not opened with ?autoplay=1. */
   autopilot: Autopilot | null;
+  /** The settings panel (volume, mouse speed, inverted look, fullscreen); any screen may open it. */
+  settings: SettingsPanel;
   /** The 3D view. Set once the boot screen has loaded the assets. */
   renderer: GameRenderer | null;
   /** The running match, from its welcome message until the room is back in the lobby. */

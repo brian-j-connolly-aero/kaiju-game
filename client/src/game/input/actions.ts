@@ -34,6 +34,8 @@ export const BUTTON_ACTIONS = [
   'sink',
   'confirm',
   'back',
+  // the settings panel
+  'menu',
 ] as const;
 export type ButtonAction = (typeof BUTTON_ACTIONS)[number];
 
@@ -68,6 +70,17 @@ export const PAD = {
   right: 15,
 } as const;
 
+/**
+ * The default keyboard map binds no modifier key (Control, Alt, Meta, Shift) and no function
+ * key, on purpose. A page cannot cancel the browser's own shortcuts: with a modifier held, the
+ * movement keys become Ctrl+W (close the tab), Ctrl+S, Ctrl+D, Alt+Left (back), Shift+Escape
+ * (the browser's task manager) and so on. `browserShortcutRisk` names the keys to stay away
+ * from; client/test/input.test.ts holds the defaults to it.
+ */
+export function browserShortcutRisk(code: string): boolean {
+  return /^(Control|Alt|Meta|OS|Shift)(Left|Right)?$/.test(code) || /^F\d+$/.test(code) || code === 'Backspace' || code === 'ContextMenu' || code.startsWith('Browser');
+}
+
 export function defaultBindings(): Bindings {
   return {
     keyboard: {
@@ -77,7 +90,7 @@ export function defaultBindings(): Bindings {
       moveRight: ['KeyD', 'ArrowRight'],
       strike: ['Mouse0'],
       grab: ['Mouse2'],
-      block: ['Space', 'ShiftLeft'],
+      block: ['Space'],
       roar: ['KeyQ'],
       special: ['KeyE'],
       molt: ['KeyF'],
@@ -91,9 +104,10 @@ export function defaultBindings(): Bindings {
       map: ['KeyM', 'Tab'],
       camera: ['KeyV'],
       rise: ['Space'],
-      sink: ['ControlLeft', 'KeyC'],
+      sink: ['KeyC'],
       confirm: ['Enter'],
       back: ['Escape'],
+      menu: ['Escape'],
     },
     gamepad: {
       moveForward: [],
@@ -120,6 +134,7 @@ export function defaultBindings(): Bindings {
       sink: [PAD.b],
       confirm: [PAD.a],
       back: [PAD.b],
+      menu: [PAD.start],
     },
   };
 }
@@ -142,6 +157,12 @@ export function mergeBindings(stored: unknown): Bindings {
 export interface ActionState {
   /** Buttons that are down. */
   down: Record<ButtonAction, boolean>;
+  /**
+   * Buttons that were down at any moment since the last 30 Hz input sample was taken. Input
+   * samples are built from this, not from `down`, so that a click shorter than the gap between
+   * two samples (a trackpad tap, a fast click on a fast screen) still reaches the server.
+   */
+  held: Record<ButtonAction, boolean>;
   /** Buttons that went down since the previous frame. */
   pressed: Record<ButtonAction, boolean>;
   /** Buttons that went up since the previous frame. */
@@ -149,9 +170,14 @@ export interface ActionState {
   /** Movement relative to the view, each -1..1 (moveZ forward, moveX right). */
   moveX: number;
   moveZ: number;
-  /** View rotation asked for this frame, radians (positive lookX turns right, positive lookY looks up). */
+  /**
+   * View rotation asked for this frame, radians (positive lookX turns right, positive lookY
+   * looks up). The player's sensitivity and inverted-look settings are already applied.
+   */
   lookX: number;
   lookY: number;
+  /** The same vertical movement before the inverted-look setting (for pointers such as the command wheel's). */
+  pointerY: number;
   /** The device used most recently (button glyphs follow it). */
   device: InputDevice;
   /**
@@ -168,7 +194,19 @@ function record(value: boolean): Record<ButtonAction, boolean> {
 }
 
 export function createActionState(): ActionState {
-  return { down: record(false), pressed: record(false), released: record(false), moveX: 0, moveZ: 0, lookX: 0, lookY: 0, device: 'keyboard', aimOverride: null };
+  return {
+    down: record(false),
+    held: record(false),
+    pressed: record(false),
+    released: record(false),
+    moveX: 0,
+    moveZ: 0,
+    lookX: 0,
+    lookY: 0,
+    pointerY: 0,
+    device: 'keyboard',
+    aimOverride: null,
+  };
 }
 
 // --- glyphs ------------------------------------------------------------------------------------
@@ -213,11 +251,59 @@ const KEY_LABELS: Record<string, string> = {
   ArrowRight: '→',
 };
 
+/**
+ * What is printed on each key of THIS player's keyboard, by key position (`KeyboardEvent.code`).
+ * Bindings are by position, so WASD is the same four keys everywhere, but the letter on a
+ * keycap depends on the layout: the key at `KeyQ` is printed A on a French keyboard. Filled
+ * from the browser's layout map where it has one, and from every key press otherwise.
+ */
+const layoutLabels = new Map<string, string>();
+let layoutVersion = 0;
+
+/** Changes whenever a key's printed letter becomes known or changes (glyph caches watch it). */
+export function keyLayoutVersion(): number {
+  return layoutVersion;
+}
+
+/** Records the character a key position produces on this keyboard. Ignores anything that is not one printable character. */
+export function noteKeyLabel(code: string, key: string): void {
+  if (!(code.startsWith('Key') || code.startsWith('Digit')) || key.length !== 1 || key.trim() === '') return;
+  const label = key.toUpperCase();
+  // One character only: some letters grow when capitalized, and a keycap has room for one.
+  if (label.length !== 1 || layoutLabels.get(code) === label) return;
+  layoutLabels.set(code, label);
+  layoutVersion++;
+}
+
+/** Forgets the learned layout (tests). */
+export function resetKeyLabels(): void {
+  layoutLabels.clear();
+  layoutVersion++;
+}
+
+interface KeyboardLayoutSource {
+  keyboard?: { getLayoutMap?: () => Promise<{ forEach(fn: (key: string, code: string) => void): void }> };
+}
+
+/**
+ * Asks the browser for the keyboard layout (only some browsers can tell). Until it answers, and
+ * where it cannot, a keycap shows the US letter of its position until that key is first pressed.
+ */
+export function loadKeyboardLayout(source: KeyboardLayoutSource | undefined = typeof navigator === 'undefined' ? undefined : (navigator as KeyboardLayoutSource)): Promise<void> {
+  const getMap = source?.keyboard?.getLayoutMap;
+  if (typeof getMap !== 'function') return Promise.resolve();
+  return getMap
+    .call(source?.keyboard)
+    .then((map) => map.forEach((key, code) => noteKeyLabel(code, key)))
+    .catch(() => undefined);
+}
+
 export function keyGlyph(code: string): Glyph {
   if (code === 'Mouse0') return { icon: 'ms_left', label: '' };
   if (code === 'Mouse1') return { icon: 'ms_middle', label: '' };
   if (code === 'Mouse2') return { icon: 'ms_right', label: '' };
-  const label = KEY_LABELS[code] ?? (code.startsWith('Key') ? code.slice(3) : code.startsWith('Digit') ? code.slice(5) : code.slice(0, 3));
+  const label =
+    KEY_LABELS[code] ?? layoutLabels.get(code) ?? (code.startsWith('Key') ? code.slice(3) : code.startsWith('Digit') ? code.slice(5) : code.slice(0, 3));
   return { icon: 'kb_key', label };
 }
 

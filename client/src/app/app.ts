@@ -10,17 +10,20 @@ import { AssetStore } from '../assets/assetStore';
 import { AudioEngine } from '../audio/audioEngine';
 import { Autopilot } from '../game/autoplay';
 import { CinematicCamera } from '../game/controllers/cinematicCamera';
+import { loadKeyboardLayout } from '../game/input/actions';
 import { InputManager } from '../game/input/inputManager';
 import { GameClient, type ClosedReason } from '../net/gameClient';
 import { browserStore, sessionToken, storedName } from '../net/session';
 import { GameRenderer } from '../render/gameRenderer';
 import { setIconSource } from '../ui/icons';
+import { SettingsPanel } from '../ui/settingsPanel';
 import { Subtitles } from '../ui/subtitles';
 import type { AppContext, Screen, ScreenId } from './context';
 import { DebugOverlay } from './debugOverlay';
 import { MatchRuntime } from './matchRuntime';
 import { installHook } from './mbHook';
 import { readPageParams } from './params';
+import { loadSettings, saveSettings, sensitivityFromSlider, sliderFromSensitivity, type Settings } from './settings';
 import { BootScreen } from './screens/boot';
 import { BriefingScreen } from './screens/briefing';
 import { EndScreen } from './screens/end';
@@ -61,14 +64,54 @@ export class App {
     const input = new InputManager(canvas);
     const autopilot = params.autoplay ? new Autopilot() : null;
     if (autopilot) input.autopilot = (state, dt) => autopilot.drive(state, dt);
+    const audio = new AudioEngine(assets, params.mute);
+    // The player's settings, as they left them.
+    const settings = loadSettings(store);
+    input.sensitivity = settings.sensitivity;
+    input.invertY = settings.invertY;
+    audio.setMasterVolume(settings.volume);
+    const change = (patch: Partial<Settings>): void => {
+      Object.assign(settings, patch);
+      saveSettings(store, settings);
+    };
+    const panel = new SettingsPanel({
+      values: () => ({ volume: settings.volume, mouse: sliderFromSensitivity(settings.sensitivity), invertY: settings.invertY, fullscreen: document.fullscreenElement !== null }),
+      setVolume: (volume) => {
+        change({ volume });
+        audio.setMasterVolume(settings.volume);
+      },
+      setMouse: (position) => {
+        change({ sensitivity: sensitivityFromSlider(position) });
+        input.sensitivity = settings.sensitivity;
+      },
+      setInvertY: (invertY) => {
+        change({ invertY });
+        input.invertY = settings.invertY;
+      },
+      setFullscreen: (on) => {
+        try {
+          const done = on ? document.documentElement.requestFullscreen() : document.exitFullscreen();
+          // Refused (no permission, or nothing to leave): the button simply stays as it was.
+          void Promise.resolve(done).catch(() => undefined);
+        } catch {
+          // This browser has no fullscreen.
+        }
+      },
+      click: () => {
+        audio.unlock();
+        audio.play('ui_click');
+      },
+    });
+    document.addEventListener('fullscreenchange', () => panel.sync());
     this.ctx = {
       params,
       store,
       assets,
       client: new GameClient({ origin: window.location.origin, token: sessionToken(store, params.profile), now: () => performance.now() }),
-      audio: new AudioEngine(assets, params.mute),
+      audio,
       input,
       autopilot,
+      settings: panel,
       renderer: null,
       runtime: null,
       ui,
@@ -87,7 +130,7 @@ export class App {
       end: new EndScreen(),
     };
     this.debug = params.debug ? new DebugOverlay() : null;
-    ui.append(this.subtitles.root);
+    ui.append(this.subtitles.root, panel.root);
     if (this.debug) document.body.append(this.debug.root);
 
     window.addEventListener('error', (e) => this.errors.push(String(e.message)));
@@ -143,6 +186,13 @@ export class App {
       }
     });
     client.events.on('cityResync', () => this.ctx.renderer?.resync());
+    client.events.on('lobby', (msg) => {
+      // The address carries the room from the moment the client is in it, however it got there
+      // (created, joined from the lobby, or typed into a match that was already running), so a
+      // reload or a restored tab comes straight back. The sandbox has no room to come back to.
+      const code = msg.lobby.code;
+      if (code && !client.local && window.location.hash !== `#${code}`) window.history.replaceState(null, '', `#${code}`);
+    });
     client.events.on('closed', (reason) => {
       this.ctx.notice = CLOSED_NOTICE[reason];
       if (reason !== 'left') console.warn(`net: left the room (${reason}).`);
@@ -154,10 +204,26 @@ export class App {
     });
   }
 
-  /** Loads everything and starts the frame loop. */
+  /**
+   * Loads everything and starts the frame loop. If that fails (most likely: this browser cannot
+   * give the 3D view a WebGL context), the boot screen shows the warning picture instead of a
+   * loading bar that never ends.
+   */
   async start(): Promise<void> {
+    try {
+      await this.load();
+    } catch (err) {
+      console.error('The game could not start.', err);
+      this.errors.push(`start: ${String(err)}`);
+      this.setScreen('boot');
+      this.boot.fail();
+    }
+  }
+
+  private async load(): Promise<void> {
     const ctx = this.ctx;
     this.setScreen('boot');
+    void loadKeyboardLayout();
     await ctx.assets.loadManifest(ctx.params.noAssets);
     setIconSource(ctx.assets);
     this.boot.setProgress(0.05);
@@ -220,6 +286,9 @@ export class App {
     this.setScreen(this.wanted());
     this.current?.frame?.(ctx, dt);
     const renderer = ctx.renderer;
+    // The settings panel opens and closes with Escape (Start on a gamepad) on every screen but
+    // the match, which has the captured mouse to look after and does it itself.
+    if (this.current?.id !== 'match' && ctx.input.state.pressed.menu) ctx.settings.setOpen(!ctx.settings.open);
     if (ctx.runtime) {
       ctx.runtime.update(dt, time / 1000);
     } else if (renderer) {

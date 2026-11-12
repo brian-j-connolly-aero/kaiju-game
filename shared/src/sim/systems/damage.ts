@@ -11,6 +11,11 @@
  *   second, slows the kaiju while it builds (sim/movement.ts reads `kaiju.nerve`), and at
  *   capacity breaks: a stagger (helpless, full damage), after which nerve clears and the kaiju
  *   is immune to nerve damage for a while. No nerve builds while it is staggered or cocooned;
+ * - it takes two squads to break it: nerve at capacity only breaks while charged volleys
+ *   (`hit.volley`) from COMBAT_RULES.breakSquads different squads have hit the kaiju within
+ *   the last `volleyBreakWindow` seconds. Until then the nerve stays at capacity ("on the
+ *   brink": slowed as far as it goes), whatever lands: scattered fire, artillery, or one
+ *   squad's volleys, however many and from whatever side;
  * - crossfire: a hit from a unit whose direction differs by `crossfireMinAngle` or more from
  *   ANOTHER unit's hit inside `crossfireWindow`. Only directional hits with a unit as their
  *   source take part (`hit.sourceId` >= 0, a human weapon kind); call-ins with source -1 never do;
@@ -110,6 +115,38 @@ function crossfireWith(world: World, k: Kaiju, unit: number, yaw: number): numbe
   return other;
 }
 
+/**
+ * Records a charged volley hit from a squad and forgets the ones that are too old to count.
+ * One entry per squad is kept (its latest hit).
+ */
+function noteVolleyHit(world: World, k: Kaiju, squad: number): void {
+  const windowTicks = COMBAT_RULES.volleyBreakWindow * TICK_RATE;
+  let own = -1;
+  for (let i = k.volleyHits.length - 1; i >= 0; i--) {
+    const v = k.volleyHits[i];
+    if (world.tick - v.tick > windowTicks) {
+      k.volleyHits.splice(i, 1);
+      if (own > i) own--;
+    } else if (v.squad === squad) own = i;
+  }
+  if (own >= 0) k.volleyHits[own].tick = world.tick;
+  else k.volleyHits.push({ squad, tick: world.tick });
+}
+
+/**
+ * Whether the kaiju's nerve may break now: charged volleys from enough different squads have
+ * hit it within the window (DESIGN.md section 3). A match with fewer squads than that needs
+ * all it has; with none (no humans at all) nothing is asked.
+ */
+function volleysCanBreak(world: World, k: Kaiju): boolean {
+  const needed = Math.min(COMBAT_RULES.breakSquads, world.squads.length);
+  if (needed <= 0) return true;
+  const windowTicks = COMBAT_RULES.volleyBreakWindow * TICK_RATE;
+  let squads = 0;
+  for (const v of k.volleyHits) if (world.tick - v.tick <= windowTicks) squads++;
+  return squads >= needed;
+}
+
 /** Breaks the kaiju's nerve: whatever it was doing is cut short and it is helpless for a while. */
 function staggerKaiju(world: World, k: Kaiju, by: PlayerId): void {
   k.nerve = kaijuKindDef(k.kind).nerveCapacity;
@@ -180,6 +217,10 @@ function hitKaiju(world: World, k: Kaiju, hit: Hit): void {
     crossedWith = crossfireWith(world, k, hit.sourceId, yaw);
   }
 
+  // So is a charged volley: one that lands just before the immunity runs out still counts as
+  // its squad's part in the next break.
+  if (hit.volleySquad !== undefined && hit.volleySquad >= 0) noteVolleyHit(world, k, hit.volleySquad);
+
   let nerve = 0;
   if (!helpless && k.nerveImmune <= 0 && hit.nerve > 0) {
     nerve = hit.nerve * facingMult * modMult(k.mods, 'nerveTaken');
@@ -220,7 +261,11 @@ function hitKaiju(world: World, k: Kaiju, hit: Hit): void {
   }
 
   if (k.hp <= 0) killKaiju(k);
-  else if (nerve > 0 && k.nerve >= def.nerveCapacity - VALUE_EPS) staggerKaiju(world, k, hit.player);
+  else if (nerve > 0 && k.nerve >= def.nerveCapacity - VALUE_EPS) {
+    if (volleysCanBreak(world, k)) staggerKaiju(world, k, hit.player);
+    // On the brink: it holds until the volleys of two squads come together.
+    else k.nerve = def.nerveCapacity;
+  }
 }
 
 /**

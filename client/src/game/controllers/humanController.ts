@@ -95,7 +95,7 @@ export class HumanController implements Controller {
     if (w.open) {
       // While the wheel is open the look input moves its pointer, not the view.
       w.x = clamp(w.x + input.lookX * 2.2, -1, 1);
-      w.y = clamp(w.y + input.lookY * 2.2, -1, 1);
+      w.y = clamp(w.y + input.pointerY * 2.2, -1, 1);
       if (Math.hypot(w.x, w.y) > 0.35) {
         const a = Math.atan2(w.x, w.y);
         const quadrant = ((Math.round(a / (Math.PI / 2)) % 4) + 4) % 4;
@@ -225,8 +225,9 @@ export class HumanController implements Controller {
       const s = Math.sin(turn);
       out.moveX = input.moveX * c - input.moveZ * s;
       out.moveZ = input.moveZ * c + input.moveX * s;
-      if (input.down.fire && !this.wheel.open) out.buttons |= Btn.fire;
-      if (input.down.callIn) out.buttons |= Btn.callIn;
+      // The latch, not the instant: a click that began and ended between two samples still fires.
+      if (input.held.fire && !this.wheel.open) out.buttons |= Btn.fire;
+      if (input.held.callIn) out.buttons |= Btn.callIn;
     }
     if (this.pendingWheel) {
       out.wheel = this.pendingWheel;

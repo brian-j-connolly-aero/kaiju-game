@@ -14,15 +14,20 @@
  * rest. Someone who joins while a match is running takes over a bot squad if one is free and
  * watches otherwise.
  *
- * Dropped players. A seat whose connection is lost is kept for `graceSeconds`; in a match a bot
- * plays its slot meanwhile. The player gets it back either through the room library's own
- * reconnection (`resume`) or by joining again with the same session token (`join`). After the
- * grace period the seat is given up; in a match the bot keeps the slot to the end.
+ * Dropped players. A seat whose connection is lost is kept for `graceSeconds`, and for nobody
+ * but its owner: a newcomer is refused while every seat is taken, dropped ones included. In a
+ * match a bot plays the slot meanwhile. The player gets it back either through the room
+ * library's own reconnection (`resume`) or by joining again with the same session token
+ * (`join`). After the grace period the seat is given up and the bot keeps the slot, but the
+ * match remembers whose slot it was: when that player comes back with their token while a bot
+ * still has it, it is theirs again, the kaiju included (DESIGN.md section 2: "can rejoin their
+ * slot with the same link").
  */
 
 import {
   addLobbyPlayer,
   buildMatchConfig,
+  buildsMatch,
   canStartMatch,
   cleanPlayerName,
   CLOSE_REPLACED,
@@ -79,14 +84,29 @@ export interface GameRoomOptions {
   speed: number;
   /** Seed for this room's own rolls (who plays the kaiju, match seeds). */
   seed: number;
+  /**
+   * Seconds after which the host may start although somebody connected is not ready (counted
+   * per person from the moment they are in the lobby). Default DEFAULT_START_WAIT_SECONDS.
+   */
+  startWaitSeconds?: number;
+  /**
+   * The build stamp a joining page must carry (`JoinOptions.build`); a page with another one,
+   * or none, is refused with JOIN_ERROR.version. A function is asked at every join (the page
+   * the server serves can be rebuilt while it runs). Undefined admits any page (unit tests).
+   */
+  build?: string | (() => string);
   /** Monotonic clock, milliseconds. */
   now: () => number;
+  /** Room chatter; may be switched off. */
   log?: (line: string) => void;
+  /** Failures (a match that could not start or was abandoned). Falls back to `log`. */
+  logError?: (line: string) => void;
 }
 
 export const DEFAULT_GRACE_SECONDS = 45;
 export const DEFAULT_END_SCREEN_SECONDS = 120;
 export const DEFAULT_HOST_HANDOFF_SECONDS = 8;
+export const DEFAULT_START_WAIT_SECONDS = 20;
 
 interface Seat {
   /** Lobby seat, 0..4. */
@@ -118,6 +138,11 @@ export class GameRoom {
   /** When the current match ended (meaningful in the 'end' phase). */
   private endedAt = 0;
   private matchCount = 0;
+  /**
+   * Per match slot: the session token of the person who last played it in the current match,
+   * or null. It outlives their seat, so that they can have the slot back.
+   */
+  private slotOwners: Array<string | null> = [];
 
   constructor(options: GameRoomOptions) {
     this.options = options;
@@ -169,6 +194,15 @@ export class GameRoom {
     if (raw.protocol !== undefined && raw.protocol !== PROTOCOL_VERSION) {
       throw new JoinRefused(JOIN_ERROR.version, `this server speaks protocol ${PROTOCOL_VERSION}`);
     }
+    const build = typeof this.options.build === 'function' ? this.options.build() : this.options.build;
+    if (build !== undefined && !buildsMatch(build, raw.build)) {
+      // Worth a line even in a quiet window: if every page is refused, it is the server that is old.
+      this.logError(
+        `refused a page from another build of the game (it has "${typeof raw.build === 'string' ? raw.build.slice(0, 60) : 'none'}", ` +
+          `this server "${build}"). The page reloads itself; if people still cannot join, restart the server.`,
+      );
+      throw new JoinRefused(JOIN_ERROR.version, 'this page is from a different build of the game than the server: reload it');
+    }
     const token = typeof raw.token === 'string' && SESSION_TOKEN_PATTERN.test(raw.token) ? raw.token : null;
 
     // People already in the match get everything up to now before the roster changes.
@@ -186,10 +220,9 @@ export class GameRoom {
       old.close(CLOSE_REPLACED, 'this seat was taken over by a newer connection');
       this.log(`seat ${seat.seat} ${wasConnected ? 'taken over by a newer connection' : 'reclaimed'}`);
     } else {
-      let player = addLobbyPlayer(this.lobby, typeof raw.name === 'string' ? raw.name : '');
-      if (!player && this.releaseLongestGone()) {
-        player = addLobbyPlayer(this.lobby, typeof raw.name === 'string' ? raw.name : '');
-      }
+      // A seat whose player is away is still taken: it waits for them for the grace period,
+      // however many newcomers knock meanwhile.
+      const player = addLobbyPlayer(this.lobby, typeof raw.name === 'string' ? raw.name : '');
       if (!player) throw new JoinRefused(JOIN_ERROR.roomFull, 'the room is full');
       player.slot = -1;
       seat = { seat: player.seat, token, peer, connected: true, droppedAt: 0, slot: -1 };
@@ -367,6 +400,11 @@ export class GameRoom {
     this.options.log?.(`[room ${this.options.code}] ${line}`);
   }
 
+  /** For failures: these are printed even when the room chatter is switched off. */
+  private logError(line: string): void {
+    (this.options.logError ?? this.options.log)?.(`[room ${this.options.code}] ${line}`);
+  }
+
   private lobbyPlayer(seat: Seat): LobbyPlayer {
     const player = this.lobby.players.find((p) => p.seat === seat.seat);
     if (!player) throw new Error(`room ${this.options.code}: seat ${seat.seat} has no lobby entry`);
@@ -420,32 +458,55 @@ export class GameRoom {
   }
 
   /**
-   * Puts a (re)connected seat back into the running match: its own slot if it has one, else a
-   * bot squad nobody holds. `fresh` is true for a new page whose input numbering starts over.
+   * Puts a (re)connected seat back into the running match: its own slot if it has one, else
+   * the slot this player had earlier in the match if a bot still plays it (the kaiju
+   * included), else a bot squad nobody holds. `fresh` is true for a new page whose input
+   * numbering starts over.
    */
   private enterMatch(seat: Seat, fresh: boolean): void {
     const m = this.match;
     if (!m || this.lobby.phase !== 'match') return;
     if (seat.slot < 0) {
-      const slot = this.freeSquadSlot(m);
+      let slot = this.formerSlot(m, seat.token);
+      const returning = slot >= 0;
+      if (!returning) slot = this.freeSquadSlot(m);
       if (slot < 0) return;
       this.setSlot(seat, slot);
+      this.slotOwners[slot] = seat.token;
       // The person's name replaces the bot's on this slot for everyone who joins from now on.
       const name = this.lobbyPlayer(seat).name;
       m.world.players[slot].name = name;
       m.world.config.players[slot].name = name;
-      this.log(`seat ${seat.seat} takes over squad slot ${slot}`);
+      if (slot === 0 && m.world.players[slot].role === 'kaiju') this.lobby.lastKaijuSeat = seat.seat;
+      this.log(returning ? `seat ${seat.seat} is back in slot ${slot}` : `seat ${seat.seat} takes over squad slot ${slot}`);
     }
     setSlotLive(m, seat.slot, true, fresh);
   }
 
-  /** A human squad slot that a bot plays and no seat holds, or -1. */
+  /** True when a bot plays the slot and no seat holds it. */
+  private slotIsFree(m: MatchSession, slot: PlayerId): boolean {
+    return m.world.players[slot].bot && !this.seats.some((s) => s.slot === slot);
+  }
+
+  /** The slot this token played earlier in the match, if it can be had back, or -1. */
+  private formerSlot(m: MatchSession, token: string | null): PlayerId {
+    if (token === null) return -1;
+    const slot = this.slotOwners.indexOf(token);
+    return slot >= 0 && slot < m.world.players.length && this.slotIsFree(m, slot) ? slot : -1;
+  }
+
+  /**
+   * A human squad slot for somebody new, or -1: one that nobody has played in this match if
+   * there is one, so that a player who is away finds their own squad free when they return.
+   */
   private freeSquadSlot(m: MatchSession): PlayerId {
+    let fallback: PlayerId = -1;
     for (const p of m.world.players) {
-      if (p.role !== 'human' || !p.bot) continue;
-      if (!this.seats.some((s) => s.slot === p.id)) return p.id;
+      if (p.role !== 'human' || !this.slotIsFree(m, p.id)) continue;
+      if (!this.slotOwners[p.id]) return p.id;
+      if (fallback < 0) fallback = p.id;
     }
-    return -1;
+    return fallback;
   }
 
   private startMatch(): void {
@@ -457,16 +518,20 @@ export class GameRoom {
     try {
       m = createMatchSession({ seed, config, speed: this.options.speed, now: this.options.now() });
     } catch (err) {
-      this.log(`could not start a match: ${describeError(err)}`);
+      this.logError(`could not start a match: ${describeError(err)}`);
       return;
     }
     this.match = m;
     this.matchCount++;
     lobby.phase = 'match';
     lobby.lastKaijuSeat = kaijuSeat;
+    this.slotOwners = m.world.players.map(() => null);
     for (const seat of this.seats) {
       this.setSlot(seat, seat.connected ? (slotBySeat[seat.seat] ?? -1) : -1);
-      if (seat.slot >= 0) setSlotLive(m, seat.slot, true, true);
+      if (seat.slot >= 0) {
+        this.slotOwners[seat.slot] = seat.token;
+        setSlotLive(m, seat.slot, true, true);
+      }
     }
     this.log(
       `match ${this.matchCount} started: seed ${seed}, kaiju ${kaijuSeat < 0 ? 'bot' : `seat ${kaijuSeat}`}, ` +
@@ -478,6 +543,7 @@ export class GameRoom {
 
   private toLobby(): void {
     this.match = null;
+    this.slotOwners = [];
     this.lobby.phase = 'lobby';
     for (const seat of this.seats) seat.slot = -1;
     for (const p of this.lobby.players) {
@@ -490,7 +556,7 @@ export class GameRoom {
 
   /** The simulation threw: stop the match and take everyone back to the lobby rather than crash. */
   private abortMatch(err: unknown): void {
-    this.log(`match ${this.matchCount} aborted, the simulation failed: ${describeError(err)}`);
+    this.logError(`match ${this.matchCount} aborted, the simulation failed: ${describeError(err)}`);
     this.toLobby();
   }
 
@@ -507,19 +573,6 @@ export class GameRoom {
       changed = true;
     }
     if (changed) this.broadcastLobby();
-  }
-
-  /** Makes room for a newcomer by giving up the seat of whoever has been gone the longest. */
-  private releaseLongestGone(): boolean {
-    let gone: Seat | null = null;
-    for (const seat of this.seats) {
-      if (!seat.connected && (!gone || seat.droppedAt < gone.droppedAt)) gone = seat;
-    }
-    if (!gone) return false;
-    this.removeSeat(gone);
-    gone.peer.close(CLOSE_SEAT_RELEASED, 'the seat was given to someone else');
-    this.log(`seat ${gone.seat} given up to make room`);
-    return true;
   }
 
   /** The host role moves on when the host has been gone a while and somebody else is here. */

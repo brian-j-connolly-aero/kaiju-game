@@ -1,11 +1,14 @@
 /**
  * Where an aim ray lands. Used for the volley aim point ("where the player's aim ray lands"),
- * for markers placed with the crosshair, and for the kaiju's throw and beam targets.
+ * for markers placed with the crosshair (`resolveMarkerPoint`), and for the kaiju's throw and
+ * beam targets.
  */
 
 import { castRay, createCityCastHit, type CityQuery } from '../city/spatialIndex';
 import { createCastHit, rayVsCapsule, type VerticalCapsule } from '../math/geom';
+import { SQUAD_RULES } from '../defs/rules';
 import { unitTypeDef } from '../defs/units';
+import type { Vec2 } from '../math/vec';
 import type { Kaiju, Unit } from './types';
 
 export interface AimPoint {
@@ -107,4 +110,109 @@ export function resolveAimPoint(
   out.z = oz + dir.z * best;
   if (out.on === 'ground') out.y = 0;
   return out;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Ground markers placed with the crosshair (move-to, call-ins)
+// ---------------------------------------------------------------------------------------------
+
+/** What marker placement needs to know about a kaiju. `Kaiju` satisfies it; a client can fill it from a snapshot and the stage definition. */
+export interface MarkerTarget {
+  alive: boolean;
+  /** The humans' map shows it. */
+  known: boolean;
+  x: number;
+  z: number;
+  radius: number;
+  height: number;
+}
+
+const markerAim = createAimPoint();
+
+/**
+ * The ground point a crosshair marks (DESIGN.md section 5, "Move to" and "Artillery"). From a
+ * unit's eye, two or three meters up, nearly all of a kaiju is above the horizon, so the ground
+ * is the last thing a player who points at it is pointing at. In order:
+ *
+ * 1. The ray meets a kaiju's body before anything else: the ground under the body, at the point
+ *    of the ray nearest to its middle (the crosshair on its chest marks its feet). The body is
+ *    its full width from the ground to a little over its head, wider at the feet than the hit
+ *    capsule that projectiles use.
+ * 2. It meets the ground or a standing structure within `maxDist`: that point.
+ * 3. It meets nothing (the sky, or ground too far off to mean anything): a kaiju on the humans'
+ *    map that the crosshair is just beside or above, within SQUAD_RULES.markerSnapRadii body
+ *    radii of the line of the crosshair, is what was meant.
+ * 4. Otherwise `skyReach` meters ahead along the heading; with `skyReach` 0 there is no marker
+ *    and the answer is false (a call-in is not spent on the empty sky).
+ *
+ * Whoever uses the point clamps it into the playable bounds.
+ */
+export function resolveMarkerPoint(
+  city: CityQuery,
+  kaijus: readonly MarkerTarget[],
+  ox: number,
+  oy: number,
+  oz: number,
+  yaw: number,
+  pitch: number,
+  maxDist: number,
+  skyReach: number,
+  out: Vec2,
+): boolean {
+  resolveAimPoint(city, ox, oy, oz, yaw, pitch, maxDist, markerAim);
+  // The same ray, in the scratch vectors resolveAimPoint left behind.
+  const hx = Math.sin(yaw);
+  const hz = Math.cos(yaw);
+  const flat = Math.cos(pitch);
+
+  let best = markerAim.dist;
+  let body: MarkerTarget | null = null;
+  for (const k of kaijus) {
+    if (!k.alive) continue;
+    // A capsule whose straight part runs from the ground to the top of the head.
+    capsule.x = k.x;
+    capsule.z = k.z;
+    capsule.r = k.radius;
+    capsule.y0 = -k.radius;
+    capsule.y1 = k.height + k.radius;
+    if (rayVsCapsule(origin, dir, best, capsule, capHit) && capHit.t < best) {
+      best = capHit.t;
+      body = k;
+    }
+  }
+  if (body) {
+    // Along the ground: where the ray enters the body, or further in where it passes nearest the middle.
+    const along = Math.max(best * flat, (body.x - ox) * hx + (body.z - oz) * hz);
+    out.x = ox + hx * along;
+    out.z = oz + hz * along;
+    return true;
+  }
+  if (markerAim.on !== 'none') {
+    out.x = markerAim.x;
+    out.z = markerAim.z;
+    return true;
+  }
+
+  let near: MarkerTarget | null = null;
+  let nearOff = Infinity;
+  for (const k of kaijus) {
+    if (!k.alive || !k.known) continue;
+    const dx = k.x - ox;
+    const dz = k.z - oz;
+    if (dx * hx + dz * hz <= 0) continue;
+    const off = Math.abs(dx * hz - dz * hx);
+    if (off <= k.radius * SQUAD_RULES.markerSnapRadii && off < nearOff) {
+      nearOff = off;
+      near = k;
+    }
+  }
+  if (near) {
+    out.x = near.x;
+    out.z = near.z;
+    return true;
+  }
+  if (!(skyReach > 0)) return false;
+  out.x = ox + hx * skyReach;
+  out.z = oz + hz * skyReach;
+  return true;
 }

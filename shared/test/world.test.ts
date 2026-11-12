@@ -20,6 +20,7 @@ import {
   queueCommand,
   setPlayerBot,
   snapshotOfWorld,
+  SQUAD_RULES,
   stageBounds,
   SYSTEM_ORDER,
   TICK_RATE,
@@ -287,6 +288,40 @@ describe('input intake', () => {
     const reach = 1.7 / Math.tan(0.1);
     expect(cmd.x).toBeCloseTo(unit.x + Math.sin(aimYaw) * reach, 6);
     expect(cmd.z).toBeCloseTo(unit.z + Math.cos(aimYaw) * reach, 6);
+  });
+
+  it('sends a move-to with the crosshair on the sky a short way ahead, not to the far edge of the map', () => {
+    const world = makeTestWorld();
+    const squad = playerSquad(world, HUMAN_PLAYER);
+    if (!squad) throw new Error('no squad');
+    const unit = world.units[squad.driven];
+    // Well to one side of the kaiju in the middle of the zone: the sky with nothing near the crosshair.
+    const aimYaw = Math.atan2(-unit.x, -unit.z) + 1.2;
+    for (const aimPitch of [0.4, 0]) {
+      world.step([null, input({ seq: 1, aimYaw, aimPitch, wheel: 'moveTo' })]);
+      const cmd = world.players[HUMAN_PLAYER].commands[0];
+      expect(cmd.type).toBe('moveTo');
+      if (cmd.type !== 'moveTo') return;
+      expect(cmd.x).toBeCloseTo(unit.x + Math.sin(aimYaw) * SQUAD_RULES.markerSkyReach, 6);
+      expect(cmd.z).toBeCloseTo(unit.z + Math.cos(aimYaw) * SQUAD_RULES.markerSkyReach, 6);
+    }
+  });
+
+  it('sends a move-to with the crosshair on a kaiju to the ground under it', () => {
+    const world = makeTestWorld();
+    const squad = playerSquad(world, HUMAN_PLAYER);
+    if (!squad) throw new Error('no squad');
+    const unit = world.units[squad.driven];
+    const k = world.kaijus[0];
+    k.x = unit.x;
+    k.z = unit.z + 60;
+    // Level with its chest: the old ray went through it and on to the horizon.
+    world.step([null, input({ seq: 1, aimYaw: 0, aimPitch: Math.atan2(k.height * 0.6 - 1.7, 60), wheel: 'moveTo' })]);
+    const cmd = world.players[HUMAN_PLAYER].commands[0];
+    expect(cmd).toMatchObject({ type: 'moveTo' });
+    if (cmd.type !== 'moveTo') return;
+    expect(cmd.x).toBeCloseTo(k.x, 6);
+    expect(cmd.z).toBeCloseTo(k.z, 6);
   });
 
   it('only offers the call-in button when the squad has a call-in (level 3)', () => {

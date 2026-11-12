@@ -86,6 +86,7 @@ function growKaiju(world: World, k: Kaiju, stage: StageId): void {
   k.vx = 0;
   k.vz = 0;
   k.recentHits.length = 0;
+  k.volleyHits.length = 0;
   const b = world.match.bounds;
   const inset = Math.min(k.radius, (b.maxX - b.minX) / 2, (b.maxZ - b.minZ) / 2);
   k.x = clamp(k.x, b.minX + inset, b.maxX - inset);

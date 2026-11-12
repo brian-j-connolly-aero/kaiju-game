@@ -70,16 +70,21 @@ export class LobbyScreen implements Screen {
       client.send('start', {});
     });
 
+    const gear = el('button', 'btn settings-open', [icon('ui_settings')]);
+    gear.addEventListener('click', () => {
+      ctx.audio.unlock();
+      ctx.audio.play('ui_click');
+      ctx.settings.setOpen(true);
+    });
+
     this.root = el('div', 'screen lobby', [
+      gear,
       el('div', 'lobby-top', [back, code, link]),
       el('div', 'lobby-mid', [this.portraitBox, this.seats]),
       el('div', 'lobby-bottom', [this.role, this.ready, this.practice, this.start]),
     ]);
     ctx.ui.append(this.root);
-    if (window.location.hash !== `#${client.code}` && client.code) {
-      // The address now carries the room, so a reload or a shared link comes straight back here.
-      window.history.replaceState(null, '', `#${client.code}`);
-    }
+    // (The app puts the room code in the page address as soon as the client is in a room.)
     this.unsubscribe = client.events.on('lobby', () => this.render(ctx));
     this.render(ctx);
     ctx.audio.playMusic(['lobby']);

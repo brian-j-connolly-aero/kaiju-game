@@ -300,15 +300,29 @@ def write(lines: list[dict], cast: dict, pron: dict, state: dict, report: dict) 
     if enc and enc.get("settings"):
         from .analyze import PEAK_LIMIT_DBTP
         rows = [[("**" if r["shipped"] else "") + ("Vorbis " if r["format"] == "ogg" else "MP3 ") + r["quality"]
-                 + (" (used)**" if r["shipped"] else ""), r["megabytes"], r["kbit_per_s"], r["wer_all"],
-                 r["wer_radio"], r["snr_median_db"], f"{r['true_peak_max_db']:.2f}"] for r in enc["settings"]]
+                 + (" (used)**" if r["shipped"] else ""), f"{r['megabytes']:.2f}", f"{r['kbit_per_s']:.1f}",
+                 f"{r['wer_all']:.1f}", f"{r['wer_radio']:.1f}", f"{r['snr_median_db']:.1f}",
+                 f"{r['spectrum_lost_pct']:.2f}", f"{r['spectrum_lost_anchor_pct']:.2f}",
+                 f"{r['true_peak_max_db']:.2f}"] for r in enc["settings"]]
         add(notes.ENCODING.format(ogg_q=OGG_QUALITY, mp3_q=MP3_QUALITY, lines=enc["settings"][0]["lines"],
                                   ceiling=CEILING_DBTP, peak_limit=PEAK_LIMIT_DBTP))
         add(_table(["Setting", "All files (MB)", "Bit rate (kbit/s)", "Word errors, all lines (%)",
-                    "Word errors, radio lines (%)", "Signal to noise, median (dB)", "Highest true peak (dBTP)"],
-                   rows, "lrrrrrr"))
+                    "Word errors, radio lines (%)", "Signal to noise, median (dB)", "Spectrum lost (%)",
+                    "Spectrum lost, anchor (%)", "Highest true peak (dBTP)"], rows, "lrrrrrrrr"))
         add("")
-        add(notes.ENCODING_AFTER.format(kb_per_line=ogg_bytes / 1000 / max(len(measured), 1)))
+        e = {r["format"] + r["quality"]: r for r in enc["settings"]}
+        used = e.get("ogg" + OGG_QUALITY, e["ogg3"])
+        add(notes.ENCODING_AFTER.format(
+            kb_per_line=ogg_bytes / 1000 / max(len(measured), 1), peak_limit=PEAK_LIMIT_DBTP,
+            ogg0_peak=e["ogg0"]["true_peak_max_db"], ogg_peak=used["true_peak_max_db"],
+            ogg3_radio=e["ogg3"]["wer_radio"], ogg0_radio=e["ogg0"]["wer_radio"],
+            mp35_radio=e["mp35"]["wer_radio"], mp38_radio=e["mp38"]["wer_radio"],
+            mp35_anchor=e["mp35"]["spectrum_lost_anchor_pct"], mp36_anchor=e["mp36"]["spectrum_lost_anchor_pct"],
+            mp37_anchor=e["mp37"]["spectrum_lost_anchor_pct"], ogg_anchor=used["spectrum_lost_anchor_pct"],
+            ogg_saving=100.0 * (1 - e["ogg2"]["megabytes"] / e["ogg3"]["megabytes"]),
+            ogg_cost=e["ogg2"]["wer_all"] - e["ogg3"]["wer_all"],
+            mp3_saving=100.0 * (1 - e["mp36"]["megabytes"] / e["mp35"]["megabytes"]),
+            mp3_cost=e["mp36"]["wer_all"] - e["mp35"]["wer_all"]))
     sheets = sorted(p.name for p in DOC_DIR.glob("sheet_*.png"))
     if sheets:
         add("Spectrogram sheets (three lines per voice; synthesizer output on the left, finished clip on the right): "
@@ -325,5 +339,6 @@ def write(lines: list[dict], cast: dict, pron: dict, state: dict, report: dict) 
     add(notes.REVIEW.format(win_min=min(orders), win_max=max(orders), window=max(WINDOW_SECONDS.values()),
                             new_lines=len(lines) - FIRST_SCRIPT_LINES, lines=len(lines),
                             tempest_wer=wer("Tempest"), granite_wer=wer("Granite"),
+                            all_wer=summ.get("all", {}).get("wer_ogg", 0),
                             brief_h=brief["humans"], brief_max=BRIEFING_BUDGET))
     DOC.write_text("\n".join(doc).rstrip() + "\n")

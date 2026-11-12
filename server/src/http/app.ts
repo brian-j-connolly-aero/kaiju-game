@@ -7,7 +7,8 @@
  * localhost, on a LAN address and behind a tunnel or reverse proxy on a single hostname.
  */
 
-import { existsSync } from 'node:fs';
+import { pageIdOf } from '@mb/shared';
+import { existsSync, readFileSync } from 'node:fs';
 import { extname, join } from 'node:path';
 import express, { type Application, type NextFunction, type Request, type Response } from 'express';
 import type { PerfReport } from '../room/perf';
@@ -16,6 +17,8 @@ export interface HealthInfo {
   ok: true;
   game: string;
   protocol: number;
+  /** The build stamp a page must carry to join (shared/src/net/build.ts). */
+  build: string;
   /** Seconds since the server started. */
   uptime: number;
   rooms: number;
@@ -37,6 +40,26 @@ const HASHED_ASSET = /-[A-Za-z0-9_-]{8}\.(?:js|css|woff2?)$/;
 const NO_CLIENT_NOTE =
   'Monster Battle 9001: the game server is running, but the game page has not been built yet.\n' +
   'Run "npm run build" and reload, or use "npm run dev" while developing.\n';
+
+/**
+ * The page part of the build stamp for the page this server serves: the hashed name of the
+ * script its index.html starts, or '' when there is no built page (development, tests). Read
+ * afresh every time, so a client rebuilt while the server runs is noticed.
+ */
+export function servedPageId(clientDir: string | null): string {
+  if (!clientDir) return '';
+  let html: string;
+  try {
+    html = readFileSync(join(clientDir, 'index.html'), 'utf8');
+  } catch {
+    return '';
+  }
+  for (const tag of html.matchAll(/<script\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/gi)) {
+    const id = pageIdOf(tag[1]);
+    if (id) return id;
+  }
+  return '';
+}
 
 export function configureApp(app: Application, options: AppOptions): void {
   app.disable('x-powered-by');

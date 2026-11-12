@@ -141,6 +141,8 @@ function impact(world: World, p: Projectile, x: number, y: number, z: number, ta
 
   if (p.damage > 0 || p.nerve > 0) {
     const sourceId = p.owner === 'callin' ? -1 : p.ownerId;
+    // A charged volley's shots count for their squad toward breaking the kaiju's nerve.
+    const volleySquad = p.volley && p.owner === 'unit' ? (world.units[p.ownerId]?.squad ?? -1) : -1;
     for (const k of world.kaijus) {
       if (!k.alive || (p.owner === 'kaiju' && p.ownerId === k.id)) continue;
       let reached = target === 'kaiju' && targetId === k.id;
@@ -160,6 +162,7 @@ function impact(world: World, p: Projectile, x: number, y: number, z: number, ta
           player: p.player,
           kind: p.cause,
           atWill: p.atWill,
+          volleySquad,
         },
       });
     }

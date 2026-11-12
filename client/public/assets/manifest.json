@@ -2778,7 +2778,7 @@
     },
     "v_building_down_4": {
       "base": "audio/voice/v_building_down_4",
-      "duration": 3.16
+      "duration": 2.925
     },
     "v_building_down_5": {
       "base": "audio/voice/v_building_down_5",
@@ -2798,7 +2798,7 @@
     },
     "v_callin_inbound_1": {
       "base": "audio/voice/v_callin_inbound_1",
-      "duration": 3.067
+      "duration": 2.926
     },
     "v_callin_inbound_2": {
       "base": "audio/voice/v_callin_inbound_2",
@@ -3050,7 +3050,7 @@
     },
     "v_kaiju_brace_1": {
       "base": "audio/voice/v_kaiju_brace_1",
-      "duration": 3.857
+      "duration": 3.939
     },
     "v_kaiju_brace_2": {
       "base": "audio/voice/v_kaiju_brace_2",
@@ -3078,7 +3078,7 @@
     },
     "v_kaiju_lost_2": {
       "base": "audio/voice/v_kaiju_lost_2",
-      "duration": 3.145
+      "duration": 2.876
     },
     "v_kaiju_lost_3": {
       "base": "audio/voice/v_kaiju_lost_3",
@@ -3190,7 +3190,7 @@
     },
     "v_kaiju_spotted_2": {
       "base": "audio/voice/v_kaiju_spotted_2",
-      "duration": 4.63
+      "duration": 4.211
     },
     "v_kaiju_spotted_3": {
       "base": "audio/voice/v_kaiju_spotted_3",

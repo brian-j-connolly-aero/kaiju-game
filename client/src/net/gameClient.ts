@@ -18,6 +18,7 @@ import { Emitter } from '../util/emitter';
 import { CLOSE_CONSENTED, createRoom, ERROR_NO_ROOM, JoinFailure, joinRoom, type RoomLink } from './connection';
 import { createLocalLink, type LocalMatchControl, type LocalMatchOptions } from './localLink';
 import { MatchSession } from './matchSession';
+import { forgetBuildReload, reloadForNewBuild } from './session';
 
 export type LinkStatus = 'offline' | 'connecting' | 'online' | 'reconnecting';
 
@@ -31,7 +32,7 @@ export type ClosedReason =
   | 'gone'
   /** The room is full, or the server refused for another reason. */
   | 'refused'
-  /** This page is older than the server: reload. */
+  /** This page and the server are different builds of the game, and reloading did not help. */
   | 'version'
   /** The server could not be reached. */
   | 'network';
@@ -59,6 +60,14 @@ export interface GameClientOptions {
   token: string;
   /** Local clock in milliseconds (performance.now in the browser). */
   now: () => number;
+  /**
+   * Reloads the page to fetch the current build after the server refused this one; `code` is
+   * the room being joined ('' when creating one). Returns false when it did not reload (it
+   * already has, once). Default: `reloadForNewBuild` and `forgetBuildReload` of session.ts.
+   */
+  reload?: (code: string) => boolean;
+  /** Called once the server has let this page in. */
+  admitted?: () => void;
 }
 
 export class GameClient {
@@ -141,11 +150,23 @@ export class GameClient {
         return;
       }
       this.code = link.code;
+      this.admitted();
       this.setStatus('online');
     } catch (err) {
       if (generation === this.generation) this.setStatus('offline');
+      // A page from another build than the server fetches the current one, once. If it is
+      // refused again after that, the failure is reported like any other.
+      if (err instanceof JoinFailure && err.code === JOIN_ERROR.version) this.reloadPage(code ?? '');
       throw err;
     }
+  }
+
+  private reloadPage(code: string): boolean {
+    return (this.options.reload ?? reloadForNewBuild)(code);
+  }
+
+  private admitted(): void {
+    (this.options.admitted ?? forgetBuildReload)();
   }
 
   private attach(link: RoomLink, generation: number): void {
@@ -248,7 +269,11 @@ export class GameClient {
         onCityResync: () => this.events.emit('cityResync', null),
       });
     } catch (err) {
+      // The welcome describes a city this page cannot build: it is not the server's build after
+      // all. Staying would mean sitting in the lobby while the others play, so get out, the
+      // same way as when the server refuses a page at the door.
       console.error('net: could not start the match from the welcome message', err);
+      this.failVersion();
       return;
     }
     if (!session.mirror.trusted) {
@@ -256,6 +281,19 @@ export class GameClient {
     }
     this.session = session;
     this.events.emit('session', session);
+  }
+
+  /** This page cannot play on this server: reload it once, else leave the room and say so. */
+  private failVersion(): void {
+    const code = this.code;
+    const link = this.link;
+    this.leaving = true;
+    this.dropLink();
+    // Leaving on purpose gives the seat up, so nobody waits for a player who cannot take part.
+    link?.leave();
+    this.reset();
+    this.setStatus('offline');
+    if (!this.reloadPage(code)) this.events.emit('closed', 'version');
   }
 
   private onClosed(code: number): void {
@@ -287,6 +325,7 @@ export class GameClient {
             link.leave();
             return;
           }
+          this.admitted();
           this.setStatus('online');
         })
         .catch((err: unknown) => {
@@ -300,6 +339,7 @@ export class GameClient {
           this.dropLink();
           this.reset();
           this.setStatus('offline');
+          if (reason === 'version' && this.reloadPage(code)) return;
           this.events.emit('closed', reason);
         });
     }, delay);

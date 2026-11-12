@@ -63,6 +63,28 @@ describe('lobby', () => {
     expect(room.join(new FakePeer('bare'), undefined)).toBe(0);
   });
 
+  it('refuses a page from another build of the game, or from before pages said which build they are', () => {
+    const { room, log } = makeRoom({ build: 'aaaaaaaa.index-AAAAAAAA.js' });
+    for (const build of ['bbbbbbbb.index-AAAAAAAA.js', 'aaaaaaaa.index-BBBBBBBB.js', undefined, 7, '']) {
+      const err = refusal(() => room.join(new FakePeer('stale'), { name: 'Stale', protocol: PROTOCOL_VERSION, build }));
+      expect(err.code).toBe(JOIN_ERROR.version);
+    }
+    expect(room.empty).toBe(true);
+    // The host is told in plain words, once per refusal.
+    expect(log.filter((line) => line.includes('another build')).length).toBe(5);
+    expect(room.join(new FakePeer('same'), { build: 'aaaaaaaa.index-AAAAAAAA.js' })).toBe(0);
+    // A development page and a command-line client know only the rules they were built from.
+    expect(room.join(new FakePeer('dev'), { build: 'aaaaaaaa.' })).toBe(1);
+
+    // The page the server serves can change while it runs: the stamp is asked for at every join.
+    let served = 'aaaaaaaa.index-AAAAAAAA.js';
+    const live = makeRoom({ build: () => served }).room;
+    expect(live.join(new FakePeer('first'), { build: 'aaaaaaaa.index-AAAAAAAA.js' })).toBe(0);
+    served = 'aaaaaaaa.index-CCCCCCCC.js';
+    expect(refusal(() => live.join(new FakePeer('old tab'), { build: 'aaaaaaaa.index-AAAAAAAA.js' })).code).toBe(JOIN_ERROR.version);
+    expect(live.join(new FakePeer('new tab'), { build: 'aaaaaaaa.index-CCCCCCCC.js' })).toBe(1);
+  });
+
   it('applies name, role, faction, ready and options, and ignores what is not allowed', () => {
     const { room } = makeRoom();
     const [a, b] = seatPlayers(room, 2);
@@ -551,18 +573,135 @@ describe('dropped players', () => {
     expect(room.seatCount).toBe(4);
   });
 
-  it('makes room for a newcomer by giving up the seat of whoever has been gone longest', () => {
-    const { room, run } = makeRoom({ graceSeconds: 600 });
+  it('keeps a dropped seat for its owner: a newcomer is refused until the grace period is over', () => {
+    const { room, run } = makeRoom({ graceSeconds: 10 });
     const peers = seatPlayers(room, 5);
+    // One player reloads the page: the connection is gone for a moment.
     room.drop('p3');
     run(1);
-    room.drop('p1');
-    run(1);
-    const newcomer = new FakePeer('new');
-    expect(room.join(newcomer, { name: 'New', token: 'token-new-abcdef' })).toBe(3);
-    expect(peers[3].closed?.code).toBe(CLOSE_SEAT_RELEASED);
-    expect(peers[1].closed).toBeNull();
+    const sixth = new FakePeer('sixth');
+    const err = refusal(() => room.join(sixth, { name: 'Sixth', token: 'token-sixth-abcdef' }));
+    expect(err.code).toBe(JOIN_ERROR.roomFull);
+    expect(peers[3].closed).toBeNull();
     expect(room.seatCount).toBe(5);
+    // The reloaded page comes back with its token and gets its own seat.
+    run(1);
+    const back = new FakePeer('p3-reloaded');
+    expect(room.join(back, { token: tokenOf(3) })).toBe(3);
+    expect(peers[3].closed?.code).toBe(CLOSE_REPLACED);
+
+    // Somebody who stays away longer than the grace period does give the seat up, and only
+    // then can a newcomer have it.
+    room.drop('p1');
+    run(9);
+    expect(refusal(() => room.join(new FakePeer('early'), { name: 'Early' })).code).toBe(JOIN_ERROR.roomFull);
+    run(2);
+    expect(peers[1].closed?.code).toBe(CLOSE_SEAT_RELEASED);
+    expect(room.join(new FakePeer('late'), { name: 'Late', token: 'token-late-abcdef' })).toBe(1);
+    expect(room.seatCount).toBe(5);
+  });
+
+  it('never gives a dropped kaiju player\'s seat to a sixth person during the match', () => {
+    const { room, run } = makeRoom({ graceSeconds: 45 });
+    const peers = seatPlayers(room, 5);
+    room.message('p0', 'setRole', { wantsKaiju: true });
+    startMatch(room, peers);
+    run(2);
+    const world = room.match!.world;
+    expect(peers[0].welcome.playerId).toBe(0);
+
+    // The kaiju player's connection blips. A second later a sixth person tries to join.
+    room.drop('p0');
+    expect(world.players[0].bot).toBe(true);
+    run(1);
+    const sixth = new FakePeer('sixth');
+    expect(refusal(() => room.join(sixth, { name: 'Sixth', token: 'token-sixth-abcdef' })).code).toBe(JOIN_ERROR.roomFull);
+    expect(peers[0].closed).toBeNull();
+
+    // Two seconds after that the kaiju player is back and has the kaiju again.
+    run(2);
+    const back = new FakePeer('p0-back');
+    expect(room.join(back, { token: tokenOf(0) })).toBe(0);
+    expect(back.welcome.playerId).toBe(0);
+    expect(back.welcome.kaijuId).toBe(0);
+    expect(world.players[0].bot).toBe(false);
+    expect(peers[0].closed?.code).toBe(CLOSE_REPLACED);
+  });
+
+  it('gives the kaiju back to its player even after the grace period, while a bot still has it', () => {
+    const { room, run } = makeRoom({ graceSeconds: 5 });
+    const peers = seatPlayers(room, 5);
+    room.message('p0', 'setRole', { wantsKaiju: true });
+    startMatch(room, peers);
+    run(2);
+    const world = room.match!.world;
+
+    // The kaiju player's laptop sleeps for longer than the grace period: the seat is given up.
+    room.drop('p0');
+    run(6);
+    expect(peers[0].closed?.code).toBe(CLOSE_SEAT_RELEASED);
+    expect(room.seatCount).toBe(4);
+    expect(world.players[0].bot).toBe(true);
+
+    // Same link, same token: a new seat, and the kaiju they were playing.
+    const back = new FakePeer('p0-back');
+    room.join(back, { name: 'Player A', token: tokenOf(0) });
+    expect(back.welcome.playerId).toBe(0);
+    expect(back.welcome.kaijuId).toBe(0);
+    expect(world.players[0].bot).toBe(false);
+    expect(back.lobby.lobby.players.find((p) => p.seat === back.lobby.you)?.slot).toBe(0);
+    expect(back.lobby.lobby.lastKaijuSeat).toBe(back.lobby.you);
+    room.message('p0-back', 'input', input(1, { moveZ: 1 }));
+    run(0.2);
+    expect(back.lastSnapshot.ackSeq).toBe(1);
+  });
+
+  it('never hands the kaiju to anybody but the player who had it', () => {
+    const { room, run } = makeRoom({ graceSeconds: 5 });
+    const peers = seatPlayers(room, 3);
+    room.message('p0', 'setRole', { wantsKaiju: true });
+    startMatch(room, peers);
+    run(1);
+    const world = room.match!.world;
+    const squadOfB = peers[1].welcome.playerId;
+    room.drop('p0');
+    room.drop('p1');
+    run(6);
+    expect(room.seatCount).toBe(1);
+
+    // A stranger gets a squad nobody ever played before the squad a known player may return to,
+    // and never the kaiju.
+    const stranger = new FakePeer('stranger');
+    room.join(stranger, { name: 'Stranger', token: 'token-stranger-abc' });
+    expect(stranger.welcome.playerId).toBeGreaterThan(0);
+    expect(stranger.welcome.playerId).not.toBe(squadOfB);
+    expect(world.players[0].bot).toBe(true);
+    // The squad player comes back to their own squad, the kaiju player to the kaiju.
+    const b = new FakePeer('p1-back');
+    room.join(b, { token: tokenOf(1) });
+    expect(b.welcome.playerId).toBe(squadOfB);
+    const a = new FakePeer('p0-back');
+    room.join(a, { token: tokenOf(0) });
+    expect(a.welcome.playerId).toBe(0);
+    expect(world.players.filter((p) => !p.bot).map((p) => p.id).sort()).toEqual([0, squadOfB, peers[2].welcome.playerId, stranger.welcome.playerId].sort());
+  });
+
+  it('forgets who had which slot when the match is over', () => {
+    const { room, run, runUntil } = makeRoom({ graceSeconds: 2 });
+    const peers = seatPlayers(room, 2);
+    room.message('p0', 'setRole', { wantsKaiju: true });
+    startMatch(room, peers);
+    run(1);
+    room.drop('p0');
+    run(3);
+    runUntil(() => room.lobby.phase === 'end', 400);
+    room.message('p1', 'toLobby', {});
+    // The next match is a new deal: the old kaiju player joins it late and gets a squad.
+    room.message('p1', 'start', {});
+    expect(room.lobby.phase).toBe('match');
+    const back = new FakePeer('p0-back');
+    room.join(back, { token: tokenOf(0) });
+    expect(back.welcome.playerId).toBeGreaterThan(0);
   });
 
   it('does not count a dropped player when the host starts', () => {

@@ -153,6 +153,7 @@ export function createKaiju(id: number, slot: PlayerSlot, x: number, z: number, 
     knownTimer: 0,
     spotted: false,
     recentHits: [],
+    volleyHits: [],
   };
   setKaijuStage(k, 1);
   return k;

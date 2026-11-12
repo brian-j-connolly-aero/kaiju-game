@@ -8,7 +8,7 @@
  * cinematic one.
  */
 
-import { DT, kaijuStageDef, unitTypeDef, weaponDef, type MatchEndEvent, type SimEvent, type SnapKaiju } from '@mb/shared';
+import { kaijuStageDef, unitTypeDef, weaponDef, type MatchEndEvent, type SimEvent, type SnapKaiju } from '@mb/shared';
 import type { AudioEngine } from '../audio/audioEngine';
 import { MatchAudio } from '../audio/matchAudio';
 import type { Autopilot } from '../game/autoplay';
@@ -16,14 +16,16 @@ import { CinematicCamera, type OrbitShot } from '../game/controllers/cinematicCa
 import { DroneController } from '../game/controllers/droneController';
 import { HumanController } from '../game/controllers/humanController';
 import { KaijuController } from '../game/controllers/kaijuController';
-import { CameraShake, type ControlContext, type Controller } from '../game/controllers/types';
+import { CameraShake, squadIsOut, type ControlContext, type Controller } from '../game/controllers/types';
 import type { InputManager } from '../game/input/inputManager';
+import { InputTicker } from '../game/input/inputTicker';
 import type { FrameState, MatchSession } from '../net/matchSession';
 import type { GameRenderer, RenderView } from '../render/gameRenderer';
 import type { HudView } from '../ui/hud';
 
-/** At very low frame rates the input ticks of a frame are sent in one burst, up to this many. */
-const MAX_TICKS_PER_FRAME = 8;
+/** The front page photo is this wide at most, and is not retaken more often than this (seconds). */
+const PHOTO_WIDTH = 640;
+const PHOTO_EVERY = 5;
 
 export interface RuntimeDeps {
   session: MatchSession;
@@ -48,9 +50,11 @@ export class MatchRuntime {
   /** When set, the camera follows this shot instead of the player's view. */
   shot: OrbitShot | null = null;
   mapOpen = false;
+  /** The settings panel is open over the match: like the map, the view holds still and the body idles. */
+  menuOpen = false;
   /** Set when the match has ended. */
   result: MatchEndEvent | null = null;
-  /** A picture of the match for the end screen's front page (a data address), or ''. */
+  /** A picture of the match for the end screen's front page (an address the page can show), or ''. */
   photo = '';
   /** Called for every simulation event after the renderer and the audio have had it. */
   onEvent: ((e: SimEvent) => void) | null = null;
@@ -61,10 +65,13 @@ export class MatchRuntime {
   private readonly deps: RuntimeDeps;
   private readonly player: KaijuController | HumanController | null;
   private readonly drone = new DroneController();
-  private accumulator = 0;
+  private readonly ticker = new InputTicker();
   private lastBounds: FrameState['bounds'] | null = null;
   private wantPhoto = 0;
   private photoScore = 0;
+  private photoAt = -PHOTO_EVERY;
+  private photoCanvas: HTMLCanvasElement | null = null;
+  private clockNow = 0;
 
   constructor(deps: RuntimeDeps) {
     this.deps = deps;
@@ -76,12 +83,15 @@ export class MatchRuntime {
     this.controller = this.player ?? this.drone;
     deps.renderer.beginMatch(deps.session.mirror, 1, deps.session.boundsFor(1));
     deps.renderer.cues = { onStep: (k) => this.onStep(k) };
+    // Whatever was pressed in the menus is not the first input of the match.
+    deps.input.sampleTaken();
   }
 
   dispose(): void {
     this.matchAudio.end();
     this.deps.renderer.cues = {};
     this.deps.autopilot?.setContext(null, null);
+    this.setPhoto('');
   }
 
   get human(): HumanController | null {
@@ -109,8 +119,16 @@ export class MatchRuntime {
 
   handleEvent(e: SimEvent): void {
     this.eventCounts[e.type] = (this.eventCounts[e.type] ?? 0) + 1;
-    this.deps.renderer.handleEvent(e);
+    // An event from a backlog (the tab was hidden): the picture takes over what lasts and shows
+    // nothing happening; no shake, no photo, no flash on the HUD. The audio is handed every
+    // event and reads the same flag (`session.catchingUp`) for what it should not play.
+    const past = this.session.catchingUp;
+    this.deps.renderer.handleEvent(e, past);
     this.matchAudio.handleEvent(e);
+    if (past) {
+      if (e.type === 'matchEnd') this.result = e;
+      return;
+    }
     const frame = this.frame;
     switch (e.type) {
       case 'kaijuAction': {
@@ -137,10 +155,10 @@ export class MatchRuntime {
         if (!s) break;
         const d = this.distanceToCamera(s.x, s.z);
         if (d < s.height * 4 + 40) this.shake.add(0.3);
-        // The front page wants the biggest thing that fell.
+        // The front page wants the biggest thing that fell (but not a capture every second).
         if (s.value > this.photoScore) {
           this.photoScore = s.value;
-          this.wantPhoto = 0.35;
+          this.wantPhoto = Math.max(0.35, this.photoAt + PHOTO_EVERY - this.clockNow);
         }
         break;
       }
@@ -163,7 +181,8 @@ export class MatchRuntime {
     const role = this.session.role.kind;
     if (role === 'kaiju' && this.player) return this.player;
     if (role === 'human' && this.player) {
-      if (frame.localUnit && frame.localUnit.alive) return this.player;
+      // A dead leader is not the end: the player is in another unit a tick later. Stay with it.
+      if (frame.localUnit && !squadIsOut(frame.squads, this.session.role.squadId)) return this.player;
       // The squad is gone until the next molt: fly a drone from where it fell.
       if (this.controller !== this.drone) {
         const k = frame.kaijus[0];
@@ -196,6 +215,7 @@ export class MatchRuntime {
       device: input.state.device,
       bindings: input.bindings,
       reconnecting: this.deps.reconnecting(),
+      pointerFree: input.pointerFree && frame?.match.phase === 'playing',
     };
   }
 
@@ -208,6 +228,7 @@ export class MatchRuntime {
     const session = this.session;
 
     const t0 = performance.now();
+    this.clockNow = now;
     autopilot?.setContext(session, this.frame);
     const actions = input.poll(dt);
     const frame = session.sample(now, dt);
@@ -229,15 +250,16 @@ export class MatchRuntime {
     this.controller = controller;
     const playing = frame.match.phase === 'playing';
     if (!playing) this.mapOpen = false;
-    const ctx: ControlContext = { session, renderer, input: actions, frame, dt, now, mapOpen: this.mapOpen };
+    const ctx: ControlContext = { session, renderer, input: actions, frame, dt, now, mapOpen: this.mapOpen || this.menuOpen };
     controller.update(ctx);
 
     // 30 Hz input ticks. Outside play the body cannot act: send a neutral sample so the server
-    // still hears from this client.
-    this.accumulator = Math.min(this.accumulator + dt, DT * MAX_TICKS_PER_FRAME);
-    while (this.accumulator >= DT) {
-      this.accumulator -= DT;
+    // still hears from this client. Buttons are read from the latch (`input.held`), which is
+    // started again after every sample, so a click between two ticks is in exactly one of them.
+    const ticks = this.ticker.advance(dt);
+    for (let i = 0; i < ticks; i++) {
       const sample = controller.sample(ctx);
+      input.sampleTaken();
       if (!sample && this.session.role.kind === 'spectator') continue;
       if (!sample || !playing) {
         session.tickInput({ moveX: 0, moveZ: 0, aimYaw: session.aimYaw, aimPitch: session.aimPitch, buttons: 0 }, now);
@@ -245,6 +267,8 @@ export class MatchRuntime {
         session.tickInput(sample, now);
       }
     }
+    // The local body is predicted tick by tick; draw it where it is between the last two.
+    session.refreshLocal(this.ticker.alpha);
 
     const cinematic = this.shot !== null;
     const human = this.activeHuman;
@@ -292,12 +316,37 @@ export class MatchRuntime {
     return frame;
   }
 
+  private setPhoto(address: string): void {
+    if (this.photo.startsWith('blob:')) URL.revokeObjectURL(this.photo);
+    this.photo = address;
+  }
+
+  /**
+   * Takes the front page photo without holding up the frame: the view is drawn once into a
+   * small canvas (straight after a render the view's canvas still holds the frame) and the
+   * browser encodes that in its own time. Reading the full-size view back and encoding it on
+   * the spot stalled the game right after the biggest collapses.
+   */
   private takePhoto(): void {
+    this.photoAt = this.clockNow;
     try {
-      // Straight after a render the canvas still holds the frame.
-      this.photo = this.deps.renderer.renderer.domElement.toDataURL('image/jpeg', 0.6);
+      const view = this.deps.renderer.renderer.domElement;
+      if (view.width === 0 || view.height === 0) return;
+      const small = (this.photoCanvas ??= document.createElement('canvas'));
+      small.width = Math.min(PHOTO_WIDTH, view.width);
+      small.height = Math.max(1, Math.round((small.width * view.height) / view.width));
+      const pen = small.getContext('2d');
+      if (!pen) return;
+      pen.drawImage(view, 0, 0, small.width, small.height);
+      small.toBlob(
+        (blob) => {
+          if (blob) this.setPhoto(URL.createObjectURL(blob));
+        },
+        'image/jpeg',
+        0.7,
+      );
     } catch {
-      this.photo = '';
+      // No picture: the front page shows its stand-in.
     }
   }
 }

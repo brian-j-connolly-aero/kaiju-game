@@ -6,3 +6,4 @@ export * from './cityState';
 export * from './lobby';
 export * from './protocol';
 export * from './welcome';
+export * from './build';

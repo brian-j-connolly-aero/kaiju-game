@@ -60,11 +60,11 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
   // The tower cluster. The generator overrides the pick near the very center (tallest there).
   core: {
     items: [
-      { a: 'tower_c', far: 0.5, near: 4 },
-      { a: 'tower_b', far: 1.2, near: 4 },
-      { a: 'tower_a', far: 3.5, near: 3 },
-      { a: 'office_c', far: 4, near: 1.5 },
-      { a: 'office_b', far: 3.5, near: 1 },
+      { a: 'tower_c', far: 1, near: 5 },
+      { a: 'tower_b', far: 2, near: 4 },
+      { a: 'tower_a', far: 4, near: 3 },
+      { a: 'office_c', far: 5, near: 1.5 },
+      { a: 'office_b', far: 2, near: 0.5 },
     ],
     setback: 0.5,
     gap: [5, 9],
@@ -74,10 +74,10 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
   },
   bayfront: {
     items: [
-      { a: 'tower_a', far: 1.5 },
-      { a: 'office_c', far: 3 },
+      { a: 'tower_a', far: 2 },
+      { a: 'office_c', far: 4 },
       { a: 'office_b', far: 3 },
-      { a: 'apartment_c', far: 2 },
+      { a: 'apartment_c', far: 1 },
     ],
     setback: 1,
     gap: [5, 9],
@@ -131,7 +131,7 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
     gap: [0.75, 1.5],
     keep: 0.96,
     alleyEvery: 4,
-    alley: 10,
+    alley: 13,
   },
   // A neighborhood high street: walk-up flats over shops, in the gaps between the starting neighborhoods.
   highStreet: {
@@ -146,7 +146,7 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
     gap: [2, 6],
     keep: 0.9,
     alleyEvery: 3,
-    alley: 10,
+    alley: 13,
   },
   // Mansion blocks and offices on the inner ring, next to the towers: Wendside and Halcyon Gate.
   riverside: {
@@ -189,7 +189,7 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
     gap: [3, 7],
     keep: 0.92,
     alleyEvery: 3,
-    alley: 10,
+    alley: 13,
   },
   // The top of Temple Hill: cloisters, pilgrim halls and shrines among trees.
   temple: {
@@ -206,7 +206,7 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
     gap: [3, 7],
     keep: 0.92,
     alleyEvery: 3,
-    alley: 10,
+    alley: 13,
   },
   // The terraces on its western slope, where a match can start.
   templeSlope: {
@@ -220,7 +220,7 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
     gap: [4, 8],
     keep: 0.8,
     alleyEvery: 4,
-    alley: 10,
+    alley: 13,
   },
   suburb: {
     items: [
@@ -233,7 +233,7 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
     gap: [5, 9],
     keep: 0.82,
     alleyEvery: 4,
-    alley: 10,
+    alley: 13,
   },
   gardenSuburb: {
     items: [
@@ -245,7 +245,7 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
     gap: [6, 10],
     keep: 0.85,
     alleyEvery: 4,
-    alley: 10,
+    alley: 13,
   },
   oldSuburb: {
     items: [
@@ -259,7 +259,7 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
     gap: [3.5, 7],
     keep: 0.84,
     alleyEvery: 5,
-    alley: 10,
+    alley: 13,
   },
   // University quarter: tight rows of tall narrow houses.
   rowhouses: {
@@ -273,7 +273,7 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
     gap: [0.75, 1.25],
     keep: 0.9,
     alleyEvery: 5,
-    alley: 10,
+    alley: 13,
   },
   // Mill workers' terraces by the factories.
   workerRows: {
@@ -286,7 +286,7 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
     gap: [0.75, 1.5],
     keep: 0.88,
     alleyEvery: 6,
-    alley: 10,
+    alley: 13,
   },
   campus: {
     items: [
@@ -370,7 +370,7 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
     gap: [2.5, 6],
     keep: 0.86,
     alleyEvery: 4,
-    alley: 10,
+    alley: 13,
   },
   boardwalk: {
     items: [
@@ -384,7 +384,7 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
     gap: [3, 8],
     keep: 0.85,
     alleyEvery: 4,
-    alley: 10,
+    alley: 13,
   },
   beachVillage: {
     items: [
@@ -397,7 +397,7 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
     gap: [3.5, 7],
     keep: 0.85,
     alleyEvery: 5,
-    alley: 10,
+    alley: 13,
   },
   fairground: {
     items: [

@@ -104,7 +104,7 @@ A squad gets eyes on the creature. This matters most in stage one, when the crea
 | Line | Voice | Text | Length (s) |
 | --- | --- | --- | ---: |
 | `v_kaiju_spotted_1` | Overlord | Contact. Target is in the open. | 2.8 |
-| `v_kaiju_spotted_2` | Overlord | Target sighted. All squads, converge and take your angles. | 4.6 |
+| `v_kaiju_spotted_2` | Overlord | Target sighted. All squads, move in from two sides. | 4.2 |
 | `v_kaiju_spotted_3` | Granite | Granite has eyes on. It is in no hurry. | 2.7 |
 | `v_kaiju_spotted_4` | Beacon | Beacon confirms visual contact. Reporting position, as required. | 4.8 |
 | `v_kaiju_spotted_5` | Tempest | Tempest has the target. It will not slip away again. | 3.7 |
@@ -130,7 +130,7 @@ Nobody can see the creature any more.
 | Line | Voice | Text | Length (s) |
 | --- | --- | --- | ---: |
 | `v_kaiju_lost_1` | Overlord | We have lost the target. All squads, search your sectors. | 4.5 |
-| `v_kaiju_lost_2` | Granite | Lost visual. It is in the streets somewhere. | 3.1 |
+| `v_kaiju_lost_2` | Granite | Lost sight of it. Somewhere in the streets. | 2.9 |
 | `v_kaiju_lost_5` | Tempest | It is hiding. I will find it. | 2.4 |
 
 **The kaiju player hears (Channel 9)**
@@ -283,7 +283,7 @@ The creature plants its feet and blocks. Shots at its front are mostly wasted.
 
 | Line | Voice | Text | Length (s) |
 | --- | --- | --- | ---: |
-| `v_kaiju_brace_1` | Overlord | It is bracing. Do not waste a volley on its front. | 3.9 |
+| `v_kaiju_brace_1` | Overlord | It is bracing. Save your volley. Get behind it. | 3.9 |
 | `v_kaiju_brace_2` | Tempest | It is bracing. Circle around behind it. | 3.1 |
 | `v_kaiju_brace_5` | Beacon | The target is bracing. The manual says to go around. | 3.6 |
 
@@ -346,7 +346,7 @@ A squad has marked the ground for a strike from outside the city and it is about
 
 | Line | Voice | Text | Length (s) |
 | --- | --- | --- | ---: |
-| `v_callin_inbound_1` | Overlord | Strike inbound. Hold it at the marker. | 3.1 |
+| `v_callin_inbound_1` | Overlord | Strike inbound. Keep it at the marker. | 2.9 |
 | `v_callin_inbound_2` | Granite | Heavy fire on the way. Keep it still. | 2.7 |
 | `v_callin_inbound_5` | Overlord | Strike is on its way. Keep it where it is. | 3.2 |
 
@@ -388,7 +388,7 @@ A building is reduced to rubble, whoever did it.
 | `v_building_down_1` | Overlord | Building down. That one counts against us. | 3.5 |
 | `v_building_down_2` | Granite | Another one down. The skyline is getting shorter. | 3.1 |
 | `v_building_down_3` | Beacon | Structure lost. Logging the address for the report. | 3.3 |
-| `v_building_down_4` | Tempest | Another building gone. I am keeping count. | 3.2 |
+| `v_building_down_4` | Tempest | Another building gone. I will remember it. | 2.9 |
 
 **The kaiju player hears (Channel 9)**
 
@@ -804,5 +804,5 @@ The last four columns count the lines each radio voice has of its own. For a cue
 - The briefing for the kaiju player takes 8.6 seconds of speech in a 10 second briefing (limit 9.2, which leaves room for the short gaps between the lines).
 - The humans' lines for `nerve.break` take 2.1 to 2.5 seconds (limit 2.5).
 - The humans' lines for `kaiju.special` take 2.0 to 2.3 seconds (limit 2.5).
-- Every finished line is played back to a speech recognizer (details in `docs/audio/VOICE.md`, section 4). Over the whole script it gets 8.5 words in a hundred wrong; a person hears far better than it does. Lines it garbled were reworded until it did not.
+- Every finished line is played back to a speech recognizer (details in `docs/audio/VOICE.md`, section 4). Over the whole script it gets 7.5 words in a hundred wrong; a person hears far better than it does. The lines it garbled worst were reworded.
 - Known weak spot: the word "volley" and the callsigns "Granite" and "Beacon" are often misheard by the speech recognizer (as "valley", "granted", "he can" and similar). They are clear to a person, and the subtitle is always there, but the two-word line "Volley away." scores badly in machine checks for that reason.

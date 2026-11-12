@@ -25,7 +25,7 @@ import {
 import type { AssetStore } from '../assets/assetStore';
 import { frameRect } from '../assets/spriteAtlas';
 import type { CityMirror } from '../net/cityMirror';
-import type { ActionHint, FrameState } from '../net/matchSession';
+import { hintPose, type ActionHint, type FrameState } from '../net/matchSession';
 import { Boundary } from './boundary';
 import { CityView } from './cityView';
 import { Crowd } from './crowd';
@@ -236,8 +236,55 @@ export class GameRenderer {
     return this.lastFrame?.kaijus[id];
   }
 
-  /** Turns a simulation event into what is seen. Sound is the audio layer's job. */
-  handleEvent(e: SimEvent): void {
+  /**
+   * An event whose moment passed while nothing was drawn (a hidden tab): only what lasts is
+   * taken over. The city ends up in the right state, marks and the stage are kept, a shell that
+   * was in flight is removed; nothing is launched, nothing flashes and nothing falls.
+   */
+  private applyQuietly(e: SimEvent): void {
+    const city = this.city;
+    switch (e.type) {
+      case 'projectileHit':
+        this.projectiles.hit(e);
+        break;
+      case 'structureStage':
+        if (city) {
+          city.setStage(e.id, e.stage, false);
+          city.flush();
+        }
+        break;
+      case 'propsDestroyed': {
+        if (!city || !this.cityData) break;
+        for (const id of e.ids) {
+          const p = this.cityData.props[id];
+          if (!p) continue;
+          city.setPropAlive(id, false);
+          if (PROP_KINDS[p.kind].leavesWreck) city.setWreck(id, true);
+        }
+        city.flushProps();
+        break;
+      }
+      case 'kaijuHeld':
+      case 'callin':
+      case 'stageChange':
+        // These only change lasting state: handled as always.
+        this.handleEvent(e);
+        break;
+      default:
+        break;
+    }
+  }
+
+  /**
+   * Turns a simulation event into what is seen. Sound is the audio layer's job. With `quiet`
+   * the event is long past (see MatchSession.catchingUp): its lasting effect is applied and
+   * nothing is shown happening.
+   */
+  handleEvent(e: SimEvent, quiet = false): void {
+    if (quiet) {
+      this.applyQuietly(e);
+      return;
+    }
     const fx = this.effects;
     const city = this.city;
     switch (e.type) {
@@ -391,14 +438,9 @@ export class GameRenderer {
     return this.kaijuViews[id]?.camAnchor ?? null;
   }
 
+  /** The local kaiju's own press, shown ahead of the server (see `hintPose`). */
   private overrideFor(k: SnapKaiju, view: RenderView): KaijuOverride | null {
-    const hint = view.hint;
-    if (!hint || k.id !== view.localKaiju || k.phase !== 'idle') return null;
-    const def = kaijuKindDef(k.kind).actions[hint.verb];
-    const elapsed = Math.max(0, view.now - hint.startedAt);
-    if (hint.verb === 'brace') return { action: 'brace', phase: 'brace', phaseTime: elapsed, phaseDuration: 0 };
-    if (hint.verb === 'roar') return { action: 'roar', phase: 'roar', phaseTime: elapsed, phaseDuration: def.timing.active };
-    return { action: hint.verb, phase: 'windup', phaseTime: elapsed, phaseDuration: def.timing.windup };
+    return k.id === view.localKaiju ? hintPose(k, view.hint, view.now) : null;
   }
 
   /**

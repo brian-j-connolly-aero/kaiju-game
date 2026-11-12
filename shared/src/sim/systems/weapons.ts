@@ -12,14 +12,22 @@
  *   error. A bot's do (the weapon's at-will error) and count as fire at will.
  * - The volley: each shot of the driven unit is the trigger. Every sub-unit that has charge,
  *   is not shaken, has its weapon ready, and whose firing arc covers the aim point fires at it
- *   with damage x(1 + charge) and nerve x(1 + 2 x charge) and the weapon's volley aim error,
- *   then loses its charge and its hold (the orders system plants it again on its spot the
- *   next tick, with a fresh arc). When the aim ray is on a kaiju the sub-units aim for
- *   the middle of its body at the height the player picked, so a shot from any side connects.
- *   A sub-unit whose arc does not reach the aim point keeps charging and does not fire: the
- *   kaiju can walk out of an arc, and the player answers by planting the squad again.
- *   A volley emits `volley` and counts in the player's tally; a trigger shot that takes a
- *   volley with it is flagged `volley` too (and a bot's then counts as volley fire).
+ *   with damage x(1 + charge), then loses its charge and its hold (the orders system plants it
+ *   again on its spot the next tick, with a fresh arc). Nerve is what a volley is for, and it
+ *   only rewards a charge that is nearly complete (`volleyStrength`): below
+ *   COMBAT_RULES.volleyMinCharge the shot is ragged, worth the fire-at-will nerve multiplier
+ *   and aimed with the at-will error; from there to a full charge the multiplier rises to
+ *   x(1 + 2) and the error falls to the weapon's volley error. So holding Fire (the guns
+ *   reload faster than the charge counts) is fire at will with the squad's shots on one
+ *   target, and waiting for the charge is what breaks nerve.
+ *   When the aim ray is on a kaiju the sub-units aim for the middle of its body at the height
+ *   the player picked, so a shot from any side connects. A sub-unit whose arc does not reach
+ *   the aim point keeps charging and does not fire: the kaiju can walk out of an arc, and the
+ *   player answers by planting the squad again.
+ *   A charged volley (at least one sub-unit at volleyMinCharge or more) emits `volley` and
+ *   counts in the player's tally; its charged shots and the trigger shot are flagged `volley`
+ *   (a bot's trigger shot then counts as volley fire), and only those count toward breaking
+ *   the kaiju's nerve (systems/damage.ts).
  * - Fire at will: a sub-unit whose orders set `control.fire` shoots along its own aim with the
  *   weapon's at-will aim error; these projectiles are flagged `atWill` (half nerve damage).
  * - Aim error is one sigma, in radians, applied to heading and elevation of every projectile
@@ -46,7 +54,7 @@ import { rngGauss, rngInDisc } from '../../math/rng';
 import { clamp } from '../../math/scalar';
 import { MAX_AIM_PITCH } from '../../net/input';
 import { createAimPoint, resolveAimPoint } from '../aim';
-import { arcCovers, nearestKaiju, scatterMult, unitAimErrorMult } from '../squads';
+import { arcCovers, isChargedVolley, nearestKaiju, scatterMult, unitAimErrorMult, volleyStrength } from '../squads';
 import type { CallInMission, Squad, Unit, World } from '../types';
 import { emit } from '../worldOps';
 import { spawnProjectile } from './projectiles';
@@ -179,13 +187,15 @@ function fireLeader(world: World, squad: Squad, leader: Unit): void {
     sz = target.z;
   }
 
+  // Who fires with the trigger, and whether any of them makes it a charged volley.
   volleyUnits.length = 0;
+  let volley = false;
   for (const id of squad.units) {
     const u = world.units[id];
     if (id === squad.driven || !ready(u) || !(u.charge > 0) || !arcCovers(u, sx, sz)) continue;
     volleyUnits.push(u);
+    if (isChargedVolley(u.charge)) volley = true;
   }
-  const volley = volleyUnits.length > 0;
 
   salvo.atPoint = true;
   salvo.x = ax;
@@ -200,20 +210,23 @@ function fireLeader(world: World, squad: Squad, leader: Unit): void {
     ? (volley ? weapon.aimErrorVolley : weapon.aimErrorAtWill) * unitAimErrorMult(squad, leader) * scatter
     : 0;
   fireSalvo(world, squad, leader, salvo);
-  if (!volley) return;
+  if (volleyUnits.length === 0) return;
 
   let charge = 0;
   const ids: number[] = [];
+  const fullNerve = 1 + COMBAT_RULES.volleyNervePerCharge;
   for (const u of volleyUnits) {
     const w = weaponDef(unitTypeDef(u.type).weapon);
+    // 0 for a ragged shot (worth what fire at will is worth) up to 1 at a full charge.
+    const strength = volleyStrength(u.charge);
     salvo.x = sx;
     salvo.y = sy;
     salvo.z = sz;
     salvo.damageMult = 1 + COMBAT_RULES.volleyDamagePerCharge * u.charge;
-    salvo.nerveMult = 1 + COMBAT_RULES.volleyNervePerCharge * u.charge;
-    salvo.volley = true;
+    salvo.nerveMult = COMBAT_RULES.atWillNerveMult + (fullNerve - COMBAT_RULES.atWillNerveMult) * strength;
+    salvo.volley = isChargedVolley(u.charge);
     salvo.atWill = false;
-    salvo.error = w.aimErrorVolley * unitAimErrorMult(squad, u) * scatter;
+    salvo.error = (w.aimErrorAtWill + (w.aimErrorVolley - w.aimErrorAtWill) * strength) * unitAimErrorMult(squad, u) * scatter;
     fireSalvo(world, squad, u, salvo);
     charge += u.charge;
     ids.push(u.id);
@@ -222,6 +235,8 @@ function fireLeader(world: World, squad: Squad, leader: Unit): void {
     u.rooted = false;
     u.state = 'idle';
   }
+  // Ragged shots alone are not a volley: nothing to announce, nothing for the tally.
+  if (!volley) return;
   player.tally.volleys++;
   emit(world, {
     type: 'volley',

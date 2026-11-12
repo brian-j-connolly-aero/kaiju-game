@@ -21,7 +21,7 @@ import {
   type SnapSquad,
   type SnapUnit,
 } from '@mb/shared';
-import { glyphFor, type Bindings, type ButtonAction, type InputDevice } from '../game/input/actions';
+import { glyphFor, keyLayoutVersion, type Bindings, type ButtonAction, type InputDevice } from '../game/input/actions';
 import type { FrameState, MatchSession } from '../net/matchSession';
 import { skylinePath } from './iconArt';
 import { el, glyph, icon, setGlyph } from './icons';
@@ -43,6 +43,8 @@ export interface HudView {
   bindings: Bindings;
   /** The connection is being restored. */
   reconnecting: boolean;
+  /** The game wants the mouse and does not have it: a click on the view captures it (and does nothing else). */
+  pointerFree: boolean;
 }
 
 interface Meter {
@@ -115,6 +117,8 @@ export class Hud {
   private readonly statusIcons: Record<string, HTMLElement>;
   private readonly statusUntil: Record<string, number> = {};
   private readonly orders: HTMLElement;
+  private readonly capture: HTMLElement;
+  private readonly menuHint: Hint;
   private lastBar = -1;
   private lastClock = -1;
   private lastDevice = '';
@@ -188,7 +192,7 @@ export class Hud {
       map: hint('st_map', 'map'),
       camera: hint('st_camera', 'camera'),
     };
-    this.droneHints = { camera: hint('st_camera', 'rise'), map: hint('st_map', 'map') };
+    this.droneHints = { rise: hint('ui_rise', 'rise'), sink: hint('ui_sink', 'sink'), map: hint('st_map', 'map') };
     this.hintsKaiju = el('div', 'hints', Object.values(this.kaijuHints).map((h) => h.root));
     this.hintsHuman = el('div', 'hints', Object.values(this.humanHints).map((h) => h.root));
     this.hintsDrone = el('div', 'hints', Object.values(this.droneHints).map((h) => h.root));
@@ -206,14 +210,20 @@ export class Hud {
       eliminated: icon('ui_skull', 'status-icon status-eliminated'),
     };
     this.status = el('div', 'status', Object.values(this.statusIcons));
+    // "Click": shown while the game wants the mouse and the pointer is free.
+    this.capture = el('div', 'capture hidden', [icon('ms_left')]);
+    // The settings panel and the button that opens it.
+    this.menuHint = hint('ui_settings', 'menu');
+    this.menuHint.root.classList.add('hint-menu');
 
     this.root.append(
-      el('div', 'hud-top', [this.clock, el('div', 'hud-top-mid', [bar, this.boss]), stage]),
+      el('div', 'hud-top', [this.clock, el('div', 'hud-top-mid', [bar, this.boss]), el('div', 'hud-top-right', [stage, this.menuHint.root])]),
       this.squads,
       el('div', 'hud-bottom-left', [meters, this.orders]),
       el('div', 'hud-bottom-right', [this.hintsKaiju, this.hintsHuman, this.hintsDrone]),
       this.crosshair,
       this.status,
+      this.capture,
     );
   }
 
@@ -360,12 +370,14 @@ export class Hud {
     setClass(this.hintsKaiju, 'hidden', view.mode !== 'kaiju');
     setClass(this.hintsHuman, 'hidden', view.mode !== 'human');
     setClass(this.hintsDrone, 'hidden', view.mode !== 'drone');
-    const deviceKey = `${view.device}:${view.mode}`;
+    // (The letter on a keycap can change when the keyboard's layout becomes known.)
+    const deviceKey = `${view.device}:${view.mode}:${keyLayoutVersion()}`;
     if (deviceKey !== this.lastDevice) {
       this.lastDevice = deviceKey;
       this.updateHints(this.kaijuHints, view);
       this.updateHints(this.humanHints, view);
       this.updateHints(this.droneHints, view);
+      setGlyph(this.menuHint.glyph, glyphFor(view.bindings, 'menu', view.device));
     }
     if (lk) {
       const def = kaijuKindDef(lk.kind);
@@ -383,6 +395,9 @@ export class Hud {
       this.cooldown(this.humanHints.callIn, own.callInCooldowns[0] / 35);
       this.cooldown(this.humanHints.fire, lu.cooldown / 3.2);
     }
+
+    // The mouse is free and the game wants it: say "click" (mouse players only).
+    setClass(this.capture, 'hidden', !view.pointerFree || view.device !== 'keyboard');
 
     // Crosshair.
     setClass(this.crosshair, 'hidden', view.mode === 'drone' || view.mapOpen || (!lk && !lu));

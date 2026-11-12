@@ -9,6 +9,5 @@ if (!(canvas instanceof HTMLCanvasElement) || !ui) {
   throw new Error('index.html must contain <canvas id="view"> and <div id="ui">');
 }
 const app = new App(canvas, ui);
-app.start().catch((err: unknown) => {
-  console.error('The game could not start.', err);
-});
+// `start` reports its own failures (on the console and as a picture on the boot screen).
+void app.start();

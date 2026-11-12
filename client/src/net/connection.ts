@@ -7,6 +7,7 @@
 
 import { Client, type Room } from '@colyseus/sdk';
 import {
+  buildStamp,
   PROTOCOL_VERSION,
   ROOM_NAME,
   type ClientMessages,
@@ -15,6 +16,7 @@ import {
   type ServerMessages,
   type ServerMessageType,
 } from '@mb/shared';
+import { pageId } from './session';
 
 /** The room library's close code for "you left on purpose". */
 export const CLOSE_CONSENTED = 4000;
@@ -84,7 +86,8 @@ function failure(err: unknown): JoinFailure {
 }
 
 function options(name: string, token: string): JoinOptions {
-  return { name, token, protocol: PROTOCOL_VERSION };
+  // The build stamp lets the server turn away a page that was left open across an update.
+  return { name, token, protocol: PROTOCOL_VERSION, build: buildStamp(pageId()) };
 }
 
 /**

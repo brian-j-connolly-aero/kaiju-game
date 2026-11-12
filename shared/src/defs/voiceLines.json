@@ -12,7 +12,7 @@
   { "id": "v_match_start_4", "cue": "match.start", "audience": "kaiju", "speaker": "Anchor", "text": "The creature has left its egg and is now in traffic." },
 
   { "id": "v_kaiju_spotted_1", "cue": "kaiju.spotted", "audience": "humans", "speaker": "Overlord", "text": "Contact. Target is in the open." },
-  { "id": "v_kaiju_spotted_2", "cue": "kaiju.spotted", "audience": "humans", "speaker": "Overlord", "text": "Target sighted. All squads, converge and take your angles." },
+  { "id": "v_kaiju_spotted_2", "cue": "kaiju.spotted", "audience": "humans", "speaker": "Overlord", "text": "Target sighted. All squads, move in from two sides." },
   { "id": "v_kaiju_spotted_3", "cue": "kaiju.spotted", "audience": "humans", "speaker": "Granite", "text": "Granite has eyes on. It is in no hurry." },
   { "id": "v_kaiju_spotted_4", "cue": "kaiju.spotted", "audience": "humans", "speaker": "Beacon", "text": "Beacon confirms visual contact. Reporting position, as required." },
   { "id": "v_kaiju_spotted_5", "cue": "kaiju.spotted", "audience": "humans", "speaker": "Tempest", "text": "Tempest has the target. It will not slip away again." },
@@ -25,7 +25,7 @@
   { "id": "v_kaiju_spotted_12", "cue": "kaiju.spotted", "audience": "humans", "speaker": "Tempest", "text": "There you are. I see it." },
 
   { "id": "v_kaiju_lost_1", "cue": "kaiju.lost", "audience": "humans", "speaker": "Overlord", "text": "We have lost the target. All squads, search your sectors." },
-  { "id": "v_kaiju_lost_2", "cue": "kaiju.lost", "audience": "humans", "speaker": "Granite", "text": "Lost visual. It is in the streets somewhere." },
+  { "id": "v_kaiju_lost_2", "cue": "kaiju.lost", "audience": "humans", "speaker": "Granite", "text": "Lost sight of it. Somewhere in the streets." },
   { "id": "v_kaiju_lost_3", "cue": "kaiju.lost", "audience": "kaiju", "speaker": "Anchor", "text": "The army appears to have lost track of the creature." },
   { "id": "v_kaiju_lost_4", "cue": "kaiju.lost", "audience": "kaiju", "speaker": "Anchor", "text": "The creature is unaccounted for. Residents are asked to check their gardens." },
   { "id": "v_kaiju_lost_5", "cue": "kaiju.lost", "audience": "humans", "speaker": "Tempest", "text": "It is hiding. I will find it." },
@@ -98,7 +98,7 @@
   { "id": "v_stagger_end_5", "cue": "stagger.end", "audience": "humans", "speaker": "Tempest", "text": "It is up again. We will break it again." },
   { "id": "v_stagger_end_6", "cue": "stagger.end", "audience": "kaiju", "speaker": "Anchor", "text": "The creature is standing again. It does not look pleased." },
 
-  { "id": "v_kaiju_brace_1", "cue": "kaiju.brace", "audience": "humans", "speaker": "Overlord", "text": "It is bracing. Do not waste a volley on its front." },
+  { "id": "v_kaiju_brace_1", "cue": "kaiju.brace", "audience": "humans", "speaker": "Overlord", "text": "It is bracing. Save your volley. Get behind it." },
   { "id": "v_kaiju_brace_2", "cue": "kaiju.brace", "audience": "humans", "speaker": "Tempest", "text": "It is bracing. Circle around behind it." },
   { "id": "v_kaiju_brace_3", "cue": "kaiju.brace", "audience": "kaiju", "speaker": "Anchor", "text": "The creature has dug in and appears to be bracing itself." },
   { "id": "v_kaiju_brace_4", "cue": "kaiju.brace", "audience": "kaiju", "speaker": "Anchor", "text": "A defensive posture, experts say. The creature is holding its ground." },
@@ -125,7 +125,7 @@
   { "id": "v_building_down_1", "cue": "building.down", "audience": "humans", "speaker": "Overlord", "text": "Building down. That one counts against us." },
   { "id": "v_building_down_2", "cue": "building.down", "audience": "humans", "speaker": "Granite", "text": "Another one down. The skyline is getting shorter." },
   { "id": "v_building_down_3", "cue": "building.down", "audience": "humans", "speaker": "Beacon", "text": "Structure lost. Logging the address for the report." },
-  { "id": "v_building_down_4", "cue": "building.down", "audience": "humans", "speaker": "Tempest", "text": "Another building gone. I am keeping count." },
+  { "id": "v_building_down_4", "cue": "building.down", "audience": "humans", "speaker": "Tempest", "text": "Another building gone. I will remember it." },
   { "id": "v_building_down_5", "cue": "building.down", "audience": "kaiju", "speaker": "Anchor", "text": "Another structure is down. Residents should make other arrangements." },
   { "id": "v_building_down_6", "cue": "building.down", "audience": "kaiju", "speaker": "Anchor", "text": "That building has collapsed. It was recently renovated." },
   { "id": "v_building_down_7", "cue": "building.down", "audience": "kaiju", "speaker": "Anchor", "text": "One more building has left the skyline." },
@@ -200,7 +200,7 @@
   { "id": "v_stage_3_3", "cue": "stage.3", "audience": "kaiju", "speaker": "Anchor", "text": "The creature now stands taller than any building in the city." },
   { "id": "v_stage_3_4", "cue": "stage.3", "audience": "kaiju", "speaker": "Anchor", "text": "Night has fallen. The creature is visible from every district." },
 
-  { "id": "v_callin_inbound_1", "cue": "callin.inbound", "audience": "humans", "speaker": "Overlord", "text": "Strike inbound. Hold it at the marker." },
+  { "id": "v_callin_inbound_1", "cue": "callin.inbound", "audience": "humans", "speaker": "Overlord", "text": "Strike inbound. Keep it at the marker." },
   { "id": "v_callin_inbound_2", "cue": "callin.inbound", "audience": "humans", "speaker": "Granite", "text": "Heavy fire on the way. Keep it still." },
   { "id": "v_callin_inbound_3", "cue": "callin.inbound", "audience": "kaiju", "speaker": "Anchor", "text": "The army has called in a strike from outside the city." },
   { "id": "v_callin_inbound_4", "cue": "callin.inbound", "audience": "kaiju", "speaker": "Anchor", "text": "We are told to expect a heavy strike in the area shortly." },

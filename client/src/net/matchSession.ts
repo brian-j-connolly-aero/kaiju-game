@@ -21,7 +21,9 @@ import {
   unitMoveParams,
   unitTypeDef,
   type Bounds,
+  type KaijuActionId,
   type KaijuMoveState,
+  type KaijuPhase,
   type KaijuVerb,
   type MatchConfig,
   type MoveParams,
@@ -71,6 +73,50 @@ export interface ActionHint {
   startedAt: number;
 }
 
+/** The session's own record of a hint: what the server has said about it and what has been drawn. */
+interface LocalHint extends ActionHint {
+  /** Sequence number of the input that carried the press. */
+  seq: number;
+  /** The newest snapshot has shown the server's own phase: prediction uses that from now on. */
+  confirmed: boolean;
+  /** The delayed view has shown the server's phase: when it is idle again the action is over. */
+  shown: boolean;
+}
+
+/** The phase a verb's press leads into (what the drawn kaiju shows once the server's state arrives). */
+function hintPhase(verb: KaijuVerb): KaijuPhase {
+  return verb === 'brace' ? 'brace' : verb === 'roar' ? 'roar' : 'windup';
+}
+
+/** The action state to pose a kaiju in, in place of its own. */
+export interface HintPose {
+  action: KaijuActionId;
+  phase: KaijuPhase;
+  phaseTime: number;
+  phaseDuration: number;
+}
+
+/**
+ * How the local kaiju's own press is shown ahead of the server (`hint` comes from
+ * `MatchSession.hintFor`, `k` is the kaiju as drawn). While the view still has the kaiju idle,
+ * the wind-up is posed from the moment of the press. When the server's phase reaches the view
+ * (a round trip plus the view's delay later) the pose carries on from the time already shown
+ * instead of starting again, and waits at the end of the wind-up for the server's strike.
+ * Null: pose the kaiju as the snapshot says.
+ */
+export function hintPose(k: SnapKaiju, hint: ActionHint | null, now: number): HintPose | null {
+  if (!hint) return null;
+  const elapsed = Math.max(0, now - hint.startedAt);
+  if (k.phase !== 'idle') {
+    if (elapsed <= k.phaseTime) return null;
+    return { action: k.action, phase: k.phase, phaseTime: k.phaseDuration > 0 ? Math.min(elapsed, k.phaseDuration) : elapsed, phaseDuration: k.phaseDuration };
+  }
+  const def = kaijuKindDef(k.kind).actions[hint.verb];
+  if (hint.verb === 'brace') return { action: 'brace', phase: 'brace', phaseTime: elapsed, phaseDuration: 0 };
+  if (hint.verb === 'roar') return { action: 'roar', phase: 'roar', phaseTime: Math.min(elapsed, def.timing.active), phaseDuration: def.timing.active };
+  return { action: hint.verb, phase: 'windup', phaseTime: Math.min(elapsed, def.timing.windup), phaseDuration: def.timing.windup };
+}
+
 export interface SessionCallbacks {
   sendInput(input: PlayerInput): void;
   sendCommand(command: SquadCommand): void;
@@ -80,9 +126,18 @@ export interface SessionCallbacks {
   onCityResync(): void;
 }
 
-const HINT_TIMEOUT = 0.35;
+/** A press the server has said nothing about for this long is no longer predicted (seconds). */
+const HINT_TIMEOUT = 1;
+/** A hint is never drawn for longer than this over a kaiju the view still shows idle (seconds). */
+const HINT_DRAW_TIMEOUT = 1.5;
 /** Events are released no later than this long after they arrived, whatever the clock says. */
 const EVENT_MAX_WAIT = 1.2;
+/**
+ * Events that have waited longer than this were not shown because no frames ran (a hidden tab,
+ * a long stall of the page). They are handed out with `catchingUp` set: only what lasts is
+ * applied, nothing is played back.
+ */
+const EVENT_STALE_AFTER = 2;
 
 interface QueuedEvent {
   event: SimEvent;
@@ -104,7 +159,14 @@ export class MatchSession {
   /** The direction the local player is looking (set by the controller every frame). */
   aimYaw = 0;
   aimPitch = 0;
-  hint: ActionHint | null = null;
+  hint: LocalHint | null = null;
+  /**
+   * True while `sample` hands out events that waited so long that their moment has passed (the
+   * tab was hidden, the page stalled for seconds). Whoever receives an event while this is set
+   * should take only its lasting effect (the state of the city, marks, the match result) and
+   * skip everything momentary: effects, camera shake, flashes, one-shot sounds.
+   */
+  catchingUp = false;
   /** Counters for the debug overlay and the automation hook. */
   stats = { snapshots: 0, snapshotBytes: 0, events: 0, inputs: 0, lastSnapshotAt: 0 };
 
@@ -116,6 +178,8 @@ export class MatchSession {
   private predictedKey = '';
   private lastButtons = 0;
   private readonly pose = { x: 0, z: 0, yaw: 0 };
+  /** How far the present is past the newest input tick, 0..1 (see `refreshLocal`). */
+  private localAlpha = 1;
 
   constructor(welcome: WelcomeMessage, callbacks: SessionCallbacks) {
     this.welcome = welcome;
@@ -190,7 +254,7 @@ export class MatchSession {
 
   private kaijuParams(k: SnapKaiju, bounds: Bounds, now: number): MoveParams {
     let state: KaijuMoveState = k;
-    const hint = this.activeHint(k, now);
+    const hint = this.predictedHint(k, now);
     if (hint) state = { kind: k.kind, stage: k.stage, nerve: k.nerve, action: hint.verb, phase: 'windup' };
     return kaijuMoveParams(state, bounds, undefined, this.params);
   }
@@ -220,26 +284,36 @@ export class MatchSession {
       this.predictedKey = body.key;
     }
     const now = this.stats.lastSnapshotAt;
+    const hint = this.hint;
+    if (hint && !hint.confirmed && body.kaiju) {
+      if (body.kaiju.phase !== 'idle') hint.confirmed = true;
+      // The server has had the press and the kaiju is still idle: it was refused. Stop pretending.
+      else if (snap.ackSeq >= hint.seq) this.hint = null;
+    }
     const { params, radius } = this.paramsFor(body, snap, now);
     const server = body.kaiju ?? (body.unit as SnapUnit);
     reconcile(this.predictor, server, radius, snap.ackSeq, this.mirror.query, params, snap.match.phase === 'playing');
   }
 
-  private activeHint(k: SnapKaiju, now: number): ActionHint | null {
+  /**
+   * The hint as the PREDICTION uses it, judged against the newest snapshot: it stands in for the
+   * server's phase only until that phase arrives (then the snapshot itself says how the body
+   * moves) or the press has gone unanswered for too long. The hint itself lives on for drawing:
+   * the view runs about 100 ms behind the newest snapshot, see `hintFor`.
+   */
+  private predictedHint(k: SnapKaiju, now: number): ActionHint | null {
     const hint = this.hint;
-    if (!hint) return null;
-    // The server's own state has taken over, or the press was refused: drop the hint.
-    if (k.phase !== 'idle' || now - hint.startedAt > HINT_TIMEOUT) {
-      this.hint = null;
-      return null;
-    }
+    if (!hint || hint.confirmed || k.phase !== 'idle' || now - hint.startedAt > HINT_TIMEOUT) return null;
     return hint;
   }
 
   /** Works out which wind-up a fresh button press will start, so it can be shown at once. */
-  private updateHint(buttons: number, k: SnapKaiju, now: number): void {
+  private updateHint(buttons: number, k: SnapKaiju, now: number, seq: number): void {
     const pressed = buttons & ~this.lastButtons;
     if (pressed === 0 || k.phase !== 'idle' || !k.alive || this.hint) return;
+    // The view is still showing the tail of the last action: a hint now would be cut off by it.
+    const drawn = this.frame?.localKaiju;
+    if (drawn && drawn.phase !== 'idle') return;
     const def = kaijuKindDef(k.kind);
     let verb: KaijuVerb | null = null;
     if (buttons & Btn.block) verb = 'brace';
@@ -247,7 +321,7 @@ export class MatchSession {
     else if (pressed & Btn.roar && k.cooldowns.roar <= 0) verb = 'roar';
     else if (pressed & Btn.strike) verb = k.held ? 'throw' : 'swipe';
     else if (pressed & Btn.grab && !k.held) verb = 'grab';
-    if (verb) this.hint = { verb, startedAt: now };
+    if (verb) this.hint = { verb, startedAt: now, seq, confirmed: false, shown: false };
   }
 
   /**
@@ -262,7 +336,7 @@ export class MatchSession {
     const body = snap ? this.localBody(snap) : null;
     if (snap && body && this.mirror.trusted) {
       const playing = snap.match.phase === 'playing';
-      if (body.kaiju && playing) this.updateHint(input.buttons, body.kaiju, now);
+      if (body.kaiju && playing) this.updateHint(input.buttons, body.kaiju, now, input.seq);
       const { params } = this.paramsFor(body, snap, now);
       predictStep(this.predictor, input, this.mirror.query, params, playing);
     }
@@ -300,6 +374,17 @@ export class MatchSession {
     };
 
     decayPredictionError(this.predictor, dt);
+    this.placeLocal(frame);
+    this.frame = frame;
+    this.releaseEvents(tick, now);
+    return frame;
+  }
+
+  /**
+   * Puts the local player's body into a frame at its predicted place, `localAlpha` of the way
+   * through the newest input tick's step, and points its aim where the player is looking.
+   */
+  private placeLocal(frame: FrameState): void {
     const usePrediction = this.predictor.ready && this.mirror.trusted;
     if (this.role.kind === 'kaiju') {
       const k = frame.kaijus[this.role.kaijuId];
@@ -307,7 +392,7 @@ export class MatchSession {
         frame.localKaiju = k;
         const latest = this.latest?.kaijus[this.role.kaijuId];
         if (usePrediction && latest && latest.stage === k.stage) {
-          const pose = predictedPose(this.predictor, this.pose);
+          const pose = predictedPose(this.predictor, this.pose, this.localAlpha);
           k.x = pose.x;
           k.z = pose.z;
           k.yaw = pose.yaw;
@@ -330,7 +415,7 @@ export class MatchSession {
         frame.localUnit = u;
         const latest = this.latest?.units[u.id];
         if (usePrediction && latest && latest.type === u.type && latest.alive && this.predictedKey === `u${u.id}t${u.type}`) {
-          const pose = predictedPose(this.predictor, this.pose);
+          const pose = predictedPose(this.predictor, this.pose, this.localAlpha);
           u.x = pose.x;
           u.z = pose.z;
           u.yaw = pose.yaw;
@@ -341,14 +426,39 @@ export class MatchSession {
         }
       }
     }
-    this.frame = frame;
-    this.releaseEvents(tick, now);
-    return frame;
   }
 
-  /** The wind-up the local kaiju should already be showing, or null. */
+  /**
+   * Call once per frame after this frame's input ticks have run and the controller has turned
+   * the view: places the local body again, `alpha` (0..1) of a tick past the newest input tick.
+   * The body is predicted in 30 steps a second; drawing it part of the way through the newest
+   * step makes it move on every frame, at any frame rate. (`sample` has already placed it once,
+   * with the previous frame's fraction, so that the controller had something to steer by.)
+   */
+  refreshLocal(alpha: number): void {
+    this.localAlpha = Math.min(1, Math.max(0, alpha));
+    if (this.frame) this.placeLocal(this.frame);
+  }
+
+  /**
+   * The wind-up the local kaiju should be showing ahead of the server, or null. `k` is the kaiju
+   * as DRAWN, which is about 100 ms behind the newest snapshot: the hint is kept while that view
+   * still shows the kaiju idle and on while it shows the phase the press led to, so that the
+   * renderer can carry on from the time already shown instead of starting the wind-up again.
+   * It ends when the drawn kaiju moves on (the strike lands, a stagger cuts in), is idle again
+   * afterwards, or was never answered.
+   */
   hintFor(k: SnapKaiju, now: number): ActionHint | null {
-    return this.role.kind === 'kaiju' && k.id === this.role.kaijuId ? this.activeHint(k, now) : null;
+    const hint = this.hint;
+    if (!hint || this.role.kind !== 'kaiju' || k.id !== this.role.kaijuId) return null;
+    if (k.phase === 'idle') {
+      if (!hint.shown && now - hint.startedAt <= HINT_DRAW_TIMEOUT) return hint;
+    } else if (k.phase === hintPhase(hint.verb)) {
+      hint.shown = true;
+      return hint;
+    }
+    this.hint = null;
+    return null;
   }
 
   private releaseEvents(tick: number, now: number): void {
@@ -357,6 +467,9 @@ export class MatchSession {
     while (n < queue.length && (queue[n].event.tick <= tick || now - queue[n].arrivedAt > EVENT_MAX_WAIT)) n++;
     if (n === 0) return;
     const due = queue.splice(0, n);
+    // The oldest has waited far longer than any event does while frames run: this is the backlog
+    // of a hidden tab or a stalled page. All of it is past; none of it is played back.
+    this.catchingUp = now - due[0].arrivedAt > EVENT_STALE_AFTER;
     for (const q of due) {
       try {
         this.callbacks.onEvent(q.event);
@@ -364,5 +477,6 @@ export class MatchSession {
         console.warn(`event handler failed for "${q.event.type}"`, err);
       }
     }
+    this.catchingUp = false;
   }
 }

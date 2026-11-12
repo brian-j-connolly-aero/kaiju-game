@@ -42,6 +42,11 @@ export interface JoinOptions {
   token?: string;
   /** The client's PROTOCOL_VERSION. A different version is refused with `JOIN_ERROR.version`. */
   protocol?: number;
+  /**
+   * The client's build stamp (`buildStamp`, build.ts). A page built from a different version of
+   * the game than the server, or one that sends no stamp, is refused with `JOIN_ERROR.version`.
+   */
+  build?: string;
 }
 
 /** What a session token must look like to be accepted. */
@@ -51,16 +56,25 @@ export const SESSION_TOKEN_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
 export const JOIN_ERROR = {
   /** All five seats are taken by people who are connected. */
   roomFull: 4401,
-  /** The client was built for a different PROTOCOL_VERSION: reload the page. */
+  /** The page was built from a different version of the game than the server (build.ts): reload it. */
   version: 4402,
   /** The server is at its room limit. */
   serverFull: 4403,
+  /**
+   * This visitor sent too many matchmaking requests in a minute (rooms created, join requests,
+   * wrong room codes). Nothing is wrong with the room: wait and try again.
+   */
+  busy: 4404,
 } as const;
 
 /** WebSocket close code: this connection's seat was taken over by a newer one with the same token. */
 export const CLOSE_REPLACED = 4101;
 /** WebSocket close code: the seat was given up (the player stayed away longer than the grace period). */
 export const CLOSE_SEAT_RELEASED = 4102;
+/** WebSocket close code: the connection never finished the join handshake. Join again. */
+export const CLOSE_JOIN_TIMEOUT = 4103;
+/** WebSocket close code: the connection stopped reading what the server sent it. Join again. */
+export const CLOSE_BACKLOG = 4104;
 
 // --- Client -> server ------------------------------------------------------------------------
 

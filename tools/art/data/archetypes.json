@@ -483,7 +483,8 @@
       "sizeClass": "medium",
       "landmark": null,
       "zones": [
-        "university"
+        "university",
+        "temple"
       ],
       "passable": false,
       "hp": 900,

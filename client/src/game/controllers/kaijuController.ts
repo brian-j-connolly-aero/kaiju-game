@@ -58,7 +58,8 @@ export class KaijuController implements Controller {
   }
 
   sample(ctx: ControlContext): InputSample {
-    const d = ctx.input.down;
+    // The latch, not the instant: a click that began and ended between two samples is in this one.
+    const d = ctx.input.held;
     if (ctx.mapOpen) return { moveX: 0, moveZ: 0, aimYaw: this.aimYaw, aimPitch: this.aimPitch, buttons: 0 };
     let buttons = 0;
     if (d.strike) buttons |= Btn.strike;

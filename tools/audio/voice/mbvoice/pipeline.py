@@ -18,12 +18,12 @@ from .synth import synthesize
 
 TARGET_LUFS = -16.0
 CEILING_DBTP = -1.5
-# Encoder settings, chosen by measurement (encode_test.py; table in docs/audio/VOICE.md section 6):
-# one step below the first build's 3 and 5. Lower settings are smaller still but are not free on
-# the whole script: the recognizer loses more words on the radio voices from Vorbis 1 and MP3 7
-# down, and Vorbis 0 overshoots the true-peak limit of the checks.
-OGG_QUALITY = "2"          # libvorbis -q:a
-MP3_QUALITY = "6"          # libmp3lame -q:a (variable bit rate)
+# Encoder settings. The audio review suggested lower ones to save space; measured on every line
+# (encode_test.py; table and reasoning in docs/audio/VOICE.md section 6) each step down costs the
+# radio voices words in the recognizer, Vorbis 0 overshoots the true-peak limit of the checks,
+# and MP3 below 5 leaves more and more of the anchor's upper band empty. So these stay.
+OGG_QUALITY = "3"          # libvorbis -q:a
+MP3_QUALITY = "5"          # libmp3lame -q:a (variable bit rate)
 
 _CODE = ("synth.py", "chains.py", "dsp.py", "pipeline.py")
 

@@ -9,7 +9,8 @@
  * - hold: stop, order 'hold fire and charge' (the sub-units plant where they stand), keep the
  *   crosshair on the kaiju, and fire the volley when the charge is full, waiting a moment for
  *   another squad that is nearly charged so the volleys land together. Against a kaiju that is
- *   staggered or in its cocoon it fires as fast as the guns load.
+ *   staggered or in its cocoon it fires as fast as the guns load. (With the harness profile
+ *   `MatchConfig.bots.triggerHappy` it always does: the lazy way to lead a squad.)
  * - retreat: when the kaiju comes close it un-parks and drives away, then starts over.
  * - search (stage 1, kaiju not on the map): go to where it was last known, then look around.
  * - a cocoon on the map is a target like any other, only better: the squad closes in on it.
@@ -413,6 +414,9 @@ export function squadBot(world: World, p: PlayerState, squad: Squad): void {
     } else if (covering < planted * S.replantUncovered) {
       // It has walked out of the arcs: plant the squad again, facing it.
       if (bs.wheel.length === 0) bs.wheel.push('holdCharge');
+    } else if (world.config.bots?.triggerHappy) {
+      // The lazy way (a harness profile): never mind the charge, shoot whenever the gun has loaded.
+      press(bs, 'fire', TAP_TICKS);
     } else if (squadCharge(world, squad) >= S.volleyCharge) {
       // Charged. Wait a moment for a neighbor that is nearly there, so the volleys land together.
       let waitFor = false;

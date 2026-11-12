@@ -13,20 +13,26 @@
  *   onReconnect           GameRoom.resume
  *   onLeave               GameRoom.leave (asked to leave, or the hold was given up)
  *   Peer.close            close the socket, or give up the hold of a dropped session
+ *
+ * Things with nobody behind them must not get in anybody's way, so this file also keeps them
+ * short-lived: a room whose creator never connects, a join request that is never followed by a
+ * connection, a connection that never finishes joining, and one that stops reading what it is
+ * sent (each is described at its constant below).
  */
 
-import { matchMaker, Room, ServerError, type Client, type Deferred } from '@colyseus/core';
+import { ClientState, matchMaker, Room, ServerError, type Client, type Deferred } from '@colyseus/core';
 import {
+  CLOSE_BACKLOG,
+  CLOSE_JOIN_TIMEOUT,
   CLOSE_SEAT_RELEASED,
-  createRng,
   JOIN_ERROR,
-  makeRoomCode,
-  rngU32,
+  ROOM_CODE_ALPHABET,
+  ROOM_CODE_LENGTH,
   TICK_RATE,
-  type Rng,
   type ServerMessages,
   type ServerMessageType,
 } from '@mb/shared';
+import { randomInt } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 import { GameRoom } from '../room/gameRoom';
 import { JoinRefused, type Peer } from '../room/peer';
@@ -40,34 +46,61 @@ export interface RoomRuntime {
   graceSeconds: number;
   endScreenSeconds: number;
   hostHandoffSeconds: number;
+  startWaitSeconds: number;
+  /** Rooms with somebody in them that may exist at once. */
   maxRooms: number;
-  /** Seed for room codes and for each room's own rolls. */
-  seed: number;
+  /** Seconds a connection may take to finish joining. */
+  joinTimeoutSeconds: number;
+  /**
+   * Seconds a join request waits for its connection (and a new room for its creator) before
+   * the place is given up. A browser connects within a fraction of a second; the library's
+   * default of 15 s only kept dead requests around.
+   */
+  reservationSeconds: number;
+  /** The build stamp a joining page must carry, asked at every join. */
+  build: () => string;
   log: ((line: string) => void) | undefined;
+  logError: (line: string) => void;
 }
 
 /**
- * Connections the library may hold per room. Deliberately more than the five seats: a player
- * who comes back must never be turned away by the library because the room "is full" of their
- * own dropped connection. The lobby does the real admission.
+ * Connections and unused join requests the library may count per room before it locks the
+ * room. The lobby does the real admission (five seats), so this only has to be out of reach:
+ * a room the library has locked answers every join, a player's own reload included, with "no
+ * such room". At 12 it took eleven join requests with no connection behind them to do that.
  */
-const MAX_CONNECTIONS = 12;
+export const MAX_CONNECTIONS = 256;
+/**
+ * Rooms that may be waiting for their creator at one time. They do not count against the room
+ * limit; one more than this closes the one that has waited longest, so requests with nobody
+ * behind them can neither fill the server nor keep anybody from creating a room.
+ */
+export const MAX_WAITING_ROOMS = 5;
 /** A client that sends more than this many messages in a second is cut off (30 inputs are normal). */
 const MAX_MESSAGES_PER_SECOND = 300;
+/**
+ * Bytes that may be waiting to go out on one connection. A match sends about 13 kB a second,
+ * so this is over a minute of it: a connection that far behind is not reading at all, and
+ * without a limit everything sent to it would pile up in memory. It is cut; the seat is kept
+ * for the usual grace period.
+ */
+export const MAX_BACKLOG_BYTES = 1024 * 1024;
 
 interface Link {
   client: Client;
   /** Set while the session is dropped and held for reconnection. */
   held: Deferred<Client> | null;
+  /** Closes the connection if it has not finished joining in time. */
+  joinTimer: NodeJS.Timeout | null;
 }
 
 let runtime: RoomRuntime | null = null;
-let codeRng: Rng | null = null;
 const liveRooms = new Map<string, MatchRoom>();
+/** Rooms nobody has joined yet, oldest first. */
+const waitingRooms = new Set<MatchRoom>();
 
 export function configureRooms(next: RoomRuntime): void {
   runtime = next;
-  codeRng = createRng(next.seed);
 }
 
 /** The codes of the rooms that are open right now. */
@@ -88,19 +121,49 @@ export function roomStats(): { rooms: number; players: number } {
   return { rooms: liveRooms.size, players };
 }
 
-function freshCode(rng: Rng): string {
+/** A room code nobody can work out from earlier ones: every letter from the system's generator. */
+function freshCode(): string {
   for (let attempt = 0; attempt < 1000; attempt++) {
-    const code = makeRoomCode(rng);
+    let code = '';
+    for (let i = 0; i < ROOM_CODE_LENGTH; i++) code += ROOM_CODE_ALPHABET[randomInt(ROOM_CODE_ALPHABET.length)];
     // A duplicate id would silently put the creator into the other room.
     if (!liveRooms.has(code) && !matchMaker.getLocalRoomById(code)) return code;
   }
   throw new ServerError(JOIN_ERROR.serverFull, 'no free room code');
 }
 
+/** The raw socket's count of bytes not yet written out, or 0 when the transport has no such thing. */
+function backlogOf(client: Client): number {
+  const amount = (client.ref as { bufferedAmount?: unknown } | undefined)?.bufferedAmount;
+  return typeof amount === 'number' ? amount : 0;
+}
+
+/**
+ * Sends one message unless the connection's backlog is over `limit`; then nothing is queued
+ * and `cut` is called instead. Returns whether the message was handed to the connection.
+ */
+export function sendBounded<K extends ServerMessageType>(
+  client: Client,
+  type: K,
+  payload: ServerMessages[K],
+  limit: number,
+  cut: () => void,
+): boolean {
+  if (backlogOf(client) > limit) {
+    cut();
+    return false;
+  }
+  if (payload instanceof Uint8Array) client.sendBytes(type, payload);
+  else client.send(type, payload);
+  return true;
+}
+
 export class MatchRoom extends Room {
   private game: GameRoom | null = null;
   private ticker: Ticker | null = null;
   private readonly links = new Map<string, Link>();
+  /** Connections that are being hung up on. */
+  private readonly cutting = new WeakSet<Client>();
 
   get connectedPlayers(): number {
     return this.game ? this.game.connectedCount : 0;
@@ -108,12 +171,22 @@ export class MatchRoom extends Room {
 
   override onCreate(): void {
     const rt = runtime;
-    if (!rt || !codeRng) throw new ServerError(JOIN_ERROR.serverFull, 'the server is not ready');
-    if (liveRooms.size >= rt.maxRooms) throw new ServerError(JOIN_ERROR.serverFull, 'the server is full');
+    if (!rt) throw new ServerError(JOIN_ERROR.serverFull, 'the server is not ready');
+    // Only rooms somebody has walked into count against the limit.
+    if (liveRooms.size - waitingRooms.size >= rt.maxRooms) throw new ServerError(JOIN_ERROR.serverFull, 'the server is full');
+    if (waitingRooms.size >= MAX_WAITING_ROOMS) {
+      const oldest = waitingRooms.values().next().value;
+      if (oldest) {
+        waitingRooms.delete(oldest);
+        rt.log?.(`[room ${oldest.roomId}] closed: its creator never connected and newer rooms are waiting`);
+        void oldest.disconnect().catch(() => undefined);
+      }
+    }
 
-    const code = freshCode(codeRng);
+    const code = freshCode();
     this.roomId = code;
     this.maxClients = MAX_CONNECTIONS;
+    this.seatReservationTimeout = rt.reservationSeconds;
     this.maxMessagesPerSecond = MAX_MESSAGES_PER_SECOND;
     // No library state sync: the game sends its own snapshots.
     this.patchRate = null;
@@ -126,13 +199,17 @@ export class MatchRoom extends Room {
       graceSeconds: rt.graceSeconds,
       endScreenSeconds: rt.endScreenSeconds,
       hostHandoffSeconds: rt.hostHandoffSeconds,
+      startWaitSeconds: rt.startWaitSeconds,
       speed: rt.speed,
-      seed: rngU32(codeRng),
+      seed: randomInt(0x100000000),
+      build: rt.build,
       now: () => performance.now(),
       log: rt.log,
+      logError: rt.logError,
     });
     this.game = game;
     liveRooms.set(code, this);
+    waitingRooms.add(this);
     rt.log?.(`[room ${code}] created (${liveRooms.size} room${liveRooms.size === 1 ? '' : 's'} open)`);
 
     // One handler for every message type: unknown types are ignored by the room, not punished
@@ -153,19 +230,34 @@ export class MatchRoom extends Room {
         if (running && lastUpdate > 0) perfSample(perf, performance.now() - began, began - lastUpdate, Math.max(0, game.matchTick - tick));
         lastUpdate = running ? began : 0;
       },
-      (err) => rt.log?.(`[room ${code}] update failed: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}`),
+      (err) => rt.logError(`[room ${code}] update failed: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}`),
     );
   }
 
   override onJoin(client: Client, options?: unknown): void {
     const game = this.requireGame();
-    this.links.set(client.sessionId, { client, held: null });
+    const link: Link = { client, held: null, joinTimer: null };
+    this.links.set(client.sessionId, link);
     try {
       game.join(this.peerFor(client), options);
     } catch (err) {
       this.links.delete(client.sessionId);
       if (err instanceof JoinRefused) throw new ServerError(err.code, err.message);
       throw err;
+    }
+    waitingRooms.delete(this);
+    // The seat is granted now, but the library only starts delivering once the client has
+    // answered its join offer. One that never answers would sit in the seat for ever, unready
+    // in the lobby or parked on a squad, with everything sent to it kept in memory.
+    const seconds = runtime?.joinTimeoutSeconds ?? 0;
+    if (seconds > 0) {
+      link.joinTimer = setTimeout(() => {
+        link.joinTimer = null;
+        if (client.state !== ClientState.JOINING) return;
+        if (this.cut(client, CLOSE_JOIN_TIMEOUT, 'the join was never completed')) {
+          runtime?.log?.(`[room ${this.roomId}] a connection did not finish joining within ${seconds} s and was closed`);
+        }
+      }, seconds * 1000);
     }
   }
 
@@ -195,6 +287,8 @@ export class MatchRoom extends Room {
   }
 
   override onLeave(client: Client): void {
+    const link = this.links.get(client.sessionId);
+    if (link?.joinTimer) clearTimeout(link.joinTimer);
     this.links.delete(client.sessionId);
     this.game?.leave(client.sessionId);
   }
@@ -202,11 +296,27 @@ export class MatchRoom extends Room {
   override onDispose(): void {
     this.ticker?.stop();
     this.ticker = null;
+    waitingRooms.delete(this);
     if (liveRooms.get(this.roomId) === this) liveRooms.delete(this.roomId);
     runtime?.log?.(`[room ${this.roomId}] closed (${liveRooms.size} room${liveRooms.size === 1 ? '' : 's'} open)`);
     this.game?.dispose();
     this.game = null;
+    for (const link of this.links.values()) if (link.joinTimer) clearTimeout(link.joinTimer);
     this.links.clear();
+  }
+
+  /**
+   * Ends a connection that cannot be reasoned with: says why, then hangs up without waiting
+   * for an answer. Returns false when that is already under way.
+   */
+  private cut(client: Client, code: number, reason: string): boolean {
+    if (this.cutting.has(client)) return false;
+    this.cutting.add(client);
+    client.leave(code, reason);
+    const socket = client.ref as { terminate?: () => void } | undefined;
+    const timer = setTimeout(() => socket?.terminate?.(), 1000);
+    timer.unref();
+    return true;
   }
 
   private requireGame(): GameRoom {
@@ -221,10 +331,13 @@ export class MatchRoom extends Room {
       send: <K extends ServerMessageType>(type: K, payload: ServerMessages[K]): void => {
         // One connection in a bad state must never stop a frame from reaching the others.
         try {
-          if (payload instanceof Uint8Array) client.sendBytes(type, payload);
-          else client.send(type, payload);
+          sendBounded(client, type, payload, MAX_BACKLOG_BYTES, () => {
+            if (this.cut(client, CLOSE_BACKLOG, 'too far behind')) {
+              runtime?.log?.(`[room ${this.roomId}] a connection stopped reading what it is sent and was closed`);
+            }
+          });
         } catch (err) {
-          runtime?.log?.(`[room ${this.roomId}] could not send "${type}": ${err instanceof Error ? err.message : String(err)}`);
+          runtime?.logError(`[room ${this.roomId}] could not send "${type}": ${err instanceof Error ? err.message : String(err)}`);
         }
       },
       close: (code: number, reason: string): void => this.release(id, client, code, reason),

@@ -25,6 +25,8 @@ export interface BotMatchOptions {
   /** Bot handicaps, 0 (best) to 1 (stands still). */
   kaijuHandicap?: number;
   humanHandicap?: number;
+  /** Squad bots hold the trigger instead of charging volleys (MatchConfig.bots.triggerHappy). */
+  triggerHappy?: boolean;
   /** Human squads in the match (default 4); 0 leaves the kaiju alone in the city. */
   squads?: number;
   /** Give up after this many simulated minutes (a match always ends by its clock well before). */
@@ -107,7 +109,7 @@ export function createBotWorld(o: BotMatchOptions): World {
     anchor: o.anchor ?? -1,
     fast: o.fast ?? false,
     squads: o.squads,
-    bots: { kaijuHandicap: o.kaijuHandicap ?? 0, humanHandicap: o.humanHandicap ?? 0 },
+    bots: { kaijuHandicap: o.kaijuHandicap ?? 0, humanHandicap: o.humanHandicap ?? 0, triggerHappy: o.triggerHappy ?? false },
   });
   return createWorld({ seed: o.seed, config, city: o.city });
 }

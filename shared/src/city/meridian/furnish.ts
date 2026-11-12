@@ -12,12 +12,14 @@ import type { River } from './areas';
 import { patchAt, type Builder, type Street } from './build';
 import { DIR_COS, DIR_SIN, DIR_YAW, nearestDir, turnDir } from './dirs';
 import { distSqPointBox, distSqPointSeg, len, pointInPolygon, quant } from './geo';
-import { G_LAND, G_PARK, G_PLAZA, G_WATER, groundAt } from './ground';
+import { dryAround, G_LAND, G_PARK, G_PLAZA, groundAt } from './ground';
 import { EDGE } from './layout';
 import type { PaletteId } from './palettes';
 
 /** Props stay inside this distance from the center on both axes. */
 const PROP_LIMIT = 1096;
+/** A car in a drive stands at most this far from the edge of its street. */
+const DRIVE_REACH = 12;
 /** Side of an occupancy cell: two props never share one. */
 const OCC_CELL = 2;
 
@@ -79,8 +81,8 @@ function put(f: Furnisher, kind: PropKindId, x: number, z: number, dir: number):
   const qx = quant(x);
   const qz = quant(z);
   if (qx < -PROP_LIMIT || qx > PROP_LIMIT || qz < -PROP_LIMIT || qz > PROP_LIMIT) return false;
-  const ground = groundAt(f.b.g, qx, qz);
-  if (ground === G_WATER) return false;
+  // Not in the water, nor on the very edge of it.
+  if (!dryAround(f.b.g, qx, qz, 2.5)) return false;
   const vehicle = isVehicle(kind);
   const radius = PROP_KINDS[kind].radius;
   const keep = (radius < 1.6 ? radius : 1.6) + 0.4;
@@ -325,7 +327,10 @@ function furnishGardens(f: Furnisher, seed: number): void {
     if (rngChance(rng, 0.16)) {
       const side = rngChance(rng, 0.5) ? 1 : -1;
       const out = box.hx + 2.3;
-      put(f, rngChance(rng, 0.75) ? 'car_sedan' : 'car_van', s.x + sx * out * side + fx * (box.hz - 2.5), s.z + sz * out * side + fz * (box.hz - 2.5), box.dir);
+      const cx = s.x + sx * out * side + fx * (box.hz - 2.5);
+      const cz = s.z + sz * out * side + fz * (box.hz - 2.5);
+      // Only houses on a street have a drive (not the cottages at the bottom of the gardens).
+      if (onRoadway(b, cx, cz, DRIVE_REACH)) put(f, rngChance(rng, 0.75) ? 'car_sedan' : 'car_van', cx, cz, box.dir);
     }
   }
 }

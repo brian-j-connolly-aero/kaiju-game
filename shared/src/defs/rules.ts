@@ -96,9 +96,24 @@ export const COMBAT_RULES = {
   /** Volleys: sub-units on hold build charge 0..1 over chargeTime and lock to this firing arc. */
   chargeTime: 6,
   chargeHalfArc: 35 * DEG,
-  /** Volley damage is multiplied by (1 + volleyDamagePerCharge * charge), nerve likewise. */
+  /**
+   * Volley damage is multiplied by (1 + volleyDamagePerCharge * charge). Nerve only rewards a
+   * charge that is nearly complete: below volleyMinCharge a sub-unit's shot is ragged (it goes
+   * with the trigger, but with the fire-at-will nerve multiplier and aim error); from there
+   * to a full charge the nerve multiplier rises evenly to (1 + volleyNervePerCharge) and the aim
+   * error falls to the weapon's volley error. volleyMinCharge must stay above the longest
+   * weapon cooldown / chargeTime, or holding Fire would charge volleys by itself.
+   */
   volleyDamagePerCharge: 1,
   volleyNervePerCharge: 2,
+  volleyMinCharge: 0.6,
+  /**
+   * The kaiju's nerve breaks only while charged volleys (charge at least volleyMinCharge) from
+   * this many different squads have hit it within the last volleyBreakWindow seconds; until
+   * then nerve damage piles up to its capacity and stays there.
+   */
+  breakSquads: 2,
+  volleyBreakWindow: 5,
 
   /** Scatter multipliers on aim error and artillery scatter. */
   scatterSlowedMult: 0.6,
@@ -155,6 +170,12 @@ export const SQUAD_RULES = {
   aimFireTolerance: 3 * DEG,
   /** How far the driven unit's aim ray reaches when it lands on nothing. */
   aimRayRange: 1500,
+  /** Markers placed with the crosshair: ground or a wall further off than this is not what the player meant. */
+  markerRange: 1500,
+  /** ...a crosshair on the sky within this many body radii of a kaiju on the map means that kaiju... */
+  markerSnapRadii: 2,
+  /** ...and otherwise a move-to goes this far ahead along the heading (a call-in is not placed at all). */
+  markerSkyReach: 100,
   /** Sub-units aim at these fractions of the kaiju's height, taking the first with a clear line of fire. */
   aimHeights: [0.5, 0.8, 0.25],
   /** Several projectiles of one unit leave from points spread this far apart, in unit radii. */

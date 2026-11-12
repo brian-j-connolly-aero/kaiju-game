@@ -136,6 +136,22 @@ export function lasersOnKaiju(world: World, k: Kaiju): number {
   return n;
 }
 
+/**
+ * How much of a volley a shot fired with this charge is, 0..1: nothing below
+ * COMBAT_RULES.volleyMinCharge (a ragged shot, worth what fire at will is worth), rising evenly
+ * to 1 at a full charge. The nerve multiplier and the aim error of a volley follow it.
+ */
+export function volleyStrength(charge: number): number {
+  const min = COMBAT_RULES.volleyMinCharge;
+  if (charge < min - EPS) return 0;
+  return min < 1 ? clamp((charge - min) / (1 - min), 0, 1) : 1;
+}
+
+/** True when a shot fired with this charge is part of a charged volley (and counts toward breaking nerve). */
+export function isChargedVolley(charge: number): boolean {
+  return charge >= COMBAT_RULES.volleyMinCharge - EPS;
+}
+
 /** Charge (0..1) the squad's volley would fire with now: the average over its charging sub-units, 0 with none. */
 export function squadCharge(world: World, squad: Squad): number {
   let sum = 0;

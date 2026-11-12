@@ -151,6 +151,54 @@ describe('the artillery call-in', () => {
     expect([clamped.x, clamped.z]).toEqual([b.maxX, b.minZ]);
   });
 
+  it('lands on a kaiju the crosshair is on: anywhere on its body, from 300 to 600 m', () => {
+    const eye = 2.8;
+    const radius = LIZARD.stages[2].bodyRadius;
+    const height = LIZARD.stages[2].height;
+    for (const dist of [300, 450, 600]) {
+      // Knees, chest, head, and the chest again well off the center line.
+      for (const [frac, side] of [[0.1, 0], [0.5, 0], [0.9, 0], [0.5, 0.7 * radius], [0.02, -0.8 * radius]]) {
+        const world = field();
+        const k = placeKaiju(world, 0, dist, 0);
+        lead(world, 1, { wheel: 'holdCharge' });
+        const aimYaw = Math.atan2(side, dist);
+        const aimPitch = Math.atan2(height * frac - eye, dist);
+        const events = [...lead(world, 1, { buttons: Btn.callIn, aimYaw, aimPitch }), ...lead(world, 1, { aimYaw, aimPitch })];
+        const marked = eventsOf(events, 'callin')[0];
+        expect(marked, `marker at ${dist} m, height ${frac}, side ${side}`).toBeDefined();
+        // The marker is on the ground under the body, not a kilometre behind it.
+        expect(Math.hypot(marked.x - k.x, marked.z - k.z)).toBeLessThanOrEqual(radius + 1e-6);
+        events.push(...lead(world, Math.round((ARTY.delay + ARTY.duration + 2) * TICK_RATE), { aimYaw, aimPitch }));
+        const hits = eventsOf(events, 'kaijuHit').filter((h) => h.cause === 'arty');
+        expect(hits.length, `shells on target at ${dist} m, height ${frac}, side ${side}`).toBe(ARTY.shells);
+      }
+    }
+  });
+
+  it('snaps to a kaiju on the map when the crosshair is on the sky just beside it, and ignores a press at the empty sky', () => {
+    const radius = LIZARD.stages[2].bodyRadius;
+    const world = field();
+    const k = placeKaiju(world, 0, 400, 0);
+    lead(world, 1, { wheel: 'holdCharge' });
+    expect(k.known).toBe(true);
+    // Over its head, and in the sky one and a half body widths to the side.
+    for (const [aimYaw, aimPitch] of [[0, 0.6], [Math.atan2(1.5 * radius, 400), 0.2]]) {
+      const w = field();
+      const kk = placeKaiju(w, 0, 400, 0);
+      lead(w, 1, { wheel: 'holdCharge' });
+      const e = eventsOf(lead(w, 1, { buttons: Btn.callIn, aimYaw, aimPitch }), 'callin')[0];
+      expect(e).toMatchObject({ phase: 'marked', x: kk.x, z: kk.z });
+    }
+    // The empty sky, nowhere near it: nothing is marked and the battery is still ready.
+    const events = lead(world, 1, { buttons: Btn.callIn, aimYaw: 2, aimPitch: 0.3 });
+    expect(eventsOf(events, 'callin')).toEqual([]);
+    expect(world.callIns).toEqual([]);
+    expect(world.squads[0].callInCooldowns).toEqual([0]);
+    // Level, the ray would only meet the ground beyond its reach: the same.
+    lead(world, 1, { aimYaw: 2, aimPitch: 0 });
+    expect(eventsOf(lead(world, 1, { buttons: Btn.callIn, aimYaw: 2, aimPitch: 0 }), 'callin')).toEqual([]);
+  });
+
   it('hurts the kaiju: 14 damage and 10 nerve a shell, and never counts as crossfire', () => {
     const world = field();
     const k = placeKaiju(world, 100, 300, 0);

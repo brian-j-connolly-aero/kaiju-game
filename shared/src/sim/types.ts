@@ -121,6 +121,12 @@ export interface RecentHit {
   tick: number;
 }
 
+/** A charged volley hit on a kaiju: which squad's, and when. */
+export interface VolleyHit {
+  squad: number;
+  tick: number;
+}
+
 /**
  * What the kaiju action system remembers between ticks: which button presses it has already
  * used, and the bookkeeping of the action that is running. Server-side only; never in snapshots.
@@ -209,6 +215,8 @@ export interface Kaiju {
   /** Whether a player-driven unit currently has it in sight within the spotting range. */
   spotted: boolean;
   recentHits: RecentHit[];
+  /** The latest charged volley hit of each squad that has landed one lately (for the two-squad rule on breaking nerve). */
+  volleyHits: VolleyHit[];
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -335,7 +343,7 @@ export interface Projectile {
   splash: number;
   structureDamage: number;
   cause: DamageKind;
-  /** Fired as part of a charged volley. */
+  /** Fired as part of a charged volley (the trigger shot, or a sub-unit with at least COMBAT_RULES.volleyMinCharge). */
   volley: boolean;
   /** Fired at will by a sub-unit or bot (halves nerve damage). */
   atWill: boolean;
@@ -387,6 +395,11 @@ export interface Hit {
   kind: DamageKind;
   /** Fire-at-will hit from a sub-unit or bot (halves nerve damage against the kaiju). */
   atWill: boolean;
+  /**
+   * The squad whose charged volley this hit is part of; absent or -1 for everything else.
+   * Only these count toward breaking a kaiju's nerve (the two-squad rule).
+   */
+  volleySquad?: number;
   /** The hit clears the volley charge of a unit it reaches, whatever its nerve (the roar). */
   resetsCharge?: boolean;
 }

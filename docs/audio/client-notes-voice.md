@@ -6,18 +6,23 @@ three things about how the game plays them. The voice side is done: the script w
 221 lines were rebuilt and measured, and the manifest is merged. This page lists what is left in
 `client/src`, which the voice worker does not own.
 
-Line numbers are those of commit `2f69ae5`; `client/src` has not changed since. Background on the
-files is in `docs/audio/VOICE.md` (section 3 is "For the client"); the words are in
-`docs/VOICE_SCRIPT.md`.
+Line numbers are those of commit `2f69ae5` (`client/src/audio` and the end screen are the same
+in every commit up to `ab2890b`). Background on the files is in `docs/audio/VOICE.md` (section 3
+is "For the client"); the words are in `docs/VOICE_SCRIPT.md`.
+
+A first draft of this page went into commit `ab2890b`, and the client work started from it. This
+version differs from that draft in section 4, which needs no client work (five more lines were
+reworded, and the encoder settings stayed as they were after all), and in a few line numbers of
+`matchAudio.ts`, which the draft had two too low.
 
 ## At a glance
 
 | # | Change | Where | Status |
 | --- | --- | --- | --- |
-| 1 | Radio squelch once per line, and only on radio lines | `audioEngine.ts:557` to `:587`, `matchAudio.ts:108` | **needed** (the review's only "must") |
-| 2 | The committee chair speaks over the `hearing` music, and is never dropped | `matchAudio.ts:106` to `:130`, `end.ts:121` to `:125` | **needed** (review finding) |
-| 3 | Orders for a window that is closing: load ahead, jump the queue, go stale fast | `audioEngine.ts:42`, `:519`, `:542`, `matchAudio.ts:77`, `:109` | recommended (the script half of the finding is done) |
-| 4 | New and reworded lines, shorter briefing, smaller files | nothing | information |
+| 1 | Radio squelch once per line, and only on radio lines | `audioEngine.ts:557` to `:587`, `matchAudio.ts:110` | **needed** (the review's only "must") |
+| 2 | The committee chair speaks over the `hearing` music, and is never dropped | `matchAudio.ts:108` to `:130`, `end.ts:121` to `:125` | **needed** (review finding) |
+| 3 | Orders for a window that is closing: load ahead, jump the queue, go stale fast | `audioEngine.ts:42`, `:519`, `:542`, `matchAudio.ts:77`, `:111` | recommended (the script half of the finding is done) |
+| 4 | New and reworded lines, shorter briefing | nothing | information |
 
 Nothing here needs another audio build.
 
@@ -49,8 +54,8 @@ not by who is speaking:
 
 ```ts
 // client/src/audio/matchAudio.ts
-107    const side = this.side();
-108    const radio = side === 'humans';
+109    const side = this.side();
+110    const radio = side === 'humans';
 ```
 
 so on the human side the committee chair, who speaks in a large reverberant room, is wrapped in
@@ -81,7 +86,7 @@ walkie-talkie squelch as well.
    // :587 becomes `finish(buffer.duration, false);`
    ```
 
-2. `matchAudio.ts`, `speak` (`:106` to `:130`): decide per line. The lines with audience
+2. `matchAudio.ts`, `speak` (`:108` to `:130`): decide per line. The lines with audience
    `humans` are the radio lines (Overlord, Granite, Beacon, Tempest); the anchor's are `kaiju`
    and the chair's are `all`. The voice build enforces that pairing
    (`tools/audio/voice/mbvoice/scriptcheck.py`, `CAST`), so the audience is a safe test and keeps
@@ -90,13 +95,13 @@ walkie-talkie squelch as well.
    ```ts
    const isRadio = (line: VoiceLine): boolean => line.audience === 'humans';
    // :119   this.audio.say(line, { priority: ..., radio: isRadio(line) });
-   // :124 and :129 the same; delete line 108
+   // :124 and :129 the same; delete line 110
    ```
 
 3. The comment on `VoiceOptions.radio` (`audioEngine.ts:45`) should say what it now means: a
    radio line without audio gets a squelch around its blips; recorded radio lines carry their own.
 
-`radio_open` and `radio_close` stay in `PRELOAD_SFX` (`matchAudio.ts:53`, `:54`) for the fallback.
+`radio_open` and `radio_close` stay in `PRELOAD_SFX` (`matchAudio.ts:54`, `:55`) for the fallback.
 
 **How to check.**
 
@@ -114,7 +119,7 @@ walkie-talkie squelch as well.
 **The problem.** At the end of a match the simulation sends two cues in the same tick
 (`shared/src/sim/systems/voice.ts:119` to `:127`): the ending (`end.*`: Overlord or the anchor,
 2.0 to 4.7 s) and the hearing (`hearing.*`: the chair, 6.6 to 8.6 s). `speak` queues both at once
-with priority 2 (`matchAudio.ts:109`, `:119`). So today:
+with priority 2 (`matchAudio.ts:111`, `:119`). So today:
 
 | Seconds after the match ends | What plays |
 | --- | --- |
@@ -150,7 +155,7 @@ which can come to more than 7 s (up to 5 s plus 4.7 s).
    }
    ```
 
-   `urgent` on `:109` then no longer needs `e.cue.startsWith('hearing.')`.
+   `urgent` on `:111` then no longer needs `e.cue.startsWith('hearing.')`.
 
 2. `end.ts`, `frame` (`:121` to `:125`): start the music when the fanfare has rung out, and the
    chair one bar later. `this.time` counts from the moment the screen opens, which is the moment
@@ -219,7 +224,7 @@ exist today:
 
 - **Behind another line.** Lines play one at a time. `nerve.break` is queued with priority 2
   and plays next, but only after the line that is playing (up to 5 s). `kaiju.special` is queued
-  with priority 1 (`matchAudio.ts:109`: it is not in `urgent`), so other chatter can go first.
+  with priority 1 (`matchAudio.ts:111`: it is not in `urgent`), so other chatter can go first.
   Either one is dropped only after 7 s (`audioEngine.ts:53`), by which time the window has shut;
   a line that starts 3 s into a 5 s stagger tells the squad to fire as the weak point closes.
 - **For its file.** A voice file is fetched and decoded the first time it is spoken
@@ -248,7 +253,7 @@ Recommended changes:
    this.audio.preloadVoice(VOICE_LINES.filter((l) => l.audience === side && AHEAD.includes(l.cue)).map((l) => l.id));
    ```
 
-   That is 17 files for a human (about 0.4 MB, megabytes, to fetch) and 12 for the kaiju player.
+   That is 17 files for a human (about 0.3 MB, megabytes, to fetch) and 12 for the kaiju player.
 
 2. **Go stale fast.** Give `VoiceOptions` (`audioEngine.ts:42`) a `staleAfter?: number` in
    seconds, store it on the queued line (default: `Infinity` for priority 3 and above, otherwise
@@ -258,7 +263,7 @@ Recommended changes:
    while (next && now - next.queuedAt > next.staleAfter) next = this.voiceQueue.shift();
    ```
 
-3. **Jump the queue.** In `speak` (`matchAudio.ts:106`):
+3. **Jump the queue.** In `speak` (`matchAudio.ts:108`):
 
    ```ts
    const order = side === 'humans' && (e.cue === 'nerve.break' || e.cue === 'kaiju.special');
@@ -296,10 +301,12 @@ Recommended changes:
   fourth squad, so variety has to exist per voice (`docs/VOICE_SCRIPT.md`, "Line counts"). The
   simulation picks from whatever the script holds, so they need no wiring. New lines have the
   next free number of their cue; no existing id was renamed or removed.
-- **16 lines were reworded** under their old ids: `v_match_briefing_1`, `v_match_briefing_3`,
-  `v_volley_ready_2`, `v_crossfire_4`, `v_nerve_break_1` to `_4`, `v_kaiju_brace_2`,
-  `v_kaiju_special_1` to `_3`, `v_collateral_human_1`, `v_unit_lost_3`, `v_squad_wiped_2`,
-  `v_player_takeover_2`. Subtitles come from the script, so they follow by themselves.
+- **21 lines were reworded** under their old ids: `v_match_briefing_1`, `v_match_briefing_3`,
+  `v_kaiju_spotted_2`, `v_kaiju_lost_2`, `v_volley_ready_2`, `v_crossfire_4`, `v_nerve_break_1`
+  to `_4`, `v_kaiju_brace_1`, `v_kaiju_brace_2`, `v_kaiju_special_1` to `_3`,
+  `v_building_down_4`, `v_collateral_human_1`, `v_unit_lost_3`, `v_squad_wiped_2`,
+  `v_player_takeover_2`, `v_callin_inbound_1`. Subtitles come from the script, so they follow
+  by themselves.
 - **`v_squad_wiped_2` is now Overlord's** (it was Granite's, who could only say it about
   itself). No squad voice has a line for `squad.wiped` any more.
 - **The briefing is shorter.** The humans' three lines add up to 9.0 s (10.6 s before), the
@@ -308,8 +315,11 @@ Recommended changes:
   (`MATCH_RULES.briefing`, `rules.ts:24`). Keep that gap as it is.
 - **Durations** in `manifest.json` are those of the new files; anything that times subtitles or
   queues by them needs no change.
-- **Smaller files.** Encoded one step lower (Vorbis quality 2, MP3 quality 6); a line is about
-  25 kB (kilobytes) on average. Loudness is unchanged: every line is at -16 LUFS (loudness units
-  relative to full scale), within 0.3.
+- **Encoding is unchanged** (Vorbis quality 3, MP3 quality 5). The review suggested lower
+  settings to save space; measured on every line they cost clarity, so they were not taken
+  (`docs/audio/VOICE.md`, section 6). The 160 lines whose words did not change are byte for byte
+  the files of the first build. A line is about 28 kB (kilobytes) on average, 6.2 MB for all
+  the `.ogg` files. Loudness: every line is at -16 LUFS (loudness units relative to full scale),
+  within 0.2.
 - **Bus levels and ducking were not touched.** For reference: while a line plays, music is
   lowered to 0.4 and effects to 0.65 (`DUCK_MUSIC`, `DUCK_SFX`, `audioEngine.ts:54`, `:55`).

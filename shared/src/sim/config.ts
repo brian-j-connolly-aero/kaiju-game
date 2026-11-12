@@ -47,6 +47,12 @@ export interface MatchTuning {
 export interface BotTuning {
   kaijuHandicap: number;
   humanHandicap: number;
+  /**
+   * Squad bots play the lazy way: parked, they pull the trigger every time the gun has loaded
+   * instead of waiting for a full charge. A profile for the balance harness, so that it can
+   * measure what undisciplined fire is worth (docs/BALANCE.md). Absent or false: they volley.
+   */
+  triggerHappy?: boolean;
 }
 
 export interface MatchConfig {
@@ -133,6 +139,7 @@ export function createMatchConfig(options: MatchConfigOptions = {}): MatchConfig
   };
   if (options.bots) {
     config.bots = { kaijuHandicap: options.bots.kaijuHandicap ?? 0, humanHandicap: options.bots.humanHandicap ?? 0 };
+    if (options.bots.triggerHappy) config.bots.triggerHappy = true;
   }
   return config;
 }

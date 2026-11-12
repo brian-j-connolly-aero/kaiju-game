@@ -6,7 +6,7 @@
  */
 
 import type { Vec2 } from '../../math/vec';
-import { DIR_COS, DIR_SIN } from './dirs';
+import { DIR_COS, DIR_QUARTER, DIR_SIN } from './dirs';
 import type { Box } from './geo';
 
 /** Side of a cell, meters. */
@@ -124,6 +124,26 @@ export function dryAround(g: Ground, x: number, z: number, reach: number): boole
  * plaza too; never water, never beyond `limit` from the city center on either axis.
  */
 export function boxOnGround(g: Ground, b: Box, margin: number, openOk: boolean, limit: number): boolean {
+  if (b.dir % DIR_QUARTER === 0) {
+    // Square to the axes (most of the city): look at every cell under it. Integer work, no sampling.
+    const turned = (b.dir / DIR_QUARTER) % 2 === 1;
+    const ex = (turned ? b.hz : b.hx) + margin;
+    const ez = (turned ? b.hx : b.hz) + margin;
+    if (b.x - ex < -limit || b.x + ex > limit || b.z - ez < -limit || b.z + ez > limit) return false;
+    const c0 = Math.floor((b.x - ex + g.half) / G_CELL);
+    const c1 = Math.floor((b.x + ex + g.half) / G_CELL);
+    const r0 = Math.floor((b.z - ez + g.half) / G_CELL);
+    const r1 = Math.floor((b.z + ez + g.half) / G_CELL);
+    if (c0 < 0 || r0 < 0 || c1 >= g.cols || r1 >= g.cols) return false;
+    for (let r = r0; r <= r1; r++) {
+      const row = r * g.cols;
+      for (let cc = c0; cc <= c1; cc++) {
+        const k = g.cells[row + cc];
+        if (k !== G_LAND && !(openOk && (k === G_PARK || k === G_PLAZA))) return false;
+      }
+    }
+    return true;
+  }
   const c = DIR_COS[b.dir];
   const s = DIR_SIN[b.dir];
   const hx = b.hx + margin;

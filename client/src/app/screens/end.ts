@@ -37,6 +37,8 @@ export class EndScreen implements Screen {
   private built: MatchEndEvent | null = null;
   private time = 0;
   private autoSent = false;
+  private photoBox: HTMLElement | null = null;
+  private shownPhoto = '';
 
   enter(ctx: AppContext): void {
     this.root = el('div', 'screen end');
@@ -81,9 +83,10 @@ export class EndScreen implements Screen {
     });
 
     // The front page: a masthead, the photo, and columns of squiggles for the story.
-    const photo = el('div', 'paper-photo');
-    if (runtime.photo) photo.style.backgroundImage = `url(${runtime.photo})`;
-    else photo.append(icon('ui_newspaper'));
+    // (The photo itself is put in by `showPhoto`: it can arrive a moment after the screen.)
+    const photo = el('div', 'paper-photo', [icon('ui_newspaper')]);
+    this.photoBox = photo;
+    this.shownPhoto = '';
     const squiggles = (lines: number, cls: string): HTMLElement => {
       const col = el('div', `paper-col ${cls}`);
       for (let i = 0; i < lines; i++) col.append(el('div', 'squiggle'));
@@ -104,6 +107,17 @@ export class EndScreen implements Screen {
     back.classList.toggle('hidden', !ctx.client.isHost());
 
     root.replaceChildren(banner, el('div', 'end-mid', [tallies, paper]), back);
+    this.showPhoto(runtime.photo);
+  }
+
+  private showPhoto(address: string): void {
+    const box = this.photoBox;
+    if (!box || address === this.shownPhoto) return;
+    this.shownPhoto = address;
+    if (address) {
+      box.style.backgroundImage = `url(${address})`;
+      box.replaceChildren();
+    }
   }
 
   frame(ctx: AppContext, dt: number): void {
@@ -112,6 +126,7 @@ export class EndScreen implements Screen {
     this.time += dt;
     // The result can arrive a moment after the screen (a late joiner gets it with the snapshot).
     if (runtime.result !== this.built) this.build(ctx);
+    this.showPhoto(runtime.photo);
     const k = runtime.frame?.kaijus[0];
     const b = runtime.frame?.bounds;
     const x = k ? k.x : b ? (b.minX + b.maxX) / 2 : 0;
@@ -135,5 +150,6 @@ export class EndScreen implements Screen {
     this.root?.remove();
     this.root = null;
     this.built = null;
+    this.photoBox = null;
   }
 }
