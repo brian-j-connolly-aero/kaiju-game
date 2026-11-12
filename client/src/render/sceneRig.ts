@@ -22,7 +22,8 @@ export class SceneRig {
   private readonly objects: THREE.Object3D[] = [];
   private readonly byName = new Map<string, number>();
 
-  constructor(model: RigModel, materials: Materials) {
+  /** `body`: a material to use in place of the shared `vcol` (the kaiju's rim-lit one). */
+  constructor(model: RigModel, materials: Materials, body?: THREE.Material) {
     this.model = model;
     model.nodes.forEach((node, i) => {
       const object = new THREE.Group();
@@ -30,7 +31,7 @@ export class SceneRig {
       object.position.copy(node.position);
       object.quaternion.copy(node.quaternion);
       for (const part of node.parts) {
-        const mesh = new THREE.Mesh(part.geometry, materials.byKind(part.material));
+        const mesh = new THREE.Mesh(part.geometry, body && part.material === 'vcol' ? body : materials.byKind(part.material));
         mesh.frustumCulled = false;
         object.add(mesh);
       }

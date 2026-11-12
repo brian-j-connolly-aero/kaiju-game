@@ -114,7 +114,7 @@ export class KaijuView {
     const key = `kaiju_${k.kind}_s${k.stage}`;
     if (!this.rig || this.rigKey !== key) {
       this.rig?.dispose();
-      this.rig = new SceneRig(this.assets.model(key), this.materials);
+      this.rig = new SceneRig(this.assets.model(key), this.materials, this.materials.kaiju);
       this.rigKey = key;
       this.armsOnHead = false;
       this.poses = this.assets.hasModel(key) ? posesFromManifest(this.assets.manifest.models[key]?.poses) : null;

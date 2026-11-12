@@ -19,6 +19,11 @@ export interface Materials {
   paint: THREE.MeshLambertMaterial;
   /** Placeholder buildings: a repeating window tile tinted by vertex and instance color. */
   building: THREE.MeshLambertMaterial;
+  /**
+   * The kaiju's body: `vcol` plus a rim of moonlight and a little of its own color at night, so
+   * the titan reads as an orange creature against a dark city, not as a black shape.
+   */
+  kaiju: THREE.MeshLambertMaterial;
   byKind(kind: MaterialKind): THREE.Material;
   /** 0 by day, 1 at night: lights the windows. */
   setNight(amount: number): void;
@@ -53,6 +58,29 @@ function maskInstanceColor(material: THREE.Material): void {
   material.customProgramCacheKey = () => 'mb-paint-mask';
 }
 
+/** Adds a rim light and a self-lift to a Lambert material; returns the uniforms to drive them. */
+function addRimLight(material: THREE.MeshLambertMaterial): { rimColor: { value: THREE.Color }; rimStrength: { value: number }; selfLift: { value: number } } {
+  const uniforms = { rimColor: { value: new THREE.Color(0x9db8ff) }, rimStrength: { value: 0 }, selfLift: { value: 0 } };
+  material.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, uniforms);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform vec3 rimColor;\nuniform float rimStrength;\nuniform float selfLift;')
+      .replace(
+        '#include <emissivemap_fragment>',
+        [
+          '#include <emissivemap_fragment>',
+          '{',
+          '  float facing = clamp( dot( normal, normalize( vViewPosition ) ), 0.0, 1.0 );',
+          '  float rim = 1.0 - facing;',
+          '  totalEmissiveRadiance += rimColor * ( rimStrength * rim * rim ) + diffuseColor.rgb * selfLift;',
+          '}',
+        ].join('\n'),
+      );
+  };
+  material.customProgramCacheKey = () => 'mb-kaiju-rim';
+  return uniforms;
+}
+
 export function createMaterials(assets: AssetStore): Materials {
   const vcol = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
   vcol.name = 'vcol';
@@ -79,6 +107,9 @@ export function createMaterials(assets: AssetStore): Materials {
     emissiveIntensity: 0,
   });
   building.name = 'building';
+  const kaiju = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  kaiju.name = 'kaiju';
+  const rim = addRimLight(kaiju);
 
   return {
     vcol,
@@ -86,12 +117,18 @@ export function createMaterials(assets: AssetStore): Materials {
     cityAtlas,
     paint,
     building,
+    kaiju,
     byKind(kind) {
       return kind === 'glow' ? glow : kind === 'city_atlas' ? cityAtlas : vcol;
     },
     setNight(amount) {
       cityAtlas.emissiveIntensity = amount;
       building.emissiveIntensity = amount * 0.9;
+      // Sunset (0.35): a warm edge; night (1): moonlight round the silhouette and the body's own
+      // orange lifted out of the dark.
+      rim.rimStrength.value = 0.25 + amount * 0.75;
+      rim.selfLift.value = amount * 0.3;
+      rim.rimColor.value.setHex(amount > 0.6 ? 0xa8c4ff : 0xffc49a);
     },
   };
 }
