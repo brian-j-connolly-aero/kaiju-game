@@ -82,10 +82,21 @@ along their picture; mast beacons are red. Nothing else glows.
 missing top corner on the street side and one to three holes through the walls, broken-open
 floors inside the holes (with embers at night), walls swapped to their wrecked twins (60% of the
 glass broken, soot plumes above the holes, cracks; at night a few holes glow with fire), faces
-near the holes scorched. **Rubble**: a low grey heap inside the footprint (8% of the height plus
-0.8 m, at most 9 m and at most a third of the building), rough mounds, bent rusty beams and two
-to four slabs of the building's own facade lying on top, plus an optional keepsake (a landmark's
-recognizable piece). **Chunks**: 6 to 24 pieces cut from the building's solids on a jittered
+near the holes scorched. A hole cuts what it reaches and nothing else: balconies, doors, signs
+and other small parts are cut at its edge, not taken away whole, so the damaged building still
+reads as the same building (a part loses everything only when the hole takes more than half of
+it, or when the triangle budget leaves no other way). Wherever a hole lets a player see the back
+of something (the underside of a cut roof, the inside of a canopy, a broken-open floor seen from
+under the eaves) the kit adds a back side in a dark inside color, measured by looking from every
+side; nothing shows magenta on the sheets. **Rubble**: a low grey heap inside the footprint (8%
+of the height plus 0.8 m, at most 9 m and at most a third of the building), rough mounds, bent
+rusty beams and two to four slabs of the building's own facade lying on top, plus an optional
+keepsake (a landmark's recognizable piece). The keepsake may stand above the heap: the whole
+ruin, keepsake included, stays inside the footprint and **at most 35% of the building's height**
+(the city check enforces this). A ruin players can recognize tells them where they are, so four
+landmarks use that room: Kiln Point Power Station (its two chimney stumps, 27 m), the Tidewheel
+(a piece of its rim, 22 m), Tidewater Cathedral (the round window frame, 19 m) and the Gasworks
+(a bent gasholder frame, 15 m). **Chunks**: 6 to 24 pieces cut from the building's solids on a jittered
 grid (8 for small, 12 for medium, 18 for large, 20 for landmarks), each textured from the wall
 it came from, broken faces in rubble, origin at its own center, at most 30 triangles.
 
@@ -118,6 +129,6 @@ glowing swatches (`lamp`, `beacon`, `neon_pink`, `neon_mint`, `lit_glass`) inste
 
 | Proof building | Intact | Damaged | Rubble | Chunks | Budget |
 | --- | --- | --- | --- | --- | --- |
-| bld_house_a | 80 | 100 | 65 | 8 | 120 |
-| bld_tower_a | 320 | 447 | 111 | 24 | 500 |
-| bld_factory_a | 164 | 206 | 119 | 8 | 250 |
+| bld_house_a | 80 | 104 | 73 | 8 | 120 |
+| bld_tower_a | 320 | 464 | 137 | 24 | 500 |
+| bld_factory_a | 164 | 216 | 121 | 8 | 250 |

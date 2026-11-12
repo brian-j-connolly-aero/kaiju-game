@@ -16,6 +16,7 @@ import { GameClient, type ClosedReason } from '../net/gameClient';
 import { browserStore, sessionToken, storedName } from '../net/session';
 import { GameRenderer } from '../render/gameRenderer';
 import { setIconSource } from '../ui/icons';
+import { ControlsCard } from '../ui/controlsCard';
 import { SettingsPanel } from '../ui/settingsPanel';
 import { Subtitles } from '../ui/subtitles';
 import type { AppContext, Screen, ScreenId } from './context';
@@ -129,6 +130,7 @@ export class App {
       input,
       autopilot,
       settings: panel,
+      controls: new ControlsCard(),
       renderer: null,
       runtime: null,
       ui,
@@ -147,7 +149,7 @@ export class App {
       end: new EndScreen(),
     };
     this.debug = params.debug ? new DebugOverlay() : null;
-    ui.append(this.subtitles.root, panel.root);
+    ui.append(this.subtitles.root, this.ctx.controls.root, panel.root);
     if (this.debug) document.body.append(this.debug.root);
 
     window.addEventListener('error', (e) => this.errors.push(String(e.message)));
@@ -244,7 +246,7 @@ export class App {
     await ctx.assets.loadManifest(ctx.params.noAssets);
     setIconSource(ctx.assets);
     this.boot.setProgress(0.05);
-    await ctx.assets.preload((p) => this.boot.setProgress(0.05 + 0.75 * (p.total > 0 ? p.loaded / p.total : 1)));
+    await ctx.assets.preload((p) => this.boot.setProgress(0.05 + 0.8 * p.fraction));
     // Let the bar paint before the city is built (a few tens of milliseconds of solid work).
     await new Promise((resolve) => setTimeout(resolve, 0));
     const renderer = new GameRenderer(this.canvas, ctx.assets, ctx.params.resolution);
@@ -307,6 +309,15 @@ export class App {
     // The settings panel opens and closes with Escape (Start on a gamepad) on every screen but
     // the match, which has the captured mouse to look after and does it itself.
     if (this.current?.id !== 'match' && ctx.input.state.pressed.menu) ctx.settings.setOpen(!ctx.settings.open);
+    // The controls card: its own key (H, or a click of the left stick) wherever it can be shown.
+    // Its glyphs follow the device in use.
+    const card = ctx.controls;
+    const screen = this.current?.id;
+    if (ctx.input.state.pressed.controls && (screen === 'lobby' || screen === 'briefing' || screen === 'match')) {
+      card.toggle();
+      ctx.audio.play('ui_click');
+    }
+    card.update(ctx.input.bindings, ctx.input.state.device);
     if (ctx.runtime) {
       ctx.runtime.update(dt, time / 1000);
     } else if (renderer) {

@@ -31,10 +31,9 @@ UNDER = "#8a8478"         # undersides of roofs and canopies, as the kit's
 
 
 # ---- damage tidying ---------------------------------------------------------------------------
-# The kit's generator cuts big faces and drops small ones that a bite touches. A small part made
-# of several faces (an awning, a chimney, a porch roof) then loses some faces and keeps others,
-# and the faces left show their backs (holes in the game). Parts registered with `part(b)` go
-# all at once instead; ceilings under a bitten roof get an upper side (an attic floor).
+# A small part made of several faces (an awning, a chimney, a porch roof) is registered with
+# `part(b)`: the kit's damage then cuts it at the hole and keeps what is left while at least half
+# of it stands, or takes all of it. Ceilings under a bitten roof get an upper side (an attic floor).
 def _key(f):
     return tuple(np.round(np.asarray(f.pts, float).ravel(), 3))
 
@@ -45,7 +44,7 @@ def _base(tag):
 
 @contextmanager
 def part(b):
-    """with part(b): ...  every face added inside goes, or stays, together in the damaged state.
+    """with part(b): ...  the faces added inside stand or fall together in the damaged state.
     The faces carry the part's mark in their tag ("detail|p3"), which survives the kit's cuts."""
     i0 = len(b.intact.faces)
     yield
@@ -55,17 +54,11 @@ def part(b):
     faces = b.intact.faces[i0:]
     for f in faces:
         f.tag = f"{f.tag}|{mark}"
-    b.parts.append((mark, {_key(f) for f in faces}))
+    b.parts.append(mark)
 
 
 def tidy(b, m):
     whole = {_key(f) for f in b.intact.faces}
-    keys = {_key(f) for f in m.faces}
-    broken = set()
-    for mark, group in getattr(b, "parts", []):
-        if not group <= keys:
-            broken.add(mark)
-    m.faces = [f for f in m.faces if f.tag.split("|")[-1] not in broken]
     # a bitten parapet: the pieces of its outer and inner faces never match, so give what is
     # left of its outer face a back side
     for zp, zt, *every in getattr(b, "parapets", []):
@@ -76,21 +69,12 @@ def tidy(b, m):
     # broken-open faces inside volumes that are not rooms (a porch, a kiosk cap) go too
     for lo, hi in getattr(b, "no_interior", []):
         m.faces = [f for f in m.faces if not (f.tag == "interior" and np.all(f.center >= lo) and np.all(f.center <= hi))]
-    # the broken-open faces inside a bite can be seen from behind through the small roof and
-    # wall pieces the kit drops round its edge: give them a back side (the same picture)
-    for f in list(m.faces):
-        if f.tag == "interior":
-            back = [p - f.normal * 0.02 for p in f.pts[::-1]]
-            m.faces.append(Face(back, f.uv[::-1] if f.uv else None, f.col, f.tint, f.region, "interior"))
-    whole = {_key(f) for f in b.intact.faces}
+    # (the kit gives broken-open faces and cut thin sheets their back sides, within the budget)
     for f in list(m.faces):
         if _key(f) in whole:
             continue
         if _base(f.tag) in ("detail", "underside") and f.normal[2] < -0.95 and f.center[2] > 1.0:
             m.faces.append(plain(f.pts[::-1], "#5d5852", tag="interior"))     # attic floor over a ceiling
-        elif _base(f.tag) == "roof" and 0.2 < f.normal[2] < 0.98:
-            # the kit drops the underside of a bitten slope; what is left is seen from inside
-            m.faces.append(plain([p - f.normal * 0.02 for p in f.pts[::-1]], "#5d5852", tag="interior"))
     for f in m.faces:
         f.tag = _base(f.tag)
 

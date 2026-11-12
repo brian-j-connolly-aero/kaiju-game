@@ -9,7 +9,15 @@
   </head>
   <body>
     <canvas id="view"></canvas>
-    <div id="ui"></div>
+    <div id="ui">
+      <!-- Shown while the game's code downloads (the boot screen replaces it): the name, the
+           kaiju, and a bar whose light keeps moving, so a slow first load never looks frozen. -->
+      <div id="preboot" class="screen boot">
+        <div class="title">MONSTER BATTLE 9001</div>
+        <span class="icon boot-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 6 L58 54 L6 54 Z" fill="currentColor"/><circle cx="24" cy="40" r="4" fill="#000" opacity="0.55"/><circle cx="40" cy="40" r="4" fill="#000" opacity="0.55"/></svg></span>
+        <div class="boot-track waiting"><div class="boot-fill"></div></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

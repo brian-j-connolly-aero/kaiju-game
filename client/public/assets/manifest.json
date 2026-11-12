@@ -2447,7 +2447,7 @@
         "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
         "part": "wall plaster"
       },
-      "tris": 1186
+      "tris": 1190
     },
     "lm_halcyon_observatory": {
       "chunks": 12,
@@ -3538,6 +3538,114 @@
       ],
       "worldHeight": 1
     },
+    "mk_chevron": {
+      "anims": {
+        "play": {
+          "col": 3,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            0
+          ]
+        }
+      },
+      "file": "sprites/markers.png",
+      "frame": [
+        32,
+        32
+      ],
+      "worldHeight": 1
+    },
+    "mk_circle": {
+      "anims": {
+        "play": {
+          "col": 0,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            0
+          ]
+        }
+      },
+      "file": "sprites/markers.png",
+      "frame": [
+        32,
+        32
+      ],
+      "worldHeight": 1
+    },
+    "mk_cross": {
+      "anims": {
+        "play": {
+          "col": 4,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            0
+          ]
+        }
+      },
+      "file": "sprites/markers.png",
+      "frame": [
+        32,
+        32
+      ],
+      "worldHeight": 1
+    },
+    "mk_diamond": {
+      "anims": {
+        "play": {
+          "col": 2,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            0
+          ]
+        }
+      },
+      "file": "sprites/markers.png",
+      "frame": [
+        32,
+        32
+      ],
+      "worldHeight": 1
+    },
+    "mk_dot": {
+      "anims": {
+        "play": {
+          "col": 5,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            0
+          ]
+        }
+      },
+      "file": "sprites/markers.png",
+      "frame": [
+        32,
+        32
+      ],
+      "worldHeight": 1
+    },
+    "mk_triangle": {
+      "anims": {
+        "play": {
+          "col": 1,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            0
+          ]
+        }
+      },
+      "file": "sprites/markers.png",
+      "frame": [
+        32,
+        32
+      ],
+      "worldHeight": 1
+    },
     "soldier_army_rifle": {
       "anims": {
         "die": {
@@ -3674,8 +3782,16 @@
       "file": "textures/ground_asphalt.png",
       "tile": true
     },
+    "ground_far": {
+      "file": "textures/ground_far.png",
+      "tile": true
+    },
     "ground_grass": {
       "file": "textures/ground_grass.png",
+      "tile": true
+    },
+    "ground_plaza": {
+      "file": "textures/ground_plaza.png",
       "tile": true
     },
     "ground_rubble": {
@@ -5571,17 +5687,41 @@
     "tl_tower": {
       "file": "ui/tl_tower.svg"
     },
+    "ui_asleep": {
+      "file": "ui/ui_asleep.svg"
+    },
     "ui_clock": {
       "file": "ui/ui_clock.svg"
     },
     "ui_copy": {
       "file": "ui/ui_copy.svg"
     },
+    "ui_fullscreen": {
+      "file": "ui/ui_fullscreen.svg"
+    },
+    "ui_invert": {
+      "file": "ui/ui_invert.svg"
+    },
+    "ui_lowres": {
+      "file": "ui/ui_lowres.svg"
+    },
     "ui_newspaper": {
       "file": "ui/ui_newspaper.svg"
     },
     "ui_offline": {
       "file": "ui/ui_offline.svg"
+    },
+    "ui_outdated": {
+      "file": "ui/ui_outdated.svg"
+    },
+    "ui_rise": {
+      "file": "ui/ui_rise.svg"
+    },
+    "ui_settings": {
+      "file": "ui/ui_settings.svg"
+    },
+    "ui_sink": {
+      "file": "ui/ui_sink.svg"
     },
     "ui_skull": {
       "file": "ui/ui_skull.svg"

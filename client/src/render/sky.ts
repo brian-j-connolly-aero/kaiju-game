@@ -25,6 +25,8 @@ interface Preset {
   cloud: number;
   /** 0 by day, 1 at night: window lights. */
   night: number;
+  /** 1 at sunset, 0 otherwise: how much the ground is warmed against the violet sky light. */
+  sunset: number;
   /** Size and color of the sun or moon disc. */
   disc: number;
   discSize: number;
@@ -44,6 +46,7 @@ const PRESETS: Record<TimeOfDay, Preset> = {
     hemiIntensity: 1.5,
     cloud: 0xffffff,
     night: 0,
+    sunset: 0,
     disc: 0xfffbe6,
     discSize: 260,
   },
@@ -60,6 +63,7 @@ const PRESETS: Record<TimeOfDay, Preset> = {
     hemiIntensity: 1.25,
     cloud: 0xffc9a8,
     night: 0.35,
+    sunset: 1,
     disc: 0xffd08a,
     discSize: 420,
   },
@@ -76,6 +80,7 @@ const PRESETS: Record<TimeOfDay, Preset> = {
     hemiIntensity: 1.0,
     cloud: 0x3a466e,
     night: 1,
+    sunset: 0,
     disc: 0xe8efff,
     discSize: 200,
   },
@@ -143,6 +148,8 @@ export class Sky {
   readonly fog: THREE.Fog;
   /** 0 by day .. 1 at night, after blending. */
   night = 0;
+  /** 1 at sunset, 0 otherwise (eased with the change of time): the ground's warm tint. */
+  sunset = 0;
   private readonly dome: THREE.Mesh;
   private readonly domeMaterial: THREE.ShaderMaterial;
   private readonly clouds: THREE.Mesh[] = [];
@@ -247,6 +254,7 @@ export class Sky {
       hemiIntensity: mix(f.hemiIntensity, g.hemiIntensity),
       cloud: mixColor(f.cloud, g.cloud),
       night: mix(f.night, g.night),
+      sunset: mix(f.sunset, g.sunset),
       disc: mixColor(f.disc, g.disc),
       discSize: mix(f.discSize, g.discSize),
     };
@@ -278,6 +286,7 @@ export class Sky {
     this.fog.near = this.fogFrom.near + (this.fogTo.near - this.fogFrom.near) * t;
     this.fog.far = this.fogFrom.far + (this.fogTo.far - this.fogFrom.far) * t;
     this.night = f.night + (g.night - f.night) * t;
+    this.sunset = f.sunset + (g.sunset - f.sunset) * t;
     for (const plane of this.clouds) {
       const material = plane.material as THREE.MeshBasicMaterial;
       mixInto(material.color, f.cloud, g.cloud);

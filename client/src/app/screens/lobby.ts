@@ -4,7 +4,7 @@
  * plays the kaiju). Names are the only words.
  */
 
-import { canStartMatch, MATCH_RULES, type LobbyState } from '@mb/shared';
+import { canStartMatch, factionDef, kaijuKindDef, MATCH_RULES, type LobbyState } from '@mb/shared';
 import { el, icon, portrait } from '../../ui/icons';
 import type { AppContext, Screen } from '../context';
 
@@ -95,8 +95,18 @@ export class LobbyScreen implements Screen {
       ctx.settings.setOpen(true);
     });
 
+    // The controls card for the role this player has picked, next to the gear.
+    const card = el('button', 'btn controls-open', [icon('ui_controls')]);
+    card.addEventListener('click', () => {
+      ctx.audio.unlock();
+      ctx.audio.play('ui_click');
+      ctx.controls.toggle();
+    });
+    ctx.controls.setPassive(false);
+
     this.root = el('div', 'screen lobby', [
       gear,
+      card,
       el('div', 'lobby-top', [back, code, link]),
       el('div', 'lobby-mid', [this.portraitBox, this.seats]),
       el('div', 'lobby-bottom', [this.role, this.ready, this.practice, this.start]),
@@ -142,6 +152,10 @@ export class LobbyScreen implements Screen {
 
     const me = client.me();
     const host = client.isHost();
+    if (me) {
+      if (me.wantsKaiju) ctx.controls.setRole('kaiju', me.kaijuKind, kaijuKindDef(me.kaijuKind).name);
+      else ctx.controls.setRole('squad', me.kaijuKind, factionDef(me.faction).name);
+    }
     if (this.role && me) {
       this.role.replaceChildren(icon(me.wantsKaiju ? 'lb_kaiju' : 'lb_human'));
       this.role.classList.toggle('kaiju', me.wantsKaiju);
@@ -195,7 +209,8 @@ export class LobbyScreen implements Screen {
     if (lobby && ctx.params.autoplay) this.autoplay(ctx, lobby, dt);
   }
 
-  exit(): void {
+  exit(ctx: AppContext): void {
+    ctx.controls.setOpen(false);
     this.unsubscribe?.();
     this.unsubscribe = null;
     this.root?.remove();

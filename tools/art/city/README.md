@@ -80,6 +80,8 @@ them all; `atlas.REGIONS` lists them).
 | `b.keepsake = Mesh` | what stays recognizable on the rubble (landmarks); position it yourself |
 | `b.bite_hint = (x, y, z)` | where the damage bites first (default: a top front corner) |
 | `b.damage_hook = fn(b, mesh)` | bespoke extra damage (a bent spire, a fallen mast) |
+| `b.holes = n` | how many holes the damage punches through the walls (default 1 to 3 by height); fewer when a hook does the named damage (the station's vault falls in: 1) |
+| `b.parts = [mark, ..]` | parts that stand or fall together: their faces carry the mark in their tag (`"detail\|p3"`). A hole cuts a part like anything else; the part goes whole only when the hole takes more than half of it. The families' `part(b)` / `balcony` helpers do this for you |
 
 `solid=True` (blocks and roofs are solid already) tells the kit that a part is a closed volume:
 chunks are cut from solids and the holes of the damaged state open into them.
@@ -97,7 +99,9 @@ chunks are cut from solids and the holes of the damaged state open into them.
    `beacon`, `neon_pink`, `neon_mint`, `lit_glass`.
 5. **Front** is -y: the FRONT cell of the sheet must show the street side.
 6. **No magenta** on the sheet (a face seen from behind is a hole in the game); thin sheets
-   that are seen from both sides need a second, reversed face.
+   that are seen from both sides need a second, reversed face. In the damaged and rubble
+   states the kit adds the back sides a hole exposes itself (it casts rays from behind every
+   face toward the viewer directions and backs what they can see), within the budget.
 7. **No words**: signs are pictures. **No real symbols**: no cross (not even a pharmacy's), no
    crescent, no six-pointed star, nothing from a real faith, brand or building.
 8. **Night**: look at the NIGHT cells: windows lit, nothing else glowing by accident.

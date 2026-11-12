@@ -36,8 +36,49 @@ export const BUTTON_ACTIONS = [
   'back',
   // the settings panel
   'menu',
+  // the controls card
+  'controls',
 ] as const;
 export type ButtonAction = (typeof BUTTON_ACTIONS)[number];
+
+/** Who presses an action: the kaiju, a squad leader, an eliminated squad leader's drone. */
+export type ActionUser = 'kaiju' | 'squad' | 'drone';
+
+/**
+ * Who can press each action during a match. The controls card (ui/controlsCard.ts) must show
+ * every action to everyone listed here (client/test/controlsCard.test.ts holds it to that); an
+ * empty list means nothing in the game reads the action. A new action does not compile until
+ * it has an entry.
+ */
+export const ACTION_USERS: Record<ButtonAction, readonly ActionUser[]> = {
+  moveForward: ['kaiju', 'squad', 'drone'],
+  moveBack: ['kaiju', 'squad', 'drone'],
+  moveLeft: ['kaiju', 'squad', 'drone'],
+  moveRight: ['kaiju', 'squad', 'drone'],
+  strike: ['kaiju'],
+  grab: ['kaiju'],
+  block: ['kaiju'],
+  roar: ['kaiju'],
+  special: ['kaiju'],
+  molt: ['kaiju'],
+  fire: ['squad'],
+  callIn: ['squad'],
+  wheel: ['squad'],
+  cmdFollow: ['squad'],
+  cmdMoveTo: ['squad'],
+  cmdFireAtWill: ['squad'],
+  cmdHoldCharge: ['squad'],
+  map: ['kaiju', 'squad', 'drone'],
+  camera: ['kaiju', 'squad'],
+  rise: ['drone'],
+  sink: ['drone'],
+  // Places a move-to on the open map (the gamepad's way of clicking it).
+  confirm: ['squad'],
+  // Bound, but nothing reads it yet (menus close with Escape through `menu`).
+  back: [],
+  menu: ['kaiju', 'squad', 'drone'],
+  controls: ['kaiju', 'squad', 'drone'],
+};
 
 export type InputDevice = 'keyboard' | 'gamepad';
 
@@ -108,6 +149,7 @@ export function defaultBindings(): Bindings {
       confirm: ['Enter'],
       back: ['Escape'],
       menu: ['Escape'],
+      controls: ['KeyH'],
     },
     gamepad: {
       moveForward: [],
@@ -135,6 +177,8 @@ export function defaultBindings(): Bindings {
       confirm: [PAD.a],
       back: [PAD.b],
       menu: [PAD.start],
+      // The one button nothing else uses: a click of the left stick.
+      controls: [PAD.ls],
     },
   };
 }

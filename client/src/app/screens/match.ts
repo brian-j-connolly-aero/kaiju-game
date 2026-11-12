@@ -17,6 +17,7 @@ import { Hud } from '../../ui/hud';
 import { el } from '../../ui/icons';
 import { MapView } from '../../ui/mapView';
 import type { AppContext, Screen } from '../context';
+import { cardForMatch } from './briefing';
 
 export class MatchScreen implements Screen {
   readonly id = 'match' as const;
@@ -47,6 +48,10 @@ export class MatchScreen implements Screen {
     };
     this.root = el('div', 'screen match', [this.hud.root, this.wheel.root, this.map.root]);
     ctx.ui.append(this.root);
+    // The controls card opens and closes with its own key and takes no mouse input here: the
+    // pointer stays captured and the game runs on behind it.
+    cardForMatch(ctx);
+    ctx.controls.setPassive(true);
     runtime.onEvent = (e) => this.onEvent(ctx, e);
 
     // The input manager captures the mouse on a click on the view while `wantCapture` is set
@@ -175,6 +180,7 @@ export class MatchScreen implements Screen {
     ctx.input.onLockLost = null;
     ctx.settings.onClose = null;
     ctx.settings.setOpen(false);
+    ctx.controls.setOpen(false);
     ctx.input.unlockPointer();
     this.root?.remove();
     this.root = null;

@@ -7,7 +7,7 @@
     tools/art/sprites/build.py --check        verify the files on disk against the manifest
 
 Writes (docs/ASSETS.md sections 3, 4 and 7):
-    client/public/assets/sprites/army.png, civilians.png, fx.png
+    client/public/assets/sprites/army.png, civilians.png, fx.png, markers.png
     client/public/assets/textures/ground_*.png, clouds_a.png, clouds_b.png
     client/public/assets/manifest.sprites.json      ("sprites" and "textures" sections)
     docs/art/previews/...                           contact sheets, strips, tiling tests
@@ -35,6 +35,7 @@ import clouds  # noqa: E402
 import fx  # noqa: E402
 import gameview as gv  # noqa: E402
 import ground  # noqa: E402
+import markers  # noqa: E402
 from pix import (ASSETS, OUTLINE, PREVIEWS, SPRITES, TEXTURES, Img, Sheet, col, hstack, label,  # noqa: E402
                  on_backdrop, save_preview, strip, upscale, vstack)
 
@@ -95,7 +96,12 @@ ALIASES = {"fx_debris": "fx_debris_1"}
 FX_STANDING = ("fx_fire", "fx_explosion_ground")
 FX_FULL_CELL = ("fx_white",)
 
-GROUND_IDS = ["ground_asphalt", "ground_sidewalk", "ground_grass", "ground_water", "ground_rubble"]
+GROUND_IDS = ["ground_asphalt", "ground_sidewalk", "ground_grass", "ground_water", "ground_rubble", "ground_plaza",
+              "ground_far"]
+
+# World markers (markers.py): one 32 x 32 cell each, white, tinted by the game per copy.
+MARKER_CELL = (32, 32)
+MARKER_SHEET = (256, 32)        # 8 cells; the last two are free
 CLOUD_IDS = ["clouds_a", "clouds_b"]
 
 
@@ -139,6 +145,14 @@ def build_fx() -> tuple:
     return sheet, frames
 
 
+def build_markers() -> tuple:
+    sheet = Sheet(*MARKER_SHEET, *MARKER_CELL)
+    frames = markers.build()
+    for i, sid in enumerate(markers.IDS):
+        sheet.put(i, 0, frames[sid])
+    return sheet, frames
+
+
 def bleed_alpha(img: Img) -> np.ndarray:
     """Give fully transparent pixels the color of the nearest cloud pixel (alpha stays 0), so
     smaller mipmap levels do not pick up a dark fringe around the clouds."""
@@ -172,6 +186,9 @@ def make_manifest() -> dict:
     for sid, (row, col0, n, fps, blend) in FX_LAYOUT.items():
         sprites[sid] = {"file": "sprites/fx.png", "frame": list(FX_CELL), "worldHeight": 1, "blend": blend,
                         "anims": {"play": {"rows": [row], "col": col0, "frames": n, "fps": fps}}}
+    for i, sid in enumerate(markers.IDS):
+        sprites[sid] = {"file": "sprites/markers.png", "frame": list(MARKER_CELL), "worldHeight": 1,
+                        "anims": {"play": {"rows": [0], "col": i, "frames": 1, "fps": 1}}}
     textures = {}
     for tid in GROUND_IDS:
         textures[tid] = {"file": f"textures/{tid}.png", "tile": True}
@@ -677,6 +694,34 @@ def preview_sky(sky: dict, tiles: dict, people: list) -> list:
     return out
 
 
+def preview_markers(frames: dict, tiles: dict) -> str:
+    """The world markers in the colors the game gives them, on the grounds they lie on: at
+    their true 32 pixels and enlarged 4x."""
+    tints = {"mk_circle": "#1ec8e0", "mk_triangle": "#ff7a1a", "mk_diamond": "#ffd91a",
+             "mk_chevron": "#1ec8e0", "mk_cross": "#ff3b5c", "mk_dot": "#f2f4f8"}
+    grounds = ["ground_sidewalk", "ground_plaza", "ground_grass", "ground_asphalt", "ground_rubble", "ground_water"]
+    rows = []
+    for k in (1, 4):
+        cells = []
+        for g in grounds:
+            tile = tiles[g].pil().convert("RGBA").crop((0, 0, 64, 40))
+            band = Image.new("RGBA", (len(markers.IDS) * 36 + 4, 40))
+            for x in range(0, band.width, 64):
+                band.paste(tile, (x, 0))
+            for i, sid in enumerate(markers.IDS):
+                t = tuple(c / 255 for c in col(tints[sid])[:3])
+                band.alpha_composite(tinted(frames[sid], t).pil(), (4 + i * 36, 4))
+            cells.append(upscale(band, k) if k > 1 else band)
+        rows.append(hstack(cells[:3], gap=6) if k > 1 else hstack(cells, gap=6))
+        if k > 1:
+            rows.append(hstack(cells[3:], gap=6))
+    width = max(r.width for r in rows)
+    pic = vstack([label("world markers, tinted as in the game (human circle cyan, kaiju triangle orange, volley diamond "
+                        "yellow; chevron, cross, dot), on sidewalk, plaza, grass, asphalt, rubble, water: true size, then 4x",
+                        width)] + rows, gap=4)
+    return save_preview(pic, os.path.join(PREVIEWS, "sprites_markers.png"))
+
+
 def preview_sheet(name: str, sheet: Sheet, k: int) -> str:
     """The whole sheet enlarged, with cell lines and column / row numbers: the picture to
     check manifest rows and columns against."""
@@ -878,6 +923,8 @@ def main(argv=None) -> int:
     army_sheet.save(os.path.join(SPRITES, "army.png"))
     civ_sheet.save(os.path.join(SPRITES, "civilians.png"))
     fx_sheet.save(os.path.join(SPRITES, "fx.png"))
+    marker_sheet, marker_frames = build_markers()
+    marker_sheet.save(os.path.join(SPRITES, "markers.png"))
 
     tiles = ground.build()
     os.makedirs(TEXTURES, exist_ok=True)
@@ -890,7 +937,7 @@ def main(argv=None) -> int:
     with open(MANIFEST, "w", encoding="utf-8") as f:
         f.write(dump_manifest(make_manifest()))
     if not args.quiet:
-        print(f"wrote 3 sheets, {len(GROUND_IDS)} ground tiles, {len(CLOUD_IDS)} cloud textures and {os.path.relpath(MANIFEST)}")
+        print(f"wrote 4 sheets, {len(GROUND_IDS)} ground tiles, {len(CLOUD_IDS)} cloud textures and {os.path.relpath(MANIFEST)}")
 
     if not no_previews:
         made = []
@@ -913,6 +960,8 @@ def main(argv=None) -> int:
         made.append(preview_sheet("army", army_sheet, 4))
         made.append(preview_sheet("civilians", civ_sheet, 4))
         made.append(preview_sheet("fx", fx_sheet, 2))
+        made.append(preview_sheet("markers", marker_sheet, 4))
+        made.append(preview_markers(marker_frames, tiles))
         made.append(preview_scene(army_frames, civ_frames, fx_frames, tiles, sky))
         made.append(preview_in_game(army_frames, civ_frames, tiles, sky))
         if not args.quiet:

@@ -505,6 +505,47 @@ server and every client build the identical city from code. No building list goe
 - End screen: mock hearing (voiced), pictogram tally of what each player flattened, newspaper
   front page with a photo over squiggle text.
 
+### Controls (as built: `client/src/game/input/actions.ts`)
+
+Bindings are by key position, so WASD is the same four keys on any keyboard layout, and the
+keycap glyphs show the letter printed on the player's own keyboard. Nothing is bound to Control,
+Alt, Meta, Shift or a function key (with one of those held, a game key becomes a browser
+shortcut that a page cannot cancel).
+
+| Control | Keyboard and mouse | Controller (standard mapping) |
+| --- | --- | --- |
+| Move | W A S D (or the arrows) | Left stick |
+| Look | Mouse (captured by a click on the view) | Right stick |
+| Kaiju: swipe, stomp (hold) | Left button | RT |
+| Kaiju: grab, throw (again), eat (hold) | Right button | LT |
+| Kaiju: brace (hold) | Space | LB |
+| Kaiju: roar | Q | Y |
+| Kaiju: beam (needs full rage) | E | RB |
+| Kaiju: molt (hold 1 s, when a molt is there) | F | B |
+| Squad: fire (also the volley's trigger) | Left button | RT |
+| Squad: command wheel (hold, point, let go) | Right button or Q | LB |
+| Squad: follow me, move to, fire at will, hold and charge | 1, 2, 3, 4 | D-pad up, right, down, left |
+| Squad: artillery call-in (stage 3) | E | X |
+| On the map: move-to here, call-in here | Left click, right click | A, X |
+| Drone: up, down | Space, C | A, B |
+| Map | M or Tab | Back |
+| Camera (first or third person) | V | Right stick click |
+| Settings | Escape | Start |
+| Controls card | H | Left stick click |
+
+**The controls card** (`client/src/ui/controlsCard.ts`) teaches all of this without words:
+every control of the player's role, each as the button's glyph on the device in use (it
+switches when the player picks up a controller) followed by a picture of what it does. A ring
+around a glyph means hold it; a small arrow means "then"; the HUD's three growing triangles
+mark a control that only exists at some stages (grabbing tanks and pieces of buildings from
+stage 2, the molt before stages 2 and 3, artillery at stage 3). The squad's card includes the
+volley (hold and charge, wait for the full charge, then the leader's own shot) and the drone.
+It has a button in the lobby (for the role picked there) and on the briefing screen, is open
+by itself for the whole briefing, and in a match opens and closes with its key (shown beside
+the settings gear) while the game runs on; it takes no mouse input there, so the captured
+pointer stays captured. A test fails if an action a player can press is missing from their
+card (`ACTION_USERS` in `actions.ts` says who presses what).
+
 ### Voice cues (contract between the simulation and the audio)
 
 The simulation emits cue ids; `shared/src/defs/voiceLines.json` maps each cue to one or more

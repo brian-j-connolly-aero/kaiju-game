@@ -33,10 +33,11 @@ class Face:
     tint: bool = False             # COLOR_0 alpha 1: the client may re-tint this face
     region: str | None = None      # atlas region the uv points into
     tag: str = "detail"            # wall | roof | detail | cut | interior | rubble | glass
+    cut: bool = False              # damaged state: a bite cut this face (it has an open edge)
 
     def copy(self) -> "Face":
         return Face([p.copy() for p in self.pts], list(self.uv) if self.uv else None, self.col,
-                    self.tint, self.region, self.tag)
+                    self.tint, self.region, self.tag, self.cut)
 
     @property
     def normal(self) -> np.ndarray:
@@ -197,7 +198,7 @@ def clip(face: Face, n, d, keep_below=True) -> Face | None:
             cu.pop()
     if len(cp) < 3:
         return None
-    f = Face(cp, cu if uvs else None, face.col, face.tint, face.region, face.tag)
+    f = Face(cp, cu if uvs else None, face.col, face.tint, face.region, face.tag, face.cut)
     if f.area < 1e-4:
         return None
     return f

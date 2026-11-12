@@ -118,54 +118,16 @@ def balcony(b, blk, side, x0, x1, z, *, depth=style.BALCONY_DEPTH, rail="rail_me
     _group(b, b.intact.faces[first:])
 
 
-def _key(f):
-    return tuple(np.round(f.center, 2))
-
-
 def _group(b, faces):
-    """Faces that stand or fall together in the damaged state (balconies, thin parts)."""
-    if not hasattr(b, "groups"):
-        b.groups = []
-        b.damage_hook = _damage_hook
-    b.groups.append({_key(f) for f in faces})
-
-
-def _drop_broken_groups(b, mesh):
-    """Damage hook: a group that lost any face to a bite loses all of them (no floating ends)."""
-    have = {_key(f) for f in mesh.faces}
-    dead = set()
-    for g in getattr(b, "groups", []):
-        if not g <= have:
-            dead |= g
-    if dead:
-        mesh.faces[:] = [f for f in mesh.faces if _key(f) not in dead]
-
-
-def _reline_roofs(b, mesh):
-    """Damage hook: the kit drops a pitched roof's whole underside when a bite opens it (so it
-    is not seen from above), which leaves the slope's back showing through the broken gable.
-    Give the remaining pieces of such a slope a lowered, reversed lining instead."""
-    from city.geom import Face
-    lost = []
-    for f in b.intact.faces:
-        if f.tag == "underside" and abs(f.normal[2]) < 0.99:
-            k = _key(f)
-            if not any(_key(g) == k for g in mesh.faces if g.tag == "underside"):
-                lost.append(-f.normal)
-    if not lost:
-        return
-    add = []
-    for f in mesh.faces:
-        if f.tag == "roof" and any(float(f.normal @ n) > 0.999 for n in lost):
-            pts = [p - UP * 0.22 for p in reversed(f.pts)]
-            add.append(plain(pts, "#8a8478", tag="interior"))
-    mesh.faces.extend(add)
-    _ = Face
-
-
-def _damage_hook(b, mesh):
-    _drop_broken_groups(b, mesh)
-    _reline_roofs(b, mesh)
+    """Faces that stand or fall together in the damaged state (balconies, thin parts). They
+    carry the group's mark in their tag ("detail|g3"); the kit's damage cuts them at the hole
+    and keeps what is left while at least half of the group stands (else it all goes)."""
+    if not hasattr(b, "parts"):
+        b.parts = []
+    mark = f"g{len(b.parts)}"
+    b.parts.append(mark)
+    for f in faces:
+        f.tag = f"{f.tag.split('|')[0]}|{mark}"
 
 
 def rail_band(b, q0, q1, rail="rail_metal", rh=style.RAIL, two_sided=True):
@@ -430,7 +392,6 @@ def campus_a(b):
     for x in (-16.0, 16.0):
         b.chimney(x, hall.cy + 2.5, zr - 1.4, zr + 0.4, w=1.0, d=0.8, region="brick_plain")
     b.bite_hint = (-21.0, -6.0, 12.0)
-    b.damage_hook = _damage_hook
 
 
 # ==== towers =================================================================================

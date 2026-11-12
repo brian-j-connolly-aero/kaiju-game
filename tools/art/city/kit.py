@@ -118,6 +118,7 @@ class Building:
         self.solids: list[np.ndarray] = []      # convex volumes (corner points) for chunks and cavities
         self.keepsake: Mesh | None = None       # the piece that stays recognizable on the rubble
         self.bite_hint: tuple | None = None     # (x, y, z) where damage should bite first
+        self.holes: int | None = None           # holes the damage punches through walls (None: 1 to 3 by height)
         self.rng = np.random.default_rng(seed)
         self.seed = seed
         self.damage_hook = None                 # fn(building, damaged_mesh) for bespoke damage

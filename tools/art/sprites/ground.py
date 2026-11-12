@@ -283,12 +283,57 @@ def rubble() -> Img:
     return t.img()
 
 
+# ---- plaza ----------------------------------------------------------------------------------
+
+def plaza() -> Img:
+    """Civic squares (the city's plaza areas): big pale sandstone flags, 16 x 16 pixels (two
+    meters) on a straight grid, warmer and twice the size of the pavement's slabs so a square
+    reads as a place of its own. One quiet joint line, tones within 3 percent of each other,
+    a little grit; no bevels and no bond (they read as a wall laid flat). Slabs and joints
+    together average to the client's plaza color #d6cdb8."""
+    rng = np.random.default_rng(17)
+    joint = col("#c4bba6")
+    tones = [col("#d9d1bd"), col("#d7cfba"), col("#dcd4c0"), col("#d9d1bd"), col("#d6ceb9")]
+    speck_d, speck_l = col("#cfc6b1"), col("#e1d9c6")
+    t = Tile(tones[0])
+    for row in range(4):
+        for c in range(4):
+            x0, y0 = c * 16, row * 16
+            t.rect(x0, y0, x0 + 15, y0 + 15, tones[int(rng.integers(len(tones)))])
+            t.hline(x0, x0 + 15, y0 + 15, joint)
+            t.vline(x0 + 15, y0, y0 + 15, joint)
+            for _ in range(int(rng.integers(1, 4))):       # a few grains of grit on each flag
+                t.px(x0 + rng.integers(1, 14), y0 + rng.integers(1, 14), speck_d if rng.random() < 0.6 else speck_l)
+    return t.img()
+
+
+# ---- far ------------------------------------------------------------------------------------
+
+def far() -> Img:
+    """The plain round the city, out to where the fog ends: seen only far off and at a grazing
+    angle, under fog. Muted grey-green scrub in soft patches (no blades, no flowers, no lines),
+    the quietest tile of all, so that 18 kilometers of it never show the 8 m repeat."""
+    rng = np.random.default_rng(18)
+    base = col("#7c9a78")
+    t = Tile(base)
+    n = wrap_noise(rng, 32, 2)
+    t.a[n > 0.62] = col("#80a07c")
+    t.a[n < 0.36] = col("#78956f")
+    m = wrap_noise(rng, 16, 1)
+    t.a[(m > 0.70) & (n > 0.45)] = col("#84a37f")
+    for (x, y) in scatter(rng, 70, 4.0):
+        t.px(x, y, col("#748f70") if rng.random() < 0.55 else col("#86a482"))
+    return t.img()
+
+
 TILES = {
     "ground_asphalt": asphalt,
     "ground_sidewalk": sidewalk,
     "ground_grass": grass,
     "ground_water": water,
     "ground_rubble": rubble,
+    "ground_plaza": plaza,
+    "ground_far": far,
 }
 
 
@@ -312,6 +357,7 @@ def seam_error(img: Img) -> float:
 ANCHORS = {
     "ground_asphalt": "road", "ground_sidewalk": "sidewalk", "ground_grass": "grass",
     "ground_water": "water", "ground_rubble": "rubble_grey",
+    "ground_plaza": "#d6cdb8", "ground_far": "#7c9a78",       # the client's own colors for them
 }
 
 

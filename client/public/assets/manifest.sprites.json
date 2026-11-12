@@ -201,6 +201,54 @@
         "play": {"rows": [3], "col": 7, "frames": 1, "fps": 1}
       }
     },
+    "mk_chevron": {
+      "file": "sprites/markers.png",
+      "frame": [32, 32],
+      "worldHeight": 1,
+      "anims": {
+        "play": {"rows": [0], "col": 3, "frames": 1, "fps": 1}
+      }
+    },
+    "mk_circle": {
+      "file": "sprites/markers.png",
+      "frame": [32, 32],
+      "worldHeight": 1,
+      "anims": {
+        "play": {"rows": [0], "col": 0, "frames": 1, "fps": 1}
+      }
+    },
+    "mk_cross": {
+      "file": "sprites/markers.png",
+      "frame": [32, 32],
+      "worldHeight": 1,
+      "anims": {
+        "play": {"rows": [0], "col": 4, "frames": 1, "fps": 1}
+      }
+    },
+    "mk_diamond": {
+      "file": "sprites/markers.png",
+      "frame": [32, 32],
+      "worldHeight": 1,
+      "anims": {
+        "play": {"rows": [0], "col": 2, "frames": 1, "fps": 1}
+      }
+    },
+    "mk_dot": {
+      "file": "sprites/markers.png",
+      "frame": [32, 32],
+      "worldHeight": 1,
+      "anims": {
+        "play": {"rows": [0], "col": 5, "frames": 1, "fps": 1}
+      }
+    },
+    "mk_triangle": {
+      "file": "sprites/markers.png",
+      "frame": [32, 32],
+      "worldHeight": 1,
+      "anims": {
+        "play": {"rows": [0], "col": 1, "frames": 1, "fps": 1}
+      }
+    },
     "soldier_army_rifle": {
       "file": "sprites/army.png",
       "frame": [24, 32],
@@ -228,7 +276,9 @@
     "clouds_a": {"file": "textures/clouds_a.png", "ring": {"repeats": 4, "bottomDeg": -5.0, "sunGap": [258, 72]}},
     "clouds_b": {"file": "textures/clouds_b.png", "ring": {"repeats": 3, "bottomDeg": -5.0, "sunGap": [414, 58]}},
     "ground_asphalt": {"file": "textures/ground_asphalt.png", "tile": true},
+    "ground_far": {"file": "textures/ground_far.png", "tile": true},
     "ground_grass": {"file": "textures/ground_grass.png", "tile": true},
+    "ground_plaza": {"file": "textures/ground_plaza.png", "tile": true},
     "ground_rubble": {"file": "textures/ground_rubble.png", "tile": true},
     "ground_sidewalk": {"file": "textures/ground_sidewalk.png", "tile": true},
     "ground_water": {"file": "textures/ground_water.png", "tile": true}

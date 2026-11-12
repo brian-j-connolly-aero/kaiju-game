@@ -18,8 +18,28 @@ import { rigModelFromScene, type RigModel } from './rigModel';
 import { buildSpriteAtlas, type SpriteAtlas, type SpriteInfo, type SpriteSheetSource } from './spriteAtlas';
 
 export interface AssetProgress {
+  /** Files finished. */
   loaded: number;
   total: number;
+  /**
+   * 0..1 by weight: finished files, plus the part of each file still coming in (models report
+   * their bytes as they arrive). Moves while a big file downloads, so the bar never stands still
+   * for as long as one file takes over a slow connection.
+   */
+  fraction: number;
+}
+
+/** A model weighs this many small files on the loading bar (the building models are most of the bytes). */
+const MODEL_WEIGHT = 4;
+/** Bytes assumed for a file whose size the server did not say (a compressed transfer): the bar creeps toward its end. */
+const UNKNOWN_SIZE = 120_000;
+
+/** The share of a file that has arrived, from a download progress event. */
+export function downloadShare(loaded: number, total: number, lengthKnown: boolean): number {
+  if (loaded <= 0) return 0;
+  if (lengthKnown && total > 0) return Math.min(0.99, loaded / total);
+  // Size unknown: approach the end without reaching it.
+  return Math.min(0.95, loaded / (loaded + UNKNOWN_SIZE));
 }
 
 export interface AssetReport {
@@ -109,12 +129,14 @@ export class AssetStore {
    * atlas. A file that fails is reported once and replaced by its stand-in. Never rejects.
    */
   async preload(onProgress?: (p: AssetProgress) => void): Promise<void> {
-    const jobs: Array<() => Promise<void>> = [];
+    const jobs: Array<(share: (part: number) => void) => Promise<void>> = [];
+    const weights: number[] = [];
     const gltf = new GLTFLoader();
     for (const [id, entry] of Object.entries(this.manifest.models)) {
-      jobs.push(async () => {
+      weights.push(MODEL_WEIGHT);
+      jobs.push(async (share) => {
         try {
-          const loaded = await gltf.loadAsync(this.url(entry.file));
+          const loaded = await gltf.loadAsync(this.url(entry.file), (e: ProgressEvent) => share(downloadShare(e.loaded, e.total, e.lengthComputable)));
           this.models.set(id, rigModelFromScene(id, loaded.scene));
           this.realModels.add(id);
         } catch (err) {
@@ -124,6 +146,7 @@ export class AssetStore {
     }
     const textureLoader = new THREE.TextureLoader();
     for (const [id, entry] of Object.entries(this.manifest.textures)) {
+      weights.push(1);
       jobs.push(async () => {
         try {
           const texture = await textureLoader.loadAsync(this.url(entry.file));
@@ -144,6 +167,7 @@ export class AssetStore {
     }
     const sheets: SpriteSheetSource[] = [];
     for (const [file, entries] of sheetFiles) {
+      weights.push(1);
       jobs.push(async () => {
         try {
           const image = await loadImage(this.url(file));
@@ -156,14 +180,30 @@ export class AssetStore {
 
     let done = 0;
     const total = jobs.length;
-    onProgress?.({ loaded: 0, total });
+    const weightTotal = weights.reduce((a, b) => a + b, 0);
+    /** Weight arrived so far, per job (whole once the job is over). */
+    const arrived = new Float64Array(total);
+    let arrivedSum = 0;
+    const report = (): void => onProgress?.({ loaded: done, total, fraction: weightTotal > 0 ? Math.min(1, arrivedSum / weightTotal) : 1 });
+    const setArrived = (i: number, value: number): void => {
+      // Never backwards: a retried or oddly reported download does not pull the bar back.
+      if (value <= arrived[i]) return;
+      arrivedSum += value - arrived[i];
+      arrived[i] = value;
+    };
+    report();
     // A few at a time: plenty for small files, and gentle on a tunnel.
-    const queue = jobs.slice();
+    let next = 0;
     const worker = async (): Promise<void> => {
-      for (let job = queue.shift(); job; job = queue.shift()) {
-        await job();
+      while (next < total) {
+        const i = next++;
+        await jobs[i]((part) => {
+          setArrived(i, part * weights[i]);
+          report();
+        });
+        setArrived(i, weights[i]);
         done++;
-        onProgress?.({ loaded: done, total });
+        report();
       }
     };
     await Promise.all(Array.from({ length: Math.min(6, Math.max(1, total)) }, worker));

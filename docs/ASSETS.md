@@ -110,7 +110,9 @@ half-built), `faith_belltruck` (`hull`, `bell`), `faith_float`, `faith_ark` (`ba
   `prop_truck`, `prop_kiosk`, `prop_tree_a`, `prop_tree_b`, `prop_lamp`, `prop_trafficlight`,
   `prop_bench`, `prop_hydrant`, `prop_billboard`, `prop_busstop`, plus `prop_car_wreck`.
 - Ground tiles (64 px, tiling): `textures/ground_asphalt.png`, `ground_sidewalk.png`,
-  `ground_grass.png`, `ground_water.png`, `ground_rubble.png`. **One tile covers 8 × 8 m** in
+  `ground_grass.png`, `ground_water.png`, `ground_rubble.png`, plus `ground_plaza.png` (the
+  city's squares: big pale sandstone flags, 2 m each) and `ground_far.png` (the plain round the
+  city out to the fog: muted grey-green, the quietest tile). **One tile covers 8 × 8 m** in
   the game, so a ground pixel is 12.5 cm (a character pixel is 6.9 cm): a paving slab is 8 px.
 - Sky: `textures/clouds_a.png`, `clouds_b.png` (dramatic cumulus with alpha, 512 × 256 px).
   These are **horizon panoramas**, side views of clouds standing on the horizon: u runs around
@@ -134,6 +136,10 @@ Pixel art, drawn by script. Sheets are grids of equal cells. Characters are flat
   debris bits (4 different chunks, one sprite each), soft glow, laser dot, shockwave ring,
   fire (6). 64 px cells. The explosion, fire and flash are full-color pictures for ordinary
   alpha blending; only glow, spark and laser dot are added (manifest field `"blend"`).
+- `markers.png`: the world markers `mk_circle` (humans), `mk_triangle` (the kaiju), `mk_diamond`
+  (a charging volley), `mk_chevron`, `mk_cross`, `mk_dot`, one 32 × 32 px cell each in one row
+  (`worldHeight` 1). White with a see-through inside and a thin dark edge; the client tints
+  each copy.
 - Tier 2: `science.png` (lab coats with ray guns), `faith.png` (fictional clergy and choir
   members of many traditions, drawn with warmth and dignity), pilots are not needed.
 
@@ -161,8 +167,11 @@ marks). No text inside icons. No third-party icon sets.
 - System: `ui_offline`, `ui_warning`, `ui_copy` (this seat was opened somewhere else),
   `ui_skull` (eliminated), `ui_trophy`, `ui_clock` (time ran out), `ui_newspaper`, `ui_sound`,
   `ui_asleep` (a lobby seat the start no longer waits for: not ready after 20 s),
-  `ui_outdated` (this page is from an older build than the server: reload it). The last two
-  are drawn in code until the art team makes them (`client/src/ui/iconArt.ts`).
+  `ui_outdated` (this page is from an older build than the server: reload it).
+- Settings and the drone: `ui_settings` (the settings panel: a cog), `ui_invert` (turn the
+  up-down look around), `ui_fullscreen`, `ui_lowres` (lower resolution for slow computers),
+  `ui_rise` and `ui_sink` (the news drone up and down). `ui_controls` (the controls card) is
+  still drawn in code (`client/src/ui/iconArt.ts`).
 - `skyline.svg`: the destruction-bar skyline with three taller towers at 21%, 57% and 100%.
   viewBox 400 × 64, drawn to be stretched into the bar (560 × 46 px; the root carries
   `preserveAspectRatio="none"`). Two paths: `sky-city` (clip it from the left as the bar fills)

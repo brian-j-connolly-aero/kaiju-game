@@ -1,7 +1,7 @@
 # Sprites, effects, ground tiles and clouds
 
 Everything flat in Monster Battle 9001 is pixel art drawn by the Python scripts in this
-folder: the soldiers, the fleeing civilians, the effects sheet, the five ground tiles and the
+folder: the soldiers, the fleeing civilians, the effects sheet, the world markers, the seven ground tiles and the
 two cloud panoramas. No image is edited by hand; to change a picture, change its script and
 run the build. The contract is `docs/ASSETS.md` (sections 3, 4 and 7).
 
@@ -11,7 +11,8 @@ tools/art/sprites/
   pix.py          the pixel kit: a tiny picture class, outlines, sheets, review-picture helpers
   characters.py   soldiers and civilians (24 x 32 pixel cells)
   fx.py           the effects sheet (64 x 64 pixel cells)
-  ground.py       the five seamless ground tiles (64 x 64)
+  markers.py      the world markers mk_* (32 x 32 pixel cells, white, tinted by the game)
+  ground.py       the seven seamless ground tiles (64 x 64)
   clouds.py       the two cloud panoramas (512 x 256)
   gameview.py     a small software camera for the review pictures: it draws tiles, cloud rings
                   and sprites the way the game does (8 m per tile, rings, upright billboards)
@@ -36,7 +37,8 @@ What it writes:
 | `client/public/assets/sprites/army.png` | 512 x 128: both soldiers |
 | `client/public/assets/sprites/civilians.png` | 512 x 256: six civilians |
 | `client/public/assets/sprites/fx.png` | 512 x 512: all effects (the two bottom rows are free) |
-| `client/public/assets/textures/ground_*.png` | five 64 x 64 tiles |
+| `client/public/assets/textures/ground_*.png` | seven 64 x 64 tiles (plaza and far added for the city squares and the plain round the city) |
+| `client/public/assets/sprites/markers.png` | the six world markers, one row of 32 x 32 cells (review: `sprites_markers.png`) |
 | `client/public/assets/textures/clouds_a.png`, `clouds_b.png` | two 512 x 256 panoramas |
 | `client/public/assets/manifest.sprites.json` | the `sprites` and `textures` manifest sections |
 | `docs/art/previews/*.png` | review pictures (list at the end) |

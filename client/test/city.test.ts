@@ -261,6 +261,26 @@ describe('the ground at night', () => {
   });
 });
 
+describe('the ground at sunset', () => {
+  it('turns the pale paving to warm stone under the violet sky light, and only at sunset', () => {
+    const city = getCity().city;
+    const ground = buildGround(city, fakeAssets());
+    const surfaces = ground.userData.nightSurfaces as { material: THREE.MeshLambertMaterial }[];
+    const paving = surfaces[1].material.color;
+    setGroundNight(ground, 0, 0);
+    expect(paving.getHex()).toBe(0xffffff);
+    // The sunset preset: a third of the way to night, fully warmed.
+    setGroundNight(ground, 0.35, 1);
+    // Blue is cut well below red and green: the violet light (rich in red and blue, short of
+    // green) lands on it as stone, not lavender.
+    expect(paving.b).toBeLessThan(paving.r * 0.6);
+    expect(paving.b).toBeLessThan(paving.g * 0.6);
+    // Back to night: no warmth left over.
+    setGroundNight(ground, 1, 0);
+    expect(paving.r).toBeLessThan(0.5);
+  });
+});
+
 describe('lobby: who the start no longer waits for', () => {
   const lobby = {
     host: 0,

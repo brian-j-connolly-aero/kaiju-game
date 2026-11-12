@@ -30,7 +30,7 @@ Summary, most important first:
 | 4 | Debris: four one-frame sprites, pick one per particle | `client/src/render/effects.ts` line 74 | nice |
 | 5 | Fire and the ground explosion stand on the bottom edge of their cell | `client/src/render/effects.ts` lines 119 and 190 | nice |
 | 6 | Nothing to do: walk speed, soldier and civilian sheets, ground scale | | information |
-| 7 | Open, not part of this review: `ground_rubble` is never drawn; `ground_plaza` and `ground_far` have no art | `client/src/render/ground.ts` lines 68 and 93 | information |
+| 7 | Open, not part of this review: `ground_rubble` is never drawn; `ground_plaza` and `ground_far` have art now (art-polish round) | `client/src/render/ground.ts` lines 68 and 93 | information |
 
 ---
 
@@ -260,6 +260,6 @@ lowest pixels are on the last row). The `facing` batch centers a quad on its poi
   says destroyed ground turns flat grey; the tile is now quiet enough to cover whole blocks
   (`ground_views.png`). When destroyed footprints get a ground patch, draw it like the parks
   (`ground.ts` line 92), one layer above the base.
-- `ground_plaza` and `ground_far` (`ground.ts` lines 93 and 68) are not in `docs/ASSETS.md`
-  and have no art, only procedural stand-ins. If they are to stay, they need a line in the
-  contract and a tile each from the sprites family.
+- `ground_plaza` and `ground_far` (`ground.ts`): done. Both are in `docs/ASSETS.md` and the
+  sprites family draws them (`tools/art/sprites/ground.py`, review pictures
+  `ground_plaza.png`, `ground_far.png`); the client picks them up from the manifest.

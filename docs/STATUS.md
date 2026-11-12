@@ -649,7 +649,7 @@ client/src/game/
                     cameraClearance (holds a first-person or chase camera short of a standing wall)
   autoplay.ts       the autopilot for both sides and the drone
 client/src/ui/      hud.ts, commandWheel.ts, mapView.ts, subtitles.ts, settingsPanel.ts, icons.ts,
-                    iconArt.ts (stand-in icons)
+                    iconArt.ts (stand-in icons), controlsCard.ts (every control of a role, as pictures)
 client/src/audio/   audioEngine.ts (effects with voice limits, staged music, voice queue with ducking, limiter, master
                     volume, cache of decoded files), matchAudio.ts (events and frame state -> sound); see 7.6
 client/test/        net.test.ts, game.test.ts, manifestTool.test.ts, audioEngine.test.ts, matchAudio.test.ts
@@ -699,7 +699,7 @@ rigs are posed, so the kaiju camera sits exactly on `cam_fp`) -> audio -> `rende
 | `render/structureGeometry.ts`, `render/cityView.ts` | All 40 archetypes come from their art files (states, chunk meshes, atlas, night atlas, wall tint). The painted boxes remain only as the fallback for a missing file. One instanced mesh per archetype, state and material, never culled (the whole city is 360,000 triangles); props are repacked around the camera. | Nothing needed for the budget. District roof colors (`docs/art/client-notes-city.md` section 6) if the art adds a second mask. |
 | `render/kaijuAnimator.ts` | One pose function for the lizard node list; the arms blend toward the art's pose targets (`poses` in the manifest; the box stand-in has the old numbers as its fallback). Swipe wind-up, stomp, roar, beam and death arms are still built-in numbers. | Per-kind animation sets for the Tier 2 kaiju; footfall timing against the art. |
 | `render/effects.ts`, `projectilesView.ts` | Sparkler bursts, dust, rings and flashes from `fx.png`; capped at 520 particles, and a bright particle is never drawn wider than 0.6 of its distance from the camera. `fx_debris_1..4` and lingering fire are drawn by nothing yet. No searchlights or tracers at night. | The effects pass (night fires, tracers, searchlights, water splashes, beam scorch, debris). |
-| `render/sky.ts`, `render/ground.ts` | Three presets, the two cloud panoramas on horizon rings (sun gap at the sunset sun), a sun or moon disc; windows light up at sunset and night through the city's night atlas; the ground goes to dim warm greys at night (paving under blue moonlight read as water). The afternoon's light from below is a pale paving grey (it was olive, and turned cream walls in shade olive). | Per-stage polish. |
+| `render/sky.ts`, `render/ground.ts` | Three presets, the two cloud panoramas on horizon rings (sun gap at the sunset sun), a sun or moon disc; windows light up at sunset and night through the city's night atlas; the ground goes to dim warm greys at night (paving under blue moonlight read as water) and to warm stone at sunset (it read lavender under the violet sky light). The afternoon's light from below is a pale paving grey (it was olive, and turned cream walls in shade olive). | Per-stage polish. |
 | `render/crowd.ts` | 260 civilians near the kaiju who run from it and wander otherwise; they do not follow streets. | Street-following crowds, panic sound. |
 | `ui/hud.ts`, `styles.css` | Functional HUD: skyline bar with three marks, sun-and-moon arc, meters, squad pips, verb hints with glyphs, crosshair, status pictures. Cramped below about 700 px wide. | The designed HUD (skyline that crumbles, portraits, stat bars). |
 | `ui/iconArt.ts` | Stand-in drawings for every icon id; the 69 real SVG files in `assets/ui/` already replace them at run time. | Delete entries once the art list is complete. |
@@ -708,7 +708,7 @@ rigs are posed, so the kaiju camera sits exactly on `cam_fp`) -> audio -> `rende
 | `audio/matchAudio.ts` | Every event has a sound, and the audio directors' notes for the client are applied (7.6); combat stem follows a simple "shots or lasers recently" heat. No tank engine, march or crowd loops; none of the Tier 2 unit sounds (their units do not exist yet). Nobody has listened to any of it: all checks are counts and measured levels. | A listening pass, unit loops, per-stage ambience balance, the Tier 2 wiring in `docs/audio/client-notes-sfx.md` section 4. |
 | `game/autoplay.ts` | Plays both sides well enough to finish a match; no pathfinding for the kaiju, street routing for humans; the squad parks and fires charged volleys together with the others as the squad bots do (`volleyVerdict`). | Nothing: it is a test tool. |
 | `game/input/actions.ts` | Default bindings only; bindings are data and are stored, but there is no rebinding screen (the settings panel has volume, mouse speed, inverted look and fullscreen). Gamepad: standard mapping, never tried on real hardware; the menus cannot be worked with a gamepad (Tab, Space and Enter do work on their buttons). | Key rebinding; gamepad focus in the menus; controller tuning. |
-| `ui/settingsPanel.ts`, `ui/iconArt.ts` | The panel's gear, inverted-look, fullscreen and half-resolution pictures, and the drone's up and down arrows (`ui_settings`, `ui_invert`, `ui_fullscreen`, `ui_lowres`, `ui_rise`, `ui_sink`) are drawn in code; there is no art file for them. | Six icons from the art team, under those names. |
+| `ui/settingsPanel.ts`, `ui/iconArt.ts` | The settings and drone icons now have art files (art polish round). The controls card's picture, `ui_controls`, is still drawn in code. | One icon from the art team, under that name. |
 
 ### 7.4 Decisions (where the docs left it open)
 
@@ -781,9 +781,10 @@ rigs are posed, so the kaiju camera sits exactly on `cam_fp`) -> audio -> `rende
 - **Default controls.** Keyboard and mouse: WASD move, mouse look, left button strike / fire,
   right button grab / hold for the command wheel (also Q), Space brace, Q roar, E
   special / call-in, F molt (hold), 1 to 4 direct commands, M or Tab map, V camera, Escape
-  settings; the drone rises with Space and comes down with C. Gamepad: sticks, RT strike /
-  fire, LT grab, LB brace / wheel, RB special, Y roar, B molt, X call-in, d-pad commands (same
-  directions as the wheel), Back map, right stick click camera, Start settings.
+  settings, H the controls card; the drone rises with Space and comes down with C. Gamepad:
+  sticks, RT strike / fire, LT grab, LB brace / wheel, RB special, Y roar, B molt, X call-in,
+  d-pad commands (same directions as the wheel), Back map, right stick click camera, Start
+  settings, left stick click the controls card. The full table is in `DESIGN.md` section 8.
 - **No modifier keys.** Nothing is bound to Control, Alt, Meta or Shift, or to a function key:
   with one of those held, a movement key becomes a browser shortcut that a page cannot cancel
   (Ctrl+W closes the tab; Shift+Escape opens the browser's task manager). The drone came down
@@ -1155,8 +1156,8 @@ volleys, the district tint. Still open:
 
 - **Stand-ins still in use:** the six marker sprites (`mk_*`); the textures `window_tile`,
   `window_tile_lit` (only for a missing building file now), `ground_plaza`, `ground_far`; the
-  icons `ui_settings`, `ui_invert`, `ui_fullscreen`, `ui_rise`, `ui_sink`, `ui_lowres`,
-  `ui_asleep`, `ui_outdated` (drawn in code).
+  icon `ui_controls` (drawn in code; the other code-drawn icons got art files in the art
+  polish round).
 - **Not done, optional:** automatic lowering of resolution on slow frames; camera roll during
   a stagger; debris sprites (nothing spawns debris yet); district roof colors
   (`docs/art/client-notes-city.md` section 6).
@@ -1239,6 +1240,74 @@ picture named here: `/tmp/mb-scratch/client-city/`.
 ### 11.5 Still open
 
 - The sunset ground reads lavender (pale paving under the sunset's violet sky light). Not
-  wrong, not pretty.
+  wrong, not pretty. (Fixed in section 12.)
 - Landmark pictures on the map are drawn once, in daylight colors.
 - Building models are 5.5 MB to download; over a slow tunnel the first load takes a few seconds.
+  (The loading screen now shows it: section 12.)
+
+## 12. Client polish before the first playtest (12 November, the client-polish task)
+
+Scratch logs, scripts and every picture named here: `/tmp/mb-scratch/client-polish/`
+(`PROGRESS.md` is the running log).
+
+### 12.1 What changed
+
+- **The controls card** (`client/src/ui/controlsCard.ts`). Every control of the player's role
+  as pictures: the button's glyph on the device in use, then a picture of what it does (a
+  ring around a glyph means hold it, a small arrow means "then", the HUD's growing triangles
+  mark controls that only exist at some stages). The kaiju's card is built from its action
+  table (swipe, stomp, grab, grabbing tanks and building pieces from stage 2, throw, eat,
+  brace, roar, beam, molt); the squad's shows move, look, fire, the call-in, the command wheel
+  and its four commands, the volley (hold and charge, full charge, then the leader's own shot),
+  the map with its click and right click, the drone, camera, settings and the card itself.
+  It switches between keyboard and controller glyphs when the device in use switches.
+  Where: a yellow button beside the gear in the lobby (for the role picked there) and top right
+  on the briefing screen; open by itself for the whole briefing (the portrait and names step
+  aside meanwhile); in a match it opens and closes with **H** or a **click of the left stick**
+  (the one controller button nothing used), and that key is shown beside the settings gear.
+  In a match it takes no mouse input, so the captured pointer stays captured and the game
+  runs on (walking with it open covers the same distance as with it closed). New action
+  `controls`; `ACTION_USERS` in `actions.ts` says who presses each action, and
+  `client/test/controlsCard.test.ts` fails if a pressable action is missing from a card.
+  The card's icon `ui_controls` is drawn in code for now. The full table: `DESIGN.md` section 8.
+- **Sunset ground.** At sunset the ground is multiplied by a warm tint (`SUNSET_TINT` in
+  `render/ground.ts`, driven by a new `sunset` amount in the sky presets): paving reads as
+  warm sandstone under the violet sky, roads as dark grey, the fields beyond the city stay
+  dark green. Tuned by eye on frames looking toward the sun and away from it.
+- **Loading screen.** The page shows the name, the kaiju and a bar from the first moment
+  (written into `index.html`, so it is there while the 1.3 MB game code downloads). The boot
+  bar follows the bytes of each model as they arrive, never moves backwards, a band of light
+  runs along it and the kaiju breathes the whole time.
+
+### 12.2 Measured
+
+| What | Figure |
+| --- | --- |
+| Load over a simulated 2 megabit per second line (one shared line, local server) | name and bar at 0.3 s; game code in at 5.4 s; home screen at 36 s; the bar never stood still longer than the 0.5 s sampling step; all 65 models real; no console error |
+| Controls card open, software rendering, 960 x 540 | frames a second drop by about a quarter (for example 7.8 to 6.2); an animated ring and a dimming sheet had halved them and were removed. A real graphics card should not notice. |
+| Tests | 56 files, 735 tests (8 new) |
+
+### 12.3 Runs
+
+- `npm run check`: passed. `npm run build`: done.
+- `shots.mjs`: passed, zero console errors, all three stages on both sides; 100 to 121 draw
+  calls, 387,000 to 426,000 triangles.
+- `smoke.mjs` and `scripted.mjs`: see 12.5.
+- Pictures for the owner: `docs/progress/controls-squad.png`, `docs/progress/controls-kaiju.png`
+  (the card in a match, keyboard and mouse) and a new `docs/progress/city-wrecked.png` (sunset,
+  stage 2, from above the kaiju as before). Also checked by eye: the card with controller
+  glyphs, at 1366 x 768, in the lobby (both roles) and on the briefing screen against a real
+  server.
+
+### 12.4 Still open
+
+- District roof colors: not done. It needs a second color mask or a second house model from
+  the art side (`docs/art/client-notes-city.md` section 6).
+- The controller glyphs come from the art: the directional pad's four directions and the
+  face buttons are small differences in a small picture; on the card they are drawn larger,
+  but nobody has tried them with a real controller in hand.
+- In the sandbox, the first frame after jumping straight to stage 3 can still show the
+  afternoon sky while the sky changes over; halfway between sunset and night the whole view
+  goes magenta for a few seconds. Neither is new, both are short.
+- The card's own icon is drawn in code; the art team may want to replace `ui_controls`.
+

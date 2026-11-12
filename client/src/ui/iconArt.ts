@@ -118,6 +118,8 @@ const ART: Record<string, string> = {
   ui_outdated: `<path d="M10 8 L42 8 L54 20 L54 56 L10 56 Z" ${S} stroke-width="4"/><path d="M42 8 L42 20 L54 20" ${S} stroke-width="4"/><path d="M42 38 A10 10 0 1 1 36 29" ${S}/><path d="M33 22 L37 29 L30 32" ${S} stroke-width="4"/>`,
   ui_newspaper: `<rect x="8" y="10" width="48" height="44" ${S} stroke-width="4"/><path d="M14 20 L50 20" ${S} stroke-width="6"/>`,
   // --- settings and the drone (drawn here only; no art file yet) ---
+  // The controls card: a card with a keycap and a directional pad on it.
+  ui_controls: `<rect x="4" y="12" width="56" height="40" rx="7" ${S} stroke-width="4"/><rect x="13" y="23" width="17" height="17" rx="3" ${F}/><path d="M46 21 L46 43 M35 32 L57 32" ${S} stroke-width="6" stroke-linecap="butt"/>`,
   ui_settings: `<path d="${cogPath(32, 32, 28, 20, 9, 8)}" fill="currentColor" fill-rule="evenodd" stroke="none"/>`,
   ui_invert: `<path d="M20 54 L20 10 M8 22 L20 10 L32 22" ${S}/><path d="M44 10 L44 54 M32 42 L44 54 L56 42" ${S}/>`,
   ui_fullscreen: `<path d="M8 22 L8 8 L22 8 M42 8 L56 8 L56 22 M56 42 L56 56 L42 56 M22 56 L8 56 L8 42" ${S}/><rect x="22" y="24" width="20" height="16" rx="2" ${F}/>`,

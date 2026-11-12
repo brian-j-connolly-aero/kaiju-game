@@ -25,7 +25,7 @@
       "kind": "landmark",
       "nodes": ["chunk_00", "chunk_01", "chunk_02", "chunk_03", "chunk_04", "chunk_05", "chunk_06", "chunk_07", "chunk_08", "chunk_09", "chunk_10", "chunk_11", "chunk_12", "chunk_13", "chunk_14", "chunk_15", "chunk_16", "chunk_17", "chunk_18", "damaged", "intact", "rubble"],
       "size": [110.8, 40.0, 50.2],
-      "tris": 1186,
+      "tris": 1190,
       "chunks": 19,
       "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint", "blend": "multiply", "base": "#ddd6c6", "colors": ["#ddd6c6", "#8fa0b5", "#f5f2ea", "#bdb9b0", "#a8d4f0"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
       "district": "downtown"

@@ -234,9 +234,17 @@ body {
 .boot-icon {
   font-size: 90px;
   color: var(--kaiju);
+  animation: boot-breathe 1.6s ease-in-out infinite;
+}
+
+@keyframes boot-breathe {
+  50% {
+    transform: translateY(-6px) scale(1.06);
+  }
 }
 
 .boot-track {
+  position: relative;
   width: min(420px, 70vw);
   height: 14px;
   border-radius: 7px;
@@ -244,11 +252,37 @@ body {
   overflow: hidden;
 }
 
+/* A band of light that runs along the bar for as long as anything is loading. */
+.boot-track::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 30%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  animation: boot-sheen 1.3s linear infinite;
+}
+
+@keyframes boot-sheen {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(340%);
+  }
+}
+
 .boot-fill {
   height: 100%;
   width: 0;
   background: var(--kaiju);
-  transition: width 0.15s;
+  transition: width 0.25s;
+}
+
+/* Before the game's code has arrived there is nothing to measure: a short stub of the bar. */
+.boot-track.waiting .boot-fill {
+  width: 4%;
 }
 
 /* The game could not start (no 3D view in this browser, or a broken download). */
@@ -1498,6 +1532,290 @@ body[data-screen='end'] .subtitles {
   right: 2vw;
   font-size: 28px;
   padding: 8px 10px;
+}
+
+/* The button that opens the controls card: beside the gear in the lobby, top right on the briefing. */
+.controls-open {
+  position: absolute;
+  top: 2vh;
+  right: calc(2vw + 66px);
+  font-size: 28px;
+  padding: 8px 12px;
+  color: var(--volley);
+  border-color: var(--volley);
+  box-shadow: 0 0 10px rgba(255, 217, 26, 0.35);
+}
+
+.briefing .controls-open {
+  right: 2vw;
+}
+
+/* The briefing shows the card by itself: the portrait and the names step aside while it is open. */
+body:has(.controls:not(.hidden)) .briefing-portrait,
+body:has(.controls:not(.hidden)) .briefing-sides {
+  visibility: hidden;
+}
+
+/* --- controls card -------------------------------------------------------------------------- */
+
+.controls {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  /* Clear of the HUD's top row and of the subtitles. */
+  padding: max(70px, 11vh) 2vw var(--subs-band);
+  background: rgba(8, 10, 18, 0.4);
+  pointer-events: auto;
+  z-index: 7;
+}
+
+/* In a match: no mouse input at all, the pointer stays with the game. */
+.controls.passive {
+  pointer-events: none;
+  background: none;
+}
+
+.controls-card {
+  /* One unit: the size of a button glyph. */
+  --u: clamp(20px, 5.4vh, 42px);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--u) * 0.25);
+  width: min(calc(var(--u) * 30), 100%);
+  max-height: 100%;
+  padding: calc(var(--u) * 0.3) calc(var(--u) * 0.45);
+  background: rgba(14, 18, 30, 0.9);
+  border: 2px solid var(--panel-edge);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.controls-card.role-kaiju {
+  border-color: rgba(255, 122, 26, 0.55);
+}
+
+.controls-card.role-squad {
+  border-color: rgba(30, 200, 224, 0.55);
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 0.35);
+  font-size: var(--u);
+}
+
+.card-role.kaiju,
+.card-name.kaiju,
+.card-pic.kaiju {
+  color: var(--kaiju);
+}
+
+.card-role.human,
+.card-name.human,
+.card-pic.human {
+  color: var(--human);
+}
+
+.card-pic.volley {
+  color: var(--volley);
+}
+
+.card-pic.dim {
+  opacity: 0.45;
+}
+
+.card-name {
+  font-size: calc(var(--u) * 0.85);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.card-device {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+  opacity: 0.55;
+  font-size: calc(var(--u) * 0.8);
+}
+
+.card-close {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--volley);
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: calc(var(--u) * 0.18);
+}
+
+.role-kaiju .card-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.card-tile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(var(--u) * 1.75);
+  padding: calc(var(--u) * 0.14) calc(var(--u) * 0.2);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.card-tile.wide {
+  grid-column: span 2;
+}
+
+.card-tile.card-squad {
+  background: rgba(30, 200, 224, 0.08);
+}
+
+.card-tile.card-verbs {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.card-parts {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 0.2);
+  font-size: var(--u);
+}
+
+.card-glyph {
+  font-size: var(--u);
+}
+
+.card-pic {
+  font-size: calc(var(--u) * 1.05);
+}
+
+/* Controller glyphs draw the whole controller or pad: they need more room to show which button. */
+.controls-card[data-device='gamepad'] .card-glyph {
+  font-size: calc(var(--u) * 1.25);
+}
+
+.controls-card[data-device='gamepad'] .card-glyph.card-stick {
+  font-size: calc(var(--u) * 1.3);
+}
+
+/* A stick tilted: four small arrows around it. */
+.card-tilt {
+  display: inline-flex;
+  padding: calc(var(--u) * 0.2);
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cg fill='%23f4f6fb' opacity='0.8'%3E%3Cpath d='M20 0 L24 5 L16 5Z'/%3E%3Cpath d='M20 40 L24 35 L16 35Z'/%3E%3Cpath d='M0 20 L5 16 L5 24Z'/%3E%3Cpath d='M40 20 L35 16 L35 24Z'/%3E%3C/g%3E%3C/svg%3E")
+    center / 100% 100% no-repeat;
+}
+
+/* "Then": a small arrow between two pictures. */
+.card-then {
+  width: 0;
+  height: 0;
+  border-left: calc(var(--u) * 0.26) solid rgba(255, 255, 255, 0.55);
+  border-top: calc(var(--u) * 0.2) solid transparent;
+  border-bottom: calc(var(--u) * 0.2) solid transparent;
+}
+
+/* "Hold it": a ring that fills around the button. */
+.card-hold {
+  position: relative;
+  display: inline-flex;
+  padding: calc(var(--u) * 0.14);
+}
+
+.card-hold::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  /* Three quarters filled, and still: an animated ring halved the frame rate on a weak machine. */
+  background: conic-gradient(var(--volley) 0.72turn, rgba(255, 255, 255, 0.18) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
+}
+
+/* The movement keys as they sit on a keyboard. */
+.card-move {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: calc(var(--u) * 0.72);
+  line-height: 0;
+}
+
+.card-key {
+  font-size: calc(var(--u) * 0.72);
+}
+
+/* The stages a control is limited to: the HUD's three growing triangles. */
+.card-stages {
+  display: flex;
+  margin-left: calc(var(--u) * 0.1);
+  align-items: flex-end;
+  gap: 1px;
+  color: rgba(255, 255, 255, 0.22);
+}
+
+.card-stage.on {
+  color: var(--kaiju);
+}
+
+.card-stage-1 {
+  font-size: calc(var(--u) * 0.32);
+}
+
+.card-stage-2 {
+  font-size: calc(var(--u) * 0.42);
+}
+
+.card-stage-3 {
+  font-size: calc(var(--u) * 0.54);
+}
+
+/* The command wheel in miniature. */
+.card-wheel {
+  position: relative;
+  width: calc(var(--u) * 1.9);
+  height: calc(var(--u) * 1.9);
+  font-size: calc(var(--u) * 0.66);
+  color: var(--human);
+}
+
+.card-wheel .icon {
+  position: absolute;
+}
+
+.card-wheel-up {
+  left: 35%;
+  top: 0;
+}
+
+.card-wheel-right {
+  right: 0;
+  top: 35%;
+}
+
+.card-wheel-down {
+  left: 35%;
+  bottom: 0;
+}
+
+.card-wheel-left {
+  left: 0;
+  top: 35%;
+  color: var(--volley);
+}
+
+.hud-menus {
+  display: flex;
+  gap: 8px;
 }
 
 /* --- debug overlay -------------------------------------------------------------------------- */

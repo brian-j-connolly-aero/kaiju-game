@@ -20,17 +20,44 @@ const NIGHT_TINT = {
   water: 0x9aa6b8,
 };
 
+/**
+ * What each surface is multiplied by at sunset (linear red, green, blue). The sunset's sky light
+ * is violet, and pale paving under it read lavender; this pulls it back to warm stone (less
+ * blue, more green and red) while the sky itself stays violet. Asphalt and grass are warmed a
+ * little so they keep their place next to it; water keeps the sky's color. Tuned by eye on
+ * stage 2 frames looking toward the sun and away from it.
+ */
+const SUNSET_TINT = {
+  // The violet light is short of green: stone needs more green back than red.
+  paving: [1.28, 1.62, 0.6],
+  // The fields beyond the city are green: more green there turns them olive.
+  far: [1.1, 1.0, 0.85],
+  grass: [1.05, 1.1, 0.8],
+  asphalt: [1.3, 1.45, 0.8],
+  water: [1, 1, 1],
+} as const;
+
 interface NightSurface {
   material: THREE.MeshLambertMaterial;
   night: THREE.Color;
+  sunset: readonly [number, number, number];
 }
 
-/** Darkens the ground toward its night colors: 0 by day, 1 at night (`Sky.night`). */
-export function setGroundNight(ground: THREE.Group, amount: number): void {
+/**
+ * Tints the ground for the time of day: `night` 0 by day, 1 at night (`Sky.night`), dims it
+ * toward its night colors; `sunset` 0 to 1 (`Sky.sunset`) warms it against the violet sky light.
+ */
+export function setGroundNight(ground: THREE.Group, night: number, sunset = 0): void {
   const surfaces = ground.userData.nightSurfaces as NightSurface[] | undefined;
-  if (!surfaces || ground.userData.night === amount) return;
-  ground.userData.night = amount;
-  for (const s of surfaces) s.material.color.setRGB(1, 1, 1).lerp(s.night, Math.max(0, Math.min(1, amount)));
+  const key = `${night}:${sunset}`;
+  if (!surfaces || ground.userData.light === key) return;
+  ground.userData.light = key;
+  const n = Math.max(0, Math.min(1, night));
+  const w = Math.max(0, Math.min(1, sunset));
+  for (const s of surfaces) {
+    const c = s.material.color.setRGB(1, 1, 1).lerp(s.night, n);
+    c.setRGB(c.r * (1 + (s.sunset[0] - 1) * w), c.g * (1 + (s.sunset[1] - 1) * w), c.b * (1 + (s.sunset[2] - 1) * w));
+  }
 }
 
 /** Meters of ground one texture tile covers. */
@@ -86,8 +113,8 @@ export function buildGround(city: CityData, assets: AssetStore): THREE.Group {
   const half = city.half;
   const nightSurfaces: NightSurface[] = [];
   group.userData.nightSurfaces = nightSurfaces;
-  const night = (material: THREE.MeshLambertMaterial, color: number): THREE.MeshLambertMaterial => {
-    nightSurfaces.push({ material, night: new THREE.Color(color) });
+  const night = (material: THREE.MeshLambertMaterial, color: number, sunset: readonly [number, number, number] = SUNSET_TINT.paving): THREE.MeshLambertMaterial => {
+    nightSurfaces.push({ material, night: new THREE.Color(color), sunset });
     return material;
   };
 
@@ -96,7 +123,7 @@ export function buildGround(city: CityData, assets: AssetStore): THREE.Group {
   const F = 9000;
   quad(far, -F, -F, F, -F, F, F, -F, F);
   const farTexture = assets.texture('ground_far');
-  group.add(flatMesh(far, -0.25, night(surface(farTexture), NIGHT_TINT.paving)));
+  group.add(flatMesh(far, -0.25, night(surface(farTexture), NIGHT_TINT.paving, SUNSET_TINT.far)));
 
   // The city square.
   const land: number[] = [];
@@ -120,10 +147,10 @@ export function buildGround(city: CityData, assets: AssetStore): THREE.Group {
       else out.push(pa.x, pa.y, pb.x, pb.y, pc.x, pc.y);
     }
   }
-  if (byKind.park.length > 0) group.add(flatMesh(byKind.park, 0.03, night(surface(assets.texture('ground_grass'), 1), NIGHT_TINT.grass)));
+  if (byKind.park.length > 0) group.add(flatMesh(byKind.park, 0.03, night(surface(assets.texture('ground_grass'), 1), NIGHT_TINT.grass, SUNSET_TINT.grass)));
   if (byKind.plaza.length > 0) group.add(flatMesh(byKind.plaza, 0.03, night(surface(assets.texture('ground_plaza'), 1), NIGHT_TINT.paving)));
   if (byKind.water.length > 0) {
-    const water = flatMesh(byKind.water, 0.05, night(surface(assets.texture('ground_water'), 2), NIGHT_TINT.water));
+    const water = flatMesh(byKind.water, 0.05, night(surface(assets.texture('ground_water'), 2), NIGHT_TINT.water, SUNSET_TINT.water));
     water.name = 'water';
     group.add(water);
   }
@@ -150,6 +177,6 @@ export function buildGround(city: CityData, assets: AssetStore): THREE.Group {
     const w = nodeWidth[i] / 2;
     if (w > 0) quad(roads, node.x - w, node.z - w, node.x + w, node.z - w, node.x + w, node.z + w, node.x - w, node.z + w);
   });
-  if (roads.length > 0) group.add(flatMesh(roads, 0.08, night(surface(assets.texture('ground_asphalt'), 3), NIGHT_TINT.asphalt)));
+  if (roads.length > 0) group.add(flatMesh(roads, 0.08, night(surface(assets.texture('ground_asphalt'), 3), NIGHT_TINT.asphalt, SUNSET_TINT.asphalt)));
   return group;
 }

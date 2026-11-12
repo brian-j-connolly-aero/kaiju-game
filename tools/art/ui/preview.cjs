@@ -103,7 +103,13 @@ const GROUPS = [
     id: 'system',
     title: 'System',
     tint: 'plain',
-    icons: ['ui_offline', 'ui_warning', 'ui_copy', 'ui_skull', 'ui_trophy', 'ui_clock', 'ui_newspaper', 'ui_sound'],
+    icons: ['ui_offline', 'ui_warning', 'ui_copy', 'ui_skull', 'ui_trophy', 'ui_clock', 'ui_newspaper', 'ui_sound', 'ui_asleep', 'ui_outdated'],
+  },
+  {
+    id: 'settings',
+    title: 'Settings and the drone',
+    tint: 'plain',
+    icons: ['ui_settings', 'ui_invert', 'ui_fullscreen', 'ui_lowres', 'ui_rise', 'ui_sink'],
   },
 ];
 
@@ -128,6 +134,7 @@ const COLORS = {
   moon: '#c9d6ff',
   ink: '#f4f6fb',
   paperInk: '#2a2620',
+  asleep: '#9db8ff',
 };
 
 /** A few icons wear a color of their own in the game: the color language, doubled by the shape. */
@@ -145,6 +152,8 @@ const OWN_TINT = {
   ui_copy: 'danger',
   ui_skull: 'rubble',
   ui_trophy: 'volley',
+  ui_outdated: 'danger',
+  ui_asleep: 'asleep',
 };
 
 function parseArgs(argv) {

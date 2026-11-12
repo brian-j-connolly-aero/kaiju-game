@@ -4,9 +4,23 @@
  * match, and the voiced briefing plays with subtitles (the simulation sends it as a voice cue).
  */
 
-import { kaijuKindDef } from '@mb/shared';
+import { factionDef, kaijuKindDef } from '@mb/shared';
 import { el, icon, portrait } from '../../ui/icons';
 import type { AppContext, Screen } from '../context';
+
+/** Points the controls card at this player's role in the running match (a spectator gets the squad's: it flies the drone). */
+export function cardForMatch(ctx: AppContext): void {
+  const session = ctx.runtime?.session;
+  if (!session) return;
+  const players = session.config.players;
+  const kind = players[0].kaijuKind;
+  if (session.role.kind === 'kaiju') {
+    ctx.controls.setRole('kaiju', kind, kaijuKindDef(kind).name);
+  } else {
+    const me = players[session.role.playerId];
+    ctx.controls.setRole('squad', kind, factionDef(me && me.faction ? me.faction : 'army').name);
+  }
+}
 
 export class BriefingScreen implements Screen {
   readonly id = 'briefing' as const;
@@ -37,8 +51,18 @@ export class BriefingScreen implements Screen {
         ),
       ),
     ]);
-    this.root = el('div', 'screen briefing', [el('div', 'briefing-portrait', [portrait(portraitId, isKaiju ? 'lb_kaiju' : 'fac_army')]), sides]);
+    // The controls card is open for the whole briefing; the button closes and opens it again.
+    const cardButton = el('button', 'btn controls-open', [icon('ui_controls')]);
+    cardButton.addEventListener('click', () => {
+      ctx.audio.unlock();
+      ctx.audio.play('ui_click');
+      ctx.controls.toggle();
+    });
+    this.root = el('div', 'screen briefing', [cardButton, el('div', 'briefing-portrait', [portrait(portraitId, isKaiju ? 'lb_kaiju' : 'fac_army')]), sides]);
     ctx.ui.append(this.root);
+    cardForMatch(ctx);
+    ctx.controls.setPassive(false);
+    ctx.controls.setOpen(true);
     this.time = 0;
     runtime.cinematic.cut();
   }
@@ -58,6 +82,7 @@ export class BriefingScreen implements Screen {
 
   exit(ctx: AppContext): void {
     if (ctx.runtime) ctx.runtime.shot = null;
+    ctx.controls.setOpen(false);
     this.root?.remove();
     this.root = null;
   }

@@ -4,7 +4,7 @@ Monster Battle 9001 has a no-reading rule: apart from names and subtitles, nothi
 text. These user interface (UI) pictograms are therefore the game's whole language. Each one has
 to be understood in under a second by someone who has never played.
 
-- **Files:** `client/public/assets/ui/<name>.svg`, 81 icons and `skyline.svg`. The names are the
+- **Files:** `client/public/assets/ui/<name>.svg`, 89 icons and `skyline.svg`. The names are the
   contract in `docs/ASSETS.md` section 5.
 - **Format:** hand-written SVG (Scalable Vector Graphics, a drawing written as text). No drawing
   program is involved: to change an icon, edit its file.
@@ -226,6 +226,19 @@ Notes for whoever wires the glyphs:
 | `ui_clock` | Time ran out | A clock face |
 | `ui_newspaper` | The front page | A newspaper page: headline, photo, lines of print |
 | `ui_sound` | Sound | A loudspeaker with two waves |
+| `ui_asleep` | A lobby seat the start no longer waits for (not ready for a while) | A closed, sleeping eye under a crescent moon (no "Z": that is a letter). Worn in the client's pale blue `#9db8ff` |
+| `ui_outdated` | This page is older than the server: reload it | A page inside a turning arrow. Worn in danger red, like the other notices |
+
+### Settings and the drone
+
+| File | Meaning | What is drawn |
+| --- | --- | --- |
+| `ui_settings` | Open the settings panel | A cog wheel |
+| `ui_invert` | Turn the up-down look around | An arrow up and an arrow down, side by side |
+| `ui_fullscreen` | Full screen | Four corners pushed out to the edges around a solid screen |
+| `ui_lowres` | Lower resolution, for slow computers | A ball drawn with big, blocky pixels |
+| `ui_rise` | The news drone goes up | The drone (a body under two rotors) with a thick arrow up above it |
+| `ui_sink` | The news drone goes down | The same drone with the arrow below it |
 
 `ui_warning` is the one outlined triangle in the set. The kaiju's triangle is always solid.
 

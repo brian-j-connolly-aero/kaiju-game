@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Drone: rise. The news drone (a body under two rotors) with a thick arrow up above it. -->
+  <path d="M32 27V7M22 16L32 6 42 16" stroke-width="5"/>
+  <path d="M10 39H24M40 39H54"/>
+  <path d="M17 39V44M47 39V44"/>
+  <rect x="22" y="42" width="20" height="13" rx="5" fill="currentColor"/>
+</svg>

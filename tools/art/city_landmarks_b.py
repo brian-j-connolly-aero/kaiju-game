@@ -291,9 +291,9 @@ def drum(b, center, r, z0, z1, *, region="plaster_plain", n=12, tone=None, per_s
 
 
 # ---- damage tidying ---------------------------------------------------------------------------
-# The kit cuts big faces and drops small ones that a bite touches. A small part made of several
-# faces (a bell, a bar, a clock hand) then loses some faces and keeps others, and the faces left
-# show their backs (holes in the game). Parts registered with `part(b)` go all at once instead.
+# A small part made of several faces (a bell, a bar, a clock hand) is registered with `part(b)`:
+# the kit's damage cuts it at the hole and keeps what is left while at least half of it stands,
+# or takes all of it.
 def _key(f):
     """Identity of a face that survives the kit's untouched pass-through (which may re-order or
     re-create a polygon's corners): its center and its area."""
@@ -302,7 +302,7 @@ def _key(f):
 
 @contextmanager
 def part(b, name=None):
-    """with part(b): ... every face added inside goes, or stays, together in the damaged state.
+    """with part(b): ... the faces added inside stand or fall together in the damaged state.
     The faces carry the part's mark in their tag ("detail|p3"), which survives the kit's cuts."""
     i0 = len(b.intact.faces)
     yield
@@ -322,15 +322,7 @@ def faces_of(m, name):
 def tidy(b, m):
     """Drop parts the bites broke, give the kit's broken-open faces a back side, and the remains
     of a bitten slope or a dropped ceiling a lining, so nothing shows its back."""
-    # a part is broken when some of its surface is gone (the kit may also split faces it does not
-    # cut, along its bites' planes, so faces are compared by area, not one by one)
-    have = {}
-    for f in m.faces:
-        if "|" in f.tag:
-            pm = f.tag.split("|")[-1]
-            have[pm] = have.get(pm, 0.0) + f.area
-    broken = {pm for pm, area in getattr(b, "parts", []) if have.get(pm, 0.0) < area * 0.995 - 1e-4}
-    m.faces[:] = [f for f in m.faces if f.tag.split("|")[-1] not in broken]
+    # (a part the bites took more than half of is gone already: the kit does that)
     # a roof's underside left where the bite took the slope above it would be seen from above
     from city.geom import face_axes
     from city.destruct import _inside
@@ -1029,6 +1021,8 @@ def grand_station(b):
             f.tag = f"{f.tag}|{lun}"            # a mark, not a part: the hook finds the fan ends by it
     face(b, [(-HW, Y1 - 0.1, 0.0), (HW, Y1 - 0.1, 0.0), (HW, Y1 - 0.1, ZS), (-HW, Y1 - 0.1, ZS)], "#b9ae98",
          want=(0, -1, 0), tag="detail")              # the back wall seen from inside
+    for x in (-HW + 0.1, HW - 0.1):                 # the side walls seen from inside (over the wings)
+        face(b, [(x, Y0, 8.2), (x, Y1, 8.2), (x, Y1, ZS), (x, Y0, ZS)], "#b9ae98", want=(-x, 0, 0), tag="detail")
     # inside: track bed, three platforms, a waiting train (seen when the vault falls in)
     face(b, [(-HW, Y0, 0.05), (HW, Y0, 0.05), (HW, Y1, 0.05), (-HW, Y1, 0.05)], "#4a4642", want=UP, tag="detail")
     for x in (-27.0, 0.0, 27.0):
@@ -1038,6 +1032,7 @@ def grand_station(b):
             b.box((-17.0, y0, 0.2), (-13.4, y0 + 13.0, 4.0), color=IRON if k else "#2f5a43", top="white")
             b.intact.faces[-1].col = hex_rgb("#d9d4c6")
     b.bite_hint = (55.0, -21.0, 34.0)
+    b.holes = 1                      # the vault falls in (the hook): one hole in the walls is enough
 
     # rubble: the clock face on the heap
     st = mark(b)

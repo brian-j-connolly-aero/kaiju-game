@@ -126,6 +126,7 @@ export class Hud {
   private readonly orders: HTMLElement;
   private readonly capture: HTMLElement;
   private readonly menuHint: Hint;
+  private readonly controlsHint: Hint;
   private lastBar = -1;
   /** The longest reload and call-in wait seen since each was last ready (a modifier can lengthen them). */
   private reloadPeak = 0;
@@ -238,9 +239,12 @@ export class Hud {
     // The settings panel and the button that opens it.
     this.menuHint = hint('ui_settings', 'menu');
     this.menuHint.root.classList.add('hint-menu');
+    // The controls card and its key, beside the gear.
+    this.controlsHint = hint('ui_controls', 'controls');
+    this.controlsHint.root.classList.add('hint-menu');
 
     this.root.append(
-      el('div', 'hud-top', [this.clock, el('div', 'hud-top-mid', [bar, this.boss]), el('div', 'hud-top-right', [stage, this.menuHint.root])]),
+      el('div', 'hud-top', [this.clock, el('div', 'hud-top-mid', [bar, this.boss]), el('div', 'hud-top-right', [stage, el('div', 'hud-menus', [this.controlsHint.root, this.menuHint.root])])]),
       this.squads,
       el('div', 'hud-bottom-left', [meters, this.orders]),
       el('div', 'hud-bottom-right', [this.hintsKaiju, this.hintsHuman, this.hintsDrone]),
@@ -413,6 +417,7 @@ export class Hud {
       this.updateHints(this.humanHints, view);
       this.updateHints(this.droneHints, view);
       setGlyph(this.menuHint.glyph, glyphFor(view.bindings, 'menu', view.device));
+      setGlyph(this.controlsHint.glyph, glyphFor(view.bindings, 'controls', view.device));
     }
     if (lk) {
       const def = kaijuKindDef(lk.kind);
