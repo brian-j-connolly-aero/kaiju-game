@@ -22,7 +22,7 @@ what is still wrong); the rest is from the scaffold task.
 | `npm install` | Installs the pinned toolchain and the server's dependencies (Express, the room library). |
 | `npm run check` | Type checks all three workspaces, runs `scripts/lint.mjs`, runs every test. The gate. |
 | `npm test` | `vitest run`: every test in `shared/test`, `server/test` and `client/test`, about 40 seconds (the server's integration tests and the whole-match simulation tests take most of it). |
-| `npm run sim` | The balance harness: full bot-versus-bot matches, headless, a few hundred times real speed, one table row per match plus a summary. Options after `--`: `--seeds N` (default 5), `--seed N`, `--unopposed` (no squads), `--kaiju-handicap H`, `--human-handicap H` (0 best, 1 stands still), `--fast`, `--anchor N`, `--max-minutes N`, `--events`, `--json`. 20 matches take 25 to 50 s depending on what else the machine is doing. How to read it: `docs/BALANCE.md`. |
+| `npm run sim` | The balance harness: full bot-versus-bot matches, headless, a few hundred times real speed, one table row per match plus a summary. Options after `--`: `--seeds N` (default 5), `--seed N`, `--unopposed` (no squads), `--kaiju-handicap H`, `--human-handicap H` (0 best, 1 stands still), `--trigger-happy` (squads hold the trigger instead of charging volleys), `--fast`, `--anchor N`, `--max-minutes N`, `--events`, `--json`. 20 matches take 25 to 50 s depending on what else the machine is doing. How to read it: `docs/BALANCE.md`. |
 | `npx vitest run server/test` | Only the server tests: 115 tests, about 18 seconds (four files start a real server on a free port and connect real clients; `process.test.ts` starts the entry point as a process of its own). `MB_TEST_SPEED=1 npx vitest run server/test/lifecycle.test.ts` plays the full five-client match in real time (about 3 minutes). |
 | `npm run dev` | Starts the server (`tsx watch`, port 2567) and the client (Vite, port 5173) side by side with hot reload; open the Vite address. Vite forwards matchmaking and the WebSocket to the server, so the page talks to its own origin exactly as in production. |
 | `npm run build`, `npm start` | Bundles the server to `server/dist/index.js`, builds the client to `client/dist`; `npm start` runs the bundle, which serves the built client and the game on one port (`PORT`, default 2567). Environment variables: `ARCHITECTURE.md` section 4.4. |
@@ -245,7 +245,8 @@ Human squads (simulation part 2; the rules as built are written out in `DESIGN.m
 - With the order 'moveTo', hold-and-charge does not stop sub-units on their way: they go on to
   their spots and plant there.
 - A sub-unit whose firing arc does not cover the aim point sits a volley out and keeps its
-  charge. Volleys check neither range nor line of sight.
+  charge. Volleys check no line of sight; range limits them only in that every projectile gives
+  out at 1.1 times its weapon's range.
 - With the crosshair on a kaiju, sub-units aim for the middle of its body at the height the
   player picked (the event's aim point is still where the ray met its skin).
 - Aim error is drawn per projectile, on heading and elevation. A person's own shots have none.
@@ -519,24 +520,26 @@ Server
   tiny and smoothed), but the city generator must never branch on such a value.
 - The snapshot holds at most 255 units and uses one byte for unit ids: fine for Tier 1 (16) and
   for the 8-squad future (32).
-- The balance is tuned for bot against bot in the placeholder grid city (`docs/BALANCE.md`):
-  kaiju wins 52% of 60 matches, stages of about 3:00 to 3:35, matches of about 10 minutes.
-  It is sensitive: a bot that hesitates 30% of the time loses 10 of 10 on either side, and one
-  batch of 20 seeds ranged from 35% to 60%. The handcrafted city and real players will both
+- The balance is tuned for bot against bot in the placeholder grid city (`docs/BALANCE.md`
+  section 7): kaiju wins 57% of 60 matches, stages of about 3:10 to 4:10, matches of about
+  10:35. Humans now win mostly on the clock (6 kills in 60). A kaiju bot that hesitates 30% of
+  the time loses 10 of 10; squads that hesitate 30% win 5 of 10; trigger-happy squads lose 20
+  of 20. The handcrafted city and real players will both
   move it. Numbers nobody has tuned yet: action move multipliers, wade damage, rage per bar
   segment, prop values, archetype hp and value.
-- Stage 1 runs a little short of the 200 to 230 s target (about 3:05) and is the stage where
-  squads matter least (1.5 staggers on average); stage 3 is where kaiju die (14 of 17 kills).
-- A bot kaiju at stage 3 is staggered about 7 times a stage. With a person in that seat it may
-  feel like too much time spent stunned; `staggerNerveImmunity` and the troop gun's nerve are
-  the numbers to look at.
+- Nerve breaks only when charged volleys (60% charge or more) from two different squads land
+  within 5 s of each other (`DESIGN.md` sections 3 and 5). A bot kaiju is staggered about 1.6 /
+  3 / 3.5 times a stage. Four idle people, or the client's autopilot squad (which holds the
+  trigger), no longer stagger anything, so browser smoke runs see fewer staggers and kills.
+- Alone, a titan now needs about 2:44 for its segment (target 100 to 130 s), the price of
+  `p3` 0.35; retune it with the real city.
 - The bots have only played the placeholder city. The squad bot finds firing positions on road
   nodes and street midpoints and the kaiju bot steers by feel (it smashes or walks round what
   is in its way); both have stuck handling, neither has been tried in a city with dead ends,
   curved streets or a harbor.
-- The kaiju grows where its cocoon was. In a street narrower than its new body it is pushed
-  clear by collision on the first ticks of the next stage and tramples whatever low
-  structures it overlaps (a few free points; tall ones push it out).
+- The kaiju grows where its cocoon was if its new body fits there; otherwise it stands up at
+  the nearest spot with room (`findStandingRoom` in `sim/spawn.ts`), and the kaiju bot picks
+  hiding places with room for the next body.
 - Sub-unit navigation was tuned and stress-tested against the placeholder grid city (3600
   random move-to trips across the three stages all arrived, nobody ever inside a wall). The
   handcrafted city will have other shapes: it needs a road graph whose edges are drivable for
