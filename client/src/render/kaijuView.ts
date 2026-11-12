@@ -7,6 +7,8 @@
 import * as THREE from 'three';
 import {
   angleDiff,
+  clamp01,
+  COMBAT_RULES,
   beamPath,
   createBeamPath,
   kaijuKindDef,
@@ -20,7 +22,7 @@ import {
 } from '@mb/shared';
 import type { AssetStore } from '../assets/assetStore';
 import type { Effects } from './effects';
-import { computeKaijuPose, createKaijuPose, type NodePose } from './kaijuAnimator';
+import { computeKaijuPose, createKaijuPose, posesFromManifest, type NodePose, type PoseTable } from './kaijuAnimator';
 import type { LineBatch } from './lineBatch';
 import type { Materials } from './materials';
 import { SceneRig } from './sceneRig';
@@ -40,7 +42,21 @@ export interface KaijuViewCallbacks {
 
 const tmp = new THREE.Vector3();
 const tmp2 = new THREE.Vector3();
+const quat = new THREE.Quaternion();
+const aimQuat = new THREE.Quaternion();
+const aimEuler = new THREE.Euler();
+const sphere = new THREE.Sphere();
 const beam = createBeamPath();
+
+/** Options of one frame of a kaiju view. */
+export interface KaijuViewFrame {
+  /** This is the local player's kaiju and the camera is in its head. */
+  firstPerson: boolean;
+  /** The camera has been pulled back inside the skull (a wall ahead): hide the arms and jaw. */
+  insideHead: boolean;
+}
+
+const NOT_LOCAL: KaijuViewFrame = { firstPerson: false, insideHead: false };
 
 function heldModelId(held: HeldObject): string {
   switch (held.kind) {
@@ -62,6 +78,16 @@ export class KaijuView {
   private readonly callbacks: KaijuViewCallbacks;
   private rig: SceneRig | null = null;
   private rigKey = '';
+  /** The rig's pose targets from the manifest (null: the stand-in's fallback). */
+  private poses: PoseTable | null = null;
+  /** The arms ride on the head (first-person view). */
+  private armsOnHead = false;
+  /** Own copies of the glow material: the embers and eyes, and the cocoon's light. */
+  private ember: THREE.MeshBasicMaterial | null = null;
+  private cocoonLight: THREE.MeshBasicMaterial | null = null;
+  private heldScale = 1;
+  private heldRadius = 1;
+  private heldHeight = 0;
   private cocoon: SceneRig | null = null;
   private held: SceneRig | null = null;
   private heldKey = '';
@@ -90,8 +116,14 @@ export class KaijuView {
       this.rig?.dispose();
       this.rig = new SceneRig(this.assets.model(key), this.materials);
       this.rigKey = key;
+      this.armsOnHead = false;
+      this.poses = this.assets.hasModel(key) ? posesFromManifest(this.assets.manifest.models[key]?.poses) : null;
       this.group.add(this.rig.root);
       this.dropHeld();
+      // The glowing facets outside the weak point (eyes, the embers at the roots of the spines
+      // and tail spikes) get their own material, so they can heat up with rage and the beam.
+      this.ember ??= this.materials.glow.clone();
+      for (const node of ['head', 'spines', 'tail_1', 'tail_2', 'tail_3', 'tail_4', 'tail_5']) this.rig.setNodeMaterial(node, 'glow', this.ember);
     }
     return this.rig;
   }
@@ -102,7 +134,7 @@ export class KaijuView {
     this.heldKey = '';
   }
 
-  private updateHeld(k: SnapKaiju, rig: SceneRig): void {
+  private updateHeld(k: SnapKaiju, rig: SceneRig, firstPerson: boolean): void {
     const held = k.held;
     const key = held ? heldModelId(held) : '';
     if (key !== this.heldKey) {
@@ -114,20 +146,39 @@ export class KaijuView {
         this.heldKey = key;
         // Carried by its middle, tilted as if pinched between claws.
         const size = model.bounds.getSize(tmp);
-        const scale = key === 'held_chunk' ? kaijuStageDef(k.kind, k.stage).bodyRadius * 0.9 : 1;
-        this.held.root.scale.setScalar(scale);
-        this.held.root.position.set(0, -size.y * 0.5 * scale, 0);
+        this.heldScale = key === 'held_chunk' ? kaijuStageDef(k.kind, k.stage).bodyRadius * 0.9 : 1;
+        this.heldRadius = Math.max(0.01, model.bounds.getBoundingSphere(sphere).radius * this.heldScale);
+        this.heldHeight = size.y * this.heldScale;
         this.held.root.rotation.set(0.5, 0.4, 0.2);
         hold.add(this.held.root);
       }
     }
+    if (this.held) {
+      // Seen from inside the head the held thing would fill the view and reach into the lens:
+      // there it is shrunk to at most 0.16 body heights across (art notes, section 6). Everyone
+      // else sees it at its true size.
+      const fp = firstPerson ? Math.min(1, (0.16 * kaijuStageDef(k.kind, k.stage).height) / this.heldRadius) : 1;
+      const scale = this.heldScale * fp;
+      this.held.root.scale.setScalar(scale);
+      this.held.root.position.set(0, -this.heldHeight * 0.5 * fp, 0);
+    }
   }
 
   /**
-   * Places and poses the kaiju for this frame. `local` marks the kaiju the player controls
-   * (its feet raise dust but it is otherwise drawn the same, snout and claws included).
+   * Places and poses the kaiju for this frame. `view.firstPerson` marks the local player's kaiju
+   * seen from inside its head: then head, snout and claws are one rigid assembly locked to the
+   * aim, like the weapon in a first-person game (docs/art/client-notes-kaiju-lizard.md section 3).
    */
-  update(k: SnapKaiju, dt: number, time: number, override: KaijuOverride | null, city: CityQuery | null, lines: LineBatch, effects: Effects): void {
+  update(
+    k: SnapKaiju,
+    dt: number,
+    time: number,
+    override: KaijuOverride | null,
+    city: CityQuery | null,
+    lines: LineBatch,
+    effects: Effects,
+    view: KaijuViewFrame = NOT_LOCAL,
+  ): void {
     const rig = this.ensureRig(k);
     const stage = kaijuStageDef(k.kind, k.stage);
     const def = kaijuKindDef(k.kind);
@@ -153,6 +204,13 @@ export class KaijuView {
         const near = phaseDuration > 0 ? Math.min(1, phaseTime / phaseDuration) : 0;
         const pulse = 1 + Math.sin(time * (4 + near * 14)) * (0.02 + near * 0.05);
         this.cocoon.root.scale.set(stage.height * 0.95 * pulse, stage.height * 0.9 / pulse, stage.height * 0.95 * pulse);
+        // The light inside beats with the swelling (and the heartbeat), faster near the end.
+        if (!this.cocoonLight) {
+          this.cocoonLight = this.materials.glow.clone();
+          this.cocoon.setNodeMaterial('cocoon_glow', 'glow', this.cocoonLight);
+        }
+        const beat = Math.pow(0.5 + 0.5 * Math.sin(time * (4 + near * 14)), 3);
+        this.cocoonLight.color.setScalar(0.75 + beat * 0.9);
       }
     }
     rig.root.visible = !cocooned;
@@ -175,6 +233,12 @@ export class KaijuView {
     }
 
     // --- pose --------------------------------------------------------------------------------------
+    const assembly = view.firstPerson && phase !== 'dead' && phase !== 'cocoon';
+    if (assembly !== this.armsOnHead) {
+      this.armsOnHead = assembly;
+      rig.ride('arm_L', assembly ? 'head' : null);
+      rig.ride('arm_R', assembly ? 'head' : null);
+    }
     computeKaijuPose(
       {
         time,
@@ -188,6 +252,8 @@ export class KaijuView {
         phaseDuration,
         holding: k.held !== null,
         height: stage.height,
+        poses: this.poses ?? undefined,
+        firstPerson: assembly,
       },
       this.pose,
     );
@@ -214,14 +280,42 @@ export class KaijuView {
       rig.root.position.set(0, 0, 0);
     }
 
-    // The weak point shows, and throbs, only while staggered (or helpless in the cocoon's stead).
+    // The weak point shows, and throbs, only while staggered. The throb never shrinks it below
+    // 1.1: the shards at the shoulder blades only show above about 0.95 (art notes, section 5).
     const weak = rig.node('weak_point');
     if (weak) {
       weak.visible = phase === 'stagger';
-      if (weak.visible) weak.scale.setScalar(1.2 + Math.sin(time * 9) * 0.25);
+      if (weak.visible) weak.scale.setScalar(1.3 + Math.sin(time * 9) * 0.2);
     }
 
-    this.updateHeld(k, rig);
+    // The embers and eyes heat up with rage and while the beam gathers and burns.
+    if (this.ember) {
+      const rage = clamp01(k.rage / COMBAT_RULES.rageMax);
+      const beamHeat = action === 'special' ? (phase === 'windup' ? clamp01(phaseTime / Math.max(0.01, phaseDuration)) : phase === 'recover' ? 0.5 : 1) : 0;
+      const heat = Math.max(rage, beamHeat);
+      const flicker = 1 + Math.sin(time * 7.3) * 0.06 * heat;
+      this.ember.color.setScalar((0.8 + heat * 0.8) * flicker);
+    }
+
+    // Seen from inside the head: lock the head to the aim (it carries the camera anchor, the
+    // snout and, riding on it, the arms), so the claws keep their place whatever the body does.
+    if (assembly) {
+      const neck = rig.node('neck');
+      const head = rig.node('head');
+      if (neck && head) {
+        this.group.updateMatrixWorld(true);
+        neck.getWorldQuaternion(quat).invert();
+        aimQuat.setFromEuler(aimEuler.set(-k.aimPitch, k.aimYaw, 0, 'YXZ'));
+        head.quaternion.copy(quat).multiply(aimQuat);
+      }
+    }
+    // With the camera pulled back into the skull the claws would be seen from behind.
+    const hideLimbs = assembly && view.insideHead;
+    rig.setVisible('arm_L', !hideLimbs);
+    rig.setVisible('arm_R', !hideLimbs);
+    rig.setVisible('jaw', !hideLimbs);
+
+    this.updateHeld(k, rig, assembly);
 
     // --- anchors ---------------------------------------------------------------------------------
     this.group.updateMatrixWorld(true);
@@ -234,7 +328,7 @@ export class KaijuView {
     if (action === 'special' && phase === 'windup') {
       // The breath gathers at the mouth.
       const charge = phaseDuration > 0 ? Math.min(1, phaseTime / phaseDuration) : 1;
-      effects.flash(this.mouth.x, this.mouth.y, this.mouth.z, stage.bodyRadius * (0.4 + charge * 1.1), 0xffa040, 0.05);
+      effects.glowAt(this.mouth.x, this.mouth.y, this.mouth.z, stage.bodyRadius * (0.4 + charge * 1.1) * 1.6, 0xffa040, 0.05);
     }
     if (k.action === 'special' && k.phase === special.activePhase && city) {
       beamPath(city, k, special, beam);
@@ -245,7 +339,7 @@ export class KaijuView {
       const flicker = 0.85 + Math.sin(time * 70) * 0.15;
       lines.push(tmp.x, tmp.y, tmp.z, tmp2.x, tmp2.y, tmp2.z, width * 3.2, 1.0, 0.45, 0.1, 0.7 * flicker);
       lines.push(tmp.x, tmp.y, tmp.z, tmp2.x, tmp2.y, tmp2.z, width * 1.3, 1.0, 0.95, 0.75, 1.0);
-      effects.flash(tmp2.x, tmp2.y, tmp2.z, width * (4 + Math.sin(time * 50)), 0xffb060, 0.06);
+      effects.glowAt(tmp2.x, tmp2.y, tmp2.z, width * (4 + Math.sin(time * 50)) * 1.6, 0xffb060, 0.06);
       if (Math.floor(time * 30) % 2 === 0) effects.dust(tmp2.x, tmp2.y, tmp2.z, width * 1.5, 1, 0x554a44);
     }
   }

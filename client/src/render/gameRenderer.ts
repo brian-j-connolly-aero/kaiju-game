@@ -45,8 +45,12 @@ export interface RenderView {
   /** The unit the local player drives, or -1. */
   localUnit: number;
   localSquad: number;
-  /** First person from a unit: its lead member is not drawn. */
+  /** First person from a unit: the local unit's own members are not drawn. */
   hideLocalLead: boolean;
+  /** The camera is in the local kaiju's head (first person, not the cinematic camera). */
+  kaijuFirstPerson: boolean;
+  /** ... and has been pulled back inside its skull by a wall ahead. */
+  kaijuInsideHead: boolean;
   /** Whether the viewer may see where the kaiju is even when the humans have lost it. */
   seesKaiju: boolean;
   /** The local kaiju's wind-up that the server has not confirmed yet. */
@@ -76,6 +80,9 @@ const FOG: Record<StageId, FogRange> = {
   2: { near: 280, far: 2700 },
   3: { near: 520, far: 4400 },
 };
+/** The weak point's light (art notes for the kaiju, section 5): violet, never the humans' cyan. */
+const WEAK_POINT_COLOR = 0xc9a6ff;
+
 /** Height of the faint curtain above the quarantine line, by stage: a line first, a wall never. */
 const CURTAIN: Record<StageId, number> = { 1: 2.5, 2: 7, 3: 20 };
 
@@ -117,6 +124,7 @@ export class GameRenderer {
   private ground: THREE.Group | null = null;
   private mirror: CityMirror | null = null;
   private lastFrame: FrameState | null = null;
+  private lastView: RenderView | null = null;
   private time = 0;
   private shownStage: StageId | 0 = 0;
   private readonly marks: GroundMark[] = [];
@@ -236,6 +244,12 @@ export class GameRenderer {
     return this.lastFrame?.kaijus[id];
   }
 
+  /** Whether the camera is inside this kaiju's head (the local kaiju in first person). */
+  private insideKaiju(id: number): boolean {
+    const v = this.lastView;
+    return !!v && v.kaijuFirstPerson && v.localKaiju === id;
+  }
+
   /**
    * The view is about to skip a stretch nobody saw (a hidden tab's backlog): whatever was in
    * the air when the frames stopped, explosions and shells alike, is long over.
@@ -302,7 +316,7 @@ export class GameRenderer {
         this.projectiles.spawn(e, k ? kaijuStageDef(k.kind, k.stage).bodyRadius * 0.9 : 3);
         if (e.owner === 'unit') {
           this.units.noteFired(e.ownerId, this.time);
-          fx.flash(e.x, e.y, e.z, e.projectile === 'rocket' ? 2.5 : 5, 0xffe9a8, 0.1);
+          fx.flash(e.x, e.y, e.z, e.projectile === 'rocket' ? 2.5 : 5, 0xffffff, 0.1);
           fx.puff(e.x, e.y, e.z, e.projectile === 'rocket' ? 1.5 : 3, 0xd8d2c4, 0.6, 0.5);
         }
         break;
@@ -313,7 +327,7 @@ export class GameRenderer {
         if (e.target === 'water') fx.splash(e.x, e.z, r);
         else if (e.target === 'none') fx.puff(e.x, e.y, e.z, r * 0.6);
         else {
-          fx.explosion(e.x, Math.max(0.5, e.y), e.z, r, e.projectile === 'thrown' ? 0xd8c9a8 : 0xffd27a);
+          fx.explosion(e.x, Math.max(0.5, e.y), e.z, r, e.projectile === 'thrown' ? 0xd8c9a8 : 0xff8a1a);
           if (e.projectile === 'thrown') fx.dust(e.x, 0.3, e.z, r, 6);
         }
         break;
@@ -329,7 +343,7 @@ export class GameRenderer {
             fx.ring(info.x, info.z, info.radius * 2.2, 0xd8cfbd, 0.9, 0.6);
           } else {
             fx.dust(info.x, info.height * 0.5, info.z, info.radius * 0.6, 4);
-            fx.flash(info.x, info.height * 0.6, info.z, info.radius, 0xffe0b0, 0.08);
+            fx.glowAt(info.x, info.height * 0.6, info.z, info.radius * 1.6, 0xffe0b0, 0.08);
           }
         }
         break;
@@ -343,7 +357,7 @@ export class GameRenderer {
           const def = PROP_KINDS[p.kind];
           if (def.leavesWreck) city.setWreck(id, true);
           fx.dust(p.x, def.height * 0.5, p.z, Math.max(1, def.radius), def.value > 0 ? 3 : 1);
-          if (def.value > 0) fx.flash(p.x, def.height * 0.6, p.z, def.radius * 2.2, 0xffe2a8, 0.08);
+          if (def.value > 0) fx.glowAt(p.x, def.height * 0.6, p.z, def.radius * 3.5, 0xffe2a8, 0.08);
         }
         city.flushProps();
         break;
@@ -378,16 +392,20 @@ export class GameRenderer {
       case 'kaijuHit': {
         const k = this.kaijuAt(e.kaiju);
         if (!k || e.damage + e.nerve <= 0) break;
+        // Not for the kaiju's own eyes: from inside its head the flash, which sits on the body
+        // right behind the camera, would blank part of the view on every hit.
+        if (this.insideKaiju(e.kaiju)) break;
         const st = kaijuStageDef(k.kind, k.stage);
-        fx.flash(k.x, st.height * 0.6, k.z, st.bodyRadius * (e.braced ? 1.2 : 2), e.braced ? 0x9fd8ff : 0xffffff, 0.08);
+        fx.glowAt(k.x, st.height * 0.6, k.z, st.bodyRadius * (e.braced ? 1.8 : 3), e.braced ? 0x9fd8ff : 0xfff0d8, 0.08, 0.8);
         break;
       }
       case 'kaijuStagger': {
         const k = this.kaijuAt(e.kaiju);
         if (k && e.on) {
+          // The weak point's violet (cyan is the humans' color).
           const st = kaijuStageDef(k.kind, k.stage);
-          fx.ring(k.x, k.z, st.bodyRadius * 5, 0x7dfcff, 0.8);
-          fx.flash(k.x, st.height * 0.6, k.z, st.bodyRadius * 5, 0xbffcff, 0.2);
+          fx.ring(k.x, k.z, st.bodyRadius * 5, WEAK_POINT_COLOR, 0.8);
+          if (!this.insideKaiju(e.kaiju)) fx.glowAt(k.x, st.height * 0.6, k.z, st.bodyRadius * 6, WEAK_POINT_COLOR, 0.2, 0.9);
         }
         break;
       }
@@ -395,7 +413,7 @@ export class GameRenderer {
         fx.ring(e.x, e.z, 40, 0xffffff, 0.5);
         break;
       case 'unitHit':
-        fx.flash(e.x, 1.5, e.z, 3, 0xffb080, 0.08);
+        fx.glowAt(e.x, 1.5, e.z, 4.5, 0xffb080, 0.08);
         break;
       case 'memberLost': {
         const u = this.lastFrame?.units[e.unit];
@@ -427,7 +445,7 @@ export class GameRenderer {
       case 'moltBlast': {
         fx.ring(e.x, e.z, e.shoveRadius, 0xffa040, 1.1);
         fx.ring(e.x, e.z, e.killRadius, 0xffffff, 0.6);
-        fx.flash(e.x, e.killRadius * 0.5, e.z, e.killRadius * 3, 0xffe0b0, 0.3);
+        fx.glowAt(e.x, e.killRadius * 0.5, e.z, e.killRadius * 4, 0xffe0b0, 0.3);
         fx.dust(e.x, 1, e.z, e.killRadius, 20);
         break;
       }
@@ -460,6 +478,7 @@ export class GameRenderer {
     this.time += dt;
     const time = this.time;
     this.lastFrame = frame;
+    this.lastView = view;
     this.sprites.begin();
     this.decals.begin();
     this.markers.begin();
@@ -475,7 +494,8 @@ export class GameRenderer {
           this.kaijuViews[i] = kv;
           this.scene.add(kv.group);
         }
-        kv.update(k, dt, time, this.overrideFor(k, view), query, this.lines, this.effects);
+        const own = k.id === view.localKaiju && view.kaijuFirstPerson;
+        kv.update(k, dt, time, this.overrideFor(k, view), query, this.lines, this.effects, { firstPerson: own, insideHead: own && view.kaijuInsideHead });
         const st = kaijuStageDef(k.kind, k.stage);
         if (k.phase !== 'cocoon' || k.id === view.localKaiju || view.seesKaiju) {
           this.decals.push(k.x, 0.12, k.z, st.bodyRadius * 3.4, st.bodyRadius * 3.4, this.ringShadowUv(), 0, 0, 0, 0, 0.6);

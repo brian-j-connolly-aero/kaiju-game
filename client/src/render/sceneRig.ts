@@ -14,6 +14,7 @@ import type { Materials } from './materials';
 
 const euler = new THREE.Euler();
 const quat = new THREE.Quaternion();
+const restTmp = new THREE.Vector3();
 
 export class SceneRig {
   readonly model: RigModel;
@@ -67,6 +68,51 @@ export class SceneRig {
   setVisible(name: string, visible: boolean): void {
     const i = this.byName.get(name);
     if (i !== undefined) this.objects[i].visible = visible;
+  }
+
+  /**
+   * Hangs a node under another parent (`null`: back under its own), where it sits in the rest
+   * pose. The rotations set afterwards are relative to the rest pose as before. Used to let the
+   * kaiju's arms ride on its head in the first-person view.
+   */
+  ride(name: string, parentName: string | null): void {
+    const i = this.byName.get(name);
+    if (i === undefined) return;
+    const own = this.model.nodes[i].parent;
+    const p = parentName === null ? own : (this.byName.get(parentName) ?? -1);
+    if (p < 0) return;
+    const parent = this.objects[p];
+    const object = this.objects[i];
+    if (object.parent === parent) return;
+    if (p === own) {
+      object.position.copy(this.model.nodes[i].position);
+    } else {
+      this.restInModel(i, object.position).sub(this.restInModel(p, restTmp));
+    }
+    parent.add(object);
+  }
+
+  /** A node's rest position in model space (rest rotations are identity by the art contract). */
+  private restInModel(index: number, out: THREE.Vector3): THREE.Vector3 {
+    out.set(0, 0, 0);
+    for (let i = index; i >= 0; i = this.model.nodes[i].parent) out.add(this.model.nodes[i].position);
+    return out;
+  }
+
+  /** Gives the meshes of one node their own material in place of the shared one. */
+  setNodeMaterial(name: string, kind: string, material: THREE.Material): number {
+    const i = this.byName.get(name);
+    if (i === undefined) return 0;
+    let n = 0;
+    this.model.nodes[i].parts.forEach((part, j) => {
+      if (part.material !== kind) return;
+      const mesh = this.objects[i].children.filter((c) => (c as THREE.Mesh).isMesh)[j] as THREE.Mesh | undefined;
+      if (mesh) {
+        mesh.material = material;
+        n++;
+      }
+    });
+    return n;
   }
 
   /** World position of a node; false (and `out` untouched) when the model has no such node. */

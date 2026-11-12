@@ -10,6 +10,8 @@ export interface ModelEntry {
   chunks?: number;
   /** Per-instance paint for props: vertex color alpha 1 marks the faces that take the tint. */
   tint?: { colors?: string[] };
+  /** Kaiju: pose targets, degrees per node relative to the rest pose (ASSETS.md section 7). */
+  poses?: Record<string, Record<string, [number, number, number]>>;
 }
 
 export interface SpriteAnim {
@@ -25,12 +27,16 @@ export interface SpriteEntry {
   frame: [number, number];
   worldHeight: number;
   anims: Record<string, SpriteAnim>;
+  /** Effects: drawn with ordinary alpha blending (full-color pictures) or added (white light). */
+  blend?: 'alpha' | 'add';
 }
 
 export interface TextureEntry {
   file: string;
   tile?: boolean;
   grid?: [number, number];
+  /** Clouds: a panorama on a horizon ring (client/src/render/sky.ts). */
+  ring?: { repeats: number; bottomDeg: number; sunGap: [number, number] };
 }
 
 export interface MusicEntry {
@@ -39,6 +45,8 @@ export interface MusicEntry {
   bpm?: number;
   group?: string;
   duration?: number;
+  /** Seconds into the track where its moment lands (the audio engine starts it early to meet it). */
+  mark?: number;
 }
 
 export interface SfxEntry {

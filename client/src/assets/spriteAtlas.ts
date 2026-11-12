@@ -25,7 +25,12 @@ export interface SpriteInfo {
   anims: Map<string, SpriteAnimInfo>;
   /** True when the frames come from the procedural generator. */
   procedural: boolean;
+  /** How an effect sprite is drawn: added (white light, tint freely) or alpha blended (full color). */
+  blend: 'alpha' | 'add';
 }
+
+/** Effect sprites made of white light; everything else is alpha blended (art notes, sprites note 2). */
+const ADDED_SPRITES = new Set(['fx_glow', 'fx_spark', 'fx_laserdot']);
 
 export interface SpriteSheetSource {
   /** Identifies the sheet: sprites that share a `file` share one image. */
@@ -101,7 +106,8 @@ export function buildSpriteAtlas(
         }
         anims.set(name, { facings, frames, fps: anim.fps > 0 ? anim.fps : 8, uv });
       }
-      sprites.set(id, { id, worldHeight: entry.worldHeight > 0 ? entry.worldHeight : 1.8, aspect: fw / fh, anims, procedural: sheet.procedural });
+      const blend = entry.blend === 'add' || entry.blend === 'alpha' ? entry.blend : ADDED_SPRITES.has(id) ? 'add' : 'alpha';
+      sprites.set(id, { id, worldHeight: entry.worldHeight > 0 ? entry.worldHeight : 1.8, aspect: fw / fh, anims, procedural: sheet.procedural, blend });
     }
     y += sheet.image.height + PAD;
   }

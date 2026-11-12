@@ -1,8 +1,11 @@
 /**
  * Short-lived effects: sparkler explosions, dust, smoke, shockwave rings and flashes
- * (ASSETS.md section 2: a model-city look). Everything is a particle in one of three sprite
- * batches (added glow, ordinary smoke, flat on the ground), so any number of effects costs
- * three draw calls.
+ * (ASSETS.md section 2: a model-city look). Everything is a particle in one of four sprite
+ * batches, so any number of effects costs four draw calls. Which batch follows the sprite's
+ * `blend` (docs/art/client-notes-sprites-textures.md note 2): the full-color pictures
+ * (explosion, fire, flash) are alpha blended in `burst`, white ones (smoke, dust) in `smoke`,
+ * and only white light (glow, sparks, the laser dot) is added, in `glow`, so nothing burns out
+ * to a white blob against a bright sky.
  */
 
 import * as THREE from 'three';
@@ -10,7 +13,7 @@ import type { AssetStore } from '../assets/assetStore';
 import { frameRect, type SpriteAnimInfo } from '../assets/spriteAtlas';
 import { QuadBatch } from './quadBatch';
 
-type Layer = 'glow' | 'smoke' | 'ground';
+type Layer = 'glow' | 'burst' | 'smoke' | 'ground';
 
 interface Particle {
   layer: Layer;
@@ -49,25 +52,34 @@ function rgb(color: number): [number, number, number] {
 export class Effects {
   readonly group = new THREE.Group();
   readonly glow: QuadBatch;
+  readonly burst: QuadBatch;
   readonly smoke: QuadBatch;
   readonly ground: QuadBatch;
   private readonly particles: Particle[] = [];
   private readonly anims: Record<string, SpriteAnimInfo>;
+  /** Animations of the sprites drawn added; the rest are alpha blended. */
+  private readonly addedAnims = new Set<SpriteAnimInfo>();
   private seed = 987654321;
 
   constructor(assets: AssetStore) {
     const atlas = assets.atlas;
     if (!atlas) throw new Error('effects need the sprite atlas');
     this.glow = new QuadBatch(atlas.texture, { mode: 'facing', capacity: MAX_PARTICLES, additive: true, renderOrder: 16 });
+    this.burst = new QuadBatch(atlas.texture, { mode: 'facing', capacity: MAX_PARTICLES, renderOrder: 15 });
     this.smoke = new QuadBatch(atlas.texture, { mode: 'facing', capacity: MAX_PARTICLES, renderOrder: 14 });
     this.ground = new QuadBatch(atlas.texture, { mode: 'ground', capacity: 400, renderOrder: 4 });
-    this.group.add(this.ground.mesh, this.smoke.mesh, this.glow.mesh);
+    this.group.add(this.ground.mesh, this.smoke.mesh, this.burst.mesh, this.glow.mesh);
     const anim = (id: string): SpriteAnimInfo => {
       const sprite = assets.sprite(id);
-      return (sprite.anims.get('play') ?? [...sprite.anims.values()][0]) as SpriteAnimInfo;
+      const a = (sprite.anims.get('play') ?? [...sprite.anims.values()][0]) as SpriteAnimInfo;
+      if (sprite.blend === 'add') this.addedAnims.add(a);
+      return a;
     };
+    const has = (id: string): boolean => atlas.sprites.has(id);
     this.anims = {
       explosion: anim('fx_explosion'),
+      explosionGround: anim(has('fx_explosion_ground') ? 'fx_explosion_ground' : 'fx_explosion'),
+      laserdot: anim('fx_laserdot'),
       smoke: anim('fx_smoke'),
       dust: anim('fx_dust'),
       fire: anim('fx_fire'),
@@ -87,6 +99,13 @@ export class Effects {
 
   private spawn(layer: Layer, anim: SpriteAnimInfo, x: number, y: number, z: number, size: number, life: number, color: number, alpha: number): Particle {
     if (this.particles.length >= MAX_PARTICLES) this.particles.shift();
+    // A procedural stand-in or an art file may say otherwise than the caller: the sprite's
+    // blend wins (added light never goes into an alpha batch, nor a picture into the added one).
+    if (layer !== 'ground') {
+      const added = this.addedAnims.has(anim);
+      if (added) layer = 'glow';
+      else if (layer === 'glow') layer = 'burst';
+    }
     const [r, g, b] = rgb(color);
     const p: Particle = {
       layer,
@@ -115,11 +134,18 @@ export class Effects {
     return p;
   }
 
-  /** A sparkler burst: flash, flying sparks, a ring on the ground and a little smoke. */
-  explosion(x: number, y: number, z: number, radius: number, color = 0xffd27a): void {
+  /**
+   * A sparkler burst: a glow underneath (the place for a tint), the full-color flash and
+   * fireball over it, flying sparks, a ring on the ground and a little smoke. On the ground the
+   * fireball is the one drawn standing on its bottom edge.
+   */
+  explosion(x: number, y: number, z: number, radius: number, color = 0xff8a1a): void {
     const r = Math.max(1.5, radius);
-    this.spawn('glow', this.anims.flash, x, y, z, r * 3.2, 0.16, 0xfff4d0, 1);
-    this.spawn('glow', this.anims.explosion, x, y, z, r * 2.6, 0.45, color, 1).rot = 0;
+    const onGround = y < r * 1.5;
+    this.spawn('glow', this.anims.glow, x, y, z, r * 4.0, 0.35, color, 0.6);
+    this.spawn('burst', this.anims.flash, x, y, z, r * 3.2, 0.16, 0xffffff, 1);
+    if (onGround) this.spawn('burst', this.anims.explosionGround, x, (r * 2.6) / 2, z, r * 2.6, 0.45, 0xffffff, 1).rot = 0;
+    else this.spawn('burst', this.anims.explosion, x, y, z, r * 2.6, 0.45, 0xffffff, 1).rot = 0;
     const sparks = Math.min(12, 5 + Math.round(r));
     for (let i = 0; i < sparks; i++) {
       const a = this.rand() * 6.283;
@@ -137,7 +163,7 @@ export class Effects {
       p.vy = r * 0.6;
       p.grow = r * 0.9;
     }
-    if (y < r * 1.5) this.ring(x, z, r * 2.4, 0xffe2a0, 0.45);
+    if (onGround) this.ring(x, z, r * 2.4, 0xffe2a0, 0.45);
   }
 
   /** Billowing dust, for collapses, stomps and footsteps. */
@@ -161,9 +187,19 @@ export class Effects {
     p.rot = 0;
   }
 
-  /** A quick bright flash (muzzles, hits). */
-  flash(x: number, y: number, z: number, size: number, color = 0xffe9a8, life = 0.09): void {
-    this.spawn('glow', this.anims.flash, x, y, z, size, life, color, 1);
+  /** A quick bright flash (muzzles): the full-color picture, untinted. */
+  flash(x: number, y: number, z: number, size: number, color = 0xffffff, life = 0.09): void {
+    this.spawn('burst', this.anims.flash, x, y, z, size, life, color, 1);
+  }
+
+  /** A soft tinted glow of light (the beam, hits): added, so it fades to nothing at its rim. */
+  glowAt(x: number, y: number, z: number, size: number, color: number, life = 0.06, alpha = 1): void {
+    this.spawn('glow', this.anims.glow, x, y, z, size, life, color, alpha);
+  }
+
+  /** The bright end of a targeting laser: a crisp dot with a thin cross flare. */
+  laserDot(x: number, y: number, z: number, size: number, color: number, life = 0.03): void {
+    this.spawn('glow', this.anims.laserdot, x, y, z, size, life, color, 1);
   }
 
   /** One puff of smoke (trails). */
@@ -186,9 +222,9 @@ export class Effects {
     this.ring(x, z, radius * 2, 0xdff1ff, 0.8);
   }
 
-  /** Lingering fire on a wreck or ruin. */
+  /** Lingering fire on a wreck or ruin, standing on `y`. */
   fire(x: number, y: number, z: number, size: number): void {
-    const p = this.spawn('glow', this.anims.fire, x, y, z, size, 0.6, 0xffffff, 0.9);
+    const p = this.spawn('burst', this.anims.fire, x, y + size / 2, z, size, 0.6, 0xffffff, 1);
     p.rot = 0;
     p.vy = size * 0.5;
   }
@@ -204,6 +240,7 @@ export class Effects {
   update(dt: number): void {
     const list = this.particles;
     this.glow.begin();
+    this.burst.begin();
     this.smoke.begin();
     this.ground.begin();
     const uv = [0, 0, 0, 0];
@@ -236,10 +273,11 @@ export class Effects {
       frameRect(p.anim, 0, p.animate ? Math.min(p.anim.frames - 1, Math.floor(t * p.anim.frames)) : 0, uv, 0);
       // Fade out over the last 60% of the life.
       const fade = p.alpha * (t < 0.4 ? 1 : 1 - (t - 0.4) / 0.6);
-      const batch = p.layer === 'glow' ? this.glow : p.layer === 'smoke' ? this.smoke : this.ground;
+      const batch = p.layer === 'glow' ? this.glow : p.layer === 'burst' ? this.burst : p.layer === 'smoke' ? this.smoke : this.ground;
       batch.push(p.x, p.y, p.z, p.size, p.size, uv, 0, p.r, p.g, p.b, fade, p.rot);
     }
     this.glow.end();
+    this.burst.end();
     this.smoke.end();
     this.ground.end();
   }

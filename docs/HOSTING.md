@@ -18,9 +18,9 @@ their web browser. The game itself never contacts any other outside service.
   - **Docker Desktop** (from docker.com).
 
   Either is fine. If you already have one, use that one.
-- About **5 GB of free disk space** (the container program itself plus about 1 GB for the game
-  while it is being built; the finished game is much smaller).
-- About **4 GB of memory (RAM)** free while hosting. A computer with 8 GB or more is comfortable.
+- About **5 GB (gigabytes) of free disk space**: the container program itself, plus about 1.5 GB for the
+  game and the building blocks it is built from. (The finished game is about 250 MB, megabytes.)
+- About **4 GB of free memory** while hosting. A computer with 8 GB or more is comfortable.
 - A normal home internet connection. Five friends playing use very little of it.
 - Your friends need: a computer (not a phone or tablet) with a **keyboard and mouse**, and an
   up-to-date **Chrome, Edge or Firefox** browser. Nothing to install.
@@ -159,7 +159,8 @@ Cloudflare.
    MB_PUBLIC_URL=https://kaiju.example.com
    ```
 6. Back in Cloudflare, add a **public hostname** to the tunnel: choose your subdomain and
-   domain (for example `kaiju` and `example.com`), service type **HTTP**, address
+   domain (for example `kaiju` and `example.com`), service type **HTTP** (the ordinary web
+   kind), address
    **game:2567**. Save.
 7. Double-click start.cmd. The box now shows your own address.
 
@@ -212,18 +213,38 @@ If the computer has **Node.js 22** (a program that runs JavaScript) installed:
 
 ## 11. What was tested, and what was not
 
-Honest status of this hosting package, as of its first version:
+Honest status of this hosting package, as of its first version. It was tried on a Linux test
+machine, not on Windows.
 
-- **Tested on a Linux test machine:** building the container image with Podman, running it,
-  the health check, and opening the game page in a headless browser (a browser without a
-  window, driven by a program) through the container, including creating a room. The Linux
-  start and stop script was run against Podman there. The settings file for compose was checked
-  for errors.
-- **Not tested yet:** the Windows files (start.cmd and the others) have **not been run on
-  Windows**; they were only checked by reading them carefully. Podman Desktop and Docker Desktop
-  on Windows have not been tried. **The tunnel itself could not be tested** (the test machine
-  is not allowed to make that kind of connection), so the first real check of the public link
-  is your first start. Docker (as opposed to Podman) was not run either.
+**Tested there, and working:**
 
-So for the first time, try it a day before the play session: start it, open the public link on
-your phone (just to see the page load; the game itself needs a computer), and stop it.
+- Building the container image with Podman, from a clean copy of the game. The finished image
+  is about 250 MB.
+- Running it: the health check answers, the game page loads, and a browser without a window
+  (driven by a program) reached the home screen and created a room with no errors.
+- Stopping it: the game shuts down cleanly in under a second.
+- The Linux start, stop, logs and link scripts (`host/*.sh`) with Podman, using both kinds of
+  Compose program (the one Podman Desktop installs on Windows, and `podman-compose`): the game
+  was built, started, reached at the local address and through the internal address the tunnel
+  uses, and stopped again. The messages for "nothing installed" and "not running" were checked.
+- The script's check for a Docker-only computer picked Docker correctly (building with Docker
+  itself could not be finished on the test machine for a reason that only exists there).
+- `npm run host` (section 10): built and started the game, and the same browser check passed.
+
+**Not tested:**
+
+- **The tunnel.** The test machine is not allowed to open a public tunnel, so no
+  trycloudflare.com link was ever created. In the script test the tunnel was replaced by a
+  stand-in that prints a made-up link, which checked that the script finds and shows the link.
+  The real tunnel program was downloaded and its settings were checked against its own help
+  text. Your first start is the first real test of the public link.
+- **The Windows files** (`start.cmd`, `stop.cmd`, `update.cmd`, `logs.cmd` and `mb.ps1`) have
+  **never been run**. They were checked line by line against the PowerShell version every Windows
+  computer has (5.1), but not executed.
+- Podman Desktop and Docker Desktop on Windows, and Docker on any computer.
+- The named tunnel with your own domain (section 7).
+- The update script with Git (`update.cmd`, `host/update.sh`).
+
+So the first time, try it a day before the play session: double-click start.cmd, open the
+public link on your phone (just to see the page load; the game itself needs a computer), then
+double-click stop.cmd.

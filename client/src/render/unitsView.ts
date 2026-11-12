@@ -106,7 +106,6 @@ export class UnitsView {
   private readonly circleUv = [0, 0, 0, 0];
   private readonly diamondUv = [0, 0, 0, 0];
   private readonly chevronUv = [0, 0, 0, 0];
-  private readonly dotUv = [0, 0, 0, 0];
   private readonly offset = { x: 0, z: 0 };
 
   constructor(assets: AssetStore, materials: Materials, sprites: QuadBatch, decals: QuadBatch, markers: QuadBatch) {
@@ -124,7 +123,6 @@ export class UnitsView {
     first('mk_circle', this.circleUv);
     first('mk_diamond', this.diamondUv);
     first('mk_chevron', this.chevronUv);
-    first('fx_laserdot', this.dotUv);
   }
 
   private rig(modelId: string): InstancedRig {
@@ -277,7 +275,7 @@ export class UnitsView {
         const width = Math.max(0.12, dist * 0.0025) * (1 + u.charge);
         lines.push(u.x, oy, u.z, ex, ey, ez, width, 1, 0.82, 0.1, glow);
         const dot = Math.max(0.6, Math.hypot(ex - camera.position.x, ey - camera.position.y, ez - camera.position.z) * 0.012) * (1 + u.charge);
-        effects.flash(ex, ey, ez, dot, 0xffd91a, 0.03);
+        effects.laserDot(ex, ey, ez, dot, 0xffd91a, 0.03);
       }
     }
 
