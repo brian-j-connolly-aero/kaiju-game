@@ -874,15 +874,14 @@ read off the result). dBFS is decibels relative to full scale; 0 is where sound 
   audio. The humans' orders (`nerve.break`, `kaiju.special`) are loaded before the match, go
   first, cut in on chatter, and are dropped after waiting 1.5 s. The chair's line is held
   back: `MatchAudio` starts `hearing` 12.5 s after the match ends and says the line at 15 s
-  (the end screen's own start of `hearing` at 14 s is then a no-op; `takeHearing()` is there
-  if the end screen is ever to do it). Clearing the voice stops the line being spoken.
+  (the end screen no longer starts it itself; `takeHearing()` is there if the end screen is
+  ever to say the line). Clearing the voice stops the line being spoken.
 - **What should sound now is read from the frame.** The beam, the heartbeat, the charging tone
   (`laser_charge_loop`, rising with the charge, then `volley_ready`) and the stage music follow
   the frame state, so a missed event (a reconnection) leaves nothing stuck. An event handed
   out more than a second after it happened, or while `MatchSession.catchingUp` is set, makes
   no one-shot sound and no radio line. A hidden page pauses the sound altogether.
-- **Not done:** the Tier 2 unit sounds (no such units yet); `MusicEntry` in
-  `client/src/assets/manifest.ts` does not declare `mark` (the engine reads it all the same).
+- **Not done:** the Tier 2 unit sounds (no such units yet).
 
 ## 8. Integration pass (the whole thing run together)
 

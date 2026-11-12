@@ -943,7 +943,7 @@ def damage(src: Region, dst: Region, cv: Canvas, win: Windows | None, rng) -> No
                     yy, xx = ys[k] + rng.integers(-1, 2), xs[k] + rng.integers(-1, 2)
                     if 0 <= yy < hgt and 0 <= xx < wid:
                         c[yy, xx] = hole
-                if rng.random() < 0.3:                             # fire inside
+                if rng.random() < 0.15:                            # fire inside
                     rows = ys.max() - ys.min() + 1
                     for yy, xx in zip(ys, xs):
                         t = (yy - ys.min()) / max(rows - 1, 1)
