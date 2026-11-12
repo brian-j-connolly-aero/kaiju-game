@@ -60,7 +60,8 @@ function makeClient(reloads: string[], allowReload: () => boolean) {
   const closed: ClosedReason[] = [];
   let admitted = 0;
   const client = new GameClient({
-    origin: 'http://game.test',
+    // Never dialled: the room library is replaced by the fake above.
+    origin: 'the-page-origin',
     token: 'token-reload-test',
     now: () => 0,
     reload: (code) => {

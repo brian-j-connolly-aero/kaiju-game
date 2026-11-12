@@ -61,7 +61,7 @@ export interface PlayerTally {
   kills: number;
   /** Own units lost (human players). */
   unitsLost: number;
-  /** Volleys fired (human players). */
+  /** Charged volleys fired (human players). */
   volleys: number;
 }
 
@@ -94,9 +94,13 @@ export interface ProjectileSpawnEvent extends EventBase {
   vz: number;
   /** Downward acceleration (0 for flat flight). */
   gravity: number;
-  /** Seconds until it expires if it hits nothing. */
+  /** Seconds until it expires if it hits nothing (a unit's shot gives out a little past its weapon's range). */
   ttl: number;
-  /** True when it was fired as part of a charged volley, the player's trigger shot included (drawn brighter). */
+  /**
+   * True when it was fired as part of a charged volley (drawn brighter): by a sub-unit with at
+   * least COMBAT_RULES.volleyMinCharge, or the player's trigger shot of such a volley. Ragged
+   * shots, which go with the trigger on less charge than that, are not volley shots.
+   */
   volley: boolean;
   /** For thrown objects: what is flying. */
   payload?: HeldObject;
@@ -291,14 +295,16 @@ export interface TakeoverEvent extends EventBase {
 }
 
 /**
- * A squad fired a charged volley: its player's shot took at least one charged sub-unit with it.
- * The projectiles themselves arrive as `projectileSpawn` events of the same tick.
+ * A squad fired a charged volley: its player's shot took with it at least one sub-unit charged
+ * to COMBAT_RULES.volleyMinCharge or more. (A trigger pulled on less charge than that also
+ * fires the sub-units, but raggedly: no `volley` event.) The projectiles themselves arrive as
+ * `projectileSpawn` events of the same tick.
  */
 export interface VolleyEvent extends EventBase {
   type: 'volley';
   squad: number;
   player: PlayerId;
-  /** The charged sub-units that fired (the driven unit, whose shot was the trigger, is not listed). */
+  /** The sub-units that fired with the trigger, ragged ones included (the driven unit, whose shot was the trigger, is not listed). */
   units: number[];
   /** The aim point: where the player's aim ray landed. */
   x: number;

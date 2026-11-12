@@ -121,7 +121,9 @@ on the server, in headless tests, and (movement only) in the client for predicti
 input. `MatchConfig` (`sim/config.ts`) lists the player slots (slot 0 is the kaiju, then the
 squads; bots fill empty slots), the city seed, the starting anchor (or -1 for random) and the
 timers (`MatchTuning`; `fastTuning()` is the `MB_FAST` set) and, optionally, bot handicaps
-(`bots`: 0 is a bot at its best, 1 leaves it standing still; `idleBots()` for tests). Squad
+(`bots`: 0 is a bot at its best, 1 leaves it standing still; `idleBots()` for tests; and
+`bots.triggerHappy`, a harness profile in which squad bots hold the trigger instead of
+charging volleys). Squad
 commands that do not travel inside an input are handed over with
 `queueCommand(world, player, command)`.
 
@@ -145,7 +147,8 @@ State (plain objects and typed arrays, cheap to snapshot):
   cocoon | dead`, with action id and timer), held object, cooldowns, mods.
 - `squads[]`: player or bot, faction, level, 4 unit ids, driven unit id (-1 when eliminated),
   movement order, fire mode, call-in cooldowns, upgrades and mods, eliminated flag; server-side
-  only: the leader's `trail`, `formed`, `volleyReady`.
+  only: the leader's `trail`, `formed`, `volleyReady`, and the order budget (`orderBudget`,
+  `pendingOrders`: wheel orders are carried out a few a second, see below).
 - `units[]`: id, squad, type, pos (and altitude for aircraft), yaw, aim yaw and pitch, hp,
   members, nerve, shaken timer, charge, weapon cooldown, veteran flag, `rooted` and `arcYaw`
   (the firing arc of a planted unit); server-side only: `nav` (hold point, route, steering
@@ -162,7 +165,9 @@ State (plain objects and typed arrays, cheap to snapshot):
   `takePropWreck`, a direct `applyHit`), and healing (`healKaiju`). All hp of combatants
   changes in `systems/damage.ts`, all city hp in `systems/cityDamage.ts`.
 - `kaiju.act` is the action system's own memory (which presses are used, the beam's current
-  length and blocker). It is server-side only and not in snapshots.
+  length and blocker). It is server-side only and not in snapshots. So are `kaiju.recentHits`
+  (crossfire) and `kaiju.volleyHits` (each squad's latest charged volley hit, for the rule
+  that it takes two squads to break its nerve).
 
 Systems run in a fixed order each tick: inputs → kaiju actions → unit orders and sub-unit AI →
 bots → movement and collision → weapons and volleys → projectiles → damage and nerve → city
@@ -229,7 +234,11 @@ do not choose lines themselves. (`pickVoiceLine` remains for tools that only hav
 
 How the human side is put together (`DESIGN.md` section 5 has the rules):
 
-- **Orders** (`systems/unitOrders.ts`). The driven unit's `control` comes straight from its
+- **Orders** (`systems/unitOrders.ts`). Wheel orders are carried out from a per-squad budget
+  (`takeOrders`: `SQUAD_RULES.orderBurst` at once, then `ordersPerSecond`; a newer order of
+  the same kind replaces one still waiting; one move-to is planned per tick in the whole
+  match), so the planning a command costs is bounded whatever a client sends. Call-ins are
+  not held up. The driven unit's `control` comes straight from its
   player's input. Every other living unit of the squad is a sub-unit and gets its `control`
   here each tick: where to go (its hold point, or its slot in the column behind the leader),
   where to point its weapon, and whether to fire at will. Hold-and-charge is a per-unit state:
@@ -248,8 +257,21 @@ How the human side is put together (`DESIGN.md` section 5 has the rules):
 - **Weapons** (`systems/weapons.ts`). A unit that fires launches one projectile per launcher or
   tank with `spawnProjectile`. The driven unit's shot goes to its aim point
   (`resolveAimPoint` from the eye, kaiju included) and is the volley trigger; sub-units fire
-  along their own aim. Aim error is added per projectile from the world's generator. Call-in
+  along their own aim. What a sub-unit's shot in a volley is worth follows its charge
+  (`volleyStrength`, `isChargedVolley` in `sim/squads.ts`): ragged below
+  `COMBAT_RULES.volleyMinCharge`, a charged volley from there up. A unit's projectile lives
+  for `SQUAD_RULES.rangeSlack` times its weapon's range (`ttl`), which is how range limits
+  every shot. Aim error is added per projectile from the world's generator. Call-in
   missions live in `world.callIns` and release their shells here.
+- **Markers placed with the crosshair** (`resolveMarkerPoint` in `sim/aim.ts`, called by the
+  input system for a move-to or a call-in that carries no map marker): the ground under a
+  kaiju the crosshair is on, else where the aim ray lands, else a kaiju on the map just
+  beside the crosshair, else a short way ahead (move-to) or nothing (call-in). It needs only
+  snapshot data, so a client can show where a marker would go.
+- **Breaking nerve** (`systems/damage.ts`). A hit carries `volleySquad` when it is part of a
+  charged volley; the kaiju remembers each squad's latest one (`volleyHits`) and its nerve
+  breaks only while `COMBAT_RULES.breakSquads` squads have landed one within
+  `volleyBreakWindow` seconds. Otherwise nerve stops at capacity.
 - **Bridge decks.** For bodies a deck is road surface; so it is for everything that flies or
   looks: `castSegment`, `castRay` and `lineOfSight` take a `skipPassable` flag, and projectile
   flight, spotting, lines of fire, corridors and `resolveAimPoint` all set it. A projectile that
@@ -274,7 +296,10 @@ How the kaiju's action state machine, the damage rules and the molt hand over to
 - **The beam** is one pure function, `beamPath(cityQuery, kaiju, action)` (`sim/beam.ts`), used
   by the simulation and meant for clients too: it works from snapshot fields (`kind`, `stage`,
   `x`, `z`, `aimYaw`, `aimPitch`) and the client's mirrored city, and returns the mouth, the
-  direction, the length and what stopped the beam. While a special's active phase runs, the
+  direction, the length and what stopped the beam. The mouth and the eye are where the model
+  has them, ahead of the body's axis along the aim heading (`kaijuMouthPoint`, `kaijuEyePoint`
+  in `sim/aim.ts`, from `mouthHeight` / `mouthForward` and `eyeHeight` / `eyeForward` in the
+  kind's stage definition); the throw's aim ray starts at the eye. While a special's active phase runs, the
   movement system turns the head only at the special's reduced rate, so the snapshot's
   `aimYaw` / `aimPitch` are the true beam direction.
 - **Projectiles** fly along `p0 + v0 t - (0, g t² / 2, 0)` with t counted from the spawn tick
@@ -446,9 +471,12 @@ documented in `shared/src/sim/events.ts`.
 What clients can rely on from the squad events and the squad part of a snapshot:
 
 - A unit's salvo is one `projectileSpawn` per projectile, all on the same tick, with
-  `owner: 'unit'` and the unit's id. `volley: true` marks a charged volley, the trigger shot
-  included; the `volley` event of that tick lists the sub-units that fired (not the driven
-  unit), the aim point and their average charge. `test/weapons.test.ts` replays every spawn
+  `owner: 'unit'` and the unit's id. `volley: true` marks a charged volley's shots (sub-units
+  with at least 60% charge, and the trigger shot); the `volley` event of that tick lists the
+  sub-units that fired (not the driven unit), the aim point and their average charge. A
+  trigger pulled on less charge fires the sub-units too, raggedly: no `volley` flag, no
+  `volley` event. A unit's projectile carries a `ttl` of 1.1 times its weapon's range over
+  its speed and ends with a `projectileHit` on target 'none' when that runs out. `test/weapons.test.ts` replays every spawn
   with `stepProjectile` and checks it ends where its `projectileHit` says.
 - A targeting laser is a snapshot unit with `laser` set: draw it from the unit's muzzle height
   along its `aimYaw` / `aimPitch` to wherever `resolveAimPoint` (mirrored city, snapshot kaiju)
@@ -535,7 +563,9 @@ layout, requires bumping `SNAPSHOT_VERSION` / `PROTOCOL_VERSION`.
   match length, time per stage, staggers, units lost, the bar at each stage end, kaiju hp lost
   per stage. These are the balance instrument; `docs/BALANCE.md` says how to read them and
   records every tuning pass. Options: `--seeds N`, `--seed N`, `--unopposed`,
-  `--kaiju-handicap H`, `--human-handicap H`, `--fast`, `--anchor N`, `--events`, `--json`.
+  `--kaiju-handicap H`, `--human-handicap H`, `--trigger-happy` (squads that hold the trigger
+  instead of charging volleys), `--fast`, `--anchor N`, `--events`, `--json`; the header of
+  `shared/scripts/sim.ts` lists them all.
 - The simulation is deterministic and the tests hold it to that: `test/determinism.test.ts`
   plays two matches side by side from one seed and compares a hash of the whole state on every
   tick, and replays recorded inputs; `test/matchSoak.test.ts` plays whole bot matches (three

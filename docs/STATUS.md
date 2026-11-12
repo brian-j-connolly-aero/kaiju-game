@@ -729,9 +729,17 @@ rigs are posed, so the kaiju camera sits exactly on `cam_fp`) -> audio -> `rende
   its slot back; the sandbox at stages 1 to 3 on both sides including two forced stage changes;
   the same on procedural fallbacks only (`--no-assets`).
 - NOT verified: a real GPU (frame rates here are software rendering on a loaded machine: about
-  6 to 12 frames a second per page, script time 2 to 6 ms a frame); a real gamepad; pointer
-  lock; building art; a Cloudflare Tunnel. (A kaiju win and the kill ending have since been
-  seen in a browser, each with its end screen: section 8.2.)
+  6 to 12 frames a second per page, script time 2 to 6 ms a frame); a real gamepad; mouse
+  look under pointer lock in a real browser; building art; a Cloudflare Tunnel. (A kaiju win
+  and the kill ending have since been seen in a browser, each with its end screen: section
+  8.2.)
+- Pointer lock, as far as it can be checked here: the rules of the captured mouse are unit
+  tested against a stand-in browser (`client/test/input.test.ts`), and headless Chromium, which
+  does grant and release the lock, showed the first click capturing without firing, the map
+  and the settings panel giving the pointer back, and the second click firing. What a real
+  browser does on Escape, on switching windows and in the second after Escape (when it
+  refuses the lock) is reasoned from the browsers' documented behavior, not seen. Smoothness
+  at 60 and 144 frames a second is from tests of the real session, not from a screen.
 - Measured: at stage 3 in the sandbox, from the titan's eye with the whole city in view, 92
   draw calls and about 195,000 triangles; the highest seen in a 5-page match was 104 draw calls
   and 390,000 triangles (an intermission's pulled-back camera draws more props). The budget is
