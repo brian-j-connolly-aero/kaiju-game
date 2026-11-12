@@ -286,6 +286,8 @@ export class MatchRuntime {
       localUnit: frame.localUnit ? frame.localUnit.id : -1,
       localSquad: session.role.squadId,
       hideLocalLead: !cinematic && human !== null && !human.thirdPerson,
+      kaijuFirstPerson: !cinematic && controller instanceof KaijuController && !controller.thirdPerson,
+      kaijuInsideHead: !cinematic && controller instanceof KaijuController && controller.insideHead,
       seesKaiju: session.role.kind !== 'human' || controller.kind === 'drone',
       hint: frame.localKaiju ? session.hintFor(frame.localKaiju, now) : null,
       now,
