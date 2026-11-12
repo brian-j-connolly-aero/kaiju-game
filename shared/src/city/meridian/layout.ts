@@ -518,6 +518,8 @@ export interface PatchSpec {
   rowGap?: number;
   /** Kiosks per 100 m of street. */
   kiosks?: number;
+  /** Multiplies the parked cars on the streets here. */
+  cars?: number;
   /** A starting neighborhood: nothing taller than a house or shop is allowed here. */
   lowRise?: boolean;
 }
@@ -528,18 +530,18 @@ const EAST: Pt = [1, 0];
 export const PATCHES: readonly PatchSpec[] = [
   // --- High streets in the gaps between the starting neighborhoods (they take their streets from
   // the neighborhood patterns below, and bring mid-rise blocks into each stage 2 square) -----------
-  { name: 'Pilgrims Rise', rect: [-1056, 518, -744, 732], palette: 'temple', kiosks: 0.6, keep: 1.087 },
-  { name: 'Shore Hotels', rect: [-726, -500, -450, -419], palette: 'hotels', kiosks: 1, keep: 1.023 },
-  { name: 'Bay Hotels', rect: [-575, -770, -440, -500], palette: 'hotels', kiosks: 1, keep: 1.089 },
-  { name: 'Bellhaven High Street', rect: [-1056, -46, -760, 136], palette: 'highStreet', kiosks: 1, keep: 1.006 },
+  { name: 'Pilgrims Rise', rect: [-1056, 518, -744, 732], palette: 'monastery', kiosks: 0.6, keep: 1.087 },
+  { name: 'Shore Hotels', rect: [-726, -500, -450, -419], palette: 'hotels', kiosks: 1, keep: 1.333 },
+  { name: 'Bay Hotels', rect: [-575, -770, -440, -500], palette: 'hotels', kiosks: 1, keep: 1.333 },
+  { name: 'Bellhaven High Street', rect: [-1056, -46, -760, 136], palette: 'highStreet', kiosks: 1, keep: 0.775 },
   { name: 'Mast Quarter', rect: [432, 752, 730, 1056], palette: 'highStreet', kiosks: 0.8, keep: 1.111 },
   { name: 'Easter Rise', rect: [750, 574, 1056, 730], palette: 'highStreet', kiosks: 0.8, keep: 1.111 },
-  { name: 'Chandlers Row', rect: [744, -536, 1056, -419], palette: 'highStreet', kiosks: 0.8, keep: 0.74 },
+  { name: 'Chandlers Row', rect: [744, -536, 1056, -419], palette: 'highStreet', kiosks: 0.8, keep: 0.984 },
   // --- The inner ring: dense mid-rise quarters right against the ring boulevard, in the corner of
   // every stage 2 square nearest downtown. They draw the juvenile toward the towers. ---------------
-  { name: 'Wendside', rect: [-372, 204, -214, 500], palette: 'riverside', kiosks: 0.6, keep: 1.111 },
-  { name: 'Halcyon Gate', rect: [214, 214, 470, 460], palette: 'riverside', kiosks: 0.6, keep: 0.813 },
-  { name: 'Customs Quarter', rect: [268, -560, 470, -419], palette: 'riverside', kiosks: 0.6, keep: 0.74 },
+  { name: 'Wendside', rect: [-372, 204, -206, 624], palette: 'riverside', kiosks: 0.6, keep: 1.111 },
+  { name: 'Halcyon Gate', rect: [214, 214, 470, 460], palette: 'riverside', kiosks: 0.6, keep: 0.65 },
+  { name: 'Customs Quarter', rect: [268, -560, 470, -419], palette: 'riverside', kiosks: 0.6, keep: 1.106 },
 
   // --- The ten starting neighborhoods (the frame) ------------------------------------------------
   {
@@ -550,16 +552,18 @@ export const PATCHES: readonly PatchSpec[] = [
     lowRise: true,
     keep: 1.22,
     gap: 0.8,
+    cars: 1.86,
     kiosks: 0.5,
-    streets: { type: 'lattice', origin: [0, 0], u: EAST, us: [-1020, -962, -878, -796], vs: [796, 878, 962, 1024], jitter: 5, wave: 10, closes: 0.5, cars: 3 },
+    streets: { type: 'lattice', origin: [0, 0], u: EAST, us: [-1020, -962, -878, -796], vs: [796, 878, 962, 1024], jitter: 5, wave: 10, closes: 0.5 },
   },
   {
     name: 'Bellhaven',
     rect: [-1056, -391, -736, 186],
     palette: 'oldSuburb',
     lowRise: true,
-    keep: 0.989,
+    keep: 1.035,
     gap: 1,
+    cars: 1,
     kiosks: 0.6,
     streets: {
       type: 'lattice',
@@ -577,8 +581,9 @@ export const PATCHES: readonly PatchSpec[] = [
     rect: [736, -391, 1056, -84],
     palette: 'workerRows',
     lowRise: true,
-    keep: 0.595,
+    keep: 0.577,
     gap: 1,
+    cars: 1,
     kiosks: 0.6,
     rowEvery: 3,
     rowGap: 36,
@@ -590,8 +595,9 @@ export const PATCHES: readonly PatchSpec[] = [
     palette: 'suburb',
     infill: 'backyards',
     lowRise: true,
-    keep: 1.22,
+    keep: 1.218,
     gap: 0.8,
+    cars: 1.3,
     kiosks: 0.5,
     streets: {
       type: 'lattice',
@@ -614,6 +620,7 @@ export const PATCHES: readonly PatchSpec[] = [
     lowRise: true,
     keep: 1.176,
     gap: 0.8,
+    cars: 1.75,
     kiosks: 0.5,
     streets: {
       type: 'polar',
@@ -626,7 +633,6 @@ export const PATCHES: readonly PatchSpec[] = [
         { r: 332, n: 32, spokeEvery: 8 },
       ],
       joinLen: 100,
-      cars: 3,
     },
   },
   {
@@ -635,8 +641,9 @@ export const PATCHES: readonly PatchSpec[] = [
     palette: 'templeSlope',
     infill: 'backyards',
     lowRise: true,
-    keep: 1.24,
-    gap: 0.87,
+    keep: 1.094,
+    gap: 0.8,
+    cars: 1,
     kiosks: 0.5,
   },
   {
@@ -644,8 +651,9 @@ export const PATCHES: readonly PatchSpec[] = [
     rect: [736, -1056, 1056, -419],
     palette: 'harborVillage',
     lowRise: true,
-    keep: 0.851,
+    keep: 0.869,
     gap: 1.2,
+    cars: 1,
     kiosks: 0.7,
     streets: {
       type: 'lattice',
@@ -667,16 +675,18 @@ export const PATCHES: readonly PatchSpec[] = [
     lowRise: true,
     keep: 1.22,
     gap: 0.8,
+    cars: 2.44,
     kiosks: 0.5,
-    streets: { type: 'lattice', origin: [0, 0], u: EAST, us: [800, 884, 968, 1026], vs: [806, 890, 974, 1030], jitter: 6, wave: 12, closes: 0.5, cars: 3 },
+    streets: { type: 'lattice', origin: [0, 0], u: EAST, us: [800, 884, 968, 1026], vs: [806, 890, 974, 1030], jitter: 6, wave: 12, closes: 0.5 },
   },
   {
     name: 'Ivy Court',
     rect: [-260, 736, 736, 1056],
     palette: 'rowhouses',
     lowRise: true,
-    keep: 0.526,
+    keep: 0.603,
     gap: 1,
+    cars: 1,
     kiosks: 0.7,
     rowEvery: 3,
     rowGap: 36,
@@ -696,21 +706,22 @@ export const PATCHES: readonly PatchSpec[] = [
     rect: [-1056, -770, -736, -419],
     palette: 'beachVillage',
     lowRise: true,
-    keep: 0.795,
+    keep: 0.807,
     gap: 1,
+    cars: 1,
     kiosks: 0.9,
     streets: { type: 'lattice', origin: [0, 0], u: EAST, us: [-1010, -962, -878, -800], vs: [-718, -642, -558, -480], jitter: 3, dropV: 0.2 },
   },
 
   // --- Downtown --------------------------------------------------------------------------------
-  { name: 'Station Row', rect: [-186, 212, 186, 300], palette: 'station', keep: 0.816 },
+  { name: 'Station Row', rect: [-186, 212, 186, 300], palette: 'station', keep: 0.581 },
   { name: 'Bayfront', rect: [-186, -392, 186, -262], palette: 'bayfront' },
   { name: 'The Core', rect: [-186, -262, 186, 186], palette: 'core' },
   {
     name: 'Eastside',
     rect: [214, -391, 456, 186],
     palette: 'eastside',
-    keep: 0.599,
+    keep: 0.5,
     streets: { type: 'lattice', origin: [0, 0], u: EAST, us: [335], vs: [-250, -160, 20, 110], joinLen: 175 },
   },
 
@@ -719,8 +730,8 @@ export const PATCHES: readonly PatchSpec[] = [
     name: 'Old Town',
     rect: [-726, -391, -436, 186],
     palette: 'oldtown',
-    keep: 0.834,
-    near: 0.45,
+    keep: 0.918,
+    near: 0.8,
     infill: 'courts',
     kiosks: 0.8,
     streets: {
@@ -748,7 +759,7 @@ export const PATCHES: readonly PatchSpec[] = [
     ],
     palette: 'temple',
     keep: 1.087,
-    near: 0.3,
+    near: 0.5,
     infill: 'cloisters',
     kiosks: 0.4,
     streets: {
@@ -767,14 +778,14 @@ export const PATCHES: readonly PatchSpec[] = [
       joinLen: 140,
     },
   },
-  { name: 'Fairground', rect: [-726, -762, -440, -419], palette: 'fairground', kiosks: 1.6, keep: 1.129 },
+  { name: 'Fairground', rect: [-726, -762, -440, -419], palette: 'fairground', kiosks: 1.6, keep: 1.333 },
 
   // --- North: the university and the science park ---------------------------------------------------
   {
     name: 'University',
     rect: [-370, 304, 186, 726],
     palette: 'campus',
-    keep: 0.639,
+    keep: 0.719,
     infill: 'campus',
     kiosks: 0.6,
     streets: { type: 'lattice', origin: [0, 0], u: EAST, us: [-282, -178, 96], vs: [300, 385, 552, 646], joinLen: 200 },
@@ -783,7 +794,7 @@ export const PATCHES: readonly PatchSpec[] = [
     name: 'Halcyon Science Park',
     rect: [214, 214, 726, 726],
     palette: 'science',
-    keep: 1.066,
+    keep: 1.25,
     infill: 'science',
     streets: { type: 'lattice', origin: [0, 0], u: EAST, us: [335, 605], vs: [335, 650], joinLen: 290 },
   },
@@ -793,7 +804,7 @@ export const PATCHES: readonly PatchSpec[] = [
     name: 'Kiln Point',
     rect: [754, -56, 1056, 186],
     palette: 'industrial',
-    keep: 0.512,
+    keep: 0.52,
     infill: 'tankFarm',
     streets: { type: 'lattice', origin: [0, 0], u: EAST, us: [806], vs: [0, 138], joinLen: 120 },
   },
@@ -801,7 +812,7 @@ export const PATCHES: readonly PatchSpec[] = [
     name: 'The Cinder Works',
     rect: [484, -391, 726, 186],
     palette: 'industrial',
-    keep: 0.608,
+    keep: 0.689,
     infill: 'yards',
     streets: { type: 'lattice', origin: [0, 0], u: EAST, us: [605], vs: [-320, -170, 65], joinLen: 150 },
   },

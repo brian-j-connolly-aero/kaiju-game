@@ -10,6 +10,8 @@ from .chains import DEFAULTS, chain_config
 from .pipeline import CEILING_DBTP, MP3_QUALITY, OGG_QUALITY, TARGET_LUFS
 from .scriptdoc import BRIEFING_BUDGET, WINDOW_SECONDS
 
+FIRST_SCRIPT_LINES = 181        # size of the script before the audio review (section 10)
+
 ENGINE_NAMES = {"rhvoice": "RHVoice", "flite": "Flite", "pico": "Pico (pico2wave)",
                 "festival": "Festival", "espeak": "eSpeak NG"}
 ORDER = ["Overlord", "Granite", "Beacon", "Tempest", "Anchor", "Chair"]
@@ -294,15 +296,34 @@ def write(lines: list[dict], cast: dict, pron: dict, state: dict, report: dict) 
         add("")
     else:
         add(notes.CHECKS_PASSED.format(window=max(WINDOW_SECONDS.values()), brief_max=BRIEFING_BUDGET))
+    enc = _load("encoding.json")
+    if enc and enc.get("settings"):
+        from .analyze import PEAK_LIMIT_DBTP
+        rows = [[("**" if r["shipped"] else "") + ("Vorbis " if r["format"] == "ogg" else "MP3 ") + r["quality"]
+                 + (" (used)**" if r["shipped"] else ""), r["megabytes"], r["kbit_per_s"], r["wer_all"],
+                 r["wer_radio"], r["snr_median_db"], f"{r['true_peak_max_db']:.2f}"] for r in enc["settings"]]
+        add(notes.ENCODING.format(ogg_q=OGG_QUALITY, mp3_q=MP3_QUALITY, lines=enc["settings"][0]["lines"],
+                                  ceiling=CEILING_DBTP, peak_limit=PEAK_LIMIT_DBTP))
+        add(_table(["Setting", "All files (MB)", "Bit rate (kbit/s)", "Word errors, all lines (%)",
+                    "Word errors, radio lines (%)", "Signal to noise, median (dB)", "Highest true peak (dBTP)"],
+                   rows, "lrrrrrr"))
+        add("")
+        add(notes.ENCODING_AFTER.format(kb_per_line=ogg_bytes / 1000 / max(len(measured), 1)))
     sheets = sorted(p.name for p in DOC_DIR.glob("sheet_*.png"))
     if sheets:
         add("Spectrogram sheets (three lines per voice; synthesizer output on the left, finished clip on the right): "
             + ", ".join(f"[{n}](voice/{n})" for n in sheets) + ".\n")
 
     add("## 7. What is weak, and what to do about it\n")
-    add(notes.WEAK_POINTS)
+    wer = lambda s: summ.get("speaker:" + s, {}).get("wer_ogg", 0)
+    add(notes.WEAK_POINTS.format(tempest_wer=wer("Tempest")))
     add("## 8. Swapping the synthesizer\n")
     add(notes.SWAP)
     add("## 9. Rebuilding\n")
     add(notes.REBUILD.format(out=OUT_DIR.relative_to(OUT_DIR.parents[4])))
+    add("## 10. What the audio review changed\n")
+    add(notes.REVIEW.format(win_min=min(orders), win_max=max(orders), window=max(WINDOW_SECONDS.values()),
+                            new_lines=len(lines) - FIRST_SCRIPT_LINES, lines=len(lines),
+                            tempest_wer=wer("Tempest"), granite_wer=wer("Granite"),
+                            brief_h=brief["humans"], brief_max=BRIEFING_BUDGET))
     DOC.write_text("\n".join(doc).rstrip() + "\n")

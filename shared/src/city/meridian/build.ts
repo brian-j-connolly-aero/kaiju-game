@@ -33,8 +33,8 @@ export interface Street {
   deck: number;
 }
 
-/** No wall comes closer to a street's center line than this (a tank troop is 18 m wide). */
-const DRIVE_HALF = 10.5;
+/** No wall comes closer to a street's center line than this (a tank troop is 18 m wide: 3 m to spare each side). */
+const DRIVE_HALF = 12;
 /** ...and never closer to its edge than this. */
 const SIDEWALK = 3;
 /** Buildings keep this far from water, parks and plazas. */
@@ -362,7 +362,7 @@ export function buildYards(b: Builder, seed: number): void {
         const near = Math.min(1, closeness(x, z, false) + (patch.spec.near ?? 0));
         const a = pick(fill.items, near, rng, 1000);
         // Yards fill up toward downtown and thin out toward the edge of town.
-        if (!a || roll >= fill.keep * (patch.spec.keep ?? 1) * (0.4 + 0.6 * near)) continue;
+        if (!a || roll >= fill.keep * (patch.spec.keep ?? 1) * (fill.gradient ? 0.4 + 0.6 * near : 1)) continue;
         const px = quant(x + jx);
         const pz = quant(z + jz);
         if (patchAt(b.patches, px, pz) !== patch) continue;

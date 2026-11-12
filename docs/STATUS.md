@@ -697,32 +697,38 @@ so the kaiju camera sits exactly on `cam_fp`) -> audio -> `render`.
 
 ## 8. Integration pass (the whole thing run together)
 
-Everything in this section was run on the production build made from the source of commit
-`bbaefc5` (server bundle and client built at 22:45 on 11 November). Nothing in the committed
-simulation, server or client code has changed since. Other people's uncommitted work has: the
-city files (8.1) and, from 23:32, the voice script `shared/src/defs/voiceLines.json`. None of
-that is in the build that was tested, and the build was deliberately not remade on top of
-unfinished work. Scratch logs, screenshots and the probe scripts are in
-`/tmp/mb-scratch/integration-resume/`.
+Everything in this section was run on the production build made at 22:45 on 11 November from
+the source of commit `bbaefc5`. It was not rebuilt afterwards. Commit `06c498a` (23:56) has since
+added other people's work to the shared code: the Port Meridian files, 18 more archetypes, a
+reworded voice script. None of that is in the build that was tested, so nothing here says how
+the game behaves with it. `npm run build` has not been run on the current head. Scratch logs,
+screenshots and the probe scripts are in `/tmp/mb-scratch/integration-resume/`.
 
-### 8.1 Is the tree green? Not quite, and not because of the game
+Where this work is in the history: it was not committed under its own name. The integration
+changes (`tools/playtest/scripted.mjs`, `driver.mjs`, `smoke.mjs`, this file and
+ARCHITECTURE.md) are inside `06c498a`, "Art: UI pictogram set", a commit of 273 files that also
+holds the city, voice and audio work in progress; one later sentence of this section is the
+only content of `99c9ce9`, "Art: Gragnor the Lizard kaiju".
 
-- **`npm run check` fails on the working tree as last checked (23:55 on 11 November)**, on one
-  test: `shared/test/exportDefs.test.ts` ("is up to date on disk"). 18 archetypes were appended
-  to `shared/src/city/archetypes.ts` for Port Meridian and `tools/art/data/archetypes.json` has
-  not been regenerated. The fix is one command, `npm run export:defs`, and it is the city
-  designer's to run when the list is final: the file is the hand-off to the art tools.
-  Everything else passes: type check, lint (212 files), 460 of 461 tests.
-- Half an hour earlier (23:31) the type check failed too, on two lines of the new
-  `shared/scripts/cityMap.ts` (constructor parameter properties, which `erasableSyntaxOnly`
-  forbids). Its author has since fixed that.
-- The integration task changed neither file, regenerated nothing under `tools/art`, and did not
-  loosen any check to get round the failure.
-- **The last commit plus the integration task's own changes passes**: `git archive` of
-  `bbaefc5` with `tools/playtest/smoke.mjs`, `scripted.mjs`, `driver.mjs`, `docs/STATUS.md` and
-  `docs/ARCHITECTURE.md` laid over it, after a clean `npm ci`: `npm run check` exits 0, 39 test
-  files, 461 tests. (No check reads the two documents, which were reworded afterwards.)
-  `npm run sim` was run once, at the start, on the same simulation code: 5 matches, no errors.
+### 8.1 Is the tree green? No: one test fails on the head commit
+
+- **`npm run check` fails on the head commit, `99c9ce9`** (run at 23:58 on 11 November in a
+  clean copy of that commit: exit code 1). One test fails:
+  `shared/test/exportDefs.test.ts` ("is up to date on disk"). 18 archetypes were appended to
+  `shared/src/city/archetypes.ts` for Port Meridian, and `tools/art/data/archetypes.json`, which
+  the art tools read, is out of date in that commit. Everything else passes: type
+  check, lint (212 files), 460 of 461 tests. `npm run sim` passes there too (5 matches, the same
+  results as before the city work: the placeholder city is unchanged).
+- The fix is one command, `npm run export:defs`. It was **not** run by the integration task:
+  the file belongs to the art tools, which that task was told to leave alone, and it would hand
+  the art team a list of buildings whose author is still changing it (three Port Meridian
+  files were modified again after the commit). It is the city designer's to run when the list
+  is final. No check was loosened or skipped to get round the failure.
+- The last commit that passed is `bbaefc5`. That commit with the integration task's files laid
+  over it passes in full: clean `npm ci`, `npm run check` exits 0, 39 test files, 461 tests.
+  (No check reads the two documents, which were reworded after that run.)
+- Earlier in the evening (23:31) the working tree also failed the type check, on two lines of
+  the new `shared/scripts/cityMap.ts`; its author fixed that before it was committed.
 
 ### 8.2 What was played, and how each run ended
 
@@ -733,7 +739,6 @@ unfinished work. Scratch logs, screenshots and the probe scripts are in
 | `smoke.mjs --players 1 --role human --expect kaiju` | bot kaiju, 1 autopilot squad, 3 bot squads | **Failed its own expectation**: humans won on the clock at stage 3. Zero console errors. |
 | headless client against the real server, twice | bot kaiju, 1 connected player who does nothing, 3 bot squads | Kaiju won by the bar, after 73 s and after 126 s of play. |
 | `scripted.mjs`, run three times | a kaiju played with real inputs; then a squad played with real inputs in a practice match, hands off after about a minute | Last two runs (the test in its final form): 35 of 35 actions confirmed by the server, none failed, none left unattempted, zero console errors. All three runs' practice matches ended with the **kaiju winning by the bar at stage 3 (after 97, 74 and 96 s), end screen shown**. (The first run reported 34 of 34, but one of those, the fire-at-will key, could not have failed: a squad starts in that mode. The test now only counts a command that changes the squad's state.) |
-
 | one page that volunteers for the kaiju, starts, and then never touches the controls | an idle kaiju, 4 bot squads | **Humans won by a kill after 143 s** (578 hits, 9 staggers, 69 volleys); the server's `matchEnd` says kill, the last snapshot has the kaiju dead at 0 health, end screen shown. Zero console errors. One match. |
 
 So, on this build: all three stages, both molts and an ending in one match on five browser
@@ -746,13 +751,19 @@ is not a reliable way to get a kill either.
 Why no autoplay run ended in a kaiju win, although `npm run sim -- --fast` gives the kaiju 5 of
 6: this was chased as a possible server fault and is not one. The match configuration the
 server builds is identical to the harness's (same marks, same timers), and the real server
-plays a bot kaiju to a win when the squads are bots or idle. What stops the kaiju in the
-browser runs is the client autopilot's squad, which drives to two thirds of weapon range and
-fires without pause; and the client autopilot's own kaiju, which at stage 3 was staggered for
-about a third of the time, walked between single targets for more than a quarter of it, and
-got a quarter of the way through the last segment. Both are test tools. The fast tuning was not
-changed. `--expect kaiju` with the autopilot as kaiju fails by nature; the header of
-`smoke.mjs` now says so.
+plays a bot kaiju to a win when the squads are bots or idle. That leaves the client's
+autopilot, on both sides, as the difference:
+
+- Its squad drives to two thirds of weapon range and fires without pause. With one such squad
+  in the room the bot kaiju ran out of clock; with none it won. This was concluded by
+  elimination; the same match was not replayed with and without that squad.
+- Its kaiju is a modest player. In the five-page run with nobody at the squads' controls it
+  got about a fifth of the way through the last segment (bar 845, marks at 215 and 3255). In a
+  separate 49 s sample at stage 3 in the sandbox it was staggered for 31% of the time, walking
+  between single targets for 28%, and striking for 21%; it stood still for 2 s in all.
+
+Both are test tools. The fast tuning was not changed. `--expect kaiju` with the autopilot as
+kaiju fails by nature; the header of `smoke.mjs` now says so.
 
 Also learned: a player who never touches the controls still fights. A squad starts on fire at
 will (`shared/src/sim/spawn.ts`), so with four people who never pressed a key that match still
@@ -767,7 +778,7 @@ as plain measurements, against the one hard limit there is: a tick has 33.3 ms.
 
 | What | Measured | Budget | How |
 | --- | --- | --- | --- |
-| Draw calls at stage 3 | at most 107 on five pages; 116 on a single page | under 350 | `smoke.mjs`, peak while stage 3 was on screen |
+| Draw calls at stage 3 | at most 107 on five pages; 116 on a single page | under 350 | `smoke.mjs`, the highest seen during play at stage 3 from the players' own cameras. The budget is stated for "the whole city in view", which these runs did not set up; section 7.5 has a figure taken that way (92). |
 | Triangles at stage 3 | at most 174,902 on five pages; 157,270 on a single page (284,417 once, during an intermission's pulled-back camera) | under 1.5 million | same |
 | Snapshot size | 792 bytes, the same at every stage while a match is in play | "about 800" | 9,289 snapshots encoded headless. Browser pages averaged 780 to 792 over whole matches; the small difference was not looked into. |
 | Simulation, one tick at stage 3 | mean 0.22 ms, median 0.06 ms, 99th percentile 4.2 ms | none (a tick has 33.3 ms) | 7,790 ticks of six fast bot matches, headless |
@@ -785,10 +796,11 @@ Read these with the following in mind:
   print about 53 kbit/s per client; that is half the true figure, because a starved server
   sent 7.5 snapshots a second instead of 15. Do not quote timing or bandwidth from a five-page
   run on this machine.
-- **Single slow ticks are the machine, as far as could be told.** Isolated ticks of 20 to 55 ms,
-  and one of 203 ms, were measured headless. The simulation is deterministic, so the same six
-  matches were timed twice: none of those slow ticks was slow at the same seed and tick the
-  second time, and only 3 ticks of 19,482 were over 3 ms in both passes. The largest cost that
+- **Single slow ticks are the machine, as far as could be told.** A first timing of six
+  matches had one tick of 203 ms. The simulation is deterministic, so the same six matches
+  were then timed twice more, noting seed and tick: the slowest ticks (20 to 55 ms) were never
+  slow at the same seed and tick in the other pass, nothing as slow as 203 ms came back in
+  either, and only 3 ticks of 19,482 were over 3 ms in both passes. The largest cost that
   repeated was about 9 ms, on a tick that carries `stageChange` (presumably the redeployment
   of the squads; it was not profiled); another repeated at 8 to 17 ms with no events. On a
   host PC that is busy with something else the same pauses will happen; the loop then runs
@@ -799,9 +811,10 @@ Read these with the following in mind:
 - The size of the events on the wire was not measured directly at stage 3 (at most 52 kbit/s
   if they were sent as text; the real encoding is smaller).
 - Frame rates are not recorded: these pages draw by software at 4 to 12 frames a second.
-- Assets: every model the art team has delivered loads (25 real, none on stand-ins); 7 of 13
-  textures and 21 of 27 sprites are real; nothing failed to load. The only console warnings
-  are the two for `city_atlas` and `city_atlas_emissive`, which do not exist yet.
+- Assets, in that build: all 25 models in its manifest loaded (none on a stand-in); 7 of the
+  13 textures and 21 of the 27 sprites the client asks for are real art, the rest drawn by
+  code; nothing failed to load. The only console warnings are the two for `city_atlas` and
+  `city_atlas_emissive`, which do not exist yet. Art committed after 22:45 is not in it.
 
 ### 8.4 Played with real inputs (`scripted.mjs`): what the server confirmed
 
@@ -815,11 +828,16 @@ and a move-to marker placed on the map; the camera toggle.
 
 What those passes do not show, so nobody reads more into them:
 
-- Grab and throw were of a **car wreck** each time (the hatchling had already crushed the car).
-  Grabbing a live car with real input was not exercised. The throw landed on open ground.
+- **Grabbing an intact car has not been seen with real input.** In all four runs the script
+  walked the hatchling up to a live vehicle (truck, bus, bus, sedan), and each time the server
+  reported that what it picked up was a wreck. Most likely the approach crushed the vehicle
+  first (the script stops 5 m short, and a bus is 4.5 m in radius), but that was not checked,
+  so whether a player at stage 1 can pick up a car without flattening it is an open question.
+  The unit tests do grab one from a placed position. The thrown wreck came down on open
+  ground three times and on a structure once; damage from a throw was not checked.
 - Eat: the action and its cooldown were confirmed; the kaiju was at full health, so the heal
   was not seen. The beam: the action, the rage spent and the beam phase were confirmed, and
-  the beam is drawn; what it burned was not checked.
+  it is drawn in the one screenshot taken while it was on; what it burned was not checked.
 - Mouse look was driven through the fallback path (a button held on the view), because the
   test switches pointer lock off. **Mouse look under pointer lock, which is what every real
   player uses, is untested.** So is any gamepad.
@@ -829,8 +847,9 @@ What those passes do not show, so nobody reads more into them:
 
 ### 8.5 What the pictures show that is wrong or weak
 
-Seen in screenshots; none of these was changed by the integration task. The first three belong
-to the first-person camera and hand-pose work listed for the client engineer.
+Seen in screenshots; none of these was changed by the integration task. The first three look
+like the first-person camera and hand-pose items said to be on the art director's list for
+the client engineer (that list itself was not read here).
 
 - **A held object blocks the hatchling's view.** While the stage 1 kaiju holds a vehicle, the
   object fills the middle and right of the first-person view; the player cannot see what the
@@ -850,8 +869,8 @@ to the first-person camera and hand-pose work listed for the client engineer.
 - **Hit flashes wash out the kaiju's own view.** Under fire in first person, each hit draws
   a large pale square over much of the screen, with its straight edge showing
   (`kill/kill-attempt1-low-health.png`: the right third of the view is blanked). It happens
-  on every hit, and there were 578 in that match. This is the explosion blending the art
-  director has already listed for the client engineer.
+  on every hit, and there were 578 in that match. It may be the same thing as the daylight
+  blending of explosions said to be on the art director's list.
 - **Third person with a tall building close behind the kaiju**: the wall clearance brings the
   chase camera in to this side of the wall, which at stage 2 is 11 m behind a creature 32 m
   tall: the view is its back and spines, edge to edge
@@ -862,9 +881,10 @@ to the first-person camera and hand-pose work listed for the client engineer.
   building next to the cocoon hides it for part of each turn. Cosmetic. (The cocoon itself is
   drawn correctly; a first reading of one such frame as "a building drawn in place of the
   cocoon" was wrong and was checked in the sandbox.)
-- **When the server stutters, the view jumps.** With the server starved to 16 to 22 ticks a
-  second, the smoothness probe saw the kaiju step up to 5.8 times what its top speed allows
-  between two frames, reverse direction twice, and the view's clock run backwards once. With
+- **When the server stutters, the view jumps.** In the two five-page runs, with the server
+  starved to 16 to 22 ticks a second, the smoothness probe saw the kaiju step up to 5.8 times
+  what its top speed allows between two frames and reverse direction twice (first run), and
+  the view's clock run backwards once on each of the two pages probed (second run). With
   the server keeping real time, one page's probe (12 frames a second, about 3 s) saw no jump,
   no reversal and no backward step. Not investigated further, and there is no measurement yet
   with a kaiju page and a human page on a healthy server, nor at 60 frames a second.
@@ -877,7 +897,7 @@ to the first-person camera and hand-pose work listed for the client engineer.
 - `smoke.mjs` extensions (idle pages, WebSocket byte counts, stage tracking, the smoothness
   probe, expectations): reviewed and used. The help text of `--idle-humans` and `--expect`
   promised more than they deliver and was corrected.
-- `driver.mjs`: reviewed and used by `scripted.mjs`.
+- `driver.mjs`: reviewed and used by `scripted.mjs`; one fault in it was fixed (8.7).
 - Wall clearance for the kaiju and human cameras (`cameraClearance.ts`): reviewed, its five
   unit tests pass, and it is in the build that was played. Measured in play at stage 2, in the
   sandbox, with the kaiju stood by a 36 m apartment block and driven with real inputs:
@@ -894,6 +914,12 @@ to the first-person camera and hand-pose work listed for the client engineer.
 
 ### 8.7 For whoever is next
 
+- **`client/dist` and `server/dist` are older than the head commit.** They were built at 22:45
+  from the source of `bbaefc5`. The playtest tools only build when those folders are missing,
+  so until someone runs `npm run build` they test that older build, without the Port Meridian
+  code, the extra archetypes or the reworded voice lines. Rebuild, then rerun `smoke.mjs` and
+  `scripted.mjs`, once the city and voice work has settled; expect the draw-call figures of 8.3
+  to need measuring again if the client makes a batch for every archetype in the list.
 - A server is being started from `server/dist` by some other tool on port 47979 with normal
   timers, every few minutes, with one room and no players. It is not part of the playtests
   here and was left alone. A rebuild replaces the files under it.

@@ -88,9 +88,9 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
   station: {
     items: [
       { a: 'office_a', far: 3 },
-      { a: 'apartment_b', far: 2 },
-      { a: 'shop_c', far: 2 },
-      { a: 'office_b', far: 1 },
+      { a: 'office_b', far: 2 },
+      { a: 'apartment_c', far: 2 },
+      { a: 'shop_c', far: 1.5 },
     ],
     setback: 0.5,
     gap: [3, 6],
@@ -100,13 +100,14 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
   },
   eastside: {
     items: [
-      { a: 'shop_c', far: 3, near: 2 },
-      { a: 'shop_b', far: 3, near: 0.5 },
-      { a: 'rowhouse_a', far: 3, near: 0.5 },
-      { a: 'apartment_a', far: 1.5, near: 3 },
-      { a: 'apartment_b', far: 0.3, near: 3 },
-      { a: 'apartment_c', far: 0, near: 2 },
-      { a: 'office_a', far: 0, near: 2.5 },
+      { a: 'shop_c', far: 3, near: 1.5 },
+      { a: 'shop_b', far: 3, near: 0 },
+      { a: 'rowhouse_a', far: 3, near: 0 },
+      { a: 'apartment_a', far: 2, near: 1.5 },
+      { a: 'apartment_b', far: 0.5, near: 3 },
+      { a: 'apartment_c', far: 0, near: 3 },
+      { a: 'office_a', far: 0, near: 3 },
+      { a: 'office_b', far: 0, near: 1.5 },
     ],
     setback: 0.5,
     gap: [3, 7],
@@ -122,8 +123,9 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
       { a: 'shop_c', far: 1.5, near: 2.5 },
       { a: 'house_a', far: 1, near: 0 },
       { a: 'shop_a', far: 0.8, near: 0 },
-      { a: 'apartment_a', far: 0.6, near: 5 },
-      { a: 'apartment_b', far: 0, near: 2.5 },
+      { a: 'apartment_a', far: 0.6, near: 4.5 },
+      { a: 'apartment_b', far: 0, near: 3 },
+      { a: 'apartment_c', far: 0, near: 1.5 },
     ],
     setback: 0,
     gap: [0.75, 1.5],
@@ -134,10 +136,11 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
   // A neighborhood high street: walk-up flats over shops, in the gaps between the starting neighborhoods.
   highStreet: {
     items: [
-      { a: 'shop_c', far: 3 },
-      { a: 'shop_b', far: 3 },
-      { a: 'rowhouse_a', far: 3 },
-      { a: 'apartment_a', far: 1.2 },
+      { a: 'apartment_a', far: 3.5 },
+      { a: 'apartment_b', far: 1 },
+      { a: 'shop_c', far: 2.5 },
+      { a: 'shop_b', far: 2 },
+      { a: 'rowhouse_a', far: 2 },
     ],
     setback: 0.5,
     gap: [2, 6],
@@ -148,11 +151,11 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
   // Mansion blocks and offices on the inner ring, next to the towers: Wendside and Halcyon Gate.
   riverside: {
     items: [
-      { a: 'apartment_b', far: 3 },
-      { a: 'apartment_c', far: 2.5 },
-      { a: 'apartment_a', far: 2 },
-      { a: 'office_a', far: 1.5 },
-      { a: 'shop_c', far: 1.5 },
+      { a: 'office_b', far: 2 },
+      { a: 'office_a', far: 3 },
+      { a: 'apartment_c', far: 3 },
+      { a: 'apartment_b', far: 2.5 },
+      { a: 'shop_c', far: 1 },
     ],
     setback: 0.5,
     gap: [3, 7],
@@ -423,6 +426,8 @@ export interface Infill {
   offStreet: number;
   /** Least gap to other buildings, meters. */
   gap: number;
+  /** The yards fill up toward downtown and thin out toward the edge of town (campuses), or are the same everywhere (works). */
+  gradient: boolean;
 }
 
 export type InfillId = 'yards' | 'docks' | 'campus' | 'science' | 'tankFarm' | 'towers' | 'cloisters' | 'courts' | 'backyards';
@@ -439,6 +444,7 @@ export const INFILLS: Readonly<Record<InfillId, Infill>> = {
     keep: 0.4,
     offStreet: 8,
     gap: 9,
+    gradient: false,
   },
   docks: {
     items: [
@@ -451,6 +457,7 @@ export const INFILLS: Readonly<Record<InfillId, Infill>> = {
     keep: 0.8,
     offStreet: 7,
     gap: 7,
+    gradient: false,
   },
   campus: {
     items: [
@@ -462,6 +469,7 @@ export const INFILLS: Readonly<Record<InfillId, Infill>> = {
     keep: 0.42,
     offStreet: 9,
     gap: 12,
+    gradient: true,
   },
   science: {
     items: [
@@ -474,6 +482,7 @@ export const INFILLS: Readonly<Record<InfillId, Infill>> = {
     keep: 0.4,
     offStreet: 9,
     gap: 12,
+    gradient: true,
   },
   cloisters: {
     items: [
@@ -485,6 +494,7 @@ export const INFILLS: Readonly<Record<InfillId, Infill>> = {
     keep: 0.9,
     offStreet: 7,
     gap: 7,
+    gradient: true,
   },
   // Suburbs: a cottage or two in the long back gardens, with room to slip between.
   backyards: {
@@ -496,6 +506,7 @@ export const INFILLS: Readonly<Record<InfillId, Infill>> = {
     keep: 0.6,
     offStreet: 3,
     gap: 6.5,
+    gradient: false,
   },
   // Old Town: small houses and workshops in the courts behind the street fronts.
   courts: {
@@ -509,6 +520,7 @@ export const INFILLS: Readonly<Record<InfillId, Infill>> = {
     keep: 0.38,
     offStreet: 3,
     gap: 5.5,
+    gradient: false,
   },
   tankFarm: {
     items: [{ a: 'tank_a', far: 1 }],
@@ -516,6 +528,7 @@ export const INFILLS: Readonly<Record<InfillId, Infill>> = {
     keep: 0.5,
     offStreet: 8,
     gap: 8,
+    gradient: false,
   },
   towers: {
     items: [
@@ -527,5 +540,6 @@ export const INFILLS: Readonly<Record<InfillId, Infill>> = {
     keep: 0.8,
     offStreet: 6,
     gap: 8,
+    gradient: false,
   },
 };

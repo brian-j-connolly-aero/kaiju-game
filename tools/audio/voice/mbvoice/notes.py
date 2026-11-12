@@ -303,9 +303,19 @@ WEAK_POINTS = """\
   the three squads are told apart at once; that the squelch at each end is noticeable but not
   annoying after fifty lines; that the hall on the chair reads as a big room and not as a
   bathroom; that the lowered Pico voice for the chair sounds grave and not ill.
-- **Tempest is the least clear radio voice** by the recognizer (see section 4). If it is hard to
-  follow by ear as well, the quickest fix is to give Tempest RHVoice `bdl` at a higher pitch
-  (one line in `cast.json`), at the cost of sounding more like Overlord.
+- **Tempest's accent costs words.** The recognizer scored Tempest's first set of lines at about
+  20% word errors, more than twice Overlord. The lines were then rewritten around the words the
+  accent loses ("fire", "hurt", "count", "flank"), which brought the same voice and the same
+  radio to {tempest_wer:g}% on the shipped files (section 4). The other way out was measured too
+  and not taken: RHVoice `bdl` at a higher pitch scores 6.1% on Tempest's lines against 9.1% for
+  `alan` (finished masters, three draws of the radio noise each), but `bdl` is Overlord's
+  speaker, and a third squad that sounds like nobody else is worth more than three words in a
+  hundred to a recognizer. If Tempest is hard to follow by ear, that change is one line in
+  `cast.json`.
+- **An order is only as fast as the client plays it.** The humans' lines for a nerve break and
+  for the signature attack are short now, but a line still arrives late if it waits behind
+  another line or for its file to load. What the game code should do about that is in
+  `docs/audio/client-notes-voice.md`.
 - **The chair's reverberation is a compromise.** It is held down under the words so they stay
   clear, and blooms in the pauses and at the end. In a recognizer's ears it still costs words;
   for a person with subtitles on the end screen it should be comfortable.
@@ -336,16 +346,80 @@ With natural voices the radio chain can afford to be rougher again: raise `drive
 `static_db` for the squads in `cast.json` and watch the error table.
 """.replace("{{", "{").replace("}}", "}")
 
+ENCODING = """\
+### Encoder settings
+
+The build encodes at Vorbis quality {ogg_q} and MP3 variable-bit-rate quality {mp3_q}.
+`tools/audio/voice/encode_test.py` encoded every finished master ({lines} lines) at four
+settings of each encoder and measured the results. "Signal to noise" compares the decoded file
+with its master sample by sample (higher is closer); the two recognizer columns are word error
+rates on the decoded files, for all lines and for the radio lines alone; "highest true peak" is
+the loudest decoded peak of any line (the masters are limited to {ceiling} dBTP and the checks
+allow {peak_limit} dBTP).
+"""
+
+ENCODING_AFTER = """\
+What decided the settings. The smallest files are not free once the whole script is measured:
+
+- **Vorbis 0 overshoots.** With so few bits its coding noise pushes decoded peaks past the limit
+  of the checks, so a build at that setting fails.
+- **The radio lines pay first.** They are band-limited and overdriven on purpose, and coding
+  noise comes on top: the recognizer's errors on the radio voices creep up as the bit rate goes
+  down, while the anchor's clean lines hardly change.
+- **One step down is free.** From the first build's settings (Vorbis 3, MP3 5) to the present
+  ones the recognizer's numbers move by less than their own scatter and the files shrink by
+  about a tenth.
+
+Voice files are fetched one at a time when a line is first spoken, {kb_per_line:.0f} kB each on
+average, so the total matters more to the size of the repository than to a player.
+"""
+
+REVIEW = """\
+An independent review measured every sound file and read the script against the way the game
+picks lines. Nothing was broken; these are the changes it led to. (The findings about game code
+are in `docs/audio/client-notes-voice.md`.)
+
+- **Orders fit their window.** The stagger lasts 5 s and the signature attack is over in under
+  4 s, but three of the humans' lines for them took 4.4 to 5.1 s and ended on the order. All such
+  lines now put the order first and take {win_min:.1f} to {win_max:.1f} s; the build fails above
+  {window:g} s.
+- **A squad no longer reports its own destruction.** The game gives a cue about a squad to that
+  squad's own voice, so Granite's line for a squad wiped out could only play when Granite had
+  just been wiped out. Those lines are Overlord's now, and the script check keeps it that way.
+- **Nothing is "new" twice.** Two lines called the signature attack new; it comes round every
+  minute or so. They were replaced by lines that stay true.
+- **Variety per voice, not per cue.** Because a squad only ever uses its own lines (and the
+  fourth squad Overlord's), each of the four radio voices now has three lines of its own for the
+  two volley cues and two for the crossfire, the nerve break, a lost unit, contact and a stray
+  shot; the cues that come round every minute have a third line per side. {new_lines} lines were
+  added, {lines} in all.
+- **The lines the recognizer lost were reworded,** using `tryline.py` to hear candidates through
+  each voice's own radio first. Tempest went from 21.3% to {tempest_wer:g}% word errors and
+  Granite from 20.9% to {granite_wer:g}% on the decoded `.ogg` files.
+- **The briefing fits its ten seconds.** The humans' three lines took 10.6 s before the gaps
+  between them; they take {brief_h:.1f} s now, and the build fails above {brief_max:g} s.
+- **"One of ours" means one thing.** It was used both for a lost unit and for a stray shot; the
+  stray-shot line now says "That shot was ours."
+- **Smaller files,** one encoder step down (section 6).
+- **The hearing lines may run to twenty words;** `docs/ASSETS.md` now says so.
+"""
+
 REBUILD = """\
 ```
-tools/audio/voice/build.sh                 # build what changed, verify, regenerate this page
+tools/audio/voice/build.sh                 # check the script, build what changed, verify, regenerate this page
 tools/audio/voice/build.sh --force         # rebuild every line
 tools/audio/voice/build.sh 'v_clock_*'     # only matching line ids
 tools/audio/voice/build.sh --verify-only   # re-measure the files that are there
 tools/audio/voice/audition.py raw          # re-run the audition (then: audition.py espeak, audition.py summary)
 tools/audio/voice/experiments.py <group>   # re-run casting and chain experiments (then: experiments.py summary)
+tools/audio/voice/tryline.py Granite "Candidate wording." "Another."   # hear a wording before it goes in
+tools/audio/voice/encode_test.py run       # re-measure the encoder settings (then: encode_test.py summary)
 npm run assets:manifest                    # merge manifest.voice.json into manifest.json
 ```
+
+The build starts by checking the script against its writing rules (`mbvoice/scriptcheck.py`;
+the rules are listed in `docs/VOICE_SCRIPT.md`) and builds nothing if one is broken. It ends by
+writing this page and `docs/VOICE_SCRIPT.md`, the readable copy of the script.
 
 A line is rebuilt when its spoken text (script text or respelling), its speaker's voice or chain
 settings in `cast.json`, or the processing code changed; `tools/audio/voice/build_state.json`

@@ -135,7 +135,7 @@ function furnishStreet(f: Furnisher, s: Street, seed: number): void {
     const at = (t: number, off: number): Vec2 => ({ x: s.ax + ux * t + nx * off, z: s.az + uz * t + nz * off });
 
     // Parked cars at the curb.
-    const cars = (l / 100) * s.spec.cars * (patch ? 0.75 : 0.3);
+    const cars = (l / 100) * s.spec.cars * (patch ? 0.75 * (patch.spec.cars ?? 1) : 0.3);
     const count = Math.floor(cars + rngFloat(rng));
     for (let i = 0; i < count; i++) {
       const p = at(rngRange(rng, 7, Math.max(8, l - 7)), half - 1.3);
