@@ -415,13 +415,15 @@ export function buildYards(b: Builder, seed: number): void {
 export const TANK_CLEAR = 4.75;
 export const INFANTRY_CLEAR = 3.75;
 /**
- * A troop of tanks is 9 m in radius: this pass looks at any ground a troop can stand on at all
- * (a little more than where the game would deploy one, which keeps it clear of the raster's
- * rounding). Troops exist only at the last stage, whose line is the edge of the city, and the
- * squads line up within some tens of meters of that line: so yards big enough for a troop are
- * opened only in a band this deep along the edge.
+ * A troop of tanks (radius 9 m) is deployed with 9.75 m of clear ground round it and needs a
+ * little over its own radius to drive. Troops exist only at the last stage, whose line is the
+ * edge of the city, and the squads line up within some tens of meters of that line: so yards big
+ * enough for a troop are opened only in a band this deep along the edge. Ground with less room
+ * than TROOP_NEARLY cannot hide a spot a troop could be put on between two cells of the raster.
  */
-export const TROOP_CLEAR = 9;
+export const TROOP_DEPLOY = 9.75;
+export const TROOP_CLEAR = 9.25;
+const TROOP_NEARLY = 8;
 export const TROOP_BAND = 200;
 const POCKET_CELL = 2.5;
 /** Smaller specks of enclosed ground than this many cells (about 19 m2) are left alone. */
@@ -685,6 +687,79 @@ function pocketSweep(job: PocketJob, id: number): void {
   }
 }
 
+/** Could a troop be deployed anywhere in this cell of the raster? Measured exactly, at 16 points. */
+function troopSpotIn(job: PocketJob, cc: number, r: number): boolean {
+  const { b, gone } = job;
+  const half = b.half;
+  const reach = TROOP_DEPLOY;
+  for (let i = 0; i < 4; i++) {
+    const z = -half + (r + (i + 0.5) / 4) * POCKET_CELL;
+    for (let j = 0; j < 4; j++) {
+      const x = -half + (cc + (j + 0.5) / 4) * POCKET_CELL;
+      let free = true;
+      const h0 = cellOf(b, x - reach);
+      const h1 = cellOf(b, x + reach);
+      const v0 = cellOf(b, z - reach);
+      const v1 = cellOf(b, z + reach);
+      for (let rr = v0; rr <= v1 && free; rr++) {
+        for (let hc = h0; hc <= h1 && free; hc++) {
+          const list = b.boxCells[rr * b.cols + hc];
+          for (let k = 0; k < list.length; k++) {
+            const id = list[k];
+            if (gone[id] || b.structures[id].passable) continue;
+            if (distSqPointBox(x, z, b.boxes[id]) < reach * reach) {
+              free = false;
+              break;
+            }
+          }
+        }
+      }
+      if (free) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * The troop's round: every cell of the band along the edge of the city. Roomy ground not yet
+ * known to be open is probed like any yard. And since the raster knows the ground only at the
+ * centers of its cells, while a patch just big enough to put a troop on can lie between them:
+ * such a patch can only be in a cell that is nearly roomy and has no roomy cell beside it, so
+ * those cells (there are few) are measured exactly, and one a troop could be put on is treated
+ * as an enclosed yard of its own.
+ */
+function bandSweep(job: PocketJob, band: number): void {
+  const { b, n, cells } = job;
+  const half = b.half;
+  const inner = half - band;
+  for (let r = 1; r < n - 1; r++) {
+    const z = -half + (r + 0.5) * POCKET_CELL;
+    const az = z < 0 ? -z : z;
+    for (let cc = 1; cc < n - 1; cc++) {
+      const k = r * n + cc;
+      const v = cells[k];
+      if (v !== 0 && v !== TIGHT) continue;
+      const x = -half + (cc + 0.5) * POCKET_CELL;
+      const ax = x < 0 ? -x : x;
+      if (ax < inner && az < inner) continue;
+      if (v === TIGHT) {
+        let roomy = false;
+        for (let dr = -1; dr <= 1 && !roomy; dr++) {
+          for (let dc = -1; dc <= 1; dc++) {
+            if ((cells[k + dr * n + dc] & FITS) === 0) {
+              roomy = true;
+              break;
+            }
+          }
+        }
+        if (roomy || !troopSpotIn(job, cc, r)) continue;
+        cells[k] = 0;
+      }
+      pocketProbe(job, k, 0, TANK_OPEN, TANK_OPEN | FOOT_OPEN);
+    }
+  }
+}
+
 /**
  * One round of yard opening for one or two sizes of body. `band` > 0 keeps it to the buildings
  * within that many meters of the edge of the city. Removed buildings are noted in `gone`.
@@ -719,11 +794,17 @@ function runPockets(b: Builder, gone: Uint8Array, roomy: number, tight: number, 
       if (k >= 0 && k < n * n && (cells[k] & FITS) === 0) cells[k] |= TANK_OPEN | FOOT_OPEN;
     }
   }
-  const inner = half - band;
-  for (let id = 0; id < count; id++) {
-    if (b.structures[id].passable || gone[id]) continue;
-    if (band > 0 && Math.max(Math.abs(b.boxes[id].x), Math.abs(b.boxes[id].z)) < inner) continue;
-    pocketSweep(job, id);
+  if (band > 0) {
+    // A wall taken out leaves new ground behind: look again until a round changes nothing.
+    for (let round = 0; round < 4; round++) {
+      const before = job.removed;
+      bandSweep(job, band);
+      if (job.removed === before) break;
+    }
+  } else {
+    for (let id = 0; id < count; id++) {
+      if (!b.structures[id].passable && !gone[id]) pocketSweep(job, id);
+    }
   }
   return job.removed;
 }
@@ -736,14 +817,15 @@ function runPockets(b: Builder, gone: Uint8Array, roomy: number, tight: number, 
  * 20 m2 or more) is not, the cheapest building of its wall is taken out, and the next, until it
  * is. Then the same for the narrower ground an infantry section can stand on, checking again
  * that a hole made for the infantry is no new trap for a tank. Along the edge of the city, where
- * the last stage deploys its troops of tanks, the same is done first for a troop: there the wall
+ * the last stage deploys its troops of tanks, the same is then done for a troop: there the wall
  * taken out is one with open ground behind it, since a troop needs a gap two houses wide.
  * Returns how many buildings were removed. Bridge decks and landmarks are never removed.
  */
 export function openPockets(b: Builder): number {
   const gone = new Uint8Array(b.structures.length);
-  let removed = runPockets(b, gone, TROOP_CLEAR, TROOP_CLEAR, TROOP_BAND);
-  removed += runPockets(b, gone, TANK_CLEAR, INFANTRY_CLEAR, 0);
+  // The troop's round comes last: a house taken out for a tank leaves a hole a troop could be put in.
+  let removed = runPockets(b, gone, TANK_CLEAR, INFANTRY_CLEAR, 0);
+  removed += runPockets(b, gone, TROOP_CLEAR, TROOP_NEARLY, TROOP_BAND);
   if (removed === 0) return 0;
   // Rebuild the lists without the removed buildings (ids stay equal to indexes).
   const structures = b.structures;

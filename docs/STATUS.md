@@ -538,6 +538,7 @@ client/src/app/
   context.ts        AppContext (the services) and the Screen interface
   params.ts         the page address flags (?autoplay, ?debug, ?sandbox, ... listed in the file header)
   matchRuntime.ts   one match: 30 Hz input ticks, session sampling, controller, renderer, audio, event routing
+  settings.ts       the player's settings (volume, mouse speed, inverted look) and their place in browser storage
   screens/          boot, home, lobby, briefing, match, end: one small module each (overlay + camera choice)
   debugOverlay.ts   ?debug=1: frames per second, script time split, draw calls, triangles, ping, net counters
   mbHook.ts         window.__mb: state(), renderer.info(), assets(), helpers, internals
@@ -545,8 +546,8 @@ client/src/net/
   connection.ts     the ONLY file that imports the room library: createRoom, joinRoom, RoomLink
   gameClient.ts     room life cycle: lobby state, MatchSession on welcome, ping, rejoin with the token
   matchSession.ts   one match: mirrored city, snapshot buffer, server clock, predictor, event queue -> FrameState
-  snapshotBuffer.ts interpolation between snapshots     serverClock.ts  render time, 100 ms behind
-  prediction.ts     stepMovement prediction and reconciliation with a fading error
+  snapshotBuffer.ts interpolation between snapshots     serverClock.ts  render time, 100 ms behind, never backwards
+  prediction.ts     stepMovement prediction, reconciliation with a fading error, the body drawn between ticks
   cityMirror.ts     live city from the welcome bytes, kept current from events
   session.ts        session token, callsign, room code in the address
   localLink.ts      sandbox: runs the shared simulation in the page behind the same RoomLink
@@ -567,15 +568,19 @@ client/src/render/
   projectilesView.ts, effects.ts projectiles flown from events; explosions, dust, rings, flashes
   quadBatch.ts, lineBatch.ts, boundary.ts   instanced sprite quads; glowing lines; the quarantine line
 client/src/game/
-  input/actions.ts, inputManager.ts   the bindable action map, glyph lookup; keyboard, mouse, gamepad
+  input/actions.ts, inputManager.ts   the bindable action map, glyph lookup; keyboard, mouse (and when it is
+                    captured), gamepad;   inputTicker.ts  frame time -> 30 Hz input ticks
   controllers/      kaijuController, humanController, droneController, cinematicCamera, types (shake, lens),
                     cameraClearance (holds a first-person or chase camera short of a standing wall)
   autoplay.ts       the autopilot for both sides and the drone
-client/src/ui/      hud.ts, commandWheel.ts, mapView.ts, subtitles.ts, icons.ts, iconArt.ts (stand-in icons)
+client/src/ui/      hud.ts, commandWheel.ts, mapView.ts, subtitles.ts, settingsPanel.ts, icons.ts,
+                    iconArt.ts (stand-in icons)
 client/src/audio/   audioEngine.ts (effects with voice limits, staged music, voice queue with ducking, limiter, master
                     volume, cache of decoded files), matchAudio.ts (events and frame state -> sound); see 7.6
 client/test/        net.test.ts, game.test.ts, manifestTool.test.ts, audioEngine.test.ts, matchAudio.test.ts
-                    (both on fakeAudio.ts, a silent stand-in for Web Audio that records what was started)
+                    (both on fakeAudio.ts, a silent stand-in for Web Audio that records what was started),
+                    input.test.ts (on fakeBrowser.ts: a window, a document and a browser's side of pointer
+                    lock), session.test.ts (a real simulation and a real MatchSession over a delayed link)
 tools/build-manifest.mjs            the assets:manifest script
 tools/playtest/smoke.mjs, shots.mjs the multi-client smoke playtest; stage screenshots from the sandbox
 tools/playtest/scripted.mjs, driver.mjs   two sessions played with real inputs; the hands and eyes it uses
@@ -584,8 +589,9 @@ tools/playtest/scripted.mjs, driver.mjs   two sessions played with real inputs; 
 How a frame flows: `App.tick` picks the screen, calls its `frame`, then `MatchRuntime.update`:
 input poll (the autopilot overrides it) -> `MatchSession.sample` (interpolated state, the local
 body at its predicted place, due events released) -> controller `update` -> 30 Hz `tickInput`
-(send + predict) -> `GameRenderer.update` -> controller `applyCamera` (after the rigs are posed,
-so the kaiju camera sits exactly on `cam_fp`) -> audio -> `render`.
+(send + predict) -> `MatchSession.refreshLocal` (the local body placed for this frame, part of
+the way through its newest tick) -> `GameRenderer.update` -> controller `applyCamera` (after the
+rigs are posed, so the kaiju camera sits exactly on `cam_fp`) -> audio -> `render`.
 
 ### 7.2 Automation hooks
 
@@ -623,7 +629,8 @@ so the kaiju camera sits exactly on `cam_fp`) -> audio -> `render`.
 | `ui/mapView.ts` | 2D canvas map: bounds, streets, buildings by state, friendly units, the kaiju when known; click or confirm places move-to, right click or the call-in button places artillery. | Styled map, district names, rubble tint. |
 | `audio/matchAudio.ts` | Every event has a sound, and the audio directors' notes for the client are applied (7.6); combat stem follows a simple "shots or lasers recently" heat. No tank engine, march or crowd loops; none of the Tier 2 unit sounds (their units do not exist yet). Nobody has listened to any of it: all checks are counts and measured levels. | A listening pass, unit loops, per-stage ambience balance, the Tier 2 wiring in `docs/audio/client-notes-sfx.md` section 4. |
 | `game/autoplay.ts` | Plays both sides well enough to finish a match; no pathfinding for the kaiju, street routing for humans. | Nothing: it is a test tool. |
-| `game/input/actions.ts` | Default bindings only; bindings are data and are stored, but there is no rebinding screen. Gamepad: standard mapping, never tried on real hardware. | Settings screen; controller tuning. |
+| `game/input/actions.ts` | Default bindings only; bindings are data and are stored, but there is no rebinding screen (the settings panel has volume, mouse speed, inverted look and fullscreen). Gamepad: standard mapping, never tried on real hardware; the menus cannot be worked with a gamepad (Tab, Space and Enter do work on their buttons). | Key rebinding; gamepad focus in the menus; controller tuning. |
+| `ui/settingsPanel.ts`, `ui/iconArt.ts` | The panel's gear, inverted-look and fullscreen pictures, and the drone's up and down arrows (`ui_settings`, `ui_invert`, `ui_fullscreen`, `ui_rise`, `ui_sink`) are drawn in code; there is no art file for them. | Five icons from the art team, under those names. |
 
 ### 7.4 Decisions (where the docs left it open)
 
@@ -635,12 +642,42 @@ so the kaiju camera sits exactly on `cam_fp`) -> audio -> `render`.
   clock, between two snapshots (up to 120 ms of extrapolation, then it holds). Events update
   the collision city the moment they arrive and are handed to the renderer, the audio and the
   HUD when the delayed view reaches their tick (or after 1.2 s at the latest).
+- **The drawn clock never runs backwards.** The server clock estimate is the least delayed
+  snapshot of the last quarter second, and snapshots that arrive together count once. When the
+  estimate moves, the drawn clock runs slower (down to half speed) or faster (up to double)
+  until it is back in place; it skips forward only when it is more than 0.25 s behind (the
+  view stood still for want of snapshots) and starts afresh only after a gap of a second.
+- **A backlog is not played back.** Events that waited more than 2 s to be shown (a hidden
+  tab gets no frames, the socket still delivers) are handed out with
+  `MatchSession.catchingUp` set: the renderer takes over the state of the city, the marks and
+  the stage and clears what was in the air; no effects, no camera shake, no HUD flash, no photo.
 - **Prediction.** One input per client tick is sent and applied locally; each snapshot restarts
   the body from the server and replays unacknowledged inputs; the difference fades out
   (half-life about 60 ms) and anything over 12 m snaps (a redeploy). Prediction is off when the
   client's city checksum differs from the server's. At low frame rates up to 8 input ticks are
-  sent per frame. A fresh press shows its wind-up at once (a "hint", dropped as soon as the
-  server's own phase arrives or after 0.35 s).
+  sent per frame. The body is drawn between the pose before its newest tick and the pose after
+  it, by the share of a tick that has passed, so it moves on every frame (one tick, 33 ms,
+  behind the prediction). Buttons are sent from a latch that is started again after every
+  sample, so a click shorter than the gap between two samples is in exactly one of them.
+- **A fresh press shows its wind-up at once** (a "hint"). The hint is drawn while the delayed
+  view still shows the kaiju idle; when the server's phase reaches the view the pose carries
+  on from the time already shown and waits at the end of the wind-up for the server's strike.
+  It is dropped when the server has had the press and did nothing (the snapshot's
+  acknowledgement says so), or after 1.5 s.
+- **The captured mouse.** During a match the game wants the mouse (pointer lock) unless the map
+  or the settings panel is open. With the pointer free, a click on the view only captures it:
+  mouse buttons are game buttons only while it is captured, and the HUD shows a "click"
+  picture meanwhile. Closing the map or the panel takes the pointer back if they had taken
+  it. Escape with the pointer captured never reaches the page (the browser frees the
+  pointer), so losing the pointer while the window has the focus opens the settings panel. A
+  browser with no pointer lock (or one that refuses three times without ever granting it)
+  gets buttons that act at once and a view that turns while a button is held; the scripted
+  playtest uses that path.
+- **Settings.** A panel of pictures: master volume, mouse speed (a quarter to four times the
+  default), inverted look, fullscreen. The gear on the home screen and in the lobby opens it;
+  Escape (Start on a gamepad) opens and closes it anywhere, a match included, where the body
+  idles as with the map. Kept in browser storage under `mb.settings` (fullscreen is not: a
+  browser enters it only on a click).
 - **Kaiju view.** The mouse sets the desired heading, which may run up to 150 degrees ahead of
   the body (enough to ask for a turn-around); the camera is the head and shows at most the 50
   degree lead. In the cocoon and when dead the camera circles outside. Third person is a chase
@@ -650,10 +687,18 @@ so the kaiju camera sits exactly on `cam_fp`) -> audio -> `render`.
   from the unit's eye to what the camera's center ray lands on, and the stick is turned into
   that frame. After a redeploy or a takeover the view turns toward the middle of the zone.
 - **Default controls.** Keyboard and mouse: WASD move, mouse look, left button strike / fire,
-  right button grab / hold for the command wheel (also Q), Space or Shift brace, Q roar, E
-  special / call-in, F molt (hold), 1 to 4 direct commands, M or Tab map, V camera. Gamepad:
-  sticks, RT strike / fire, LT grab, LB brace / wheel, RB special, Y roar, B molt, X call-in,
-  d-pad commands (same directions as the wheel), Back map, right stick click camera.
+  right button grab / hold for the command wheel (also Q), Space brace, Q roar, E
+  special / call-in, F molt (hold), 1 to 4 direct commands, M or Tab map, V camera, Escape
+  settings; the drone rises with Space and comes down with C. Gamepad: sticks, RT strike /
+  fire, LT grab, LB brace / wheel, RB special, Y roar, B molt, X call-in, d-pad commands (same
+  directions as the wheel), Back map, right stick click camera, Start settings.
+- **No modifier keys.** Nothing is bound to Control, Alt, Meta or Shift, or to a function key:
+  with one of those held, a movement key becomes a browser shortcut that a page cannot cancel
+  (Ctrl+W closes the tab; Shift+Escape opens the browser's task manager). The drone came down
+  with Ctrl and brace had Shift as a second key; both are gone. A test holds the defaults to it.
+- **Keycap letters** are what the player's own keyboard prints on the key in that position:
+  from the browser's layout map where it has one, otherwise learned from each key press (until
+  then the US letter is shown).
 - **Command wheel layout.** Follow up, move-to right, fire-at-will down, hold-and-charge left.
 - **Map.** North is up: +Z up the screen, +X to the left (a true view from above). The kaiju
   player's map shows only units whose lasers are on.
