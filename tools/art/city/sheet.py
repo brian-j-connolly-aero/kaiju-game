@@ -218,6 +218,54 @@ def city_sheet(mid: str, out: str | None = None, force: bool = False) -> str:
     return out
 
 
+def lineup(ids, out: str, backdrop: str = "sky", gap: float = 8.0, kaiju: bool = True, **concept_kw) -> str:
+    """A beauty shot of several buildings' intact states side by side (left to right as seen
+    from the front), with the hatchling and a soldier in front of the first one."""
+    import bpy
+    import contract
+    import mb
+    import mb_preview as P
+    mb.reset()
+    x = 0.0
+    first_w = None
+    for mid in ids:
+        arch = contract.archetypes()[mid.split("_", 1)[1]]
+        w = arch["footprint"][0]
+        before = set(bpy.context.scene.objects)
+        with P._quiet():
+            bpy.ops.import_scene.gltf(filepath=contract.model_path(mid))
+        new = [o for o in bpy.context.scene.objects if o not in before]
+        keep = [o for o in new if o.name.split(".")[0] == "intact"]
+        for o in new:
+            if o not in keep:
+                bpy.data.objects.remove(o, do_unlink=True)
+        for o in keep:
+            o.name = f"{mid}_intact"
+            o.location = (o.location[0] + x + w / 2, o.location[1], o.location[2])
+        if first_w is None:
+            first_w = w
+        x += w + gap
+    if kaiju:
+        path = os.path.join(contract.MODELS, "kaiju_lizard_s1.glb")
+        before = set(bpy.context.scene.objects)
+        with P._quiet():
+            bpy.ops.import_scene.gltf(filepath=path)
+        for o in bpy.context.scene.objects:
+            if o not in before and o.parent is None:
+                o.location = (o.location[0] + first_w + gap * 0.5, o.location[1] - 9.0, o.location[2])
+                o.rotation_mode = "QUATERNION"
+    for o in bpy.context.scene.objects:
+        o.rotation_mode = "QUATERNION"
+    bpy.context.view_layer.update()
+    sol = _soldier(first_w + gap * 0.5 + 3.0, -10.0)
+    mat = bpy.data.materials.new("mbsheet_olive")
+    bsdf = next(n for n in mat.node_tree.nodes if n.bl_idname == "ShaderNodeBsdfPrincipled")
+    bsdf.inputs["Base Color"].default_value = (0.16, 0.2, 0.08, 1.0)
+    for o in sol:
+        o.data.materials.append(mat)
+    return mb.concept(os.path.basename(out)[:-4], out=out, backdrop=backdrop, **concept_kw)
+
+
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser()

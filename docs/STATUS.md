@@ -1138,3 +1138,28 @@ the client engineer (that list itself was not read here).
 - `driver.mjs`: `until()` now awaits its test. Before, an async test returned a promise, which
   counted as true, so the wait ended at once having waited for nothing (this cost one wasted
   run here). `scripted.mjs` only uses plain tests and is unaffected.
+
+## 9. Open items for the next client engineer (from the coordinator)
+
+Collected from the reports of the engineers who have finished. Whoever next owns `client/`
+(the "real city in the browser" task) should take these with their own list:
+
+- **New building models draw black in the client** (seen 12 November, 01:52, with
+  `bld_house_a`, `bld_tower_a`, `bld_factory_a`). The kit artist's findings on how the client
+  reads the atlas, vertex colors and texture orientation are in `docs/art/client-notes-city.md`.
+- **The ground at night reads as bright blue water** from a squad's eye
+  (`docs/progress/art-wired-titan.png`): asphalt and paving should stay recognizable at night.
+- **A thrown object does not start at the kaiju's hand** (kaiju art note, change 6): either
+  draw the projectile from the model's hold anchor for its first 0.15 s, or adopt the model's
+  hand height in the shared definition.
+- **Lobby:** show that the host may start without a player who has waited 20 seconds
+  (`canStartMatch` in `shared/src/net/lobby.ts`), and show empty seats as bots.
+- **Autopilot squad** (`client/src/game/autoplay.ts`) holds the trigger; the rules now reward
+  only charged volleys from two squads, so automated matches see few staggers until it charges.
+- **Stand-ins still in use:** the six marker sprites (`mk_*`); the textures `window_tile`,
+  `window_tile_lit`, `ground_plaza`, `ground_far`; the icons `ui_settings`, `ui_invert`,
+  `ui_fullscreen`, `ui_rise`, `ui_sink`, `ui_lowres` (drawn in code).
+- **Not done, optional:** automatic lowering of resolution on slow frames; camera roll during
+  a stagger; debris sprites (nothing spawns debris yet).
+- **District tint:** Port Meridian carries a building tint per district (`District.tint`,
+  `docs/CITY.md` section 2); the client draws real models in plain white until it applies it.
