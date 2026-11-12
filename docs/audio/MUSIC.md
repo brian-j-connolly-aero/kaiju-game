@@ -264,8 +264,9 @@ written to line up with the game clock:
 - **Into the next stage.** Start the stage's stems when the hit lands; the hit and the stage's
   first chord are both D. Bring the stems in quickly (0.3 s) and let the intermission ring for
   about 2.5 s instead of cutting it: the ring-out is below -30 dBFS (decibels relative to full
-  scale) 1.5 s after the hit. The two together peak at -1.7 dBTP at most, so they are safe to
-  overlap.
+  scale) 1.5 s after the hit. The two together peak at -2.9 dBTP with the base stem (-2.1 in the
+  `.mp3`), and at -1.2 dBTP (-0.8 in the `.mp3`, stage 1) if the combat stem is already at full
+  level, so they are safe to overlap at the music bus level.
 - **Match end.** Cut the stage stems (0.3 s fade) and play `win_humans` or `win_kaiju`. Start the
   `hearing` loop when the hearing screen opens.
 
@@ -420,7 +421,9 @@ score and proved on the rebuilt files (all figures from the `.ogg`; the `.mp3` a
   the hit is (`mark`). Cut from the file as the game should play it: from 0.0 s an 8 s
   intermission is -22.6 LUFS with no hit; from 12.0 s it is -13.7 LUFS, rising second by second
   from -18 to -12, and the hit lands as the stage begins. Followed by the first bar of the next
-  stage with the fades recommended in section 4, the overlap peaks at -1.7 dBTP at most.
+  stage with the fades recommended in section 4, the overlap peaks at -2.9 dBTP with the base
+  stem (-2.1 in the `.mp3`); with the combat stem at full level as well, at -1.2 dBTP (-0.8 in
+  the `.mp3`, stage 1; stages 2 and 3 at -1.3 to -2.0).
 
 ## 7. Known weaknesses
 

@@ -41,6 +41,7 @@ services:
     image: docker.io/cloudflare/cloudflared:2026.10.7
     restart: unless-stopped
     command: ["tunnel", "--no-autoupdate", "--url", "http://game:2567"]
+    stop_grace_period: 5s
     depends_on:
       - game
 
@@ -51,6 +52,7 @@ services:
     restart: unless-stopped
     profiles: ["named"]
     command: ["tunnel", "--no-autoupdate", "run"]
+    stop_grace_period: 5s
     environment:
       TUNNEL_TOKEN: "${TUNNEL_TOKEN:-}"
     depends_on:

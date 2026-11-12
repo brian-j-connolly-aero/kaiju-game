@@ -147,9 +147,12 @@ function Wait-Game {
 function Get-QuickLink {
     # The newest trycloudflare.com address in the tunnel's log, or '' when there is none yet.
     $text = Get-ComposeText @('logs', 'tunnel')
-    $found = [regex]::Matches($text, 'https://[a-z0-9-]+\.trycloudflare\.com')
-    if ($found.Count -eq 0) { return '' }
-    return $found[$found.Count - 1].Value
+    # api.trycloudflare.com is where cloudflared asks for an address, never an address itself.
+    $link = ''
+    foreach ($m in [regex]::Matches($text, 'https://[a-z0-9-]+\.trycloudflare\.com')) {
+        if ($m.Value -ne 'https://api.trycloudflare.com') { $link = $m.Value }
+    }
+    return $link
 }
 
 function Wait-QuickLink {

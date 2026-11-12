@@ -219,9 +219,11 @@ So the hit, then the stage's first chord an eighth later, both on D.
    ```
 
 **Headroom.** The overlap of the ringing hit and the first bar of the stage was added up from
-the encoded files: the true peak is -2.9 dBTP (decibels true peak) with the base stem alone and
--1.7 dBTP with the combat stem at full level as well. That is under the peak of a single cue, so
-no limiter is needed for it.
+the encoded files, with the fades above: the true peak is -2.9 dBTP (decibels true peak; -2.1
+in the `.mp3`) with the base stem alone. With the combat stem at full level as well it is -2.0
+to -1.2 dBTP in the `.ogg` and -1.7 to -0.8 dBTP in the `.mp3`, stage 1 being the loudest. The
+music bus plays at 0.55 of the master's 0.9, so even that is far from clipping, and no limiter
+is needed for it.
 
 **How to check.** By ear: the hit decays naturally under the first bar of the new stage, and
 the stage's first chord speaks at full strength. In a test: after the switch the old layer's

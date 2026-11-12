@@ -87,7 +87,8 @@ wait_for_game() {
 
 quick_link() {
   # The newest trycloudflare.com address in the tunnel's log ("" while there is none yet).
-  compose logs tunnel 2>&1 | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | tail -n 1
+  # api.trycloudflare.com is where cloudflared asks for an address, never an address itself.
+  compose logs tunnel 2>&1 | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | grep -v '^https://api\.' | tail -n 1
 }
 
 wait_for_link() {

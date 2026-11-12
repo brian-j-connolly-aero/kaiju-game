@@ -158,8 +158,9 @@ Lengths, loop points and "loudest at" times are in the table at the end of `docs
 
 **Roars work today.** `matchAudio.ts` line 161 already asks for
 `kaiju_roar_${kind}_s${stage}`, and the kinds in `shared/src/defs/ids.ts` line 44 (`lizard`,
-`crab`, `burrower`, `moth`) match the file names. All four roars have the same lengths and the
-same loudness at each stage, so nothing else changes. Only the preload is wrong for a kaiju
+`crab`, `burrower`, `moth`) match the file names. At each stage the four roars are within
+0.25 s of each other in length and equally loud at their loudest moment (over the whole roar
+the burrower's is about 1 LU quieter), so nothing else changes. Only the preload is wrong for a kaiju
 that is not the Lizard: `PRELOAD_SFX` names `kaiju_roar_lizard_s1` (line 43). Preload
 `kaiju_roar_${kind}_s${stage}` for the kaiju in the match when it starts and at each new stage.
 
