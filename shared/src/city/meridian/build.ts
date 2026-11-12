@@ -91,6 +91,8 @@ export interface Builder {
   structures: Structure[];
   boxes: Box[];
   boxCells: number[][];
+  /** Scratch for visiting each box once in a neighborhood query. */
+  boxStamp: number[];
   patches: PatchInfo[];
   stamp: number[];
   stampNow: number;
@@ -109,7 +111,7 @@ export function createBuilder(g: Ground, streets: Street[]): Builder {
     streetCells.push([]);
     boxCells.push([]);
   }
-  const b: Builder = { g, half: g.half, cols, streets, streetCells, structures: [], boxes: [], boxCells, patches: patchInfos(), stamp: [], stampNow: 0 };
+  const b: Builder = { g, half: g.half, cols, streets, streetCells, structures: [], boxes: [], boxCells, boxStamp: [], patches: patchInfos(), stamp: [], stampNow: 0 };
   // A street is listed in every cell a building near it could fall in.
   const reach = 26;
   for (const s of streets) {
@@ -188,6 +190,7 @@ export function addStructure(b: Builder, a: ArchetypeDef, box: Box): number {
     passable: a.passable,
   });
   b.boxes.push(box);
+  b.boxStamp.push(0);
   const ex = boxExtentX(box);
   const ez = boxExtentZ(box);
   const c0 = cellOf(b, box.x - ex);
@@ -233,25 +236,33 @@ function closeness(x: number, z: number, core: boolean): number {
   return c < 0 ? 0 : c > 1 ? 1 : c;
 }
 
+/** The archetypes of a palette, looked up once. */
+const defsOf = new Map<readonly PaletteItem[], ArchetypeDef[]>();
+
 function pick(items: readonly PaletteItem[], c: number, rng: Rng, maxWidth: number): ArchetypeDef | null {
+  let defs = defsOf.get(items);
+  if (!defs) {
+    defs = items.map((it) => archetypeDef(it.a));
+    defsOf.set(items, defs);
+  }
   let total = 0;
-  for (const it of items) {
-    const a = archetypeDef(it.a);
-    if (a.footprint[0] > maxWidth) continue;
+  for (let i = 0; i < items.length; i++) {
+    if (defs[i].footprint[0] > maxWidth) continue;
+    const it = items[i];
     total += it.far + ((it.near ?? it.far) - it.far) * c;
   }
   const roll = rngFloat(rng) * total;
   if (total <= 0) return null;
   let acc = 0;
   let last: ArchetypeDef | null = null;
-  for (const it of items) {
-    const a = archetypeDef(it.a);
-    if (a.footprint[0] > maxWidth) continue;
+  for (let i = 0; i < items.length; i++) {
+    if (defs[i].footprint[0] > maxWidth) continue;
+    const it = items[i];
     const w = it.far + ((it.near ?? it.far) - it.far) * c;
     if (w <= 0) continue;
     acc += w;
-    last = a;
-    if (roll < acc) return a;
+    last = defs[i];
+    if (roll < acc) return last;
   }
   return last;
 }
@@ -314,10 +325,10 @@ function frontSide(b: Builder, s: Street, side: number, seed: number): void {
     box.hz = d / 2;
     box.dir = facing;
     const fits =
-      boxOnGround(b.g, box, SHORE, false, BUILD_LIMIT) && clearOfStreets(b, box, tall) && clearOfBuildings(b, box, gapMin);
+      clearOfStreets(b, box, tall) && boxOnGround(b.g, box, SHORE, false, BUILD_LIMIT) && clearOfBuildings(b, box, gapMin);
     if (!fits) {
-      // Slide along a little and try again (the corner of a block, a park, the shore).
-      at += blocked < 3 ? 2.5 : 5;
+      // Slide along and try again (the corner of a block, a park, the shore): a little at first, then in strides.
+      at += blocked < 2 ? 3 : blocked < 5 ? 6 : 10;
       blocked++;
       continue;
     }
@@ -379,25 +390,32 @@ export function buildYards(b: Builder, seed: number): void {
 /** A tank (radius 4 m) is deployed with this much clear ground round it (sim/spawn.ts). */
 const POCKET_CLEAR = 4.75;
 const POCKET_CELL = 2;
+/** Smaller specks of unreached ground than this many cells are left alone. */
+const POCKET_MIN_CELLS = 3;
 
 /**
  * Opens every enclosed yard. Squads are deployed wherever the stage bounds happen to run, on any
  * clear spot big enough for the unit; a yard walled in by buildings would trap a tank there for
- * the whole stage. So: flood the ground a tank can stand on from the streets, and wherever some
- * is left unreached, take out the cheapest building of the wall, until nothing is left unreached.
- * Returns how many buildings were removed. Bridge decks and landmarks are never removed.
+ * the whole stage. So: flood the ground a tank can stand on from the streets, and wherever a
+ * patch of it (12 m2 or more) is left unreached, take out the cheapest building of its wall and
+ * flood on from there, until it joins the rest. Returns how many buildings were removed. Bridge
+ * decks and landmarks are never removed.
  */
 export function openPockets(b: Builder): number {
   const half = b.half;
   const n = Math.ceil((half * 2) / POCKET_CELL);
-  const blocked = new Uint8Array(n * n);
-  const seen = new Uint8Array(n * n);
+  // 0 free, 1 too close to a wall for a tank, 2 reached from the streets, 3 in the pocket at hand.
+  const cells = new Uint8Array(n * n);
+  const queue = new Int32Array(n * n);
   const gone = new Uint8Array(b.structures.length);
   const reach = POCKET_CLEAR;
-  const mark = (id: number, value: number): void => {
+  const reachSq = reach * reach;
+  const mark = (id: number): void => {
     const box = b.boxes[id];
     const c = DIR_COS[box.dir];
     const s = DIR_SIN[box.dir];
+    const hx = box.hx;
+    const hz = box.hz;
     const ex = boxExtentX(box) + reach;
     const ez = boxExtentZ(box) + reach;
     const c0 = Math.max(0, Math.floor((box.x - ex + half) / POCKET_CELL));
@@ -405,51 +423,107 @@ export function openPockets(b: Builder): number {
     const r0 = Math.max(0, Math.floor((box.z - ez + half) / POCKET_CELL));
     const r1 = Math.min(n - 1, Math.floor((box.z + ez + half) / POCKET_CELL));
     for (let r = r0; r <= r1; r++) {
+      const z = -half + (r + 0.5) * POCKET_CELL - box.z;
+      const row = r * n;
       for (let cc = c0; cc <= c1; cc++) {
+        if (cells[row + cc] === 1) continue;
         const x = -half + (cc + 0.5) * POCKET_CELL - box.x;
-        const z = -half + (r + 0.5) * POCKET_CELL - box.z;
-        const lx = Math.abs(x * c - z * s) - box.hx;
-        const lz = Math.abs(x * s + z * c) - box.hz;
-        const ox = lx > 0 ? lx : 0;
-        const oz = lz > 0 ? lz : 0;
-        if (ox * ox + oz * oz < reach * reach) blocked[r * n + cc] = value;
+        const lx = Math.abs(x * c - z * s) - hx;
+        const lz = Math.abs(x * s + z * c) - hz;
+        if (lx >= reach || lz >= reach) continue;
+        if (lx <= 0 || lz <= 0 || lx * lx + lz * lz < reachSq) cells[row + cc] = 1;
       }
     }
   };
-  let removed = 0;
-  const queue: number[] = [];
-  const pocket: number[] = [];
-  for (let pass = 0; pass < 6; pass++) {
-    blocked.fill(0);
-    seen.fill(0);
-    for (let id = 0; id < b.structures.length; id++) if (!gone[id] && !b.structures[id].passable) mark(id, 1);
-    // Flood from the streets.
-    queue.length = 0;
-    for (const st of b.streets) {
-      const l = len(st.bx - st.ax, st.bz - st.az);
-      const steps = Math.max(1, Math.ceil(l));
-      for (let i = 0; i <= steps; i++) {
-        const x = st.ax + ((st.bx - st.ax) * i) / steps;
-        const z = st.az + ((st.bz - st.az) * i) / steps;
-        const k = Math.floor((z + half) / POCKET_CELL) * n + Math.floor((x + half) / POCKET_CELL);
-        if (k >= 0 && k < n * n && !blocked[k] && !seen[k]) {
-          seen[k] = 1;
-          queue.push(k);
-        }
+  for (let id = 0; id < b.structures.length; id++) if (!b.structures[id].passable) mark(id);
+
+  /** Floods free cells from queue[head..tail) with `tag`; returns the new tail, negated when it met reached ground. */
+  const flood = (head: number, tailIn: number, tag: number): number => {
+    let tail = tailIn;
+    let met = false;
+    for (let q = head; q < tail; q++) {
+      const k = queue[q];
+      const c = k % n;
+      if (c + 1 < n) {
+        const v = cells[k + 1];
+        if (v === 0) {
+          cells[k + 1] = tag;
+          queue[tail++] = k + 1;
+        } else if (v === 2 && tag !== 2) met = true;
+      }
+      if (c > 0) {
+        const v = cells[k - 1];
+        if (v === 0) {
+          cells[k - 1] = tag;
+          queue[tail++] = k - 1;
+        } else if (v === 2 && tag !== 2) met = true;
+      }
+      if (k + n < n * n) {
+        const v = cells[k + n];
+        if (v === 0) {
+          cells[k + n] = tag;
+          queue[tail++] = k + n;
+        } else if (v === 2 && tag !== 2) met = true;
+      }
+      if (k >= n) {
+        const v = cells[k - n];
+        if (v === 0) {
+          cells[k - n] = tag;
+          queue[tail++] = k - n;
+        } else if (v === 2 && tag !== 2) met = true;
       }
     }
-    flood(queue, blocked, seen, n, 1);
-    // What is left: pockets. For each, remove the cheapest ordinary building of its wall.
-    let found = 0;
-    for (let k = 0; k < n * n; k++) {
-      if (blocked[k] || seen[k]) continue;
-      pocket.length = 0;
-      pocket.push(k);
-      seen[k] = 2;
-      flood(pocket, blocked, seen, n, 2);
-      found++;
+    return met ? -tail : tail;
+  };
+
+  // Flood from the streets, a whole run of free cells at a time (most of the city is open ground).
+  let top = 0;
+  for (const st of b.streets) {
+    const l = len(st.bx - st.ax, st.bz - st.az);
+    const steps = Math.max(1, Math.ceil(l / POCKET_CELL));
+    for (let i = 0; i <= steps; i++) {
+      const x = st.ax + ((st.bx - st.ax) * i) / steps;
+      const z = st.az + ((st.bz - st.az) * i) / steps;
+      const k = Math.floor((z + half) / POCKET_CELL) * n + Math.floor((x + half) / POCKET_CELL);
+      if (k >= 0 && k < n * n && cells[k] === 0 && top < queue.length) queue[top++] = k;
+    }
+  }
+  while (top > 0) {
+    const k = queue[--top];
+    if (cells[k] !== 0) continue;
+    const row = k - (k % n);
+    let x0 = k;
+    while (x0 > row && cells[x0 - 1] === 0) x0--;
+    let x1 = k;
+    while (x1 + 1 < row + n && cells[x1 + 1] === 0) x1++;
+    for (let x = x0; x <= x1; x++) cells[x] = 2;
+    for (let side = -1; side <= 1; side += 2) {
+      const base = row + side * n;
+      if (base < 0 || base >= n * n) continue;
+      const shift = base - row;
+      let open = false;
+      for (let x = x0; x <= x1; x++) {
+        const free = cells[x + shift] === 0;
+        if (free && !open && top < queue.length) queue[top++] = x + shift;
+        open = free;
+      }
+    }
+  }
+
+  let removed = 0;
+  const near = reach + POCKET_CELL * 1.5;
+  for (let k = 0; k < n * n; k++) {
+    if (cells[k] !== 0) continue;
+    cells[k] = 3;
+    queue[0] = k;
+    let end = flood(0, 1, 3);
+    let joined = end < 0;
+    if (joined) end = -end;
+    // Take walls out, cheapest first, until the pocket runs into ground that is already reached.
+    for (let tries = 0; tries < 6 && !joined && end >= POCKET_MIN_CELLS; tries++) {
       let best = -1;
-      for (const cellId of pocket) {
+      for (let q = 0; q < end; q++) {
+        const cellId = queue[q];
         const x = -half + ((cellId % n) + 0.5) * POCKET_CELL;
         const z = -half + (Math.floor(cellId / n) + 0.5) * POCKET_CELL;
         const c = cellOf(b, x);
@@ -457,22 +531,52 @@ export function openPockets(b: Builder): number {
         for (let rr = r - 1; rr <= r + 1; rr++) {
           for (let cc = c - 1; cc <= c + 1; cc++) {
             if (rr < 0 || cc < 0 || rr >= b.cols || cc >= b.cols) continue;
-            for (const id of b.boxCells[rr * b.cols + cc]) {
+            const list = b.boxCells[rr * b.cols + cc];
+            for (let i = 0; i < list.length; i++) {
+              const id = list[i];
               const st = b.structures[id];
               if (gone[id] || st.passable || st.landmark !== null) continue;
-              const near = reach + POCKET_CELL * 1.5;
               if (distSqPointBox(x, z, b.boxes[id]) > near * near) continue;
               if (best < 0 || st.value < b.structures[best].value || (st.value === b.structures[best].value && id > best)) best = id;
             }
           }
         }
       }
-      if (best >= 0) {
-        gone[best] = 1;
-        removed++;
+      if (best < 0) break;
+      gone[best] = 1;
+      removed++;
+      // Free the ground it stood on, except what its neighbors still cover.
+      const box = b.boxes[best];
+      const ex = boxExtentX(box) + reach;
+      const ez = boxExtentZ(box) + reach;
+      const c0 = Math.max(0, Math.floor((box.x - ex + half) / POCKET_CELL));
+      const c1 = Math.min(n - 1, Math.floor((box.x + ex + half) / POCKET_CELL));
+      const r0 = Math.max(0, Math.floor((box.z - ez + half) / POCKET_CELL));
+      const r1 = Math.min(n - 1, Math.floor((box.z + ez + half) / POCKET_CELL));
+      for (let r = r0; r <= r1; r++) for (let cc = c0; cc <= c1; cc++) if (cells[r * n + cc] === 1) cells[r * n + cc] = 0;
+      const h0 = cellOf(b, box.x - ex - reach);
+      const h1 = cellOf(b, box.x + ex + reach);
+      const v0 = cellOf(b, box.z - ez - reach);
+      const v1 = cellOf(b, box.z + ez + reach);
+      const now = ++b.stampNow;
+      for (let r = v0; r <= v1; r++) {
+        for (let cc = h0; cc <= h1; cc++) {
+          const list = b.boxCells[r * b.cols + cc];
+          for (let i = 0; i < list.length; i++) {
+            const id = list[i];
+            if (gone[id] || b.structures[id].passable || b.boxStamp[id] === now) continue;
+            b.boxStamp[id] = now;
+            mark(id);
+          }
+        }
       }
+      // Flood on from the whole pocket through the gap.
+      end = flood(0, end, 3);
+      joined = end < 0;
+      if (joined) end = -end;
     }
-    if (found === 0) break;
+    // Whatever happened, this ground is dealt with.
+    for (let q = 0; q < end; q++) cells[queue[q]] = 2;
   }
   if (removed === 0) return 0;
   // Rebuild the lists without the removed buildings (ids stay equal to indexes).
@@ -480,34 +584,11 @@ export function openPockets(b: Builder): number {
   const boxes = b.boxes;
   b.structures = [];
   b.boxes = [];
+  b.boxStamp = [];
   for (const cell of b.boxCells) cell.length = 0;
   for (let id = 0; id < structures.length; id++) {
     if (gone[id]) continue;
     addStructure(b, archetypeDef(structures[id].archetype), boxes[id]);
   }
   return removed;
-}
-
-/** Four-way flood over free cells; `list` holds the seeds and receives every cell reached. */
-function flood(list: number[], blocked: Uint8Array, seen: Uint8Array, n: number, tag: number): void {
-  for (let q = 0; q < list.length; q++) {
-    const k = list[q];
-    const c = k % n;
-    if (c + 1 < n && !blocked[k + 1] && !seen[k + 1]) {
-      seen[k + 1] = tag;
-      list.push(k + 1);
-    }
-    if (c > 0 && !blocked[k - 1] && !seen[k - 1]) {
-      seen[k - 1] = tag;
-      list.push(k - 1);
-    }
-    if (k + n < n * n && !blocked[k + n] && !seen[k + n]) {
-      seen[k + n] = tag;
-      list.push(k + n);
-    }
-    if (k >= n && !blocked[k - n] && !seen[k - n]) {
-      seen[k - n] = tag;
-      list.push(k - n);
-    }
-  }
 }

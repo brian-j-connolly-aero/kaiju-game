@@ -282,7 +282,7 @@ def write(lines: list[dict], state: dict, report: dict | None = None) -> None:
         w(f"- Every finished line is played back to a speech recognizer (details in "
           f"`docs/audio/VOICE.md`, section 4). Over the whole script it gets "
           f"{summ['all']['wer_ogg']:g} words in a hundred wrong; a person hears far better than it does. "
-          "Lines it garbled were reworded until it did not.")
+          "The lines it garbled worst were reworded.")
     w("- Known weak spot: the word \"volley\" and the callsigns \"Granite\" and \"Beacon\" are often "
       "misheard by the speech recognizer (as \"valley\", \"granted\", \"he can\" and similar). They are "
       "clear to a person, and the subtitle is always there, but the two-word line \"Volley away.\" "

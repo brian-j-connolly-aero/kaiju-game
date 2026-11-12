@@ -33,16 +33,20 @@ interface Furnisher {
   nodeStreets: number[][];
 }
 
-/** Distance (squared) to the nearest building wall near a point; Infinity when none is close. */
+/** Distance (squared) to the nearest building wall within a few meters of a point; Infinity when none is that close. */
 function wallDistSq(b: Builder, x: number, z: number): number {
   const cell = 40;
-  const c = Math.floor((x + b.half) / cell);
-  const r = Math.floor((z + b.half) / cell);
+  const reach = 3;
+  const c0 = Math.max(0, Math.floor((x - reach + b.half) / cell));
+  const c1 = Math.min(b.cols - 1, Math.floor((x + reach + b.half) / cell));
+  const r0 = Math.max(0, Math.floor((z - reach + b.half) / cell));
+  const r1 = Math.min(b.cols - 1, Math.floor((z + reach + b.half) / cell));
   let best = Infinity;
-  for (let rr = r - 1; rr <= r + 1; rr++) {
-    for (let cc = c - 1; cc <= c + 1; cc++) {
-      if (rr < 0 || cc < 0 || rr >= b.cols || cc >= b.cols) continue;
-      for (const id of b.boxCells[rr * b.cols + cc]) {
+  for (let rr = r0; rr <= r1; rr++) {
+    for (let cc = c0; cc <= c1; cc++) {
+      const list = b.boxCells[rr * b.cols + cc];
+      for (let i = 0; i < list.length; i++) {
+        const id = list[i];
         if (b.structures[id].passable) continue;
         const d = distSqPointBox(x, z, b.boxes[id]);
         if (d < best) best = d;
