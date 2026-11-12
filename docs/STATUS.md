@@ -1292,10 +1292,17 @@ Scratch logs, scripts and every picture named here: `/tmp/mb-scratch/client-poli
 - `npm run check`: passed. `npm run build`: done.
 - `shots.mjs`: passed, zero console errors, all three stages on both sides; 100 to 121 draw
   calls, 387,000 to 426,000 triangles.
-- `smoke.mjs` and `scripted.mjs`: see 12.5.
+- `smoke.mjs`: passed. Five pages, zero console errors and zero warnings, stage 3 reached,
+  every page predicting; at most 125 draw calls and 453,000 triangles.
+- `scripted.mjs`: the human session 21 of 21 confirmed by the server. The kaiju session
+  failed one hold in each of its first two runs (eat in the first, brace in the second; each
+  passed in the other run) and passed 16 of 16 on the third, all with zero console errors.
+  The machine was loaded (four cores shared with the art work); nothing in this task touches
+  the kaiju's buttons, but the flakiness is reported, not explained.
 - Pictures for the owner: `docs/progress/controls-squad.png`, `docs/progress/controls-kaiju.png`
   (the card in a match, keyboard and mouse) and a new `docs/progress/city-wrecked.png` (sunset,
-  stage 2, from above the kaiju as before). Also checked by eye: the card with controller
+  stage 2, from above the kaiju as before), all taken from the build that includes the art
+  polish round's new ground textures and icons. Also checked by eye: the card with controller
   glyphs, at 1366 x 768, in the lobby (both roles) and on the briefing screen against a real
   server.
 
