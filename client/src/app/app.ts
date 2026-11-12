@@ -40,6 +40,9 @@ const CLOSED_NOTICE: Record<ClosedReason, string> = {
   network: 'ui_offline',
 };
 
+/** The 3D view's resolution scale with the low-resolution setting on. */
+const LOW_RES = 0.5;
+
 export class App {
   readonly ctx: AppContext;
   private readonly canvas: HTMLCanvasElement;
@@ -55,6 +58,8 @@ export class App {
   private readonly afterFrame: Array<() => void> = [];
   private last = 0;
   private menuFrame = 0;
+  /** Draw the 3D view at half resolution (a player setting). */
+  private lowRes = false;
 
   constructor(canvas: HTMLCanvasElement, ui: HTMLElement) {
     this.canvas = canvas;
@@ -67,6 +72,7 @@ export class App {
     const audio = new AudioEngine(assets, params.mute);
     // The player's settings, as they left them.
     const settings = loadSettings(store);
+    this.lowRes = settings.lowRes;
     input.sensitivity = settings.sensitivity;
     input.invertY = settings.invertY;
     audio.setMasterVolume(settings.volume);
@@ -96,7 +102,8 @@ export class App {
       },
       setLowRes: (lowRes) => {
         change({ lowRes });
-        this.ctx.renderer?.setQuality(settings.lowRes ? LOW_RES : 1);
+        this.lowRes = settings.lowRes;
+        this.ctx.renderer?.setQuality(this.lowRes ? LOW_RES : 1);
       },
       setFullscreen: (on) => {
         try {
@@ -241,7 +248,7 @@ export class App {
     // Let the bar paint before the city is built (a few tens of milliseconds of solid work).
     await new Promise((resolve) => setTimeout(resolve, 0));
     const renderer = new GameRenderer(this.canvas, ctx.assets, ctx.params.resolution);
-    renderer.setQuality(ctx.settings.lowRes ? LOW_RES : 1);
+    renderer.setQuality(this.lowRes ? LOW_RES : 1);
     renderer.setCity(getCity().city);
     ctx.renderer = renderer;
     this.resize();

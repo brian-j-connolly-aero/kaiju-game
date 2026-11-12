@@ -29,6 +29,9 @@ services:
     environment:
       PORT: "2567"
       MB_QUIET: "${MB_QUIET:-0}"
+      # Your own address (named tunnel), so invites copied in the game use it. Empty: the game
+      # learns the quick tunnel's address from the requests that come through it.
+      MB_PUBLIC_URL: "${MB_PUBLIC_URL:-}"
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:2567/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
       interval: 15s

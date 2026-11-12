@@ -144,6 +144,35 @@ function Wait-Game {
     return $false
 }
 
+$script:LinkStatus = ''
+
+function Test-Link([string]$Link) {
+    # Asks the game for its health through the public address, the way a friend's browser goes.
+    # That proves the tunnel works end to end, and tells the game its public address so that the
+    # link button in a room copies an invite that works for friends. A fresh quick tunnel can
+    # take a little while to answer, so this keeps trying for about 40 seconds. The outcome goes
+    # into $script:LinkStatus (one line, shown under the link); it never stops the start.
+    if (-not $Link) { return }
+    Say 'Checking that the public link answers through the internet (up to a minute) ...'
+    # Older Windows set-ups do not offer the secure connection Cloudflare needs unless asked.
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+    } catch { }
+    $deadline = (Get-Date).AddSeconds(40)
+    while ($true) {
+        try {
+            $r = Invoke-WebRequest -Uri "$Link/healthz" -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
+            if ($r.StatusCode -eq 200) {
+                $script:LinkStatus = 'Checked just now: this link works.'
+                return
+            }
+        } catch { }
+        if ((Get-Date) -ge $deadline) { break }
+        Start-Sleep -Seconds 3
+    }
+    $script:LinkStatus = 'Warning: this link did not answer yet. Wait a minute and try it; if it still fails, double-click start.cmd again.'
+}
+
 function Get-QuickLink {
     # The newest trycloudflare.com address in the tunnel's log, or '' when there is none yet.
     $text = Get-ComposeText @('logs', 'tunnel')
@@ -173,6 +202,11 @@ function Show-Links([string]$Link) {
     if ($Link) {
         Say '  Send this link to your friends (it is already copied, just paste it):'
         Write-Host "      $Link" -ForegroundColor Cyan
+        if ($script:LinkStatus) {
+            $color = 'Green'
+            if ($script:LinkStatus.StartsWith('Warning')) { $color = 'Yellow' }
+            Write-Host "  $($script:LinkStatus)" -ForegroundColor $color
+        }
         try { Set-Clipboard -Value $Link } catch { }
     } else {
         Say '  The public link is not ready yet. Wait a minute and double-click'
@@ -203,6 +237,10 @@ function Start-Game {
         $ok = Invoke-Compose @('--profile', 'named', 'up', '-d', '--build', 'game', 'named-tunnel')
     } else {
         Get-ComposeText @('--profile', 'named', 'stop', 'named-tunnel') | Out-Null
+        # Quick tunnel: an MB_PUBLIC_URL left in .env from a named tunnel would put the wrong
+        # address in the game's invites. Set here, it wins over .env. (PowerShell removes a
+        # variable set to nothing, so it is one space, which the game reads as empty.)
+        $env:MB_PUBLIC_URL = ' '
         $ok = Invoke-Compose @('up', '-d', '--build', 'game', 'tunnel')
     }
     if (-not $ok) { Fail 'The game could not be built or started. The messages above say why.' }
@@ -220,6 +258,7 @@ function Start-Game {
         $link = Wait-QuickLink
         if (-not $link) { Invoke-Compose @('logs', '--tail', '20', 'tunnel') | Out-Null }
     }
+    Test-Link $link
     Show-Links $link
     # Open the game for the host, on this computer, without going through the tunnel.
     try { Start-Process $LocalUrl } catch { }

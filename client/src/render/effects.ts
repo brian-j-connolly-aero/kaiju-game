@@ -42,6 +42,10 @@ interface Particle {
 
 /** A hard cap: blended particles are the most expensive thing on screen for a weak GPU. */
 const MAX_PARTICLES = 520;
+/** A bright particle is drawn at most this many times its distance from the camera across. */
+const NEAR_SIZE = 0.6;
+/** The same for smoke and dust: they may come closer to filling the view, but never blank it. */
+const NEAR_SMOKE = 1;
 const scratch = new THREE.Color();
 
 function rgb(color: number): [number, number, number] {
@@ -237,8 +241,16 @@ export class Effects {
     this.particles.length = 0;
   }
 
-  update(dt: number): void {
+  /**
+   * Moves and draws every particle. With a camera, a bright particle (fireball, flash, glow) is
+   * never drawn wider than 0.6 of its distance from the camera, a third of the view at most,
+   * and smoke or dust no wider than its distance: a shell bursting on the kaiju's own snout, or
+   * right beside a tank, must not blank the screen (and a full-screen blended quad is the most
+   * expensive thing a weak graphics chip draws).
+   */
+  update(dt: number, camera?: THREE.Camera): void {
     const list = this.particles;
+    const cam = camera?.position;
     this.glow.begin();
     this.burst.begin();
     this.smoke.begin();
@@ -274,7 +286,9 @@ export class Effects {
       // Fade out over the last 60% of the life.
       const fade = p.alpha * (t < 0.4 ? 1 : 1 - (t - 0.4) / 0.6);
       const batch = p.layer === 'glow' ? this.glow : p.layer === 'burst' ? this.burst : p.layer === 'smoke' ? this.smoke : this.ground;
-      batch.push(p.x, p.y, p.z, p.size, p.size, uv, 0, p.r, p.g, p.b, fade, p.rot);
+      let size = p.size;
+      if (cam && p.layer !== 'ground') size = Math.min(size, Math.hypot(p.x - cam.x, p.y - cam.y, p.z - cam.z) * (p.layer === 'smoke' ? NEAR_SMOKE : NEAR_SIZE));
+      batch.push(p.x, p.y, p.z, size, size, uv, 0, p.r, p.g, p.b, fade, p.rot);
     }
     this.glow.end();
     this.burst.end();

@@ -68,22 +68,50 @@ Install it with   sudo apt install podman-compose   (or in Podman Desktop: Setti
 compose() { $ENGINE compose "$@"; }
 
 # ---- helpers --------------------------------------------------------------------------------
+fetch_ok() {
+  # True when the address answers with success within $2 seconds. $3 is the same address as
+  # seen from inside the game's container, for computers without curl or wget.
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsS -m "$2" "$1" >/dev/null 2>&1
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q -T "$2" -O /dev/null "$1" 2>/dev/null
+  else
+    compose exec -T game node -e "fetch('$3',{signal:AbortSignal.timeout($2*1000)}).then(r=>process.exit(r.ok?0:1),()=>process.exit(1))" >/dev/null 2>&1
+  fi
+}
+
 wait_for_game() {
   say "Waiting for the game to answer on $LOCAL_URL ..."
   local _
   for _ in $(seq 1 90); do
-    if command -v curl >/dev/null 2>&1; then
-      curl -fsS -m 3 "$LOCAL_URL/healthz" >/dev/null 2>&1 && return 0
-    elif command -v wget >/dev/null 2>&1; then
-      wget -q -T 3 -O /dev/null "$LOCAL_URL/healthz" 2>/dev/null && return 0
-    else
-      # No download tool here: ask the server from inside its own container.
-      compose exec -T game node -e "fetch('http://127.0.0.1:2567/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))" >/dev/null 2>&1 && return 0
-    fi
+    fetch_ok "$LOCAL_URL/healthz" 3 "http://127.0.0.1:2567/healthz" && return 0
     sleep 2
   done
   return 1
 }
+
+LINK_CHECK_SECONDS=40
+check_link() {
+  # Asks the game for its health through the public address, the way a friend's browser goes.
+  # That proves the tunnel works end to end, and tells the game its public address so that the
+  # link button in a room copies an invite that works for friends. A fresh quick tunnel can
+  # take a little while to answer, so this keeps trying for about LINK_CHECK_SECONDS. The
+  # outcome goes into LINK_STATUS (one line, shown under the link); it never stops the start.
+  local link="$1" deadline=$((SECONDS + LINK_CHECK_SECONDS))
+  [ -n "$link" ] || return 0
+  say "Checking that the public link answers through the internet (up to a minute) ..."
+  while :; do
+    if fetch_ok "$link/healthz" 5 "$link/healthz"; then
+      LINK_STATUS="Checked just now: this link works."
+      return 0
+    fi
+    [ "$SECONDS" -lt "$deadline" ] || break
+    sleep 3
+  done
+  LINK_STATUS="Warning: this link did not answer yet. Wait a minute and try it; if it still fails, run host/start.sh again."
+  return 0
+}
+LINK_STATUS=""
 
 quick_link() {
   # The newest trycloudflare.com address in the tunnel's log ("" while there is none yet).
@@ -111,6 +139,7 @@ print_links() {
   if [ -n "$link" ]; then
     say "  Send this link to your friends:"
     say "      $link"
+    [ -z "$LINK_STATUS" ] || say "  $LINK_STATUS"
   else
     say "  The public link is not ready yet. Run   host/mb.sh link   in a minute,"
     say "  or see docs/HOSTING.md, 'If something goes wrong'."
@@ -138,6 +167,9 @@ do_start() {
     compose --profile named up -d --build game named-tunnel || fail "The game could not be built or started. The messages above say why."
   else
     compose --profile named stop named-tunnel >/dev/null 2>&1
+    # Quick tunnel: an MB_PUBLIC_URL left in .env from a named tunnel would put the wrong
+    # address in the game's invites. (Set here, it wins over .env.)
+    export MB_PUBLIC_URL=""
     compose up -d --build game tunnel || fail "The game could not be built or started. The messages above say why."
   fi
   if ! wait_for_game; then
@@ -153,6 +185,7 @@ If they mention the port, another program uses port $PORT: see docs/HOSTING.md."
     link="$(wait_for_link)" || link=""
     [ -n "$link" ] || compose logs --tail 20 tunnel
   fi
+  check_link "$link"
   print_links "$link"
 }
 

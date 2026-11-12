@@ -68,7 +68,8 @@ server/                   @mb/server: Express + Colyseus room that owns a World
   src/room/               the room logic, free of any library: lobby, seats, match loop
   src/net/                the only place that imports Colyseus: server, room adapter, Node test client
   src/http/               guard.ts (the front door: size and sanity checks, per-visitor limits) and
-                          app.ts (Express: /healthz, the built client, the page fallback)
+                          app.ts (Express: /healthz, the built client, the page fallback),
+                          publicUrl.ts (the address friends open: MB_PUBLIC_URL or the quick tunnel's)
   test/                   unit tests (fake clock, fake connections) and real-network integration tests
 client/                   @mb/client
   src/app/                screen state machine: boot, home, lobby, briefing, match, end
@@ -376,6 +377,11 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
   `MatchConfig` (both in `shared/src/net/lobby.ts`). Bots play every other slot. The lobby
   message carries each seat's slot (`LobbyPlayer.slot`, -1 in the lobby and for a spectator) and
   `lastKaijuSeat` (set when a match starts, so during a match it names the current kaiju seat).
+- The lobby message also carries `publicUrl` (optional) when the server knows the address
+  friends open: `MB_PUBLIC_URL`, or the quick tunnel's address learned from requests that came
+  through it (section 4.4). The lobby's link button builds the invite from it
+  (`inviteLink` in `client/src/app/screens/lobby.ts`), so a host who plays on localhost still
+  copies a link that works for friends; without it the page's own address is used.
 - Someone who joins while a match is running takes over a bot squad if one is free (their name
   replaces the bot's on that slot; a squad nobody has played in this match before one whose
   player is away) and otherwise watches (`welcome.playerId` is -1; this also happens to the
@@ -499,7 +505,7 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
 ### 4.4 Running the server
 
 - HTTP on the same port: `GET /healthz` (JSON: `ok`, `protocol`, `build`, `uptime`, `rooms`,
-  `players`, `fast`, `perf`), the built client from `client/dist` when it exists, and the game
+  `players`, `fast`, `perf`, `publicUrl`), the built client from `client/dist` when it exists, and the game
   page at the root. Any other page address is redirected (302) to the root, because the page
   finds its script and assets relative to its own address; one that ends in a room code
   (`/BCDF`, `/join/bcdf/`) is redirected to `/#BCDF`, which joins that room. `perf` is the room loop's own timing over the most recent updates of
@@ -558,7 +564,17 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
   `MB_MAX_ROOMS` (50 rooms with somebody in them), `MB_NO_LIMITS=1` (no per-visitor limits),
   `MB_ANY_BUILD=1` (pages from any build are let in),
   `MB_CLIENT_DIR` (the built client, default `client/dist`), `MB_QUIET=1` (no room chatter;
-  failures are still printed). When the tunnel is the only way in, set `HOST=127.0.0.1` so
+  failures are still printed), `MB_PUBLIC_URL` (the address friends open, such as
+  `https://kaiju.example.com`; only an http or https site address, checked at start).
+- Public address (`server/src/http/publicUrl.ts`): `MB_PUBLIC_URL` when set. Otherwise the
+  server learns it from requests through the quick tunnel: `cloudflared` passes the visitor's
+  Host header on unchanged (it rewrites it only with `--http-host-header`, which `compose.yaml`
+  does not set), so a page load or `/healthz` whose Host is a single name directly under
+  `trycloudflare.com` (not `api.`) sets it to `https://<that host>`; the newest wins, nothing
+  else is accepted. It is reported as `publicUrl` in `/healthz` (null while unknown) and in the
+  lobby state. The start scripts request `<public address>/healthz` through the tunnel right
+  after the tunnel hands out its address, which both checks the tunnel end to end and teaches
+  the server its address. When the tunnel is the only way in, set `HOST=127.0.0.1` so
   that nothing else on the network can reach the port.
 - `server/src/net/nodeClient.ts` is a typed headless client for Node (`createRoom`, `joinRoom`),
   used by the integration tests and available to tools. The browser wrapper in

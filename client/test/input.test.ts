@@ -499,8 +499,9 @@ describe('settings', () => {
   it('survives anything that may be in the browser storage', () => {
     expect(cleanSettings(null)).toEqual(DEFAULT_SETTINGS);
     expect(cleanSettings('loud')).toEqual(DEFAULT_SETTINGS);
-    expect(cleanSettings({ volume: 7, sensitivity: -3, invertY: 'yes' })).toEqual({ volume: 1, sensitivity: SENSITIVITY_MIN, invertY: false });
-    expect(cleanSettings({ volume: Number.NaN, sensitivity: 99 })).toEqual({ volume: DEFAULT_SETTINGS.volume, sensitivity: SENSITIVITY_MAX, invertY: false });
+    expect(cleanSettings({ volume: 7, sensitivity: -3, invertY: 'yes' })).toEqual({ volume: 1, sensitivity: SENSITIVITY_MIN, invertY: false, lowRes: false });
+    expect(cleanSettings({ volume: Number.NaN, sensitivity: 99 })).toEqual({ volume: DEFAULT_SETTINGS.volume, sensitivity: SENSITIVITY_MAX, invertY: false, lowRes: false });
+    expect(cleanSettings({ lowRes: 'on' }).lowRes).toBe(false);
     const store = memoryStore();
     expect(loadSettings(store)).toEqual(DEFAULT_SETTINGS);
     store.setItem(SETTINGS_KEY, '{not json');
@@ -509,8 +510,8 @@ describe('settings', () => {
 
   it('remembers what the player chose', () => {
     const store = memoryStore();
-    saveSettings(store, { volume: 0.25, sensitivity: 1.7, invertY: true });
-    expect(loadSettings(store)).toEqual({ volume: 0.25, sensitivity: 1.7, invertY: true });
+    saveSettings(store, { volume: 0.25, sensitivity: 1.7, invertY: true, lowRes: true });
+    expect(loadSettings(store)).toEqual({ volume: 0.25, sensitivity: 1.7, invertY: true, lowRes: true });
   });
 
   it('puts the default mouse speed in the middle of its slider', () => {

@@ -33,7 +33,7 @@ import { aimCamera, setLens, type ControlContext, type Controller, type InputSam
 const MAX_HEADING_LEAD = 150 * DEG;
 const PITCH_LIMIT = 62 * DEG;
 /** How high the chase camera may rise over a wall behind the kaiju, in body heights. */
-const MAX_LIFT = 2.4;
+const MAX_LIFT = 2;
 
 /** Where the chase camera wants to be and what it looks at, before walls. */
 interface ChasePose {
@@ -46,15 +46,19 @@ interface ChasePose {
 }
 
 /**
- * The lift (body heights) that takes a camera at `wanted`, looking from `pivot`, clear over the
- * walls between them: the lowest of a few steps whose line of sight is free, or -1 when none is.
+ * The lift (body heights) that takes a chase camera at `wanted`, hanging from `pivot` above
+ * the body, clear over the walls between them: camera and pivot rise together (the air above
+ * the kaiju is open), and the answer is the lowest of a few steps whose line is free, or -1
+ * when none is.
  */
 export function liftOverWalls(query: Parameters<typeof clearOfWalls>[0], pivot: Point3, wanted: Point3, height: number, margin: number): number {
-  const probe = { x: wanted.x, y: wanted.y, z: wanted.z };
+  const from = { x: pivot.x, y: pivot.y, z: pivot.z };
+  const to = { x: wanted.x, y: wanted.y, z: wanted.z };
   for (let i = 0; i <= 12; i++) {
     const lift = (MAX_LIFT * i) / 12;
-    probe.y = wanted.y + lift * height;
-    if (clearOfWalls(query, pivot, probe, margin) >= 1) return lift;
+    from.y = pivot.y + lift * height;
+    to.y = wanted.y + lift * height;
+    if (clearOfWalls(query, from, to, margin) >= 1) return lift;
   }
   return -1;
 }
@@ -174,6 +178,7 @@ export class KaijuController implements Controller {
     const target = Math.max(0, wanted);
     this.lift = target > this.lift ? this.lift + (target - this.lift) * (1 - Math.exp(-ctx.dt * 10)) : this.lift + (target - this.lift) * (1 - Math.exp(-ctx.dt * 1.5));
     p.y += this.lift * st.height;
+    this.pivot.y += this.lift * st.height;
     // Whatever is still in the way (rising, or nothing clears it): come in to this side of it.
     this.clear = easeClearance(this.clear, clearOfWalls(query, this.pivot, p, near * 2), ctx.dt);
     if (this.clear < 1) {

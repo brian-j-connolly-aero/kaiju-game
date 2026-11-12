@@ -81,6 +81,8 @@ const FOG: Record<StageId, FogRange> = {
   3: { near: 520, far: 4400 },
 };
 const NO_KAIJUS: SnapKaiju[] = [];
+/** The most pixels the 3D view is drawn with: a 1080p screen's worth. */
+const MAX_PIXELS = 1920 * 1080;
 
 /** The weak point's light (art notes for the kaiju, section 5): violet, never the humans' cyan. */
 const WEAK_POINT_COLOR = 0xc9a6ff;
@@ -133,6 +135,8 @@ export class GameRenderer {
   private readonly ringUv = [0, 0, 0, 0];
   private readonly triangleUv = [0, 0, 0, 0];
   private resolution: number;
+  private quality = 1;
+  private readonly size = { w: 0, h: 0 };
 
   constructor(canvas: HTMLCanvasElement, assets: AssetStore, resolution = 1) {
     this.assets = assets;
@@ -232,9 +236,29 @@ export class GameRenderer {
     this.sky.setTime(stageDef(stage).timeOfDay, FOG[stage], immediate ? 0 : 5);
   }
 
+  /**
+   * The player's resolution setting (1, or 0.5 for weak graphics hardware), on top of the
+   * page's `?res=` flag. Applied at once.
+   */
+  setQuality(scale: number): void {
+    this.quality = Math.min(1, Math.max(0.25, scale));
+    if (this.size.w > 0) this.resize(this.size.w, this.size.h);
+  }
+
+  /** The drawing buffer's pixel ratio for a view of this size (exported for tests). */
+  static pixelRatio(width: number, height: number, devicePixelRatio: number, scale: number): number {
+    let ratio = Math.min(devicePixelRatio || 1, 2) * scale;
+    // Never more pixels than a 1080p screen holds: a 4K or high-density laptop screen would
+    // otherwise draw four times as many, and blended effects cost by the pixel.
+    const pixels = width * height * ratio * ratio;
+    if (pixels > MAX_PIXELS) ratio *= Math.sqrt(MAX_PIXELS / pixels);
+    return ratio;
+  }
+
   resize(width: number, height: number): void {
-    const ratio = Math.min(window.devicePixelRatio || 1, 2) * this.resolution;
-    this.renderer.setPixelRatio(ratio);
+    this.size.w = width;
+    this.size.h = height;
+    this.renderer.setPixelRatio(GameRenderer.pixelRatio(width, height, window.devicePixelRatio, this.resolution * this.quality));
     this.renderer.setSize(width, height, false);
     this.camera.aspect = width / Math.max(1, height);
     this.camera.updateProjectionMatrix();
@@ -565,7 +589,7 @@ export class GameRenderer {
     // Props are drawn out to a distance that grows with the camera's height.
     const cam = this.camera.position;
     this.stats.props = this.city ? this.city.updateProps(cam.x, cam.z, Math.min(950, 330 + cam.y * 2.6)) : 0;
-    this.effects.update(dt);
+    this.effects.update(dt, this.camera);
     this.boundary.update(dt, time);
     this.sky.update(dt, this.camera);
     this.materials.setNight(this.sky.night);

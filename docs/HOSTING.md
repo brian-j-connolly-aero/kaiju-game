@@ -62,10 +62,17 @@ the internet (to download the building blocks). Every later start takes seconds.
 
      Send this link to your friends (it is already copied, just paste it):
          https://some-random-words.trycloudflare.com
+     Checked just now: this link works.
 
      Open this one yourself (on this computer):
          http://localhost:2567
    ```
+
+   Before showing the box, the start file opens the public link once through the internet, the
+   way your friends will. "Checked just now: this link works." means it is ready to send. If it
+   says **"Warning: this link did not answer yet"** instead, a brand-new link sometimes needs a
+   minute: wait a minute and open the link yourself; if it still does not open, double-click
+   start.cmd again and use the new link it shows.
 
 4. Paste the first link (the one ending in **trycloudflare.com**) into your group chat. It is
    already copied: just press Ctrl+V.
@@ -73,12 +80,11 @@ the internet (to download the building blocks). Every later start takes seconds.
    yourself: it is faster for you because it does not travel through the internet.
 6. You can close the black window. The game keeps running.
 7. In the game, enter your name and **create a room**. The room has a **four-letter code**.
-   - Send your friends the **four-letter code**. They open the link from step 4, enter their
-     name, choose **join** and type the code.
-   - The **link button** in the room copies an invite link that opens the room directly. But it
-     copies the address *you* are using. If you opened the game at `localhost`, that invite link
-     only works on your computer, so send the code instead. (Or open the trycloudflare.com link
-     yourself and use the link button there.)
+   - The **link button** next to the code copies an invite link that opens your room directly.
+     It works for your friends, even though you are playing on `localhost`. Paste it into your
+     group chat.
+   - The **code** works too: friends open the link from step 4, enter their name, choose
+     **join** and type the code.
 8. Five players in total: one plays the monster, four play the army squads.
 
 ## 4. Stopping
@@ -125,13 +131,18 @@ Read the last lines in the black window first: they say in plain words what the 
    - If the page opens but joining fails, double-click stop.cmd and start.cmd, and send the new
      link.
    - Ask them to use Chrome, Edge or Firefox on a computer.
-6. **The game feels laggy** (things jump or react late).
+6. **The invite link from the link button starts with `http://localhost`.**
+   The game has not heard from its public link yet (the start file said "Warning: this link did
+   not answer yet", or the game was restarted on its own). Double-click start.cmd again and wait
+   for "Checked just now: this link works.", then leave the room and create a new one. Until
+   then, send the four-letter code instead: it always works.
+7. **The game feels laggy** (things jump or react late).
    - Close other heavy programs on the host computer (games, video calls, many browser tabs).
    - The host should play on `http://localhost:2567`, not on the public link.
    - The quick tunnel routes everyone through Cloudflare; friends far away (another continent)
      will feel some delay. A named tunnel (section 7) is usually a little steadier.
    - If one friend's connection is weak, a wired connection instead of Wi-Fi helps.
-7. **The link changes every time.** That is how the free quick tunnel works. If you want an
+8. **The link changes every time.** That is how the free quick tunnel works. If you want an
    address that never changes, use your own domain (section 7).
 
 If none of this helps, double-click **logs.cmd**, select everything in the window, copy it and
@@ -162,9 +173,11 @@ Cloudflare.
    domain (for example `kaiju` and `example.com`), service type **HTTP** (the ordinary web
    kind), address
    **game:2567**. Save.
-7. Double-click start.cmd. The box now shows your own address.
+7. Double-click start.cmd. The box now shows your own address, and the link button in a room
+   copies invites with it.
 
-To go back to the quick tunnel, empty the `TUNNEL_TOKEN=` line in `.env` and start again.
+To go back to the quick tunnel, empty the `TUNNEL_TOKEN=` and `MB_PUBLIC_URL=` lines in `.env`
+and start again.
 
 Never send your `.env` file to anyone, and never upload it. It is already excluded from the
 game's shared files.
@@ -230,6 +243,13 @@ machine, not on Windows.
 - The script's check for a Docker-only computer picked Docker correctly (building with Docker
   itself could not be finished on the test machine for a reason that only exists there).
 - `npm run host` (section 10): built and started the game, and the same browser check passed.
+- The invite link (added later): the game learning its public address from requests that
+  arrive through the quick tunnel, reporting it, and the link button building invites from it
+  are covered by automatic tests that send requests the way the tunnel passes them on. The
+  Linux start script's link check was tried against a stand-in for the tunnel: the game
+  answered through it and then knew its public address; a link that never answered gave the
+  warning after about 40 seconds without stopping the start; a link that only started answering
+  after 10 seconds was reported as working.
 
 **Not tested:**
 
@@ -237,10 +257,12 @@ machine, not on Windows.
   trycloudflare.com link was ever created. In the script test the tunnel was replaced by a
   stand-in that prints a made-up link, which checked that the script finds and shows the link.
   The real tunnel program was downloaded and its settings were checked against its own help
-  text. Your first start is the first real test of the public link.
+  text. Your first start is the first real test of the public link. That the tunnel passes its
+  own address on to the game (which the invite link relies on) was checked by reading the
+  tunnel program's source code, not by running it.
 - **The Windows files** (`start.cmd`, `stop.cmd`, `update.cmd`, `logs.cmd` and `mb.ps1`) have
   **never been run**. They were checked line by line against the PowerShell version every Windows
-  computer has (5.1), but not executed.
+  computer has (5.1), but not executed. That includes the new link check in `mb.ps1`.
 - Podman Desktop and Docker Desktop on Windows, and Docker on any computer.
 - The named tunnel with your own domain (section 7).
 - The update script with Git (`update.cmd`, `host/update.sh`).

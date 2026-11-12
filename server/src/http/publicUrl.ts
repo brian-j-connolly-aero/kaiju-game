@@ -54,10 +54,13 @@ export function parsePublicUrl(raw: string, name = 'MB_PUBLIC_URL'): string {
 
 /** What the server knows about its public address. */
 export class PublicAddress {
+  private readonly fixed: string | null;
   private learned: string | null = null;
 
   /** `fixed` is the configured address (MB_PUBLIC_URL, already checked), or null to learn it. */
-  constructor(private readonly fixed: string | null = null) {}
+  constructor(fixed: string | null = null) {
+    this.fixed = fixed;
+  }
 
   /** The public address, or null while it is not known. */
   get(): string | null {
