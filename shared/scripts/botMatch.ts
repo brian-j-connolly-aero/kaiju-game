@@ -33,7 +33,7 @@ export interface BotMatchOptions {
   maxMinutes?: number;
   /** Called after every tick, with that tick's events. */
   onTick?: (world: World, events: SimEvent[]) => void;
-  /** Play in this city instead of the default one (for example Port Meridian; see sim.ts --city). */
+  /** Play in this city instead of the default one (Port Meridian; for example the placeholder grid, see sim.ts --city). */
   city?: BuiltCity;
 }
 

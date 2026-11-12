@@ -8,7 +8,7 @@ Last updated by: the game server task (everything about `server/`), simulation p
 kaiju, damage and nerve, city destruction, projectiles) and simulation part 2 (the human side:
 squads, commands, sub-unit behavior, weapons, volleys, call-ins, lives, veterans, spotting),
 simulation part 3 (match flow and the molt, bots, voice lines, the balance harness and the
-tuning: `docs/BALANCE.md`) and
+tuning: `docs/BALANCE.md`), the city switch (section 10: the game now plays in Port Meridian) and
 the client core task (everything in `client/`, `tools/playtest/`, `tools/build-manifest.mjs`:
 section 7), and the integration task (section 8: what was run end to end, what was measured,
 what is still wrong); the rest is from the scaffold task.
@@ -22,7 +22,7 @@ what is still wrong); the rest is from the scaffold task.
 | `npm install` | Installs the pinned toolchain and the server's dependencies (Express, the room library). |
 | `npm run check` | Type checks all three workspaces, runs `scripts/lint.mjs`, runs every test. The gate. |
 | `npm test` | `vitest run`: every test in `shared/test`, `server/test` and `client/test`, about 40 seconds (the server's integration tests and the whole-match simulation tests take most of it). |
-| `npm run sim` | The balance harness: full bot-versus-bot matches, headless, a few hundred times real speed, one table row per match plus a summary. Options after `--`: `--seeds N` (default 5), `--seed N`, `--unopposed` (no squads), `--kaiju-handicap H`, `--human-handicap H` (0 best, 1 stands still), `--trigger-happy` (squads hold the trigger instead of charging volleys), `--fast`, `--anchor N`, `--max-minutes N`, `--events`, `--json`. 20 matches take 25 to 50 s depending on what else the machine is doing. How to read it: `docs/BALANCE.md`. |
+| `npm run sim` | The balance harness: full bot-versus-bot matches, headless, a few hundred times real speed, one table row per match plus a summary. Options after `--`: `--seeds N` (default 5), `--seed N`, `--unopposed` (no squads), `--kaiju-handicap H`, `--human-handicap H` (0 best, 1 stands still), `--trigger-happy` (squads hold the trigger instead of charging volleys), `--fast`, `--anchor N`, `--every-anchor` (every start in turn), `--bar P1,P2,P3` (other bar fractions for one run), `--nav` (how the bots got about), `--city placeholder` (the old grid city), `--max-minutes N`, `--events`, `--json`. 20 matches take 25 to 50 s depending on what else the machine is doing. How to read it: `docs/BALANCE.md`. |
 | `npx vitest run server/test` | Only the server tests: 115 tests, about 18 seconds (four files start a real server on a free port and connect real clients; `process.test.ts` starts the entry point as a process of its own). `MB_TEST_SPEED=1 npx vitest run server/test/lifecycle.test.ts` plays the full five-client match in real time (about 3 minutes). |
 | `npm run dev` | Starts the server (`tsx watch`, port 2567) and the client (Vite, port 5173) side by side with hot reload; open the Vite address. Vite forwards matchmaking and the WebSocket to the server, so the page talks to its own origin exactly as in production. |
 | `npm run build`, `npm start` | Bundles the server to `server/dist/index.js`, builds the client to `client/dist`; `npm start` runs the bundle, which serves the built client and the game on one port (`PORT`, default 2567). Environment variables: `ARCHITECTURE.md` section 4.4. |
@@ -54,7 +54,9 @@ Everything below is in `shared/` (`@mb/shared`) unless it says otherwise, is cov
   empty pool, and the voice cue list with a typed, validating loader for `voiceLines.json`.
 - **`city/`:** `CityData` types, 22 starter archetypes, 14 prop kinds, the spatial index and its
   queries (`CityIndex` / `CityQuery`), stage bounds, road graph helpers (`findRoadPath`),
-  `validateCity`, `cityChecksum`, a cached `getCity()`, and the **placeholder** `generateCity`.
+  `validateCity`, `cityChecksum`, a cached `getCity()` that builds **Port Meridian**
+  (`city/meridian/`, `docs/CITY.md`), and the old placeholder `generateCity` (tests and
+  `getCity(seed, 'placeholder')` only).
 - **`net/`:** the input contract (`input.ts`, with the meaning of every button), all client and
   server message types (`protocol.ts`), lobby state and the seat, role and config rules
   (`lobby.ts`), the binary snapshot codec (`snapshot.ts`, `worldSnapshot.ts`), the city state
@@ -152,7 +154,9 @@ Everything below is in `shared/` (`@mb/shared`) unless it says otherwise, is cov
   (`runBotMatch`, the per-stage report, `worldHash`). The tuning history is `docs/BALANCE.md`.
 - **Whole-match tests:** `shared/test/determinism.test.ts` (two matches side by side from one
   seed, hashed every tick; recorded inputs replayed) and `shared/test/matchSoak.test.ts` (three
-  full-length and six fast bot matches with every invariant checked), besides `molt.test.ts`,
+  full-length and six fast bot matches with every invariant checked, nobody stuck 20 s or
+  outside the bounds), `shared/test/meridianPlay.test.ts` (deployment at every start and
+  stage), besides `molt.test.ts`,
   `bots.test.ts` and `voice.test.ts`.
 - **Root scripts:** `scripts/dev.mjs`, `scripts/lint.mjs`. `npm run assets:manifest` now runs
   `tools/build-manifest.mjs`; `scripts/merge-manifests.mjs` is the older merge-only script,
@@ -169,9 +173,8 @@ remains is marked `STUB(<area>):` where it lives.
 
 Placeholders (not `STUB`-tagged; each file says so at the top):
 
-- `shared/src/city/generateCity.ts`: a plain grid city (2592 structures, 4303 props, 10 anchors,
-  a straight river with 5 bridges, 8 park and plaza blocks, 2 landmark stand-ins). The city task replaces this
-  one file behind `generateCity(seed?): CityData` and extends `archetypes.ts`.
+- `shared/src/city/generateCity.ts`: the old plain grid city, no longer the game's. Kept for tests
+  and as a development option (`getCity(seed, 'placeholder')`, `npm run sim -- --city placeholder`).
 - The client's placeholders (boxes for buildings, the functional HUD, stand-in icons and
   sounds) are listed in section 7.3 with what a specialist should put in their place.
 
@@ -432,9 +435,8 @@ Server
   (`idleBots()`: they stand still, hands off the buttons) unless the test passes `bots: true`
   or its own `config.bots`. A world made with `createWorld` directly has real bots.
 - **Anyone tuning the game:** `docs/BALANCE.md` first. Change numbers in `shared/src/defs/`,
-  run `npm run sim -- --seeds 20` and `--unopposed`, compare summaries (not rows), and record
-  what you did there. When the handcrafted city lands, rerun all of it: start with the bar
-  fractions (`MATCH_RULES.bar`), which set the pace.
+  run `npm run sim -- --seeds 20 --every-anchor` and `--unopposed`, compare summaries (not
+  rows), and record what you did there (`docs/BALANCE.md` section 8 is the current state).
 - **Client workers (voice, intermission, bots):**
   - Play `event.lines.humans` or `event.lines.kaiju` of a `voice` event, in order; do not pick
     lines with `pickVoiceLine` (`client/src/audio/matchAudio.ts` plays the event's lines and
@@ -504,10 +506,9 @@ Server
   events (`hpForStage`), and run `stepMovement` with `kaijuMoveParams` or `unitMoveParams` from
   snapshot data. Bounds come from `stageBounds(city, welcome.anchor, snapshot.match.stage)`.
 - **City worker:** keep `validateCity` clean and the generator engine-independent (see the
-  header of `generateCity.ts`). After changing `archetypes.ts` or `props.ts`, run
-  `npm run export:defs`. Tests that hard-code facts about the placeholder (counts, the straight
-  river) are in `shared/test/city.test.ts` and are written against the contract, not the layout;
-  adjust the few numeric ranges if the handcrafted city differs.
+  header of `city/meridian/generate.ts`). After changing `archetypes.ts` or `props.ts`, run
+  `npm run export:defs`. A change to the city changes its checksum (pinned in
+  `shared/test/meridian.test.ts`) and moves the balance: rerun `docs/BALANCE.md` section 8.
 - **Audio:** `shared/test/defs.test.ts` fails if `voiceLines.json` has a line with an unknown
   cue or audience, a duplicate or non-file-safe id, or if a cue has no line at all.
 
@@ -520,32 +521,32 @@ Server
   tiny and smoothed), but the city generator must never branch on such a value.
 - The snapshot holds at most 255 units and uses one byte for unit ids: fine for Tier 1 (16) and
   for the 8-squad future (32).
-- The balance is tuned for bot against bot in the placeholder grid city (`docs/BALANCE.md`
-  section 7): kaiju wins 57% of 60 matches, stages of about 3:10 to 4:10, matches of about
-  10:35. Humans now win mostly on the clock (6 kills in 60). A kaiju bot that hesitates 30% of
-  the time loses 10 of 10; squads that hesitate 30% win 5 of 10; trigger-happy squads lose 20
-  of 20. The handcrafted city and real players will both
-  move it. Numbers nobody has tuned yet: action move multipliers, wade damage, rage per bar
-  segment, prop values, archetype hp and value.
+- The balance is tuned for bot against bot in Port Meridian (`docs/BALANCE.md` section 8):
+  kaiju wins 47% of 60 matches, stages of about 3:15 / 3:05 / 3:50, matches of about 10:20,
+  18 kills in 60. A kaiju bot or squads that hesitate 30% of the time lose 9 of 10;
+  trigger-happy squads lose 20 of 20. Real players will move it. Numbers nobody has tuned yet:
+  action move multipliers, wade damage, rage per bar segment, prop values, archetype hp and
+  value.
 - Nerve breaks only when charged volleys (60% charge or more) from two different squads land
   within 5 s of each other (`DESIGN.md` sections 3 and 5). A bot kaiju is staggered about 1.6 /
   3 / 3.5 times a stage. Four idle people, or the client's autopilot squad (which holds the
   trigger), no longer stagger anything, so browser smoke runs see fewer staggers and kills.
-- Alone, a titan now needs about 2:44 for its segment (target 100 to 130 s), the price of
-  `p3` 0.35; retune it with the real city.
-- The bots have only played the placeholder city. The squad bot finds firing positions on road
-  nodes and street midpoints and the kaiju bot steers by feel (it smashes or walks round what
-  is in its way); both have stuck handling, neither has been tried in a city with dead ends,
-  curved streets or a harbor.
+- Alone, a titan needs about 3:02 for its segment (target 100 to 130 s): it starts some 720 m
+  from the towers. Lowering `p3` hands the kaiju the contested match; the bots' stage 3 plan is
+  the next lever.
+- The bots have played Port Meridian from every start (`docs/BALANCE.md` section 8 lists what
+  was wrong and fixed). In 60 matches nobody was stuck longer than 3.1 s (the kaiju 9.7 s),
+  nobody left the bounds, units spent 0.1 to 0.4% of their time out in open water. The squad
+  bot still finds firing positions only on road nodes and street midpoints.
 - The kaiju grows where its cocoon was if its new body fits there; otherwise it stands up at
   the nearest spot with room (`findStandingRoom` in `sim/spawn.ts`), and the kaiju bot picks
   hiding places with room for the next body.
-- Sub-unit navigation was tuned and stress-tested against the placeholder grid city (3600
-  random move-to trips across the three stages all arrived, nobody ever inside a wall). The
-  handcrafted city will have other shapes: it needs a road graph whose edges are drivable for
-  a 9 m radius body at stage 3, and the stress should be rerun against it
-  (`test/nav.test.ts` has a small version). A unit that cannot reach its spot waits and
-  retries; it never pushes into a wall forever, but it will not arrive either.
+- Sub-unit navigation, stress-tested in Port Meridian (1800 random move-to trips over every
+  start and stage, markers anywhere): nobody inside a wall or outside the bounds; 13 trips
+  (0.7%) took more than three times the straight drive plus a minute, 4 never arrived, all into
+  pockets of houses against the stage 1 line or far out in the bay. Every street edge is
+  drivable straight for a 9 m troop. A unit that cannot reach its spot waits and retries; it
+  never pushes into a wall forever, but it will not arrive either.
 - Units do not collide with each other or with the kaiju; sub-units only keep apart while
   moving. A parked squad can be walked through.
 - Hold-and-charge deviates from the letter of the design in one place (firing does not release
@@ -1163,3 +1164,27 @@ Collected from the reports of the engineers who have finished. Whoever next owns
   a stagger; debris sprites (nothing spawns debris yet).
 - **District tint:** Port Meridian carries a building tint per district (`District.tint`,
   `docs/CITY.md` section 2); the client draws real models in plain white until it applies it.
+
+## 10. The city switch (12 November)
+
+The game plays in Port Meridian: `getCity()` builds it for the server (match setup, the
+welcome's city checksum, the build stamp), the client, the sandbox, the bots and the harness.
+Checked in headless Chromium: the sandbox (`?sandbox=1` and `=3`) runs with Port Meridian's
+marks and no console error. Bot, navigation and simulation fixes the new city needed, and the
+retune (bar fractions 0.18 / 0.125 / 0.31): `docs/BALANCE.md` section 8.
+
+Cost against section 8.3, measured headless in Node on this machine, same session, same method
+for both cities:
+
+| What | Port Meridian | Placeholder | Matters for five players at home? |
+| --- | --- | --- | --- |
+| Simulation, one tick at stage 3 | mean 0.08 ms, median 0.05, 99th percentile 0.4 to 0.5, longest 14 ms (38,000 ticks of 3 full and 6 fast bot matches) | mean 0.10 to 0.14 ms, same method | No: under 1% of the 33 ms a tick has. |
+| The tick that starts a stage (redeployment) | median 4 / 5 ms, at most 20 ms (stage 2 / 3, every start) | 2 / 4 ms | No: once a stage, inside the tick. It was 59 ms before the street lookup got a grid (`nav.ts`, results identical). |
+| Snapshot | 792 bytes | 792 bytes | No change. |
+| City state in the welcome | 2068 bytes | 1732 bytes | No: once per join. |
+| Events at stage 3, bots only | 11.7 to 16.7 a second, 16 to 24 kbit/s as plain text | 9.4 to 13.0, 12 to 18 kbit/s | Slightly more (about a quarter, more props and buildings): a few kbit/s per player on top of the 95 kbit/s of snapshots, about 0.6 Mbit/s up from the host for four remote players. |
+| Building the city in Node | 200 to 216 ms processor time cold (fresh process, 5 runs), 47 ms warm | 12 to 17 ms cold, 2 ms warm | Once when the server starts; the page does the same behind its loading screen (about 270 ms in Chromium, `docs/CITY.md` section 7). |
+
+Left open: the client draws buildings without the district tint and its draw calls with the
+real city have not been counted (`docs/CITY.md` section 9, item 5; section 9 above); five
+browser pages on the real city have not been played (`client/dist` was not rebuilt here).

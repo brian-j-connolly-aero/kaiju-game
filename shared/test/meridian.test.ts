@@ -1,7 +1,7 @@
 /**
  * Port Meridian, the handcrafted city (shared/src/city/meridian, docs/CITY.md): what the data
- * must always be. The game still runs on the placeholder; these tests build Port Meridian
- * directly with generatePortMeridian().
+ * must always be. It is the game's city (getCity builds it); these tests build it directly with
+ * generatePortMeridian().
  */
 
 import { readdirSync, readFileSync } from 'node:fs';
@@ -81,14 +81,15 @@ function inBounds(b: Bounds, x: number, z: number): boolean {
   return x >= b.minX && x <= b.maxX && z >= b.minZ && z <= b.maxZ;
 }
 
-describe('the placeholder is untouched', () => {
-  it('still is what generateCity and getCity return, to the last bit', () => {
+describe('the game plays in Port Meridian; the placeholder is untouched', () => {
+  it('is what getCity returns, and the placeholder is still what generateCity returns, to the last bit', () => {
+    expect(cityChecksum(getCity().city)).toBe(1739170986);
+    expect(cityChecksum(getCity().city)).toBe(cityChecksum(city));
     // The checksum the placeholder had before Port Meridian's archetypes were appended.
     expect(cityChecksum(generateCity())).toBe(1340881825);
-    expect(cityChecksum(getCity().city)).toBe(1340881825);
-    expect(getCity().city.structures.length).toBe(2592);
-    expect(getCity().city.props.length).toBe(4303);
-    expect(cityChecksum(city)).not.toBe(1340881825);
+    expect(cityChecksum(getCity(CITY_SEED, 'placeholder').city)).toBe(1340881825);
+    expect(getCity(CITY_SEED, 'placeholder').city.structures.length).toBe(2592);
+    expect(getCity(CITY_SEED, 'placeholder').city.props.length).toBe(4303);
   });
 
   it('keeps the archetype list within the draw budget, append-only', () => {

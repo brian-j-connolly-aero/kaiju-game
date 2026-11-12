@@ -4,9 +4,10 @@ Port Meridian is the one city of Monster Battle 9001. This document is for the o
 the reasons behind the layout) and for the building artists who model it next (every district,
 every landmark and every ordinary building type, described so it can be modeled without asking).
 
-Status: the city is built, tested and playable through the balance harness, but **the game does
-not use it yet**. The game still runs on the placeholder grid city. Section 9 lists the exact
-switch-over steps.
+Status: **the game plays in Port Meridian** (since 12 November): the server, the client, the
+sandbox, the bots and the balance harness all build it through `getCity()`. The placeholder grid
+city is kept for tests and as a development option. Section 9 says what the switch did and what
+is left (the client's district tint and a draw-call count).
 
 ![The whole city](city/map.png)
 
@@ -409,7 +410,8 @@ generator, run in both). For seed 9002 the city checksum is 2320056143 and the f
   the checksum only, or keep a prebuilt city in the client bundle and check it against the
   checksum (a city's JSON is about 1 MB).
 
-**Bot matches** (`npm run sim -- --city meridian --nav`):
+**Bot matches** (`npm run sim -- --city meridian --nav`, before the switch; the tuned numbers
+since are in `docs/BALANCE.md` section 8):
 
 | Run | Bar fractions | Kaiju wins | Mean length | Stage times (stage 1 / 2 / 3, when completed) | Navigation |
 |---|---|---|---|---|---|
@@ -457,7 +459,14 @@ What this says:
 
 ## 9. How to switch the game over to Port Meridian
 
-Do these in order; each item names who owns the file.
+**Done** by the city switch, except item 5 (the client's). What it did, in short: items 1 and 2
+as written (the deploy rule, the kaiju bot, `cache.ts`, which now takes `getCity(seed, kind)`);
+item 3 was not needed (no archetype changed); item 4: every test listed passes, none loosened
+(the clock-end bug was fixed in the simulation, the nav test's missing sub-unit was a navigation
+fault on the new city and was fixed with several others, the molt test searches both cities);
+items 6 and 7: the documents are updated and the bar fractions are now 0.18 / 0.125 / 0.31
+(`docs/BALANCE.md` section 8 has every batch, and the bot and navigation fixes the new city
+needed). The steps as they were planned:
 
 1. **Fix the two bot and spawn problems first** (they show up on this city, and they skew any
    balance numbers taken before they are fixed):
@@ -539,8 +548,8 @@ Do these in order; each item names who owns the file.
 - Tests: `shared/test/meridian.test.ts` (the data, the level, identical on every machine),
   `shared/test/meridianPlay.test.ts` (deployment and bot matches), `shared/test/meridianCold.test.ts`
   (the first build's time).
-- `shared/scripts/cityMap.ts`: the pictures. `shared/scripts/sim.ts --city meridian`: the
-  balance harness on this city (`--nav` adds the navigation summary, `--bar` tries other bar
+- `shared/scripts/cityMap.ts`: the pictures. `npm run sim`: the
+  balance harness, on this city by default (`--nav` adds the navigation summary, `--bar` tries other bar
   fractions).
 - Same on every machine: the generator uses only + - * /, `Math.sqrt`, rounding and the
   project's seeded generator; headings come from a fixed table; every final coordinate

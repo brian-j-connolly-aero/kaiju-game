@@ -20,6 +20,7 @@ import {
   idleBots,
   inWater,
   stageBounds,
+  standsByRoad,
   type BuiltCity,
   type CityData,
   type StageId,
@@ -179,6 +180,9 @@ describe('Port Meridian: deployment', () => {
           expect(circleHitsStructure(world.cityQuery, u.x, u.z, u.radius), `${a.name} stage ${stage} unit ${u.id}`).toBe(false);
           // Every unit, not only the one at the deploy point, can drive out to the streets.
           expect(reach[stage - 1](u.x, u.z), `${a.name} stage ${stage} unit ${u.id} at E ${(-u.x).toFixed(0)} N ${u.z.toFixed(0)} is walled in`).toBe(2);
+          // ... and without crossing the quarantine line: a street inside the bounds is in plain reach
+          // (a pocket of houses against the line is a trap the reach map above cannot see).
+          expect(standsByRoad(world, u.x, u.z, u.radius), `${a.name} stage ${stage} unit ${u.id} at E ${(-u.x).toFixed(0)} N ${u.z.toFixed(0)} has no street in reach inside the bounds`).toBe(true);
           expect(u.x >= b.minX + u.radius && u.x <= b.maxX - u.radius && u.z >= b.minZ + u.radius && u.z <= b.maxZ - u.radius).toBe(true);
           // Not on top of the kaiju: at least 150 m out even in the small stage 1 square.
           expect(Math.hypot(u.x - world.kaijus[0].x, u.z - world.kaijus[0].z)).toBeGreaterThan(150);
@@ -186,6 +190,34 @@ describe('Port Meridian: deployment', () => {
         expect(alive).toBe(16);
       }
     }
+  }, LONG);
+});
+
+describe('Port Meridian: deployment at the city edge', () => {
+  it('never lands a squad out on the mole or a pier, nor in the sea, whatever start and wherever the titan stands', () => {
+    // Along the south edge the deploy line is open sea. A point there must not send its squad
+    // walking inland to the Long Mole or a pier, a kilometer from the fight.
+    let checked = 0;
+    for (const a of data.anchors) {
+      const world = createWorld({ seed: 31 + a.id, config: createMatchConfig({ anchor: a.id, bots: idleBots() }), city: built });
+      const k = world.kaijus[0];
+      // At its anchor, half way to downtown, and downtown itself.
+      for (const f of [0, 0.5, 1]) {
+        k.x = a.x + (data.downtown.x - a.x) * f;
+        k.z = a.z + (data.downtown.z - a.z) * f;
+        beginStage(world, 3);
+        const b = world.match.bounds;
+        for (const squad of world.squads) {
+          const leader = world.units[squad.units[0]];
+          const inside = Math.min(leader.x - b.minX, b.maxX - leader.x, leader.z - b.minZ, b.maxZ - leader.z);
+          const where = `${a.name}, titan ${f * 100}% of the way, squad ${squad.id} at E ${(-leader.x).toFixed(0)} N ${leader.z.toFixed(0)}`;
+          expect(inside, where).toBeLessThanOrEqual(40);
+          for (const id of squad.units) expect(inWater(world.cityQuery, world.units[id].x, world.units[id].z), `${where}, unit ${id}`).toBe(false);
+          checked++;
+        }
+      }
+    }
+    expect(checked).toBe(data.anchors.length * 3 * 4);
   }, LONG);
 });
 

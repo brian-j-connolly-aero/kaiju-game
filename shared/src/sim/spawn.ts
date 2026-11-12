@@ -16,7 +16,7 @@ import { yawFromTo } from '../math/angle';
 import type { Bounds } from '../math/geom';
 import type { Vec2 } from '../math/vec';
 import type { PlayerSlot } from './config';
-import { createUnitNav, resetNav } from './nav';
+import { createUnitNav, resetNav, standsByRoad } from './nav';
 import type { Kaiju, KaijuActionMemory, Squad, Unit, World } from './types';
 
 /** How far inside the bounds line squads deploy. */
@@ -27,6 +27,9 @@ const DEPLOY_SEPARATION = 120;
 /** Ways the sectors are turned when looking for the shortest drives, and what an empty sector costs (meters). */
 const DEPLOY_TURNS = 8;
 const DEPLOY_EMPTY_COST = 5000;
+/** A deploy point counts only when dry ground for the squad lies within this many meters of it. */
+const DEPLOY_DRY_REACH = 40;
+const NO_DISCS: readonly Disc[] = [];
 
 interface Disc {
   x: number;
@@ -36,8 +39,9 @@ interface Disc {
 
 /**
  * Finds open ground for a circle of `radius` at or near (x, z): inside the bounds, clear of
- * standing structures and of the given discs, and dry when possible. Searches outward in rings.
- * Returns false (and leaves `out` at the requested point) when nothing within about 16 rings fits.
+ * standing structures and of the given discs, and dry when possible (only dry with `dryOnly`),
+ * and passing `accept` when that is given. Searches outward in rings. Returns false (and leaves `out` at the requested point) when nothing
+ * within about 16 rings fits.
  */
 export function findClearSpot(
   city: CityQuery,
@@ -47,10 +51,12 @@ export function findClearSpot(
   bounds: Bounds,
   avoid: readonly Disc[],
   out: Vec2,
+  dryOnly = false,
+  accept?: (x: number, z: number) => boolean,
 ): boolean {
   const step = Math.max(2, radius);
   const margin = radius + 1;
-  for (let pass = 0; pass < 2; pass++) {
+  for (let pass = 0; pass < (dryOnly ? 1 : 2); pass++) {
     // First pass insists on dry ground; the second accepts water.
     for (let ring = 0; ring <= 16; ring++) {
       const count = ring === 0 ? 1 : 6 + ring * 2;
@@ -72,7 +78,7 @@ export function findClearSpot(
             break;
           }
         }
-        if (!free) continue;
+        if (!free || (accept && !accept(cx, cz))) continue;
         out.x = cx;
         out.z = cz;
         return true;
@@ -335,6 +341,12 @@ export function refillSquad(world: World, squad: Squad, stage: StageId): void {
 
 const spot: Vec2 = { x: 0, z: 0 };
 
+/** Body radius of the units the squads field at a stage (the first squad's faction stands for all). */
+function squadRadius(world: World, stage: StageId): number {
+  const squad = world.squads[0];
+  return squad ? unitTypeDef(factionLevelDef(squad.faction, stage).unitType).radius : 1;
+}
+
 /**
  * Refills every squad for the current stage and spreads them around the inside of the bounds
  * line: on every side of the kaiju, each as near to it as the rules allow (at least
@@ -362,7 +374,24 @@ export function deploySquads(world: World): void {
   let farthest = 0;
   for (const p of pts) farthest = Math.max(farthest, Math.hypot(p.x - tx, p.z - tz));
   const need = Math.min(MATCH_RULES.redeployMinKaijuDist, farthest * 0.92);
-  const eligible = pts.filter((p) => Math.hypot(p.x - tx, p.z - tz) >= need);
+  const far = pts.filter((p) => Math.hypot(p.x - tx, p.z - tz) >= need);
+  // A point of the line out at sea is no place to arrive: the search for dry ground from there
+  // would walk inland to a mole or a pier far inside the line. Such points are left out, so the
+  // sector takes its next point on the shore (unless the whole line is wet, which no city has).
+  // Nor is a pocket between houses whose only way out is across the quarantine line: the squad
+  // must be able to drive straight out onto a street inside the bounds.
+  const r = squadRadius(world, stage);
+  const usable = (p: Vec2): boolean => {
+    // The plain search first (cheap); the one that also asks for a street only when that fails,
+    // and only as far out as a spot could still count.
+    if (!findClearSpot(world.cityQuery, p.x, p.z, r, b, NO_DISCS, spot, true)) return false;
+    if (Math.hypot(spot.x - p.x, spot.z - p.z) > DEPLOY_DRY_REACH) return false;
+    if (standsByRoad(world, spot.x, spot.z, r)) return true;
+    const near = (x: number, z: number): boolean => Math.hypot(x - p.x, z - p.z) <= DEPLOY_DRY_REACH && standsByRoad(world, x, z, r);
+    return findClearSpot(world.cityQuery, p.x, p.z, r, b, NO_DISCS, spot, true, near);
+  };
+  const dry = far.filter(usable);
+  const eligible = dry.length > 0 ? dry : far;
 
   // One squad per sector of bearings around the kaiju, so that they come at it from every
   // side, each at the eligible point of its sector nearest to the kaiju: "at the new edge" should
@@ -433,7 +462,16 @@ export function deploySquads(world: World): void {
       const spacing = u.radius * 2 + 3;
       const wantX = base.x + px * spacing * rowOffsets[s % rowOffsets.length];
       const wantZ = base.z + pz * spacing * rowOffsets[s % rowOffsets.length];
-      findClearSpot(world.cityQuery, wantX, wantZ, u.radius, b, placed, spot);
+      const ur = u.radius;
+      // Room by a street, and no nearer the kaiju than the deploy point had to be (the search
+      // for room must not walk a unit back inside the redeploy distance).
+      // Dry ground comes first, then that distance, then any open ground at all.
+      const byStreet = (x: number, z: number): boolean => standsByRoad(world, x, z, ur);
+      const fits = (x: number, z: number): boolean => Math.hypot(x - tx, z - tz) >= need && byStreet(x, z);
+      const q = world.cityQuery;
+      if (!findClearSpot(q, wantX, wantZ, ur, b, placed, spot, true, fits) && !findClearSpot(q, wantX, wantZ, ur, b, placed, spot, true, byStreet)) {
+        findClearSpot(q, wantX, wantZ, ur, b, placed, spot);
+      }
       u.x = spot.x;
       u.z = spot.z;
       u.yaw = yawFromTo(u.x, u.z, tx, tz);

@@ -22,11 +22,11 @@
  */
 
 import { roadAdjacency } from '../city/roads';
-import { castSegment, structuresInCircle, type CityQuery } from '../city/spatialIndex';
+import { bridgeAt, castSegment, groundCodeAt, GROUND_WATER, structuresInCircle, type CityQuery } from '../city/spatialIndex';
 import type { CityData } from '../city/types';
 import { DT, SQUAD_RULES } from '../defs/rules';
 import { unitTypeDef } from '../defs/units';
-import { boundsContains, closestTOnSegment2 } from '../math/geom';
+import { boundsContains, closestTOnSegment2, type Bounds } from '../math/geom';
 import type { Vec2, Vec3 } from '../math/vec';
 import type { Unit, World } from './types';
 
@@ -69,6 +69,23 @@ export interface UnitNav {
   /** The closest it has been to this goal, and for how long it has not come closer (feeling its way with no route). */
   bestDist: number;
   sinceBest: number;
+  /**
+   * The point it is steering for right now (the goal, or the next stop of its route), the closest
+   * it has come to it, and for how long it has not come closer: a unit that has lost its street
+   * can drive about for good without ever being stuck.
+   */
+  legX: number;
+  legZ: number;
+  legBest: number;
+  legTime: number;
+  /**
+   * A goal near by whose route along the streets is a long way round: it first feels its way
+   * there straight (`feel` 1); only when that fails (2) does it take the long route. Kept, with
+   * the goal it is for, across give-ups; a new goal starts again at 0.
+   */
+  feel: number;
+  feelX: number;
+  feelZ: number;
   /** Seconds left of standing still after giving up on a goal it cannot reach. */
   wait: number;
   /**
@@ -104,6 +121,13 @@ export function createUnitNav(): UnitNav {
     fails: 0,
     bestDist: Infinity,
     sinceBest: 0,
+    legX: NaN,
+    legZ: NaN,
+    legBest: Infinity,
+    legTime: 0,
+    feel: 0,
+    feelX: NaN,
+    feelZ: NaN,
     wait: 0,
     shotAt: -1,
     shotHeight: 0,
@@ -116,6 +140,9 @@ export function resetRoute(nav: UnitNav): void {
   nav.fresh = true;
   nav.bestDist = Infinity;
   nav.sinceBest = 0;
+  nav.legX = NaN;
+  nav.legBest = Infinity;
+  nav.legTime = 0;
   nav.path.length = 0;
   nav.planned = false;
   nav.repath = 0;
@@ -130,6 +157,9 @@ export function resetRoute(nav: UnitNav): void {
 /** Back to a blank memory (a fresh unit at the start of a stage). */
 export function resetNav(nav: UnitNav): void {
   resetRoute(nav);
+  nav.feel = 0;
+  nav.feelX = NaN;
+  nav.feelZ = NaN;
   nav.hasHold = false;
   nav.settled = true;
   nav.hurry = 1;
@@ -160,6 +190,8 @@ const FEELER_SPACING = 4;
 const LEG_MARGIN = 0.5;
 /** The short look-ahead is this much narrower than the body, so sliding along a wall counts as open. */
 const PROBE_SLACK = 0.4;
+/** Staying on a straight line asks for room for this much less than the body's radius (section 1 of steerToward). */
+const STAY_SLACK = 0.3;
 /** The straight line to the goal and the corner-cutting are re-checked every this many ticks. */
 const RECHECK_TICKS = 5;
 /** The look-ahead for walls is repeated every this many ticks; in between the unit holds the turn it chose. */
@@ -178,15 +210,29 @@ const MAX_FAILS = 3;
 const GIVE_UP_WAIT = 3;
 /** Feeling its way round walls with no route, it gives up after this long without getting any closer. */
 const WANDER_LIMIT = 20;
+/** A route along the streets longer than this many times the straight distance, plus this many meters, is the long way round. */
+const LONG_WAY_RATIO = 2.5;
+const LONG_WAY_EXTRA = 60;
+/** Getting no closer to the point it steers for (the goal or the next stop) for this long, it plans again from where it is. */
+const LEG_PATIENCE = 8;
 /** Streets considered as the way onto and off the road network, nearest first. */
 const ACCESS_CANDIDATES = 6;
-/** How close it comes to the point where it leaves the street for the goal. */
+/** How close it comes to the point where it leaves the street for the goal, and to a crossroads on the way. */
 const EXIT_REACH = 1.5;
+const NODE_REACH = 3;
 /** Lowest throttle while easing into a stop, so the last meter does not take forever. */
 const MIN_THROTTLE = 0.25;
 /** A turn sharper than this (the cosine of 45 degrees) at the next stop is taken slowly, at no less than this throttle. */
 const SHARP_TURN_COS = Math.SQRT1_2;
 const CORNER_THROTTLE = 0.4;
+/**
+ * A straight line through more water than this is not taken: wading the river is the slow way
+ * across (the widest crossing of Port Meridian's river is about 100 m, diagonally), but a line
+ * across the bay is several hundred meters at half speed, and the streets round it are quicker.
+ */
+const WADE_MAX = 120;
+/** Water along a line is sampled this far apart. */
+const WADE_STEP = 4;
 
 const ids: number[] = [];
 const segA: Vec3 = { x: 0, y: FEELER_HEIGHT, z: 0 };
@@ -221,6 +267,24 @@ export function corridorClear(q: CityQuery, ax: number, az: number, bx: number, 
     }
   }
   return !solidInCircle(q, bx, bz, r);
+}
+
+/** True when the straight line from a to b crosses no more than WADE_MAX meters of water (bridge decks are dry). */
+export function shallowWay(q: CityQuery, ax: number, az: number, bx: number, bz: number): boolean {
+  const len = Math.hypot(bx - ax, bz - az);
+  if (len <= WADE_MAX) return true;
+  const steps = Math.ceil(len / WADE_STEP);
+  const each = len / steps;
+  let wet = 0;
+  for (let i = 0; i < steps; i++) {
+    const t = (i + 0.5) / steps;
+    const x = ax + (bx - ax) * t;
+    const z = az + (bz - az) * t;
+    if (groundCodeAt(q.index, x, z) !== GROUND_WATER || bridgeAt(q, x, z) >= 0) continue;
+    wet += each;
+    if (wet > WADE_MAX) return false;
+  }
+  return true;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -263,6 +327,93 @@ function nodeInPlay(world: World, node: number, r: number): boolean {
   return boundsContains(world.match.bounds, n.x, n.z, r);
 }
 
+/** Streets by grid cell (meters on a side), built once per city: a nearby street is found without looking at all of them. */
+const EDGE_CELL = 100;
+interface EdgeGrid {
+  cols: number;
+  half: number;
+  cells: number[][];
+}
+const edgeGridCache = new WeakMap<CityData, EdgeGrid>();
+const nearIds: number[] = [];
+const nearBest: number[] = [];
+let edgeStamp = new Int32Array(0);
+let stampNow = 0;
+
+function edgeGridOf(city: CityData): EdgeGrid {
+  let grid = edgeGridCache.get(city);
+  if (!grid) {
+    const half = city.half;
+    const cols = Math.ceil((2 * half) / EDGE_CELL);
+    const cells: number[][] = [];
+    for (let i = 0; i < cols * cols; i++) cells.push([]);
+    const cell = (v: number): number => Math.min(cols - 1, Math.max(0, Math.floor((v + half) / EDGE_CELL)));
+    for (const e of city.roads.edges) {
+      const a = city.roads.nodes[e.a];
+      const b = city.roads.nodes[e.b];
+      for (let r = cell(Math.min(a.z, b.z)); r <= cell(Math.max(a.z, b.z)); r++) {
+        for (let c = cell(Math.min(a.x, b.x)); c <= cell(Math.max(a.x, b.x)); c++) cells[r * cols + c].push(e.id);
+      }
+    }
+    grid = { cols, half, cells };
+    edgeGridCache.set(city, grid);
+  }
+  return grid;
+}
+
+/**
+ * Collects into `nearIds`, in id order, every street that can be among the ACCESS_CANDIDATES
+ * nearest to (x, z) whose nearest point lies inside the bounds: rings of grid cells outward
+ * until that many have been found closer than anything outside the rings can be. The answer
+ * is what a look at every street would give (the same streets, in the same order; checked
+ * against that look over six whole bot matches, which came out identical to the bit).
+ */
+function nearbyEdges(city: CityData, b: Bounds, x: number, z: number, r: number): void {
+  const grid = edgeGridOf(city);
+  const graph = city.roads;
+  if (edgeStamp.length !== graph.edges.length) {
+    edgeStamp = new Int32Array(graph.edges.length);
+    stampNow = 0;
+  }
+  stampNow++;
+  nearIds.length = 0;
+  nearBest.length = 0;
+  const cols = grid.cols;
+  const cx = Math.min(cols - 1, Math.max(0, Math.floor((x + grid.half) / EDGE_CELL)));
+  const cz = Math.min(cols - 1, Math.max(0, Math.floor((z + grid.half) / EDGE_CELL)));
+  for (let k = 0; k < cols; k++) {
+    for (let rz = cz - k; rz <= cz + k; rz++) {
+      if (rz < 0 || rz >= cols) continue;
+      const edge = rz === cz - k || rz === cz + k;
+      for (let rx = cx - k; rx <= cx + k; rx += edge ? 1 : 2 * k) {
+        if (rx < 0 || rx >= cols) continue;
+        for (const id of grid.cells[rz * cols + rx]) {
+          if (edgeStamp[id] === stampNow) continue;
+          edgeStamp[id] = stampNow;
+          nearIds.push(id);
+          const e = graph.edges[id];
+          const a = graph.nodes[e.a];
+          const c = graph.nodes[e.b];
+          const t = closestTOnSegment2(x, z, a.x, a.z, c.x, c.z);
+          const px = a.x + (c.x - a.x) * t;
+          const pz = a.z + (c.z - a.z) * t;
+          if (!boundsContains(b, px, pz, r)) continue;
+          const d = (px - x) * (px - x) + (pz - z) * (pz - z);
+          let at = nearBest.length;
+          while (at > 0 && nearBest[at - 1] > d) at--;
+          if (at < ACCESS_CANDIDATES) nearBest.splice(at, 0, d);
+          if (nearBest.length > ACCESS_CANDIDATES) nearBest.length = ACCESS_CANDIDATES;
+        }
+        if (k === 0) break;
+      }
+    }
+    // Anything not seen yet lies wholly outside the rings: at least k cells away.
+    const reach = k * EDGE_CELL;
+    if (nearBest.length >= ACCESS_CANDIDATES && nearBest[ACCESS_CANDIDATES - 1] <= reach * reach) break;
+  }
+  nearIds.sort((p, q) => p - q);
+}
+
 /**
  * Finds where to step onto the streets from (x, z): the nearest point of a road edge, inside
  * the playable bounds, that a body of radius `r` can reach in a straight line; when no street
@@ -276,7 +427,9 @@ function roadAccess(world: World, x: number, z: number, r: number, out: RoadAcce
   candDist.length = 0;
   candX.length = 0;
   candZ.length = 0;
-  for (const e of graph.edges) {
+  nearbyEdges(world.city, b, x, z, r);
+  for (let n = 0; n < nearIds.length; n++) {
+    const e = graph.edges[nearIds[n]];
     const a = graph.nodes[e.a];
     const c = graph.nodes[e.b];
     const t = closestTOnSegment2(x, z, a.x, a.z, c.x, c.z);
@@ -405,6 +558,19 @@ function planRoute(world: World, u: Unit, gx: number, gz: number): void {
   nav.path.push({ x: accessTo.x, z: accessTo.z });
 }
 
+/** Meters from the unit along a planned route to the goal. */
+function routeLength(u: Unit, path: readonly Vec2[], gx: number, gz: number): number {
+  let len = 0;
+  let x = u.x;
+  let z = u.z;
+  for (const p of path) {
+    len += Math.hypot(p.x - x, p.z - z);
+    x = p.x;
+    z = p.z;
+  }
+  return len + Math.hypot(gx - x, gz - z);
+}
+
 // ---------------------------------------------------------------------------------------------
 // Steering
 // ---------------------------------------------------------------------------------------------
@@ -457,10 +623,22 @@ export function steerToward(world: World, u: Unit, gx: number, gz: number, toler
   // Leaving a route for the straight line takes room to spare; staying on the straight line
   // only takes room to pass. Without the difference a unit squeezing past a corner would
   // change its mind with every step.
-  if (recheck) nav.direct = corridorClear(q, u.x, u.z, gx, gz, nav.direct && !nav.fresh ? probeR : r + LEG_MARGIN);
+  const type = unitTypeDef(u.type);
+  // What water slows takes the streets round a bay rather than wading straight across it.
+  const wades = type.body !== 'aircraft';
+  if (recheck) {
+    // A tank does not drive a ruler-straight line (it turns its hull as it goes), so staying on
+    // the line forgives a wall that comes within a part of its width: local steering and the
+    // movement system take it past, and if the wall does stop it, the progress watch below
+    // drops the line (a troop of tanks used to swing between the line and its street for good).
+    // Water only matters when choosing the line: a goal out in the water is reached by wading
+    // from the nearest street, and once on its way the unit does not turn back for the shore.
+    const staying = nav.direct && !nav.fresh;
+    const stay = Math.max(0.5, r - Math.max(PROBE_SLACK, STAY_SLACK * r));
+    nav.direct = corridorClear(q, u.x, u.z, gx, gz, staying ? stay : r + LEG_MARGIN) && (staying || !wades || shallowWay(q, u.x, u.z, gx, gz));
+  }
   nav.fresh = false;
 
-  const type = unitTypeDef(u.type);
   let tx = gx;
   let tz = gz;
   let cornering = 1;
@@ -472,22 +650,43 @@ export function steerToward(world: World, u: Unit, gx: number, gz: number, toler
     // A route is planned for a new goal, and again whenever the last one has run out without
     // bringing the goal into plain reach.
     const path = nav.path;
-    const stale = !nav.planned || path.length === 0 || Math.hypot(gx - nav.pathX, gz - nav.pathZ) > replanDist;
-    if (stale && nav.repath <= 0) planRoute(world, u, gx, gz);
+    if (!(Math.hypot(gx - nav.feelX, gz - nav.feelZ) <= replanDist)) {
+      nav.feel = 0;
+      nav.feelX = gx;
+      nav.feelZ = gz;
+    }
+    const feeling = nav.feel === 1 && nav.planned;
+    const stale = !nav.planned || (path.length === 0 && !feeling) || Math.hypot(gx - nav.pathX, gz - nav.pathZ) > replanDist;
+    if (stale && nav.repath <= 0) {
+      planRoute(world, u, gx, gz);
+      if (nav.feel === 0 && path.length > 0 && routeLength(u, path, gx, gz) > LONG_WAY_RATIO * goalDist + LONG_WAY_EXTRA) {
+        // The streets go a long way round (a square cut off by the quarantine line, a block
+        // with its back to the goal): try the short way first, feeling round the walls.
+        path.length = 0;
+        nav.feel = 1;
+      }
+    }
     while (path.length > 0) {
       const p = path[0];
       // Crossroads are rounded; the point where it leaves the street is met exactly, because
       // the way from there to the goal is the one that was checked.
-      const reach = path.length > 1 ? Math.max(r, 3) : EXIT_REACH;
+      // Not too roughly for a big body, though: a troop of tanks that counted a crossroads as
+      // passed nine meters short came out of the turn nine meters off the middle of the next
+      // street, with its flank in the houses (the corner-cutting below is the way to turn early).
+      const reach = path.length > 1 ? NODE_REACH : EXIT_REACH;
       let passed = Math.hypot(p.x - u.x, p.z - u.z) <= reach;
       if (!passed && recheck) {
         // Cut the corner when the stop after this one is already in plain view.
         const nx = path.length > 1 ? path[1].x : gx;
         const nz = path.length > 1 ? path[1].z : gz;
-        passed = corridorClear(q, u.x, u.z, nx, nz, r + LEG_MARGIN);
+        passed = corridorClear(q, u.x, u.z, nx, nz, r + LEG_MARGIN) && (!wades || shallowWay(q, u.x, u.z, nx, nz));
       }
       if (!passed) break;
       path.shift();
+      // Off the street where the way to the goal was checked with the whole body and room to
+      // spare: that is the straight line now. (Judged afresh a meter further on, it could fail
+      // by a hair and send the unit back to the street, again and again.)
+      if (path.length === 0) nav.direct = true;
     }
     if (path.length > 0) {
       tx = path[0].x;
@@ -564,6 +763,30 @@ export function steerToward(world: World, u: Unit, gx: number, gz: number, toler
 
   // --- Progress watch ---------------------------------------------------------------------------
   let gaveUp = false;
+  if (tx !== nav.legX || tz !== nav.legZ) {
+    nav.legX = tx;
+    nav.legZ = tz;
+    nav.legBest = d;
+    nav.legTime = 0;
+  } else if (d <= nav.legBest - PROGRESS_STEP) {
+    nav.legBest = d;
+    nav.legTime = 0;
+  } else {
+    nav.legTime += DT;
+    if (nav.legTime >= LEG_PATIENCE) {
+      // Driving about without getting anywhere (round a block, off the street it was on): judge
+      // the straight line afresh and plan again from here, and count it as a failure.
+      nav.legTime = 0;
+      nav.legX = NaN;
+      nav.fresh = true;
+      nav.planned = false;
+      nav.repath = 0;
+      nav.side = 0;
+      nav.turn = 0;
+      nav.fails++;
+      if (nav.fails >= MAX_FAILS) gaveUp = true;
+    }
+  }
   if (Math.hypot(u.x - nav.markX, u.z - nav.markZ) >= PROGRESS_STEP) {
     nav.markX = u.x;
     nav.markZ = u.z;
@@ -580,6 +803,8 @@ export function steerToward(world: World, u: Unit, gx: number, gz: number, toler
       nav.openTime = 0;
       nav.planned = false;
       nav.repath = 0;
+      // The straight line it was on may be the narrow one that stopped it: judge it again in full.
+      nav.fresh = true;
       if (nav.fails >= MAX_FAILS) gaveUp = true;
     }
   }
@@ -592,6 +817,8 @@ export function steerToward(world: World, u: Unit, gx: number, gz: number, toler
     if (nav.sinceBest >= WANDER_LIMIT) gaveUp = true;
   }
   if (gaveUp) {
+    // Feeling its way did not get it there: next time it takes the streets, however long.
+    if (nav.feel === 1) nav.feel = 2;
     resetRoute(nav);
     nav.wait = GIVE_UP_WAIT;
     nav.pathX = gx;

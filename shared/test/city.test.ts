@@ -20,6 +20,7 @@ import {
   distToStructure,
   findRoadPath,
   generateCity,
+  generatePortMeridian,
   getCity,
   groundKindAt,
   inWater,
@@ -53,6 +54,7 @@ import {
   v3Normalize,
 } from '../src/math';
 
+/** The game's city (Port Meridian). These tests are written against the contract, not the layout. */
 const { city, index } = getCity();
 
 function freshQuery(): CityQuery {
@@ -109,10 +111,13 @@ describe('the generated city', () => {
   });
 
   it('is deterministic, and the seed matters', () => {
-    const again = generateCity(CITY_SEED);
+    const again = generatePortMeridian(CITY_SEED);
     expect(cityChecksum(again)).toBe(cityChecksum(city));
     expect(again.structures.length).toBe(city.structures.length);
-    expect(cityChecksum(generateCity(CITY_SEED + 1))).not.toBe(cityChecksum(city));
+    expect(cityChecksum(generatePortMeridian(CITY_SEED + 1))).not.toBe(cityChecksum(city));
+    // The placeholder grid is still there for tests and as a development option, and is another city.
+    expect(cityChecksum(getCity(CITY_SEED, 'placeholder').city)).toBe(cityChecksum(generateCity(CITY_SEED)));
+    expect(cityChecksum(generateCity(CITY_SEED))).not.toBe(cityChecksum(city));
   });
 
   it('has the right scale: thousands of structures and props, anchors, landmarks, water, parks', () => {
@@ -343,10 +348,18 @@ describe('spatial index', () => {
     const pc = centroid(park.polygon);
     expect(groundKindAt(index, pc.x, pc.z)).toBe('park');
     expect(groundKindAt(index, 5000, 5000)).toBe('land');
-    // Mid-river, away from any bridge: wading.
-    const wx = bridge.x + 150;
-    expect(groundKindAt(index, wx, bridge.z)).toBe('water');
-    expect(inWater(q, wx, bridge.z)).toBe(true);
+    // Water well away from every bridge deck: wading.
+    const decks = city.structures.filter((s) => s.cls === 'bridge');
+    let wet: { x: number; z: number } | null = null;
+    for (let z = -1000; z <= 1000 && !wet; z += 10) {
+      for (let x = -1000; x <= 1000 && !wet; x += 5) {
+        if (groundKindAt(index, x, z) === 'water' && decks.every((d) => Math.hypot(d.x - x, d.z - z) > 80)) wet = { x, z };
+      }
+    }
+    expect(wet).not.toBeNull();
+    if (!wet) return;
+    expect(inWater(q, wet.x, wet.z)).toBe(true);
+    expect(bridgeAt(q, wet.x, wet.z)).toBe(-1);
     // On the bridge deck: over water but dry.
     expect(groundKindAt(index, bridge.x, bridge.z)).toBe('water');
     expect(bridgeAt(q, bridge.x, bridge.z)).toBe(bridge.id);
@@ -384,10 +397,23 @@ describe('spatial index', () => {
 
 describe('road graph', () => {
   const adjacency = roadAdjacency(city.roads);
+  // Port Meridian's river runs from the north edge down to the bay: the Old Town on its west
+  // bank, downtown on its east bank (x is west-positive: east = -x).
+  const oldTown = nearestRoadNode(city.roads, 600, -100);
+  const downtown = nearestRoadNode(city.roads, -100, -100);
+  /** A street over open water that is not a bridge deck: a ford. */
+  const ford = (id: number): boolean => {
+    const e = city.roads.edges[id];
+    const a = city.roads.nodes[e.a];
+    const b = city.roads.nodes[e.b];
+    if (e.kind === 'bridge') return false;
+    for (let t = 0.1; t < 1; t += 0.1) if (groundKindAt(index, a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t) === 'water') return true;
+    return false;
+  };
 
   it('routes across the river over a bridge', () => {
-    const south = nearestRoadNode(city.roads, 0, -500);
-    const north = nearestRoadNode(city.roads, 0, 700);
+    const south = oldTown;
+    const north = downtown;
     const path = findRoadPath(city.roads, adjacency, south, north);
     expect(path[0]).toBe(south);
     expect(path[path.length - 1]).toBe(north);
@@ -403,10 +429,14 @@ describe('road graph', () => {
   });
 
   it('respects closed edges and reports no route', () => {
-    const south = nearestRoadNode(city.roads, 0, -500);
-    const north = nearestRoadNode(city.roads, 0, 700);
+    const south = oldTown;
+    const north = downtown;
+    // Without the bridges the one way left is Tanners Ford; without that too, there is none.
     const noBridges = findRoadPath(city.roads, adjacency, south, north, (id) => city.roads.edges[id].kind !== 'bridge');
-    expect(noBridges).toEqual([]);
+    expect(noBridges.length).toBeGreaterThan(0);
+    expect(noBridges.some((n, i) => i > 0 && city.roads.edges.some((e) => ford(e.id) && ((e.a === n && e.b === noBridges[i - 1]) || (e.b === n && e.a === noBridges[i - 1]))))).toBe(true);
+    const noCrossing = findRoadPath(city.roads, adjacency, south, north, (id) => city.roads.edges[id].kind !== 'bridge' && !ford(id));
+    expect(noCrossing).toEqual([]);
     expect(findRoadPath(city.roads, adjacency, south, south)).toEqual([south]);
     expect(findRoadPath(city.roads, adjacency, -1, north)).toEqual([]);
   });

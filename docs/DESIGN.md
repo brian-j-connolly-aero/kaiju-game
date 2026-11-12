@@ -74,16 +74,17 @@ squares clamped to the city, drawn as a thin glowing quarantine line; nobody can
   points, whoever caused it. At 0 hp it is rubble: flat, passable, worth nothing more, and shots
   that land on it cost nothing.
 - Marks are computed per match from the value actually present, so every neighborhood is fair:
-  `P1 = 0.13 × V(stage 1 bounds)`, `P2 = max(1.6 × P1, 0.088 × V(stage 2 bounds))`,
-  `P3 = max(1.6 × P2, 0.35 × V(whole city))`. The three fractions are the pace knob; they were
-  tuned with the balance harness (`docs/BALANCE.md`).
+  `P1 = 0.18 × V(stage 1 bounds)`, `P2 = max(1.6 × P1, 0.125 × V(stage 2 bounds))`,
+  `P3 = max(1.6 × P2, 0.31 × V(whole city))`. The three fractions are the pace knob; they were
+  tuned with the balance harness in Port Meridian (`docs/BALANCE.md` section 8).
 - Display: a skyline with three towers. Points 0..P1 map to the first 21% of its width, P1..P2 to
   21..57%, P2..P3 to 57..100% (these are the doc's 15 / 40 / 70 marks, rescaled so the third
   tower is the end of the bar).
 - Tuning target: an unopposed kaiju fills a stage's segment in 100 to 130 s; a typical contested
   stage lasts about 200 to 230 s; a full match about 10 to 12 minutes. Measured with
-  `npm run sim` (bot against bot): 120 to 127 s alone, 3:00 to 3:37 contested, 10:08 on average,
-  the kaiju winning 52% of 60 matches. `docs/BALANCE.md` has the tables.
+  `npm run sim` (bot against bot, Port Meridian, every start in turn): alone 122 / 122 / 182 s
+  for the three segments; contested stages of about 3:15 / 3:05 / 3:50; 10:19 on average; the
+  kaiju winning 47% of 60 matches. `docs/BALANCE.md` section 8 has the tables.
 
 ### The molt
 
@@ -119,7 +120,11 @@ squares clamped to the city, drawn as a thin glowing quarantine line; nobody can
   the bounds widen, and every squad returns whole at the new level. Squads deploy one per
   sector of bearings around the kaiju, so that they come at it from every side, each at the
   point of the new perimeter nearest to it that is at least 250 m away (at stage 1 the bounds
-  are too small for that: the four squads start near the corners, about 210 m out).
+  are too small for that: the four squads start near the corners, about 210 m out). A point of
+  the perimeter only counts when dry ground lies within 40 m of it and a unit there can drive
+  straight out onto a street inside the bounds: no squad arrives out at sea, on a mole or a
+  pier, or in a pocket of houses whose only way out is across the quarantine line. Each unit
+  stands on dry ground by a street, no nearer the kaiju than its squad's point.
 - The starting neighborhood is drawn from the match seed (or fixed by the match config); the
   kaiju hatches at its anchor on the nearest open ground.
 
@@ -339,9 +344,15 @@ photos for the front page).
   calls it in. A sub-unit that has dropped behind closes up at 1.3 times its speed.
 - **Move to.** Each sub-unit gets its own spot round the marker: open ground with room to
   spare that it can drive to from a street (a marker on a roof or in a back yard sends them to
-  the nearest such ground). They get there by the straight line when it is clear, otherwise
-  along the streets, feeling their way round walls; rubble, the river and bridge decks are all
-  passable. Markers are pulled back inside the playable bounds.
+  the nearest such ground; when there is none near, as in the middle of the stadium, they look
+  four times as far before settling for any open ground). They get there by the straight line
+  when it is clear, otherwise along the streets, feeling their way round walls; rubble, the
+  river and bridge decks are all passable. A straight line that wades more than 120 m (across
+  the bay rather than the river) is not taken: the streets round the bay are quicker. When the
+  way along the streets is more than two and a half times the straight distance plus 60 m (a
+  stage 1 square cuts its streets at the quarantine line), a unit first feels its way straight
+  there and takes the long way only if that fails. Markers are pulled back inside the playable
+  bounds.
 - **Markers placed with the crosshair** (move-to and artillery; a map marker is used as it is).
   With the crosshair on a kaiju's body the marker is the ground under it: from a unit's eye
   nearly all of a kaiju is above the horizon, so pointing at it has to work. Otherwise it is
@@ -441,7 +452,8 @@ tick behind what it saw, and plays any slot it is handed at any moment.
   most, then not again for 6 s), throws what is at hand at a squad in range, turns the beam on
   units in reach (else on something big), eats below 70% health, and when the molt is offered
   looks for ground where fewer guns can see it and where its next body will have room, for
-  16 s at most, then cocoons.
+  16 s at most (smashing what stands in its way there, as it does when wrecking), then
+  cocoons.
 - **Handicap.** `MatchConfig.bots` handicaps either side from 0 (its best) to 1 (stands still):
   in between, the bot idles that share of the time. For the balance harness, tests and
   practice options. `MatchConfig.bots.triggerHappy` makes the squad bots play the lazy way

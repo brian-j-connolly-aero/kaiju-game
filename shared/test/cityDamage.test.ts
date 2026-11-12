@@ -248,7 +248,10 @@ describe('upgrade and Tier 2 hooks in city damage', () => {
     expect(onDeck.hp).toBe(onDeck.maxHp);
     let events = damage(world, 0, 100, KAIJU_PLAYER, 'stomp');
     expect(eventsOf(events, 'structureStage')).toMatchObject([{ id: 0, stage: 3 }]);
-    // The fall lands on the next tick, through the same door as every other hit.
+    // The fall lands on the tick the deck goes, through the same door as every other hit
+    // (no hit is left queued from one tick to the next), and only once.
+    expect(onDeck.maxHp - onDeck.hp).toBe(COMBAT_RULES.bridgeFallDamage);
+    expect(world.hits).toEqual([]);
     events = [...events, ...world.step()];
     expect(onDeck.maxHp - onDeck.hp).toBe(COMBAT_RULES.bridgeFallDamage);
     expect(onDeck.shaken).toBeGreaterThan(0);

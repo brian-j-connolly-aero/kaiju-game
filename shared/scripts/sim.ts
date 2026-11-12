@@ -8,6 +8,8 @@
  *   --seeds N            how many matches (default 5); seeds run from --seed upward
  *   --seed N             first seed (default 1)
  *   --anchor N           start every match at this neighborhood anchor (default: the seed picks)
+ *   --every-anchor       take the anchors in turn instead (match i starts at anchor i mod 10), so
+ *                        that every start is played equally often
  *   --fast               the short MB_FAST timers and small bar
  *   --kaiju-handicap H   0 (the bot at its best) to 1 (it stands still); default 0
  *   --human-handicap H   the same for the squads
@@ -15,10 +17,10 @@
  *                        loaded instead of charging volleys (what undisciplined fire is worth)
  *   --unopposed          no squads at all: how fast does a kaiju fill the bar when left alone
  *   --max-minutes N      give up on a match after this many simulated minutes (default 20)
- *   --city NAME          'placeholder' (default: the city the game ships with today) or 'meridian'
+ *   --city NAME          'meridian' (default: Port Meridian, the game's city, docs/CITY.md) or
+ *                        'placeholder' (the old grid city, a development option)
  *   --bar P1,P2,P3       try other destruction bar fractions (MATCH_RULES.bar.p1/p2/p3) in this run
  *                        only; the rules file is not changed
- *                        (Port Meridian, docs/CITY.md), built once and handed to every match
  *   --nav                also print how the squads got about: stuck time, wading, bridge crowding
  *   --events             also print each match's event counts
  *   --json               print the reports as JSON instead of the table
@@ -31,7 +33,7 @@
  */
 
 import { MATCH_RULES } from '../src/defs/rules';
-import { buildCityIndex, generatePortMeridian, type BuiltCity } from '../src/index';
+import { getCity, type BuiltCity, type CityKind } from '../src/index';
 import { runBotMatch, type BotMatchReport } from './botMatch';
 import { createNavWatch, navSummary, type NavWatch } from './navWatch';
 
@@ -39,6 +41,7 @@ interface Options {
   seed: number;
   seeds: number;
   anchor: number;
+  everyAnchor: boolean;
   fast: boolean;
   kaijuHandicap: number;
   humanHandicap: number;
@@ -47,7 +50,7 @@ interface Options {
   maxMinutes: number;
   events: boolean;
   json: boolean;
-  city: string;
+  city: CityKind;
   nav: boolean;
   bar: [number, number, number] | null;
 }
@@ -57,6 +60,7 @@ function parseArgs(argv: string[]): Options {
     seed: 1,
     seeds: 5,
     anchor: -1,
+    everyAnchor: false,
     fast: false,
     kaijuHandicap: 0,
     humanHandicap: 0,
@@ -65,7 +69,7 @@ function parseArgs(argv: string[]): Options {
     maxMinutes: 20,
     events: false,
     json: false,
-    city: 'placeholder',
+    city: 'meridian',
     nav: false,
     bar: null,
   };
@@ -85,6 +89,9 @@ function parseArgs(argv: string[]): Options {
         break;
       case '--anchor':
         o.anchor = next();
+        break;
+      case '--every-anchor':
+        o.everyAnchor = true;
         break;
       case '--max-minutes':
         o.maxMinutes = next();
@@ -113,10 +120,12 @@ function parseArgs(argv: string[]): Options {
       case '--nav':
         o.nav = true;
         break;
-      case '--city':
-        o.city = argv[++i] ?? '';
-        if (o.city !== 'placeholder' && o.city !== 'meridian') throw new Error("--city needs 'placeholder' or 'meridian'");
+      case '--city': {
+        const name = argv[++i] ?? '';
+        if (name !== 'placeholder' && name !== 'meridian') throw new Error("--city needs 'meridian' or 'placeholder'");
+        o.city = name;
         break;
+      }
       case '--bar': {
         const v = (argv[++i] ?? '').split(',').map(Number);
         if (v.length !== 3 || !v.every((x) => Number.isFinite(x) && x > 0)) throw new Error('--bar needs three fractions, like 0.18,0.13,0.30');
@@ -160,7 +169,7 @@ function printTable(reports: BotMatchReport[], o: Options): void {
     per(r, (s) => s.kaijuHpLost.toFixed(0)),
   ]);
   const widths = head.map((h, i) => Math.max(h.length, ...rows.map((c) => c[i].length)));
-  const tags = [o.city !== 'placeholder' ? `city: ${o.city}` : '', o.bar ? `bar ${o.bar.join(' / ')}` : '', o.fast ? 'fast tuning' : '', o.kaijuHandicap > 0 ? `kaiju handicap ${o.kaijuHandicap}` : '', o.humanHandicap > 0 ? `human handicap ${o.humanHandicap}` : '', o.triggerHappy ? 'trigger-happy squads' : '', o.squads === 0 ? 'unopposed' : ''].filter(Boolean);
+  const tags = [o.city !== 'meridian' ? `city: ${o.city}` : '', o.bar ? `bar ${o.bar.join(' / ')}` : '', o.fast ? 'fast tuning' : '', o.kaijuHandicap > 0 ? `kaiju handicap ${o.kaijuHandicap}` : '', o.humanHandicap > 0 ? `human handicap ${o.humanHandicap}` : '', o.triggerHappy ? 'trigger-happy squads' : '', o.squads === 0 ? 'unopposed' : '', o.everyAnchor ? 'every start in turn' : ''].filter(Boolean);
   console.log(`${reports.length} bot matches${tags.length > 0 ? ` [${tags.join(', ')}]` : ''}`);
   console.log(row(head, widths));
   console.log(widths.map((w) => '-'.repeat(w)).join('  '));
@@ -213,11 +222,8 @@ if (options.bar) {
   const bar = MATCH_RULES.bar as { p1: number; p2: number; p3: number };
   [bar.p1, bar.p2, bar.p3] = options.bar;
 }
-let city: BuiltCity | undefined;
-if (options.city === 'meridian') {
-  const data = generatePortMeridian();
-  city = { city: data, index: buildCityIndex(data) };
-}
+// Built once and handed to every match.
+const city: BuiltCity = getCity(undefined, options.city);
 const reports: BotMatchReport[] = [];
 const watches: NavWatch[] = [];
 for (let i = 0; i < options.seeds; i++) {
@@ -225,7 +231,7 @@ for (let i = 0; i < options.seeds; i++) {
   reports.push(
     runBotMatch({
       seed: options.seed + i,
-      anchor: options.anchor,
+      anchor: options.everyAnchor ? i % city.city.anchors.length : options.anchor,
       fast: options.fast,
       kaijuHandicap: options.kaijuHandicap,
       humanHandicap: options.humanHandicap,

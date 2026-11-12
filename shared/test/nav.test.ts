@@ -6,6 +6,7 @@ import {
   createRng,
   createSteer,
   rngRange,
+  shallowWay,
   solidInCircle,
   steerToward,
   structureContact,
@@ -69,6 +70,45 @@ describe('corridors: can a body of this width go straight from here to there', (
     q.structureHp[0] = 0;
     expect(corridorClear(q, 0, 0, 0, 100, 3)).toBe(true);
     expect(solidInCircle(q, 0, 50, 4)).toBe(false);
+  });
+});
+
+describe('water: a straight line may wade a river, not cross a bay', () => {
+  const q = queryFor(
+    makeTestCity({
+      // A river 60 m wide with a bridge deck over it, and a bay 400 m across.
+      water: [
+        [-1000, 100, 1000, 160],
+        [-1000, 400, 1000, 800],
+      ],
+      structures: [{ x: 300, z: 130, w: 16, d: 80, height: 8, passable: true }],
+    }),
+  );
+
+  it('takes a line that wades no more than about a river, and not one across the bay', () => {
+    expect(shallowWay(q, 0, 0, 0, 300)).toBe(true);
+    // Diagonally over the river: still under the limit.
+    expect(shallowWay(q, 0, 0, 100, 300)).toBe(true);
+    expect(shallowWay(q, 0, 300, 0, 900)).toBe(false);
+    // Along the shore, dry the whole way: fine however long.
+    expect(shallowWay(q, -900, 300, 900, 300)).toBe(true);
+    // Along the river on its bridge deck: the deck is dry.
+    expect(shallowWay(q, 300, 92, 300, 168)).toBe(true);
+    expect(shallowWay(q, 0, 105, 900, 105)).toBe(false);
+  });
+
+  it('does not set off straight across the bay, but wades the river', () => {
+    const world = makeTestWorld({ water: [[-1000, 100, 1000, 160], [-1000, 400, 1000, 800]] });
+    world.match.bounds = world.match.stageBounds[2];
+    parkUnits(world);
+    placeKaiju(world, -700, -700, 0);
+    const steer = createSteer();
+    const u = placeUnit(world, 1, 0, 0);
+    steerToward(world, u, 0, 300, 2, steer);
+    expect(u.nav.direct).toBe(true);
+    const v = placeUnit(world, 2, 50, 300);
+    steerToward(world, v, 50, 900, 2, steer);
+    expect(v.nav.direct).toBe(false);
   });
 });
 

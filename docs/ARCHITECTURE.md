@@ -320,12 +320,18 @@ turn rate, steering model, trample height, wading, bounds) comes from `kaijuMove
 city: it reports what the body trampled or waded through and the movement system queues the
 damage. `test/prediction.test.ts` plays a server and a snapshot-fed client side by side.
 
-The city (`shared/src/city`): `generateCity(seed)` builds `CityData` (structures, props, road
-graph, water and park areas, districts, neighborhood anchors) identically on every machine;
-`cityChecksum` verifies it. `buildCityIndex` makes the static spatial index; a `CityQuery` is that
-index plus one match's live state (structure hp, live props) and is what every query takes:
-`structuresInCircle`, `circleHitsStructure`, `propsInCircle`, `castSegment`, `castRay`,
-`lineOfSight`, `structureAt`, `bridgeAt`, `inWater`. `getCity(seed)` caches both.
+The city (`shared/src/city`): `generatePortMeridian(seed)` (`city/meridian/`, `docs/CITY.md`)
+builds Port Meridian as `CityData` (structures, props, road graph, water and park areas,
+districts, neighborhood anchors) identically on every machine; `cityChecksum` verifies it.
+`buildCityIndex` makes the static spatial index; a `CityQuery` is that index plus one match's
+live state (structure hp, live props) and is what every query takes: `structuresInCircle`,
+`circleHitsStructure`, `propsInCircle`, `castSegment`, `castRay`, `lineOfSight`, `structureAt`,
+`bridgeAt`, `inWater`. `getCity(seed)` builds both once per process and caches them; the server,
+the welcome's city checksum, the build stamp, the client and the sandbox all get the city from
+it. The old placeholder grid (`generateCity(seed)`) is kept for tests and as a development
+option: `getCity(seed, 'placeholder')`, `npm run sim -- --city placeholder`. Building Port
+Meridian takes about 210 ms of processor time the first time in a fresh process and about
+47 ms after that (Node 22, this machine).
 `stageBounds(city, anchor, stage)` gives the playable square for a stage.
 
 Everything tunable is data in `shared/src/defs/`. Kaiju kinds, unit types, weapons and upgrades

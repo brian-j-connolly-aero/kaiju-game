@@ -37,7 +37,9 @@ describe('client-side prediction from the wire', () => {
   }
 
   it('predicts the kaiju through streets and into walls', () => {
-    const world = makeTestWorld({ realCity: true, seed: 21 });
+    // Harrow Lane: in Port Meridian this walk runs into houses there (at most starts the
+    // hatchling only tramples parked cars), so collision prediction is exercised.
+    const world = makeTestWorld({ realCity: true, seed: 21, config: { anchor: 7 } });
     const welcome = welcomeFor(world, KAIJU_PLAYER);
 
     // --- client setup, from the welcome message only ---

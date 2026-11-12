@@ -302,18 +302,15 @@ const taken: Array<{ x: number; z: number; radius: number }> = [];
 const HOLD_CLEARANCE = 2;
 /** Rings searched outward from where a hold point was wanted. */
 const HOLD_RINGS = 16;
+/** Searches made before settling for any open ground; the second one's rings are this many times further apart. */
+const HOLD_PASSES = 2;
+const HOLD_WIDER = 4;
 
-/**
- * Picks the ground a unit will hold near (x, z): inside the bounds, with room to spare from
- * walls, clear of the spots already given out, and beside a street it can drive in from (so
- * nobody is sent into a back yard). Searches outward in rings; when nothing that good is near,
- * it settles for any open ground.
- */
-function findHoldSpot(world: World, x: number, z: number, radius: number, out: Vec2): void {
+/** One ring search for a hold point by a street (see findHoldSpot), `step` meters between rings. */
+function holdSpotNear(world: World, x: number, z: number, radius: number, step: number, center: boolean, out: Vec2): boolean {
   const b = world.match.bounds;
-  const step = Math.max(2, radius);
   const margin = radius + 1;
-  for (let ring = 0; ring <= HOLD_RINGS; ring++) {
+  for (let ring = center ? 0 : 1; ring <= HOLD_RINGS; ring++) {
     const count = ring === 0 ? 1 : 6 + ring * 2;
     for (let i = 0; i < count; i++) {
       const a = (i / count) * Math.PI * 2;
@@ -332,9 +329,26 @@ function findHoldSpot(world: World, x: number, z: number, radius: number, out: V
       if (!free || !standsByRoad(world, cx, cz, radius)) continue;
       out.x = cx;
       out.z = cz;
-      return;
+      return true;
     }
   }
+  return false;
+}
+
+/**
+ * Picks the ground a unit will hold near (x, z): inside the bounds, with room to spare from
+ * walls, clear of the spots already given out, and beside a street it can drive in from (so
+ * nobody is sent into a back yard). Searches outward in rings; when nothing that good is near,
+ * it settles for any open ground.
+ */
+function findHoldSpot(world: World, x: number, z: number, radius: number, out: Vec2): void {
+  // A marker in the middle of something big (a stadium, a factory yard) can be more than the
+  // first search away from any street: then look again, wider, before settling for open ground
+  // that may be a walled-in strip nobody can drive into.
+  for (let pass = 0; pass < HOLD_PASSES; pass++) {
+    if (holdSpotNear(world, x, z, radius, Math.max(2, radius) * (pass === 0 ? 1 : HOLD_WIDER), pass === 0, out)) return;
+  }
+  const b = world.match.bounds;
   findClearSpot(world.cityQuery, x, z, radius, b, taken, out);
   clampIntoBounds(world, radius, out);
 }

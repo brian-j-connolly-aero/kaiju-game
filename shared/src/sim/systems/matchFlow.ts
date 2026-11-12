@@ -265,7 +265,9 @@ export function matchFlowSystem(world: World): void {
 
   if (m.phase !== 'playing') return;
 
-  m.clock = Math.max(0, m.clock - DT);
+  // Thousands of subtractions of 1/30 leave a rounding crumb: a clock that is out to within a
+  // microsecond is out on this tick, not one tick later.
+  m.clock = m.clock - DT <= 1e-6 ? 0 : m.clock - DT;
   m.elapsed += DT;
   m.stageTime[m.stage - 1] += DT;
 

@@ -36,13 +36,14 @@ export const MATCH_RULES = {
 
   /**
    * Destruction bar marks: P1 = p1 * V(stage 1), P2 = max(growth * P1, p2 * V(stage 2)), ...
-   * Tuned with the balance harness so that a kaiju left alone fills each segment in about two
-   * minutes (docs/BALANCE.md).
+   * Tuned with the balance harness on Port Meridian so that a kaiju left alone fills the first
+   * two segments in about two minutes and contested matches come out about even at about ten
+   * minutes (docs/BALANCE.md section 8).
    */
   bar: {
-    p1: 0.13,
-    p2: 0.088,
-    p3: 0.35,
+    p1: 0.18,
+    p2: 0.125,
+    p3: 0.31,
     growth: 1.6,
     /** Where the three marks sit along the skyline display, 0..1. */
     display: [0.21, 0.57, 1] as PerStage<number>,

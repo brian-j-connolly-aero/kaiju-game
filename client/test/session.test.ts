@@ -44,6 +44,8 @@ class Rig {
   dropInput: (input: PlayerInput) => boolean = () => false;
   /** Every event the session released, with whether it was handed out as a backlog. */
   readonly released: Array<{ event: SimEvent; past: boolean }> = [];
+  /** Every event the server's world produced, in order. */
+  readonly emitted: SimEvent[] = [];
   frame: FrameState | null = null;
 
   private readonly ticker = new InputTicker();
@@ -103,7 +105,9 @@ class Rig {
     const inputs: PlayerInput[] = [];
     // One input per tick, as the server takes them.
     if (this.toServer.length > 0 && this.toServer[0].at <= this.now) inputs[this.player] = (this.toServer.shift() as { input: PlayerInput }).input;
-    this.pendingEvents.push(...this.world.step(inputs));
+    const events = this.world.step(inputs);
+    this.emitted.push(...events);
+    this.pendingEvents.push(...events);
     if (this.world.tick % 2 === 0) this.sendSnapshot();
   }
 
@@ -312,9 +316,13 @@ describe('events a hidden tab missed', () => {
     expect(backlog.length).toBeGreaterThan(200);
     expect(backlog.every((r) => r.past)).toBe(true);
     expect(rig.session.catchingUp).toBe(false);
-    // Nothing of the backlog is left for later, and the city the session mirrors is the server's.
-    const newestBacklogTick = Math.max(...backlog.map((r) => r.event.tick));
-    expect(rig.world.tick - newestBacklogTick).toBeLessThan(0.3 / DT);
+    // Nothing of the backlog is left for later (every event older than the link's delay and a
+    // little slack is out; a quiet second in the match must not count against it), and the city
+    // the session mirrors is the server's.
+    const out = new Set(rig.released.map((r) => r.event));
+    const due = rig.emitted.filter((e) => e.tick <= rig.world.tick - 0.3 / DT);
+    expect(due.length).toBeGreaterThan(200);
+    expect(due.filter((e) => !out.has(e))).toEqual([]);
     for (let i = 0; i < rig.world.structureStage.length; i++) expect(rig.session.mirror.structureStage[i]).toBe(rig.world.structureStage[i]);
 
     // Play goes on: what happens now is shown as it happens.

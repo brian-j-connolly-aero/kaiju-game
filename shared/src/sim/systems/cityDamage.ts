@@ -36,6 +36,7 @@ import { hasModFlag, modMult } from '../../defs/upgrades';
 import { structureStageFor } from '../bar';
 import type { PlayerId } from '../config';
 import { noteKaijuNoise } from '../spotting';
+import { applyHit } from './damage';
 import type { StructureHit, World } from '../types';
 import { emit } from '../worldOps';
 
@@ -183,6 +184,11 @@ export function takePropWreck(world: World, id: number): boolean {
 export function cityDamageSystem(world: World): void {
   for (const hit of world.structureHits) applyStructureDamage(world, hit);
   world.structureHits.length = 0;
+  // Units that fell with a bridge deck take their fall now, on the tick it fell: the damage
+  // system has already run this tick (it used to land a tick late, which the soak test caught
+  // on Port Meridian, where squads cross decks a titan is wading through).
+  for (let i = 0; i < world.hits.length; i++) applyHit(world, world.hits[i].target, world.hits[i].hit);
+  world.hits.length = 0;
 
   if (world.propHits.length > 0) {
     // One event per (player, cause) pair keeps the message count low when a titan walks a street.

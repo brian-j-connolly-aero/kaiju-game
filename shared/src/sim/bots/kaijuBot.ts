@@ -549,6 +549,9 @@ export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
     input.aimYaw = moveYaw;
     input.aimPitch = 0;
     input.moveZ = 1;
+    // On the way it smashes what it does not walk round (steer leaves that to it), as it does
+    // when wrecking: a hatchling used to lean on a house for the whole search.
+    if (!k.held && !st.wadesTall && canAct(k) && wallAhead(world, k, st, moveYaw) >= 0) strike(world, k, bs, def, st, k.aimYaw);
     input.buttons = heldButtons(bs);
     watchProgress(k, bs, true);
     return;

@@ -19,7 +19,14 @@ npm run sim -- --seeds 10 --human-handicap 0.3 # the same for the squads
 npm run sim -- --seeds 20 --trigger-happy      # squads that hold the trigger instead of charging volleys
 npm run sim -- --seeds 8 --fast                # the short MB_FAST timers and bar
 npm run sim -- --seeds 3 --events --json       # event counts; reports as JSON
+npm run sim -- --seeds 20 --every-anchor       # match i starts at anchor i mod 10: every start equally often
+npm run sim -- --seeds 20 --nav                # also how the bots got about (stuck, wading, the bay, hanging back)
+npm run sim -- --seeds 20 --bar 0.18,0.125,0.31  # try other bar fractions for this run only
+npm run sim -- --seeds 5 --city placeholder    # the old grid city (a development option)
 ```
+
+The harness plays in Port Meridian, the game's city, since the city switch (section 8). Every
+table before section 8 was measured in the placeholder grid city and is history.
 
 Columns: winner and why, match length, time per stage, kaiju nerve breaks (staggers) per stage,
 units lost per stage, the bar at the end of each stage (as a percentage of the skyline, where
@@ -39,7 +46,7 @@ plus or minus 11 points of noise; the three batches in section 4 show it.
 
 | Target | Measured with |
 | --- | --- |
-| A kaiju left alone fills a stage's segment of the bar in 100 to 130 s (stage 3 is allowed more since the second pass: section 7) | `--unopposed`, "segment filled after" |
+| A kaiju left alone fills a stage's segment of the bar in 100 to 130 s (stage 3 is allowed more since the second pass: sections 7 and 8) | `--unopposed`, "segment filled after" |
 | A contested stage lasts roughly 200 to 230 s | default run, "stage time when completed" |
 | A match ends in 10 to 12 minutes | default run, "mean match length" |
 | Neither side wins more than about 65% with equal bots, over about 20 seeds | default run |
@@ -273,6 +280,8 @@ Things tried and dropped:
 
 ## 7. Second pass: charged, coordinated volleys (after the rules inspection)
 
+(History: measured in the placeholder grid city. The tables for the game's city are in section 8.)
+
 An inspection of the rules found that the bots had been hiding two things from the harness,
 because they never play that way:
 
@@ -499,3 +508,186 @@ them either way. How they fire matters far more than how often.
 - **Four idle people no longer stagger anything**: squads start on fire at will, which never
   breaks nerve now. The client's autopilot squad (`client/src/game/autoplay.ts`) holds the
   trigger too, so browser smoke runs will see fewer staggers and kills than before.
+
+## 8. Third pass: Port Meridian (the city switch)
+
+The game moved from the placeholder grid to Port Meridian (`docs/CITY.md`). The marks are
+fractions of the value standing in each stage's square, so they carried over in name only: the
+real city has its towers 720 m from where a titan starts, low-rise starts with less in reach,
+a bay and a river. Before tuning, the bots and the navigation were fixed on the new city (bot
+matches from every start, with `--nav`); the numbers below are with those fixes in.
+
+### What was wrong on the new city, and what changed
+
+| Seen | Fix (file) |
+| --- | --- |
+| A squad deployed at stage 3 along the sea edge walked inland to the Long Mole, 150 m inside the line and a kilometer from the fight; some units stood in the sea. | A deploy point counts only when dry ground lies within 40 m of it (`sim/spawn.ts`). Test: `meridianPlay.test.ts`, every start, titan at its anchor, half way and downtown. |
+| A squad deployed into a pocket of houses against the stage 1 line (Juniper Bay): its only way out was across the quarantine line, so it went back and forth for the whole stage (65 swings in three matches). | Deploy spots must have a street inside the bounds in plain reach (`standsByRoad`), and sub-units are placed dry first and no nearer the kaiju than the deploy distance. Test: the deployment test now checks this for every unit of every start and stage. |
+| Squads drove straight across the bay at half speed (up to 10% of their time in it). | A straight line may wade at most 120 m (the widest river crossing is about 100 m); longer, the unit takes the streets (`sim/nav.ts`, `shallowWay`). Out in open water (no land within 50 m) fell to 0.1 to 0.4% of unit time. |
+| A troop of tanks came out of a turn 9 m off the middle of the next street, flank in the houses, and drove about for good. | A crossroads counts as passed within 3 m, not within the body's radius; a unit that gets no closer to its next stop for 8 s plans again from where it is. |
+| A troop of tanks swung between a straight line and its street (the line was clear by a hair from one spot and not from the next). | Staying on a straight line forgives a wall within 30% of the body's radius (the progress watch still drops a line that stops it); stepping off the street at the checked point counts as being on the line. |
+| A 30 m trip took a 900 m route, because the stage 1 square cuts the streets. | When the street route is more than 2.5 times the straight distance plus 60 m, the unit first feels its way straight there, and takes the long route only if that fails. |
+| A move-to marker in the middle of the stadium sent units into a walled strip behind it. | Hold points: a second, four times wider search for ground by a street before settling for any open ground (`sim/squads.ts`). |
+| The hatchling leaned on a house for 11 s while looking for a place to molt. | The kaiju bot smashes what stands in its way while it looks, as it does while wrecking (`sim/bots/kaijuBot.ts`). The soak test now fails if the kaiju or a unit is stuck for 20 s or goes outside the bounds. |
+| A match ran one tick past its clock (150.033 s of 150). | The clock ends within a microsecond of zero instead of after a rounding crumb (`systems/matchFlow.ts`). |
+| Units on a collapsing bridge deck took their fall a tick late, leaving a hit queued between ticks. | Applied on the tick the deck goes (`systems/cityDamage.ts`). |
+
+A stress run of 1800 random move-to trips (every start, every stage, markers anywhere: roofs,
+yards, the river, the bay) went from 286 trips that did not arrive within 10 times the straight
+drive plus a minute to 4; within 3 times plus a minute, 13 do not (0.7%), all into pockets
+against the stage 1 line or far out in the bay. Nobody was ever inside a wall or outside the
+bounds. (The script is `/tmp/mb-scratch/city-switch/stress.mts`; `test/nav.test.ts` has a
+small version.)
+
+Bot navigation in the final batches below (60 matches, `--nav`): units stuck 0.00 to 0.01% of
+their time (longest 3.1 s), no route given up, 3 to 4% wading, at most 4 units on one deck,
+1.1 to 1.3% in the bay (0.1 to 0.4% out in open water), never outside the bounds, the kaiju
+stuck 0.07 to 0.40% of play (longest 9.7 s), never without something to wreck.
+
+### Tuning
+
+Start: today's fractions on the new city, 20 contested matches (`--every-anchor`, seeds 1 to
+20) and 10 unopposed:
+
+| Fractions p1 / p2 / p3 | Kaiju wins | Mean length | Contested stage times | Alone: segment filled after |
+| --- | --- | --- | --- | --- |
+| 0.13 / 0.088 / 0.35 (the placeholder's) | 4 of 20 | 10:51 | 2:21 / 2:34 / 5:49 | 1:29 / 1:30 / 4:18 |
+| 0.165 / 0.11 / 0.27 | 15 of 20 | 8:31 | 2:55 / 2:43 / 2:57 | 1:53 / 1:45 / 2:29 |
+| 0.18 / 0.125 / 0.30 | 34 of 60 (65, 55, 50%) | 10:08, 10:05, 9:37 | 3:17 / 3:07 / 3:16 (first 20) | 2:02 / 2:02 / 2:49 |
+| **0.18 / 0.125 / 0.31** | **28 of 60 (50, 40, 50%)** | **10:46, 10:18, 9:52** | 3:15 to 3:18 / 2:56 to 3:16 / 3:41 to 4:01 | **2:02 / 2:02 / 3:02** |
+| 0.18 / 0.125 / 0.32 | 18 of 40 (55, 35%) | 10:53, 10:33 | 3:17 / 3:07 / 4:21 (first 20) | 2:02 / 2:02 / 3:13 |
+
+Chosen: **0.18 / 0.125 / 0.31** (`MATCH_RULES.bar` in `defs/rules.ts`). p1 and p2 put a lone
+kaiju's first two segments at about two minutes, as before. p3 is the knob between the sides:
+0.30 gives the kaiju 57% and 9:57 matches, 0.31 gives it 47% and 10:19. The stopgap the
+placeholder needed (p3 raised from 0.31 to 0.35 so a titan could not finish before the squads
+arrived) is gone: on this city the titan walks 720 m to the towers anyway.
+
+| Number (file) | Before | After | Why |
+| --- | --- | --- | --- |
+| `p1` (`defs/rules.ts`) | 0.13 | 0.18 | A hatchling alone took 1:29 for its segment in the low-rise starts; now 2:02. Contested stage 1 went from 2:21 to 3:17. |
+| `p2` | 0.088 | 0.125 | The same for the juvenile: 1:30 alone, now 2:02; contested 2:34 to about 3:05. |
+| `p3` | 0.35 | 0.31 | At 0.35 a titan alone needed 4:18 and lost 16 of 20 contested matches (most by a kill in a 5:49 stage 3). At 0.31: 3:02 alone, even contested. |
+
+### Current tables
+
+20 matches, `npm run sim -- --seeds 20 --every-anchor`:
+
+```
+20 bot matches [every start in turn]
+seed  start         winner          length          stage time    staggers  units lost  bar % at stage end     kaiju hp lost
+----  ------------  --------------  ------  ------------------  ----------  ----------  ------------------  ----------------
+1     Alder Row     humans (kill)     9:51  3:09 / 3:05 / 3:37   1 / 3 / 5   5 / 3 / 3        22 / 57 / 98  302 / 463 / 1315
+2     Bellhaven     kaiju (bar)      10:53  3:26 / 3:57 / 3:29   2 / 6 / 2   7 / 4 / 3       22 / 57 / 100   186 / 733 / 516
+3     Cinder Flats  kaiju (bar)      10:07  2:53 / 2:53 / 4:21   1 / 1 / 4   3 / 3 / 4       21 / 57 / 100   171 / 226 / 896
+4     Dovecote      humans (kill)    11:22  4:13 / 2:15 / 4:55   5 / 0 / 8   3 / 0 / 3       21 / 57 / 100   527 / 81 / 1559
+5     Easter Green  humans (clock)   12:00  3:40 / 3:47 / 4:34   0 / 3 / 4   3 / 7 / 4        21 / 57 / 93   129 / 436 / 976
+6     Fennel Hill   kaiju (bar)      11:41  3:07 / 2:40 / 5:53   1 / 0 / 7   8 / 2 / 4       21 / 57 / 100   206 / 79 / 1334
+7     Gull Point    humans (clock)   12:00  3:19 / 2:45 / 5:56   1 / 1 / 9   0 / 3 / 6        22 / 57 / 87  275 / 255 / 1504
+8     Harrow Lane   kaiju (bar)       9:00  2:45 / 2:25 / 3:50   1 / 1 / 0   4 / 7 / 2       21 / 57 / 100    91 / 124 / 337
+9     Ivy Court     humans (clock)   12:00  2:39 / 5:01 / 4:21   2 / 3 / 5  3 / 11 / 3        22 / 57 / 98   313 / 521 / 916
+10    Juniper Bay   kaiju (bar)       8:26  2:50 / 2:43 / 2:53   0 / 3 / 0   6 / 4 / 0       21 / 57 / 100    37 / 410 / 195
+11    Alder Row     humans (kill)    10:19  4:15 / 2:54 / 3:10  2 / 3 / 10   5 / 3 / 5        21 / 57 / 59  322 / 661 / 1640
+12    Bellhaven     humans (kill)     9:30  3:05 / 2:27 / 3:58   0 / 0 / 6   5 / 1 / 2        22 / 57 / 98    64 / 36 / 1396
+13    Cinder Flats  kaiju (bar)      11:26  3:03 / 3:33 / 4:49   2 / 2 / 4   3 / 3 / 1       21 / 57 / 100   230 / 455 / 980
+14    Dovecote      kaiju (bar)       9:24  3:33 / 2:43 / 3:08   3 / 0 / 0   5 / 2 / 2       21 / 58 / 100    222 / 97 / 310
+15    Easter Green  humans (clock)   12:00  4:08 / 2:37 / 5:15   2 / 2 / 5   9 / 4 / 2        21 / 57 / 99  274 / 243 / 1165
+16    Fennel Hill   kaiju (bar)      11:43  3:07 / 3:43 / 4:53   1 / 3 / 6   2 / 0 / 3       21 / 57 / 100  248 / 572 / 1047
+17    Gull Point    humans (clock)   12:00  3:33 / 3:45 / 4:42   2 / 5 / 5   2 / 5 / 6        22 / 57 / 89  245 / 603 / 1050
+18    Harrow Lane   kaiju (bar)      11:34  3:20 / 4:05 / 4:09   2 / 4 / 3   5 / 5 / 2       21 / 57 / 100   276 / 540 / 712
+19    Ivy Court     humans (clock)   12:00  2:47 / 2:25 / 6:48   1 / 1 / 9   3 / 0 / 2        22 / 57 / 99  162 / 201 / 1873
+20    Juniper Bay   kaiju (bar)       8:08  2:44 / 2:38 / 2:47   0 / 0 / 0   4 / 7 / 1       21 / 57 / 100     27 / 78 / 233
+
+kaiju wins 10/20 (50%)   human wins 10 (50%): 4 by kill, 6 by the clock
+mean match length 10:46   shortest 8:08   longest 12:00
+stage 1: reached 20, completed 20, segment filled after 2:51, stage time when completed 3:17; per match: staggers 1.4, volleys 29.9, units lost 4.3, kaiju hp lost 215 (healed 8), collateral 47 points
+stage 2: reached 20, completed 20, segment filled after 2:42, stage time when completed 3:07; per match: staggers 2.0, volleys 22.4, units lost 3.7, kaiju hp lost 341 (healed 96), collateral 297 points
+stage 3: reached 20, completed 10, segment filled after 4:01, stage time when completed 4:01; per match: staggers 4.6, volleys 33.0, units lost 2.9, kaiju hp lost 998 (healed 460), collateral 971 points
+voice: 13.2 cues per minute, at most 7 in any 10 s   simulated 403299 ticks in 23.0 s (584x real time)
+```
+
+Seeds 21 to 40, then 41 to 60:
+
+```
+kaiju wins 8/20 (40%)   human wins 12 (60%): 9 by kill, 3 by the clock
+mean match length 10:18   shortest 7:56   longest 12:00
+stage 1: reached 20, completed 20, segment filled after 2:49, stage time when completed 3:15; per match: staggers 1.4, volleys 29.9, units lost 4.0, kaiju hp lost 249 (healed 4), collateral 47 points
+stage 2: reached 20, completed 19, segment filled after 2:52, stage time when completed 3:16; per match: staggers 2.8, volleys 29.3, units lost 4.0, kaiju hp lost 428 (healed 176), collateral 307 points
+stage 3: reached 19, completed 8, segment filled after 3:41, stage time when completed 3:41; per match: staggers 3.8, volleys 29.5, units lost 2.2, kaiju hp lost 967 (healed 332), collateral 875 points
+```
+
+```
+kaiju wins 10/20 (50%)   human wins 10 (50%): 5 by kill, 5 by the clock
+mean match length 9:52   shortest 5:58   longest 12:00
+stage 1: reached 20, completed 20, segment filled after 2:54, stage time when completed 3:18; per match: staggers 1.5, volleys 32.8, units lost 4.0, kaiju hp lost 256 (healed 40), collateral 51 points
+stage 2: reached 20, completed 18, segment filled after 2:34, stage time when completed 2:56; per match: staggers 1.9, volleys 20.9, units lost 3.8, kaiju hp lost 335 (healed 72), collateral 284 points
+stage 3: reached 18, completed 10, segment filled after 3:57, stage time when completed 3:57; per match: staggers 3.6, volleys 26.1, units lost 2.3, kaiju hp lost 850 (healed 342), collateral 1065 points
+```
+
+The same 20 seeds with trigger-happy squads (`--trigger-happy`):
+
+```
+kaiju wins 20/20 (100%)   human wins 0 (0%): 0 by kill, 0 by the clock
+mean match length 8:40   shortest 6:21   longest 11:42
+stage 1: reached 20, completed 20, segment filled after 1:51, stage time when completed 2:16; per match: staggers 0.0, volleys 1.5, units lost 2.9, kaiju hp lost 108 (healed 0), collateral 114 points
+stage 2: reached 20, completed 20, segment filled after 2:14, stage time when completed 2:34; per match: staggers 0.0, volleys 1.9, units lost 3.9, kaiju hp lost 225 (healed 44), collateral 482 points
+stage 3: reached 20, completed 20, segment filled after 3:50, stage time when completed 3:50; per match: staggers 0.0, volleys 1.9, units lost 2.4, kaiju hp lost 524 (healed 259), collateral 1682 points
+```
+
+And the kaiju alone (`--unopposed --seeds 10 --every-anchor`: each start once; an unopposed
+match repeats exactly per start):
+
+```
+10 bot matches [unopposed, every start in turn]
+seed  start         winner       length          stage time   staggers  units lost  bar % at stage end  kaiju hp lost
+----  ------------  -----------  ------  ------------------  ---------  ----------  ------------------  -------------
+1     Alder Row     kaiju (bar)    7:44  2:22 / 2:10 / 3:13  0 / 0 / 0   0 / 0 / 0       21 / 57 / 100      0 / 0 / 0
+2     Bellhaven     kaiju (bar)    7:18  2:07 / 2:04 / 3:07  0 / 0 / 0   0 / 0 / 0       21 / 57 / 100      0 / 0 / 0
+3     Cinder Flats  kaiju (bar)    8:34  2:10 / 2:34 / 3:49  0 / 0 / 0   0 / 0 / 0       21 / 57 / 100      0 / 0 / 0
+4     Dovecote      kaiju (bar)    7:30  2:23 / 2:08 / 3:00  0 / 0 / 0   0 / 0 / 0       21 / 57 / 100      0 / 0 / 0
+5     Easter Green  kaiju (bar)    8:30  2:25 / 3:18 / 2:48  0 / 0 / 0   0 / 0 / 0       21 / 57 / 100      0 / 0 / 0
+6     Fennel Hill   kaiju (bar)    7:13  2:11 / 2:13 / 2:50  0 / 0 / 0   0 / 0 / 0       21 / 57 / 100      0 / 0 / 0
+7     Gull Point    kaiju (bar)    7:06  2:05 / 1:59 / 3:02  0 / 0 / 0   0 / 0 / 0       21 / 57 / 100      0 / 0 / 0
+8     Harrow Lane   kaiju (bar)    7:07  2:11 / 2:01 / 2:55  0 / 0 / 0   0 / 0 / 0       21 / 57 / 100      0 / 0 / 0
+9     Ivy Court     kaiju (bar)    7:19  2:16 / 2:02 / 3:01  0 / 0 / 0   0 / 0 / 0       21 / 57 / 100      0 / 0 / 0
+10    Juniper Bay   kaiju (bar)    6:29  2:03 / 1:45 / 2:41  0 / 0 / 0   0 / 0 / 0       21 / 57 / 100      0 / 0 / 0
+
+kaiju wins 10/10 (100%)   human wins 0 (0%): 0 by kill, 0 by the clock
+mean match length 7:29   shortest 6:29   longest 8:34
+stage 1: reached 10, completed 10, segment filled after 2:02, stage time when completed 2:13; per match: staggers 0.0, volleys 0.0, units lost 0.0, kaiju hp lost 0 (healed 0), collateral 0 points
+stage 2: reached 10, completed 10, segment filled after 2:02, stage time when completed 2:13; per match: staggers 0.0, volleys 0.0, units lost 0.0, kaiju hp lost 0 (healed 0), collateral 0 points
+stage 3: reached 10, completed 10, segment filled after 3:02, stage time when completed 3:02; per match: staggers 0.0, volleys 0.0, units lost 0.0, kaiju hp lost 0 (healed 0), collateral 0 points
+```
+
+Against the targets, over the 60 contested matches:
+
+| Target | Result |
+| --- | --- |
+| Alone, a segment in 100 to 130 s | 2:02 / 2:02 (122 s each; every start between 1:45 and 2:34, except Easter Green's 3:18 at stage 2) / 3:02. Stage 3 is over the window, as it was in the placeholder (2:44): a titan starts about 720 m from the towers. |
+| Contested stage 200 to 230 s | Stage 1: 3:15 to 3:18. Stage 2: 2:56 to 3:16. Stage 3: 3:41 to 4:01 (the stage the squads fight hardest: 3.6 to 4.6 staggers). |
+| Match 10 to 12 minutes | Mean 9:52 to 10:46 per batch (10:19 overall). |
+| Neither side above about 65% | Kaiju 28 of 60 (47%): 50%, 40% and 50%. |
+| Scattered fire rarely kills, coordinated volleys do | 18 kills in 60 (the humans' other 14 wins are the clock): 15 at stage 3 after 4 to 10 staggers there, 3 at stage 2 after 7 to 17. Trigger-happy squads: no stagger, no kill, no win in 20. |
+| Undisciplined fire is clearly worse at breaking nerve | Disciplined squads break the kaiju 1.4 / 2.0 / 4.6 times a stage (seeds 1 to 20); trigger-happy squads never do, cost it half to two thirds of the health (108 / 225 / 524 against 215 / 341 / 998), add 1.6 to 2.4 times the collateral (114 / 482 / 1682 against 47 / 297 / 971 points), and their matches are 2:06 shorter. |
+
+Sensitivity, 10 matches each, every start once: a kaiju bot that hesitates 30% of the time wins
+1 of 10 (`kaiju wins 1/10 (10%)   human wins 9 (90%): 0 by kill, 9 by the clock`); squads that
+hesitate 30% of the time win 1 of 10 (`kaiju wins 9/10 (90%)   human wins 1 (10%): 0 by kill,
+1 by the clock`). Both sides are more sensitive to hesitation than in the placeholder (where
+hesitant squads still won 5 of 10): the real city's streets cost a hesitant squad more.
+
+### Limits of the third pass
+
+- **Kills came back** (18 in 60, against 6 in 60 in the placeholder): 15 at stage 3, where the
+  titan wades through the downtown grid with long straight avenues for crossfire.
+  If the owner wants fewer, `helplessMult` is the lever (section 7).
+- **Stage 3 is still the long one contested** (3:41 to 4:01 against 200 to 230 s) and alone
+  (3:02). Lowering p3 shortens it and hands the kaiju the match (0.27: 75% kaiju wins in 8:31).
+  The next lever, as CITY.md says, is the bots' stage 3 plan: how far the titan walks before it
+  wrecks.
+- **The start matters**: unopposed, Easter Green's juvenile needs 3:18 for its segment and
+  Juniper Bay's 1:45; contested, Ivy Court and Gull Point lose more often by the clock. The
+  value inside each square is within 14% (CITY.md section 6); the layout around it is not.
+- **Move-to in odd places**: 0.7% of random move-to trips take more than three times the
+  straight drive (pockets against the stage 1 line, far out in the bay). Bots never order
+  these; a person can, and then re-orders.

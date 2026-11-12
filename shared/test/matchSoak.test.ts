@@ -11,6 +11,7 @@ import {
   type World,
 } from '../src/index';
 import { runBotMatch, type BotMatchReport } from '../scripts/botMatch';
+import { createNavWatch } from '../scripts/navWatch';
 
 /**
  * Soak: whole bot-versus-bot matches, start to finish, with the invariants checked as they go.
@@ -77,8 +78,21 @@ function checkWorld(world: World, events: SimEvent[], peak: { events: number }, 
 function play(seed: number, fast: boolean): { report: BotMatchReport; peakEvents: number } {
   const peak = { events: 0 };
   const problems: string[] = [];
-  const { report, world } = runBotMatch({ seed, fast, onTick: (w, events) => checkWorld(w, events, peak, problems) });
+  const watch = createNavWatch();
+  const { report, world } = runBotMatch({
+    seed,
+    fast,
+    onTick: (w, events) => {
+      checkWorld(w, events, peak, problems);
+      watch.onTick(w, events);
+    },
+  });
   expect(problems).toEqual([]);
+  // Nobody is ever wedged for long: not the kaiju bot (it smashes or backs out of what holds it)
+  // and not a unit; and nobody ever stands outside the quarantine line.
+  expect(watch.kaijuLongestStuck, `kaiju stuck at ${watch.kaijuLongestStuckAt}`).toBeLessThan(20);
+  expect(watch.longestStuck, `unit stuck at ${watch.longestStuckAt}`).toBeLessThan(20);
+  expect(watch.outsideTicks).toBe(0);
   const clock = world.config.tuning.clock;
 
   // It ended, the way matches end.

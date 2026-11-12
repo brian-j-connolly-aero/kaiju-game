@@ -4,6 +4,7 @@ import {
   beginStage,
   boundsContains,
   Btn,
+  CITY_SEED,
   COMBAT_RULES,
   createMatchConfig,
   createRng,
@@ -376,42 +377,46 @@ describe('the molt: room for the new body', () => {
   });
 
   it('never leaves a juvenile shaking between the walls of the real city, wherever a hatchling could have stood', () => {
-    const built = getCity();
-    const index = built.index;
-    const s1 = kaijuStageDef('lizard', 1);
-    const s2 = kaijuStageDef('lizard', 2);
-    const rng = createRng(11);
-    const ids: number[] = [];
+    // Port Meridian's stage 1 squares hold only low-rise streets, so it has few or no such gaps;
+    // the placeholder grid has them in most neighborhoods. Both are searched, so the rule is
+    // proved on the city the game plays in and still exercised where the gaps exist.
     let tried = 0;
-    for (let anchor = 0; anchor < built.city.anchors.length; anchor++) {
-      const [b1] = allStageBounds(built.city, anchor);
-      const config = { ...createMatchConfig({ humans: [{ name: 'K', role: 'kaiju' }], anchor, squads: 0 }), bots: idleBots() };
-      config.tuning = { ...config.tuning, briefing: 0 };
-      const probe = createWorld({ seed: 3, config });
-      let found = 0;
-      for (let i = 0; i < 20000 && found < 6; i++) {
-        const x = rngRange(rng, b1.minX + 10, b1.maxX - 10);
-        const z = rngRange(rng, b1.minZ + 10, b1.maxZ - 10);
-        // A spot where the hatchling stands free and the juvenile would overlap two or more tall buildings.
-        structuresInCircle(probe.cityQuery, x, z, s1.bodyRadius, ids);
-        if (ids.some((id) => index.sheight[id] > s1.trampleHeight && index.spassable[id] === 0)) continue;
-        structuresInCircle(probe.cityQuery, x, z, s2.bodyRadius, ids);
-        if (ids.filter((id) => index.sheight[id] > s2.trampleHeight && index.spassable[id] === 0).length < 2) continue;
-        found++;
-        tried++;
-        const world = createWorld({ seed: 3, config });
-        world.step();
-        const k = world.kaijus[0];
-        k.x = x;
-        k.z = z;
-        beginStage(world, 2);
-        expect(inAWall(world), `${built.city.anchors[anchor].name} (${x.toFixed(0)}, ${z.toFixed(0)})`).toBe(false);
-        const at = { x: k.x, z: k.z };
-        for (let t = 0; t < 30; t++) world.step([input()]);
-        expect(Math.hypot(k.x - at.x, k.z - at.z), `${built.city.anchors[anchor].name} (${x.toFixed(0)}, ${z.toFixed(0)})`).toBeLessThan(1e-6);
+    for (const built of [getCity(), getCity(CITY_SEED, 'placeholder')]) {
+      const index = built.index;
+      const s1 = kaijuStageDef('lizard', 1);
+      const s2 = kaijuStageDef('lizard', 2);
+      const rng = createRng(11);
+      const ids: number[] = [];
+      for (let anchor = 0; anchor < built.city.anchors.length; anchor++) {
+        const [b1] = allStageBounds(built.city, anchor);
+        const config = { ...createMatchConfig({ humans: [{ name: 'K', role: 'kaiju' }], anchor, squads: 0 }), bots: idleBots() };
+        config.tuning = { ...config.tuning, briefing: 0 };
+        const probe = createWorld({ seed: 3, config, city: built });
+        let found = 0;
+        for (let i = 0; i < 20000 && found < 6; i++) {
+          const x = rngRange(rng, b1.minX + 10, b1.maxX - 10);
+          const z = rngRange(rng, b1.minZ + 10, b1.maxZ - 10);
+          // A spot where the hatchling stands free and the juvenile would overlap two or more tall buildings.
+          structuresInCircle(probe.cityQuery, x, z, s1.bodyRadius, ids);
+          if (ids.some((id) => index.sheight[id] > s1.trampleHeight && index.spassable[id] === 0)) continue;
+          structuresInCircle(probe.cityQuery, x, z, s2.bodyRadius, ids);
+          if (ids.filter((id) => index.sheight[id] > s2.trampleHeight && index.spassable[id] === 0).length < 2) continue;
+          found++;
+          tried++;
+          const world = createWorld({ seed: 3, config, city: built });
+          world.step();
+          const k = world.kaijus[0];
+          k.x = x;
+          k.z = z;
+          beginStage(world, 2);
+          expect(inAWall(world), `${built.city.anchors[anchor].name} (${x.toFixed(0)}, ${z.toFixed(0)})`).toBe(false);
+          const at = { x: k.x, z: k.z };
+          for (let t = 0; t < 30; t++) world.step([input()]);
+          expect(Math.hypot(k.x - at.x, k.z - at.z), `${built.city.anchors[anchor].name} (${x.toFixed(0)}, ${z.toFixed(0)})`).toBeLessThan(1e-6);
+        }
       }
     }
-    // The placeholder city has such gaps in most neighborhoods; a city with none proves nothing here.
+    // A search that found no gap anywhere would prove nothing.
     expect(tried).toBeGreaterThan(0);
   });
 });
