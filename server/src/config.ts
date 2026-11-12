@@ -19,11 +19,15 @@
  *                   out for an evening when a browser is wrongly refused; expect a stale page
  *                   to misbehave
  *   MB_CLIENT_DIR   folder with the built client (default: client/dist next to the server)
+ *   MB_PUBLIC_URL   the address friends open, such as https://kaiju.example.com (a named
+ *                   tunnel). Unset: learned from requests that come through a quick tunnel
+ *                   (http/publicUrl.ts). The lobby's link button builds invites from it
  *   MB_QUIET=1      no log lines for room events; failures are always printed
  */
 
 import { DEFAULT_PORT } from '@mb/shared';
 import { DEFAULT_RATE_LIMITS, type RateLimits } from './http/guard';
+import { parsePublicUrl } from './http/publicUrl';
 import {
   DEFAULT_END_SCREEN_SECONDS,
   DEFAULT_GRACE_SECONDS,
@@ -60,6 +64,11 @@ export interface ServerConfig {
   checkBuild: boolean;
   /** Folder with the built client, or null to serve no page. */
   clientDir: string | null;
+  /**
+   * The address friends open (MB_PUBLIC_URL, checked, no trailing slash), or null to learn it
+   * from requests that come through a quick tunnel.
+   */
+  publicUrl: string | null;
   /** Install SIGINT / SIGTERM handlers that shut the server down cleanly and exit. */
   handleSignals: boolean;
   /** Room chatter: who joined, what started. Undefined switches it off (MB_QUIET). */
@@ -92,6 +101,7 @@ export function defaultConfig(overrides: Partial<ServerConfig> = {}): ServerConf
     build: null,
     checkBuild: true,
     clientDir: null,
+    publicUrl: null,
     handleSignals: false,
     log: undefined,
     logError: (line) => console.error(line),
@@ -137,5 +147,6 @@ export function configFromEnv(env: Record<string, string | undefined>, overrides
   if (flag(env.MB_NO_LIMITS)) fromEnv.limits = { createsPerMinute: 0, joinsPerMinute: 0, missesPerMinute: 0 };
   if (flag(env.MB_ANY_BUILD)) fromEnv.checkBuild = false;
   if (env.MB_CLIENT_DIR) fromEnv.clientDir = env.MB_CLIENT_DIR;
+  if (env.MB_PUBLIC_URL && env.MB_PUBLIC_URL.trim() !== '') fromEnv.publicUrl = parsePublicUrl(env.MB_PUBLIC_URL);
   return defaultConfig({ ...overrides, ...fromEnv });
 }

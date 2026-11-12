@@ -1,7 +1,9 @@
 /**
  * Sky, fog and lighting for the three times of day (DESIGN.md section 2: afternoon, sunset,
  * night). The sky is a gradient dome that follows the camera, with a sun or moon disc and two
- * drifting cloud layers; fog and haze sell the scale, and there are no shadow maps.
+ * cloud panoramas on horizon rings around the camera (towers standing on the horizon, with a
+ * gap for the sunset sun: docs/art/client-notes-sprites-textures.md note 1); fog and haze sell
+ * the scale, and there are no shadow maps.
  */
 
 import * as THREE from 'three';
@@ -21,7 +23,6 @@ interface Preset {
   hemiGround: number;
   hemiIntensity: number;
   cloud: number;
-  cloudOpacity: number;
   /** 0 by day, 1 at night: window lights. */
   night: number;
   /** Size and color of the sun or moon disc. */
@@ -42,7 +43,6 @@ const PRESETS: Record<TimeOfDay, Preset> = {
     hemiGround: 0x8a8f7a,
     hemiIntensity: 1.5,
     cloud: 0xffffff,
-    cloudOpacity: 0.9,
     night: 0,
     disc: 0xfffbe6,
     discSize: 260,
@@ -59,7 +59,6 @@ const PRESETS: Record<TimeOfDay, Preset> = {
     hemiGround: 0x7a5a52,
     hemiIntensity: 1.25,
     cloud: 0xffc9a8,
-    cloudOpacity: 0.85,
     night: 0.35,
     disc: 0xffd08a,
     discSize: 420,
@@ -76,12 +75,32 @@ const PRESETS: Record<TimeOfDay, Preset> = {
     hemiGround: 0x1a1c2a,
     hemiIntensity: 1.0,
     cloud: 0x3a466e,
-    cloudOpacity: 0.55,
     night: 1,
     disc: 0xe8efff,
     discSize: 200,
   },
 };
+
+/** Radius of the cloud rings: the taller ring's far corner stays inside the 9000 m far plane. */
+const RING_RADIUS = 6000;
+interface CloudRing {
+  repeats: number;
+  bottomDeg: number;
+  sunGap: [number, number];
+}
+const RING_FALLBACK: Record<'clouds_a' | 'clouds_b', CloudRing> = {
+  clouds_a: { repeats: 4, bottomDeg: -5, sunGap: [258, 72] },
+  clouds_b: { repeats: 3, bottomDeg: -5, sunGap: [414, 58] },
+};
+/** Azimuth of the sunset sun (heading 0 looks along +z and grows toward +x). */
+const SUNSET_AZIMUTH = Math.atan2(PRESETS.sunset.sunDir[0], PRESETS.sunset.sunDir[2]);
+
+/** Texture offset that turns a ring so the middle of its sun gap stands at the sunset sun. */
+export function ringOffset(ring: CloudRing, width = 512): number {
+  const middle = (ring.sunGap[0] + ring.sunGap[1] / 2) / width;
+  const offset = middle + (ring.repeats * SUNSET_AZIMUTH) / (2 * Math.PI);
+  return offset - Math.floor(offset);
+}
 
 const DOME_VERTEX = /* glsl */ `
 varying vec3 vDir;
@@ -159,19 +178,30 @@ export class Sky {
     this.dome.renderOrder = -100;
     this.group.add(this.dome);
 
-    for (const [id, height, repeat] of [['clouds_a', 520, 5], ['clouds_b', 760, 3]] as const) {
+    // Each panorama goes on the inside of an upright open cylinder centered on the camera:
+    // clouds_b behind, clouds_a in front; no fog (the rings are far past it), no scrolling.
+    for (const id of ['clouds_b', 'clouds_a'] as const) {
+      const ring = assets.manifest.textures[id]?.ring ?? RING_FALLBACK[id];
       const texture = assets.texture(id);
       texture.wrapS = THREE.RepeatWrapping;
-      texture.wrapT = THREE.RepeatWrapping;
-      texture.repeat.set(repeat, repeat);
-      const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, fog: true, side: THREE.DoubleSide });
-      const plane = new THREE.Mesh(new THREE.PlaneGeometry(14000, 14000), material);
-      plane.rotation.x = Math.PI / 2;
-      plane.position.y = height;
-      plane.renderOrder = -50;
-      plane.frustumCulled = false;
-      this.clouds.push(plane);
-      this.group.add(plane);
+      texture.wrapT = THREE.ClampToEdgeWrapping;
+      texture.magFilter = THREE.NearestFilter;
+      texture.minFilter = THREE.NearestFilter;
+      texture.generateMipmaps = false;
+      // Negative: seen from inside, the painting must not be mirrored (lit from the upper left).
+      texture.repeat.set(-ring.repeats, 1);
+      texture.offset.set(ringOffset(ring), 0);
+      texture.needsUpdate = true;
+      const height = (Math.PI * RING_RADIUS) / ring.repeats;
+      const bottom = RING_RADIUS * Math.tan((ring.bottomDeg * Math.PI) / 180);
+      const geometry = new THREE.CylinderGeometry(RING_RADIUS, RING_RADIUS, height, 48, 1, true);
+      geometry.translate(0, bottom + height / 2, 0);
+      const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, fog: false, side: THREE.BackSide });
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.renderOrder = id === 'clouds_b' ? -51 : -50;
+      mesh.frustumCulled = false;
+      this.clouds.push(mesh);
+      this.group.add(mesh);
     }
 
     this.sun = new THREE.DirectionalLight(0xffffff, 2);
@@ -216,7 +246,6 @@ export class Sky {
       hemiGround: mixColor(f.hemiGround, g.hemiGround),
       hemiIntensity: mix(f.hemiIntensity, g.hemiIntensity),
       cloud: mixColor(f.cloud, g.cloud),
-      cloudOpacity: mix(f.cloudOpacity, g.cloudOpacity),
       night: mix(f.night, g.night),
       disc: mixColor(f.disc, g.disc),
       discSize: mix(f.discSize, g.discSize),
@@ -252,7 +281,7 @@ export class Sky {
     for (const plane of this.clouds) {
       const material = plane.material as THREE.MeshBasicMaterial;
       mixInto(material.color, f.cloud, g.cloud);
-      material.opacity = f.cloudOpacity + (g.cloudOpacity - f.cloudOpacity) * t;
+      material.opacity = 1;
     }
     this.sunDirection.copy(dir);
   }
@@ -260,7 +289,7 @@ export class Sky {
   /** Unit vector toward the sun or moon. */
   readonly sunDirection = new THREE.Vector3(0, 1, 0);
 
-  update(dt: number, camera: THREE.Camera, time: number): void {
+  update(dt: number, camera: THREE.Camera): void {
     if (this.blend < 1) {
       this.blend = Math.min(1, this.blend + dt * this.speed);
       this.apply(this.blend);
@@ -270,11 +299,8 @@ export class Sky {
     this.sun.position.copy(camera.position).addScaledVector(this.sunDirection, 1000);
     this.sun.target.position.copy(camera.position);
     this.sun.target.updateMatrixWorld();
-    this.clouds.forEach((plane, i) => {
-      const texture = (plane.material as THREE.MeshBasicMaterial).map;
-      if (texture) texture.offset.set(time * (0.0006 + i * 0.0004), time * 0.0002);
-      plane.position.x = camera.position.x;
-      plane.position.z = camera.position.z;
-    });
+    // The rings follow the camera on all three axes, so the horizon stays put when a titan
+    // stands up; they never turn (the two sun gaps must stay lined up).
+    for (const ring of this.clouds) ring.position.copy(camera.position);
   }
 }

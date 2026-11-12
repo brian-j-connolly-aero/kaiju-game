@@ -13,6 +13,7 @@ import { performance } from 'node:perf_hooks';
 import type { ServerConfig } from '../config';
 import { configureApp, servedPageId, type HealthInfo } from '../http/app';
 import { installFrontGuard } from '../http/guard';
+import { PublicAddress } from '../http/publicUrl';
 import { configureRooms, MatchRoom, openRoomCodes, roomPerf, roomStats } from './matchRoom';
 
 /**
@@ -43,6 +44,7 @@ export interface GameServer {
 export async function startGameServer(config: ServerConfig): Promise<GameServer> {
   const startedAt = performance.now();
   const fixedBuild = config.build;
+  const publicAddress = new PublicAddress(config.publicUrl);
   const build = fixedBuild !== null ? (): string => fixedBuild : (): string => buildStamp(servedPageId(config.clientDir));
   const health = (): HealthInfo => ({
     ok: true,
@@ -53,6 +55,7 @@ export async function startGameServer(config: ServerConfig): Promise<GameServer>
     ...roomStats(),
     fast: config.fast,
     perf: roomPerf(),
+    publicUrl: publicAddress.get(),
   });
 
   configureRooms({
@@ -66,6 +69,7 @@ export async function startGameServer(config: ServerConfig): Promise<GameServer>
     joinTimeoutSeconds: config.joinTimeoutSeconds,
     reservationSeconds: config.reservationSeconds,
     build: config.checkBuild ? build : null,
+    publicUrl: () => publicAddress.get(),
     log: config.log,
     logError: config.logError,
   });
@@ -88,7 +92,7 @@ export async function startGameServer(config: ServerConfig): Promise<GameServer>
     // The library's own handling ends the process on ANY uncaught error. Signals are handled
     // below instead, and stray errors by the crash guard the entry point installs.
     gracefullyShutdown: false,
-    express: (app) => configureApp(app, { clientDir: config.clientDir, health }),
+    express: (app) => configureApp(app, { clientDir: config.clientDir, health, publicAddress, log: config.log }),
   });
   server.define(ROOM_NAME, MatchRoom);
   if (config.latencyMs > 0) server.simulateLatency(config.latencyMs);

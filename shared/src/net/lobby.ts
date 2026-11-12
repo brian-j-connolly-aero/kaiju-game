@@ -69,6 +69,14 @@ export interface LobbyState {
    * server sets it when a match starts, so during a match it is the current kaiju's seat.
    */
   lastKaijuSeat: number;
+  /**
+   * The address friends open to reach this server, such as https://<words>.trycloudflare.com
+   * (no trailing slash), when the server knows it: MB_PUBLIC_URL, or the quick tunnel's
+   * address learned from requests that came through it. The lobby's link button builds the
+   * invite from it, so the host's own invite works for friends even when the host plays on
+   * localhost. Absent while unknown (then the page's own address is used).
+   */
+  publicUrl?: string;
 }
 
 export function createLobbyState(code: string): LobbyState {

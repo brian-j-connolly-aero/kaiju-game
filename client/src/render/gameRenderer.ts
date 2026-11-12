@@ -80,6 +80,8 @@ const FOG: Record<StageId, FogRange> = {
   2: { near: 280, far: 2700 },
   3: { near: 520, far: 4400 },
 };
+const NO_KAIJUS: SnapKaiju[] = [];
+
 /** The weak point's light (art notes for the kaiju, section 5): violet, never the humans' cyan. */
 const WEAK_POINT_COLOR = 0xc9a6ff;
 
@@ -525,11 +527,16 @@ export class GameRenderer {
         this.effects,
       );
 
+      // The crowd is kept around the kaiju and runs from it, but only where the viewer may know
+      // where it is: a squad that has lost the kaiju gets its crowd around its own camera and
+      // nobody fleeing, so empty and busy streets give nothing away.
       const focus = frame.kaijus[0];
       if (query && focus) {
         const st = kaijuStageDef(focus.kind, focus.stage);
         const spread = Math.min(420, 90 + st.height * 4);
-        this.crowd.update(dt, time, query, frame.bounds, frame.kaijus, focus.x, focus.z, spread, 25 + st.height * 3, this.camera);
+        const known = view.seesKaiju || focus.known;
+        const cam = this.camera.position;
+        this.crowd.update(dt, time, query, frame.bounds, known ? frame.kaijus : NO_KAIJUS, known ? focus.x : cam.x, known ? focus.z : cam.z, spread, 25 + st.height * 3, this.camera);
       }
 
       // Squad move-to markers and call-in marks on the ground.
@@ -560,7 +567,7 @@ export class GameRenderer {
     this.stats.props = this.city ? this.city.updateProps(cam.x, cam.z, Math.min(950, 330 + cam.y * 2.6)) : 0;
     this.effects.update(dt);
     this.boundary.update(dt, time);
-    this.sky.update(dt, this.camera, time);
+    this.sky.update(dt, this.camera);
     this.materials.setNight(this.sky.night);
     this.lines.setFog(this.sky.fog.near, this.sky.fog.far);
 

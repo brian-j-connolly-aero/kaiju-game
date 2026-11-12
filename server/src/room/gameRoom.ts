@@ -95,6 +95,11 @@ export interface GameRoomOptions {
    * the server serves can be rebuilt while it runs). Undefined admits any page (unit tests).
    */
   build?: string | (() => string);
+  /**
+   * The address friends open to reach the server (http/publicUrl.ts), asked every time the lobby
+   * state is sent; null or undefined while it is not known. Undefined: never known (unit tests).
+   */
+  publicUrl?: () => string | null;
   /** Monotonic clock, milliseconds. */
   now: () => number;
   /** Room chatter; may be switched off. */
@@ -430,6 +435,9 @@ export class GameRoom {
   }
 
   private broadcastLobby(): void {
+    const publicUrl = this.options.publicUrl?.() ?? null;
+    if (publicUrl) this.lobby.publicUrl = publicUrl;
+    else delete this.lobby.publicUrl;
     for (const seat of this.seats) {
       if (seat.connected) seat.peer.send('lobby', { lobby: this.lobby, you: seat.seat });
     }

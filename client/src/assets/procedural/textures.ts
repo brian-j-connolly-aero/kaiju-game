@@ -101,6 +101,9 @@ function clouds(seed: number): HTMLCanvasElement {
     ctx.fillStyle = '#c3cbdb';
     ctx.fillRect(Math.round(cx - 40), Math.round(cy + 6), 80, 5);
   }
+  // Drawn on a horizon ring that never repeats vertically: keep the edge rows clear.
+  ctx.clearRect(0, 0, 256, 1);
+  ctx.clearRect(0, 127, 256, 1);
   return canvas;
 }
 

@@ -133,11 +133,7 @@ export class EndScreen implements Screen {
     const z = k ? k.z : b ? (b.minZ + b.maxZ) / 2 : 0;
     const stage = runtime.frame?.match.stage ?? 1;
     runtime.shot = { x, y: 4 * stage * stage, z, radius: 40 + 70 * stage * stage * 0.5, height: 22 + 40 * (stage - 1) * stage * 0.5, speed: 0.12 };
-    if (ctx.audio.music === 'win_humans' || ctx.audio.music === 'win_kaiju') {
-      if (this.time > 14) ctx.audio.playMusic(['hearing']);
-    } else if (this.time > 14 && ctx.audio.music !== 'hearing') {
-      ctx.audio.playMusic(['hearing']);
-    }
+    // (The hearing music and the chair's line are started by the match audio.)
     // The autopilot, as host, goes back to the lobby when asked to loop.
     if (ctx.params.autoplay && ctx.params.loop && ctx.client.isHost() && this.time > 6 && !this.autoSent) {
       this.autoSent = true;

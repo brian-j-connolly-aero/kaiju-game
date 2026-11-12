@@ -8,6 +8,16 @@ import { canStartMatch, MATCH_RULES, type LobbyState } from '@mb/shared';
 import { el, icon, portrait } from '../../ui/icons';
 import type { AppContext, Screen } from '../context';
 
+/**
+ * The invite the link button copies. It opens the room directly. Built from the public address
+ * the server sends (`LobbyState.publicUrl`: the tunnel's address, so it works for friends even
+ * when the host plays on localhost), else from the page's own address.
+ */
+export function inviteLink(code: string, publicUrl: string | undefined, page: { origin: string; pathname: string }): string {
+  const base = publicUrl && /^https?:\/\/[^/?#]+$/.test(publicUrl) ? `${publicUrl}/` : `${page.origin}${page.pathname}`;
+  return `${base}#${code}`;
+}
+
 export class LobbyScreen implements Screen {
   readonly id = 'lobby' as const;
   private root: HTMLElement | null = null;
@@ -28,7 +38,7 @@ export class LobbyScreen implements Screen {
     const code = el('div', 'room-code', [client.code]);
     const link = el('button', 'btn', [icon('lb_link')]);
     link.addEventListener('click', () => {
-      const address = `${window.location.origin}${window.location.pathname}#${client.code}`;
+      const address = inviteLink(client.code, client.lobby?.publicUrl, window.location);
       void navigator.clipboard?.writeText(address).catch(() => undefined);
       ctx.audio.play('ui_click');
       link.classList.add('done');

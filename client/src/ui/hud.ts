@@ -28,7 +28,7 @@ import {
 import { glyphFor, keyLayoutVersion, type Bindings, type ButtonAction, type InputDevice } from '../game/input/actions';
 import type { FrameState, MatchSession } from '../net/matchSession';
 import { skylinePath } from './iconArt';
-import { el, glyph, icon, setGlyph } from './icons';
+import { el, glyph, icon, setGlyph, uiMarkup } from './icons';
 
 export interface HudView {
   /** What the crosshair is on. */
@@ -95,6 +95,9 @@ export class Hud {
   readonly root = el('div', 'hud');
   private readonly barFill: SVGRectElement;
   private readonly barRuin: SVGRectElement;
+  /** The finished skyline's standing city and the fill line over it, once the file has loaded. */
+  private barCity: SVGElement | null = null;
+  private barEdge: HTMLElement | null = null;
   private readonly marks: HTMLElement[] = [];
   private readonly clockSun: HTMLElement;
   private readonly clock: HTMLElement;
@@ -143,9 +146,22 @@ export class Hud {
       `<rect class="bar-edge" x="0" y="0" width="3" height="${SKY_H}"/></svg>`;
     this.barFill = bar.querySelector('#bar-standing rect') as SVGRectElement;
     this.barRuin = bar.querySelector('#bar-ruined rect') as SVGRectElement;
+    // The finished skyline replaces the procedural one when its file arrives: the city is
+    // clipped from the left as the bar fills and a low heap of rubble stays (art notes, UI 2).
+    void uiMarkup('skyline').then((svg) => {
+      if (!svg) return;
+      bar.querySelector('svg')?.remove();
+      bar.insertAdjacentHTML('afterbegin', svg);
+      this.barCity = bar.querySelector('.sky-city');
+      if (!this.barCity) return;
+      this.barEdge = el('div', 'bar-edge-line');
+      bar.append(this.barEdge);
+      this.lastBar = -1;
+    });
     for (const at of MATCH_RULES.bar.display) {
       const mark = el('div', 'bar-mark', [icon('k_molt')]);
-      mark.style.left = `${at * 100}%`;
+      // Under the middle of its tower: each tower is 3% of the bar wide and ends on its mark.
+      mark.style.left = `${(at - 0.03) * 100}%`;
       this.marks.push(mark);
       bar.append(mark);
     }
@@ -297,6 +313,12 @@ export class Hud {
     const f = Math.round(barDisplayFraction(match.barPoints, match.marks) * 1000) / 1000;
     if (f !== this.lastBar) {
       this.lastBar = f;
+      if (this.barCity && this.barEdge) {
+        const pct = (f * 100).toFixed(1);
+        this.barCity.style.clipPath = `inset(0 0 0 ${pct}%)`;
+        this.barEdge.style.left = `calc(${pct}% - 1.5px)`;
+        this.barEdge.style.display = f > 0 ? '' : 'none';
+      }
       this.barFill.setAttribute('x', `${(f * SKY_W).toFixed(1)}`);
       this.barRuin.setAttribute('width', `${(f * SKY_W).toFixed(1)}`);
       (this.root.querySelector('.bar-edge') as SVGRectElement | null)?.setAttribute('x', `${Math.max(0, f * SKY_W - 1.5).toFixed(1)}`);

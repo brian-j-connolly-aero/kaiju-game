@@ -12,6 +12,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { extname, join } from 'node:path';
 import express, { type Application, type NextFunction, type Request, type Response } from 'express';
 import type { PerfReport } from '../room/perf';
+import type { PublicAddress } from './publicUrl';
 
 export interface HealthInfo {
   ok: true;
@@ -26,12 +27,21 @@ export interface HealthInfo {
   fast: boolean;
   /** Timing of the room loop over the most recent match updates (room/perf.ts). */
   perf: PerfReport;
+  /**
+   * The address friends open (MB_PUBLIC_URL, or the quick tunnel's address learned from
+   * requests that came through it; http/publicUrl.ts), or null while it is not known.
+   */
+  publicUrl: string | null;
 }
 
 export interface AppOptions {
   /** Folder with the built client (it need not exist yet), or null to serve no page. */
   clientDir: string | null;
   health: () => HealthInfo;
+  /** Learns the public address from requests that come through a quick tunnel (http/publicUrl.ts). */
+  publicAddress?: PublicAddress;
+  /** Room chatter; may be switched off. */
+  log?: (line: string) => void;
 }
 
 /** File names the bundler stamps with a content hash never change, so browsers may keep them. */
@@ -72,6 +82,16 @@ export function roomCodeInPath(path: string): string {
 
 export function configureApp(app: Application, options: AppOptions): void {
   app.disable('x-powered-by');
+
+  // Every page load and health check that came through the quick tunnel says which address it
+  // came in on. The start scripts ask /healthz through the tunnel for exactly this reason.
+  const publicAddress = options.publicAddress;
+  if (publicAddress) {
+    app.use((req: Request, _res: Response, next: NextFunction) => {
+      if (publicAddress.observe(req.headers.host)) options.log?.(`public address: ${publicAddress.get() ?? ''}`);
+      next();
+    });
+  }
 
   app.get('/healthz', (_req: Request, res: Response) => {
     res.set('Cache-Control', 'no-store');

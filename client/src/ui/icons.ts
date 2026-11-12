@@ -17,6 +17,11 @@ export function setIconSource(assets: AssetStore): void {
   store = assets;
 }
 
+/** The markup of an art file from ui/, or null when it does not exist. */
+export function uiMarkup(id: string): Promise<string | null> {
+  return store ? store.uiSvg(id) : Promise.resolve(null);
+}
+
 function placeholder(id: string): string {
   return `<svg xmlns="${SVG_NS}" viewBox="0 0 64 64" aria-hidden="true">${iconArt(id)}</svg>`;
 }

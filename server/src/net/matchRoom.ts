@@ -59,6 +59,8 @@ export interface RoomRuntime {
   reservationSeconds: number;
   /** The build stamp a joining page must carry, asked at every join; null lets any page in. */
   build: (() => string) | null;
+  /** The address friends open, or null while unknown (http/publicUrl.ts); sent in the lobby state. */
+  publicUrl?: () => string | null;
   log: ((line: string) => void) | undefined;
   logError: (line: string) => void;
 }
@@ -205,6 +207,7 @@ export class MatchRoom extends Room {
       speed: rt.speed,
       seed: randomInt(0x100000000),
       build: rt.build ?? undefined,
+      publicUrl: rt.publicUrl,
       now: () => performance.now(),
       log: rt.log,
       logError: rt.logError,
