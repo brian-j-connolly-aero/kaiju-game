@@ -15,7 +15,7 @@ import { hash32 } from '../../math/rng';
 import type { Vec2 } from '../../math/vec';
 import { CITY_HALF, CITY_SEED, PROP_KIND_IDS, type CityData, type District, type NeighborhoodAnchor, type RoadEdge, type RoadNode } from '../types';
 import { buildAreas, buildRiver, toWorld } from './areas';
-import { buildDecks, buildFronts, buildLandmarks, buildYards, createBuilder, type Street } from './build';
+import { buildDecks, buildFronts, buildLandmarks, buildYards, createBuilder, openPockets, type Street } from './build';
 import { furnish } from './furnish';
 import { buildGround } from './ground';
 import { ANCHORS, DISTRICTS, DOWNTOWN } from './layout';
@@ -51,6 +51,7 @@ export function generatePortMeridian(seed: number = CITY_SEED): CityData {
   buildLandmarks(builder);
   buildFronts(builder, seed);
   buildYards(builder, seed);
+  openPockets(builder);
 
   const edges: RoadEdge[] = streets.map((s, i) => ({
     id: i,

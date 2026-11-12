@@ -131,7 +131,7 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
     gap: [0.75, 1.5],
     keep: 0.96,
     alleyEvery: 4,
-    alley: 6,
+    alley: 10,
   },
   // A neighborhood high street: walk-up flats over shops, in the gaps between the starting neighborhoods.
   highStreet: {
@@ -146,7 +146,7 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
     gap: [2, 6],
     keep: 0.9,
     alleyEvery: 3,
-    alley: 7,
+    alley: 10,
   },
   // Mansion blocks and offices on the inner ring, next to the towers: Wendside and Halcyon Gate.
   riverside: {
@@ -189,7 +189,7 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
     gap: [3, 7],
     keep: 0.92,
     alleyEvery: 3,
-    alley: 6,
+    alley: 10,
   },
   // The top of Temple Hill: cloisters, pilgrim halls and shrines among trees.
   temple: {
@@ -206,7 +206,7 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
     gap: [3, 7],
     keep: 0.92,
     alleyEvery: 3,
-    alley: 6,
+    alley: 10,
   },
   // The terraces on its western slope, where a match can start.
   templeSlope: {
@@ -220,7 +220,7 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
     gap: [4, 8],
     keep: 0.8,
     alleyEvery: 4,
-    alley: 6,
+    alley: 10,
   },
   suburb: {
     items: [
@@ -232,8 +232,8 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
     setback: 3,
     gap: [5, 9],
     keep: 0.82,
-    alleyEvery: 0,
-    alley: 0,
+    alleyEvery: 4,
+    alley: 10,
   },
   gardenSuburb: {
     items: [
@@ -244,8 +244,8 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
     setback: 4,
     gap: [6, 10],
     keep: 0.85,
-    alleyEvery: 0,
-    alley: 0,
+    alleyEvery: 4,
+    alley: 10,
   },
   oldSuburb: {
     items: [
@@ -259,7 +259,7 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
     gap: [3.5, 7],
     keep: 0.84,
     alleyEvery: 5,
-    alley: 6,
+    alley: 10,
   },
   // University quarter: tight rows of tall narrow houses.
   rowhouses: {
@@ -273,7 +273,7 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
     gap: [0.75, 1.25],
     keep: 0.9,
     alleyEvery: 5,
-    alley: 6.5,
+    alley: 10,
   },
   // Mill workers' terraces by the factories.
   workerRows: {
@@ -286,7 +286,7 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
     gap: [0.75, 1.5],
     keep: 0.88,
     alleyEvery: 6,
-    alley: 6.5,
+    alley: 10,
   },
   campus: {
     items: [
@@ -370,7 +370,7 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
     gap: [2.5, 6],
     keep: 0.86,
     alleyEvery: 4,
-    alley: 6,
+    alley: 10,
   },
   boardwalk: {
     items: [
@@ -384,7 +384,7 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
     gap: [3, 8],
     keep: 0.85,
     alleyEvery: 4,
-    alley: 6,
+    alley: 10,
   },
   beachVillage: {
     items: [
@@ -397,7 +397,7 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
     gap: [3.5, 7],
     keep: 0.85,
     alleyEvery: 5,
-    alley: 6,
+    alley: 10,
   },
   fairground: {
     items: [
