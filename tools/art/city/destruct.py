@@ -116,7 +116,7 @@ def damaged(b, limit: int) -> Mesh:
                         continue
                     n = piece.normal
                     if abs(n[2]) > 0.7:
-                        m += map_region(piece.pts, "rubble", col=hex_rgb("#9a9aa1"), tag="interior")
+                        m += map_region(piece.pts, "rubble", col=(0.9, 0.9, 0.9), tag="interior")
                     else:
                         m += map_region(piece.pts, "interior", tag="interior", origin=(0.0, 0.0, 0.0))
         # wrecked twins, soot near the holes
@@ -165,7 +165,9 @@ def rubble(b, limit: int) -> Mesh:
             n_rocks, n_slabs, n_beams = min(n_rocks, 3), min(n_slabs, 2), min(n_beams, 1)
         rng = np.random.default_rng(b.seed * 104729 + 7)
         m = Mesh()
-        greys = [hex_rgb(c) for c in style.RUBBLE]
+        # the rubble texture is already grey: vertex colors only vary its brightness a little
+        greys = [(1.0, 1.0, 1.0), (0.93, 0.93, 0.94), (1.06, 1.06, 1.06), (0.88, 0.88, 0.9)]
+        greys = [tuple(min(1.0, c) for c in g) for g in greys]
         # the broken base: a low frustum of 7 sides inside the footprint
         n = 7
         ring0, ring1 = [], []
@@ -254,7 +256,7 @@ def _slab(src: Face, rng, W, D, hh) -> list:
         top.uv.reverse()
     back = Face([p - top.normal * 0.02 for p in reversed(top.pts)])
     out = [top]
-    out += map_region(back.pts, "rubble", col=hex_rgb(style.RUBBLE[2]), tag="rubble",
+    out += map_region(back.pts, "rubble", col=(0.85, 0.85, 0.85), tag="rubble",
                       unit=(sw + 0.01, th + 0.01))
     return out
 
@@ -382,7 +384,7 @@ def _texture(poly, n, src_info) -> list:
         if dd < best_d:
             best, best_d = f, dd
     if best is None or best_d > 0.6:
-        return _map_once(poly, "rubble", hex_rgb("#a6a6ac"), tag="cut")
+        return _map_once(poly, "rubble", (1.0, 1.0, 1.0), tag="cut")
     if best.uv is None or best.region is None:
         return [plain(poly, best.col, tag=best.tag)]
     fuv = affine_uv(best)
