@@ -24,6 +24,7 @@ tools/art
 tools/audio
 tools/playtest
 Containerfile
-compose.yaml
+compose*.yaml
+compose*.yml
 .containerignore
 .dockerignore
