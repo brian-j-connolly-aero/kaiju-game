@@ -343,9 +343,33 @@ body {
   box-shadow: inset 6px 0 0 #49d17d;
 }
 
-.seat.away,
-.seat.empty {
+.seat.away {
   opacity: 0.45;
+}
+
+/* An empty seat is played by a bot: shown as one, not as a missing person. */
+.seat.empty {
+  opacity: 0.7;
+  border-style: dashed;
+  gap: 6px;
+}
+
+.seat-role.bot {
+  color: var(--ink);
+}
+
+.seat-bot-role {
+  font-size: 20px;
+  color: var(--human);
+}
+
+/* Not ready for a while: the start does not wait for them. */
+.seat.asleep {
+  opacity: 0.75;
+}
+
+.flag.asleep {
+  color: #9db8ff;
 }
 
 .seat-role {

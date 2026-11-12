@@ -39,6 +39,8 @@ export class MatchScreen implements Screen {
     this.wheel = new CommandWheel();
     this.map = new MapView();
     this.map.setCity(runtime.session.mirror.city);
+    const renderer = ctx.renderer;
+    if (renderer) this.map.setLandmarkPictures(() => renderer.landmarkPictures());
     this.map.onCommand = (command) => {
       runtime.session.sendCommand(command);
       ctx.audio.play('ui_wheel_select');

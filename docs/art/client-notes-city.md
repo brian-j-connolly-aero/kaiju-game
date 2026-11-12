@@ -1,5 +1,10 @@
 # Client notes: city buildings
 
+**Applied** (12 November, the client's city task): sections 1 to 4 are in the client as
+suggested (atlas read unflipped and mipmapped, masked wall tint with a separate damage shade,
+the real chunk meshes in one dynamic buffer). The tint also takes the district's building
+tint (`docs/CITY.md` section 2); landmarks keep their own colors. Section 6 is still open.
+
 For the client engineer who comes after the building artists. What the building files
 (`bld_*.glb`, `lm_*.glb`, `textures/city_atlas.png`, `textures/city_atlas_emissive.png`) provide,
 what the client does with them today (read in `client/src/render/structureGeometry.ts`,

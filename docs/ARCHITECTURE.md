@@ -655,9 +655,19 @@ layout, requires bumping `SNAPSHOT_VERSION` / `PROTOCOL_VERSION`.
   The kaiju's arms blend toward the pose targets the manifest gives each model (`poses`); in the
   player's own first-person view the head is locked to the aim and the arms ride on it, so
   snout and claws stay in one place on screen (`docs/art/client-notes-kaiju-lizard.md`).
-- Structures: per archetype one instanced mesh per visual state (intact, damaged, rubble).
-  Collapse is a client-only effect: spawn that archetype's pre-made chunks, tumble them with
-  cheap fake physics, dust, then show rubble.
+- Structures: per archetype one instanced mesh per visual state (intact, damaged, rubble), all
+  on the one city atlas material (read with glTF texture coordinates: unflipped, mipmapped).
+  The instance color paints only the wall faces a model masks (vertex color alpha), with the
+  building's color and its district's tint; a per-instance `instanceShade` darkens the whole
+  building as damage deepens. Collapse is a client-only effect: the archetype's own chunk
+  meshes, tumbled with cheap fake physics and copied each frame into one shared buffer (one
+  draw call for every falling piece), dust, then rubble. Measured with the whole city in view
+  at stage 3, every state drawn and 480 pieces falling: 166 draw calls, 367,000 triangles
+  (`docs/CITY.md` section 8).
+- The map (`ui/mapView.ts`) draws the city from `CityData`: district ground in its map tint
+  with the district's name, streets, water, bridges, buildings by state, and each landmark as
+  a small picture of its own model (`render/landmarkPictures.ts`, painted on the processor so
+  the frame never waits on a read-back from the graphics processor).
 - UI is DOM over the canvas. The no-reading rule in `DESIGN.md` §8 is binding.
 - Input: keyboard and mouse, and gamepad; button glyphs follow the last device used, and a
   keycap shows the letter the player's own keyboard layout prints on that key. Rules that are

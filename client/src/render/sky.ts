@@ -40,7 +40,7 @@ const PRESETS: Record<TimeOfDay, Preset> = {
     sunIntensity: 2.6,
     sunDir: [0.45, 0.78, 0.35],
     hemiSky: 0xcfe8ff,
-    hemiGround: 0x8a8f7a,
+    hemiGround: 0xb3b0a4,
     hemiIntensity: 1.5,
     cloud: 0xffffff,
     night: 0,

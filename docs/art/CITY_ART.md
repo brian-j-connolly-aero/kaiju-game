@@ -66,8 +66,9 @@ side (the simulation collides with the box); the kit refuses a building that doe
 | Boardwalk | plaster, clapboard, glass rail | white, seafoam, peach, sky, rose | slate, canvas | candy-striped awnings |
 
 The wall color is a **tint**: walls on tintable regions carry a mask (vertex color alpha 1) and
-the manifest lists the district's colors, so one model can be painted many ways. The client does
-not apply it yet (`docs/art/client-notes-city.md`); until it does, every copy shows its default.
+the manifest lists the district's colors, so one model can be painted many ways. The client
+applies it: each copy takes one of the colors, times its district's building tint
+(`docs/CITY.md` section 2).
 Signs are pictures only (a cup, a loaf, a fish, scissors, a key, glasses...), never words, and
 never a cross (not even a pharmacy's: the pharmacy sign is a pill) or any religious symbol.
 

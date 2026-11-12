@@ -8,6 +8,31 @@ import * as THREE from 'three';
 import type { CityData } from '@mb/shared';
 import type { AssetStore } from '../assets/assetStore';
 
+/**
+ * What each surface is multiplied by at full night. Pale paving under blue moonlight read as
+ * water from a squad's eye; at night it goes to a dim warm grey, so asphalt, paving, grass and
+ * the river stay four different things.
+ */
+const NIGHT_TINT = {
+  paving: 0x857b6e,
+  grass: 0x9c9c90,
+  asphalt: 0xb3a99c,
+  water: 0x9aa6b8,
+};
+
+interface NightSurface {
+  material: THREE.MeshLambertMaterial;
+  night: THREE.Color;
+}
+
+/** Darkens the ground toward its night colors: 0 by day, 1 at night (`Sky.night`). */
+export function setGroundNight(ground: THREE.Group, amount: number): void {
+  const surfaces = ground.userData.nightSurfaces as NightSurface[] | undefined;
+  if (!surfaces || ground.userData.night === amount) return;
+  ground.userData.night = amount;
+  for (const s of surfaces) s.material.color.setRGB(1, 1, 1).lerp(s.night, Math.max(0, Math.min(1, amount)));
+}
+
 /** Meters of ground one texture tile covers. */
 const TILE = 8;
 
@@ -59,18 +84,24 @@ function quad(out: number[], ax: number, az: number, bx: number, bz: number, cx:
 export function buildGround(city: CityData, assets: AssetStore): THREE.Group {
   const group = new THREE.Group();
   const half = city.half;
+  const nightSurfaces: NightSurface[] = [];
+  group.userData.nightSurfaces = nightSurfaces;
+  const night = (material: THREE.MeshLambertMaterial, color: number): THREE.MeshLambertMaterial => {
+    nightSurfaces.push({ material, night: new THREE.Color(color) });
+    return material;
+  };
 
   // Far plain: out to where the fog ends.
   const far: number[] = [];
   const F = 9000;
   quad(far, -F, -F, F, -F, F, F, -F, F);
   const farTexture = assets.texture('ground_far');
-  group.add(flatMesh(far, -0.25, surface(farTexture)));
+  group.add(flatMesh(far, -0.25, night(surface(farTexture), NIGHT_TINT.paving)));
 
   // The city square.
   const land: number[] = [];
   quad(land, -half, -half, half, -half, half, half, -half, half);
-  group.add(flatMesh(land, 0, surface(assets.texture('ground_sidewalk'))));
+  group.add(flatMesh(land, 0, night(surface(assets.texture('ground_sidewalk')), NIGHT_TINT.paving)));
 
   // Parks, plazas, water.
   const byKind: Record<string, number[]> = { water: [], park: [], plaza: [] };
@@ -89,10 +120,10 @@ export function buildGround(city: CityData, assets: AssetStore): THREE.Group {
       else out.push(pa.x, pa.y, pb.x, pb.y, pc.x, pc.y);
     }
   }
-  if (byKind.park.length > 0) group.add(flatMesh(byKind.park, 0.03, surface(assets.texture('ground_grass'), 1)));
-  if (byKind.plaza.length > 0) group.add(flatMesh(byKind.plaza, 0.03, surface(assets.texture('ground_plaza'), 1)));
+  if (byKind.park.length > 0) group.add(flatMesh(byKind.park, 0.03, night(surface(assets.texture('ground_grass'), 1), NIGHT_TINT.grass)));
+  if (byKind.plaza.length > 0) group.add(flatMesh(byKind.plaza, 0.03, night(surface(assets.texture('ground_plaza'), 1), NIGHT_TINT.paving)));
   if (byKind.water.length > 0) {
-    const water = flatMesh(byKind.water, 0.05, surface(assets.texture('ground_water'), 2));
+    const water = flatMesh(byKind.water, 0.05, night(surface(assets.texture('ground_water'), 2), NIGHT_TINT.water));
     water.name = 'water';
     group.add(water);
   }
@@ -119,6 +150,6 @@ export function buildGround(city: CityData, assets: AssetStore): THREE.Group {
     const w = nodeWidth[i] / 2;
     if (w > 0) quad(roads, node.x - w, node.z - w, node.x + w, node.z - w, node.x + w, node.z + w, node.x - w, node.z + w);
   });
-  if (roads.length > 0) group.add(flatMesh(roads, 0.08, surface(assets.texture('ground_asphalt'), 3)));
+  if (roads.length > 0) group.add(flatMesh(roads, 0.08, night(surface(assets.texture('ground_asphalt'), 3), NIGHT_TINT.asphalt)));
   return group;
 }

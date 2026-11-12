@@ -106,6 +106,9 @@ export class KaijuView {
   /** World position of the mouth, valid after update(). */
   readonly mouth = new THREE.Vector3();
   hasCamAnchor = false;
+  /** World position of the `hold` anchor (the hand, where a held thing sits), valid after update() when `hasHand`. */
+  readonly hand = new THREE.Vector3();
+  hasHand = false;
 
   constructor(assets: AssetStore, materials: Materials, callbacks: KaijuViewCallbacks = {}) {
     this.assets = assets;
@@ -338,6 +341,7 @@ export class KaijuView {
     this.hasCamAnchor = rig.worldPosition('cam_fp', this.camAnchor);
     if (!this.hasCamAnchor) this.camAnchor.set(k.x, stage.eyeHeight, k.z);
     if (!rig.worldPosition('mouth', this.mouth)) this.mouth.set(k.x, stage.mouthHeight, k.z);
+    this.hasHand = rig.worldPosition('hold', this.hand);
 
     // --- beam --------------------------------------------------------------------------------------
     const special = def.actions.special;

@@ -3,8 +3,9 @@
  *
  * When the art file for the archetype exists (`bld_<id>.glb` / `lm_<id>.glb` with nodes
  * `intact`, `damaged`, `rubble`, `chunk_NN`: docs/ASSETS.md section 3) its meshes are used.
- * Until then each state is a painted box: walls that repeat a window tile once per storey, a
- * roof, a cracked and scorched version, and a low grey heap.
+ * Without it each state is a painted box: walls that repeat a window tile once per storey, a
+ * roof, a cracked and scorched version, and a low grey heap. A real model's collapse pieces are
+ * kept as meshes (`ChunkBox.mesh`); a box stand-in's are plain boxes.
  */
 
 import * as THREE from 'three';
@@ -29,6 +30,18 @@ export interface ChunkBox {
   w: number;
   h: number;
   d: number;
+  /** The art's own piece (centered on the chunk's center, unindexed); absent on box stand-ins. */
+  mesh?: ChunkMesh;
+}
+
+/** A collapse piece's triangles as flat arrays, ready to be transformed into the falling-chunk buffer. */
+export interface ChunkMesh {
+  /** x, y, z per vertex, three vertices per triangle, centered on the chunk's center. */
+  position: Float32Array;
+  /** u, v per vertex (glTF convention, into the city atlas). */
+  uv: Float32Array;
+  /** r, g, b, a per vertex: a = 1 on faces that take the building's tint. */
+  color: Float32Array;
 }
 
 export interface ArchetypeGeometry {
@@ -242,6 +255,26 @@ function partsOfNode(model: RigModel, index: number): StatePart[] {
   });
 }
 
+/** Flattens a chunk's geometries into unindexed arrays centered on `center`. */
+export function chunkMesh(geometries: THREE.BufferGeometry[], center: THREE.Vector3): ChunkMesh {
+  const positions: number[] = [];
+  const uvs: number[] = [];
+  const colors: number[] = [];
+  for (const source of geometries) {
+    const g = source.index ? source.toNonIndexed() : source;
+    const position = g.getAttribute('position');
+    const uv = g.getAttribute('uv');
+    const color = g.getAttribute('color');
+    for (let v = 0; v < position.count; v++) {
+      positions.push(position.getX(v) - center.x, position.getY(v) - center.y, position.getZ(v) - center.z);
+      uvs.push(uv ? uv.getX(v) : 0, uv ? uv.getY(v) : 0);
+      if (color) colors.push(color.getX(v), color.getY(v), color.getZ(v), color.itemSize >= 4 ? color.getW(v) : 0);
+      else colors.push(1, 1, 1, 0);
+    }
+  }
+  return { position: new Float32Array(positions), uv: new Float32Array(uvs), color: new Float32Array(colors) };
+}
+
 function fromModel(model: RigModel, def: ArchetypeDef): ArchetypeGeometry | null {
   const find = (name: string): number => model.nodes.findIndex((n) => n.name === name);
   const intactIndex = find('intact');
@@ -254,20 +287,22 @@ function fromModel(model: RigModel, def: ArchetypeDef): ArchetypeGeometry | null
   const fallback = proceduralStates(def);
   const rubble = rubbleIndex >= 0 ? partsOfNode(model, rubbleIndex) : fallback.states[2];
 
-  // STUB(render): collapse draws each art chunk as a box of its bounding size; a specialist
-  // should draw the real `chunk_NN` meshes.
+  // Collapse pieces: the art's own meshes, kept centered on their own middle.
   const chunks: ChunkBox[] = [];
   model.nodes.forEach((node, i) => {
     if (!/^chunk_\d+$/.test(node.name)) return;
+    const parts = partsOfNode(model, i);
     const bounds = new THREE.Box3();
-    for (const part of partsOfNode(model, i)) {
-      if (!part.geometry.boundingBox) part.geometry.computeBoundingBox();
+    for (const part of parts) {
+      part.geometry.computeBoundingBox();
       if (part.geometry.boundingBox) bounds.union(part.geometry.boundingBox);
     }
     if (bounds.isEmpty()) return;
     const size = bounds.getSize(new THREE.Vector3());
     const center = bounds.getCenter(new THREE.Vector3());
-    chunks.push({ x: center.x, y: center.y, z: center.z, w: size.x, h: size.y, d: size.z });
+    const atlasParts = parts.filter((p) => p.material === 'city_atlas');
+    const mesh = atlasParts.length > 0 ? chunkMesh(atlasParts.map((p) => p.geometry), center) : undefined;
+    chunks.push({ x: center.x, y: center.y, z: center.z, w: size.x, h: size.y, d: size.z, mesh });
   });
   return {
     states: [intact, damaged.length > 0 ? damaged : intact, rubble],

@@ -63,7 +63,7 @@ export class HomeScreen implements Screen {
       } catch (err) {
         const failure = err instanceof JoinFailure ? err.code : 0;
         // No such room, a full room, an old page, or no server at all.
-        showNotice(failure === ERROR_NO_ROOM ? 'lb_join' : failure === JOIN_ERROR.roomFull || failure === JOIN_ERROR.serverFull ? 'lb_human' : failure === JOIN_ERROR.version ? 'ui_warning' : 'ui_offline');
+        showNotice(failure === ERROR_NO_ROOM ? 'lb_join' : failure === JOIN_ERROR.roomFull || failure === JOIN_ERROR.serverFull ? 'lb_human' : failure === JOIN_ERROR.version ? 'ui_outdated' : 'ui_offline');
         ctx.audio.play('ui_error');
         if (failure === ERROR_NO_ROOM) {
           code.classList.add('bad');

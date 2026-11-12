@@ -42,6 +42,11 @@ const TEXTURE_IDS = [
   'city_atlas_emissive',
 ];
 
+/** The two shared city atlases (docs/art/CITY_ART.md): same layout, read with glTF texture coordinates. */
+export function isCityAtlas(id: string): boolean {
+  return id === 'city_atlas' || id === 'city_atlas_emissive';
+}
+
 function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
@@ -122,7 +127,7 @@ export class AssetStore {
       jobs.push(async () => {
         try {
           const texture = await textureLoader.loadAsync(this.url(entry.file));
-          this.textures.set(id, this.prepareTexture(texture, entry.tile === true || id.startsWith('ground_')));
+          this.textures.set(id, this.prepareTexture(texture, entry.tile === true || id.startsWith('ground_'), id));
           this.realTextures.add(id);
         } catch (err) {
           this.fail(`texture "${id}"`, entry.file, err);
@@ -171,10 +176,16 @@ export class AssetStore {
     console.warn(`assets: ${what} could not be loaded from ${file} (${err instanceof Error ? err.message : String(err)}); using a stand-in.`);
   }
 
-  private prepareTexture(texture: THREE.Texture, tile: boolean): THREE.Texture {
+  private prepareTexture(texture: THREE.Texture, tile: boolean, id = ''): THREE.Texture {
+    // The city atlases are read by glTF texture coordinates, which start at the top of the
+    // image (docs/art/client-notes-city.md section 1), and are mipmapped so that window grids on
+    // far towers do not shimmer (section 4). Pictures stay crisp up close.
+    const cityAtlas = isCityAtlas(id);
+    if (cityAtlas) texture.flipY = false;
+    const mipmaps = tile || cityAtlas;
     texture.magFilter = THREE.NearestFilter;
-    texture.minFilter = tile ? THREE.NearestMipmapLinearFilter : THREE.NearestFilter;
-    texture.generateMipmaps = tile;
+    texture.minFilter = mipmaps ? THREE.NearestMipmapLinearFilter : THREE.NearestFilter;
+    texture.generateMipmaps = mipmaps;
     texture.colorSpace = THREE.SRGBColorSpace;
     if (tile) {
       texture.wrapS = THREE.RepeatWrapping;
@@ -235,6 +246,13 @@ export class AssetStore {
     return Array.isArray(colors) ? colors.filter((c) => typeof c === 'string') : [];
   }
 
+  /** A building model's wall tint (base color and the colors a copy may take), or null. */
+  modelTint(id: string): { base: string; colors: string[] } | null {
+    const tint = this.manifest.models[id]?.tint;
+    if (!tint || typeof tint.base !== 'string') return null;
+    return { base: tint.base, colors: this.modelTints(id) };
+  }
+
   hasTexture(id: string): boolean {
     return this.realTextures.has(id);
   }
@@ -245,7 +263,7 @@ export class AssetStore {
     if (!texture) {
       const canvas = id === 'window_tile' ? windowTile(false) : id === 'window_tile_lit' ? windowTile(true) : proceduralTexture(id);
       const tile = id.startsWith('ground_') || id.startsWith('window_tile') || id.startsWith('clouds_');
-      texture = this.prepareTexture(new THREE.CanvasTexture(canvas), tile);
+      texture = this.prepareTexture(new THREE.CanvasTexture(canvas), tile, id);
       this.textures.set(id, texture);
       if (this.hasManifest && TEXTURE_IDS.includes(id)) this.warnOnce(`texture:${id}`, `no texture "${id}" yet; drawing a stand-in.`);
     }

@@ -36,7 +36,7 @@ const CLOSED_NOTICE: Record<ClosedReason, string> = {
   replaced: 'ui_copy',
   gone: 'lb_join',
   refused: 'lb_human',
-  version: 'ui_warning',
+  version: 'ui_outdated',
   network: 'ui_offline',
 };
 

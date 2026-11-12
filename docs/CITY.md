@@ -6,8 +6,8 @@ every landmark and every ordinary building type, described so it can be modeled 
 
 Status: **the game plays in Port Meridian** (since 12 November): the server, the client, the
 sandbox, the bots and the balance harness all build it through `getCity()`. The placeholder grid
-city is kept for tests and as a development option. Section 9 says what the switch did and what
-is left (the client's district tint and a draw-call count).
+city is kept for tests and as a development option. Section 9 says what the switch did; the
+client's part (district tint, draw-call count) was done on 12 November (section 8).
 
 ![The whole city](city/map.png)
 
@@ -84,10 +84,11 @@ color family. A white model shows the tint exactly; a dark one hardly changes.
 | The Docks | `#d6dee2` | harbor blue-grey |
 | The Boardwalk | `#fcf6ee` | whitewash |
 
-The client does not apply the tint yet (it draws real models in plain white today, see
-`client/src/render/cityView.ts`); that is a request to the client owner, listed in section 9.
-Landmarks are one-offs and are modeled in their final colors; the tint is for ordinary buildings
-only.
+The client applies it (`client/src/render/cityView.ts`): a building's wall faces (those its
+model masks for paint, `docs/art/client-notes-city.md` section 2) take one of the colors its
+model offers, picked by the structure's id, times the tint of the district its center is in.
+Roofs, glass, signs and doors keep the art's colors. Landmarks are one-offs and are modeled in
+their final colors; the tint is for ordinary buildings only.
 
 | District | Map tint | Street pattern | Buildings | Structures | Value |
 |---|---|---|---|---|---|
@@ -444,14 +445,15 @@ What this says:
 
 ## 8. Budget
 
-- **Archetypes**: 40 of 40. The client draws one instanced batch per archetype, per damage state
-  (intact, damaged, rubble) and per material of its model, and only batches that have instances
-  are drawn (`client/src/render/cityView.ts`). So: 40 x 3 = 120 calls at most with one material
-  per model, up to about 240 with two, plus about 15 to 45 for props. That stays under the 350
-  budget **only if every building model uses at most two of the shared materials** (section 4).
-  One more archetype would cost 3 to 6 calls. This is an estimate from reading the code, not a
-  measurement: at switch-over, read `renderer.info.render.calls` in headless Chromium at stage 3
-  with buildings in all three damage states, and write the number here.
+- **Archetypes**: 40 of 40, every one from its art file, one material each. The client draws one
+  instanced batch per archetype, per damage state (intact, damaged, rubble) and per material of
+  its model, and only batches that have instances are drawn (`client/src/render/cityView.ts`),
+  plus one draw for all falling collapse pieces. One more archetype would cost up to 3 calls.
+  **Measured** (12 November, headless Chromium, stage 3 at night, the whole city in view from
+  1.7 km up, `window.__mb.renderer.info()`): every building intact 111 draw calls and 360,000
+  triangles; a third of each archetype damaged and a third in rubble (all 120 batches drawn)
+  with 480 pieces falling, 166 calls and 367,000 triangles. The most seen in a five-page match:
+  130 calls and 462,000 triangles. Budget: 350 and 1.5 million.
 - **District tint**: free in draw calls (one color per instance, set once at load).
 - **Counts**: 2695 structures (allowed 2500 to 3200), 5541 props (4000 to 6000).
 
@@ -459,7 +461,8 @@ What this says:
 
 ## 9. How to switch the game over to Port Meridian
 
-**Done** by the city switch, except item 5 (the client's). What it did, in short: items 1 and 2
+**Done**: items 1 to 4, 6 and 7 by the city switch, item 5 by the client on 12 November
+(section 8 has the measured draw calls). What the switch did, in short: items 1 and 2
 as written (the deploy rule, the kaiju bot, `cache.ts`, which now takes `getCity(seed, kind)`);
 item 3 was not needed (no archetype changed); item 4: every test listed passes, none loosened
 (the clock-end bug was fixed in the simulation, the nav test's missing sub-unit was a navigation

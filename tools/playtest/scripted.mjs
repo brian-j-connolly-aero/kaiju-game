@@ -11,9 +11,13 @@
  *
  *   kaiju   creates a room, volunteers, starts. Then: look, walk, swipe, stomp, grab, throw,
  *           eat, roar, brace, molt (when the bar offers it), the special (when rage allows).
- *   human   creates a room, switches the practice option on (a bot plays the kaiju), starts.
- *           Then: drive, fire, the four commands, a charged volley, the map and a marker on
- *           it. After that the player lets go and the match runs to its end.
+ *   human   creates a room, switches the practice option on (a bot plays the kaiju) and off
+ *           again; a second page joins by the invite address, volunteers for the kaiju, gets
+ *           ready and then never touches the controls. The host starts. Then: drive, fire, the
+ *           four commands, a charged volley, the map and a marker on it. After that the player
+ *           lets go and the match runs to its end. (On Port Meridian the practice bot kaiju
+ *           molts within a minute of a fast match, and every molt redeploys the squads, which
+ *           undid the human checks half way through: an idle kaiju keeps the match at stage 1.)
  *
  * What counts as working. Every action is judged ONLY by what the server said afterwards: the
  * newest snapshot it sent and the simulation events it sent (driver.mjs reads both). What the
@@ -129,7 +133,7 @@ async function openSession(origin, opts, name, errors) {
 }
 
 /** Clicks through the home screen and the lobby as a person does, then waits for play to begin. */
-async function startMatch(page, driver, report, { kaiju, practice }) {
+async function startMatch(page, driver, report, { kaiju, practice, guest }) {
   await page.waitForSelector('.home .btn-big', { timeout: 60000 });
   await page.click('.home .btn-big');
   await page.waitForSelector('.lobby .start', { timeout: 30000 });
@@ -151,6 +155,22 @@ async function startMatch(page, driver, report, { kaiju, practice }) {
     const ok = await page.waitForFunction(() => window.__mb.internals.ctx.client.lobby?.options.botKaiju === true, null, { timeout: 8000 }).catch(() => null);
     if (ok) report.pass('practice option', 'clicked the practice button; the lobby message from the server shows botKaiju');
     else report.fail('practice option', 'the lobby state from the server never showed botKaiju');
+  }
+  if (guest) {
+    // The practice option off again, and a person (the guest page) in the kaiju's seat.
+    if (practice) {
+      await page.click('.lobby .practice-toggle');
+      const off = await page.waitForFunction(() => window.__mb.internals.ctx.client.lobby?.options.botKaiju === false, null, { timeout: 8000 }).catch(() => null);
+      if (off) report.pass('practice option off', 'clicked the practice button again; the lobby message from the server shows botKaiju off');
+      else report.fail('practice option off', 'the lobby state from the server still showed botKaiju');
+    }
+    await guest(lobby.code);
+    const seated = await page
+      .waitForFunction(() => (window.__mb.internals.ctx.client.lobby?.players ?? []).some((pl) => pl.seat !== window.__mb.internals.ctx.client.seat && pl.ready && pl.wantsKaiju), null, { timeout: 30000 })
+      .catch(() => null);
+    if (seated) report.pass('a guest joins by the invite address', 'the second page opened the room from its address, volunteered for the kaiju and got ready: the host\'s lobby message shows it');
+    else report.fail('a guest joins by the invite address', 'the host\'s lobby never showed a ready kaiju volunteer');
+    await page.waitForFunction(() => !document.querySelector('.lobby .start')?.disabled, null, { timeout: 10000 }).catch(() => null);
   }
   await page.click('.lobby .start');
   const playing = await driver.until((p) => (p.match && p.match.phase === 'playing' && p.screen === 'match' ? p : null), 40000, 150);
@@ -401,13 +421,76 @@ async function playKaiju(origin, opts, errors) {
 // The human session
 // ---------------------------------------------------------------------------------------------
 
+/**
+ * Runs in the page: the heading nearest `yaw` along which the next 30 m are clear of standing,
+ * solid structures (3 m to spare), or null when there is none.
+ */
+function openHeadingInPage({ x, z, yaw }) {
+  const mirror = window.__mb.internals.ctx.runtime?.session?.mirror;
+  if (!mirror) return null;
+  const near = mirror.city.structures.filter((st) => !st.passable && mirror.structureStage[st.id] < 3 && Math.hypot(st.x - x, st.z - z) < 30 + Math.hypot(st.hx, st.hz) + 3);
+  const blocked = (px, pz) =>
+    near.some((st) => {
+      const dx = px - st.x;
+      const dz = pz - st.z;
+      const c = Math.cos(st.yaw);
+      const s = Math.sin(st.yaw);
+      // Into the structure's own frame (its yaw turns +z toward +x).
+      const lx = dx * c - dz * s;
+      const lz = dx * s + dz * c;
+      return Math.abs(lx) < st.hx + 3 && Math.abs(lz) < st.hz + 3;
+    });
+  let best = null;
+  for (let i = 0; i < 48; i++) {
+    const turn = (i % 2 === 0 ? 1 : -1) * Math.ceil(i / 2) * (Math.PI / 24);
+    const h = yaw + turn;
+    let clear = true;
+    for (let d = 2; d <= 30 && clear; d += 2) clear = !blocked(x + Math.sin(h) * d, z + Math.cos(h) * d);
+    if (clear) {
+      best = h;
+      break;
+    }
+  }
+  return best;
+}
+
 async function playHuman(origin, opts, errors) {
   const report = new Report('human');
   const { browser, page, driver } = await openSession(origin, opts, 'Ada', errors);
   const shot = (name) => driver.screenshot(join(opts.out, `human-${name}.png`));
   try {
-    if (!(await startMatch(page, driver, report, { kaiju: false, practice: true }))) return report;
-    await shot('00-start');
+    // The guest: a second person who takes the kaiju and then leaves the controls alone.
+    let guestBrowser = null;
+    const guest = async (code) => {
+      const { chromium } = require('playwright');
+      guestBrowser = await chromium.launch({ headless: true, args: CHROMIUM_ARGS });
+      const gp = await guestBrowser.newPage({ viewport: { width: 640, height: 360 }, deviceScaleFactor: 1 });
+      gp.on('console', (m) => {
+        if (m.type() === 'error') errors.push(`Idle: ${m.text()}`);
+      });
+      gp.on('pageerror', (e) => errors.push(`Idle: uncaught: ${e.message}`));
+      await gp.goto(`${origin}/?name=Idle&mute=1&fps=10&res=0.5#${code}`, { waitUntil: 'load' });
+      await gp.waitForSelector('.lobby .role-toggle', { timeout: 60000 });
+      await gp.click('.lobby .role-toggle');
+      await gp.waitForFunction(() => window.__mb.internals.ctx.client.me()?.wantsKaiju === true, null, { timeout: 8000 }).catch(() => null);
+      await gp.click('.lobby .ready-toggle');
+    };
+    try {
+      if (!(await startMatch(page, driver, report, { kaiju: false, practice: true, guest }))) return report;
+      await shot('00-start');
+      await playHumanChecks(page, driver, report, opts, shot);
+    } finally {
+      await guestBrowser?.close().catch(() => {});
+    }
+    return report;
+  } finally {
+    await browser.close().catch(() => {});
+  }
+}
+
+/** The human session's checks, from the start of play to the end of the match. */
+async function playHumanChecks(page, driver, report, opts, shot) {
+  {
     let p = await driver.probe();
     if (!p.me) {
       report.fail('own unit', 'the snapshot has no driven unit for this squad');
@@ -417,6 +500,10 @@ async function playHuman(origin, opts, errors) {
 
     // --- drive ---------------------------------------------------------------------------------
     {
+      // Port Meridian is dense: a squad may start facing a house. Turn to the nearest open
+      // heading first, so "W drives" is not judged against a wall.
+      const open = await page.evaluate(openHeadingInPage, { x: start.x, z: start.z, yaw: p.view?.yaw ?? 0 });
+      if (open !== null && Math.abs(wrapAngle(open - (p.view?.yaw ?? 0))) > 0.05) await driver.lookTo(open, 0, 0.06, 5000);
       await driver.keyDown('KeyW');
       const moved = await driver.until((q) => (q.me && Math.hypot(q.me.x - start.x, q.me.z - start.z) > 5 ? q : null), 6000);
       await driver.keyUp('KeyW');
@@ -595,8 +682,6 @@ async function playHuman(origin, opts, errors) {
     }
     p = await driver.probe();
     report.final = { fps: p.fps, pageErrors: p.errors };
-  } finally {
-    await browser.close().catch(() => {});
   }
   return report;
 }

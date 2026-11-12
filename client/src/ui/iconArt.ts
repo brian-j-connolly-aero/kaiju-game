@@ -112,6 +112,10 @@ const ART: Record<string, string> = {
   ui_skull: `<path d="M12 30 Q12 8 32 8 Q52 8 52 30 Q52 40 44 44 L44 54 L20 54 L20 44 Q12 40 12 30 Z" ${S}/><circle cx="24" cy="30" r="5" ${F}/><circle cx="40" cy="30" r="5" ${F}/>`,
   ui_clock: `<circle cx="32" cy="32" r="24" ${S}/><path d="M32 16 L32 32 L44 38" ${S}/>`,
   ui_trophy: `<path d="M18 8 L46 8 L46 24 Q46 38 32 38 Q18 38 18 24 Z" ${F}/><path d="M32 38 L32 50 M20 54 L44 54" ${S}/><path d="M18 12 L8 12 Q8 26 18 26 M46 12 L56 12 Q56 26 46 26" ${S}/>`,
+  // A player who has not readied up for a while: the host may start without them (a moon and a nap's zigzags).
+  ui_asleep: `<path d="M30 12 A20 20 0 1 0 50 40 A15 15 0 0 1 30 12 Z" ${F}/><path d="M40 8 L52 8 L40 20 L52 20" ${S} stroke-width="4"/><path d="M50 26 L58 26 L50 34 L58 34" ${S} stroke-width="3.5"/>`,
+  // This page is from an older build than the server: a page with a turning arrow (reload it).
+  ui_outdated: `<path d="M10 8 L42 8 L54 20 L54 56 L10 56 Z" ${S} stroke-width="4"/><path d="M42 8 L42 20 L54 20" ${S} stroke-width="4"/><path d="M42 38 A10 10 0 1 1 36 29" ${S}/><path d="M33 22 L37 29 L30 32" ${S} stroke-width="4"/>`,
   ui_newspaper: `<rect x="8" y="10" width="48" height="44" ${S} stroke-width="4"/><path d="M14 20 L50 20" ${S} stroke-width="6"/>`,
   // --- settings and the drone (drawn here only; no art file yet) ---
   ui_settings: `<path d="${cogPath(32, 32, 28, 20, 9, 8)}" fill="currentColor" fill-rule="evenodd" stroke="none"/>`,

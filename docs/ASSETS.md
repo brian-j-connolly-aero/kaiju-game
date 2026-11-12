@@ -159,7 +159,10 @@ marks). No text inside icons. No third-party icon sets.
   `gp_ls`, `gp_rs`, `gp_dpad` (no direction), `gp_dpad_up`, `gp_dpad_right`, `gp_dpad_down`,
   `gp_dpad_left` (one direction of the directional pad), `gp_start`, `gp_back`.
 - System: `ui_offline`, `ui_warning`, `ui_copy` (this seat was opened somewhere else),
-  `ui_skull` (eliminated), `ui_trophy`, `ui_clock` (time ran out), `ui_newspaper`, `ui_sound`.
+  `ui_skull` (eliminated), `ui_trophy`, `ui_clock` (time ran out), `ui_newspaper`, `ui_sound`,
+  `ui_asleep` (a lobby seat the start no longer waits for: not ready after 20 s),
+  `ui_outdated` (this page is from an older build than the server: reload it). The last two
+  are drawn in code until the art team makes them (`client/src/ui/iconArt.ts`).
 - `skyline.svg`: the destruction-bar skyline with three taller towers at 21%, 57% and 100%.
   viewBox 400 × 64, drawn to be stretched into the bar (560 × 46 px; the root carries
   `preserveAspectRatio="none"`). Two paths: `sky-city` (clip it from the left as the bar fills)

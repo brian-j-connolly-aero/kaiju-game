@@ -8,8 +8,11 @@ export interface ModelEntry {
   tris?: number;
   rig?: string;
   chunks?: number;
-  /** Per-instance paint for props: vertex color alpha 1 marks the faces that take the tint. */
-  tint?: { colors?: string[] };
+  /**
+   * Per-instance paint for props and buildings: vertex color alpha 1 marks the faces that take
+   * the tint. Buildings also give `base`, the wall color the model was painted in.
+   */
+  tint?: { colors?: string[]; base?: string };
   /** Kaiju: pose targets, degrees per node relative to the rest pose (ASSETS.md section 7). */
   poses?: Record<string, Record<string, [number, number, number]>>;
 }

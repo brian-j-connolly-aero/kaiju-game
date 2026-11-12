@@ -10,10 +10,11 @@ squads, commands, sub-unit behavior, weapons, volleys, call-ins, lives, veterans
 simulation part 3 (match flow and the molt, bots, voice lines, the balance harness and the
 tuning: `docs/BALANCE.md`), the city switch (section 10: the game now plays in Port Meridian) and
 the client core task (everything in `client/`, `tools/playtest/`, `tools/build-manifest.mjs`:
-section 7), and the integration task (section 8: what was run end to end, what was measured,
-what is still wrong); the rest is from the scaffold task.
+section 7), the integration task (section 8: what was run end to end, what was measured,
+what is still wrong) and the client's city task (section 11: Port Meridian drawn from its art,
+the last client follow-ups); the rest is from the scaffold task.
 
-**Read section 8.1 first: it says whether `npm run check` passes right now.**
+**Read section 11.1 first: it says whether `npm run check` passes right now.**
 
 ## 1. How to run things
 
@@ -630,8 +631,10 @@ client/src/render/
   materials.ts      vcol / glow / city_atlas shared materials, paint-mask tint, placeholder building material
   sky.ts            gradient dome, sun or moon disc, two cloud rings on the horizon, fog and lights per time of day
   ground.ts         land, roads, parks, plazas, water, far plain from CityData
-  cityView.ts       instanced structures per archetype and state, props near the camera, collapse chunks
-  structureGeometry.ts  an archetype's three states from its .glb, or painted boxes
+  cityView.ts       instanced structures per archetype and state (wall tint, damage shade), props near the
+                    camera, collapse pieces (the art's chunk meshes in one dynamic buffer)
+  structureGeometry.ts  an archetype's three states and chunk meshes from its .glb, or painted boxes
+  landmarkPictures.ts   the map's landmark pictures, painted on the processor from the models
   sceneRig.ts, instancedRig.ts   the rig abstraction: one posable copy, or many instanced copies, of a RigModel
   kaijuAnimator.ts, kaijuView.ts animation from the action state toward the manifest's pose targets;
                     first-person head lock; cocoon, held object, weak point halo, embers, beam
@@ -653,7 +656,10 @@ client/test/        net.test.ts, game.test.ts, manifestTool.test.ts, audioEngine
                     (both on fakeAudio.ts, a silent stand-in for Web Audio that records what was started),
                     input.test.ts (on fakeBrowser.ts: a window, a document and a browser's side of pointer
                     lock), session.test.ts (a real simulation and a real MatchSession over a delayed link),
-                    view.test.ts (pose targets, the chase camera's rise, cloud rings, pixel cap, icons)
+                    view.test.ts (pose targets, the chase camera's rise, cloud rings, pixel cap, icons),
+                    city.test.ts (building paint and shade, the city view's batches and collapse
+                    pieces, landmark pictures, the night ground, sleeping lobby seats, the
+                    autopilot's volleys, the thrown object leaving the hand)
 tools/build-manifest.mjs            the assets:manifest script
 tools/playtest/smoke.mjs, shots.mjs the multi-client smoke playtest; stage screenshots from the sandbox
 tools/playtest/scripted.mjs, driver.mjs   two sessions played with real inputs; the hands and eyes it uses
@@ -690,18 +696,17 @@ rigs are posed, so the kaiju camera sits exactly on `cam_fp`) -> audio -> `rende
 
 | Where | What is there now | What it should become |
 | --- | --- | --- |
-| `render/structureGeometry.ts` | No `bld_*` / `lm_*` models exist yet, so every structure is a painted box: repeating window tile, gable roofs on houses, a scorched version, a grey heap. The loader for real files (nodes `intact`, `damaged`, `rubble`, `chunk_NN`) is written but has never met a real file. `STUB(render)`: collapse draws every chunk as a box of the chunk's size. | Real building art through the same function; draw the real `chunk_NN` meshes. |
-| `render/cityView.ts` | One instanced mesh per archetype, state and material, never culled; props are repacked around the camera (radius grows with camera height). Bridges are drawn as a low road slab with side trusses. | District chunking or level of detail if the real models push triangles past the budget. |
+| `render/structureGeometry.ts`, `render/cityView.ts` | All 40 archetypes come from their art files (states, chunk meshes, atlas, night atlas, wall tint). The painted boxes remain only as the fallback for a missing file. One instanced mesh per archetype, state and material, never culled (the whole city is 360,000 triangles); props are repacked around the camera. | Nothing needed for the budget. District roof colors (`docs/art/client-notes-city.md` section 6) if the art adds a second mask. |
 | `render/kaijuAnimator.ts` | One pose function for the lizard node list; the arms blend toward the art's pose targets (`poses` in the manifest; the box stand-in has the old numbers as its fallback). Swipe wind-up, stomp, roar, beam and death arms are still built-in numbers. | Per-kind animation sets for the Tier 2 kaiju; footfall timing against the art. |
 | `render/effects.ts`, `projectilesView.ts` | Sparkler bursts, dust, rings and flashes from `fx.png`; capped at 520 particles, and a bright particle is never drawn wider than 0.6 of its distance from the camera. `fx_debris_1..4` and lingering fire are drawn by nothing yet. No searchlights or tracers at night. | The effects pass (night fires, tracers, searchlights, water splashes, beam scorch, debris). |
-| `render/sky.ts` | Three presets, the two cloud panoramas on horizon rings (sun gap at the sunset sun), a sun or moon disc; windows light up at sunset and night through the placeholder building material. | Per-stage polish; emissive city atlas when it exists. |
+| `render/sky.ts`, `render/ground.ts` | Three presets, the two cloud panoramas on horizon rings (sun gap at the sunset sun), a sun or moon disc; windows light up at sunset and night through the city's night atlas; the ground goes to dim warm greys at night (paving under blue moonlight read as water). The afternoon's light from below is a pale paving grey (it was olive, and turned cream walls in shade olive). | Per-stage polish. |
 | `render/crowd.ts` | 260 civilians near the kaiju who run from it and wander otherwise; they do not follow streets. | Street-following crowds, panic sound. |
 | `ui/hud.ts`, `styles.css` | Functional HUD: skyline bar with three marks, sun-and-moon arc, meters, squad pips, verb hints with glyphs, crosshair, status pictures. Cramped below about 700 px wide. | The designed HUD (skyline that crumbles, portraits, stat bars). |
 | `ui/iconArt.ts` | Stand-in drawings for every icon id; the 69 real SVG files in `assets/ui/` already replace them at run time. | Delete entries once the art list is complete. |
 | `app/screens/*` | Plain panels: home (callsign, create, join by code), lobby (seats, role, ready, practice, start), briefing (portrait, names), end (winner, pictogram tally, front page with a photo). | Kaiju and faction select with stat bars, the playable tutorial, the hearing, the draft. |
-| `ui/mapView.ts` | 2D canvas map: bounds, streets, buildings by state, friendly units, the kaiju when known; click or confirm places move-to, right click or the call-in button places artillery. | Styled map, district names, rubble tint. |
+| `ui/mapView.ts` | 2D canvas map of Port Meridian: district ground in map tints with names, streets, river and bay, bridges, buildings by state, landmark pictures, friendly units, the kaiju when known; click or confirm places move-to, right click or the call-in button places artillery. | Zoom and pan; rubble drawn as heaps. |
 | `audio/matchAudio.ts` | Every event has a sound, and the audio directors' notes for the client are applied (7.6); combat stem follows a simple "shots or lasers recently" heat. No tank engine, march or crowd loops; none of the Tier 2 unit sounds (their units do not exist yet). Nobody has listened to any of it: all checks are counts and measured levels. | A listening pass, unit loops, per-stage ambience balance, the Tier 2 wiring in `docs/audio/client-notes-sfx.md` section 4. |
-| `game/autoplay.ts` | Plays both sides well enough to finish a match; no pathfinding for the kaiju, street routing for humans. | Nothing: it is a test tool. |
+| `game/autoplay.ts` | Plays both sides well enough to finish a match; no pathfinding for the kaiju, street routing for humans; the squad parks and fires charged volleys together with the others as the squad bots do (`volleyVerdict`). | Nothing: it is a test tool. |
 | `game/input/actions.ts` | Default bindings only; bindings are data and are stored, but there is no rebinding screen (the settings panel has volume, mouse speed, inverted look and fullscreen). Gamepad: standard mapping, never tried on real hardware; the menus cannot be worked with a gamepad (Tab, Space and Enter do work on their buttons). | Key rebinding; gamepad focus in the menus; controller tuning. |
 | `ui/settingsPanel.ts`, `ui/iconArt.ts` | The panel's gear, inverted-look, fullscreen and half-resolution pictures, and the drone's up and down arrows (`ui_settings`, `ui_invert`, `ui_fullscreen`, `ui_lowres`, `ui_rise`, `ui_sink`) are drawn in code; there is no art file for them. | Six icons from the art team, under those names. |
 
@@ -827,6 +832,8 @@ rigs are posed, so the kaiju camera sits exactly on `cam_fp`) -> audio -> `rende
   browser does on Escape, on switching windows and in the second after Escape (when it
   refuses the lock) is reasoned from the browsers' documented behavior, not seen. Smoothness
   at 60 and 144 frames a second is from tests of the real session, not from a screen.
+- Port Meridian with its building art (section 11.3): 111 to 166 draw calls and about 360,000
+  triangles with the whole city in view; at most 131 calls and 500,000 triangles in play.
 - Measured after the art was wired in (development server, sandbox, 12 November): from the
   titan's eye over the whole city 102 draw calls and 148,000 triangles; from its chase camera
   100 and 123,000. Earlier: at stage 3 in the sandbox, from the titan's eye with the whole city in view, 92
@@ -899,7 +906,7 @@ ARCHITECTURE.md) are inside `06c498a`, "Art: UI pictogram set", a commit of 273 
 holds the city, voice and audio work in progress; one later sentence of this section is the
 only content of `99c9ce9`, "Art: Gragnor the Lizard kaiju".
 
-### 8.1 Is the tree green? No: one test fails on the head commit
+### 8.1 Is the tree green? (At the time: no. Superseded by section 11.1.)
 
 - **`npm run check` fails on the head commit, `99c9ce9`** (run at 23:58 on 11 November in a
   clean copy of that commit: exit code 1). One test fails:
@@ -1142,28 +1149,17 @@ the client engineer (that list itself was not read here).
 
 ## 9. Open items for the next client engineer (from the coordinator)
 
-Collected from the reports of the engineers who have finished. Whoever next owns `client/`
-(the "real city in the browser" task) should take these with their own list:
+Done by the client's city task (section 11): black building models, the night ground, the
+thrown object from the hand, the lobby's sleeping seats and bot seats, the autopilot's
+volleys, the district tint. Still open:
 
-- **New building models draw black in the client** (seen 12 November, 01:52, with
-  `bld_house_a`, `bld_tower_a`, `bld_factory_a`). The kit artist's findings on how the client
-  reads the atlas, vertex colors and texture orientation are in `docs/art/client-notes-city.md`.
-- **The ground at night reads as bright blue water** from a squad's eye
-  (`docs/progress/art-wired-titan.png`): asphalt and paving should stay recognizable at night.
-- **A thrown object does not start at the kaiju's hand** (kaiju art note, change 6): either
-  draw the projectile from the model's hold anchor for its first 0.15 s, or adopt the model's
-  hand height in the shared definition.
-- **Lobby:** show that the host may start without a player who has waited 20 seconds
-  (`canStartMatch` in `shared/src/net/lobby.ts`), and show empty seats as bots.
-- **Autopilot squad** (`client/src/game/autoplay.ts`) holds the trigger; the rules now reward
-  only charged volleys from two squads, so automated matches see few staggers until it charges.
 - **Stand-ins still in use:** the six marker sprites (`mk_*`); the textures `window_tile`,
-  `window_tile_lit`, `ground_plaza`, `ground_far`; the icons `ui_settings`, `ui_invert`,
-  `ui_fullscreen`, `ui_rise`, `ui_sink`, `ui_lowres` (drawn in code).
+  `window_tile_lit` (only for a missing building file now), `ground_plaza`, `ground_far`; the
+  icons `ui_settings`, `ui_invert`, `ui_fullscreen`, `ui_rise`, `ui_sink`, `ui_lowres`,
+  `ui_asleep`, `ui_outdated` (drawn in code).
 - **Not done, optional:** automatic lowering of resolution on slow frames; camera roll during
-  a stagger; debris sprites (nothing spawns debris yet).
-- **District tint:** Port Meridian carries a building tint per district (`District.tint`,
-  `docs/CITY.md` section 2); the client draws real models in plain white until it applies it.
+  a stagger; debris sprites (nothing spawns debris yet); district roof colors
+  (`docs/art/client-notes-city.md` section 6).
 
 ## 10. The city switch (12 November)
 
@@ -1185,6 +1181,64 @@ for both cities:
 | Events at stage 3, bots only | 11.7 to 16.7 a second, 16 to 24 kbit/s as plain text | 9.4 to 13.0, 12 to 18 kbit/s | Slightly more (about a quarter, more props and buildings): a few kbit/s per player on top of the 95 kbit/s of snapshots, about 0.6 Mbit/s up from the host for four remote players. |
 | Building the city in Node | 200 to 216 ms processor time cold (fresh process, 5 runs), 47 ms warm | 12 to 17 ms cold, 2 ms warm | Once when the server starts; the page does the same behind its loading screen (about 270 ms in Chromium, `docs/CITY.md` section 7). |
 
-Left open: the client draws buildings without the district tint and its draw calls with the
-real city have not been counted (`docs/CITY.md` section 9, item 5; section 9 above); five
-browser pages on the real city have not been played (`client/dist` was not rebuilt here).
+The client's part (district tint, draw calls, five browser pages on the real city) is in
+section 11.
+
+## 11. The real city in the browser (12 November, the client's city task)
+
+### 11.1 Is the tree green? Yes
+
+`npm run check` exits 0 on the working tree at the end of this task: type check clean, lint 238
+files clean (one `STUB(server)` left; `STUB(render)` is gone), 55 test files, 727 tests.
+`npm run build` was run; `client/dist` and `server/dist` are current. Scratch logs and every
+picture named here: `/tmp/mb-scratch/client-city/`.
+
+### 11.2 What changed
+
+- **Buildings from their art.** All 40 archetypes draw from their files: the city atlas read
+  unflipped (it was upside down, which made the models black) and mipmapped; the night atlas
+  lights windows, signs and beacons, and fires in damaged buildings; damaged and rubble states;
+  collapse throws the art's own chunk meshes (one shared buffer, one draw call). Wall colors:
+  each building takes one of its model's colors times its district's tint; landmarks keep
+  their own colors (`docs/CITY.md` section 2). The afternoon's light from below is now pale
+  grey (cream walls in shade were olive); the ground dims to warm greys at night.
+- **Map.** District ground in map tints with names, bridges as roads, and a small picture of
+  each landmark painted from its model.
+- **Lobby.** A player not ready after 20 s gets a sleeping picture (`ui_asleep`) and the start
+  button is live without them; empty seats show a bot leading a squad. A page refused as out of
+  date shows its own picture (`ui_outdated`).
+- **Autopilot squad.** Parks, charges and fires volleys together with the others as the squad
+  bots do. **Thrown objects** start at the model's hand and join the simulation's path within
+  0.15 s.
+- **`scripted.mjs`.** The human session turns to an open street before testing the drive, and
+  plays against a second page that takes the kaiju and stays idle (the practice bot kaiju
+  molted within a minute on Port Meridian, and every molt redeploys the squad, which undid the
+  checks half way).
+
+### 11.3 Measured
+
+| What | Figure |
+| --- | --- |
+| Whole city in view, stage 3, all buildings intact | 111 draw calls, 360,000 triangles |
+| Same, a third damaged and a third rubble, 480 pieces falling | 166 draw calls, 367,000 triangles (budget 350 / 1.5 million) |
+| Five-page match, highest on any page | 131 draw calls, 500,556 triangles |
+| Before this task (black buildings) | 94 to 114 calls, up to 597,000 triangles |
+| Page ready (home screen, cold, local) | 0.94 to 1.0 s; 84 files, 8.3 MB (5.5 MB are building models) |
+| City mirror | all five pages predicted (checksum equal to the server's) through a whole match |
+| Volleys in a five-page autopilot match | 29, with 2 staggers (4 before the change, none) |
+
+### 11.4 Runs
+
+- `smoke.mjs`: passed, zero console errors and zero warnings, stage 3 reached, humans won on
+  the clock.
+- `scripted.mjs`: 37 of 37 confirmed by the server, zero console errors.
+- `shots.mjs`: passed, zero console errors.
+- Pictures for the owner: `docs/progress/city-*.png` (skyline, street, night, wrecked, map),
+  real frames of the built game in the sandbox, uncropped.
+
+### 11.5 Still open
+
+- The sunset ground reads lavender (pale paving under the sunset's violet sky light). Not
+  wrong, not pretty.
+- Landmark pictures on the map are drawn once, in daylight colors.
+- Building models are 5.5 MB to download; over a slow tunnel the first load takes a few seconds.

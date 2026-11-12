@@ -28,9 +28,10 @@ import type { CityMirror } from '../net/cityMirror';
 import { hintPose, type ActionHint, type FrameState } from '../net/matchSession';
 import { Boundary } from './boundary';
 import { CityView } from './cityView';
+import { atlasPixels, renderLandmarkPictures } from './landmarkPictures';
 import { Crowd } from './crowd';
 import { Effects } from './effects';
-import { buildGround } from './ground';
+import { buildGround, setGroundNight } from './ground';
 import { KaijuView, type KaijuOverride } from './kaijuView';
 import { LineBatch } from './lineBatch';
 import { createMaterials, type Materials } from './materials';
@@ -188,8 +189,23 @@ export class GameRenderer {
     if (this.ground) this.scene.remove(this.ground);
     this.ground = buildGround(city, this.assets);
     this.city = new CityView(city, this.assets, this.materials);
+    this.pictures = null;
     this.scene.add(this.ground, this.city.group);
   }
+
+  /**
+   * Pictures of the landmarks for the map, by archetype id (drawn on first use, then kept).
+   * Empty when the landmarks have no art files.
+   */
+  landmarkPictures(): Map<string, HTMLCanvasElement> {
+    if (!this.pictures) {
+      const atlas = this.materials.cityAtlas.map;
+      this.pictures = renderLandmarkPictures(this.city ? this.city.landmarkModels() : [], atlasPixels(atlas?.image));
+    }
+    return this.pictures;
+  }
+
+  private pictures: Map<string, HTMLCanvasElement> | null = null;
 
   /** A match begins (or is joined): show its city state and forget the last match's leftovers. */
   beginMatch(mirror: CityMirror, stage: StageId, bounds: Bounds): void {
@@ -339,7 +355,9 @@ export class GameRenderer {
     switch (e.type) {
       case 'projectileSpawn': {
         const k = e.owner === 'kaiju' ? this.kaijuAt(e.ownerId) : undefined;
-        this.projectiles.spawn(e, k ? kaijuStageDef(k.kind, k.stage).bodyRadius * 0.9 : 3);
+        // A thrown thing leaves the model's hand (the simulation throws it from a point of its own).
+        const view = e.owner === 'kaiju' && e.projectile === 'thrown' ? this.kaijuViews[e.ownerId] : undefined;
+        this.projectiles.spawn(e, k ? kaijuStageDef(k.kind, k.stage).bodyRadius * 0.9 : 3, view?.hasHand ? view.hand : null);
         if (e.owner === 'unit') {
           this.units.noteFired(e.ownerId, this.time);
           fx.flash(e.x, e.y, e.z, e.projectile === 'rocket' ? 2.5 : 5, 0xffffff, 0.1);
@@ -597,6 +615,7 @@ export class GameRenderer {
     this.boundary.update(dt, time);
     this.sky.update(dt, this.camera);
     this.materials.setNight(this.sky.night, view?.kaijuFirstPerson === true);
+    if (this.ground) setGroundNight(this.ground, this.sky.night);
     this.lines.setFog(this.sky.fog.near, this.sky.fog.far);
 
     this.stats.sprites = this.sprites.size;

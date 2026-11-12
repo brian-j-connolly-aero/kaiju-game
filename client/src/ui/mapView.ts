@@ -4,9 +4,13 @@
  * units, and the kaiju when the humans know where it is. A human can place a move-to marker
  * (click, or the confirm button) and, with artillery, a call-in (right click, or the call-in
  * button). North is up: +Z up the screen, which puts +X on the left, exactly as seen from above.
+ *
+ * Port Meridian is drawn as itself: each district's ground in its map tint (docs/CITY.md
+ * section 2) with its name, the real road network, the river and the bay, bridges as roads over
+ * the water, and every landmark as a small picture of its own model.
  */
 
-import { kaijuStageDef, type Bounds, type CityData, type SquadCommand } from '@mb/shared';
+import { kaijuStageDef, type Bounds, type CityData, type District, type SquadCommand } from '@mb/shared';
 import type { ActionState } from '../game/input/actions';
 import type { FrameState, MatchSession } from '../net/matchSession';
 import { el } from './icons';
@@ -26,6 +30,20 @@ const COLORS = {
   human: '#1ec8e0',
   kaiju: '#ff7a1a',
   volley: '#ffd91a',
+  bridge: '#6b7590',
+  districtName: 'rgba(232, 238, 250, 0.8)',
+};
+
+/** District ground on the map, by zone: the map tints of docs/CITY.md section 2, darkened for a night-blue map. */
+const ZONE_GROUND: Record<District['zone'], string> = {
+  downtown: '#2b3653',
+  oldtown: '#3b3426',
+  temple: '#3e2c35',
+  suburb: '#25392c',
+  university: '#33304c',
+  industrial: '#37302a',
+  harbor: '#273643',
+  boardwalk: '#41302a',
 };
 
 export class MapView {
@@ -43,6 +61,8 @@ export class MapView {
   private view: Bounds = { minX: -1, minZ: -1, maxX: 1, maxZ: 1 };
   private frames = 0;
   private pendingClick: { x: number; y: number; button: number } | null = null;
+  private pictureSource: (() => Map<string, HTMLCanvasElement>) | null = null;
+  private pictures: Map<string, HTMLCanvasElement> | null = null;
 
   constructor() {
     const ctx = this.canvas.getContext('2d');
@@ -66,6 +86,13 @@ export class MapView {
 
   setCity(city: CityData): void {
     this.city = city;
+    this.pictures = null;
+  }
+
+  /** Where the landmark pictures come from (asked once, when the map is first drawn). */
+  setLandmarkPictures(source: () => Map<string, HTMLCanvasElement>): void {
+    this.pictureSource = source;
+    this.pictures = null;
   }
 
   setOpen(open: boolean): void {
@@ -156,16 +183,24 @@ export class MapView {
     const c1 = this.toMap(-city.half, -city.half);
     ctx.fillStyle = COLORS.land;
     ctx.fillRect(c0.x, c0.y, c1.x - c0.x, c1.y - c0.y);
-
-    for (const area of city.areas) {
-      ctx.fillStyle = area.kind === 'water' ? COLORS.water : area.kind === 'park' ? COLORS.park : COLORS.plaza;
+    const polygon = (points: readonly { x: number; z: number }[]): void => {
       ctx.beginPath();
-      area.polygon.forEach((p, i) => {
+      points.forEach((p, i) => {
         const m = this.toMap(p.x, p.z);
         if (i === 0) ctx.moveTo(m.x, m.y);
         else ctx.lineTo(m.x, m.y);
       });
       ctx.closePath();
+    };
+    for (const d of city.districts) {
+      ctx.fillStyle = ZONE_GROUND[d.zone] ?? COLORS.land;
+      polygon(d.polygon);
+      ctx.fill();
+    }
+
+    for (const area of city.areas) {
+      ctx.fillStyle = area.kind === 'water' ? COLORS.water : area.kind === 'park' ? COLORS.park : COLORS.plaza;
+      polygon(area.polygon);
       ctx.fill();
     }
 
@@ -189,7 +224,7 @@ export class MapView {
       const r = Math.max(st.hx, st.hz) * 1.5;
       if (!inView(st.x, st.z, r)) continue;
       const stage = stages[st.id];
-      ctx.fillStyle = stage >= 3 ? COLORS.rubble : stage > 0 ? COLORS.damaged : COLORS.standing;
+      ctx.fillStyle = stage >= 3 ? COLORS.rubble : stage > 0 ? COLORS.damaged : st.cls === 'bridge' ? COLORS.bridge : COLORS.standing;
       const m = this.toMap(st.x, st.z);
       const w = Math.max(1.5, st.hx * 2 * scale);
       const h = Math.max(1.5, st.hz * 2 * scale);
@@ -202,6 +237,63 @@ export class MapView {
         ctx.fillRect(-w / 2, -h / 2, w, h);
         ctx.restore();
       }
+    }
+
+    // Landmarks: a picture of each one's own model, faded once it has fallen.
+    if (!this.pictures && this.pictureSource) this.pictures = this.pictureSource();
+    const pictures = this.pictures;
+    if (pictures && pictures.size > 0) {
+      for (const st of city.structures) {
+        if (st.landmark === null) continue;
+        const picture = pictures.get(st.archetype);
+        if (!picture) continue;
+        const r = Math.max(st.hx, st.hz);
+        if (!inView(st.x, st.z, r)) continue;
+        const m = this.toMap(st.x, st.z);
+        const side = Math.min(64, Math.max(30, r * 2 * scale * 1.2));
+        ctx.globalAlpha = stages[st.id] >= 3 ? 0.35 : 1;
+        ctx.drawImage(picture, m.x - side / 2, m.y - side / 2, side, side);
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    // District names (names are the only words in the game), faint, under everything that moves:
+    // in the middle of the district's box, broken into lines to fit its width.
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    for (const d of city.districts) {
+      let minX = Infinity;
+      let maxX = -Infinity;
+      let minZ = Infinity;
+      let maxZ = -Infinity;
+      for (const p of d.polygon) {
+        minX = Math.min(minX, p.x);
+        maxX = Math.max(maxX, p.x);
+        minZ = Math.min(minZ, p.z);
+        maxZ = Math.max(maxZ, p.z);
+      }
+      const x = (minX + maxX) / 2;
+      const z = (minZ + maxZ) / 2;
+      if (!inView(x, z, 0)) continue;
+      const width = (maxX - minX) * scale * 0.9;
+      const size = Math.round(Math.min(15, Math.max(9, scale * 26)));
+      ctx.font = `700 ${size}px system-ui, sans-serif`;
+      const lines: string[] = [];
+      for (const word of d.name.toUpperCase().split(' ')) {
+        const last = lines.length - 1;
+        if (last >= 0 && ctx.measureText(`${lines[last]} ${word}`).width <= width) lines[last] = `${lines[last]} ${word}`;
+        else lines.push(word);
+      }
+      const m = this.toMap(x, z);
+      lines.forEach((line, i) => {
+        const y = m.y + (i - (lines.length - 1) / 2) * size * 1.1;
+        ctx.strokeStyle = 'rgba(12, 15, 24, 0.85)';
+        ctx.lineWidth = 3;
+        ctx.strokeText(line, m.x, y);
+        ctx.fillStyle = COLORS.districtName;
+        ctx.fillText(line, m.x, y);
+      });
     }
 
     // Quarantine line.

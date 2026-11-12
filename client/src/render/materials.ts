@@ -15,6 +15,12 @@ export interface Materials {
   glow: THREE.MeshBasicMaterial;
   /** Lit, textured from the shared city atlas. */
   cityAtlas: THREE.MeshLambertMaterial;
+  /**
+   * The city atlas for instanced buildings: the instance color paints only the wall faces the
+   * model masks (vertex color alpha 1), and the per-instance `instanceShade` darkens everything
+   * (docs/art/client-notes-city.md section 2). Opaque, always: alpha-0 faces must not vanish.
+   */
+  cityTint: THREE.MeshLambertMaterial;
   /** Lit vertex colors where the instance color only paints the faces masked by vertex alpha (cars). */
   paint: THREE.MeshLambertMaterial;
   /** Placeholder buildings: a repeating window tile tinted by vertex and instance color. */
@@ -61,6 +67,38 @@ function maskInstanceColor(material: THREE.Material): void {
   material.customProgramCacheKey = () => 'mb-paint-mask';
 }
 
+/** Name of the per-instance float attribute `cityTint` reads (1 = as built, below 1 = darker). */
+export const INSTANCE_SHADE = 'instanceShade';
+
+/** `cityTint`: masked instance color plus a separate shade for every face. */
+function maskInstanceColorWithShade(material: THREE.Material): void {
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', `#include <common>\n#ifdef USE_INSTANCING\nattribute float ${INSTANCE_SHADE};\n#endif`)
+      .replace(
+        '#include <color_vertex>',
+        [
+          '#if defined( USE_COLOR ) || defined( USE_COLOR_ALPHA ) || defined( USE_INSTANCING_COLOR )',
+          '  vColor = vec4( 1.0 );',
+          '#endif',
+          '#ifdef USE_COLOR_ALPHA',
+          '  vColor *= color;',
+          '#elif defined( USE_COLOR )',
+          '  vColor.rgb *= color;',
+          '#endif',
+          '#ifdef USE_INSTANCING_COLOR',
+          '  #ifdef USE_COLOR_ALPHA',
+          `    vColor.rgb *= mix( vec3( ${INSTANCE_SHADE} ), instanceColor.rgb * ${INSTANCE_SHADE}, color.a );`,
+          '  #else',
+          `    vColor.rgb *= instanceColor.rgb * ${INSTANCE_SHADE};`,
+          '  #endif',
+          '#endif',
+        ].join('\n'),
+      );
+  };
+  material.customProgramCacheKey = () => 'mb-city-tint';
+}
+
 /** Adds a rim light and a self-lift to a Lambert material; returns the uniforms to drive them. */
 function addRimLight(material: THREE.MeshLambertMaterial): { rimColor: { value: THREE.Color }; rimStrength: { value: number }; selfLift: { value: number } } {
   const uniforms = { rimColor: { value: new THREE.Color(0x9db8ff) }, rimStrength: { value: 0 }, selfLift: { value: 0 } };
@@ -98,6 +136,16 @@ export function createMaterials(assets: AssetStore): Materials {
     emissiveIntensity: 0,
   });
   cityAtlas.name = 'city_atlas';
+  const cityTint = new THREE.MeshLambertMaterial({
+    vertexColors: true,
+    flatShading: true,
+    map: cityAtlas.map,
+    emissiveMap: cityAtlas.emissiveMap,
+    emissive: new THREE.Color(0xffffff),
+    emissiveIntensity: 0,
+  });
+  cityTint.name = 'city_tint';
+  maskInstanceColorWithShade(cityTint);
   const paint = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
   paint.name = 'paint';
   maskInstanceColor(paint);
@@ -120,6 +168,7 @@ export function createMaterials(assets: AssetStore): Materials {
     vcol,
     glow,
     cityAtlas,
+    cityTint,
     paint,
     building,
     kaiju,
@@ -128,6 +177,7 @@ export function createMaterials(assets: AssetStore): Materials {
     },
     setNight(amount, insideKaiju = false) {
       cityAtlas.emissiveIntensity = amount;
+      cityTint.emissiveIntensity = amount;
       building.emissiveIntensity = amount * 0.9;
       // Sunset (0.35): a warm edge; night (1): moonlight round the silhouette and the body's own
       // orange lifted out of the dark.

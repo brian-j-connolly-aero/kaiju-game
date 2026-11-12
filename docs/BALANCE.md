@@ -506,8 +506,12 @@ them either way. How they fire matters far more than how often.
 - **The bots fire at full charge only.** A person who fires at 60 to 90% charge gets a
   weaker volley sooner; the harness has no profile for that middle ground.
 - **Four idle people no longer stagger anything**: squads start on fire at will, which never
-  breaks nerve now. The client's autopilot squad (`client/src/game/autoplay.ts`) holds the
-  trigger too, so browser smoke runs will see fewer staggers and kills than before.
+  breaks nerve now. The client's autopilot squad (`client/src/game/autoplay.ts`) used to hold
+  the trigger too; since 12 November it plays the squad bot's volley rule (park, charge to
+  full, wait up to 2.5 s for a squad that is nearly charged, then fire), so browser smoke runs
+  fire charged volleys again. Measured in the sandbox at stage 2 over 100 s (one autopilot
+  squad, three bot squads, bot kaiju): the old autopilot fired no volley of its own, the new
+  one seven, all at full charge, most of them within a second of a bot squad's.
 
 ## 8. Third pass: Port Meridian (the city switch)
 

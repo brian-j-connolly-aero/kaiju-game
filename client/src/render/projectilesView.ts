@@ -31,9 +31,25 @@ interface Flying {
   object: SceneRig | null;
   spin: THREE.Vector3;
   trail: number;
+  /** Where it is drawn at launch minus where the simulation launched it; faded out over `HAND_BLEND`. */
+  ox: number;
+  oy: number;
+  oz: number;
   x: number;
   y: number;
   z: number;
+}
+
+/**
+ * Seconds over which a thrown object goes from the model's hand to the simulation's path
+ * (docs/art/client-notes-kaiju-lizard.md section 7: the simulation throws from its own hand
+ * point, up to 59 m from the model's at stage 3).
+ */
+export const HAND_BLEND = 0.15;
+
+/** How much of the launch offset is still added `t` seconds after the launch (1 at the hand, 0 from `HAND_BLEND` on). */
+export function handBlend(t: number): number {
+  return t >= HAND_BLEND ? 0 : 1 - Math.max(0, t) / HAND_BLEND;
 }
 
 const MODELS: Partial<Record<ProjectileTypeId, string>> = { rocket: 'proj_rocket', shell: 'proj_shell', arty: 'proj_arty' };
@@ -80,7 +96,8 @@ export class ProjectilesView {
     return this.flying.size;
   }
 
-  spawn(e: ProjectileSpawnEvent, chunkScale: number): void {
+  /** `hand`: for a thrown object, the model's hand at the moment of release (the drawing starts there). */
+  spawn(e: ProjectileSpawnEvent, chunkScale: number, hand: THREE.Vector3 | null = null): void {
     let object: SceneRig | null = null;
     if (e.projectile === 'thrown') {
       const id = payloadModel(e.payload);
@@ -104,6 +121,9 @@ export class ProjectilesView {
       object,
       spin: new THREE.Vector3((e.id % 5) - 2, (e.id % 3) - 1, (e.id % 7) - 3).multiplyScalar(0.9),
       trail: 0,
+      ox: hand && e.projectile === 'thrown' ? hand.x - e.x : 0,
+      oy: hand && e.projectile === 'thrown' ? hand.y - e.y : 0,
+      oz: hand && e.projectile === 'thrown' ? hand.z - e.z : 0,
       x: e.x,
       y: e.y,
       z: e.z,
@@ -156,7 +176,8 @@ export class ProjectilesView {
       const yaw = Math.atan2(p.vx, p.vz);
       const pitch = -Math.atan2(vy, Math.hypot(p.vx, p.vz));
       if (p.object) {
-        p.object.root.position.set(p.x, p.y, p.z);
+        const blend = handBlend(t - DT);
+        p.object.root.position.set(p.x + p.ox * blend, p.y + p.oy * blend, p.z + p.oz * blend);
         p.object.root.rotation.set(p.spin.x * t, p.spin.y * t, p.spin.z * t);
         continue;
       }

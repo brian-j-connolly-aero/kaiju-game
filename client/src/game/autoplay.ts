@@ -7,13 +7,17 @@
  *           soldiers are near, breathes its beam at them when rage is full, grabs and throws a
  *           car now and then, eats when hurt, braces against a charged volley, molts when it can.
  *   human   drives along the streets to a firing position at its own bearing around the kaiju,
- *           parks the sub-units on hold-and-charge, fires when it has range and a clear line,
- *           backs off when the kaiju closes, calls artillery when it has some, and now and then
- *           opens the map and toggles the camera.
+ *           parks the sub-units on hold-and-charge and, with range and a clear line, fires the
+ *           volley when the charge is full, waiting a moment for another squad that is nearly
+ *           charged so the volleys land together (as the squad bots do: `volleyVerdict`); it
+ *           holds its fire on the move, shoots freely at a helpless kaiju or when alone; backs off
+ *           when the kaiju closes, calls artillery when it has some, and now and then opens the
+ *           map and toggles the camera.
  *   drone   circles the kaiju.
  */
 
 import {
+  BOT_RULES,
   boundsContains,
   clamp,
   distToStructure,
@@ -36,6 +40,46 @@ import type { ActionState } from './input/actions';
 interface Target {
   x: number;
   z: number;
+}
+
+/**
+ * The charge of a squad's planted sub-units (their mean, as `squadCharge` in the simulation
+ * computes it), read from the snapshot. 0 when none is planted.
+ */
+export function snapSquadCharge(units: readonly SnapUnit[], squad: number): number {
+  let sum = 0;
+  let n = 0;
+  for (const u of units) {
+    if (u.squad !== squad || !u.alive || u.driven || !u.rooted) continue;
+    sum += u.charge;
+    n++;
+  }
+  return n > 0 ? sum / n : 0;
+}
+
+/**
+ * Whether the autopilot's squad pulls the trigger now (it has range and a clear line): the squad
+ * bot's rule (shared/src/sim/bots/squadBot.ts). `fire` with the kaiju helpless or nobody to
+ * charge with; `hold` while moving or charging; at full charge `wait` while another planted
+ * squad is nearly charged (for at most `syncWait` seconds, counted by the caller in `waited`),
+ * then `fire`, so the volleys land together.
+ */
+export function volleyVerdict(units: readonly SnapUnit[], squad: number, parked: boolean, helpless: boolean, waited: number): 'fire' | 'wait' | 'hold' {
+  const S = BOT_RULES.squad;
+  let subs = 0;
+  for (const u of units) if (u.squad === squad && u.alive && !u.driven) subs++;
+  if (subs === 0 || helpless) return 'fire';
+  if (!parked) return 'hold';
+  // Charges travel in 1/255 steps.
+  if (snapSquadCharge(units, squad) < S.volleyCharge - 0.5 / 255) return 'hold';
+  if (waited >= S.syncWait) return 'fire';
+  const others = new Set<number>();
+  for (const u of units) if (u.squad !== squad && u.alive && u.rooted && !u.driven) others.add(u.squad);
+  for (const other of others) {
+    const c = snapSquadCharge(units, other);
+    if (c >= S.syncCharge && c < S.volleyCharge - 0.5 / 255) return 'wait';
+  }
+  return 'fire';
 }
 
 const from = { x: 0, y: 0, z: 0 };
@@ -76,6 +120,10 @@ export class Autopilot {
   private mapHold = 0;
   private cameraRest = 9;
   private callInRest = 3;
+  /** Seconds the parked squad has had no line of fire. */
+  private noLine = 0;
+  /** Seconds the charged squad has waited for a neighbor's volley. */
+  private volleyWait = 0;
 
   /** Give the autopilot this frame's view of the match (null between matches). */
   setContext(session: MatchSession | null, frame: FrameState | null): void {
@@ -373,7 +421,6 @@ export class Autopilot {
     }
     const tooClose = known && dist < Math.max(st.bodyRadius * 3 + 12, range * 0.25);
     const toGoal = Math.hypot(goal.x - u.x, goal.z - u.z);
-    const inPosition = known && toGoal < 18 && !tooClose;
 
     // Look at the kaiju's chest (or along the way when it has not been found).
     const eyeY = u.y + def.eyeHeight;
@@ -391,6 +438,12 @@ export class Autopilot {
       to.z = k.z;
       clear = lineOfSight(session.mirror.query, from, to);
     }
+    // In position: at the goal, or anywhere in the firing band with a line of fire. Once parked
+    // the squad stays (its charge builds only while it holds still) until the kaiju walks out of
+    // range or too close, or the line of fire stays blocked, as the squad bots do.
+    this.noLine = clear ? 0 : this.noLine + dt;
+    const inBand = known && clear && dist >= range * 0.45 && dist <= range * 0.9;
+    const inPosition = known && !tooClose && (this.parked ? dist <= range * 0.97 && this.noLine < BOT_RULES.squad.losPatience : toGoal < 18 || inBand);
 
     // Drive.
     let wantX = 0;
@@ -434,8 +487,17 @@ export class Autopilot {
     state.moveX = -wantX * c + wantZ * s;
     state.aimOverride = { yaw: aimYaw, pitch: aimPitch };
 
-    // Shoot when in range with a clear line; the shot also triggers the charged volley.
-    if (known && clear && dist < range * 0.97) d.fire = true;
+    // With range and a clear line: the shot fires the charged volley, so wait for a full charge
+    // (and a moment for a neighbor that is nearly there) instead of holding the trigger down.
+    if (known && clear && dist < range * 0.97) {
+      const helpless = k.phase === 'stagger' || k.phase === 'cocoon';
+      const verdict = volleyVerdict(frame.units, squad.id, this.parked && squad.fireMode === 'charge', helpless, this.volleyWait);
+      if (verdict === 'wait') this.volleyWait += dt;
+      else if (verdict === 'fire') d.fire = true;
+      else this.volleyWait = 0;
+    } else {
+      this.volleyWait = 0;
+    }
 
     // Orders: follow on the move, hold and charge once in position.
     this.commandRest -= dt;
@@ -444,7 +506,7 @@ export class Autopilot {
         d.cmdHoldCharge = true;
         this.parked = true;
         this.commandRest = 4;
-      } else if (!inPosition && this.parked && (tooClose || toGoal > 60)) {
+      } else if (!inPosition && this.parked) {
         d.cmdFollow = true;
         this.parked = false;
         this.commandRest = 4;

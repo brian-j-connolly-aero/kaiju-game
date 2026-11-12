@@ -18,6 +18,14 @@ export function inviteLink(code: string, publicUrl: string | undefined, page: { 
   return `${base}#${code}`;
 }
 
+/**
+ * A seat the start no longer waits for: connected, not the host, not ready, and in the lobby
+ * long enough (the server's `waited` flag; `canStartMatch` in shared/src/net/lobby.ts).
+ */
+export function seatAsleep(lobby: LobbyState, p: LobbyState['players'][number]): boolean {
+  return p.connected && !p.ready && p.seat !== lobby.host && p.waited === true;
+}
+
 export class LobbyScreen implements Screen {
   readonly id = 'lobby' as const;
   private root: HTMLElement | null = null;
@@ -112,15 +120,19 @@ export class LobbyScreen implements Screen {
     for (let seat = 0; seat < MATCH_RULES.maxPlayers; seat++) {
       const p = lobby.players.find((x) => x.seat === seat);
       if (!p) {
-        cards.push(el('div', 'seat empty', [icon('lb_bot', 'seat-role')]));
+        // Nobody here: a bot leads this squad.
+        cards.push(el('div', 'seat empty', [icon('lb_bot', 'seat-role bot'), icon('lb_human', 'seat-bot-role')]));
         continue;
       }
-      const card = el('div', `seat${p.seat === client.seat ? ' me' : ''}${p.connected ? '' : ' away'}${p.ready || p.seat === lobby.host ? ' ready' : ''}`, [
+      // Not ready for 20 seconds: the host may start without them (`canStartMatch`).
+      const asleep = seatAsleep(lobby, p);
+      const card = el('div', `seat${p.seat === client.seat ? ' me' : ''}${p.connected ? '' : ' away'}${p.ready || p.seat === lobby.host ? ' ready' : ''}${asleep ? ' asleep' : ''}`, [
         icon(p.wantsKaiju ? 'lb_kaiju' : 'lb_human', `seat-role ${p.wantsKaiju ? 'kaiju' : 'human'}`),
         el('div', 'seat-name', [p.name]),
         el('div', 'seat-flags', [
           p.seat === lobby.host ? icon('lb_host', 'flag host') : '',
           p.ready ? icon('lb_ready', 'flag ok') : '',
+          asleep ? icon('ui_asleep', 'flag asleep') : '',
           p.connected ? '' : icon('ui_offline', 'flag off'),
         ]),
       ]);
