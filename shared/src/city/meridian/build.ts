@@ -414,6 +414,15 @@ export function buildYards(b: Builder, seed: number): void {
 /** A tank (radius 4 m) is deployed with this much clear ground round it (sim/spawn.ts), an infantry section (3 m) with this much. */
 export const TANK_CLEAR = 4.75;
 export const INFANTRY_CLEAR = 3.75;
+/**
+ * A troop of tanks is 9 m in radius: this pass looks at any ground a troop can stand on at all
+ * (a little more than where the game would deploy one, which keeps it clear of the raster's
+ * rounding). Troops exist only at the last stage, whose line is the edge of the city, and the
+ * squads line up within some tens of meters of that line: so yards big enough for a troop are
+ * opened only in a band this deep along the edge.
+ */
+export const TROOP_CLEAR = 9;
+export const TROOP_BAND = 200;
 const POCKET_CELL = 2.5;
 /** Smaller specks of enclosed ground than this many cells (about 19 m2) are left alone. */
 const POCKET_MIN_CELLS = 3;
@@ -436,6 +445,14 @@ interface PocketJob {
   queue: Int32Array;
   gone: Uint8Array;
   removed: number;
+  /** Clear ground the bigger body of this job needs round its center, and the smaller one (the same number when there is only one). */
+  roomy: number;
+  tight: number;
+  /** How many walls may go for one yard, and the smallest patch of enclosed ground (in cells) worth opening. */
+  tries: number;
+  least: number;
+  /** Prefer a wall with other open ground behind it (a wide body gets through no other kind). */
+  through: boolean;
 }
 
 /** Classes the cells near a box (flags are kept). */
@@ -447,14 +464,15 @@ function pocketMark(job: PocketJob, id: number): void {
   const s = DIR_SIN[box.dir];
   const hx = box.hx;
   const hz = box.hz;
-  const ex = boxExtentX(box) + TANK_CLEAR;
-  const ez = boxExtentZ(box) + TANK_CLEAR;
+  const roomy = job.roomy;
+  const ex = boxExtentX(box) + roomy;
+  const ez = boxExtentZ(box) + roomy;
   const c0 = Math.max(0, Math.floor((box.x - ex + half) / POCKET_CELL));
   const c1 = Math.min(n - 1, Math.floor((box.x + ex + half) / POCKET_CELL));
   const r0 = Math.max(0, Math.floor((box.z - ez + half) / POCKET_CELL));
   const r1 = Math.min(n - 1, Math.floor((box.z + ez + half) / POCKET_CELL));
-  const tankSq = TANK_CLEAR * TANK_CLEAR;
-  const footSq = INFANTRY_CLEAR * INFANTRY_CLEAR;
+  const tankSq = roomy * roomy;
+  const footSq = job.tight * job.tight;
   if (box.dir % DIR_QUARTER === 0) {
     // Square to the axes: the same test in whole eighths of a meter (every number here is one),
     // which costs the engine nothing to compute before it has warmed up.
@@ -464,8 +482,8 @@ function pocketMark(job: PocketJob, id: number): void {
     const bx = Math.round((box.x + half) * 8);
     const bz = Math.round((box.z + half) * 8);
     const step = POCKET_CELL * 8;
-    const tank = TANK_CLEAR * 8;
-    const foot = INFANTRY_CLEAR * 8;
+    const tank = roomy * 8;
+    const foot = job.tight * 8;
     for (let r = r0; r <= r1; r++) {
       let lz = r * step + step / 2 - bz;
       if (lz < 0) lz = -lz;
@@ -497,7 +515,7 @@ function pocketMark(job: PocketJob, id: number): void {
       const x = -half + (cc + 0.5) * POCKET_CELL - box.x;
       const lx = Math.abs(x * c - z * s) - hx;
       const lz = Math.abs(x * s + z * c) - hz;
-      if (lx >= TANK_CLEAR || lz >= TANK_CLEAR) continue;
+      if (lx >= roomy || lz >= roomy) continue;
       const ox = lx > 0 ? lx : 0;
       const oz = lz > 0 ? lz : 0;
       const d = ox * ox + oz * oz;
@@ -532,6 +550,27 @@ function pocketFlood(job: PocketJob, head: number, tailIn: number, fits: number,
   return tail;
 }
 
+/** Is there ground the bigger body can stand on next to this building that is not part of the yard being looked at? */
+function pocketBehind(job: PocketJob, id: number): boolean {
+  const { b, n, cells } = job;
+  const half = b.half;
+  const box = b.boxes[id];
+  const pad = job.roomy + POCKET_CELL * 1.5;
+  const ex = boxExtentX(box) + pad;
+  const ez = boxExtentZ(box) + pad;
+  const c0 = Math.max(0, Math.floor((box.x - ex + half) / POCKET_CELL));
+  const c1 = Math.min(n - 1, Math.floor((box.x + ex + half) / POCKET_CELL));
+  const r0 = Math.max(0, Math.floor((box.z - ez + half) / POCKET_CELL));
+  const r1 = Math.min(n - 1, Math.floor((box.z + ez + half) / POCKET_CELL));
+  for (let r = r0; r <= r1; r++) {
+    for (let cc = c0; cc <= c1; cc++) {
+      const v = cells[r * n + cc];
+      if ((v & FITS) === 0 && (v & IN_POCKET) === 0) return true;
+    }
+  }
+  return false;
+}
+
 /**
  * Looks at the ground from one cell: if it is an enclosed pocket for a body of class `fits`,
  * takes walls out (cheapest building first) until it is not. Either way the ground visited ends
@@ -545,9 +584,11 @@ function pocketProbe(job: PocketJob, seed: number, fits: number, open: number, f
   let end = pocketFlood(job, 0, 1, fits, open);
   let isOpen = end < 0;
   if (isOpen) end = -end;
-  const near = TANK_CLEAR + POCKET_CELL * 1.5;
-  for (let tries = 0; tries < 6 && !isOpen && end >= POCKET_MIN_CELLS; tries++) {
+  const roomy = job.roomy;
+  const near = roomy + POCKET_CELL * 1.5;
+  for (let tries = 0; tries < job.tries && !isOpen && end >= job.least; tries++) {
     let best = -1;
+    let bestThrough = false;
     for (let q = 0; q < end; q++) {
       const cellId = queue[q];
       const x = -half + ((cellId % n) + 0.5) * POCKET_CELL;
@@ -562,8 +603,14 @@ function pocketProbe(job: PocketJob, seed: number, fits: number, open: number, f
             const id = list[i];
             const st = b.structures[id];
             if (gone[id] || st.passable || st.landmark !== null) continue;
-            if (distSqPointBox(x, z, b.boxes[id]) > near * near) continue;
-            if (best < 0 || st.value < b.structures[best].value || (st.value === b.structures[best].value && id > best)) best = id;
+            if (id === best || distSqPointBox(x, z, b.boxes[id]) > near * near) continue;
+            const through = job.through && pocketBehind(job, id);
+            if (best >= 0 && bestThrough && !through) continue;
+            const better = best < 0 || (through && !bestThrough);
+            if (better || st.value < b.structures[best].value || (st.value === b.structures[best].value && id > best)) {
+              best = id;
+              bestThrough = through;
+            }
           }
         }
       }
@@ -573,17 +620,17 @@ function pocketProbe(job: PocketJob, seed: number, fits: number, open: number, f
     job.removed++;
     // Free the ground it stood on, except what its neighbors still cover.
     const box = b.boxes[best];
-    const ex = boxExtentX(box) + TANK_CLEAR;
-    const ez = boxExtentZ(box) + TANK_CLEAR;
+    const ex = boxExtentX(box) + roomy;
+    const ez = boxExtentZ(box) + roomy;
     const c0 = Math.max(0, Math.floor((box.x - ex + half) / POCKET_CELL));
     const c1 = Math.min(n - 1, Math.floor((box.x + ex + half) / POCKET_CELL));
     const r0 = Math.max(0, Math.floor((box.z - ez + half) / POCKET_CELL));
     const r1 = Math.min(n - 1, Math.floor((box.z + ez + half) / POCKET_CELL));
     for (let r = r0; r <= r1; r++) for (let cc = c0; cc <= c1; cc++) cells[r * n + cc] &= ~FITS;
-    const h0 = cellOf(b, box.x - ex - TANK_CLEAR);
-    const h1 = cellOf(b, box.x + ex + TANK_CLEAR);
-    const v0 = cellOf(b, box.z - ez - TANK_CLEAR);
-    const v1 = cellOf(b, box.z + ez + TANK_CLEAR);
+    const h0 = cellOf(b, box.x - ex - roomy);
+    const h1 = cellOf(b, box.x + ex + roomy);
+    const v0 = cellOf(b, box.z - ez - roomy);
+    const v1 = cellOf(b, box.z + ez + roomy);
     const now = ++b.stampNow;
     for (let r = v0; r <= v1; r++) {
       for (let cc = h0; cc <= h1; cc++) {
@@ -613,7 +660,7 @@ function pocketSweep(job: PocketJob, id: number): void {
   const { b, n, cells } = job;
   const half = b.half;
   const box = b.boxes[id];
-  const pad = TANK_CLEAR + POCKET_CELL;
+  const pad = job.roomy + POCKET_CELL;
   const ex = boxExtentX(box) + pad;
   const ez = boxExtentZ(box) + pad;
   const c0 = Math.max(0, Math.floor((box.x - ex + half) / POCKET_CELL));
@@ -639,16 +686,10 @@ function pocketSweep(job: PocketJob, id: number): void {
 }
 
 /**
- * Opens every enclosed yard. Squads are deployed wherever the stage bounds happen to run, on
- * any clear spot big enough for the unit, and a yard walled in by buildings would trap the
- * unit there for the whole stage. So, round every building: is the ground a tank can stand on
- * there connected to a street (or simply to a lot more open ground)? Where a patch of it (about
- * 20 m2 or more) is not, the cheapest building of its wall is taken out, and the next, until it
- * is. Then the same for the narrower ground an infantry section can stand on, checking again
- * that a hole made for the infantry is no new trap for a tank. Returns how many buildings were
- * removed. Bridge decks and landmarks are never removed.
+ * One round of yard opening for one or two sizes of body. `band` > 0 keeps it to the buildings
+ * within that many meters of the edge of the city. Removed buildings are noted in `gone`.
  */
-export function openPockets(b: Builder): number {
+function runPockets(b: Builder, gone: Uint8Array, roomy: number, tight: number, band: number): number {
   const half = b.half;
   const n = Math.ceil((half * 2) / POCKET_CELL);
   const job: PocketJob = {
@@ -656,12 +697,17 @@ export function openPockets(b: Builder): number {
     n,
     cells: new Uint8Array(n * n),
     queue: new Int32Array(POCKET_OPEN_CELLS + 8),
-    gone: new Uint8Array(b.structures.length),
+    gone,
     removed: 0,
+    roomy,
+    tight,
+    tries: band > 0 ? 8 : 6,
+    least: band > 0 ? 1 : POCKET_MIN_CELLS,
+    through: band > 0,
   };
-  const { cells, gone } = job;
+  const cells = job.cells;
   const count = b.structures.length;
-  for (let id = 0; id < count; id++) if (!b.structures[id].passable) pocketMark(job, id);
+  for (let id = 0; id < count; id++) if (!b.structures[id].passable && !gone[id]) pocketMark(job, id);
   // The streets are open ground by definition.
   for (const st of b.streets) {
     const l = len(st.bx - st.ax, st.bz - st.az);
@@ -673,10 +719,32 @@ export function openPockets(b: Builder): number {
       if (k >= 0 && k < n * n && (cells[k] & FITS) === 0) cells[k] |= TANK_OPEN | FOOT_OPEN;
     }
   }
+  const inner = half - band;
   for (let id = 0; id < count; id++) {
-    if (!b.structures[id].passable) pocketSweep(job, id);
+    if (b.structures[id].passable || gone[id]) continue;
+    if (band > 0 && Math.max(Math.abs(b.boxes[id].x), Math.abs(b.boxes[id].z)) < inner) continue;
+    pocketSweep(job, id);
   }
-  if (job.removed === 0) return 0;
+  return job.removed;
+}
+
+/**
+ * Opens every enclosed yard. Squads are deployed wherever the stage bounds happen to run, on
+ * any clear spot big enough for the unit, and a yard walled in by buildings would trap the
+ * unit there for the whole stage. So, round every building: is the ground a tank can stand on
+ * there connected to a street (or simply to a lot more open ground)? Where a patch of it (about
+ * 20 m2 or more) is not, the cheapest building of its wall is taken out, and the next, until it
+ * is. Then the same for the narrower ground an infantry section can stand on, checking again
+ * that a hole made for the infantry is no new trap for a tank. Along the edge of the city, where
+ * the last stage deploys its troops of tanks, the same is done first for a troop: there the wall
+ * taken out is one with open ground behind it, since a troop needs a gap two houses wide.
+ * Returns how many buildings were removed. Bridge decks and landmarks are never removed.
+ */
+export function openPockets(b: Builder): number {
+  const gone = new Uint8Array(b.structures.length);
+  let removed = runPockets(b, gone, TROOP_CLEAR, TROOP_CLEAR, TROOP_BAND);
+  removed += runPockets(b, gone, TANK_CLEAR, INFANTRY_CLEAR, 0);
+  if (removed === 0) return 0;
   // Rebuild the lists without the removed buildings (ids stay equal to indexes).
   const structures = b.structures;
   const boxes = b.boxes;
@@ -688,5 +756,5 @@ export function openPockets(b: Builder): number {
     if (gone[id]) continue;
     addStructure(b, archetypeDef(structures[id].archetype), boxes[id]);
   }
-  return job.removed;
+  return removed;
 }

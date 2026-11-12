@@ -67,7 +67,7 @@ interface Rig {
   audio: MatchAudio;
   ctx: FakeAudioContext;
   fetcher: FakeFetch;
-  session: { role: LocalRole; mirror: MatchAudioSession['mirror']; frame: FrameState | null };
+  session: { role: LocalRole; mirror: MatchAudioSession['mirror']; frame: FrameState | null; catchingUp?: boolean };
   /** One frame: the session shows it, the match audio and the engine update, time moves on. */
   frame(frame: FrameState, dt?: number): Promise<void>;
   /** The same frame for a while, at 20 frames a second, its tick moving with the time. */
@@ -144,11 +144,11 @@ function unit(over: Partial<SnapUnit> = {}): SnapUnit {
   return { id: 0, squad: 0, alive: true, laser: false, charge: 0, x: 0, y: 0, z: 0, ...over } as SnapUnit;
 }
 
-function frameOf(over: { tick?: number; phase?: SnapMatch['phase']; stage?: StageId; kaiju?: Partial<SnapKaiju>; units?: SnapUnit[] } = {}): FrameState {
+function frameOf(over: { tick?: number; phase?: SnapMatch['phase']; stage?: StageId; phaseTime?: number; kaiju?: Partial<SnapKaiju>; units?: SnapUnit[] } = {}): FrameState {
   const stage = over.stage ?? 1;
   return {
     tick: over.tick ?? 900,
-    match: { phase: over.phase ?? 'playing', stage } as SnapMatch,
+    match: { phase: over.phase ?? 'playing', stage, phaseTime: over.phaseTime ?? 0 } as SnapMatch,
     kaijus: [kaiju({ stage, ...over.kaiju })],
     squads: [],
     units: over.units ?? [],
@@ -504,6 +504,21 @@ describe('music through a match', () => {
     expect((stem.startedAt as number) - (startedAt + 8)).toBeLessThan(0.2);
   });
 
+  it('gives someone who arrives in the middle of a briefing or an intermission its music, timed by what is left', async () => {
+    const briefed = rig();
+    await briefed.hold(frameOf({ phase: 'briefing', tick: 30 }), 0.2);
+    expect(briefed.engine.music).toBe('briefing');
+    expect(briefed.ctx.startedFrom('music/briefing')).toHaveLength(1);
+
+    const r = rig();
+    const at = r.ctx.currentTime;
+    // No event: the frame shows an intermission with 5 s left.
+    await r.hold(frameOf({ phase: 'intermission', stage: 1, phaseTime: 5, kaiju: { stage: 2 } }), 0.2);
+    const build = r.ctx.startedFrom('music/intermission');
+    expect(build).toHaveLength(1);
+    expect((build[0].startedAt as number) + (20 - build[0].offset) - at).toBeCloseTo(5, 2);
+  });
+
   it('loads the coming stage in an intermission from the kaiju, whose stage is already the new one', async () => {
     const r = rig({ kind: 'spectator', squadId: -1, playerId: -1 });
     await r.frame(frameOf({ stage: 1, phase: 'intermission', kaiju: { stage: 2, kind: 'crab' as KaijuKindId } }));
@@ -529,7 +544,7 @@ describe('music through a match', () => {
       for (let i = 0; i < steps; i++) {
         await r.frame(f);
         f.tick += 0.05 * TICK_RATE;
-        const mb = r.engine.stats().megabytes;
+        const mb = r.engine.stats().musicMegabytes;
         if (mb > peak) {
           peak = mb;
           at = label;
@@ -574,14 +589,14 @@ describe('music through a match', () => {
     const music = (): number => [...r.ctx.decoded.keys()].filter((u) => u.includes('/music/')).length;
     // Every track was played: all thirteen were decoded at some point (lobby twice).
     expect(music()).toBe(13);
-    // Before: everything stayed, 261 MB of music. Now the most at once is one stage's two
-    // stems with the next stage's two loading under the cocoon, and the short cues.
+    // Before: everything stayed, 261 MB of music. Now the most at once is in the briefing
+    // (94.8 MB: its own track, the first stage's two stems and the four short cues).
     const all = megabytes(Object.values(MUSIC).reduce((s, m) => s + m.duration, 0));
     expect(all).toBeGreaterThan(255);
-    expect(peak, `peak during ${at}`).toBeLessThan(160);
+    expect(peak, `peak during ${at}`).toBeLessThan(100);
+    expect(peak, `peak during ${at}`).toBeGreaterThan(megabytes(161));
     // Back in the lobby: the lobby track and nothing else of the music.
-    const sfxAndVoice = r.engine.stats().megabytes - megabytes(80.5);
-    expect(sfxAndVoice).toBeLessThan(40);
+    expect(r.engine.stats().musicMegabytes).toBeCloseTo(megabytes(80.5), 1);
     expect(r.ctx.decoded.get('audio/music/lobby.ogg')).toBe(2);
   });
 });
@@ -627,6 +642,22 @@ describe('events that arrive long after they happened', () => {
     for (let i = 0; i < 40; i++) r.event({ type: 'projectileSpawn', tick: 900 + i, id: i, projectile: 'shell', x: 0, y: 1, z: 0 });
     // Ticks 900 to 929 are more than a second old at tick 960; 930 to 939 are not.
     expect(r.ctx.startedFrom('tank_fire')).toHaveLength(5);
+  });
+
+  it('plays nothing the session hands out as a backlog, however recent', async () => {
+    const r = rig();
+    const say = vi.spyOn(r.engine, 'say');
+    await r.hold(frameOf({ tick: 900 }), 0.2);
+    const f = frameOf({ tick: 905 });
+    r.session.frame = f;
+    r.session.catchingUp = true;
+    for (let i = 0; i < 10; i++) r.event({ type: 'projectileSpawn', tick: 904, id: i, projectile: 'shell', x: 0, y: 1, z: 0 });
+    r.event(voice('volley.fired', 904, { humans: [firstLine('volley.fired', 'humans')] }));
+    expect(r.ctx.startedFrom('tank_fire')).toHaveLength(0);
+    expect(say).not.toHaveBeenCalled();
+    r.session.catchingUp = false;
+    r.event({ type: 'projectileSpawn', tick: 904, id: 99, projectile: 'shell', x: 0, y: 1, z: 0 });
+    expect(r.ctx.startedFrom('tank_fire')).toHaveLength(1);
   });
 
   it('times an intermission it hears of late by how much of it is left', async () => {

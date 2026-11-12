@@ -486,6 +486,26 @@ describe('lobby', () => {
     expect(cleanPlayerName('', 2)).toBe('Player 3');
     expect(cleanPlayerName(42, 0)).toBe('Player 1');
     expect(cleanPlayerName('x'.repeat(50), 0).length).toBe(16);
+    // Characters that garble a lobby row or a terminal are taken out, whatever is left stays.
+    expect(cleanPlayerName('Rex\u202Eevil', 0)).toBe('Rexevil'); // right-to-left override
+    expect(cleanPlayerName('R\u200Be\u200Dx\uFEFF', 0)).toBe('Rex'); // zero-width characters
+    expect(cleanPlayerName('Rex\u009B31m', 0)).toBe('Rex31m'); // a terminal escape introducer
+    expect(cleanPlayerName('Rex\u2028Tyr\u2029', 0)).toBe('RexTyr'); // line and paragraph separators
+    expect(cleanPlayerName('Rex \t  the\u00A0 Great', 0)).toBe('Rex the Great');
+    // A name with nothing visible in it is no name.
+    expect(cleanPlayerName('\u200B\u200B\u200B', 1)).toBe('Player 2');
+    expect(cleanPlayerName('\u3164\u2800 \u115F', 1)).toBe('Player 2');
+    expect(cleanPlayerName('\u0301\u0301', 1)).toBe('Player 2');
+    expect(cleanPlayerName('\uD83D', 1)).toBe('Player 2'); // half an emoji
+    // Composed form, and no tower of marks on one letter.
+    expect(cleanPlayerName('Ame\u0301lie', 0)).toBe('Am\u00E9lie');
+    expect(Array.from(cleanPlayerName(`Z${'\u0301'.repeat(40)}algo`, 0)).filter((c) => /\p{M}/u.test(c)).length).toBeLessThanOrEqual(2);
+    // Sixteen characters as people count them: an emoji at the cut is kept whole or left out.
+    const emoji = cleanPlayerName(`${'a'.repeat(15)}\u{1F996}\u{1F996}`, 0);
+    expect(Array.from(emoji)).toEqual([...'a'.repeat(15), '\u{1F996}']);
+    expect(cleanPlayerName('\u{1F996}'.repeat(40), 0)).toBe('\u{1F996}'.repeat(16));
+    // Hostile lengths cost nothing.
+    expect(cleanPlayerName('\u200B'.repeat(1_000_000) + 'Rex', 0)).toBe('Player 1');
     const rng = createRng(1);
     for (let i = 0; i < 50; i++) {
       const code = makeRoomCode(rng);
@@ -502,6 +522,33 @@ describe('lobby', () => {
     if (bob) bob.ready = true;
     expect(canStartMatch(lobby)).toBe(true);
     expect(canStartMatch(createLobbyState('XXXX'))).toBe(false);
+  });
+
+  it('does not wait for ever for somebody who is not ready, and never makes them the kaiju', () => {
+    const lobby = createLobbyState('BCDF');
+    for (const n of ['Ann', 'Bob', 'Cy']) addLobbyPlayer(lobby, n);
+    const [, bob, cy] = lobby.players;
+    bob.ready = true;
+    cy.wantsKaiju = true;
+    expect(canStartMatch(lobby)).toBe(false);
+    // The server marks a player once they have had their time in the lobby.
+    cy.waited = true;
+    expect(canStartMatch(lobby)).toBe(true);
+    // Somebody who is not there to be waited for does not count either way.
+    cy.waited = false;
+    cy.connected = false;
+    expect(canStartMatch(lobby)).toBe(true);
+
+    // Started without Cy: Cy is in the match, but the kaiju goes to somebody who is at the keys.
+    cy.connected = true;
+    cy.waited = true;
+    const rng = createRng(9);
+    const picks = new Set<number>();
+    for (let i = 0; i < 60; i++) picks.add(pickKaijuSeat(lobby, rng));
+    expect([...picks].sort()).toEqual([0, 1]);
+    // Once Cy is ready the volunteer gets it, as always.
+    cy.ready = true;
+    for (let i = 0; i < 20; i++) expect(pickKaijuSeat(lobby, rng)).toBe(2);
   });
 
   it('gives the kaiju to a volunteer, otherwise rotates it, never twice in a row', () => {

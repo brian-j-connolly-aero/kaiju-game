@@ -4,8 +4,10 @@
  *
  *   - a fixed 30 Hz step driven by the accumulator in fixedStep.ts;
  *   - one input per human-controlled slot per tick, taken from that slot's short queue; a tick
- *     with nothing queued repeats the previous input, and a player who stays silent is brought
- *     to a stop rather than left walking;
+ *     with nothing queued is played on a guess (the previous input again, held buttons
+ *     included), and the queue is told, so that it can skip the late inputs the guess already
+ *     stood in for (inputQueue.ts). A player who stays silent is brought to a stop rather than
+ *     left walking;
  *   - the sequence number of the last input applied per slot (the snapshot acknowledgement);
  *   - the events since the last flush, sent together with each snapshot;
  *   - a snapshot every second tick at normal speed, and never more than one per update, so a
@@ -32,7 +34,7 @@ import {
   type World,
 } from '@mb/shared';
 import { createFixedStep, dueSteps, type FixedStep, type FixedStepOptions } from './fixedStep';
-import { clearInputQueue, createInputQueue, pushInput, takeInput, type InputQueue } from './inputQueue';
+import { clearInputQueue, createInputQueue, noteGuessedTick, pushInput, takeInput, type InputQueue } from './inputQueue';
 
 export const TICK_MS = 1000 / TICK_RATE;
 /** Ticks one update may run to catch up (at speed 1). */
@@ -147,14 +149,20 @@ export function stepMatch(m: MatchSession): void {
       inputs[slot] = next;
       m.acks[slot] = next.seq;
       m.starved[slot] = 0;
-    } else if (++m.starved[slot] === STARVED_TICKS) {
+      continue;
+    }
+    // Nothing arrived for this tick: it is played on a guess, the last input again.
+    const last = world.players[slot].input;
+    let buttons = last.buttons;
+    if (++m.starved[slot] === STARVED_TICKS) {
       // Still connected but silent: let go of the controls, keep looking the same way.
-      const last = world.players[slot].input;
       const stop = neutralInput(last.seq);
       stop.aimYaw = last.aimYaw;
       stop.aimPitch = last.aimPitch;
       inputs[slot] = stop;
+      buttons = 0;
     }
+    noteGuessedTick(m.queues[slot], buttons);
   }
   const events = world.step(inputs);
   for (const e of events) {

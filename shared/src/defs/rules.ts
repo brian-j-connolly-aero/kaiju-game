@@ -42,7 +42,7 @@ export const MATCH_RULES = {
   bar: {
     p1: 0.13,
     p2: 0.088,
-    p3: 0.31,
+    p3: 0.36,
     growth: 1.6,
     /** Where the three marks sit along the skyline display, 0..1. */
     display: [0.21, 0.57, 1] as PerStage<number>,
@@ -178,8 +178,22 @@ export const SQUAD_RULES = {
   markerSkyReach: 100,
   /** Sub-units aim at these fractions of the kaiju's height, taking the first with a clear line of fire. */
   aimHeights: [0.5, 0.8, 0.25],
+  /**
+   * A unit's projectile flies this many times its weapon's range and then gives out, so that
+   * range limits a person's own shots and volleys as it limits fire at will.
+   */
+  rangeSlack: 1.1,
   /** Several projectiles of one unit leave from points spread this far apart, in unit radii. */
   muzzleSpread: 0.6,
+  /**
+   * Wheel orders (follow, move to, fire at will, hold and charge) cost the simulation planning
+   * work, so a squad carries them out from a budget: up to orderBurst at once, refilled at
+   * ordersPerSecond. Orders beyond it wait their turn, and a newer order of the same kind
+   * replaces one still waiting. No person and no bot gives orders this fast; a flooding
+   * client gets the same few a second as everyone else.
+   */
+  orderBurst: 6,
+  ordersPerSecond: 3,
   /** Call-in shells fall at this angle above the horizon, toward the marker from behind the caller. */
   callInElevation: 75 * DEG,
 } as const;

@@ -118,6 +118,8 @@ interface Seat {
   connected: boolean;
   /** When the connection was lost (meaningful while not connected). */
   droppedAt: number;
+  /** When this player last came into the lobby: joined, reconnected, or returned from a match. */
+  lobbySince: number;
   /** Match slot, or -1 (no match, or watching). */
   slot: PlayerId;
 }
@@ -217,6 +219,7 @@ export class GameRoom {
       this.byPeer.set(peer.id, seat);
       seat.connected = true;
       this.lobbyPlayer(seat).connected = true;
+      this.enterLobby(seat);
       old.close(CLOSE_REPLACED, 'this seat was taken over by a newer connection');
       this.log(`seat ${seat.seat} ${wasConnected ? 'taken over by a newer connection' : 'reclaimed'}`);
     } else {
@@ -225,7 +228,8 @@ export class GameRoom {
       const player = addLobbyPlayer(this.lobby, typeof raw.name === 'string' ? raw.name : '');
       if (!player) throw new JoinRefused(JOIN_ERROR.roomFull, 'the room is full');
       player.slot = -1;
-      seat = { seat: player.seat, token, peer, connected: true, droppedAt: 0, slot: -1 };
+      player.waited = false;
+      seat = { seat: player.seat, token, peer, connected: true, droppedAt: 0, lobbySince: this.options.now(), slot: -1 };
       this.seats.push(seat);
       this.byPeer.set(peer.id, seat);
       this.log(`seat ${seat.seat} joined as "${player.name}"`);
@@ -264,6 +268,7 @@ export class GameRoom {
     seat.peer = peer;
     seat.connected = true;
     this.lobbyPlayer(seat).connected = true;
+    this.enterLobby(seat);
     this.enterMatch(seat, false);
     this.log(`seat ${seat.seat} reconnected`);
     this.broadcastLobby();
@@ -371,6 +376,7 @@ export class GameRoom {
     const now = this.options.now();
     this.expireSeats(now);
     this.handOffHost(now);
+    this.stopWaiting(now);
 
     if (this.lobby.phase === 'match' && this.match) {
       const m = this.match;
@@ -545,9 +551,13 @@ export class GameRoom {
     this.match = null;
     this.slotOwners = [];
     this.lobby.phase = 'lobby';
-    for (const seat of this.seats) seat.slot = -1;
+    for (const seat of this.seats) {
+      seat.slot = -1;
+      seat.lobbySince = this.options.now();
+    }
     for (const p of this.lobby.players) {
       p.ready = false;
+      p.waited = false;
       p.slot = -1;
     }
     this.log('back in the lobby');
@@ -570,6 +580,30 @@ export class GameRoom {
       this.removeSeat(seat);
       seat.peer.close(CLOSE_SEAT_RELEASED, 'the seat was given up');
       this.log(`seat ${seat.seat} given up after ${this.options.graceSeconds} s away`);
+      changed = true;
+    }
+    if (changed) this.broadcastLobby();
+  }
+
+  /** A player has (re)appeared: the time the others wait for their ready starts over. */
+  private enterLobby(seat: Seat): void {
+    seat.lobbySince = this.options.now();
+    this.lobbyPlayer(seat).waited = false;
+  }
+
+  /**
+   * In the lobby, marks the players who have had their time to get ready (`startWaitSeconds`
+   * since they came in): from then on the host may start without them (canStartMatch).
+   */
+  private stopWaiting(now: number): void {
+    if (this.lobby.phase !== 'lobby') return;
+    const waitMs = (this.options.startWaitSeconds ?? DEFAULT_START_WAIT_SECONDS) * 1000;
+    let changed = false;
+    for (const seat of this.seats) {
+      if (!seat.connected || now - seat.lobbySince < waitMs) continue;
+      const player = this.lobbyPlayer(seat);
+      if (player.waited) continue;
+      player.waited = true;
       changed = true;
     }
     if (changed) this.broadcastLobby();

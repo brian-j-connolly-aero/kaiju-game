@@ -76,6 +76,11 @@ export class CameraShake {
     this.amount = Math.min(1.5, this.amount + strength);
   }
 
+  /** Stops the shake at once (the moment that caused it is long past). */
+  reset(): void {
+    this.amount = 0;
+  }
+
   apply(camera: THREE.PerspectiveCamera, dt: number, scale: number): void {
     if (this.amount < 0.002) {
       this.amount = 0;

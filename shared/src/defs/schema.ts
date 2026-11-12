@@ -123,10 +123,15 @@ export interface KaijuStageDef {
   wadeContactDps: number;
   /** Speed multiplier while standing in water (the river is shallow; a titan ignores it). */
   waterSpeedMult: number;
-  /** Height of the first-person camera and of the aim ray origin. */
+  /**
+   * The eye, where the aim ray starts and the first-person camera sits: its height, and how far
+   * ahead of the body's axis it is along the aim heading. From the model's `cam_fp` anchor.
+   */
   eyeHeight: number;
-  /** Height of the beam origin. */
+  eyeForward: number;
+  /** The mouth, where the beam starts: height and distance ahead of the body's axis along the aim heading. From the model's `mouth` anchor. */
   mouthHeight: number;
+  mouthForward: number;
   /** Height at which a held object is carried and from which it is thrown. */
   handHeight: number;
 }

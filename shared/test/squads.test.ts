@@ -3,6 +3,7 @@ import {
   angleDist,
   beginStage,
   boundsContains,
+  Btn,
   COMBAT_RULES,
   DEG,
   decodeSnapshot,
@@ -130,6 +131,66 @@ describe('squads and commands', () => {
     const snap = decodeSnapshot(encodeSnapshot(snapshotOfWorld(world)));
     expect(snap.squads[0]).toMatchObject({ moveOrder: 'moveTo', fireMode: 'charge', driven: 0 });
     expect(snap.squads[0].moveTargetX).toBeCloseTo(world.match.bounds.minX, 1);
+  });
+});
+
+describe('a flood of orders', () => {
+  /** Ticks on which the squad's move target or a sub-unit's hold point changed (each is one round of planning). */
+  function plansDuring(world: World, ticks: number, each: (tick: number) => PlayerInput): number {
+    const squad = world.squads[0];
+    let plans = 0;
+    for (let t = 0; t < ticks; t++) {
+      const before = [squad.moveTarget.x, squad.moveTarget.z, ...subs(world).flatMap((u) => [u.nav.holdX, u.nav.holdZ])];
+      world.step([null, each(t)]);
+      const after = [squad.moveTarget.x, squad.moveTarget.z, ...subs(world).flatMap((u) => [u.nav.holdX, u.nav.holdZ])];
+      if (after.some((v, i) => v !== before[i])) plans++;
+    }
+    return plans;
+  }
+
+  it('is carried out a few orders a second, newest first to go: nine move-to commands a tick cost no more planning than three a second', () => {
+    const world = field();
+    lineUp(world, 0, 0);
+    const squad = world.squads[0];
+    const seconds = 4;
+    let last = { x: 0, z: 0 };
+    const plans = plansDuring(world, seconds * TICK_RATE, (t) => {
+      // What a hostile client can send: eight command messages and a wheel pick, every tick.
+      for (let c = 0; c < 8; c++) queueCommand(world, HUMAN_PLAYER, { type: 'moveTo', x: -150 + ((t * 8 + c) % 300), z: 40 + c });
+      last = { x: 150 - (t % 300), z: -60 - (t % 7) };
+      return input({ wheel: 'moveTo', marker: last });
+    });
+    expect(plans).toBeLessThanOrEqual(SQUAD_RULES.orderBurst + Math.ceil(SQUAD_RULES.ordersPerSecond * seconds));
+    expect(plans).toBeGreaterThanOrEqual(SQUAD_RULES.ordersPerSecond * seconds - 1);
+    // Nothing is lost: the newest order is the one that stands once the flood stops.
+    lead(world, Math.ceil(TICK_RATE / SQUAD_RULES.ordersPerSecond) + 1);
+    expect(squad.moveOrder).toBe('moveTo');
+    expect(squad.moveTarget).toEqual(last);
+  });
+
+  it('keeps the newest order of each kind, in the order they came, and never holds up a call-in', () => {
+    const world = field();
+    beginStage(world, 3);
+    world.match.bounds = world.match.stageBounds[2];
+    lineUp(world, 0, 0);
+    const squad = world.squads[0];
+    // Use the burst up.
+    for (let i = 0; i < SQUAD_RULES.orderBurst; i++) lead(world, 1, { wheel: i % 2 === 0 ? 'holdCharge' : 'fireAtWill' });
+    expect(squad.fireMode).toBe('atWill');
+    // Now three orders in one tick: two movement orders and a fire mode. Nothing can go at once...
+    queueCommand(world, HUMAN_PLAYER, { type: 'moveTo', x: 40, z: 40 });
+    queueCommand(world, HUMAN_PLAYER, { type: 'holdCharge' });
+    queueCommand(world, HUMAN_PLAYER, { type: 'moveTo', x: -70, z: 25 });
+    // ...except the artillery, which is no wheel order.
+    const events = lead(world, 1, { buttons: Btn.callIn, marker: { x: 300, z: 300 } });
+    expect(eventsOf(events, 'callin')).toMatchObject([{ phase: 'marked', x: 300, z: 300 }]);
+    expect([squad.moveOrder, squad.fireMode]).toEqual(['follow', 'atWill']);
+    // Within a second both have been carried out: the hold order first, then the newer of the two markers.
+    lead(world, TICK_RATE);
+    expect([squad.moveOrder, squad.fireMode]).toEqual(['moveTo', 'charge']);
+    expect(squad.moveTarget).toEqual({ x: -70, z: 25 });
+    // (Hold-and-charge before the move-to: the sub-units went on to the marker rather than parking where they stood.)
+    for (const u of subs(world)) expect(Math.hypot(u.nav.holdX + 70, u.nav.holdZ - 25)).toBeLessThan(60);
   });
 });
 

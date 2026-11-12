@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   beginStage,
   Btn,
+  COMBAT_RULES,
   decodeSnapshot,
   encodeSnapshot,
   markVeterans,
@@ -76,8 +77,8 @@ describe('lives: the squad is the life pool', () => {
     const world = field();
     const [leader, a, b, c] = [0, 1, 2, 3].map((id) => world.units[id]);
     lead(world, 1, { wheel: 'holdCharge' });
-    lead(world, 60);
-    expect(a.charge).toBeGreaterThan(0.3);
+    lead(world, 120);
+    expect(a.charge).toBeGreaterThan(COMBAT_RULES.volleyMinCharge);
 
     strike(world, 0, 500, 'stomp');
     let events = lead(world, 1, { moveZ: 1 });

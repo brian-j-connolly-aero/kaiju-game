@@ -1,14 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import {
+  allStageBounds,
+  beginStage,
   boundsContains,
   Btn,
   COMBAT_RULES,
   createMatchConfig,
+  createRng,
   createWorld,
   DT,
+  getCity,
+  idleBots,
+  kaijuStageDef,
   LIZARD,
   MATCH_RULES,
+  rngRange,
   spawnProjectile,
+  structuresInCircle,
   TICK_RATE,
   UNIT_TYPES,
   type PlayerInput,
@@ -280,6 +288,131 @@ describe('the molt: the next stage', () => {
     run(world, MOLT_HOLD_TICKS, [input({ buttons: Btn.molt })]);
     const events = run(world, COCOON_TICKS + 2, [input()]);
     expect(eventsOf(events, 'matchPhase')).toMatchObject([{ phase: 'intermission', duration: MATCH_RULES.intermissionWithDraft }]);
+  });
+});
+
+describe('the molt: room for the new body', () => {
+  const TALL = { height: 40, hp: 5000 };
+  // A 6 m alley between two 40 m blocks (a hatchling fits, a juvenile is 18 m wide), then the
+  // same with a wall across one end, then a light well shut in on every side.
+  const ALLEY = [
+    { x: -23, z: 0, w: 40, d: 80, ...TALL },
+    { x: 23, z: 0, w: 40, d: 80, ...TALL },
+  ];
+  const DEAD_END = [...ALLEY, { x: 0, z: 30, w: 6, d: 20, ...TALL }];
+  const WELL = [
+    { x: -24, z: 0, w: 40, d: 88, ...TALL },
+    { x: 24, z: 0, w: 40, d: 88, ...TALL },
+    { x: 0, z: 24, w: 8, d: 40, ...TALL },
+    { x: 0, z: -24, w: 8, d: 40, ...TALL },
+  ];
+
+  /** True when a wall the body cannot walk through overlaps it. */
+  function inAWall(world: World): boolean {
+    const k = world.kaijus[0];
+    const ids: number[] = [];
+    structuresInCircle(world.cityQuery, k.x, k.z, k.radius, ids);
+    const trample = kaijuStageDef(k.kind, k.stage).trampleHeight;
+    return ids.some((id) => world.cityIndex.spassable[id] === 0 && world.cityIndex.sheight[id] > trample);
+  }
+
+  it('stands the juvenile up on the nearest ground with room when the cocoon was between tall buildings', () => {
+    for (const structures of [ALLEY, DEAD_END, WELL]) {
+      // The first structure is the one moltWorld flattens for the bar; keep it out of the way.
+      const world = moltWorld({ structures: [{ x: 150, z: 150, w: 10, d: 10, height: 20, hp: 100, value: 25 }, ...structures] });
+      parkUnits(world);
+      const k = placeKaiju(world, 0, 0, 0);
+      cocoon(world);
+      const events = play(world, COCOON_TICKS + 2);
+      expect(world.match.phase).toBe('intermission');
+      expect(k.stage).toBe(2);
+      // Out of the gap, on open ground, as near as there is any; the closing event says where.
+      expect(inAWall(world)).toBe(false);
+      const moved = Math.hypot(k.x, k.z);
+      expect(moved).toBeGreaterThan(5);
+      expect(moved).toBeLessThan(90);
+      const stood = eventsOf(events, 'kaijuAction').find((e) => e.action === 'molt' && e.phase === 'idle');
+      expect(stood).toMatchObject({ x: k.x, z: k.z });
+      // The blast still goes off where the cocoon was.
+      expect(eventsOf(events, 'moltBlast')).toMatchObject([{ x: 0, z: 0 }]);
+
+      // Into stage 2: it stands still when left alone, and walks like any juvenile when told to.
+      play(world, INTERMISSION_TICKS + 2);
+      expect(world.match.stage).toBe(2);
+      let px = k.x;
+      let pz = k.z;
+      for (let t = 0; t < 90; t++) {
+        play(world, 1);
+        expect(Math.hypot(k.x - px, k.z - pz)).toBeLessThan(1e-9);
+        px = k.x;
+        pz = k.z;
+      }
+      const away = Math.atan2(k.x, k.z);
+      for (let t = 0; t < 150; t++) {
+        play(world, 1, { moveZ: 1, aimYaw: away });
+        // No jump: never more than a step of its top speed in a tick.
+        expect(Math.hypot(k.x - px, k.z - pz)).toBeLessThan(LIZARD.stages[1].topSpeed * DT + 1e-6);
+        expect(inAWall(world)).toBe(false);
+        px = k.x;
+        pz = k.z;
+      }
+    }
+  });
+
+  it('leaves it where the cocoon was when there is room, and when what stands close is low enough to walk through', () => {
+    const world = moltWorld({
+      structures: [
+        { x: 150, z: 150, w: 10, d: 10, height: 20, hp: 100, value: 25 },
+        // A house (the juvenile tramples up to 12 m) right beside the cocoon.
+        { x: 9, z: 0, w: 10, d: 10, height: 8, hp: 100, value: 10 },
+      ],
+    });
+    parkUnits(world);
+    const k = placeKaiju(world, 0, 0, 0);
+    cocoon(world);
+    play(world, COCOON_TICKS + 2);
+    expect(k.stage).toBe(2);
+    expect([k.x, k.z]).toEqual([0, 0]);
+  });
+
+  it('never leaves a juvenile shaking between the walls of the real city, wherever a hatchling could have stood', () => {
+    const built = getCity();
+    const index = built.index;
+    const s1 = kaijuStageDef('lizard', 1);
+    const s2 = kaijuStageDef('lizard', 2);
+    const rng = createRng(11);
+    const ids: number[] = [];
+    let tried = 0;
+    for (let anchor = 0; anchor < built.city.anchors.length; anchor++) {
+      const [b1] = allStageBounds(built.city, anchor);
+      const config = { ...createMatchConfig({ humans: [{ name: 'K', role: 'kaiju' }], anchor, squads: 0 }), bots: idleBots() };
+      config.tuning = { ...config.tuning, briefing: 0 };
+      const probe = createWorld({ seed: 3, config });
+      let found = 0;
+      for (let i = 0; i < 20000 && found < 6; i++) {
+        const x = rngRange(rng, b1.minX + 10, b1.maxX - 10);
+        const z = rngRange(rng, b1.minZ + 10, b1.maxZ - 10);
+        // A spot where the hatchling stands free and the juvenile would overlap two or more tall buildings.
+        structuresInCircle(probe.cityQuery, x, z, s1.bodyRadius, ids);
+        if (ids.some((id) => index.sheight[id] > s1.trampleHeight && index.spassable[id] === 0)) continue;
+        structuresInCircle(probe.cityQuery, x, z, s2.bodyRadius, ids);
+        if (ids.filter((id) => index.sheight[id] > s2.trampleHeight && index.spassable[id] === 0).length < 2) continue;
+        found++;
+        tried++;
+        const world = createWorld({ seed: 3, config });
+        world.step();
+        const k = world.kaijus[0];
+        k.x = x;
+        k.z = z;
+        beginStage(world, 2);
+        expect(inAWall(world), `${built.city.anchors[anchor].name} (${x.toFixed(0)}, ${z.toFixed(0)})`).toBe(false);
+        const at = { x: k.x, z: k.z };
+        for (let t = 0; t < 30; t++) world.step([input()]);
+        expect(Math.hypot(k.x - at.x, k.z - at.z), `${built.city.anchors[anchor].name} (${x.toFixed(0)}, ${z.toFixed(0)})`).toBeLessThan(1e-6);
+      }
+    }
+    // The placeholder city has such gaps in most neighborhoods; a city with none proves nothing here.
+    expect(tried).toBeGreaterThan(0);
   });
 });
 

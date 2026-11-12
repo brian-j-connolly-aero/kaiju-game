@@ -7,6 +7,22 @@
 const S = 'fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"';
 const F = 'fill="currentColor" stroke="none"';
 
+/**
+ * The outline of a cog wheel around (cx, cy): `teeth` blunt teeth reaching `outer`, the rim at
+ * `inner`, and a round hole of radius `hole` (draw it with the even-odd fill rule).
+ */
+function cogPath(cx: number, cy: number, outer: number, inner: number, hole: number, teeth: number): string {
+  const step = (Math.PI * 2) / teeth;
+  const at = (r: number, a: number): string => `${(cx + Math.sin(a) * r).toFixed(1)} ${(cy - Math.cos(a) * r).toFixed(1)}`;
+  let d = '';
+  for (let i = 0; i < teeth; i++) {
+    const a = i * step;
+    // Each tooth is wider at the rim than at its tip.
+    d += `${i === 0 ? 'M' : 'L'}${at(inner, a - step * 0.3)} L${at(outer, a - step * 0.19)} L${at(outer, a + step * 0.19)} L${at(inner, a + step * 0.3)} `;
+  }
+  return `${d}Z M${cx - hole} ${cy} A${hole} ${hole} 0 1 0 ${cx + hole} ${cy} A${hole} ${hole} 0 1 0 ${cx - hole} ${cy} Z`;
+}
+
 const ART: Record<string, string> = {
   // --- commands ---
   cmd_follow: `<circle cx="46" cy="32" r="7" ${F}/><path d="M10 18 L24 32 L10 46 M24 18 L38 32 L24 46" ${S}/>`,
@@ -93,7 +109,7 @@ const ART: Record<string, string> = {
   ui_trophy: `<path d="M18 8 L46 8 L46 24 Q46 38 32 38 Q18 38 18 24 Z" ${F}/><path d="M32 38 L32 50 M20 54 L44 54" ${S}/><path d="M18 12 L8 12 Q8 26 18 26 M46 12 L56 12 Q56 26 46 26" ${S}/>`,
   ui_newspaper: `<rect x="8" y="10" width="48" height="44" ${S} stroke-width="4"/><path d="M14 20 L50 20" ${S} stroke-width="6"/>`,
   // --- settings and the drone (drawn here only; no art file yet) ---
-  ui_settings: `<circle cx="32" cy="32" r="13" ${S} stroke-width="7"/><path d="M32 6 L32 12 M32 52 L32 58 M6 32 L12 32 M52 32 L58 32 M13.6 13.6 L17.9 17.9 M46.1 46.1 L50.4 50.4 M50.4 13.6 L46.1 17.9 M17.9 46.1 L13.6 50.4" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="butt"/>`,
+  ui_settings: `<path d="${cogPath(32, 32, 28, 20, 9, 8)}" fill="currentColor" fill-rule="evenodd" stroke="none"/>`,
   ui_invert: `<path d="M20 54 L20 10 M8 22 L20 10 L32 22" ${S}/><path d="M44 10 L44 54 M32 42 L44 54 L56 42" ${S}/>`,
   ui_fullscreen: `<path d="M8 22 L8 8 L22 8 M42 8 L56 8 L56 22 M56 42 L56 56 L42 56 M22 56 L8 56 L8 42" ${S}/><rect x="22" y="24" width="20" height="16" rx="2" ${F}/>`,
   ui_rise: `<path d="M32 46 L32 8 M16 24 L32 8 L48 24" ${S} stroke-width="7"/><path d="M12 57 L52 57" ${S}/>`,

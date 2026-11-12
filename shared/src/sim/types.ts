@@ -258,6 +258,13 @@ export interface Squad {
   formed: boolean;
   /** Every sub-unit that is charging has a full charge (the edge of this is the `volley.ready` cue). */
   volleyReady: boolean;
+  /**
+   * Wheel orders the squad may still carry out right now (SQUAD_RULES.orderBurst at most,
+   * refilled over time), and the orders waiting for it: at most one movement order and one fire
+   * mode, in the order they were given. Server-side only.
+   */
+  orderBudget: number;
+  pendingOrders: SquadCommand[];
 }
 
 /** What a unit is trying to do this tick; same meaning as the matching PlayerInput fields. */

@@ -2,10 +2,12 @@
  * The path of a beam special (the Lizard's breath), as one pure function that the simulation
  * and the clients both use, so the beam is drawn exactly where it burns.
  *
- * The beam leaves the mouth, at the stage's mouth height above the body center, along the
- * head's aim (`aimYaw`, `aimPitch`). It ends at the first standing structure, at the ground, or
- * at its range, whichever comes first. A beam has width: it is stopped by the first structure
- * that its center line or either of its two edges touches.
+ * The beam leaves the mouth (`kaijuMouthPoint`: at the stage's mouth height, ahead of the body's
+ * axis along the aim heading, where the model has it) along the head's aim (`aimYaw`,
+ * `aimPitch`). It ends at the first standing structure, at the ground, or at its range,
+ * whichever comes first. A beam has width: it is stopped by the first structure that its
+ * center line or either of its two edges touches. A mouth that is inside a building (the
+ * kaiju pressed against a wall) burns that building.
  *
  * While the special's active phase runs, the movement system turns the head toward the
  * player's aim only at the special's reduced turn rate, so `aimYaw` / `aimPitch` in a snapshot
@@ -15,9 +17,9 @@
 import { castRay, createCityCastHit, type CityQuery } from '../city/spatialIndex';
 import type { KaijuKindId, StageId } from '../defs/ids';
 import { perStage } from '../defs/ids';
-import { kaijuStageDef } from '../defs/kaiju/index';
 import type { BeamSpecialDef } from '../defs/schema';
 import type { Vec3 } from '../math/vec';
+import { kaijuMouthPoint } from './aim';
 
 /** The parts of a kaiju's state that fix its beam. Kaiju and snapshot kaiju both satisfy it. */
 export interface BeamSource {
@@ -60,15 +62,15 @@ const dir: Vec3 = { x: 0, y: 0, z: 0 };
 
 /** Computes where a kaiju's beam goes right now, against the city in its current state. */
 export function beamPath(city: CityQuery, k: BeamSource, action: BeamSpecialDef, out: BeamPath = createBeamPath()): BeamPath {
-  const st = kaijuStageDef(k.kind, k.stage);
   const range = perStage(action.range, k.stage);
   const halfWidth = perStage(action.width, k.stage) / 2;
   const cp = Math.cos(k.aimPitch);
   const sy = Math.sin(k.aimYaw);
   const cy = Math.cos(k.aimYaw);
-  out.ox = k.x;
-  out.oy = st.mouthHeight;
-  out.oz = k.z;
+  kaijuMouthPoint(k, origin);
+  out.ox = origin.x;
+  out.oy = origin.y;
+  out.oz = origin.z;
   out.dx = sy * cp;
   out.dy = Math.sin(k.aimPitch);
   out.dz = cy * cp;

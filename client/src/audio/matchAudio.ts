@@ -37,6 +37,8 @@ export interface MatchAudioSession {
   readonly mirror: { readonly city: Pick<CityData, 'structures' | 'props'> };
   /** The frame most recently put together (events are handed out while it is the current one). */
   readonly frame: FrameState | null;
+  /** True while the session hands out a backlog of events whose moment has passed (a hidden tab). */
+  readonly catchingUp?: boolean;
 }
 
 /** How far big sounds carry before they fall off, by stage: a titan is heard across the city. */
@@ -295,7 +297,9 @@ export class MatchAudio {
   handleEvent(e: SimEvent): void {
     const a = this.audio;
     const age = this.ageOf(e);
-    const fresh = age <= STALE_EVENT_SECONDS;
+    // Two signs that the moment has passed: the session says it is working through a backlog,
+    // or the event is older, by the match clock, than anything a running page hands out.
+    const fresh = age <= STALE_EVENT_SECONDS && this.session?.catchingUp !== true;
     // Old news makes no sound. Only the events that decide what plays from now on are still read.
     if (!fresh && e.type !== 'matchPhase' && e.type !== 'matchEnd' && e.type !== 'voice' && e.type !== 'cocoon') return;
     const stage = this.frame?.match.stage ?? 1;
@@ -485,6 +489,10 @@ export class MatchAudio {
       if (k0) this.loadKaijuSounds(k0.kind, coming);
     }
 
+    // The timed phases normally get their music from their event; someone who arrived in the
+    // middle of one (a late join, a reconnection) gets it from the frame, timed by what is left.
+    if (match.phase === 'briefing' && a.music !== 'briefing') a.playMusic(['briefing']);
+    if (match.phase === 'intermission' && a.music !== 'intermission') a.playMusic(['intermission'], { fade: 0.6, landIn: match.phaseTime });
     if (playing && !cocoon && this.musicStage !== match.stage) {
       // After the intermission: its hit rings out under the first bar, and the stage comes in at once.
       const afterIntermission = a.music === 'intermission';

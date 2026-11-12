@@ -17,7 +17,7 @@
  *
  *   voice limits    a sound may have a few copies playing at once; copies asked for on the same
  *                   instant (a volley) are spread out by a few hundredths of a second, and when
- *                   there is no room the quietest copy gives way to a louder one
+ *                   there is no room the quietest copy (or one long past its attack) gives way
  *   the limiter     everything passes through a compressor set as a limiter, so a full salvo is
  *                   loud instead of clipped
  *   the cache       decoded music is dropped once it is no longer playing or announced, and only
@@ -113,6 +113,9 @@ const MAX_PER_SOUND = 6;
 const STAGGER_STEPS = [0.026, 0.037, 0.03, 0.041];
 /** A copy that would have to wait longer than this for its turn is not played. */
 const STAGGER_WINDOW = 0.15;
+/** A copy this long into its sound is taken to be past its attack, and to lose half its weight every so often. */
+const TAIL_AFTER = 0.1;
+const TAIL_HALVES_IN = 0.15;
 /** A file that arrives later than this after its sound was asked for is not played. */
 const LATE_SECONDS = 0.25;
 const VOICE_QUEUE_LIMIT = 4;
@@ -409,17 +412,26 @@ export class AudioEngine {
     }
   }
 
-  /** What is sounding and what is held in memory, for the debug hook and for tests. */
-  stats(): { voices: number; buffers: number; megabytes: number } {
-    let bytes = 0;
+  /**
+   * What is sounding and what is held in memory, for the debug hook and for tests: effect
+   * voices, decoded files, and the megabytes they take (all of them, and the music alone).
+   */
+  stats(): { voices: number; buffers: number; megabytes: number; musicMegabytes: number } {
+    const size = (buffer: AudioBuffer): number => (buffer.length * buffer.numberOfChannels * 4) / 1e6;
+    let megabytes = 0;
     let buffers = 0;
     for (const buffer of this.ready.values()) {
       if (!buffer) continue;
       buffers++;
-      bytes += buffer.length * buffer.numberOfChannels * 4;
+      megabytes += size(buffer);
+    }
+    let musicMegabytes = 0;
+    for (const entry of Object.values(this.assets.manifest.music)) {
+      const buffer = this.ready.get(entry.base);
+      if (buffer) musicMegabytes += size(buffer);
     }
     const now = this.ctx ? this.ctx.currentTime : 0;
-    return { voices: this.voices.filter((v) => v.until > now).length, buffers, megabytes: bytes / 1e6 };
+    return { voices: this.voices.filter((v) => v.until > now).length, buffers, megabytes, musicMegabytes };
   }
 
   // --- buffers ---------------------------------------------------------------------------------
@@ -617,8 +629,12 @@ export class AudioEngine {
     const crowded = same.length >= MAX_PER_SOUND || when - now > STAGGER_WINDOW;
     const pool = crowded ? same : voices.length >= MAX_VOICES ? voices : null;
     if (pool) {
-      const quietest = pool.reduce((q, v) => (v.level < q.level ? v : q));
-      if (quietest.level >= level) return null;
+      // Among copies of one sound, one that began a while ago is in its tail and counts for
+      // less: in a long firefight the old tails give way to new shots, while copies asked for
+      // on the same instant (a volley) only give way to a louder one.
+      const worth = (v: Voice): number => v.level * (crowded ? Math.pow(0.5, Math.max(0, now - v.when - TAIL_AFTER) / TAIL_HALVES_IN) : 1);
+      const quietest = pool.reduce((q, v) => (worth(v) < worth(q) ? v : q));
+      if (worth(quietest) >= level) return null;
       quietest.kill(now);
       voices.splice(voices.indexOf(quietest), 1);
       // A louder copy takes the place, and the turn, of the quietest one.

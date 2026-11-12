@@ -9,6 +9,9 @@
  *   survivor (`takeover`). (The damage system marks the squad eliminated when the last one dies.)
  * - Commands from `player.commands`. The movement order ('follow' / 'moveTo') and the fire mode
  *   ('atWill' / 'charge') are independent; a call-in request starts a mission if it is ready.
+ *   Wheel orders cost planning (hold points, routes), so a squad carries them out from a small
+ *   budget (`takeOrders`): a few at once, then a few a second, the newest of each kind first
+ *   in line. However many commands a client sends, the work per squad is bounded.
  * - Every living sub-unit then gets its `control` for this tick:
  *     shaken            it cannot fire, lets go of a hold, and backs away from a kaiju that is near;
  *     on hold (rooted)  it stands, keeps its laser on the target inside its firing arc, and
@@ -245,6 +248,52 @@ function applyCommand(world: World, squad: Squad, leader: Unit, c: SquadCommand)
     u.nav.hasHold = c.type === 'holdCharge';
     u.nav.holdX = u.x;
     u.nav.holdZ = u.z;
+  }
+}
+
+function isMoveOrder(c: SquadCommand): boolean {
+  return c.type === 'follow' || c.type === 'moveTo';
+}
+
+/** What the orders of one tick share across the squads. */
+interface OrderTick {
+  /** A move-to has been planned this tick. */
+  moveToPlanned: boolean;
+}
+
+/**
+ * Takes this tick's commands for a squad. Call-ins go straight through (their cooldown is the
+ * limit). Wheel orders join the squad's short queue, where a newer movement order replaces an
+ * older one that has not been carried out yet and a newer fire mode an older fire mode, and
+ * are carried out in the order they came as far as the squad's order budget reaches
+ * (SQUAD_RULES.orderBurst at once, refilled at ordersPerSecond). Every order plans afresh for
+ * the whole squad, so this is what keeps a flood of commands from costing more than a few
+ * honest ones. A move-to is the dear one (it searches for hold points), so only one is planned
+ * per tick in the whole match: a second squad's waits for the next tick.
+ */
+function takeOrders(world: World, squad: Squad, leader: Unit, commands: readonly SquadCommand[], tick: OrderTick): void {
+  squad.orderBudget = Math.min(SQUAD_RULES.orderBurst, squad.orderBudget + SQUAD_RULES.ordersPerSecond * DT);
+  const pending = squad.pendingOrders;
+  for (const c of commands) {
+    if (c.type === 'callIn') {
+      applyCommand(world, squad, leader, c);
+      continue;
+    }
+    const move = isMoveOrder(c);
+    for (let i = pending.length - 1; i >= 0; i--) {
+      if (isMoveOrder(pending[i]) === move) pending.splice(i, 1);
+    }
+    pending.push(c);
+  }
+  while (pending.length > 0 && squad.orderBudget >= 1 - 1e-9) {
+    const next = pending[0];
+    if (next.type === 'moveTo') {
+      if (tick.moveToPlanned) break;
+      tick.moveToPlanned = true;
+    }
+    pending.shift();
+    squad.orderBudget = Math.max(0, squad.orderBudget - 1);
+    applyCommand(world, squad, leader, next);
   }
 }
 
@@ -495,6 +544,7 @@ function orderSubUnit(world: World, squad: Squad, leader: Unit, u: Unit, rank: n
 export function unitOrderSystem(world: World): void {
   if (world.match.phase !== 'playing') return;
   updateSpotting(world);
+  const orderTick: OrderTick = { moveToPlanned: false };
 
   for (const squad of world.squads) {
     // An eliminated player is out until the next stage: nothing to order, nothing to call in.
@@ -506,7 +556,7 @@ export function unitOrderSystem(world: World): void {
     const leader = world.units[squad.driven];
     if (!leader.alive) continue;
 
-    for (const c of world.players[squad.player].commands) applyCommand(world, squad, leader, c);
+    takeOrders(world, squad, leader, world.players[squad.player].commands, orderTick);
     updateTrail(squad, leader);
 
     // The driven unit is never on hold; the player moves and aims it.

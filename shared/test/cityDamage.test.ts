@@ -63,7 +63,8 @@ describe('the destruction bar', () => {
     marks = computeBarMarks(city, 0);
     expect(marks[0]).toBeCloseTo(bar.p1 * 1000, 9);
     expect(marks[1]).toBeCloseTo(bar.growth * marks[0], 9);
-    expect(marks[2]).toBeCloseTo(bar.growth * marks[1], 9);
+    expect(marks[2]).toBeCloseTo(Math.max(bar.growth * marks[1], bar.p3 * 1000), 9);
+    expect(marks[2]).toBeGreaterThanOrEqual(bar.growth * marks[1]);
   });
 
   it('gives partial credit for partial damage, from every kind of source, and nothing for rubble', () => {

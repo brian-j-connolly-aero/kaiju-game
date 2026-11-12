@@ -72,6 +72,8 @@ export class MatchRuntime {
   private photoAt = -PHOTO_EVERY;
   private photoCanvas: HTMLCanvasElement | null = null;
   private clockNow = 0;
+  private skippedAt = -1;
+  private disposed = false;
 
   constructor(deps: RuntimeDeps) {
     this.deps = deps;
@@ -88,6 +90,7 @@ export class MatchRuntime {
   }
 
   dispose(): void {
+    this.disposed = true;
     this.matchAudio.end();
     this.deps.renderer.cues = {};
     this.deps.autopilot?.setContext(null, null);
@@ -123,6 +126,12 @@ export class MatchRuntime {
     // nothing happening; no shake, no photo, no flash on the HUD. The audio is handed every
     // event and reads the same flag (`session.catchingUp`) for what it should not play.
     const past = this.session.catchingUp;
+    if (past && this.skippedAt !== this.clockNow) {
+      // The first of a backlog: what was on screen when the frames stopped is over too.
+      this.skippedAt = this.clockNow;
+      this.deps.renderer.skipMoment();
+      this.shake.reset();
+    }
     this.deps.renderer.handleEvent(e, past);
     this.matchAudio.handleEvent(e);
     if (past) {
@@ -322,29 +331,44 @@ export class MatchRuntime {
   }
 
   /**
-   * Takes the front page photo without holding up the frame: the view is drawn once into a
-   * small canvas (straight after a render the view's canvas still holds the frame) and the
-   * browser encodes that in its own time. Reading the full-size view back and encoding it on
-   * the spot stalled the game right after the biggest collapses.
+   * Takes the front page photo without holding up the frame. Straight after a render the view's
+   * canvas still holds the frame: the browser is asked for a small copy of it, which it makes
+   * in its own time, and encodes that in its own time too. (Reading the full-size view back and
+   * encoding it on the spot stalled the game right after the biggest collapses.)
    */
   private takePhoto(): void {
     this.photoAt = this.clockNow;
     try {
       const view = this.deps.renderer.renderer.domElement;
       if (view.width === 0 || view.height === 0) return;
-      const small = (this.photoCanvas ??= document.createElement('canvas'));
-      small.width = Math.min(PHOTO_WIDTH, view.width);
-      small.height = Math.max(1, Math.round((small.width * view.height) / view.width));
-      const pen = small.getContext('2d');
-      if (!pen) return;
-      pen.drawImage(view, 0, 0, small.width, small.height);
-      small.toBlob(
-        (blob) => {
-          if (blob) this.setPhoto(URL.createObjectURL(blob));
-        },
-        'image/jpeg',
-        0.7,
-      );
+      const width = Math.min(PHOTO_WIDTH, view.width);
+      const height = Math.max(1, Math.round((width * view.height) / view.width));
+      const encode = (source: CanvasImageSource): void => {
+        if (this.disposed) return;
+        const small = (this.photoCanvas ??= document.createElement('canvas'));
+        small.width = width;
+        small.height = height;
+        const pen = small.getContext('2d');
+        if (!pen) return;
+        pen.drawImage(source, 0, 0, width, height);
+        small.toBlob(
+          (blob) => {
+            if (blob && !this.disposed) this.setPhoto(URL.createObjectURL(blob));
+          },
+          'image/jpeg',
+          0.7,
+        );
+      };
+      if (typeof createImageBitmap === 'function') {
+        createImageBitmap(view, { resizeWidth: width, resizeHeight: height, resizeQuality: 'low' })
+          .then((bitmap) => {
+            encode(bitmap);
+            bitmap.close();
+          })
+          .catch(() => undefined);
+      } else {
+        encode(view);
+      }
     } catch {
       // No picture: the front page shows its stand-in.
     }

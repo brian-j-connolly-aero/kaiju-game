@@ -502,6 +502,16 @@ layout, requires bumping `SNAPSHOT_VERSION` / `PROTOCOL_VERSION`.
   cheap fake physics, dust, then show rubble.
 - UI is DOM over the canvas. The no-reading rule in `DESIGN.md` §8 is binding.
 - Input: keyboard and mouse, and gamepad; button glyphs follow the last device used.
+- Sound (`client/src/audio`; as built: `docs/STATUS.md` section 7.6). What the rest of the
+  client may call on the `AudioEngine`: `play` and `loop` (effects by manifest id), `playMusic`,
+  `say` and `clearVoice` (voice lines), `preload` / `preloadMusic` / `preloadVoice`, `unlock`
+  (from a click or key press), `setMuted`, and for the settings panel `setMasterVolume(v)` and
+  `getMasterVolume()`: 0 to 1, eased, kept if set before the first click. Everything passes one
+  limiter before the master volume, and a sound has a limited number of copies, so callers need
+  not ration what they play. During a match `MatchAudio` is handed every simulation event and
+  the frame once per frame; it plays the lines a `voice` event names (`event.lines`), and takes
+  what should be sounding now (loops, stage music) from the frame, not from events alone.
+  `audio.stats()` (through `__mb.internals.ctx.audio`) reports voices and megabytes held.
 - Debug and automation hooks (required for automated playtests): `window.__mb` exposes state,
   `renderer.info`, and helpers; `?autoplay=1` makes the client play itself with a simple
   autopilot; `?debug=1` shows an overlay. The server honors `MB_FAST=1` (short timers) and a

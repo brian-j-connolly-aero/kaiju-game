@@ -237,6 +237,15 @@ export class GameRenderer {
   }
 
   /**
+   * The view is about to skip a stretch nobody saw (a hidden tab's backlog): whatever was in
+   * the air when the frames stopped, explosions and shells alike, is long over.
+   */
+  skipMoment(): void {
+    this.effects.clear();
+    this.projectiles.clear();
+  }
+
+  /**
    * An event whose moment passed while nothing was drawn (a hidden tab): only what lasts is
    * taken over. The city ends up in the right state, marks and the stage are kept, a shell that
    * was in flight is removed; nothing is launched, nothing flashes and nothing falls.

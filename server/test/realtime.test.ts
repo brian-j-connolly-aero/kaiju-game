@@ -4,12 +4,18 @@
  * fallback page). One server on a free port for the whole file.
  */
 
-import { CLOSE_REPLACED, SNAPSHOT_RATE, TICK_RATE } from '@mb/shared';
+import { buildStamp, CLOSE_REPLACED, JOIN_ERROR, rulesStamp, SNAPSHOT_RATE, TICK_RATE } from '@mb/shared';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { connect, createServer, type AddressInfo, type Server, type Socket } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { PING_INTERVAL_MS, PING_MAX_MISSED } from '../src/net/server';
 import { options, Player, sleep, startTestServer, token, until, type TestServer } from './netHelpers';
+
+/** The page the test server serves: a production build names its script after a hash of the code. */
+const PAGE = (script: string): string => `<!doctype html><title>Monster Battle 9001</title><script type="module" crossorigin src="./assets/${script}"></script>`;
+const PAGE_SCRIPT = 'index-Bq3xK9pZ.js';
 
 const GRACE_SECONDS = 4;
 
@@ -42,8 +48,8 @@ async function startedRoom(count: number, firstToken: number, kaiju = -1): Promi
 beforeAll(async () => {
   clientDir = mkdtempSync(join(tmpdir(), 'mb-server-test-'));
   mkdirSync(join(clientDir, 'assets', 'models'), { recursive: true });
-  writeFileSync(join(clientDir, 'index.html'), '<!doctype html><title>Monster Battle 9001</title>');
-  writeFileSync(join(clientDir, 'assets', 'index-Bq3xK9pZ.js'), 'console.log("game")');
+  writeFileSync(join(clientDir, 'index.html'), PAGE(PAGE_SCRIPT));
+  writeFileSync(join(clientDir, 'assets', PAGE_SCRIPT), 'console.log("game")');
   writeFileSync(join(clientDir, 'assets', 'models', 'army_tank.glb'), 'glb');
   ts = await startTestServer({ graceSeconds: GRACE_SECONDS, clientDir });
 });
@@ -60,6 +66,13 @@ describe('http', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('cache-control')).toBe('no-store');
     expect(await res.json()).toMatchObject({ ok: true, game: 'monster-battle-9001', protocol: 1, fast: true });
+  });
+
+  it('says which build it is: the shared rules and the page it serves', async () => {
+    const health = (await (await fetch(`${ts.url}/healthz`)).json()) as { build: string };
+    expect(health.build).toBe(`${rulesStamp()}.${PAGE_SCRIPT}`);
+    expect(health.build).toBe(buildStamp(PAGE_SCRIPT));
+    expect(ts.server.build()).toBe(health.build);
   });
 
   it('serves the built client, and the game page for any page address', async () => {
@@ -89,6 +102,58 @@ describe('http', () => {
     // A script asking for something that is not there gets a 404 too, not a web page.
     const api = await fetch(`${ts.url}/no/such/api`);
     expect(api.status).toBe(404);
+  });
+});
+
+describe('pages from another build', () => {
+  const refusedCode = async (p: Promise<Player>): Promise<number | undefined> => {
+    try {
+      await (await track(p)).leave();
+      return undefined;
+    } catch (err) {
+      return (err as { code?: number } | null)?.code;
+    }
+  };
+
+  it('lets in the page it serves, a development page and a tool built from the same rules', async () => {
+    const host = await track(Player.create(ts.url, { ...options(70), build: buildStamp(PAGE_SCRIPT) }));
+    // No page part: a development page (its script has no hashed name) or a command-line client.
+    const guest = await track(Player.join(ts.url, host.code, { ...options(71), build: buildStamp() }));
+    await until(() => guest.lobbies.length > 0 && guest.lobby.players.length === 2, 'both seated');
+    await guest.leave();
+    await host.leave();
+  });
+
+  it('refuses a tab left open across an update, whether the rules changed or only the page', async () => {
+    const host = await track(Player.create(ts.url, options(72)));
+    const code = host.code;
+    // The page was rebuilt (any change to the client or the shared code renames its script).
+    expect(await refusedCode(Player.join(ts.url, code, { ...options(73), build: buildStamp('index-AAAAAAAA.js') }))).toBe(JOIN_ERROR.version);
+    // The rules changed (the city, a tuning number).
+    expect(await refusedCode(Player.join(ts.url, code, { ...options(73), build: `00000000.${PAGE_SCRIPT}` }))).toBe(JOIN_ERROR.version);
+    expect(await refusedCode(Player.join(ts.url, code, { ...options(73), build: '00000000.' }))).toBe(JOIN_ERROR.version);
+    // A page from before pages carried a stamp.
+    expect(await refusedCode(Player.join(ts.url, code, { ...options(73), omitBuild: true }))).toBe(JOIN_ERROR.version);
+    // Creating a room is refused the same way, and leaves no room behind.
+    expect(await refusedCode(Player.create(ts.url, { ...options(74), build: buildStamp('index-AAAAAAAA.js') }))).toBe(JOIN_ERROR.version);
+    await until(() => ts.server.roomCodes().length === 1, 'the refused creator\'s room to close');
+    expect(host.lobby.players.length).toBe(1);
+    await host.leave();
+  });
+
+  it('notices a client that was rebuilt while the server runs', async () => {
+    const host = await track(Player.create(ts.url, { ...options(75), build: buildStamp(PAGE_SCRIPT) }));
+    const rebuilt = 'index-Zz9yX8wV.js';
+    try {
+      writeFileSync(join(clientDir, 'index.html'), PAGE(rebuilt));
+      expect(ts.server.build()).toBe(buildStamp(rebuilt));
+      // The old tab is now the stale one and is told so; a fresh load of the page gets in.
+      expect(await refusedCode(Player.join(ts.url, host.code, { ...options(76), build: buildStamp(PAGE_SCRIPT) }))).toBe(JOIN_ERROR.version);
+      expect(await refusedCode(Player.join(ts.url, host.code, { ...options(76), build: buildStamp(rebuilt) }))).toBeUndefined();
+    } finally {
+      writeFileSync(join(clientDir, 'index.html'), PAGE(PAGE_SCRIPT));
+    }
+    await host.leave();
   });
 });
 
@@ -163,6 +228,54 @@ describe('reconnecting', () => {
     expect(other.snapshot.ackSeq).toBeGreaterThanOrEqual(ackBefore);
     await until(() => squadIsBot(host) === false && squadIsBot(other) === false, 'the squad to be back in human hands');
     for (const p of [host, other]) await p.leave();
+  });
+
+  it('notices within a few seconds a connection that died without a word', async () => {
+    // A relay between one player and the server that can go silent in both directions without
+    // closing anything on the server's side: what a laptop changing networks looks like.
+    const pairs: Array<{ near: Socket; far: Socket; dead: boolean }> = [];
+    const relay: Server = createServer((near) => {
+      const far = connect(ts.server.port, '127.0.0.1');
+      const pair = { near, far, dead: false };
+      pairs.push(pair);
+      near.on('data', (d: Buffer) => void (pair.dead || far.write(d)));
+      far.on('data', (d: Buffer) => void (pair.dead || near.write(d)));
+      near.on('close', () => void (pair.dead || far.destroy()));
+      far.on('close', () => void (pair.dead || near.destroy()));
+      near.on('error', () => undefined);
+      far.on('error', () => undefined);
+    });
+    await new Promise<void>((resolve) => relay.listen(0, '127.0.0.1', resolve));
+    const relayUrl = `http://127.0.0.1:${(relay.address() as AddressInfo).port}`;
+    try {
+      const host = await track(Player.create(ts.url, options(50)));
+      const guest = await track(Player.join(relayUrl, host.code, options(51)));
+      await until(() => host.lobbies.length > 0 && host.lobby.players.length === 2, 'both seated');
+      // Let a ping or two go round so the test does not start in the middle of nothing.
+      await sleep(PING_INTERVAL_MS + 200);
+      expect(host.lobby.players[1].connected).toBe(true);
+
+      const diedAt = performance.now();
+      for (const pair of pairs) {
+        pair.dead = true;
+        pair.near.destroy();
+      }
+      await until(() => host.lobby.players[1]?.connected === false, 'the server to notice the dead connection', 8000);
+      const noticedAfter = performance.now() - diedAt;
+      // Missed pings, not a close: it takes at least the pings that may go unanswered...
+      expect(noticedAfter).toBeGreaterThan(PING_INTERVAL_MS * (PING_MAX_MISSED - 1));
+      // ...and no more than a few seconds whatever the settings are called (the library's own
+      // defaults needed 6 to 9).
+      expect(noticedAfter).toBeLessThan(4500);
+      expect(guest.closedCode).not.toBe(4000);
+      await host.leave();
+    } finally {
+      for (const pair of pairs) {
+        pair.near.destroy();
+        pair.far.destroy();
+      }
+      await new Promise<void>((resolve) => relay.close(() => resolve()));
+    }
   });
 
   it('gives the seat to the newest connection that shows the same token', async () => {

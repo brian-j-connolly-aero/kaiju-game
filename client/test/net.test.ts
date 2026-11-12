@@ -237,6 +237,157 @@ describe('server clock', () => {
   });
 });
 
+describe('the drawn clock under bad conditions', () => {
+  interface Arrival {
+    tick: number;
+    at: number;
+  }
+
+  /** Snapshots every second tick from a server that keeps time, each `latency` on the way. */
+  function steady(seconds: number, latency: number): Arrival[] {
+    const out: Arrival[] = [];
+    for (let tick = 2; tick * DT < seconds; tick += 2) out.push({ tick, at: tick * DT + latency });
+    return out;
+  }
+
+  /**
+   * Plays arrivals against frames at 60 a second. Returns, from `from` seconds on: the largest
+   * backward step of the drawn clock, how long it stood still, and how far behind where it
+   * should be (`ideal`, in ticks, for a given time) it was at each frame.
+   */
+  function play(arrivals: Arrival[], seconds: number, from: number, ideal: (now: number) => number, stuck: { at: number; len: number } | null = null) {
+    const clock = createServerClock();
+    let i = 0;
+    let prev = Number.NaN;
+    let back = 0;
+    let frozen = 0;
+    const behind: Array<{ now: number; s: number }> = [];
+    for (let now = 0.5; now < seconds; now += 1 / 60) {
+      // A stuck page runs no frames and handles no messages; they are all waiting when it wakes.
+      if (stuck && now > stuck.at && now < stuck.at + stuck.len) continue;
+      while (i < arrivals.length && arrivals[i].at <= now) clockSample(clock, arrivals[i++].tick, now);
+      const drawn = renderTick(clock, now);
+      if (now >= from) {
+        if (drawn < prev) back = Math.max(back, (prev - drawn) * DT);
+        if (drawn === prev) frozen += 1 / 60;
+        behind.push({ now, s: (ideal(now) - drawn) * DT });
+      }
+      prev = drawn;
+    }
+    return { back, frozen, behind, clock };
+  }
+
+  it('does not go back in time when a stalled connection delivers its backlog at once', () => {
+    const LATENCY = 0.075;
+    const ideal = (now: number): number => (now - LATENCY - INTERP_DELAY) / DT;
+    for (const stall of [0.2, 0.3, 0.4, 0.6, 1, 2]) {
+      const arrivals = steady(20, LATENCY).map((a) => (a.at > 10 && a.at < 10 + stall ? { tick: a.tick, at: 10 + stall } : a));
+      const { back, behind } = play(arrivals, 20, 9, ideal);
+      expect(back, `${stall} s stall`).toBe(0);
+      // Before the stall and from half a second after the backlog arrived the view is where it
+      // belongs. (It used to be drawn a third of a second late for two seconds after a 0.4 s stall.)
+      for (const b of behind) {
+        if (b.now < 10 || b.now > 10 + stall + 0.5) expect(Math.abs(b.s), `${stall} s stall, at ${b.now.toFixed(2)}`).toBeLessThan(0.03);
+        // Never ahead of the server's present, never further behind than the stall made it.
+        expect(b.s, `${stall} s stall, at ${b.now.toFixed(2)}`).toBeGreaterThan(-MAX_EXTRAPOLATION - INTERP_DELAY);
+        expect(b.s).toBeLessThan(stall + 0.05);
+      }
+    }
+  });
+
+  it('ignores one late snapshot', () => {
+    const arrivals = steady(8, 0.05);
+    // One snapshot is held up for 180 ms, and with it (the link delivers in order) the two behind it.
+    const late = arrivals.findIndex((a) => a.at > 4);
+    arrivals[late] = { tick: arrivals[late].tick, at: arrivals[late].at + 0.18 };
+    for (let i = late + 1; i < arrivals.length; i++) arrivals[i].at = Math.max(arrivals[i].at, arrivals[i - 1].at);
+    const ideal = (now: number): number => (now - 0.05 - INTERP_DELAY) / DT;
+    const { back, behind } = play(arrivals, 8, 3, ideal);
+    expect(back).toBe(0);
+    for (const b of behind) expect(Math.abs(b.s), `at ${b.now.toFixed(2)}`).toBeLessThan(0.02);
+  });
+
+  it('slows down instead of stepping back when the server itself falls behind', () => {
+    // The server stops for 1.3 s at t = 5 (a paused host), catches up a quarter of a second and
+    // drops the rest, as its loop does: from then on its clock is a good second behind.
+    const arrivals: Arrival[] = [];
+    let tick = 0;
+    let owed = 0;
+    for (let t = 0; t < 12; t += DT) {
+      if (t >= 5 && t < 6.3) {
+        owed = Math.min(0.25, owed + DT);
+        continue;
+      }
+      const extra = Math.min(3, Math.round(owed / DT));
+      owed -= extra * DT;
+      tick += 1 + extra;
+      const even = tick - (tick % 2);
+      if (arrivals.length === 0 || even > arrivals[arrivals.length - 1].tick) arrivals.push({ tick: even, at: t + 0.03 });
+    }
+    const { back, frozen, clock } = play(arrivals, 12, 2, () => 0);
+    expect(back).toBe(0);
+    // It stands still while nothing arrives, and not for longer.
+    expect(frozen).toBeGreaterThan(1);
+    expect(frozen).toBeLessThan(1.3);
+    // And it ends up the usual distance behind the server's (later) clock.
+    const end = renderTick(clock, 12);
+    expect(end).toBeGreaterThan(tick - (INTERP_DELAY + 0.05) / DT);
+    expect(end).toBeLessThan(tick - (INTERP_DELAY - 0.05) / DT + 1);
+  });
+
+  it('takes a page that was stuck for a moment in its stride', () => {
+    const ideal = (now: number): number => (now - 0.04 - INTERP_DELAY) / DT;
+    const { back, behind } = play(steady(12, 0.04), 12, 2, ideal, { at: 5, len: 0.4 });
+    expect(back).toBe(0);
+    // The snapshots that waited are handled together, with one time stamp: only the newest
+    // counts, and that one waited at most the 67 ms between two snapshots.
+    for (const b of behind) expect(Math.abs(b.s), `at ${b.now.toFixed(2)}`).toBeLessThan(b.now > 5.4 && b.now < 5.7 ? 0.07 : 0.03);
+  });
+
+  it('never runs backwards, whatever the arrivals, and never faster than twice real time while it follows', () => {
+    let seed = 99;
+    const random = (): number => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed / 0x7fffffff;
+    };
+    for (let round = 0; round < 20; round++) {
+      // A server that loses time now and then, and a link with jitter and the odd stall.
+      const arrivals: Arrival[] = [];
+      let tick = 0;
+      let hold = 0;
+      for (let t = 0; t < 15; t += DT) {
+        if (random() < 0.02) hold = random() * 0.5;
+        if (hold > 0) {
+          hold -= DT;
+          continue;
+        }
+        tick++;
+        if (tick % 2 === 0) arrivals.push({ tick, at: t + 0.02 + random() * 0.06 + (random() < 0.03 ? random() * 0.4 : 0) });
+      }
+      // The link delivers in order.
+      for (let i = 1; i < arrivals.length; i++) arrivals[i].at = Math.max(arrivals[i].at, arrivals[i - 1].at);
+      const clock = createServerClock();
+      let i = 0;
+      let prev = Number.NaN;
+      let prevNow = 0;
+      for (let now = 0.5; now < 15; now += 1 / 60 + (random() < 0.02 ? random() * 0.2 : 0)) {
+        while (i < arrivals.length && arrivals[i].at <= now) clockSample(clock, arrivals[i++].tick, now);
+        const drawn = renderTick(clock, now);
+        if (!Number.isNaN(prev)) {
+          expect(drawn, `round ${round} at ${now.toFixed(3)}`).toBeGreaterThanOrEqual(prev);
+          const real = (now - prevNow) / DT;
+          const step = drawn - prev;
+          // Either it follows (at most twice real time), or it skips forward after standing still.
+          if (step > real * 2 + 1e-6) expect(step * DT, `round ${round} at ${now.toFixed(3)}`).toBeGreaterThan(0.2);
+          expect(drawn).toBeLessThanOrEqual(clock.newestTick + MAX_EXTRAPOLATION / DT + 1e-6);
+        }
+        prev = drawn;
+        prevNow = now;
+      }
+    }
+  });
+});
+
 describe('session helpers', () => {
   it('keeps one token per profile and cleans room codes', () => {
     const store = memoryStore();

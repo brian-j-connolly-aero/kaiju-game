@@ -48,6 +48,8 @@ function rig(options: { unlock?: boolean } = {}): Rig {
     manifest.sfx[id] = { variants: [`audio/sfx/${id}`], gain: 1 };
     ctx.durations.set(`audio/sfx/${id}.ogg`, 1);
   }
+  manifest.sfx.long_boom = { variants: ['audio/sfx/long_boom'], gain: 1 };
+  ctx.durations.set('audio/sfx/long_boom.ogg', 4);
   manifest.sfx.hum_loop = { variants: ['audio/sfx/hum_loop'], gain: 1, loop: [0.25, 1.25] };
   ctx.durations.set('audio/sfx/hum_loop.ogg', 1.5);
   for (let i = 0; i < 40; i++) {
@@ -156,6 +158,27 @@ describe('voice limits', () => {
     for (let n = 0; n < 8; n++) for (let i = 0; i < 8; i++) engine.play(`s${n}`);
     expect(engine.stats().voices).toBeLessThanOrEqual(28);
     expect(ctx.started.length).toBeLessThanOrEqual(28);
+  });
+
+  it('lets the oldest tail give way to a new shot in a long firefight', async () => {
+    const { engine, ctx } = rig();
+    engine.preload(['long_boom']);
+    await settle();
+    // Six copies, a third of a second apart, each four seconds long: all still sounding.
+    for (let i = 0; i < 6; i++) {
+      engine.play('long_boom');
+      await pass(ctx, 0.3);
+    }
+    expect(ctx.playing()).toHaveLength(6);
+    engine.play('long_boom');
+    expect(ctx.started).toHaveLength(7);
+    expect(ctx.started[6].startedAt).toBeCloseTo(ctx.currentTime, 5);
+    // The one that gave way is the oldest, faded out within a few hundredths of a second.
+    expect(ctx.started[0].stoppedAt).not.toBeNull();
+    expect((ctx.started[0].stoppedAt as number) - ctx.currentTime).toBeLessThan(0.05);
+    expect(ctx.started.slice(1, 6).every((s) => s.stoppedAt === null)).toBe(true);
+    await pass(ctx, 0.1);
+    expect(ctx.playing()).toHaveLength(6);
   });
 
   it('frees a voice when its sound has ended', async () => {

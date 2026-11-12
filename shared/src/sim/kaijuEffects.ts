@@ -24,7 +24,7 @@ import { PI } from '../math/angle';
 import { bitGet } from '../math/bits';
 import { circleInArc, obbInArc } from '../math/geom';
 import { lerp } from '../math/scalar';
-import { createAimPoint, resolveAimPoint } from './aim';
+import { createAimPoint, kaijuEyePoint, resolveAimPoint } from './aim';
 import { beamPath, beamTouches, createBeamPath } from './beam';
 import type { HeldObject, HeldSource } from './events';
 import { noteKaijuNoise } from './spotting';
@@ -45,6 +45,7 @@ const GRAB_HP_SLACK = 1e-6;
 
 const ids: number[] = [];
 const aim = createAimPoint();
+const eyePoint = { x: 0, y: 0, z: 0 };
 const beam = createBeamPath();
 
 /** A hit dealt by a kaiju's own body or breath, in raw numbers; `fromDir` points from the target to the kaiju. */
@@ -351,7 +352,8 @@ export function throwEffect(world: World, k: Kaiju, def: KaijuKindDef): void {
 
   // What the crosshair is on, out to well past the longest possible throw.
   const reach = (speed * speed) / Math.max(g, 0.01) + st.eyeHeight * 2 + 50;
-  resolveAimPoint(world.cityQuery, k.x, st.eyeHeight, k.z, k.aimYaw, k.aimPitch, reach, aim);
+  kaijuEyePoint(k, eyePoint);
+  resolveAimPoint(world.cityQuery, eyePoint.x, eyePoint.y, eyePoint.z, k.aimYaw, k.aimPitch, reach, aim);
 
   let dirX = Math.sin(k.aimYaw);
   let dirZ = Math.cos(k.aimYaw);

@@ -32,7 +32,7 @@ import { modMult } from '../../defs/upgrades';
 import { clamp } from '../../math/scalar';
 import { shoveUnit } from '../kaijuEffects';
 import { createMoveResult, stepMovement, unitMoveParams, type MoveInput, type MoveParams } from '../movement';
-import { deploySquads, setKaijuStage } from '../spawn';
+import { deploySquads, findStandingRoom, setKaijuStage } from '../spawn';
 import { markVeterans, nearestKaiju, scatterMult } from '../squads';
 import type { Kaiju, World } from '../types';
 import { emit } from '../worldOps';
@@ -43,6 +43,7 @@ const BLAST_SHOVE_MARGIN = 6;
 /** A unit slower than this has stopped sliding. */
 const COAST_MIN_SPEED = 0.05;
 
+const room = { x: 0, z: 0 };
 const coastInput: MoveInput = { moveX: 0, moveZ: 0, aimYaw: 0 };
 const coastParams = {} as MoveParams;
 const coastResult = createMoveResult();
@@ -67,8 +68,10 @@ export function endMatch(world: World, winner: Exclude<Winner, 'none'>, reason: 
 
 /**
  * Gives a kaiju the body of a stage: its size, full hp and nerve, and a clean action state.
- * Position, rage, what it has drafted and what it has wrecked are untouched. The bigger body is
- * kept inside the current bounds.
+ * Rage, what it has drafted and what it has wrecked are untouched. It stays where it is when
+ * the bigger body has room there; otherwise it is kept inside the current bounds and stood on
+ * the nearest ground clear of the walls it cannot walk through (a cocoon in a gap between tall
+ * buildings would leave the new body wedged, thrown from wall to wall by collision).
  */
 function growKaiju(world: World, k: Kaiju, stage: StageId): void {
   const def = kaijuKindDef(k.kind);
@@ -91,6 +94,12 @@ function growKaiju(world: World, k: Kaiju, stage: StageId): void {
   const inset = Math.min(k.radius, (b.maxX - b.minX) / 2, (b.maxZ - b.minZ) / 2);
   k.x = clamp(k.x, b.minX + inset, b.maxX - inset);
   k.z = clamp(k.z, b.minZ + inset, b.maxZ - inset);
+  const st = kaijuStageDef(k.kind, stage);
+  // A body that wades through everything is never wedged.
+  if (!st.wadesTall && findStandingRoom(world.cityQuery, k.x, k.z, k.radius, st.trampleHeight, b, room)) {
+    k.x = room.x;
+    k.z = room.z;
+  }
 }
 
 /**

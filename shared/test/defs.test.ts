@@ -74,7 +74,7 @@ describe('stages (DESIGN.md section 2)', () => {
     expect(MATCH_RULES.blastShoveRadius).toBe(7);
     expect(MATCH_RULES.redeployMinKaijuDist).toBe(250);
     // The three fractions are tuned with the balance harness (docs/BALANCE.md).
-    expect(MATCH_RULES.bar).toMatchObject({ p1: 0.13, p2: 0.088, p3: 0.31, growth: 1.6, display: [0.21, 0.57, 1] });
+    expect(MATCH_RULES.bar).toMatchObject({ p1: 0.13, p2: 0.088, p3: 0.36, growth: 1.6, display: [0.21, 0.57, 1] });
     expect(MATCH_RULES.maxPlayers).toBe(5);
     expect(SNAPSHOT_EVERY_TICKS).toBe(2);
   });

@@ -90,7 +90,8 @@ describe('lobby', () => {
     const [a, b] = seatPlayers(room, 2);
 
     room.message('p1', 'setName', { name: '  <b>Rex</b> the very long named one  ' });
-    expect(b.lobby.lobby.players[1].name).toBe('bRex/b the very ');
+    // Cut to sixteen characters, and not left ending in a space.
+    expect(b.lobby.lobby.players[1].name).toBe('bRex/b the very');
     room.message('p1', 'setName', { name: 42 });
     expect(b.lobby.lobby.players[1].name).toBe('Player 2');
 
@@ -142,6 +143,72 @@ describe('lobby', () => {
     room.message('p0', 'start', {});
     expect(room.lobby.phase).toBe('match');
     for (const peer of peers) expect(peer.lobby.lobby.phase).toBe('match');
+  });
+
+  it('lets the host start without somebody who has had twenty seconds to get ready', () => {
+    const { room, run } = makeRoom({ startWaitSeconds: 20 });
+    const peers = seatPlayers(room, 4);
+    room.message('p1', 'ready', { ready: true });
+    room.message('p2', 'ready', { ready: true });
+    room.message('p3', 'setRole', { wantsKaiju: true });
+    // Player D left the tab open and went to make tea. For a while the room waits.
+    run(19);
+    room.message('p0', 'start', {});
+    expect(room.lobby.phase).toBe('lobby');
+    expect(peers[0].lobby.lobby.players.some((p) => p.waited)).toBe(false);
+
+    // After twenty seconds in the lobby the server says so in the lobby state, once.
+    const before = peers[0].all('lobby').length;
+    run(2);
+    expect(peers[0].all('lobby').length).toBe(before + 1);
+    expect(peers[0].lobby.lobby.players.map((p) => p.waited)).toEqual([true, true, true, true]);
+    expect(peers[0].lobby.lobby.players[3].ready).toBe(false);
+
+    // Only the host can use it.
+    room.message('p1', 'start', {});
+    expect(room.lobby.phase).toBe('lobby');
+    room.message('p0', 'start', {});
+    expect(room.lobby.phase).toBe('match');
+    // Player D is in the match all the same, with a squad to come back to, but is not the
+    // kaiju although they volunteered: nobody waits for a kaiju that is not at the keyboard.
+    expect(peers[3].welcome.playerId).toBeGreaterThan(0);
+    expect(peers.filter((p) => p.welcome.playerId === 0).length).toBeLessThanOrEqual(1);
+    expect(peers[0].lobby.lobby.lastKaijuSeat).not.toBe(3);
+  });
+
+  it('starts the waiting time over for somebody who has only just come (back) into the lobby', () => {
+    const { room, run, runUntil } = makeRoom({ startWaitSeconds: 20, graceSeconds: 600 });
+    const peers = seatPlayers(room, 2);
+    run(30);
+    expect(peers[0].lobby.lobby.players.map((p) => p.waited)).toEqual([true, true]);
+    // A third person arrives: the room waits for them again, for their twenty seconds.
+    const late = new FakePeer('late');
+    room.join(late, { name: 'Late', token: 'token-late-abcdef' });
+    room.message('p1', 'ready', { ready: true });
+    room.message('p0', 'start', {});
+    expect(room.lobby.phase).toBe('lobby');
+    // Somebody whose connection blipped gets the same courtesy when they are back.
+    room.drop('p1');
+    run(1);
+    expect(room.resume(new FakePeer('p1'))).toBe(true);
+    expect(peers[0].lobby.lobby.players.map((p) => p.waited)).toEqual([true, false, false]);
+    room.message('late', 'ready', { ready: true });
+    room.message('p0', 'start', {});
+    expect(room.lobby.phase).toBe('match');
+
+    // Back from the match everybody's ready flag is cleared and everybody gets their time again.
+    runUntil(() => room.lobby.phase === 'end', 400);
+    room.message('p0', 'toLobby', {});
+    expect(peers[0].lobby.lobby.players.map((p) => [p.ready, p.waited])).toEqual([
+      [false, false],
+      [false, false],
+      [false, false],
+    ]);
+    room.message('p0', 'start', {});
+    expect(room.lobby.phase).toBe('lobby');
+    run(21);
+    room.message('p0', 'start', {});
+    expect(room.lobby.phase).toBe('match');
   });
 
   it('answers a ping with the same number and the current tick', () => {
@@ -375,6 +442,77 @@ describe('match loop', () => {
     expect(state.buttons).toBe(0);
     expect(state.aimYaw).toBeCloseTo(0.7);
     expect(peers[0].lastSnapshot.ackSeq).toBe(1);
+  });
+
+  describe('on a link that stalls and then delivers everything at once', () => {
+    /** A room whose only player is the kaiju, in play, with the bots standing still. */
+    function kaijuRoom() {
+      const made = makeRoom({ fast: false });
+      const [peer] = seatPlayers(made.room, 1);
+      made.room.message('p0', 'setRole', { wantsKaiju: true });
+      startMatch(made.room, [peer]);
+      const world = made.room.match!.world;
+      world.config.bots = { kaijuHandicap: 1, humanHandicap: 1 };
+      made.runUntil(() => world.match.phase === 'playing', 30);
+      let seq = 0;
+      /** One tick of real time; `buttons` is what arrives during it (nothing during a stall). */
+      const tick = (...buttons: number[]): void => {
+        for (const b of buttons) made.room.message('p0', 'input', input(++seq, { buttons: b }));
+        made.run(TICK_MS / 1000);
+      };
+      const actions = (): string[] =>
+        peer.events.flatMap((e) => (e.type === 'kaijuAction' && e.phase !== 'recover' && e.phase !== 'idle' ? [`${e.action}/${e.phase}`] : []));
+      for (let i = 0; i < 10; i++) tick(0);
+      peer.clear();
+      return { ...made, peer, world, tick, actions };
+    }
+
+    it('still plays a tap that was pressed and released inside the stall', () => {
+      for (const downs of [1, 2, 3]) {
+        const { tick, actions } = kaijuRoom();
+        // Nine ticks with nothing arriving, then the nine late inputs and the current one.
+        for (let i = 0; i < 9; i++) tick();
+        tick(0, 0, 0, ...new Array<number>(downs).fill(Btn.strike), ...new Array<number>(7 - downs).fill(0));
+        for (let i = 0; i < 45; i++) tick(0);
+        expect(actions(), `a tap of ${downs} input(s)`).toEqual(['swipe/windup', 'swipe/active']);
+      }
+    });
+
+    it('keeps a hold a hold when its first inputs arrive late', () => {
+      const { tick, actions } = kaijuRoom();
+      for (let i = 0; i < 9; i++) tick();
+      // The player pressed Strike during the stall and is still holding it: twelve inputs in
+      // all (0.4 s, a deliberate Stomp), eight of them late.
+      tick(0, 0, ...new Array<number>(8).fill(Btn.strike));
+      for (let i = 0; i < 4; i++) tick(Btn.strike);
+      for (let i = 0; i < 60; i++) tick(0);
+      expect(actions()).toEqual(['swipe/windup', 'stomp/windup', 'stomp/active']);
+    });
+
+    it('keeps a hold a hold when the stall falls in the middle of it', () => {
+      const { tick, actions, room } = kaijuRoom();
+      tick(Btn.strike);
+      tick(Btn.strike);
+      // Nine ticks on a guess ("still down"), then the nine late inputs say the same.
+      for (let i = 0; i < 9; i++) tick();
+      tick(...new Array<number>(10).fill(Btn.strike));
+      tick(Btn.strike);
+      tick(Btn.strike);
+      for (let i = 0; i < 60; i++) tick(0);
+      expect(actions()).toEqual(['swipe/windup', 'stomp/windup', 'stomp/active']);
+      // The guessed ticks were paid back: the player is not left a third of a second behind.
+      expect(room.match!.queues[0].items.length).toBeLessThanOrEqual(2);
+    });
+
+    it('lets go of a held button as soon as the late inputs show it was released', () => {
+      const { tick, world } = kaijuRoom();
+      tick(Btn.block);
+      for (let i = 0; i < 6; i++) tick();
+      expect(world.players[0].input.buttons & Btn.block).toBe(Btn.block);
+      // The release had happened two inputs into the stall.
+      tick(Btn.block, Btn.block, 0, 0, 0, 0, 0);
+      expect(world.players[0].input.buttons & Btn.block).toBe(0);
+    });
   });
 
   it('never spirals: a long stall costs a handful of ticks and one snapshot', () => {

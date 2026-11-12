@@ -36,6 +36,11 @@ function shot(yaw: number, partial: Partial<Hit> = {}): Hit {
   };
 }
 
+/** The same, as part of a charged volley of a squad (unit 4 is the second squad's; pass the unit to match). */
+function volleyShot(yaw: number, squad: number, partial: Partial<Hit> = {}): Hit {
+  return shot(yaw, { sourceId: squad * 4, player: squad + 1, volleySquad: squad, ...partial });
+}
+
 /** Applies a hit to the kaiju right now and returns the events it caused. */
 function hitKaiju(world: World, hit: Hit): SimEvent[] {
   const from = world.events.length;
@@ -322,8 +327,9 @@ describe('applyHit on the kaiju: nerve', () => {
     run(world, 5, [input({ buttons: Btn.strike, moveZ: 1 })]);
     expect(k.phase).toBe('windup');
 
-    world.hits.push({ target: { entity: 'kaiju', id: 0 }, hit: shot(0, { nerve: CAP - 1 }) });
-    world.hits.push({ target: { entity: 'kaiju', id: 0 }, hit: shot(0, { nerve: 5 }) });
+    // Charged volleys from two squads, landing on the same tick.
+    world.hits.push({ target: { entity: 'kaiju', id: 0 }, hit: volleyShot(0, 1, { nerve: CAP - 1 }) });
+    world.hits.push({ target: { entity: 'kaiju', id: 0 }, hit: volleyShot(0, 0, { nerve: 5 }) });
     let events = world.step([input({ moveZ: 1 })]);
     expect(k.phase).toBe('stagger');
     expect(k.action).toBe('none');
@@ -340,7 +346,7 @@ describe('applyHit on the kaiju: nerve', () => {
     expect(eventsOf(events, 'kaijuAction')).toEqual([]);
     expect(Math.hypot(k.x - at.x, k.z - at.z)).toBeLessThan(1.5);
     expect(k.phase).toBe('stagger');
-    events = hitKaiju(world, shot(0, { damage: 50, nerve: CAP }));
+    events = hitKaiju(world, volleyShot(0, 1, { damage: 50, nerve: CAP }));
     expect(hp - k.hp).toBeCloseTo(50 * P.helplessMult, 9);
     expect(eventsOf(events, 'nerveBreak')).toEqual([]);
     expect(world.match.breaks).toBe(1);
@@ -357,7 +363,8 @@ describe('applyHit on the kaiju: nerve', () => {
 
     // Immune: nerve damage does nothing, hp damage still lands (at the normal rate again).
     const hp2 = k.hp;
-    events = hitKaiju(world, shot(0, { damage: 50, nerve: CAP * 2 }));
+    events = hitKaiju(world, volleyShot(0, 0, { damage: 50, nerve: CAP * 2 }));
+    hitKaiju(world, volleyShot(0, 1, { damage: 0, nerve: CAP * 2 }));
     expect(k.nerve).toBe(0);
     expect(k.phase).toBe('idle');
     expect(hp2 - k.hp).toBeCloseTo(50 * P.normalMult, 9);
@@ -366,9 +373,64 @@ describe('applyHit on the kaiju: nerve', () => {
     // When the immunity runs out it can be broken again.
     run(world, Math.ceil(COMBAT_RULES.staggerNerveImmunity * TICK_RATE) + 1, [input()]);
     expect(k.nerveImmune).toBe(0);
-    hitKaiju(world, shot(0, { nerve: CAP }));
+    hitKaiju(world, volleyShot(0, 0, { nerve: CAP }));
+    hitKaiju(world, volleyShot(0, 1, { nerve: 1 }));
     expect(k.phase).toBe('stagger');
     expect(world.match.breaks).toBe(2);
+  });
+
+  it('takes two squads to break: anything else only brings it to the brink', () => {
+    const world = arena();
+    const k = world.kaijus[0];
+    const window = Math.round(COMBAT_RULES.volleyBreakWindow * TICK_RATE);
+    expect(COMBAT_RULES.breakSquads).toBe(2);
+
+    // Fire that is no charged volley, however much of it, from however many squads: the brink.
+    let events = hitKaiju(world, shot(0, { nerve: CAP * 3 }));
+    events.push(...hitKaiju(world, shot(Math.PI, { nerve: CAP, sourceId: 8, player: 3 })));
+    events.push(...hitKaiju(world, shot(0, { nerve: CAP, sourceId: -1, kind: 'arty' })));
+    expect(eventsOf(events, 'nerveBreak')).toEqual([]);
+    expect(k.phase).toBe('idle');
+    expect(k.nerve).toBe(CAP);
+    // On the brink it is as slow as nerve damage makes it, and it leaks away as ever.
+    expect(kaijuMoveParams(k, world.match.bounds).topSpeed).toBeCloseTo(LIZARD.stages[0].topSpeed * (1 - COMBAT_RULES.nerveSlowMax), 6);
+    run(world, TICK_RATE, [input()]);
+    expect(k.nerve).toBeCloseTo(CAP - LIZARD.nerveLeak, 6);
+
+    // One squad's charged volleys, from behind and crossing each other: still the brink.
+    events = hitKaiju(world, volleyShot(Math.PI, 0, { nerve: CAP }));
+    events.push(...hitKaiju(world, volleyShot(Math.PI - 70 * DEG, 0, { nerve: CAP, sourceId: 1 })));
+    expect(eventsOf(events, 'crossfire').length).toBe(1);
+    expect(eventsOf(events, 'nerveBreak')).toEqual([]);
+    expect(k.nerve).toBe(CAP);
+
+    // A second squad's volley that comes too late is one squad again...
+    run(world, window + 1, [input()]);
+    events = hitKaiju(world, volleyShot(0, 1, { nerve: CAP }));
+    expect(eventsOf(events, 'nerveBreak')).toEqual([]);
+    expect(k.phase).toBe('idle');
+    // ...and the first squad's next volley, inside the window, is what breaks it. The straw that
+    // does it need not be a volley shot: the two volleys have landed, the nerve is full.
+    run(world, window - 5, [input()]);
+    events = hitKaiju(world, volleyShot(Math.PI, 0, { nerve: 1 }));
+    expect(eventsOf(events, 'nerveBreak')).toEqual([]);
+    events = hitKaiju(world, shot(0, { nerve: CAP, atWill: true }));
+    expect(eventsOf(events, 'nerveBreak')).toMatchObject([{ kaiju: 0, by: HUMAN_PLAYER }]);
+    expect(k.phase).toBe('stagger');
+  });
+
+  it('asks a match with a single squad for that squad only, and one with no squads for nothing', () => {
+    const one = arena();
+    one.squads.length = 1;
+    hitKaiju(one, shot(0, { nerve: CAP }));
+    expect(one.kaijus[0].phase).toBe('idle');
+    hitKaiju(one, volleyShot(0, 0, { nerve: 1 }));
+    expect(one.kaijus[0].phase).toBe('stagger');
+
+    const none = arena();
+    none.squads.length = 0;
+    hitKaiju(none, shot(0, { nerve: CAP, sourceId: -1 }));
+    expect(none.kaijus[0].phase).toBe('stagger');
   });
 
   it('cannot have its nerve broken in the cocoon', () => {

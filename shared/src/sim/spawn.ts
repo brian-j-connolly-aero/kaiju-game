@@ -3,12 +3,12 @@
  * the start of every stage (DESIGN.md section 2, the molt, step 4 and 5).
  */
 
-import { circleHitsStructure, inWater, type CityQuery } from '../city/spatialIndex';
+import { circleHitsStructure, inWater, structuresInCircle, type CityQuery } from '../city/spatialIndex';
 import { factionLevelDef } from '../defs/factions';
 import type { KaijuVerb, StageId } from '../defs/ids';
 import { KAIJU_ACTION_IDS } from '../defs/ids';
 import { kaijuKindDef, kaijuStageDef } from '../defs/kaiju/index';
-import { MATCH_RULES } from '../defs/rules';
+import { MATCH_RULES, SQUAD_RULES } from '../defs/rules';
 import { stageDef } from '../defs/stages';
 import { unitTypeDef } from '../defs/units';
 import { emptyMods, modMult } from '../defs/upgrades';
@@ -77,6 +77,60 @@ export function findClearSpot(
         out.z = cz;
         return true;
       }
+    }
+  }
+  out.x = x;
+  out.z = z;
+  return false;
+}
+
+/** Rings searched for standing room, half a body radius apart: about 24 radii out. */
+const ROOM_RINGS = 48;
+/** Room a body is given beyond its radius. */
+const ROOM_MARGIN = 0.5;
+const roomIds: number[] = [];
+
+/**
+ * Finds the ground nearest (x, z) where a body of `radius` has room to stand: inside the
+ * bounds and clear of every standing structure it cannot walk through (taller than
+ * `trampleHeight`; bridge decks never count). The spot itself is tried first, so a body that
+ * already has room stays exactly where it is; then rings outward. For a kaiju that has just
+ * outgrown the gap its cocoon was in: left between two walls, collision would throw it from
+ * one to the other on every tick. Returns false (and leaves `out` at the spot asked for) when
+ * nothing within reach fits.
+ */
+export function findStandingRoom(
+  city: CityQuery,
+  x: number,
+  z: number,
+  radius: number,
+  trampleHeight: number,
+  bounds: Bounds,
+  out: Vec2,
+): boolean {
+  const index = city.index;
+  const step = Math.max(1, radius / 2);
+  for (let ring = 0; ring <= ROOM_RINGS; ring++) {
+    const count = ring === 0 ? 1 : Math.ceil(2 * Math.PI * ring);
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2;
+      const cx = ring === 0 ? x : x + Math.sin(a) * ring * step;
+      const cz = ring === 0 ? z : z + Math.cos(a) * ring * step;
+      if (cx < bounds.minX + radius - 1e-9 || cx > bounds.maxX - radius + 1e-9) continue;
+      if (cz < bounds.minZ + radius - 1e-9 || cz > bounds.maxZ - radius + 1e-9) continue;
+      structuresInCircle(city, cx, cz, radius + ROOM_MARGIN, roomIds);
+      let free = true;
+      for (let j = 0; j < roomIds.length; j++) {
+        const id = roomIds[j];
+        if (index.spassable[id] === 0 && index.sheight[id] > trampleHeight) {
+          free = false;
+          break;
+        }
+      }
+      if (!free) continue;
+      out.x = cx;
+      out.z = cz;
+      return true;
     }
   }
   out.x = x;
@@ -223,6 +277,8 @@ export function createSquad(world: World, slot: PlayerSlot): Squad {
     trail: [],
     formed: false,
     volleyReady: false,
+    orderBudget: SQUAD_RULES.orderBurst,
+    pendingOrders: [],
   };
   world.squads.push(squad);
   return squad;
@@ -242,6 +298,9 @@ export function refillSquad(world: World, squad: Squad, stage: StageId): void {
   squad.eliminated = false;
   squad.moveOrder = 'follow';
   squad.fireMode = 'atWill';
+  // Orders that were still waiting were for the squad that is gone.
+  squad.orderBudget = SQUAD_RULES.orderBurst;
+  squad.pendingOrders.length = 0;
   squad.callInCooldowns = levelDef.callIns.map(() => 0);
   squad.trail.length = 0;
   squad.formed = false;

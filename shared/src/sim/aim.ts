@@ -6,9 +6,11 @@
 
 import { castRay, createCityCastHit, type CityQuery } from '../city/spatialIndex';
 import { createCastHit, rayVsCapsule, type VerticalCapsule } from '../math/geom';
+import type { KaijuKindId, StageId } from '../defs/ids';
+import { kaijuStageDef } from '../defs/kaiju/index';
 import { SQUAD_RULES } from '../defs/rules';
 import { unitTypeDef } from '../defs/units';
-import type { Vec2 } from '../math/vec';
+import type { Vec2, Vec3 } from '../math/vec';
 import type { Kaiju, Unit } from './types';
 
 export interface AimPoint {
@@ -32,6 +34,37 @@ const capHit = createCastHit();
 const capsule: VerticalCapsule = { x: 0, z: 0, r: 0, y0: 0, y1: 0 };
 const origin = { x: 0, y: 0, z: 0 };
 const dir = { x: 0, y: 0, z: 0 };
+
+/** What fixes where a kaiju's head is. Kaiju and snapshot kaiju both satisfy it. */
+export interface KaijuHeadSource {
+  kind: KaijuKindId;
+  stage: StageId;
+  x: number;
+  z: number;
+  aimYaw: number;
+}
+
+/**
+ * The kaiju's eye: where its aim ray starts (the throw's target is what this ray lands on) and
+ * where the first-person camera sits. The head leads the body along the aim heading, so the
+ * eye is ahead of the body's axis by the stage's `eyeForward`.
+ */
+export function kaijuEyePoint(k: KaijuHeadSource, out: Vec3): Vec3 {
+  const st = kaijuStageDef(k.kind, k.stage);
+  out.x = k.x + Math.sin(k.aimYaw) * st.eyeForward;
+  out.y = st.eyeHeight;
+  out.z = k.z + Math.cos(k.aimYaw) * st.eyeForward;
+  return out;
+}
+
+/** The kaiju's mouth, where the beam starts: ahead of the body's axis along the aim heading by the stage's `mouthForward`. */
+export function kaijuMouthPoint(k: KaijuHeadSource, out: Vec3): Vec3 {
+  const st = kaijuStageDef(k.kind, k.stage);
+  out.x = k.x + Math.sin(k.aimYaw) * st.mouthForward;
+  out.y = st.mouthHeight;
+  out.z = k.z + Math.cos(k.aimYaw) * st.mouthForward;
+  return out;
+}
 
 /** Hit volume of a kaiju: an upright capsule of its body radius and height. */
 export function kaijuCapsule(k: Kaiju, out: VerticalCapsule): VerticalCapsule {

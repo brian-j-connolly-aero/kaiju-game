@@ -37,6 +37,12 @@ export interface LobbyPlayer {
   /** False while the player is disconnected and may still reclaim the seat. */
   connected: boolean;
   /**
+   * Set by the server in the lobby: this player has been in the lobby long enough (20 s by
+   * default) that the host may start without waiting for their ready. A player who is not
+   * ready and not yet `waited` is who the start is waiting for.
+   */
+  waited?: boolean;
+  /**
    * Set by the server: the match slot (PlayerId) this seat plays while the room is in a match or
    * on the end screen; -1 for a spectator and whenever the room is in the lobby.
    */
@@ -76,10 +82,32 @@ export function makeRoomCode(rng: Rng): string {
   return code;
 }
 
-/** Trims a requested display name to something safe to show; falls back to "Player N". */
+/**
+ * Characters that never belong in a name: control characters (some terminals read U+009B as
+ * the start of an escape sequence), invisible and direction-changing format characters
+ * (zero-width spaces, right-to-left overrides), line and paragraph separators, halves of a
+ * surrogate pair, letters that are drawn as blanks, and the two characters of markup.
+ */
+const NAME_JUNK = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Cs}\u115f\u1160\u2800\u3164\uffa0<>]/gu;
+
+/**
+ * Turns a requested display name into something safe to show and to print: composed form, no
+ * junk characters, single spaces, at most two combining marks on a letter, cut to
+ * MAX_NAME_LENGTH whole characters (never through the middle of an emoji). Falls back to
+ * "Player N" when nothing visible is left.
+ */
 export function cleanPlayerName(raw: unknown, seat: number): string {
-  const text = typeof raw === 'string' ? raw.replace(/[\u0000-\u001f\u007f<>]/g, '').trim() : '';
-  return text.length > 0 ? text.slice(0, MAX_NAME_LENGTH) : `Player ${seat + 1}`;
+  const fallback = `Player ${seat + 1}`;
+  if (typeof raw !== 'string') return fallback;
+  const text = raw
+    .slice(0, 256)
+    .normalize('NFC')
+    .replace(NAME_JUNK, '')
+    .replace(/\s+/gu, ' ')
+    .replace(/(\p{M}{2})\p{M}+/gu, '$1')
+    .trim();
+  const name = Array.from(text).slice(0, MAX_NAME_LENGTH).join('').trim();
+  return /[^\s\p{M}]/u.test(name) ? name : fallback;
 }
 
 /** Adds a player in the lowest free seat. Returns the new player, or null when the room is full. */
@@ -109,10 +137,20 @@ export function removeLobbyPlayer(lobby: LobbyState, seat: number): void {
   if (lobby.lastKaijuSeat === seat) lobby.lastKaijuSeat = -1;
 }
 
-/** Whether the host may start: everyone connected is ready (the host's own ready flag is implied). */
+/** True when this player does not hold the start up: they are the host, ready, or have had their time. */
+function startNeedNotWaitFor(lobby: LobbyState, p: LobbyPlayer): boolean {
+  return p.ready || p.seat === lobby.host || p.waited === true;
+}
+
+/**
+ * Whether the host may start: everyone connected is ready (the host's own ready flag is
+ * implied) or has been in the lobby long enough that the server no longer makes the others
+ * wait for them (`LobbyPlayer.waited`). One person who walked away cannot keep a room from
+ * playing; they are in the match all the same and find their squad when they come back.
+ */
 export function canStartMatch(lobby: LobbyState): boolean {
   const present = lobby.players.filter((p) => p.connected);
-  return present.length > 0 && present.every((p) => p.ready || p.seat === lobby.host);
+  return present.length > 0 && present.every((p) => startNeedNotWaitFor(lobby, p));
 }
 
 /**
@@ -121,14 +159,18 @@ export function canStartMatch(lobby: LobbyState): boolean {
  * - Volunteers go first (a random one if several; one who was not the kaiju last match if possible).
  * - Otherwise the role rotates: a random connected player, never the same one twice in a row.
  * - A lone player who did not volunteer plays a squad against a bot kaiju.
+ * - Somebody the host started without (connected, not ready, `waited`) is never the kaiju: the
+ *   match must not hang on a player who may not be at the keyboard.
  */
 export function pickKaijuSeat(lobby: LobbyState, rng: Rng): number {
   const present = lobby.players.filter((p) => p.connected);
   if (lobby.options.botKaiju || present.length === 0) return -1;
-  const volunteers = present.filter((p) => p.wantsKaiju);
+  const here = present.filter((p) => p.ready || p.seat === lobby.host || !p.waited);
+  const volunteers = here.filter((p) => p.wantsKaiju);
   if (volunteers.length === 1) return volunteers[0].seat;
   if (present.length === 1 && volunteers.length === 0) return -1;
-  let pool = volunteers.length > 0 ? volunteers : present;
+  if (here.length === 0) return -1;
+  let pool = volunteers.length > 0 ? volunteers : here;
   if (MATCH_RULES.rotateKaijuRole) {
     const fresh = pool.filter((p) => p.seat !== lobby.lastKaijuSeat);
     if (fresh.length > 0) pool = fresh;

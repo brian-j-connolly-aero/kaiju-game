@@ -18,7 +18,7 @@ import {
   type StageId,
   type World,
 } from '../src/index';
-import { eventsOf, holdFire, input, KAIJU_PLAYER, makeTestWorld, parkUnits, placeKaiju, placeUnit, run, type TestWorldOptions } from './helpers';
+import { breakNerve, eventsOf, holdFire, input, KAIJU_PLAYER, makeTestWorld, parkUnits, placeKaiju, placeUnit, run, type TestWorldOptions } from './helpers';
 
 const A = LIZARD.actions;
 
@@ -632,9 +632,7 @@ describe('eat: grab held', () => {
     k.hp = 500;
     play(world, ticksFor(A.eat.holdTime) + 10, { buttons: Btn.grab });
     expect(k.phase).toBe('eat');
-    applyHit(world, { entity: 'kaiju', id: 0 }, {
-      damage: 0, nerve: 1000, fromDir: { x: 0, z: 1 }, sourceId: 4, player: 1, kind: 'shell', atWill: false,
-    });
+    breakNerve(world);
     expect(k.phase).toBe('stagger');
     play(world, ticksFor(COMBAT_RULES.staggerDuration) + ticksFor(A.eat.timing.active) + 5);
     expect(k.phase).toBe('idle');
@@ -899,9 +897,8 @@ describe('the beam special', () => {
     play(world, windup + 10);
     const hp = world.structureHp[0];
     expect(hp).toBeLessThan(5000);
-    applyHit(world, { entity: 'kaiju', id: 0 }, {
-      damage: 0, nerve: 1000, fromDir: { x: 0, z: 1 }, sourceId: 4, player: 1, kind: 'shell', atWill: false,
-    });
+    breakNerve(world);
+    expect(k.phase).toBe('stagger');
     play(world, 60);
     expect(world.structureHp[0]).toBe(hp);
     expect(k.rage).toBeLessThan(beam.rageCost);

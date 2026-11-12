@@ -145,8 +145,8 @@ describe('the squad bot', () => {
     const patient = volleys.filter((v) => !staggered(v.tick) && !staggered(v.tick - 1));
     expect(patient.length).toBeGreaterThanOrEqual(4);
     expect(patient.every((v) => v.charge >= BOT_RULES.squad.volleyCharge - 1e-6)).toBe(true);
-    // They did not plink: every projectile was part of a volley.
-    expect(eventsOf(events, 'projectileSpawn').every((s) => s.volley)).toBe(true);
+    // They did not plink: every projectile was part of a charged volley (the ragged fire into a stagger aside).
+    expect(eventsOf(events, 'projectileSpawn').every((s) => s.volley || staggered(s.tick) || staggered(s.tick - 1))).toBe(true);
     // Rockets found the target.
     expect(eventsOf(events, 'kaijuHit').length).toBeGreaterThan(20);
   });

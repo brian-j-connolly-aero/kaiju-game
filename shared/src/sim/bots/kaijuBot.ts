@@ -24,7 +24,7 @@
 import { PROP_KINDS } from '../../city/props';
 import { castSegment, distToStructure, lineOfSight, propsInCircle, structuresInCircle } from '../../city/spatialIndex';
 import { BOT_RULES } from '../../defs/bots';
-import { perStage } from '../../defs/ids';
+import { perStage, type StageId } from '../../defs/ids';
 import { kaijuKindDef, kaijuStageDef } from '../../defs/kaiju/index';
 import { DT, TICK_RATE } from '../../defs/rules';
 import type { KaijuKindDef, KaijuStageDef } from '../../defs/schema';
@@ -187,6 +187,9 @@ function chooseWreckGoal(world: World, k: Kaiju, bs: BotState): void {
 function chooseHidingPlace(world: World, k: Kaiju, bs: BotState): boolean {
   const b = world.match.bounds;
   const st = kaijuStageDef(k.kind, k.stage);
+  // The body it will come out with needs room there too (one that wades needs none).
+  const next = k.stage < LAST_STAGE ? kaijuStageDef(k.kind, (k.stage + 1) as StageId) : null;
+  const grown = next && !next.wadesTall ? next : null;
   const reach = R.hideRadii * k.radius;
   const sightHeight = k.height * 0.7;
   const seenFrom = (x: number, z: number): number => {
@@ -222,6 +225,12 @@ function chooseHidingPlace(world: World, k: Kaiju, bs: BotState): boolean {
       let free = true;
       for (const id of ids) {
         if (world.cityIndex.spassable[id] === 0 && world.cityIndex.sheight[id] > st.trampleHeight) free = false;
+      }
+      if (free && grown) {
+        structuresInCircle(world.cityQuery, x, z, grown.bodyRadius, ids);
+        for (const id of ids) {
+          if (world.cityIndex.spassable[id] === 0 && world.cityIndex.sheight[id] > grown.trampleHeight) free = false;
+        }
       }
       if (!free) continue;
       const seen = seenFrom(x, z);
@@ -405,7 +414,7 @@ function nearestUnit(world: World, k: Kaiju): { unit: Unit | null; dist: number 
   return { unit, dist };
 }
 
-/** Pitch that puts the crosshair (from the eye at `fromY`) on a point `dist` meters away at height `y`. */
+/** Pitch that puts the crosshair (from the eye or the mouth at `fromY`) on a point `dist` meters ahead of it at height `y`. */
 function pitchTo(fromY: number, y: number, dist: number): number {
   return clamp(Math.atan2(y - fromY, Math.max(dist, 0.5)), -MAX_AIM_PITCH, MAX_AIM_PITCH);
 }
@@ -414,14 +423,17 @@ function pitchTo(fromY: number, y: number, dist: number): number {
 function beamUnit(world: World, k: Kaiju, st: KaijuStageDef, range: number, nx: number, nz: number): Unit | null {
   let best: Unit | null = null;
   let bestD = Infinity;
-  eye.x = k.x;
   eye.y = st.mouthHeight;
-  eye.z = k.z;
   for (const u of world.units) {
     if (!u.alive) continue;
-    if (Math.hypot(u.x - k.x, u.z - k.z) > range) continue;
+    const away = Math.hypot(u.x - k.x, u.z - k.z);
+    // The beam starts at the mouth, ahead of the body: what stands under its chin is out of it.
+    if (away > range || away <= st.mouthForward + u.radius) continue;
     const d = Math.hypot(u.x - nx, u.z - nz);
     if (d >= bestD) continue;
+    // The mouth, with the head turned toward this unit.
+    eye.x = k.x + ((u.x - k.x) / away) * st.mouthForward;
+    eye.z = k.z + ((u.z - k.z) / away) * st.mouthForward;
     mark.x = u.x;
     mark.y = u.y + 1;
     mark.z = u.z;
@@ -516,7 +528,7 @@ export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
     }
     const d = Math.hypot(bs.beamX - k.x, bs.beamZ - k.z);
     input.aimYaw = yawFromTo(k.x, k.z, bs.beamX, bs.beamZ);
-    input.aimPitch = pitchTo(st.mouthHeight, bs.beamY, d);
+    input.aimPitch = pitchTo(st.mouthHeight, bs.beamY, d - st.mouthForward);
     input.buttons = heldButtons(bs);
     return;
   }
@@ -582,7 +594,7 @@ export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
     } else if (near.unit && near.dist <= throwReach) {
       const u = near.unit;
       aimYaw = yawFromTo(k.x, k.z, u.x, u.z);
-      aimPitch = pitchTo(st.eyeHeight, 0.5, Math.hypot(u.x - k.x, u.z - k.z));
+      aimPitch = pitchTo(st.eyeHeight, 0.5, Math.hypot(u.x - k.x, u.z - k.z) - st.eyeForward);
       facing = true;
       if (canAct(k) && angleDist(aimYaw, k.yaw) <= FACE_ANGLE && angleDist(k.aimYaw, aimYaw) < 0.1) press(bs, 'strike', TAP_TICKS, 6);
     } else if (canAct(k) && !busyWith(bs, 'strike')) {
@@ -615,7 +627,7 @@ export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
     }
     if (found) {
       aimYaw = yawFromTo(k.x, k.z, tx, tz);
-      aimPitch = pitchTo(st.mouthHeight, ty, Math.hypot(tx - k.x, tz - k.z));
+      aimPitch = pitchTo(st.mouthHeight, ty, Math.hypot(tx - k.x, tz - k.z) - st.mouthForward);
       facing = true;
       if (canAct(k) && angleDist(aimYaw, k.yaw) <= FACE_ANGLE && press(bs, 'special', TAP_TICKS, 10)) {
         bs.beamX = tx;

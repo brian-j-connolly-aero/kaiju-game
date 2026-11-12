@@ -392,9 +392,8 @@ Server
   fractions (`MATCH_RULES.bar`), which set the pace.
 - **Client workers (voice, intermission, bots):**
   - Play `event.lines.humans` or `event.lines.kaiju` of a `voice` event, in order; do not pick
-    lines with `pickVoiceLine` any more (`client/src/audio/matchAudio.ts` still does: it works,
-    but it can choose a different line than the event names, and it ignores the "never another
-    squad's voice" rule).
+    lines with `pickVoiceLine` (`client/src/audio/matchAudio.ts` plays the event's lines and
+    nothing else).
   - The intermission: `matchPhase` 'intermission' carries `duration` and `nextStage`; the new
     bounds are `stageBounds(city, anchor, nextStage)`. The kaiju in snapshots is already at the
     new stage; `match.stage` changes with `stageChange` when the intermission ends.
@@ -490,9 +489,6 @@ Server
 - The kaiju grows where its cocoon was. In a street narrower than its new body it is pushed
   clear by collision on the first ticks of the next stage and tramples whatever low
   structures it overlaps (a few free points; tall ones push it out).
-- `client/src/audio/matchAudio.ts` still picks voice lines itself from `variant` instead of
-  playing `event.lines`: both sides hear a valid line, but not necessarily the one the
-  simulation named.
 - Sub-unit navigation was tuned and stress-tested against the placeholder grid city (3600
   random move-to trips across the three stages all arrived, nobody ever inside a wall). The
   handcrafted city will have other shapes: it needs a road graph whose edges are drivable for
@@ -576,8 +572,10 @@ client/src/game/
                     cameraClearance (holds a first-person or chase camera short of a standing wall)
   autoplay.ts       the autopilot for both sides and the drone
 client/src/ui/      hud.ts, commandWheel.ts, mapView.ts, subtitles.ts, icons.ts, iconArt.ts (stand-in icons)
-client/src/audio/   audioEngine.ts (effects, staged music, voice queue with ducking), matchAudio.ts (events -> sound)
-client/test/        net.test.ts, game.test.ts, manifestTool.test.ts
+client/src/audio/   audioEngine.ts (effects with voice limits, staged music, voice queue with ducking, limiter, master
+                    volume, cache of decoded files), matchAudio.ts (events and frame state -> sound); see 7.6
+client/test/        net.test.ts, game.test.ts, manifestTool.test.ts, audioEngine.test.ts, matchAudio.test.ts
+                    (both on fakeAudio.ts, a silent stand-in for Web Audio that records what was started)
 tools/build-manifest.mjs            the assets:manifest script
 tools/playtest/smoke.mjs, shots.mjs the multi-client smoke playtest; stage screenshots from the sandbox
 tools/playtest/scripted.mjs, driver.mjs   two sessions played with real inputs; the hands and eyes it uses
@@ -623,7 +621,7 @@ so the kaiju camera sits exactly on `cam_fp`) -> audio -> `render`.
 | `ui/iconArt.ts` | Stand-in drawings for every icon id; the 69 real SVG files in `assets/ui/` already replace them at run time. | Delete entries once the art list is complete. |
 | `app/screens/*` | Plain panels: home (callsign, create, join by code), lobby (seats, role, ready, practice, start), briefing (portrait, names), end (winner, pictogram tally, front page with a photo). | Kaiju and faction select with stat bars, the playable tutorial, the hearing, the draft. |
 | `ui/mapView.ts` | 2D canvas map: bounds, streets, buildings by state, friendly units, the kaiju when known; click or confirm places move-to, right click or the call-in button places artillery. | Styled map, district names, rubble tint. |
-| `audio/matchAudio.ts` | Every event has a sound; combat stem follows a simple "shots or lasers recently" heat. No tank engine, march or crowd loops. | Mix pass, unit loops, per-stage ambience balance. |
+| `audio/matchAudio.ts` | Every event has a sound, and the audio directors' notes for the client are applied (7.6); combat stem follows a simple "shots or lasers recently" heat. No tank engine, march or crowd loops; none of the Tier 2 unit sounds (their units do not exist yet). Nobody has listened to any of it: all checks are counts and measured levels. | A listening pass, unit loops, per-stage ambience balance, the Tier 2 wiring in `docs/audio/client-notes-sfx.md` section 4. |
 | `game/autoplay.ts` | Plays both sides well enough to finish a match; no pathfinding for the kaiju, street routing for humans. | Nothing: it is a test tool. |
 | `game/input/actions.ts` | Default bindings only; bindings are data and are stored, but there is no rebinding screen. Gamepad: standard mapping, never tried on real hardware. | Settings screen; controller tuning. |
 
@@ -694,6 +692,56 @@ so the kaiju camera sits exactly on `cam_fp`) -> audio -> `render`.
   and 390,000 triangles (an intermission's pulled-back camera draws more props). The budget is
   350 and 1.5 million. Building art will add to the triangles; props are already limited to
   those near the camera.
+
+### 7.6 Sound, as built (`client/src/audio`)
+
+Nobody has heard any of this: the machine has no speakers. Everything below is from 65 unit
+tests on a silent stand-in for Web Audio (`client/test/fakeAudio.ts`) and from renders made
+without playing them (an `OfflineAudioContext` in headless Chromium, real files, peak level
+read off the result). dBFS is decibels relative to full scale; 0 is where sound clips.
+
+- **Volume.** `audio.setMasterVolume(v)` and `audio.getMasterVolume()`, 0 to 1, 0.9 until
+  someone sets it; eased over about 0.15 s; works before the first click. `setMuted` is
+  separate. Measured: 0.5 gives 0.501 of the level at 1, 0 gives silence.
+- **A volley is loud, not clipped.** A sound may have 6 copies playing; copies asked for
+  together start 26 to 41 ms apart (5 fit in the 150 ms allowed); when there is no room the
+  quietest copy, or one long past its attack, gives way to a louder or newer one, so a far
+  squad's shots never crowd out your own; 28 voices in all. Everything then passes a limiter
+  (a compressor node: threshold -3 dB, decibels, 20 to 1, hard knee) before the volume. A
+  volley of five voices measures 5 dB louder than one shot. On `tank_fire`: 12 copies used to peak at +17.3
+  dBFS and 28 at +24.6 (clipped for thousands of samples); now any number peaks at -3.1 dBFS
+  with nothing clipped, and a single shot is untouched (0.00 dB change on four sounds). Three
+  salvos, impacts, a roar, stage 3 music with its combat stem and a radio line all started on
+  one instant: -1.5 dBFS (-0.6 with the volume at 1).
+- **Memory.** Decoded music is dropped once other music has taken its place, unless it was
+  announced (`preloadMusic`) and not yet let go (`releaseMusic`); the match audio announces the
+  coming stage's stems, the cocoon, intermission and win cues, and lets go of each when its
+  time is over. Only the 24 most recent voice lines stay decoded, plus the orders loaded ahead.
+  All thirteen tracks decoded come to 261 MB (megabytes) and used to stay for good; in a
+  whole match played through the stand-in the most music held at once was 95 MB (in the
+  briefing; about 87 MB during a stage, and one track, 31 MB, back in the lobby).
+- **Music timing.** One-shots (no `loop` in the manifest) never loop. A cue with a `mark` is
+  started part-way in so that the mark lands on its event (`landIn`): measured with the real
+  files, the intermission's mark lands 8.006 s and 20.006 s after an 8 s and a 20 s
+  intermission begin, the cocoon's cut 10.006 s after the cocoon (6 ms is the limiter's
+  look-ahead). After an intermission the stage stems come in over 0.3 s while the hit rings
+  out over 2.5 s. In the real page (sandbox, sound on, one molt): the cocoon cue started
+  0.11 s in, the intermission cue 12.07 s in, and the stage 2 stems 7.99 s after that
+  (7.99 + 12.07 = 20.06 against the mark at 20).
+- **Voice.** The lines of `event.lines` are played, nothing else. Radio is a property of the
+  line (audience `humans`); the squelch effects are added only to a radio line that has no
+  audio. The humans' orders (`nerve.break`, `kaiju.special`) are loaded before the match, go
+  first, cut in on chatter, and are dropped after waiting 1.5 s. The chair's line is held
+  back: `MatchAudio` starts `hearing` 12.5 s after the match ends and says the line at 15 s
+  (the end screen's own start of `hearing` at 14 s is then a no-op; `takeHearing()` is there
+  if the end screen is ever to do it). Clearing the voice stops the line being spoken.
+- **What should sound now is read from the frame.** The beam, the heartbeat, the charging tone
+  (`laser_charge_loop`, rising with the charge, then `volley_ready`) and the stage music follow
+  the frame state, so a missed event (a reconnection) leaves nothing stuck. An event handed
+  out more than a second after it happened, or while `MatchSession.catchingUp` is set, makes
+  no one-shot sound and no radio line. A hidden page pauses the sound altogether.
+- **Not done:** the Tier 2 unit sounds (no such units yet); `MusicEntry` in
+  `client/src/assets/manifest.ts` does not declare `mark` (the engine reads it all the same).
 
 ## 8. Integration pass (the whole thing run together)
 

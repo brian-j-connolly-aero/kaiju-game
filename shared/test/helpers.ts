@@ -1,6 +1,7 @@
 /** Test helpers: tiny hand-made cities and worlds, so each rule can be checked in isolation. */
 
 import {
+  applyHit,
   bitGet,
   buildCityIndex,
   CITY_HALF,
@@ -196,6 +197,26 @@ export function parkUnits(world: World, except: number[] = []): void {
  */
 export function holdFire(world: World): void {
   for (const p of world.players) if (p.role === 'human') queueCommand(world, p.id, { type: 'holdCharge' });
+}
+
+/**
+ * Breaks a kaiju's nerve the way the rules allow it (DESIGN.md section 3): charged volleys from
+ * two different squads landing together. For tests that need a stagger and are not about how
+ * one comes about.
+ */
+export function breakNerve(world: World, kaiju = 0): void {
+  for (const squad of [0, 1]) {
+    applyHit(world, { entity: 'kaiju', id: kaiju }, {
+      damage: 0,
+      nerve: 1000,
+      fromDir: { x: 0, z: 1 },
+      sourceId: world.squads[squad].units[0],
+      player: world.squads[squad].player,
+      kind: 'shell',
+      atWill: false,
+      volleySquad: squad,
+    });
+  }
 }
 
 /** Unit vector pointing along a heading (the forward vector of that yaw). */

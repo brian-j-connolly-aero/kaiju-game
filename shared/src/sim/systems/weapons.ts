@@ -10,6 +10,9 @@
  *   player's aim ray (from the unit's eye, along the view) lands: on a kaiju, a structure, the
  *   ground, or far away along the ray when it meets nothing. A person's shots have no aim
  *   error. A bot's do (the weapon's at-will error) and count as fire at will.
+ * - Range: every projectile a unit fires, whoever aimed it, gives out in the air once it has
+ *   flown SQUAD_RULES.rangeSlack times the weapon's range (its `ttl`). Nothing else checks
+ *   range for the driven unit or for a volley.
  * - The volley: each shot of the driven unit is the trigger. Every sub-unit that has charge,
  *   is not shaken, has its weapon ready, and whose firing arc covers the aim point fires at it
  *   with damage x(1 + charge), then loses its charge and its hold (the orders system plants it
@@ -102,6 +105,10 @@ function fireSalvo(world: World, squad: Squad, u: Unit, s: Salvo): void {
   const rz = Math.sin(facing);
   const spread = u.radius * SQUAD_RULES.muzzleSpread;
 
+  // Range is the weapon's reach: the projectile gives out a little beyond it, whoever aimed it.
+  const reach = weapon.range * modMult(squad.mods, 'weaponRange') * SQUAD_RULES.rangeSlack;
+  const ttl = proj.speed > 0 ? Math.min(proj.ttl, reach / proj.speed) : proj.ttl;
+
   const damage = weapon.damage * s.damageMult * modMult(squad.mods, 'unitDamage');
   const nerve = weapon.nerve * s.nerveMult * modMult(squad.mods, 'nerveDamage');
   const structureDamage = weapon.structureDamage * modMult(squad.mods, 'structureDamage');
@@ -141,7 +148,7 @@ function fireSalvo(world: World, squad: Squad, u: Unit, s: Salvo): void {
       vy: Math.sin(pitch) * proj.speed,
       vz: Math.cos(yaw) * cp * proj.speed,
       gravity: proj.gravity,
-      ttl: proj.ttl,
+      ttl,
       damage,
       nerve,
       splash: weapon.splashRadius,
