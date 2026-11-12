@@ -521,7 +521,11 @@ export class GameRenderer {
           this.scene.add(kv.group);
         }
         const own = k.id === view.localKaiju && view.kaijuFirstPerson;
-        kv.update(k, dt, time, this.overrideFor(k, view), query, this.lines, this.effects, { firstPerson: own, insideHead: own && view.kaijuInsideHead });
+        kv.update(k, dt, time, this.overrideFor(k, view), query, this.lines, this.effects, {
+          firstPerson: own,
+          insideHead: own && view.kaijuInsideHead,
+          camera: this.camera.position,
+        });
         const st = kaijuStageDef(k.kind, k.stage);
         if (k.phase !== 'cocoon' || k.id === view.localKaiju || view.seesKaiju) {
           this.decals.push(k.x, 0.12, k.z, st.bodyRadius * 3.4, st.bodyRadius * 3.4, this.ringShadowUv(), 0, 0, 0, 0, 0.6);

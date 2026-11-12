@@ -54,9 +54,13 @@ export interface KaijuViewFrame {
   firstPerson: boolean;
   /** The camera has been pulled back inside the skull (a wall ahead): hide the arms and jaw. */
   insideHead: boolean;
+  /** Where the camera is (for the weak point's halo, drawn on the side facing it). */
+  camera?: THREE.Vector3;
 }
 
 const NOT_LOCAL: KaijuViewFrame = { firstPerson: false, insideHead: false };
+/** The weak point's violet (art notes for the kaiju, section 5). */
+const WEAK_GLOW = 0xc9a6ff;
 
 function heldModelId(held: HeldObject): string {
   switch (held.kind) {
@@ -283,9 +287,10 @@ export class KaijuView {
     // The weak point shows, and throbs, only while staggered. The throb never shrinks it below
     // 1.1: the shards at the shoulder blades only show above about 0.95 (art notes, section 5).
     const weak = rig.node('weak_point');
+    const throb = 1.3 + Math.sin(time * 9) * 0.2;
     if (weak) {
       weak.visible = phase === 'stagger';
-      if (weak.visible) weak.scale.setScalar(1.3 + Math.sin(time * 9) * 0.2);
+      if (weak.visible) weak.scale.setScalar(throb);
     }
 
     // The embers and eyes heat up with rage and while the beam gathers and burns.
@@ -316,6 +321,17 @@ export class KaijuView {
     rig.setVisible('jaw', !hideLimbs);
 
     this.updateHeld(k, rig, assembly);
+
+    // A staggered kaiju's weak point also gets a halo of its light, toward whoever looks: from a
+    // squad's eye, across a dark city, the crystal alone is a few pixels.
+    if (phase === 'stagger' && !assembly && view.camera) {
+      this.group.updateMatrixWorld(true);
+      if (!rig.worldPosition('weak_point', tmp)) tmp.set(k.x, stage.height * 0.6, k.z);
+      tmp2.copy(view.camera).sub(tmp).setY(0);
+      const toward = tmp2.length();
+      if (toward > 1e-3) tmp.addScaledVector(tmp2, (stage.bodyRadius * 0.6) / toward);
+      effects.glowAt(tmp.x, tmp.y, tmp.z, stage.bodyRadius * 2.4 * throb, WEAK_GLOW, 0.06, 0.85);
+    }
 
     // --- anchors ---------------------------------------------------------------------------------
     this.group.updateMatrixWorld(true);
