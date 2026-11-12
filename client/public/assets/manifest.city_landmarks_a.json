@@ -1,0 +1,74 @@
+{
+  "models": {
+    "lm_anchor_field": {
+      "file": "models/lm_anchor_field.glb",
+      "kind": "landmark",
+      "nodes": ["chunk_00", "chunk_01", "chunk_02", "chunk_03", "chunk_04", "chunk_05", "chunk_06", "chunk_07", "chunk_08", "chunk_09", "chunk_10", "chunk_11", "chunk_12", "chunk_13", "damaged", "intact", "rubble"],
+      "size": [150.0, 29.95, 120.0],
+      "tris": 900,
+      "chunks": 14,
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint", "blend": "multiply", "base": "#f5f2ea", "colors": ["#f5f2ea", "#b4e3dc", "#f6c9a0", "#a8d4f0", "#efb3b8"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "boardwalk"
+    },
+    "lm_city_hall": {
+      "file": "models/lm_city_hall.glb",
+      "kind": "landmark",
+      "nodes": ["chunk_00", "chunk_01", "chunk_02", "chunk_03", "chunk_04", "chunk_05", "chunk_06", "chunk_07", "chunk_08", "damaged", "intact", "rubble"],
+      "size": [50.0, 45.0, 39.6],
+      "tris": 1092,
+      "chunks": 9,
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint", "blend": "multiply", "base": "#ddd6c6", "colors": ["#ddd6c6", "#8fa0b5", "#f5f2ea", "#bdb9b0", "#a8d4f0"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "downtown"
+    },
+    "lm_farewell_light": {
+      "file": "models/lm_farewell_light.glb",
+      "kind": "landmark",
+      "nodes": ["chunk_00", "chunk_01", "chunk_02", "chunk_03", "chunk_04", "chunk_05", "chunk_06", "chunk_07", "chunk_08", "chunk_09", "chunk_10", "chunk_11", "chunk_12", "damaged", "intact", "rubble"],
+      "size": [12.0, 48.0, 12.02],
+      "tris": 496,
+      "chunks": 13,
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint", "blend": "multiply", "base": "#f5f2ea", "colors": ["#a8d4f0", "#b4e3dc", "#f5f2ea", "#8fa0b5", "#f2a48b"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "harbor"
+    },
+    "lm_halcyon_observatory": {
+      "file": "models/lm_halcyon_observatory.glb",
+      "kind": "landmark",
+      "nodes": ["chunk_00", "chunk_01", "chunk_02", "chunk_03", "chunk_04", "chunk_05", "chunk_06", "chunk_07", "chunk_08", "chunk_09", "chunk_10", "chunk_11", "damaged", "intact", "rubble"],
+      "size": [40.0, 24.068, 40.0],
+      "tris": 774,
+      "chunks": 12,
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint", "blend": "multiply", "base": "#f5f2ea", "colors": ["#ddd6c6", "#ead2a0", "#f3e3b3"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "university"
+    },
+    "lm_meridian_tower": {
+      "file": "models/lm_meridian_tower.glb",
+      "kind": "landmark",
+      "nodes": ["chunk_00", "chunk_01", "chunk_02", "chunk_03", "chunk_04", "chunk_05", "chunk_06", "chunk_07", "damaged", "intact", "rubble"],
+      "size": [36.0, 220.0, 36.0],
+      "tris": 838,
+      "chunks": 8,
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint", "blend": "multiply", "base": "#ddd6c6", "colors": ["#ddd6c6", "#8fa0b5", "#f5f2ea", "#bdb9b0", "#a8d4f0"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "downtown"
+    },
+    "lm_tidewater_cathedral": {
+      "file": "models/lm_tidewater_cathedral.glb",
+      "kind": "landmark",
+      "nodes": ["chunk_00", "chunk_01", "chunk_02", "chunk_03", "chunk_04", "chunk_05", "chunk_06", "chunk_07", "chunk_08", "chunk_09", "chunk_10", "chunk_11", "chunk_12", "chunk_13", "chunk_14", "chunk_15", "chunk_16", "damaged", "intact", "rubble"],
+      "size": [40.0, 58.0, 72.675],
+      "tris": 1205,
+      "chunks": 17,
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint", "blend": "multiply", "base": "#ead2a0", "colors": ["#e6b566", "#ead2a0", "#f2a48b", "#f3e3b3", "#f6c9a0", "#e3c04f"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "oldtown"
+    },
+    "lm_tidewheel": {
+      "file": "models/lm_tidewheel.glb",
+      "kind": "landmark",
+      "nodes": ["chunk_00", "chunk_01", "chunk_02", "chunk_03", "chunk_04", "chunk_05", "chunk_06", "chunk_07", "chunk_08", "chunk_09", "chunk_10", "chunk_11", "chunk_12", "damaged", "intact", "rubble"],
+      "size": [63.9, 75.75, 14.0],
+      "tris": 816,
+      "chunks": 13,
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint", "blend": "multiply", "base": "#f5f2ea", "colors": ["#f5f2ea", "#b4e3dc", "#f6c9a0", "#a8d4f0", "#efb3b8"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "boardwalk"
+    }
+  }
+}
