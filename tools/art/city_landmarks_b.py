@@ -331,6 +331,25 @@ def tidy(b, m):
             have[pm] = have.get(pm, 0.0) + f.area
     broken = {pm for pm, area in getattr(b, "parts", []) if have.get(pm, 0.0) < area * 0.995 - 1e-4}
     m.faces[:] = [f for f in m.faces if f.tag.split("|")[-1] not in broken]
+    # a roof's underside left where the bite took the slope above it would be seen from above
+    from city.geom import face_axes
+    from city.destruct import _inside
+    slopes = [g for g in m.faces if g.tag.split("|")[0] == "roof"]
+
+    def covered(f):
+        c = f.center
+        for g in slopes:
+            n = g.normal
+            if float(n @ f.normal) > -0.98:
+                continue
+            dist = float(n @ (c - g.pts[0]))
+            if not (0.0 < -dist < 0.6):
+                continue
+            u, v = face_axes(n)
+            if _inside((float(c @ u), float(c @ v)), np.array([(float(p @ u), float(p @ v)) for p in g.pts])):
+                return True
+        return False
+    m.faces[:] = [f for f in m.faces if f.tag.split("|")[0] != "underside" or abs(f.normal[2]) > 0.99 or covered(f)]
     whole = {_key(f) for f in b.intact.faces}
     # the holes: the kit's broken-open faces mark where its bites went into the building. Only the
     # cut faces next to them need a lining (the kit also splits faces far from any bite).
@@ -354,10 +373,10 @@ def tidy(b, m):
         return any(min(float(np.linalg.norm(p - c)) for p in f.pts) < r for c, r in holes)
 
     def cut(f):
-        return _key(f) not in whole and "|" not in f.tag and near_hole(f)
+        return _key(f) not in whole and "|" not in f.tag and (getattr(b, "line_all", True) or near_hole(f))
     for f in list(m.faces):
         base = f.tag.split("|")[0]
-        if base == "interior" and getattr(b, "interior_backs", True):
+        if base == "interior" and (getattr(b, "interior_backs", True) or abs(f.normal[2]) < 0.7):
             m.faces.append(Face([p - f.normal * 0.02 for p in f.pts[::-1]], f.uv[::-1] if f.uv else None, f.col, f.tint,
                                 f.region, "interior"))
         elif base == "roof" and 0.15 < f.normal[2] < 0.995 and cut(f):
@@ -469,7 +488,7 @@ def founders_clock(b):
     b.dial_r = 3.4
     # cornice and pinnacles
     zt = 51.8
-    b.box((-6.0, -6.0, zt), (6.0, 6.0, zt + 0.9), region="cornice", top="white")
+    b.box((-6.0, -6.0, zt), (6.0, 6.0, zt + 0.9), region="cornice", top="white", solid=True)
     b.intact.faces[-1].col = hex_rgb(STONE)
     for sx in (-1, 1):
         for sy in (-1, 1):
@@ -743,6 +762,7 @@ def sevenfold_temple(b):
     # gold (a stack of hat brims); the lowest drum an arcade. Thick ropes hung with big bronze
     # bells loop under the first, third and fifth brims. On top an open belfry with the biggest
     # bell, a gold ball and a gold point. Invented: no upturned eaves, no symbols.
+    b.line_all = False          # only line faces next to the holes: the garlands leave little budget
     zp = 4.0
     P = 15.0
     for name, nrm in (("front", (0, -1, 0)), ("left", (1, 0, 0)), ("back", (0, 1, 0)), ("right", (-1, 0, 0))):
@@ -1060,6 +1080,12 @@ def grand_station(b):
                          and f.center[2] > 16.0 and Y0 - 1.0 < f.center[1] < Y1 + 1.0
                          and f.tag.split("|")[0] in ("roof", SHELL, "interior", "detail")
                          and not f.tag.split("|")[-1].startswith("lun_"))
+            ex, ez = pts[k + 1] if sx < 0 else pts[k - 1]          # the panels' torn edge over the gap
+            s0 = mark(b)
+            face(b, [(ex, Y0, ez), (ex, Y1, ez), (ex, Y1, ez - 0.32), (ex, Y0, ez - 0.32)], IRON_DK, want=(-sx, 0, 0))
+            edge = take(b, s0).faces
+            sag.extend(edge)
+            m.faces.extend(edge)
             rotate_faces(sag, (0, 1, 0), -sx * 26.0, (hx, 0.0, hz))
         # the back fan end broken out above the gap
         for f in [f for f in m.faces if f.tag.endswith("|lun_b")]:
@@ -1159,12 +1185,14 @@ def kiln_point_power(b):
     # 82 m, stone-collared at the eaves, a pale band and soot-black above it. A lower boiler house
     # behind, switch houses at both ends, a transformer yard behind a low wall on the street side.
     HX, HY, HZ = 42.0, 16.0, 29.0
-    b.interior_backs = False        # a big hall: the holes are seen from outside only
+    b.interior_backs = True
     hall = b.block(2 * HX, 2 * HY, HZ, facade="brick_plain", roof=False)
     for f in b.intact.faces:
         if f.region == "brick_plain":
             f.col = hex_rgb(BRICK_DK)
-    b.box((-HX - 0.4, -HY - 0.4, HZ), (HX + 0.4, HY + 0.4, HZ + 1.0), color=CREAM_DK, top=None, bottom=True)
+    for name in kit.SIDES:                       # a stone band under the eaves, flush with the walls
+        a, c, _n = hall.side(name)
+        b.wall(a, c, HZ - 1.0, HZ, "cornice")
     zr = b.gable(hall, rise=7.0, along="x", roof="tile_slate", window=False)
     with part(b, "ridge_vent"):
         for y, nrm in ((-1.6, (0, -1, 0)), (1.6, (0, 1, 0))):
@@ -1174,7 +1202,7 @@ def kiln_point_power(b):
             face(b, [(x, -1.6, zr - 1.2), (x, 1.6, zr - 1.2), (x, 1.6, zr + 1.6), (x, -1.6, zr + 1.6)], "#5d636e", want=nrm)
         face(b, [(-30.6, -2.2, zr + 1.6), (30.6, -2.2, zr + 1.6), (30.6, 2.2, zr + 1.6), (-30.6, 2.2, zr + 1.6)], "#4f5866",
              want=UP, tag="roof")
-        face(b, [(-30.6, -2.2, zr + 1.5), (30.6, -2.2, zr + 1.5), (30.6, 2.2, zr + 1.5), (-30.6, 2.2, zr + 1.5)], "#3a3f4a",
+        face(b, [(-30.6, -2.2, zr + 1.59), (30.6, -2.2, zr + 1.59), (30.6, 2.2, zr + 1.59), (-30.6, 2.2, zr + 1.59)], "#3a3f4a",
              want=-UP)
     # tall round-headed windows, long sides and ends
     for y, nrm in ((-HY, (0, -1, 0)),):              # the back wall is behind the boiler house
@@ -1182,7 +1210,7 @@ def kiln_point_power(b):
             x = -HX + 5.25 + i * 10.5
             arch_window(b, (x, y, 4.0), nrm, 4.6, 21.0, frame=CREAM_DK, frame_w=0.5, segs=3)
     for x, nrm in ((-HX, (-1, 0, 0)), (HX, (1, 0, 0))):
-        for y, w, h in ((0.0, 6.0, 24.0), (-8.5, 3.6, 17.0), (8.5, 3.6, 17.0)):
+        for y, w, h in ((0.0, 7.0, 24.0),):
             arch_window(b, (x, y, 3.0), nrm, w, h, frame=CREAM_DK, frame_w=0.5, segs=3)
     # four chimneys at the corners
     b.chimneys = {}
@@ -1231,7 +1259,7 @@ def kiln_point_power(b):
             for x in (x0, x1):
                 face(b, [(x, -35.0, 0.0), (x, -34.4, 0.0), (x, -34.4, 1.8), (x, -35.0, 1.8)], "#bdb7aa",
                      want=(1 if x == x1 else -1, 0, 0))
-    b.bite_hint = (12.0, 0.0, zr + 1.0)            # the roof holed in the middle
+    b.bite_hint = (16.0, 8.0, zr + 1.0)            # the roof holed, toward the back
 
     # rubble: two chimneys still standing out of the heap, their tops broken off
     st = mark(b)
@@ -1245,6 +1273,8 @@ def kiln_point_power(b):
     b.keepsake = keep
 
     def damage(b, m):
+        # the ridge vent falls in with the holed roof
+        remove_faces(m, [f for f in m.faces if f.tag.split("|")[-1] == "ridge_vent"])
         # the front right chimney snapped mid-height: its top lies across the hall roof
         cx, cy = b.chimneys["chim_rf"]
         snap = 47.0
@@ -1266,8 +1296,7 @@ def kiln_point_power(b):
         move_faces(above, (0.0, 2.0, -1.5))
         m.faces.extend(above)
         st = mark(b)
-        steam(b, (12.0, 2.0, zr + 1.5), size=4.5, n=3, seed=7)
-        steam(b, (cx + 20.0, cy + 6.0, zr - 1.0), size=2.6, n=2, seed=9)
+        steam(b, (16.0, 8.0, zr + 1.5), size=4.5, n=3, seed=7)
         m.faces.extend(take(b, st).faces)
     b.damage_hook = hooked(damage)
 
