@@ -15,7 +15,7 @@
       "kind": "structure",
       "nodes": ["chunk_00", "chunk_01", "chunk_02", "chunk_03", "chunk_04", "chunk_05", "chunk_06", "chunk_07", "damaged", "intact", "rubble"],
       "size": [9.0, 6.0, 10.075],
-      "tris": 88,
+      "tris": 80,
       "chunks": 8,
       "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint", "blend": "multiply", "base": "#f3e3b3", "colors": ["#f3e3b3", "#f2a48b", "#a8d4f0", "#a9e5c5", "#f6c9a0", "#cfe8a0", "#f5f2ea", "#c9b5e8"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
       "district": "suburb"

@@ -983,6 +983,8 @@ def extension_modules():
     mods = []
     if os.path.isdir(pkg):
         for info in sorted(pkgutil.iter_modules([pkg]), key=lambda i: i.name):
+            if info.name.startswith("_"):
+                continue
             mods.append(importlib.import_module(f"city.atlas_extra.{info.name}"))
     return mods
 

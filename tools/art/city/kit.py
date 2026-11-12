@@ -249,11 +249,12 @@ class Building:
                      [(blk.x1, blk.y0, ze), (blk.x1, blk.y1, ze), (blk.x1 + o, blk.y1, ze), (blk.x1 + o, blk.y0, ze)]]
         self.intact += map_region(front, roof, tag="roof")
         self.intact += map_region(back, roof, tag="roof")
-        for u in under:
-            f = Face([np.array(p, float) for p in u])
-            if f.normal[2] > 0:
-                u = list(reversed(u))
-            self.intact += plain(u, "#6a6660", tag="detail")
+        # the underside: each slope again, reversed and a little lower (cheaper than soffits,
+        # and no hole from below anywhere along the overhangs)
+        for slope in (front, back):
+            low = [np.array(p, float) + np.array([0.0, 0.0, -0.22]) for p in reversed(slope)]
+            self.intact += plain(low, "#8a8478", tag="underside")
+        _ = under
         self._roof_trim(front, back, along, blk, o)
         for tri in ends:
             self.intact += map_region(tri, end_region, col=ecol, tint=blk.tint and er.tint, tag="wall")
@@ -293,14 +294,6 @@ class Building:
             if f.normal @ out < 0:
                 q = [ridge + down, eave + down, eave, ridge]
             self.intact += plain(q, trim)
-            # soffit: the underside of the overhang strip between this verge and the wall
-            wall = (blk.x0 if out[0] < 0 else blk.x1) if along == "x" else (blk.y0 if out[1] < 0 else blk.y1)
-            k = ax * (wall - (eave @ ax))
-            s = [eave + down * 0.3, ridge + down * 0.3, ridge + k + down * 0.3, eave + k + down * 0.3]
-            fs = Face(s)
-            if fs.normal[2] > 0:
-                s.reverse()
-            self.intact += plain(s, "#8a8478")
 
     def hip(self, blk: Block, rise: float, *, overhang=style.EAVE, roof="tile_red") -> float:
         """A hipped roof: four slopes. Returns the top height."""
@@ -363,7 +356,7 @@ class Building:
         # underside (a lowered, reversed copy) and boards on the three free edges
         S = [np.array(p, float) for p in slope]
         down = np.array([0.0, 0.0, -0.22])
-        self.intact += plain([p + down * 0.3 for p in reversed(S)], "#8a8478", tag="detail")
+        self.intact += plain([p + down for p in reversed(S)], "#8a8478", tag="underside")
         c = np.mean(S, axis=0)
         for k in range(4):
             e0, e1 = S[k], S[(k + 1) % 4]
@@ -403,9 +396,10 @@ class Building:
 
     # ---- parts -------------------------------------------------------------------------
     def box(self, lo, hi, *, color="#d8d2c4", region=None, top=None, bottom=False, tag="detail",
-            solid=False, tint=False) -> Mesh:
+            solid=False, tint=False, tone=None) -> Mesh:
         """An axis-aligned box from corner lo to hi. Sides use `region` (or a flat color),
-        the top `top` (default: same as the sides). No bottom unless asked."""
+        the top `top` (default: same as the sides). No bottom unless asked. `tone` multiplies a
+        region's picture (orange containers from the grey metal, a white tank...)."""
         x0, y0, z0 = lo
         x1, y1, z1 = hi
         quads = {
@@ -422,8 +416,8 @@ class Building:
             reg = (top if top is not None else region) if k == "top" else region
             if reg:
                 r = atlas.region(reg)
-                col = self.tone if (tint and r.tint) else (1, 1, 1)
-                if r.kind == "swatch":
+                col = self.tone if (tint and r.tint) else (hex_rgb(tone) if tone else (1, 1, 1))
+                if r.kind == "swatch" and not tone:
                     col = (1, 1, 1)
                 m += map_region(q, reg, col=col, tint=tint and r.tint, tag=tag)
             else:
@@ -434,7 +428,7 @@ class Building:
         return m
 
     def prism(self, center, radius, z0, z1, *, n=8, radius_top=None, color="#d8d2c4", region=None,
-              top="white", top_color=None, tag="detail", solid=False, phase=None) -> Mesh:
+              top="white", top_color=None, tag="detail", solid=False, phase=None, tone=None) -> Mesh:
         """An upright n-sided prism (tanks, drums, columns), or a taper with radius_top."""
         cx, cy = center
         rt = radius if radius_top is None else radius_top
@@ -447,7 +441,7 @@ class Building:
             q = [(cx + a[0] * radius, cy + a[1] * radius, z0), (cx + b[0] * radius, cy + b[1] * radius, z0),
                  (cx + b[0] * rt, cy + b[1] * rt, z1), (cx + a[0] * rt, cy + a[1] * rt, z1)]
             if region:
-                m += map_region(q, region, tag=tag)
+                m += map_region(q, region, tag=tag, col=hex_rgb(tone) if tone else (1, 1, 1))
             else:
                 m += plain(q, color, tag=tag)
         if rt > 1e-6 and top:
@@ -615,6 +609,48 @@ class Building:
             self.intact += map_region([q1, q0, q0 + UP * rh, q1 + UP * rh], rail, tag="detail")   # seen from inside
             for e0, e1 in ((p0, q0), (q1, p1)):
                 self.intact += plain([e0, e1, e1 + UP * rh, e0 + UP * rh], "#3a3f4a", tag="detail")
+
+    def beam(self, p0, p1, width=0.4, depth=None, *, color="#c5553d", region=None, tag="detail") -> Mesh:
+        """A square bar between two points: girders, crane booms, lattice members, legs."""
+        p0, p1 = np.asarray(p0, float), np.asarray(p1, float)
+        d = p1 - p0
+        d /= np.linalg.norm(d)
+        a = np.cross(d, UP)
+        if np.linalg.norm(a) < 1e-6:
+            a = np.array([1.0, 0.0, 0.0])
+        a /= np.linalg.norm(a)
+        bvec = np.cross(a, d)
+        hw, hd = width / 2, (depth or width) / 2
+        ring = [a * hw + bvec * hd, -a * hw + bvec * hd, -a * hw - bvec * hd, a * hw - bvec * hd]
+        m = Mesh()
+        for k in range(4):
+            q = [p0 + ring[k], p0 + ring[(k + 1) % 4], p1 + ring[(k + 1) % 4], p1 + ring[k]]
+            if Face(q).normal @ (ring[k] + ring[(k + 1) % 4]) < 0:
+                q.reverse()
+            m += map_region(q, region, tag=tag) if region else plain(q, color, tag=tag)
+        for end, sgn in ((p1, 1.0), (p0, -1.0)):
+            q = [end + r for r in ring]
+            if Face(q).normal @ (d * sgn) < 0:
+                q.reverse()
+            m += plain(q, color, tag=tag)
+        self.intact += m
+        return m
+
+    def upturns(self, blk: Block, z: float, *, overhang=style.EAVE, lift=0.8, color="#c4552d") -> None:
+        """Turned-up roof corners (shrines, the temple): a small two-sided horn at each eave
+        corner of a hipped roof, rising `lift` meters."""
+        o = overhang
+        for sx in (-1, 1):
+            for sy in (-1, 1):
+                cx = blk.cx + sx * (blk.w / 2 + o)
+                cy = blk.cy + sy * (blk.d / 2 + o)
+                tip = np.array([cx + sx * 0.35, cy + sy * 0.35, z + lift])
+                a = np.array([cx - sx * 1.2, cy, z])
+                bb = np.array([cx, cy - sy * 1.2, z])
+                c0 = np.array([cx, cy, z])
+                for tri in ([a, c0, tip], [c0, bb, tip]):
+                    self.intact += plain(tri, color)
+                    self.intact += plain(list(reversed(tri)), color)
 
     def add(self, mesh: Mesh, solid: bool = False) -> Mesh:
         self.intact += mesh

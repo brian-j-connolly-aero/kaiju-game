@@ -45,7 +45,8 @@ the humans and to charging volleys.
   `prop_bus`, `prop_truck`, `prop_car_wreck`): the body paint is authored near-white and the
   **alpha of `COLOR_0`** says where it is: 1 = paint (multiply the tint color in), 0 = glass,
   tires, lights, trim (leave alone). It is a mask, not opacity: draw these with an opaque
-  material. Every other model has alpha 1 throughout.
+  material. Buildings (`bld_*`, `lm_*`) whose manifest entry has `"tint"` use the same mask
+  for wall plaster (`docs/art/CITY_ART.md`). Every other model has alpha 1 throughout.
 - Animation is done in code. Models are **rigid segments under named nodes with pivots at the
   joints**; no armatures, no baked animation. Rest pose: neutral stance.
 - Triangle budgets: kaiju stage 1 and 2 up to 2500, stage 3 up to 4000; vehicles up to 500;
@@ -102,6 +103,9 @@ half-built), `faith_belltruck` (`hull`, `bell`), `faith_float`, `faith_ark` (`ba
   approximate `intact`, each with its origin at its own center).
 - Shared atlases: `textures/city_atlas.png` (facades, roofs, signs; low resolution, nearest
   filtering) and `textures/city_atlas_emissive.png` (same layout, lit windows and signs for night).
+  1024 x 512, 16 px = 3 m; texture coordinates follow glTF (v = 0 at the top of the image).
+  Buildings are made with the city kit (`tools/art/city/README.md`): one material
+  (`city_atlas`) per building, sizes and states as in `docs/art/CITY_ART.md`.
 - Props, one mesh each: `prop_car_sedan`, `prop_car_taxi`, `prop_car_van`, `prop_bus`,
   `prop_truck`, `prop_kiosk`, `prop_tree_a`, `prop_tree_b`, `prop_lamp`, `prop_trafficlight`,
   `prop_bench`, `prop_hydrant`, `prop_billboard`, `prop_busstop`, plus `prop_car_wreck`.
@@ -232,7 +236,9 @@ deep-merges every partial into `manifest.json`, which the client loads. Never ha
   "rig"?: "lizard" | .., "chunks"?: n, "tint"?: { "part": "body paint", "mask": "..", "blend":
   "multiply", "colors": ["#rrggbb", ..], "hint"?: ".." }, "poses"?: { "<name>": { "<node>":
   [x, y, z] } } } }` (`tint`: suggested paint colors for the vehicles with a paint mask, see
-  section 3; `poses`: see below)
+  section 3; `poses`: see below; buildings add `"base"` to `tint`, the authored wall color, so
+  the client multiplies masked faces by color / base, and `"district"`, the archetype's home
+  district: `docs/art/client-notes-city.md`)
   - `"poses"` (optional, kaiju only): pose targets the animator blends toward instead of fixed
     joint angles, because each stage has its own proportions. Angles are degrees relative to the
     rest pose, in the game's axes, to be set as `node.rotation.set(x, y, z)` (three.js Euler

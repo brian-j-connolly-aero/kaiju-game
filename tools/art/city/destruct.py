@@ -103,7 +103,10 @@ def damaged(b, limit: int) -> Mesh:
                         if not any(all(n @ q <= dd for n, dd in planes) for q in p.pts + [p.center]):
                             nxt.append(p)
                         continue
-                    nxt.extend(subtract_convex(p, planes))
+                    cut = subtract_convex(p, planes)
+                    if p.tag == "underside" and (len(cut) != 1 or cut[0].area < p.area - 1e-3):
+                        continue          # a roof's underside opened by a bite would be seen from above
+                    nxt.extend(cut)
                 pieces = nxt
             m += pieces
         # broken-open floors and walls inside each bite

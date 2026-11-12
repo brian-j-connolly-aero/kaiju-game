@@ -17,11 +17,11 @@ from __future__ import annotations
 CITY_CAP = 900_000
 
 COUNTS = {
-    "house_a": 333, "house_b": 299, "house_c": 441, "rowhouse_a": 361, "shop_a": 132, "shop_b": 188,
+    "house_a": 333, "house_b": 299, "house_c": 441, "rowhouse_a": 359, "shop_a": 132, "shop_b": 189,
     "shop_c": 135, "apartment_a": 159, "apartment_b": 97, "apartment_c": 62, "office_a": 51,
-    "office_b": 35, "office_c": 28, "tower_a": 21, "tower_b": 12, "tower_c": 12, "factory_a": 46,
-    "factory_b": 7, "warehouse_a": 24, "bridge_a": 5, "meridian_tower": 1, "city_hall": 1, "tank_a": 31,
-    "crane_a": 15, "container_a": 55, "campus_a": 38, "pavilion_a": 24, "shrine_a": 72, "bridge_b": 1,
+    "office_b": 35, "office_c": 28, "tower_a": 21, "tower_b": 12, "tower_c": 12, "factory_a": 45,
+    "factory_b": 7, "warehouse_a": 24, "bridge_a": 5, "meridian_tower": 1, "city_hall": 1, "tank_a": 28,
+    "crane_a": 15, "container_a": 58, "campus_a": 38, "pavilion_a": 24, "shrine_a": 72, "bridge_b": 1,
     "tidewater_cathedral": 1, "anchor_field": 1, "tidewheel": 1, "halcyon_observatory": 1,
     "farewell_light": 1, "kiln_point_power": 1, "sevenfold_temple": 1, "grand_station": 1,
     "signal_mast": 1, "gasworks": 1, "founders_clock": 1,
