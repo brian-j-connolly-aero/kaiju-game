@@ -12,10 +12,14 @@
 
 import {
   barDisplayFraction,
+  callInDef,
   clamp01,
   COMBAT_RULES,
+  factionLevelDef,
   kaijuKindDef,
   MATCH_RULES,
+  unitTypeDef,
+  weaponDef,
   type CommandId,
   type SnapKaiju,
   type SnapSquad,
@@ -120,6 +124,9 @@ export class Hud {
   private readonly capture: HTMLElement;
   private readonly menuHint: Hint;
   private lastBar = -1;
+  /** The longest reload and call-in wait seen since each was last ready (a modifier can lengthen them). */
+  private reloadPeak = 0;
+  private callInPeak = 0;
   private lastClock = -1;
   private lastDevice = '';
 
@@ -277,6 +284,12 @@ export class Hud {
     setClass(h.root, 'unavailable', !ready);
   }
 
+  /** The full reload time of the driven unit's weapon (the definition, or longer if seen longer). */
+  private reloadFull(lu: SnapUnit): number {
+    this.reloadPeak = lu.cooldown > 0 ? Math.max(this.reloadPeak, lu.cooldown) : 0;
+    return Math.max(weaponDef(unitTypeDef(lu.type).weapon).cooldown, this.reloadPeak, 0.01);
+  }
+
   update(frame: FrameState, session: MatchSession, view: HudView, now: number): void {
     const match = frame.match;
 
@@ -348,7 +361,7 @@ export class Hud {
       }
       setMeter(this.charge, n > 0 ? sum / n : 0);
       setClass(this.charge.root, 'full', n > 0 && sum / n > 0.98);
-      setMeter(this.reload, 1 - clamp01(lu.cooldown / 3.2));
+      setMeter(this.reload, 1 - clamp01(lu.cooldown / this.reloadFull(lu)));
     }
 
     // Squads and the standing orders of the local squad.
@@ -392,8 +405,12 @@ export class Hud {
     if (lu && own) {
       const hasCallIn = own.level >= 3;
       setClass(this.humanHints.callIn.root, 'hidden', !hasCallIn);
-      this.cooldown(this.humanHints.callIn, own.callInCooldowns[0] / 35);
-      this.cooldown(this.humanHints.fire, lu.cooldown / 3.2);
+      const callIn = factionLevelDef(own.faction, own.level).callIns[0];
+      const wait = own.callInCooldowns[0];
+      this.callInPeak = wait > 0 ? Math.max(this.callInPeak, wait) : 0;
+      const callInFull = Math.max(callIn ? callInDef(callIn).cooldown : 1, this.callInPeak);
+      this.cooldown(this.humanHints.callIn, wait / callInFull);
+      this.cooldown(this.humanHints.fire, lu.cooldown / this.reloadFull(lu));
     }
 
     // The mouse is free and the game wants it: say "click" (mouse players only).

@@ -67,8 +67,8 @@ const ART: Record<string, string> = {
   // --- factions ---
   fac_army: `<path d="M32 4 L39 24 L60 24 L43 37 L50 58 L32 45 L14 58 L21 37 L4 24 L25 24 Z" ${F}/>`,
   fac_air: `<path d="M32 6 L38 28 L60 40 L60 46 L38 40 L36 52 L42 56 L42 60 L32 56 L22 60 L22 56 L28 52 L26 40 L4 46 L4 40 L26 28 Z" ${F}/>`,
-  fac_science: `<ellipse cx="32" cy="32" rx="26" ry="10" ${S}/><ellipse cx="32" cy="32" rx="26" ry="10" transform="rotate(60 32 32)" ${S}/><ellipse cx="32" cy="32" rx="26" ry="10" transform="rotate(120 32 32)" ${S}/><circle cx="32" cy="32" r="5" ${F}/>`,
-  fac_faith: `<path d="M32 6 L32 58 M14 32 L50 32" ${S}/><circle cx="32" cy="32" r="22" ${S}/>`,
+  fac_science: `<ellipse cx="32" cy="32" rx="27" ry="11" transform="rotate(-45 32 32)" ${S}/><ellipse cx="32" cy="32" rx="27" ry="11" transform="rotate(45 32 32)" ${S}/><circle cx="32" cy="32" r="6" ${F}/><circle cx="13" cy="13" r="4.5" ${F}/><circle cx="51" cy="51" r="4.5" ${F}/>`,
+  fac_faith: `<path d="M24 46 L24 26 Q24 14 32 10 Q40 14 40 26 L40 46 Z" ${F}/><path d="M18 55 L46 55" ${S}/><path d="M14 16 L9 10 M50 16 L55 10 M10 30 L4 28 M54 30 L60 28" ${S}/>`,
   // --- tally ---
   tl_car: `<path d="M6 40 L10 28 L20 18 L44 18 L54 28 L58 40 L58 46 L6 46 Z" ${F}/><circle cx="18" cy="48" r="6" ${F}/><circle cx="46" cy="48" r="6" ${F}/>`,
   tl_kiosk: `<path d="M8 22 L32 8 L56 22 Z" ${F}/><rect x="14" y="26" width="36" height="30" ${S}/>`,
