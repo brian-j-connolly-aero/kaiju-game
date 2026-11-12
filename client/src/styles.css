@@ -427,6 +427,14 @@ body {
   white-space: nowrap;
 }
 
+/* The player's own name, as a field they can change: same size as the other names. */
+.seat-name-field {
+  font-size: inherit;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
 .seat-flags {
   display: flex;
   gap: 6px;

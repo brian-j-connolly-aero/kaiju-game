@@ -1,10 +1,12 @@
 /**
  * Lobby: the room code to share, five seats, a role choice (volunteer for the kaiju or lead a
  * squad), a ready switch, and for the host the start button and the practice option (a bot
- * plays the kaiju). Names are the only words.
+ * plays the kaiju). Names are the only words. The player's own name is a field they can change
+ * here (the server cleans it, as on joining).
  */
 
-import { canStartMatch, factionDef, kaijuKindDef, MATCH_RULES, type LobbyState } from '@mb/shared';
+import { canStartMatch, factionDef, kaijuKindDef, MATCH_RULES, MAX_NAME_LENGTH, type LobbyState } from '@mb/shared';
+import { storeName } from '../../net/session';
 import { el, icon, portrait } from '../../ui/icons';
 import type { AppContext, Screen } from '../context';
 
@@ -35,6 +37,8 @@ export class LobbyScreen implements Screen {
   private role: HTMLButtonElement | null = null;
   private practice: HTMLButtonElement | null = null;
   private portraitBox: HTMLElement | null = null;
+  /** The player's own name, editable. Kept across redraws so typing is never interrupted. */
+  private nameField: HTMLInputElement | null = null;
   private unsubscribe: (() => void) | null = null;
   private shown = '';
   private autoClock = 0;
@@ -58,6 +62,31 @@ export class LobbyScreen implements Screen {
     });
 
     this.seats = el('div', 'seats');
+    const nameField = el('input', 'field seat-name seat-name-field');
+    nameField.type = 'text';
+    nameField.maxLength = MAX_NAME_LENGTH;
+    nameField.spellcheck = false;
+    nameField.autocomplete = 'off';
+    nameField.setAttribute('aria-label', 'callsign');
+    nameField.addEventListener('change', () => {
+      const me = client.me();
+      if (!me) return;
+      ctx.name = nameField.value.trim().slice(0, MAX_NAME_LENGTH);
+      storeName(ctx.store, ctx.name, ctx.params.profile);
+      // An empty field gives the seat its default name back.
+      client.send('setName', { name: ctx.name });
+      ctx.audio.play('ui_click');
+    });
+    nameField.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === 'Escape') nameField.blur();
+    });
+    nameField.addEventListener('blur', () => {
+      // Show the room's name for this seat again (an emptied field gets its default back when
+      // the server's answer arrives; a redraw now covers the case where nothing changed).
+      this.shown = '';
+      this.render(ctx);
+    });
+    this.nameField = nameField;
     this.portraitBox = el('div', 'lobby-portrait');
     this.role = el('button', 'btn btn-big role-toggle');
     this.role.addEventListener('click', () => {
@@ -138,7 +167,7 @@ export class LobbyScreen implements Screen {
       const asleep = seatAsleep(lobby, p);
       const card = el('div', `seat${p.seat === client.seat ? ' me' : ''}${p.connected ? '' : ' away'}${p.ready || p.seat === lobby.host ? ' ready' : ''}${asleep ? ' asleep' : ''}`, [
         icon(p.wantsKaiju ? 'lb_kaiju' : 'lb_human', `seat-role ${p.wantsKaiju ? 'kaiju' : 'human'}`),
-        el('div', 'seat-name', [p.name]),
+        p.seat === client.seat && this.nameField ? this.ownName(p.name) : el('div', 'seat-name', [p.name]),
         el('div', 'seat-flags', [
           p.seat === lobby.host ? icon('lb_host', 'flag host') : '',
           p.ready ? icon('lb_ready', 'flag ok') : '',
@@ -173,6 +202,13 @@ export class LobbyScreen implements Screen {
     this.practice?.classList.toggle('on', lobby.options.botKaiju);
     this.start?.classList.toggle('hidden', !host);
     if (this.start) this.start.disabled = !canStartMatch(lobby) || lobby.phase !== 'lobby';
+  }
+
+  /** The player's own name field, showing the room's name for them unless they are typing. */
+  private ownName(name: string): HTMLInputElement {
+    const field = this.nameField as HTMLInputElement;
+    if (document.activeElement !== field) field.value = name;
+    return field;
   }
 
   /** The autopilot's lobby manners: pick a role, get ready, and (as host) start when the room is full enough. */
@@ -215,6 +251,7 @@ export class LobbyScreen implements Screen {
     this.unsubscribe = null;
     this.root?.remove();
     this.root = null;
+    this.nameField = null;
     this.shown = '';
   }
 }
