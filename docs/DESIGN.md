@@ -229,8 +229,8 @@ the molt; each molt adds one move, picked from three cards, on one of two move b
 
 | Button (keys) | What it does |
 | --- | --- |
-| Strike (left mouse) | Swipe. With something in the hand: throw it at the crosshair. |
-| Grab (right mouse) | Grab what is in reach. With something in the hand: eat it. With nothing to pick up in reach but something to eat (a kiosk, a wreck): eat that. With neither: the hand closes on nothing. |
+| Strike (left mouse) | Swipe. With something in the hand: throw it at the crosshair; a fast-food sign is swung instead (the club, phase 2). |
+| Grab (right mouse) | Grab what is in reach (a city weapon only while it is a hatchling, phase 2). With something in the hand: eat it; a city weapon is never eaten: Grab drops it, and it lies on the ground to be picked up again. With nothing to pick up in reach but something to eat (a kiosk, a wreck): eat that. With neither: the hand closes on nothing. |
 | Stomp (Space) | Stomp. |
 | First move (Q) | The move picked at the first molt; nothing before it. |
 | Second move (E) | The move picked at the second molt; nothing before it. |
@@ -246,6 +246,7 @@ Action timings are the tells. `r` = body radius for the stage.
 | Grab | Grab | 0.4 s | Grabs the nearest car, wreck, live vehicle (stage 2+) or building chunk (stage 2+) in a 100° arc within 2.5 r. |
 | Throw | Strike, holding something | 0.3 / 0 / 0.2 s | At the aim point: 25 / 45 / 70 m/s ballistic. Impact: units 120 in radius 4 / 10 / 22 m; structures 60 / 350 / 1500. |
 | Eat | Grab, holding something (or nothing to grab but something edible in reach) | 2.0 s, rooted | Heals 80 hp. 10 s cooldown. The meal is consumed. |
+| Club | Strike, holding a fast-food sign (phase 2) | 0.5 / 0.15 / 0.55 s | 200° arc in front of the head, reach 4 r (1.6 times the swipe's). Units: 140 damage, 60 nerve, thrown back 2.5 r at the body, half that at the tip. Structures: 80 / 600 / 4000, twice a swipe. Three swings, then the sign breaks. |
 | Molt | Molt, one press | 10 s cocoon | Only when a molt is available. The molt cards are offered (below). |
 
 The moves a molt can add (each on the move button of the slot it was put in):
@@ -398,6 +399,57 @@ As built (`shared/src/sim/swim.ts`, numbers in the kind's `swim` definition):
   `submerge` for whatever else wants it.)
 - **No stalling.** Nothing it does in the water earns anything and the clock runs on: time
   spent hiding is time the humans win by.
+
+### The city as a weapon (phase 2, as built)
+
+`docs/ROADMAP.md`, phase 2: "the city as a weapon, small monster first". Every starting
+neighborhood has a handful each of propane tanks, water tanks, television antennas, fast-food
+pole signs and garage doors standing beside its houses and shops (section 7), and a radio mast
+that falls leaves its top lying about. Rules in `shared/src/sim/cityWeapons.ts`, numbers in the
+kind's `cityWeapons` (`shared/src/defs/kaiju/lizard.ts`); all starting values.
+
+- **Picking them up.** Grab picks them up like a car (the nearest thing in the arc wins), but
+  only while the monster is a hatchling (stage 1). The hatchling's feet step round them and its
+  claws, tail and stomp push them aside rather than wreck them (they are there to be picked up);
+  a charge, fire and explosions still wreck them. From stage 2 they cannot be picked up and feet
+  and tank tracks crush them like any small prop. They are worth nothing to the bar.
+- **Never eaten.** Grab with one in the hand lets go of it: it lies on the ground below the hand
+  (a loose object, `world.loose`) and can be picked up again. The cocoon drops whatever is held,
+  as before. Strike uses it: a throw, except the fast-food sign, which is swung (the club).
+- **Propane tank.** Thrown (on the throw's arc, 25 m/s), it explodes where it lands: units
+  within 8 m take 110 damage at the middle falling to 40 at the rim and 40 to 20 nerve, and are
+  thrown out 7 m (2 m at the rim); structures within it take 120; props within it are destroyed
+  and other propane tanks go off with it. The thrower is never hurt. A shot or an explosion that
+  lands within 2 m of a tank sets it off: on the ground (a full blast, which hurts a monster
+  standing in it too: 110 raw, about 13 hp in the open), or in the monster's hand, where the blast
+  goes off at the hand, the hand is empty, the monster loses exactly 60 hp (whatever its state or
+  facing) and flinches for 0.8 s (rooted, whatever it was doing cut short). Fire (shots,
+  explosions, the beam, a fireball) sets a tank off; crushed underfoot or under tracks, struck,
+  or under a falling building it goes off with a small bang (3.5 m: 35 to 15 damage, 30 to
+  structures).
+- **Water tank.** Thrown (22 m/s), it bursts into a splash 10 m across: units in it take 30
+  damage and 20 to 10 nerve, are pushed out 6 m (4 m at the rim) and knocked over: they lie flat
+  for 1.5 s, unable to move or fire, exactly like the roar's stun but shorter (their charge is
+  lost too). Nothing burns.
+- **Antenna.** Thrown, it is a javelin: it flies straight at the crosshair at 70 m/s with almost
+  no drop (1.5 m/s² of gravity) and gives out after 120 m. It goes through up to three units
+  (110 damage and 40 nerve each, each pushed 3 m along its flight) and flies on past any more,
+  stopping in the first structure (150 damage) or the ground; a monster it hits stops it (110
+  raw).
+- **Mast.** The radio mast's 8 m top section (section 7). A heavier javelin: 60 m/s, up to 110 m,
+  through up to five units at 200 damage and 60 nerve each, 400 to the structure it stops in.
+- **Fast-food sign.** A club: Strike swings it (the Club row above) instead of throwing it. It
+  breaks after its third swing and the hand is empty; Strike swipes again.
+- **Garage door.** A shield: a hit that arrives within 70° of the body's facing hits the door
+  instead of the monster (no damage, no nerve, and a charged volley that hits the door does not
+  count toward breaking the monster's nerve). The door soaks up 250 of raw hit damage (about 80
+  rockets) and breaks. It does not cover a blast with no direction, nor a monster that is
+  staggered or in its cocoon. Strike throws it like a frisbee: flat (32 m/s, 3 m/s² of gravity,
+  70 m at most), 80 damage and 30 nerve to the units within 3.5 m of where it lands, knocked over
+  for 1.5 s and pushed out 4 m, 60 to structures.
+- **What the snapshot carries.** The held object as before (a 'prop' of its kind); a sign's
+  swings left (`clubSwings`) and a door's hp left (`shieldHp`). Events for every new impact
+  (`ARCHITECTURE.md` section 4.2).
 
 **Tier 2 kaiju (same verbs, different numbers and one special each):**
 
@@ -694,6 +746,21 @@ and plays any slot it is handed at any moment.
   away again for 30 s. Water farther away cost it more than it gave back in the balance runs
   (it turned its back on the guns to get there): with 45 and 28 radii it won 20% of matches
   instead of about half.
+  Phase 2 (`BOT_RULES.kaiju`): the special buildings are milestones between fights. One within
+  140 m (220 m at stage 2) is worth six times as much to wreck while no unit is within 60 m
+  (110 m) of it; the substation ten times while a move it has picked is cooling down or its
+  beam waits for rage; the gas station fourteen times whenever units stand within its fireball,
+  squads about or not. While it is a hatchling, with units within 110 m and none within its
+  swipe, it walks to the city weapon within 50 m that suits the moment and picks it up (giving
+  up after 6 s, and not trying again for 6): a propane or water tank for units within throwing
+  range (better a group of two or more within 9 m of each other), an antenna or the mast for a
+  squad beyond its melee range, the fast-food sign for units within 45 m, the garage door when
+  guns can see it and it has ground to cover. Then it uses it: the tanks thrown at the group, a
+  javelin at the squad it lines up best (the most units close to the line), the club swung at
+  the units in reach (and at buildings when no unit is near), the door carried toward the guns,
+  facing them, and thrown once a unit is within 22 m or the door is down to 30% of its hp. A
+  house in the way is smashed (with the club, or a stomp when the hand holds something else).
+  With nobody about to use it on, it lets the thing drop (the club it keeps).
 - **Handicap.** `MatchConfig.bots` handicaps either side from 0 (its best) to 1 (stands still):
   in between, the bot idles that share of the time. For the balance harness, tests and
   practice options. `MatchConfig.bots.triggerHappy` makes the squad bots play the lazy way
@@ -738,6 +805,54 @@ server and every client build the identical city from code. No building list goe
   for it; it took the place of the tree belt outside the beltway (docs/CITY.md section 11).
 - Civilians are client-only fleeing sprites with no effect on play.
 
+### Special buildings (phase 2, as built)
+
+`docs/ROADMAP.md`, phase 2: special buildings in every starting neighborhood, each with a reward
+you can see, so the monster has a milestone to chase between fights. Placement in
+`shared/src/city/meridian/specials.ts`, rewards in `shared/src/sim/systems/specials.ts`, numbers
+in the kind's `rewards` (`shared/src/defs/kaiju/lizard.ts`); all starting values.
+
+- **Three of them per start.** A power substation (`substation_a`, 22 by 16 m, 9 m high), a gas
+  station (`gasstation_a`, 26 by 20 m, 7 m) and a lattice radio mast (`radiomast_a`, 8 by 8 m,
+  24 m). Every neighborhood anchor (every place a match can start) has one of each wholly inside
+  its stage 1 square, 40 to 120 m from the anchor (about 60 to 95 m as generated), on a street
+  front, in three directions about a third of a turn apart (turned by the city's seed); they
+  stand before the street fronts are filled in, and the yard opener never takes one out.
+  `validateCity` reports a start that lacks one. A hatchling wrecks each in three to five swipes
+  (hp 150, 160 and 120 against its 40); each is worth 15 bar points, what a shop is. The juvenile
+  tramples the substation and the gas station (12 m) and needs a swipe for the mast.
+- **The reward, once per building, when it collapses** (whoever wrecked it: the squads' stray
+  fire pays the monster too; the reward is the monster's that wrecked it, else the nearest one):
+  - **Power substation: a power surge** for 8 s. Every cooldown is cleared at once (the moves,
+    and the meal's) and they recover three times as fast while it lasts; its attacks (swipe,
+    stomp, tail sweep, club, charge, beam, throws, a chunk torn out) do 1.5 times the damage to
+    units and structures; its rage jumps by 50 of 100. The snapshot's kaiju record carries the
+    seconds left (`surge`).
+  - **Gas station: a fireball** 30 m across round the middle of the station (sized to the
+    building, not the monster: it fills the lot and reaches the houses behind and beside it).
+    Units in it take 90 damage at the middle falling to 25 at the rim and 60 to 20 nerve, and are
+    thrown out 8 m (3 m at the rim); structures in it take 150 (houses and small shops go with
+    it); props in it burn, and propane tanks in it go off. It never hurts the monster.
+  - **Radio mast: it falls over**, always away from the monster (from the monster to the mast,
+    onto the side of its footprint that faces that way most nearly), whatever chance the other
+    slender buildings have; it lands 2 s later and crushes what lies under it like any building
+    that falls over (below). Its top 8 m section then lies at the far end as a `mast` the
+    hatchling can pick up and throw as a heavy javelin (section 4). And the army's map turns to
+    static for 20 s (`match.staticUntil`, the tick it ends, in the snapshot): while it lasts the
+    map shows nothing, so the squads know where the monster is only from what their units see
+    within 250 m, at every stage (noise does not put it on the map either).
+- **Measured** (ten bot matches, seeds 1 to 10, every start in turn): the hatchling's monster
+  bot wrecked 19 of the 30 special buildings of the starting neighborhoods itself and the squads'
+  fire 4 more (substation 9, gas station 8, radio mast 6 of 10); 10 more went at stage 2 and 3.
+
+### City weapons (phase 2, as built)
+
+Beside the houses and shops of every start (`shared/src/city/meridian/furnish.ts`): 5 propane
+tanks and 4 each of water tanks, antennas, fast-food signs (by the shops first) and garage doors,
+all inside the stage 1 square; about one house or shop in 45 elsewhere has one too (230 in all).
+`validateCity` reports a start with fewer than 3 of a kind. The radio mast's top (`mast`) is never
+placed: it only comes from a mast that falls. What they do in the hand: section 4.
+
 ### Rubble and falls (phase 2, as built)
 
 `docs/ROADMAP.md`, phase 2: rubble stays as half-height mounds that still block shots and sight,
@@ -757,7 +872,8 @@ falls in `shared/src/sim/systems/cityDamage.ts`, numbers in `shared/src/defs/rub
   pass over rubble, as before. Rubble from a house (2.5 to 4.5 m) is enough to hide a hatchling's
   legs, and a pile of it can hide the whole hatchling: squads have to find a line round it.
 - **Buildings that fall over.** A slender structure, at least 2.9 times taller than its longer
-  footprint side (the towers, the tall offices, the slender landmarks and the radio masts), falls
+  footprint side (the towers, the tall offices, the slender landmarks and the radio masts: a
+  radio mast always falls, away from the monster, as its reward above), falls
   over on its side half the time it collapses (the match's random numbers), instead of straight
   down. It tips over the side of its footprint that faces along whatever hit it last (a shell's
   flight), or away from the kaiju for everything else, over 2 s. When it lands, every unit under
@@ -795,8 +911,8 @@ shortcut that a page cannot cancel).
 | --- | --- | --- |
 | Move | W A S D (or the arrows) | Left stick |
 | Look | Mouse (captured by a click on the view) | Right stick |
-| Kaiju: swipe; with something in the hand, throw it at the crosshair | Left button | RT |
-| Kaiju: grab; with something in the hand, eat it (heals; 10 s between meals); nothing to grab but a kiosk or a wreck in reach: eat that | Right button | LT |
+| Kaiju: swipe; with something in the hand, throw it at the crosshair; with a fast-food sign, swing it (phase 2) | Left button | RT |
+| Kaiju: grab; with something in the hand, eat it (heals; 10 s between meals), or drop it if it is a city weapon (phase 2); nothing to grab but a kiosk or a wreck in reach: eat that | Right button | LT |
 | Kaiju: stomp | Space | LB |
 | Kaiju: the move picked at the first molt (nothing before it; the brace is held) | Q | Y |
 | Kaiju: the move picked at the second molt (nothing before it) | E | RB |

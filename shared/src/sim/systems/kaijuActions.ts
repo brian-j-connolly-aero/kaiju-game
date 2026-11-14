@@ -68,7 +68,7 @@ import { LAST_STAGE } from '../../defs/stages';
 import { modMult } from '../../defs/upgrades';
 import { PI, wrapAngle } from '../../math/angle';
 import { Btn, BtnIndex, INPUT_BUFFER_TICKS, type ButtonName } from '../../net/input';
-import { dropToGround, heldCityWeapon, heldEdible, strikeVerb, updateLoose } from '../cityWeapons';
+import { dropToGround, heldCityWeapon, strikeVerb, updateLoose } from '../cityWeapons';
 import {
   beamTick,
   chargeTick,
@@ -357,7 +357,7 @@ function startFromInput(world: World, k: Kaiju, def: KaijuKindDef, input: InputS
     return;
   }
   if (freshPress(k, input, 'grab')) {
-    if (k.held && heldCityWeapon(k.held) !== null && !heldEdible(k.held)) {
+    if (heldCityWeapon(k.held) !== null) {
       // A city weapon is never eaten: Grab lets go of it, and it lies on the ground.
       k.act.usedPress |= Btn.grab;
       dropToGround(world, k);

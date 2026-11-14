@@ -264,7 +264,8 @@ function chooseHidingPlace(world: World, k: Kaiju, bs: BotState): boolean {
       eye.x = u.x;
       eye.y = u.y + unitTypeDef(u.type).eyeHeight;
       eye.z = u.z;
-      if (lineOfSight(world.cityQuery, eye, mark, true)) n++;
+      // Rubble and fallen buildings hide it as well as standing ones (phase 2, the army's mounds).
+      if (lineOfSight(world.cityQuery, eye, mark, true, true)) n++;
     }
     return n;
   };
@@ -773,7 +774,8 @@ function javelinTarget(world: World, k: Kaiju, st: KaijuStageDef, range: number)
     mark.x = u.x;
     mark.y = 1;
     mark.z = u.z;
-    if (castSegment(world.cityQuery, eye, mark)) continue;
+    // A javelin flies like any projectile: rubble and fallen buildings stop it too.
+    if (castSegment(world.cityQuery, eye, mark, undefined, -1, true, true)) continue;
     let count = 0;
     for (const o of world.units) {
       if (!o.alive || o === u) continue;

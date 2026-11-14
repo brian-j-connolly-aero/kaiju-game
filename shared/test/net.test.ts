@@ -379,6 +379,23 @@ describe('city state on the wire', () => {
     expect(hpForStage(100, 0)).toBe(100);
   });
 
+  it('carries the city weapons lying loose: the ones still down, in id order', () => {
+    const world = makeTestWorld({ realCity: true });
+    world.loose.push(
+      { id: 0, kind: 'propane', x: 10.5, z: -3.25, yaw: 0.5, state: 'down', landsAt: 0 },
+      { id: 1, kind: 'garagedoor', x: 1, z: 2, yaw: 0, state: 'gone', landsAt: 0 },
+      { id: 2, kind: 'mast', x: -40.125, z: 77.5, yaw: -1.25, state: 'down', landsAt: 300 },
+      { id: 3, kind: 'mast', x: 5, z: 5, yaw: 0, state: 'falling', landsAt: 9999 },
+    );
+    const bytes = encodeCityState(world.structureStage, world.propAlive, world.propWreck, world.city.props.length, world.structureFall, world.loose);
+    expect(decodeCityState(bytes).loose).toEqual([
+      { id: 0, prop: 'propane', x: 10.5, z: -3.25, yaw: 0.5 },
+      { id: 2, prop: 'mast', x: -40.125, z: 77.5, yaw: -1.25 },
+    ]);
+    // The welcome sends them.
+    expect(decodeCityState(welcomeFor(world, 0).cityState).loose.map((o) => o.id)).toEqual([0, 2]);
+  });
+
   it('survives base64 for text-only transports', () => {
     for (const len of [0, 1, 2, 3, 4, 5, 250]) {
       const bytes = new Uint8Array(len);

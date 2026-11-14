@@ -2732,7 +2732,9 @@ weight client): the handoff list at the end of this section is for them.
   open again" (`spotting`, `flow`, `squads`, `bots`) now check that the rubble still hides a
   hatchling and that the line opens from on top of it, over a low wall's rubble, or when the
   kaiju steps out; `net.test.ts` (pick-ups and crates in the snapshot, the fallen list in the
-  city state), `callins.test.ts`, `defs.test.ts`, `world.test.ts` (twelve systems).
+  city state), `callins.test.ts`, `defs.test.ts`, `world.test.ts` (twelve systems), and
+  `matchSoak.test.ts` (the six fast matches must now see crates, the radio's barrages and falls,
+  where phase 1 checked that nothing called artillery).
 
 **Measured** (ten bot matches each, seeds 1 to 10, every start in turn; the city's phase 2 work
 was in the same tree and still changing, so these are this tree's numbers, not the army's
@@ -2794,11 +2796,10 @@ and 1:48 / 3:26 / 2:36): balance waits for the owner's playtest, as the roadmap 
 - The beam and the third-person camera pass over rubble (a choice, so the monster's favorite
   move is not blunted by its own wreckage; `beamPath` and the client's camera do not pass the
   `mounds` flag).
-- When this section was written, five tests failed that belong to the city's work in progress
-  (the new `club` verb in `defs.test.ts`, `net.test.ts` and the client's `controlsCard.test.ts`;
-  the substation now standing on the target point of the swarm test in `squads.test.ts`; propane
-  blasts left in the damage queues at the end of a tick in `matchSoak.test.ts`). The last
-  section of this file says whether `npm run check` passes.
+- When this section was written, `npm run check` type checked and linted clean, and 1 of 857
+  tests failed, from the city's work still in progress: the monster's new `club` verb has no
+  tile yet in the client's `controlsCard.test.ts`. The last section of this file says whether
+  `npm run check` passes.
 
 ## Art: the supply crate, its parachute and the pick-up pictures (phase 2)
 
@@ -2851,3 +2852,109 @@ art file is involved.
 - The pick-up pictures were judged by eye on the sheets only, not yet in the game over a real
   crate or by the owner. The machine gun is the least obvious of the five at small sizes.
 - No lit beauty picture of a soldier under the parachute was made; the scene shows a crate.
+
+## Phase 2: special buildings and the city as a weapon (14 November, the city-simulation task)
+
+`docs/ROADMAP.md`, phase 2: the special buildings in every starting neighborhood and their
+rewards, and the city as a weapon for the small monster, in the city generator, the simulation
+and the monster bot. The rules as built are in `DESIGN.md` section 4 ("The city as a weapon")
+and section 7 ("Special buildings", "City weapons"); the contracts in `ARCHITECTURE.md` sections
+3 and 4.2; the city's numbers in `CITY.md` section 12. Drawing it is the next two tasks' (the
+city and weight client, the weapons and pick-ups client).
+
+**Is the tree green? Yes.** `npm run check` passes with the army's phase 2 work in the same
+tree: type checks, lint (263 files clean, one `STUB(server)`), 858 tests in 67 files.
+
+**What changed**
+
+- **The city.** Three archetypes appended (`substation_a`, `gasstation_a`, `radiomast_a`, with a
+  `special` kind; the cap raised from 40 to 48, the client's batching needs nothing for it). Every
+  one of the ten starts has one of each wholly inside its stage 1 square, 58 to 95 m from the
+  anchor, on street fronts in three directions (`city/meridian/specials.ts`); the yard opener
+  never removes one. Six prop kinds appended (`propane`, `watertank`, `antenna`, `foodsign`,
+  `garagedoor`, `mast`, with `cityWeapon` set): 21 of the first five by the houses and shops of
+  every start, 230 in all; `mast` is never placed. `validateCity` checks both (its `specials`
+  option is off for the placeholder grid). The city's checksums changed (3115597894 and
+  3365977326); nothing else in it moved.
+- **The rewards** (`sim/systems/specials.ts`, called by the city damage system when a structure
+  turns to rubble): the substation's power surge (8 s: cooldowns cleared and recovering three
+  times as fast, attacks 1.5 times as hard, rage +50), the gas station's fireball (30 m across,
+  spares the monster), the radio mast falling away from the monster through the army's
+  `startStructureFall`, its top landing as a loose `mast` 2 s later, and the humans' map showing
+  static for 20 s (`match.staticUntil`; `spotting.ts` keeps `known` to what units see).
+- **The city as a weapon** (`sim/cityWeapons.ts`, with `kaijuEffects.ts` and the action system):
+  stage 1 only; spared by the hatchling's feet, claws and stomp; never eaten (Grab drops one, and
+  it lies loose: `world.loose`). Propane explodes thrown, set off by a shot or explosion within
+  2 m on the ground or in the hand (60 hp exactly and a 0.8 s flinch, a new phase), small bang
+  when crushed; the water tank knocks units over (the roar's stun, 1.5 s, drawn lying down); the
+  antenna and the mast are javelins through 3 and 5 units; the fast-food sign is a club (a new
+  verb, `club`, three swings); the garage door a shield against hits from the front (250 hp) and
+  a frisbee when thrown.
+- **The monster bot** (`sim/bots/kaijuBot.ts`, `BOT_RULES.kaiju`): special buildings as
+  milestones (more when no squad is close; the substation when its moves are cooling; the gas
+  station whenever units stand in its fireball), and the city weapon that suits the moment
+  picked up within 50 m and used (`DESIGN.md` section 5). Its hiding places and javelin lines
+  count rubble now (the army builder's note).
+- **Shared files touched with small edits** (the army builder edited them too): `defs/ids.ts`
+  (verb 'club', phase 'flinch', damage kinds 'propane', 'fireball', 'splash', 'javelin',
+  'club'), `defs/schema.ts` (`ClubActionDef`, `KaijuCityWeapons`, `KaijuSpecialRewards`),
+  `sim/types.ts` (kaiju `surge`, `clubSwings`, `shieldHp`; `world.loose`; `match.staticUntil`;
+  `Projectile.city`; `Hit.knockdown` and `exact`), `sim/events.ts` (twelve events, `knockdown` on
+  `unitStunned`, source 'loose'), `net/snapshot.ts` and `worldSnapshot.ts` (the kaiju's three
+  fields and the match's `staticUntil`; version 4, the one bump shared with the army),
+  `net/cityState.ts` and `welcome.ts` (the loose list), `systems/cityDamage.ts` (two hooks: the
+  reward on a collapse, a propane tank among the destroyed props), `systems/projectiles.ts`
+  (javelins, a city weapon's landing, the blast check where shots land), `systems/damage.ts`
+  (the shield, exact hits, the knock-down), `systems/movement.ts` and `sim/movement.ts` (the
+  spared props, the flinch roots), `spotting.ts` (static), `spawn.ts` and `createWorld.ts`.
+  Client, only to keep it compiling and its tests passing: stand-in models for the six props
+  (`assets/procedural/models.ts`), a stand-in club tile on the controls card, the three new
+  fields in two test fixtures.
+- **Tests.** New: `cityWeapons.test.ts` (picking up at stage 1 only and spared underfoot, the
+  drop and pick-up again, propane set off in the hand by a shot and not by one 2 m off, on the
+  ground by a shot, thrown; the water tank's knock-down; a javelin through three units into a
+  building; the club's three swings; the door from the front only, broken, thrown),
+  `specials.test.ts` (the surge's cooldowns, rage, damage and end, once only, in the snapshot;
+  the fireball sparing the monster and felling the house behind; the mast falling away, its
+  top landing and taken, the static in the snapshot and on the map), `kaijuBotCity.test.ts` (the
+  bot wrecking a special before nearer houses, the gas station first with squads by it, and
+  picking up and using a propane tank, a sign, a door and an antenna); in `meridian.test.ts` the
+  placement at every start and `validateCity` reporting a missing one; in `net.test.ts` the loose
+  list on the wire. Changed: the checksums and the cap (`meridian.test.ts`), the club in
+  `defs.test.ts`, and the swarm test in `squads.test.ts` (its target point now stood inside
+  Alder Row's substation: it is moved onto open ground).
+
+**Measured** (`npm run sim -- --seeds 10 --every-anchor`, seeds 1 to 10, every start; the army's
+phase 2 work is in the same tree, so these are the tree's numbers): every match finished
+without an error; the monster won 4 of 10 (5 of 10 in a run an hour earlier with the bot's
+hiding not yet counting rubble); stages took 2:09 / 2:51 / 2:54 when completed (phase 1: 2:02 /
+2:27 / 3:01; the earlier run 2:11 / 2:36 / 2:31), the match 7:53 (7:31). The navigation report:
+the monster never stuck (longest 0 s). In those ten matches:
+
+| | Stage 1 (the ten starts) | Later stages |
+| --- | --- | --- |
+| Substations wrecked | 7 by the monster, 2 by the squads' fire | 3 |
+| Gas stations wrecked | 5 by the monster, 2 by the squads' fire | 4 |
+| Radio masts felled | 5 by the monster | 8 (2 by the squads) |
+
+City weapons picked up by the bot: 25 (garage doors 8, antennas 5, water tanks 5, fast-food signs
+3, masts 2, propane tanks 2). 21 were thrown, the 3 signs swung (9 swings, 5 units hit) and one
+door went into the cocoon with the monster; the doors took 146 hits for it, javelins ran through
+10 units, water knocked 6 over. Propane tanks went off 14 times set off by the squads' own fire
+and 6 times crushed.
+
+**Still open**
+
+- Nothing is drawn yet (the two client tasks): the special buildings' rewards, the props in
+  place and in the hand, the loose objects, the club's swing, the flinch, the knock-down.
+  Until then the client shows a city weapon in the hand as a plain prop and swings nothing.
+- The client's own wind-up hint (`hintVerb` in `client/src/net/matchSession.ts`) still says
+  'throw' for Strike with a sign in the hand and 'eat' for Grab with a city weapon; it should
+  ask `strikeVerb(held)` and `heldEdible(held)` (both exported from `@mb/shared`).
+- A unit knocked over looks like a stunned one in the snapshot (`stunned`); only the
+  `unitStunned` event says `knockdown`, so a page that joins during those 1.5 s draws a stun.
+- Not felt by a person yet: whether 2 m is the right distance for a shot to set off a tank in the
+  hand (a hatchling holding one under fire loses it quickly), the door's 250 hp, the surge's
+  strength. Levers: `cityWeapons` and `rewards` in `defs/kaiju/lizard.ts`, `BOT_RULES.kaiju`.
+- The Chromium run of the city checksum was not repeated (the generator's new code passes the
+  same exact-arithmetic scan as the rest).

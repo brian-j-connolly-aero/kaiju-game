@@ -20,7 +20,10 @@
  *   ANOTHER unit's hit inside `crossfireWindow`. Only directional hits with a unit as their
  *   source take part (`hit.sourceId` >= 0, a human weapon kind); call-ins with source -1 never do;
  * - rage: 1 per `rageDamagePerPoint` hp actually lost;
- * - at 0 hp it dies (phase 'dead'); the match flow system ends the match.
+ * - at 0 hp it dies (phase 'dead'); the match flow system ends the match;
+ * - phase 2: a garage door held as a shield takes a hit from the front instead (no damage, no
+ *   nerve, no volley counted: `shieldTakes` in sim/cityWeapons.ts), and a hit marked `exact`
+ *   (its own propane tank going off in its hand) is taken as it is, whatever the state or side.
  *
  * Units: hp and members, nerve (leaks; at capacity the unit is shaken: cannot fire, loses its
  * charge), the roar's stun (`hit.stun`: frozen, charge gone; its shaking waits until the stun

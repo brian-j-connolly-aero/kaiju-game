@@ -31,7 +31,7 @@ export const PROP_KINDS: Readonly<Record<PropKindId, PropKindDef>> = {
   antenna: weapon('antenna', 0.5, 7),
   foodsign: weapon('foodsign', 1.5, 7.5),
   garagedoor: weapon('garagedoor', 1.8, 2.8),
-  mast: weapon('mast', 4, 1.2),
+  mast: weapon('mast', 4, 1.5),
 };
 
 export function propKindDef(id: PropKindId): PropKindDef {

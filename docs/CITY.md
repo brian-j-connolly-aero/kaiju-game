@@ -277,9 +277,10 @@ notch between a landmark and a block of flats.
 
 ## 4. The ordinary buildings
 
-40 archetypes in total (the cap, see section 8): the 22 the placeholder city already had, and 18
-appended for Port Meridian (6 new ordinary types, one new bridge, 11 new landmarks). Size is
-width x depth x height in meters. The class decides what the game counts (end-screen tallies).
+43 archetypes in total (the cap is 48 since phase 2, see section 8): the 22 the placeholder city
+already had, 18 appended for Port Meridian (6 new ordinary types, one new bridge, 11 new
+landmarks), and the 3 special buildings of phase 2 (section 12). Size is width x depth x height
+in meters. The class decides what the game counts (end-screen tallies).
 
 Rules of thumb for gameplay: houses (5 to 9 m) are the hatchling's food; shops and low blocks
 (up to 12 m) get trampled by the juvenile; apartments and offices stop the juvenile; towers above
@@ -349,9 +350,10 @@ Ids are append-only: never rename or reorder. Art files are named after them.
   the river, Founders Plaza, Exchange Square, Station Square, Market Square, the Stadium
   Concourse, Wheel Plaza, the Embankment Promenade along the downtown waterfront and Juniper
   Strand (the beach).
-- **Props** (5362): parked and moving cars, taxis, vans, trucks, buses at stops, kiosks on plazas
+- **Props** (5588): parked and moving cars, taxis, vans, trucks, buses at stops, kiosks on plazas
   and high streets, trees in parks and along avenues, lamps, traffic lights at junctions,
-  benches, hydrants and billboards.
+  benches, hydrants and billboards; and since phase 2 the city weapons by the houses and shops
+  of the starts (230: section 12).
 
 ---
 
@@ -365,18 +367,19 @@ of the value inside these squares, so the value inside them is kept close for ev
 
 | Anchor | Position (E, N) | Value in stage 1 square | Value in stage 2 square | Landmarks in the stage 2 square |
 |---|---|---|---|---|
-| Alder Row | -920, 920 | 1372 | 17 361 | Sevenfold Temple |
-| Bellhaven | -920, -240 | 1379 | 18 088 | Tidewater Cathedral |
-| Cinder Flats | 920, -235 | 1383 | 18 651 | Kiln Point Power Station |
-| Dovecote | -540, 920 | 1384 | 17 942 | Sevenfold Temple, Grand Meridian Station, Founders Clock Tower |
-| Easter Green | 920, 380 | 1352 | 18 713 | Kiln Point Power Station |
-| Fennel Hill | -928, 328 | 1369 | 19 244 | Tidewater Cathedral, Sevenfold Temple |
-| Gull Point | 920, -720 | 1384 | 16 932 | Number Three Gasworks |
-| Harrow Lane | 920, 920 | 1397 | 17 268 | Halcyon Observatory, Signal Hill Mast |
-| Ivy Court | 240, 920 | 1407 | 18 397 | Halcyon Observatory, Grand Meridian Station, Founders Clock Tower |
-| Juniper Bay | -920, -600 | 1380 | 17 163 | Tidewater Cathedral, Anchor Field, The Tidewheel |
+| Alder Row | -920, 920 | 1341 | 17 302 | Sevenfold Temple |
+| Bellhaven | -920, -240 | 1326 | 18 011 | Tidewater Cathedral |
+| Cinder Flats | 920, -235 | 1375 | 18 646 | Kiln Point Power Station |
+| Dovecote | -540, 920 | 1381 | 17 914 | Sevenfold Temple, Grand Meridian Station, Founders Clock Tower |
+| Easter Green | 920, 380 | 1348 | 18 701 | Kiln Point Power Station |
+| Fennel Hill | -928, 328 | 1352 | 19 168 | Tidewater Cathedral, Sevenfold Temple |
+| Gull Point | 920, -720 | 1381 | 16 923 | Number Three Gasworks |
+| Harrow Lane | 920, 920 | 1384 | 17 257 | Halcyon Observatory, Signal Hill Mast |
+| Ivy Court | 240, 920 | 1415 | 18 413 | Halcyon Observatory, Grand Meridian Station, Founders Clock Tower |
+| Juniper Bay | -920, -600 | 1402 | 17 128 | Tidewater Cathedral, Anchor Field, The Tidewheel |
 
-Spread: stage 1 within 4% (1352 to 1407), stage 2 within 14% (16 932 to 19 244); the target was
+(Since phase 2, with the three special buildings of each start standing among the houses.)
+Spread: stage 1 within 7% (1326 to 1415), stage 2 within 14% (16 923 to 19 168); the target was
 about 25%. No stage 2 square reaches the downtown core.
 
 ---
@@ -387,14 +390,18 @@ All numbers below were measured on the shared 4-core machine while other work wa
 (load average 2.3 to 4.7; another program's headless browser used up to 3.6 cores at times). The
 machine was never idle.
 
-**Size**: 2695 structures, 5362 props, 40 archetypes, 13 landmarks plus the landmark bridge,
-6 bridge decks, 12 districts, 10 anchors, 27 parks and plazas, and the Old Moat (section 11).
+**Size** (since phase 2, section 12): 2664 structures, 5588 props, 43 archetypes, 13 landmarks
+plus the landmark bridge, 6 bridge decks, 30 special buildings (3 per start), 12 districts, 10
+anchors, 27 parks and plazas, and the Old Moat (section 11).
 
-**Same everywhere**: city checksum (seed 9001, the game's seed) 3570529651, full checksum
-(`meridianChecksum`, which also covers streets, areas, districts and their tints) 3898350366.
-Node 22 and headless Chromium 153 compute exactly the same numbers (an esbuild bundle of the
-generator, run in both). For seed 9002 the city checksum is 485795498 and the full checksum
-3758613154. (Before the Old Moat, 14 November: 5541 props, checksums 1739170986 and 1876286051;
+**Same everywhere**: city checksum (seed 9001, the game's seed) 3115597894, full checksum
+(`meridianChecksum`, which also covers streets, areas, districts and their tints) 3365977326.
+For seed 9002 the city checksum is 1387892865 and the full checksum 973293805. (Before phase 2's
+special buildings and city weapons: 2695 structures and 5362 props, checksums 3570529651 and
+3898350366, for seed 9002 485795498 and 3758613154; Node 22 and headless Chromium 153 computed
+exactly the same numbers then, from an esbuild bundle of the generator run in both. The phase 2
+code uses only the same exact arithmetic, and the test that scans for anything else passes, but
+the Chromium run has not been repeated.) (Before the Old Moat, 14 November: 5541 props, checksums 1739170986 and 1876286051;
 for seed 9002, 2320056143 and 424900319. The moat changed nothing but the tree belt outside the
 beltway, which it replaced.) The placeholder city is unchanged: 1340881825 from both `generateCity()` and
 `getCity()`.
@@ -450,7 +457,8 @@ What this says:
 
 ## 8. Budget
 
-- **Archetypes**: 40 of 40, every one from its art file, one material each. The client draws one
+- **Archetypes**: 43 of 48 (40 until phase 2's special buildings), every one from its art file,
+  one material each. The client draws one
   instanced batch per archetype, per damage state (intact, damaged, rubble) and per material of
   its model, and only batches that have instances are drawn (`client/src/render/cityView.ts`),
   plus one draw for all falling collapse pieces. One more archetype would cost up to 3 calls.
@@ -460,7 +468,7 @@ What this says:
   with 480 pieces falling, 166 calls and 367,000 triangles. The most seen in a five-page match:
   130 calls and 462,000 triangles. Budget: 350 and 1.5 million.
 - **District tint**: free in draw calls (one color per instance, set once at load).
-- **Counts**: 2695 structures (allowed 2500 to 3200), 5541 props (4000 to 6000).
+- **Counts**: 2664 structures (allowed 2500 to 3200), 5588 props (4000 to 6000).
 
 ---
 
@@ -610,4 +618,58 @@ Green) and 138 000 (Juniper Bay) square meters, all of it reachable. The city te
 deployment on every perimeter point, no squad landing in water) pass unchanged; only the two
 checksum values were updated. `map.png` and `anchors.png` are redrawn with the moat; the other
 pictures in `docs/city/` do not show it.
+
+---
+
+## 12. The special buildings and the city weapons (14 November, phase 2, the city's simulation task)
+
+`docs/ROADMAP.md`, phase 2: special buildings in every starting neighborhood, each with a
+reward, and the city as a weapon for the hatchling. What they do in play: `docs/DESIGN.md`
+sections 4 ("The city as a weapon") and 7 ("Special buildings", "City weapons").
+
+**The special buildings** (appended to `shared/src/city/archetypes.ts`; each has a `special`
+kind; the models are the art stream's):
+
+| id | Class | Size | Hp, value | Look (model nodes) |
+|---|---|---|---|---|
+| `substation_a` | factory | 22 x 16 x 9 | 150, 15 | A fenced power substation of transformers and insulator racks; nodes `spark` at the insulator tops. |
+| `gasstation_a` | shop | 26 x 20 x 7 | 160, 15 | A gas station with its canopy over the pumps and a shop behind (a thin pole sign may rise to 10 m); nodes `light` at the pumps. |
+| `radiomast_a` | factory | 8 x 8 x 24 | 120, 15 | A red and white lattice radio mast; nodes `lamp` (red lamps) and `top`, the top 8 m section (it lies apart once the mast has fallen: the `mast` prop). |
+
+- **Where** (`shared/src/city/meridian/specials.ts`, run after the landmarks and before the
+  street fronts): for every anchor and each of the three in turn, every lot along the streets
+  near the anchor's stage 1 square (a front facing the street, at the street's clearance plus a
+  meter, plus the tall setback for the mast) is scored: best in the special's own direction
+  from the anchor (three directions a third of a turn apart, turned by the seed), about 75 m
+  out, with a jitter from the seed; then the best lots are tried in turn until one is wholly
+  inside the square (8 m in from its line), 40 to 120 m from the anchor, at least 45 m from the
+  start's other specials, clear of the streets, on dry land off parks and plazas, and 4 m from
+  any building. As built they stand 58 to 95 m from their anchors. The yard opener never takes a
+  special out (like a landmark), and `validateCity` reports a start without its three.
+- **The city weapons** (`shared/src/city/meridian/furnish.ts`, after everything else): 5 propane
+  tanks and 4 each of water tanks, antennas, fast-food signs and garage doors beside the houses
+  and shops of every start's square (a seeded shuffle of them; the signs by the shops first),
+  each at the first legal spot of a short list round its building (a tank by the side wall,
+  the water tank in the back garden, the antenna pole beside the house, the sign out front by
+  the pavement, the garage door at the side by the drive); and about one house or shop in 45
+  elsewhere gets one of the five. 230 in all. The `mast` prop kind is never placed: the top of a
+  fallen radio mast lies loose in a match instead (`world.loose`).
+
+| Prop | Radius, height | |
+|---|---|---|
+| `propane` | 1.3, 1.3 | A propane tank on its cradle, about 2.4 m long. |
+| `watertank` | 1.6, 4.5 | A water tank on short legs, 3 m across. |
+| `antenna` | 0.5, 7 | A television antenna on its pole. |
+| `foodsign` | 1.5, 7.5 | A fast-food pole sign. |
+| `garagedoor` | 1.8, 2.8 | A roll-up garage door in its frame, 3.2 m wide. |
+| `mast` | 4, 1.5 | The radio mast's 8 m top section, lying on its side. |
+
+(Each model has a node `grip` where the hand holds it.)
+
+**Measured**: checksums in section 7. Building it costs no more than before: built side by side
+in one process with the city as it was before phase 2 (taken from git), warm builds took 83 to
+109 ms against the old city's 83 to 125 ms on the same busy machine (the 41 to 61 ms of section 7
+were measured on a quieter one); a profile puts the specials' placement at about 7 ms a build.
+`meridianCold.test.ts` (the first build in a fresh process) passed. Nothing else moved: the
+streets, the landmarks and the districts are the same.
 

@@ -83,6 +83,7 @@ export function cardButton(verb: keyof KaijuActionSet): { action: ButtonAction; 
   switch (verb) {
     case 'swipe':
     case 'throw':
+    case 'club':
       return { action: 'strike', hold: false, slot: false };
     case 'grab':
     case 'eat':
@@ -142,6 +143,8 @@ export function kaijuTiles(kind: KaijuKindId): CardTile[] {
     { id: 'eat', group: 'verbs', verb: 'eat', parts: [picture('k_grab', 'dim'), then, button('grab'), picture('k_eat', 'kaiju'), picture('st_health')] },
     // Nothing to pick up, but a kiosk in reach: the grab button eats that.
     { id: 'eat-kiosk', group: 'verbs', verb: 'eat', parts: [picture('tl_kiosk', 'dim'), then, button('grab'), picture('k_eat', 'kaiju')] },
+    // Phase 2, the city as a weapon: a fast-food sign in the hand is swung (a stand-in picture until the weapon's own).
+    { id: 'club', group: 'verbs', verb: 'club', parts: [picture('k_grab', 'dim'), then, button('strike'), picture('k_swipe', 'kaiju')], stages: stagesFrom(1).filter((s) => s <= def.cityWeapons.grabStage) },
   );
   // Swimming (sim/swim.ts) has no button: walk into deep water and stand, and it goes under.
   if (def.swim) {

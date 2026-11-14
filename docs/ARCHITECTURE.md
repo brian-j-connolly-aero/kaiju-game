@@ -148,8 +148,10 @@ State (plain objects and typed arrays, cheap to snapshot):
 - `match`: phase, stage, clock, bar points and marks, winner, per-player tallies.
 - `kaijus[]`: id, controlling player, kind, stage, pos, yaw, velocity, hp, nerve, rage, action
   state machine (`idle | windup | active | recover | brace | eat | roar | special | stagger |
-  cocoon | dead | charge | stumble`, with action id and timer), held object, cooldowns, mods,
-  the moves picked at the molts (`moves`, two slots) and the molt cards on offer (`offer`);
+  cocoon | dead | charge | stumble | flinch`, with action id and timer), held object, cooldowns,
+  mods, the moves picked at the molts (`moves`, two slots) and the molt cards on offer
+  (`offer`); since phase 2 what is left of a city weapon in the hand (`clubSwings`, a sign's
+  swings; `shieldHp`, a garage door's hp) and the power surge's seconds left (`surge`);
   server-side only: `forceMolt` and `collapse` (never alone, below).
 - `squads[]`: player or bot, faction, level, 4 unit ids, driven unit id (-1 when eliminated),
   upgrades and mods, eliminated flag, its weapon pick-up (`pickup`) and the artillery radio's
@@ -165,7 +167,8 @@ State (plain objects and typed arrays, cheap to snapshot):
   `sim/nav.ts`).
 - `projectiles[]`: id, type, owner, pos, velocity, flight model (`flat | arc | thrown |
   guided`), ttl; a guided one (the missile pod) also an acceleration and `steer`, the seconds
-  of it left.
+  of it left; server-side only: a thrown city weapon's `city` (what it is, its damage
+  multipliers, and for a javelin the units it can still go through and has gone through).
 - `callIns[]`: artillery missions on their way (marker, timers, shells left, approach direction).
 - `crates[]`: the army's supply crates coming down or lying on the ground (id, kind, position,
   `fall` seconds left), `nextCrateId`; server-side only: `supply` (the stage they belong to, the
@@ -175,6 +178,12 @@ State (plain objects and typed arrays, cheap to snapshot):
   structure: 0, or 1 + the side it lies fallen toward; `cityQuery.fallen` lists those);
   `shields` (zones that reduce structure damage, Tier 2) and `insuredStructures` (landmarks
   covered by the insurance rider); server-side only: `falls` (structures on their way over).
+- `loose[]` (phase 2): city weapons lying loose, not part of the generated city: dropped from the
+  kaiju's hand, or a fallen radio mast's top (`LooseObject`: id = index, prop kind, x, z, yaw,
+  `state` 'falling' until tick `landsAt`, 'down', 'gone'). Clients learn of them from
+  `looseProp` events and from the welcome's city state.
+- `match.staticUntil` (phase 2): the humans' map shows static until this tick (a radio mast
+  fell); 0 when it never has. In the snapshot's match record.
 - Queues filled during a tick: `hits` (drained by the damage system through `applyHit`),
   `structureHits` and `propHits` (drained by the city damage system). Systems never change hp
   directly; they queue. Two things are immediate because the object must be gone at once: a
@@ -206,8 +215,36 @@ file in `systems/`, operates on `World`, and is covered by tests.
 | 11 | `matchFlow.ts` | the bar marks, hp, the clock, a cocoon that has run its time, squads all eliminated | phases, the clock, never alone (the city gives way, `forceMolt`), the end of the molt (blast wave, the kaiju's new body, intermission, a molt card drawn if none was picked, `beginStage`), the end of the match |
 | 12 | `voice.ts` | this tick's events, kaiju hp, the bar | `voice` events with the lines to play (rationed) |
 
-All twelve are implemented (the city's phase 2 systems are listed with its work); `docs/STATUS.md`
-lists what is still a stub elsewhere.
+All twelve are implemented; `docs/STATUS.md` lists what is still a stub elsewhere.
+
+The city's phase 2 work (special buildings and the city as a weapon) adds no system of its own:
+it is two modules the systems above call into, so it runs in their order.
+
+- `sim/cityWeapons.ts`: what the hatchling's hand does with a city weapon (`DESIGN.md` section 4).
+  The kaiju action system calls `updateLoose` first each tick (a fallen mast's top coming to
+  rest, loose weapons crushed underfoot at the later stages), drops one on Grab
+  (`dropToGround`), starts the club on Strike (`strikeVerb`; the swing is `clubEffect` in
+  `sim/kaijuEffects.ts`) and counts the flinch down; `kaijuEffects.ts` picks them up
+  (`canPickUp`, loose ones too: source 'loose'), arms the hand (`armHeld`) and throws them
+  (`cityThrow`); the movement system and the kaiju's blows spare them at the grab stage
+  (`sparedByKaiju`); the projectile system calls `javelinPierce` on every step of a javelin,
+  `cityWeaponImpact` instead of its own impact for a thrown city weapon, and `cityBlastAt` where
+  any other shot lands (a propane tank within 2 m goes off, in a hand too: `propaneInHand`, the
+  flinch); the damage system asks `shieldTakes` before a hit lands on a kaiju; the city damage
+  system calls `propaneDestroyed` for a propane tank among the props it destroys (fire sets it
+  off, anything else crushes it, and what that blast queues is applied there and then, so the
+  queues are empty when the tick ends).
+- `sim/systems/specials.ts`: `specialCollapsed`, called by the city damage system on the tick a
+  structure turns to rubble, before the chance of a fall; for the three special archetypes it
+  pays the reward (a surge on `kaiju.surge`; a fireball through `burst` in `cityWeapons.ts`; the
+  radio mast through the army's `startStructureFall`, away from the kaiju, its top as a loose
+  `mast` landing with it, and `match.staticUntil`). `mapStatic(world)` says whether the map is
+  static; `spotting.ts` then keeps `kaiju.known` to what units see.
+- Damage numbers: a power surge multiplies every kaiju attack's damage to units and structures
+  (`attackMult`, `surgeMult` in `kaijuEffects.ts`); the action system recovers cooldowns
+  `rewards.surge.cooldownRate` times as fast while it lasts. A `Hit` may carry `knockdown` (the
+  stun is a knock-down: `unitStunned` says so) and `exact` (the kaiju loses exactly `damage`: its
+  own propane tank in its hand).
 
 How a match runs from start to end (`systems/matchFlow.ts`; rules in `DESIGN.md` section 2):
 
@@ -416,6 +453,12 @@ option: `getCity(seed, 'placeholder')`, `npm run sim -- --city placeholder`. Bui
 Meridian takes about 210 ms of processor time the first time in a fresh process and about
 47 ms after that (Node 22, this machine).
 `stageBounds(city, anchor, stage)` gives the playable square for a stage.
+Since phase 2 every anchor's stage 1 square holds the three special buildings (archetypes with a
+`special` kind: `archetypeSpecial(id)` says which; placed by `city/meridian/specials.ts`) and a
+handful of each city weapon prop (`PropKindDef.cityWeapon`, `CITY_WEAPON_KINDS`; placed by
+`city/meridian/furnish.ts`); `validateCity(city, { specials })` checks both (on by default; pass
+`false` for the placeholder grid, which has neither). The archetype list is capped at 48 (43 now):
+the client draws one batch per archetype and damage state.
 
 Everything tunable is data in `shared/src/defs/`. Kaiju kinds, unit types, weapons and upgrades
 are registered definitions; systems read definitions and `mods`, never hardcode a kind. Adding a
@@ -575,12 +618,18 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
   `PICKUP_IDS` code, 'none' without one) and `barrages` (the artillery radio's barrages left);
   the snapshot ends with the supply crates (`crates`: id, kind, x, z and `fall`, the seconds
   until it lands, 0 once it is on the ground). A unit coming down by parachute shows as its
-  `y` (the city's own additions are listed with its work).
+  `y`. For the city's work: the match record ends with `staticUntil` (u32, the tick the humans'
+  map stops showing static); the kaiju record has a twelfth cooldown (the new verb 'club', in
+  `KAIJU_ACTION_IDS` order) and ends with `surge` (seconds left of a power surge), `clubSwings`
+  (a fast-food sign's swings left) and `shieldHp` (a garage door's hp left); the held object of
+  a city weapon is a 'prop' of its kind, as any prop is. `KAIJU_PHASES` gained 'flinch'.
 - The city state of the `welcome` (`encodeCityState`, `shared/src/net/cityState.ts`) ends,
   since phase 2, with the list of structures that lie fallen over and the side each fell
   toward; `cityStateFromWire` turns it into the `structureFall` and `fallen` of a `CityState`,
   so a client's queries count fallen buildings at once. Bytes that end before it decode as
-  nothing fallen.
+  nothing fallen. After it comes the list of city weapons lying loose (`DecodedCityState.loose`:
+  id, prop kind, x, z, yaw; what the `looseProp` events with state 'down' said), empty when the
+  bytes end before it.
 - Projectiles are **not** in snapshots. Clients spawn them from `projectileSpawn` events and fly
   them locally with the same kinematics; `projectileHit` ends them.
 - Structure changes are events (`structureStage { id, stage }` with stage 0 intact, 1 damaged,
@@ -752,8 +801,11 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
 `nerveBreak`, `crossfire`, `unitHit`, `memberLost`, `unitDestroyed`, `unitShaken`, `takeover`,
 `volley`, `roar`, `callin`, `moltAvailable`, `cocoon`, `moltBlast`, `stageChange`, `barMark`,
 `matchPhase`, `voice`, `matchEnd`, `unitStunned`, `moltOffer`, `moltPick`, `cityCollapse`,
-and since phase 2 `structureFall`, `crate` and `reinforce` (the city's own new events are listed
-with its work). Every event carries its `tick`; the payloads are defined and documented in
+and since phase 2 `structureFall`, `crate` and `reinforce` (the army's), and for the city's
+special buildings and city weapons `powerSurge`, `fireball`, `mastFall`, `looseProp`,
+`propaneBlast`, `waterSplash`, `javelinHit`, `clubSwing`, `signBroken`, `shieldHit`,
+`shieldBroken` and `kaijuFlinch`; `unitStunned` gained `knockdown` and `kaijuHeld` the source
+'loose'. Every event carries its `tick`; the payloads are defined and documented in
 `shared/src/sim/events.ts`.
 
 What clients can rely on from the squad events and the squad part of a snapshot:
