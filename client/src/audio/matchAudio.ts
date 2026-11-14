@@ -4,9 +4,10 @@
  * the local player is on (humans hear the radio, the kaiju player hears the news), and the
  * state of the fight into how much of the combat stem plays.
  *
- * Phase 2's weapons and pick-ups (the monster's city weapons and power surge, the army's crates,
- * new weapons and artillery barrages) are sounded from what the effects library has: no sound
- * was made for them (docs/STATUS.md lists the ones that are missing).
+ * Every move, weapon, crate and special building of phases 1 to 3 has a sound of its own
+ * (docs/audio/SFX.md), and an attack's sound follows the look the screens draw for it (the
+ * two-claw rake, the hop, the stumble's three falls: `attackLook`). The whooshes of the swipe,
+ * the rake, the tail and the sign are started early enough to peak as the strike comes through.
  *
  * Two rules keep it honest when the page has missed something (a hidden tab, a reconnection):
  * what should be sounding NOW is read from the frame state on every update (the beam, the
@@ -17,7 +18,9 @@
 import {
   archetypeSpecial,
   chooseVoiceLines,
+  DT,
   heldCityWeapon,
+  kaijuKindDef,
   kaijuStageDef,
   stageDef,
   TICK_RATE,
@@ -37,7 +40,9 @@ import {
   type VoiceLine,
 } from '@mb/shared';
 import type { FrameState, LocalRole } from '../net/matchSession';
+import { attackVariant } from '../render/kaijuAnimator';
 import type { AudioEngine, LoopHandle, PlayOptions } from './audioEngine';
+import { EVENT_CUES, eventLine, type EventCueId } from './eventVoice';
 
 /** What the match audio reads from the match session. */
 export interface MatchAudioSession {
@@ -73,6 +78,53 @@ const READY_GAP = 0.3;
 
 /** `arty_incoming`: the whistle swells to its end, where the shell lands (seconds). */
 export const WHISTLE_SECONDS = 1.81;
+
+/**
+ * When each whoosh is at its loudest, seconds from its start, by stage (docs/audio/SFX.md: the
+ * sound tools' SWIPE_PEAK, RAKE_PEAK, TAIL_PEAK and CLUB_PEAK). A whoosh is started that long
+ * before its strike, so that it peaks as the claws, the tail or the sign come through.
+ */
+export const WHOOSH_PEAK = {
+  swipe: [0.11, 0.17, 0.28],
+  rake: [0.13, 0.2, 0.33],
+  tail: [0.2, 0.3, 0.45],
+  club: [0.24, 0.24, 0.24],
+} as const;
+
+/** Ticks a phase of `seconds` lasts in the simulation (counted as render/kaijuView.ts counts them). */
+function phaseTicks(seconds: number): number {
+  return seconds > 0 ? Math.ceil(seconds / DT - 1e-6) : 0;
+}
+
+/**
+ * The look an attack takes (`attackVariant` in render/kaijuAnimator.ts), worked out from its
+ * event as every screen works it out, so what is heard is what is drawn: the two-claw rake (swipe
+ * look 2), the hop onto both feet (stomp look 2), the stumble's three falls. The look comes from
+ * the tick the attack began (its wind-up's, reckoned back from a later phase), for the charge from
+ * the tick its stumble began.
+ */
+export function attackLook(e: Extract<SimEvent, { type: 'kaijuAction' }>, kind: KaijuKindId): number {
+  if (e.action === 'charge') return e.phase === 'stumble' ? attackVariant('charge', e.tick, e.kaiju) : 0;
+  const timing = kaijuKindDef(kind).actions[e.action]?.timing;
+  if (!timing) return 0;
+  const start = e.phase === 'windup' || !(timing.windup > 0) ? e.tick : e.tick - phaseTicks(timing.windup);
+  return attackVariant(e.action, start, e.kaiju);
+}
+
+/**
+ * How strongly air rushes past the player's own unit at `share` of its top speed, 0 to 1: the
+ * same curve as the streaks of air drawn past its camera (`streakStrength` in render/motionFx.ts,
+ * 62% to 95% of top speed), so the wind is heard when the streaks are seen.
+ */
+export function windStrength(share: number): number {
+  const c = Math.min(1, Math.max(0, (share - 0.62) / (0.95 - 0.62)));
+  return c * c * (3 - 2 * c);
+}
+
+/** A playback rate a few percent either side of 1: the same file never lands twice the same. */
+function jitter(spread = 0.05): number {
+  return 1 + (Math.random() - 0.5) * spread;
+}
 /** At most one sound per salvo, and the machine gun's clatter no closer together than this (seconds). */
 const MG_GAP = 0.09;
 /** A shot glancing off the monster's garage door clangs no more often than this (seconds). */
@@ -142,10 +194,16 @@ export function chargeTone(
 
 /** Seconds the fire of a gas station's fireball crackles on (the picture's fire lasts as long). */
 const FIRE_SECONDS = 9;
+/** Seconds the player's own squad's crate lies untouched before the radio reminds them of it. */
+export const CRATE_REMINDER = 3;
+/** An event line (eventVoice.ts) not begun this long after its moment is not said at all. */
+const EVENT_LINE_STALE = 4;
 /** A substation hums for a player whose body is this close to it (meters). */
 const HUM_RANGE = 70;
 /** At most one burst of glass from the monster's feet in this time (seconds). */
 const GLASS_GAP = 0.15;
+/** Two pops of squashed civilians are at least this far apart (seconds). */
+const POP_GAP = 0.06;
 
 /** Effects worth having decoded before the first shot is fired (the kaiju's own are loaded per stage). */
 export const PRELOAD_SFX = [
@@ -169,6 +227,26 @@ export const PRELOAD_SFX = [
   'arty_distant',
   'takeover',
   'splash',
+  'mg_burst',
+  'bullet_hit',
+  'cannon_fire',
+  'flare_pop',
+  'supply_drop',
+  'crate_land',
+  'crate_take',
+  // Phase 2's city: the special buildings, the city weapons, buildings falling over.
+  'fireball',
+  'power_surge',
+  'propane_blast',
+  'shield_clang',
+  'club_swing',
+  'club_hit',
+  'building_groan',
+  'fire_bell',
+  // Phase 3: civilians, the roar's stun, the mast's static.
+  'civ_pop',
+  'stun_ring',
+  'radio_static',
 ];
 
 /** The music of a stage: the base stem and the combat stem. */
@@ -222,6 +300,19 @@ export class MatchAudio {
   private substations: { id: number; x: number; z: number }[] | null = null;
   private readonly fires: { loop: LoopHandle; until: number }[] = [];
   private lastGlass = -1;
+  private lastPop = -1;
+  /** The player's own tank's tracks, and the air rushing past the player at speed. */
+  private tracks: LoopHandle | null = null;
+  private wind: LoopHandle | null = null;
+  /** The player's own squad stunned by a roar: until when (the shaking comes after it), and the last ring. */
+  private stunUntil = -1;
+  private lastStun = -1;
+  private lastShaken = -1;
+  /** Event lines (eventVoice.ts): when each cue was last said here, the crates coming down for squads, the player's own lying about. */
+  private readonly eventSaid = new Map<EventCueId, number>();
+  private readonly crateFor = new Map<number, number>();
+  private readonly cratesDown = new Map<number, number>();
+  private eaten = 0;
 
   constructor(audio: AudioEngine) {
     this.audio = audio;
@@ -261,6 +352,10 @@ export class MatchAudio {
     this.result = null;
     this.sinceEnd = 0;
     this.chairSaid = false;
+    this.eventSaid.clear();
+    this.crateFor.clear();
+    this.cratesDown.clear();
+    this.eaten = 0;
     this.audio.clearVoice();
     this.audio.releaseMusic();
     this.audio.releaseVoice();
@@ -324,6 +419,20 @@ export class MatchAudio {
     }
   }
 
+  /**
+   * An event line (eventVoice.ts) for a moment the simulation sends no voice cue for: said on this
+   * side if the cue has a line for it and has not been said here within its gap. `seed` (the
+   * event's tick) picks the line, so every screen on a side says the same one.
+   */
+  private sayEvent(cue: EventCueId, seed: number): void {
+    const line = eventLine(cue, this.side(), seed);
+    if (!line) return;
+    const last = this.eventSaid.get(cue);
+    if (last !== undefined && this.time - last < EVENT_CUES[cue].gap) return;
+    this.eventSaid.set(cue, this.time);
+    this.audio.say(line, { priority: 1, radio: isRadioLine(line), staleAfter: EVENT_LINE_STALE });
+  }
+
   /** The committee chair's line for this match, once; whoever takes it says it. Null when it is gone or never came. */
   takeHearing(): VoiceLine | null {
     const line = this.hearing;
@@ -360,7 +469,19 @@ export class MatchAudio {
   }
 
   private loadKaijuSounds(kind: KaijuKindId, stage: StageId): void {
-    this.audio.preload([`kaiju_step_s${stage}`, `kaiju_swipe_s${stage}`, `kaiju_stomp_s${stage}`, `kaiju_roar_${kind}_s${stage}`]);
+    this.audio.preload([
+      `kaiju_step_s${stage}`,
+      `kaiju_swipe_s${stage}`,
+      `kaiju_stomp_s${stage}`,
+      `kaiju_roar_${kind}_s${stage}`,
+      // The attack looks and the molt cards' moves (whichever it took, any may come at once).
+      `kaiju_rake_s${stage}`,
+      `kaiju_hop_s${stage}`,
+      `kaiju_tail_s${stage}`,
+      `kaiju_charge_s${stage}`,
+      `kaiju_stumble_s${stage}`,
+      'kaiju_gulp',
+    ]);
   }
 
   /** A simulation event whose moment has come. */
@@ -380,21 +501,29 @@ export class MatchAudio {
       case 'kaijuAction': {
         const s = this.stageOf(e.kaiju);
         if (!s) break;
-        const at = { x: e.x, y: kaijuStageDef(s.k.kind, s.stage).height * 0.6, z: e.z, refDistance: REACH[s.stage] };
-        if (e.action === 'swipe' && e.phase === 'windup') a.play(`kaiju_swipe_s${s.stage}`, at);
-        else if (e.action === 'stomp' && e.phase === 'active') a.play(`kaiju_stomp_s${s.stage}`, { ...at, y: 0, refDistance: REACH[s.stage] * 1.5 });
+        const st = s.stage;
+        const at = { x: e.x, y: kaijuStageDef(s.k.kind, st).height * 0.6, z: e.z, refDistance: REACH[st] };
+        const look = attackLook(e, s.k.kind);
+        // The swipe, or both claws raked down together (look 2): two cuts, heavier.
+        if (e.action === 'swipe' && e.phase === 'windup') {
+          const rake = look === 2;
+          this.strike(e, age, rake ? `kaiju_rake_s${st}` : `kaiju_swipe_s${st}`, WHOOSH_PEAK[rake ? 'rake' : 'swipe'][st - 1], at);
+        }
+        // The stomp lands on one foot, or the hop (look 2) on both.
+        else if (e.action === 'stomp' && e.phase === 'active') a.play(look === 2 ? `kaiju_hop_s${st}` : `kaiju_stomp_s${st}`, { ...at, y: 0, refDistance: REACH[st] * 1.5 });
         else if (e.action === 'grab' && e.phase === 'windup') a.play('kaiju_grab', at);
         else if (e.action === 'throw' && e.phase === 'windup') a.play('kaiju_throw', at);
         else if (e.action === 'eat' && (e.phase === 'eat' || e.phase === 'active')) a.play('kaiju_eat', at);
         else if (e.action === 'brace' && e.phase === 'brace') a.play('kaiju_brace', at);
         else if (e.action === 'special' && e.phase === 'windup') a.play('kaiju_beam_charge', at);
         else if (e.action === 'special' && e.phase === 'special') this.startBeam(s.k, e.x, e.z);
-        // The moves a molt card gives (phase 1), on the sounds there are: the charge's run sets
-        // off with a thud and ends in a crash; the tail sweep whooshes like a swipe.
-        else if (e.action === 'charge' && (e.phase === 'charge' || e.phase === 'stumble')) a.play(`kaiju_stomp_s${s.stage}`, { ...at, y: 0, refDistance: REACH[s.stage] * (e.phase === 'stumble' ? 1.5 : 1) });
-        else if (e.action === 'tailSweep' && e.phase === 'windup') a.play(`kaiju_swipe_s${s.stage}`, at);
-        // The fast-food sign swung: a heavier whoosh than the claws'.
-        else if (e.action === 'club' && e.phase === 'windup') a.play(`kaiju_swipe_s${s.stage}`, { ...at, rate: 0.8, gain: 1.1 });
+        // The charge: it digs in and bellows as the run begins (the gallop is its footsteps, which
+        // pound harder while it runs: `step`), and the stumble it ends in is the fall drawn for it.
+        else if (e.action === 'charge' && e.phase === 'charge') a.play(`kaiju_charge_s${st}`, { ...at, refDistance: REACH[st] * 1.5, gain: 0.85 });
+        else if (e.action === 'charge' && e.phase === 'stumble') a.play(`kaiju_stumble_s${st}`, { ...at, y: 0, refDistance: REACH[st] * 1.5, variant: look });
+        else if (e.action === 'tailSweep' && e.phase === 'windup') this.strike(e, age, `kaiju_tail_s${st}`, WHOOSH_PEAK.tail[st - 1], { ...at, y: at.y * 0.4 });
+        // The fast-food sign swung (the overhead smash a little heavier).
+        else if (e.action === 'club' && e.phase === 'windup') this.strike(e, age, 'club_swing', WHOOSH_PEAK.club[st - 1], { ...at, rate: look === 2 ? 0.9 : 1 });
         if (e.action === 'special' && (e.phase === 'recover' || e.phase === 'idle')) {
           this.beam?.stop(0.4);
           this.beam = null;
@@ -441,15 +570,15 @@ export class MatchAudio {
           // a javelin thuds into what stopped it, a garage door lands with a clang.
           if (e.target === 'water') a.play('splash', at);
           else if (thrown === 'antenna' || thrown === 'mast') a.play('structure_hit', { ...at, refDistance: 25, rate: 0.85 });
-          else if (thrown === 'garagedoor') a.play('car_crush', { ...at, refDistance: 25, gain: 0.8, rate: 1.2 });
+          else if (thrown === 'garagedoor') a.play('shield_clang', { ...at, refDistance: 25, gain: 1, rate: 0.75 });
           break;
         }
         if (e.target === 'water') a.play('splash', at);
         else if (e.projectile === 'tracer') {
-          // The machine gun's rounds: a quick crack, not an explosion each.
+          // The machine gun's rounds: a chip, a ricochet or a smack, not an explosion each.
           if (this.time - this.lastCrack > MG_GAP) {
             this.lastCrack = this.time;
-            a.play('structure_hit', { ...at, refDistance: 18, gain: 0.35, rate: 1.7 });
+            a.play('bullet_hit', { ...at, refDistance: 16, gain: 0.8, rate: jitter(0.08) });
           }
         } else if (e.projectile === 'arty') a.play('explosion_l', { ...at, refDistance: 90, gain: 1.2 });
         else if (e.projectile === 'heavyShell') a.play('explosion_l', { ...at, refDistance: 45 });
@@ -461,8 +590,11 @@ export class MatchAudio {
         if (!s) break;
         const volume = s.hx * s.hz * 4 * s.height;
         const at = { x: s.x, y: s.height * 0.4, z: s.z, refDistance: 12 + Math.cbrt(volume) * 1.6 };
-        if (e.stage >= 3) a.play(volume > 30000 ? 'crumble_l' : volume > 2500 ? 'crumble_m' : 'crumble_s', at);
-        else a.play(s.cls === 'office' || s.cls === 'tower' ? 'glass' : 'structure_hit', at);
+        if (e.stage >= 3) {
+          a.play(volume > 30000 ? 'crumble_l' : volume > 2500 ? 'crumble_m' : 'crumble_s', at);
+          // A firehouse's alarm bell rings out as it comes down, and is cut short.
+          if (s.archetype.startsWith('firehouse')) a.play('fire_bell', { ...at, y: s.height * 0.7, refDistance: 30 });
+        } else a.play(s.cls === 'office' || s.cls === 'tower' ? 'glass' : 'structure_hit', at);
         break;
       }
       case 'propsDestroyed': {
@@ -484,9 +616,26 @@ export class MatchAudio {
         if (u) a.play('member_down', { x: u.x, y: 1, z: u.z, refDistance: 10, gain: 0.7 });
         break;
       }
+      case 'unitStunned': {
+        // The roar's stun on the player's own squad: the ears ring (once, however many are stunned).
+        // A knock-down (a water tank's splash, a thrown door) is heard in its own event.
+        const u = this.frame?.units[e.unit];
+        if (e.knockdown || !u || u.squad !== this.session?.role.squadId) break;
+        this.stunUntil = Math.max(this.stunUntil, this.time + e.duration);
+        if (this.time - this.lastStun > 1) {
+          this.lastStun = this.time;
+          a.play('stun_ring', { gain: 0.9 });
+        }
+        break;
+      }
       case 'unitShaken': {
         const u = this.frame?.units[e.unit];
-        if (u && u.squad === this.session?.role.squadId) a.play('shaken', { gain: 0.6 });
+        if (!u || u.squad !== this.session?.role.squadId || this.time - this.lastShaken < 0.5) break;
+        this.lastShaken = this.time;
+        // Stunned by the same roar: the shaking, and its sound, start when the stun is over.
+        const wait = this.stunUntil - this.time;
+        if (wait > 0.05) this.later(wait, 'shaken', { gain: 0.6 });
+        else a.play('shaken', { gain: 0.6 });
         break;
       }
       case 'takeover':
@@ -519,7 +668,9 @@ export class MatchAudio {
         break;
       case 'callin':
         if (e.phase === 'marked') {
-          // The radio crackles as the barrage is called (the voice says "strike inbound").
+          // The marker's smoke flare pops where the shells will land, for anyone near it, and
+          // the radio crackles as the barrage is called (the voice says "strike inbound").
+          a.play('flare_pop', { x: e.x, y: 0.5, z: e.z, refDistance: 30, gain: 0.7 });
           if (this.side() === 'humans') {
             a.play('radio_open', { gain: 0.9 });
             this.later(0.3, 'radio_close', { gain: 0.8 });
@@ -528,15 +679,20 @@ export class MatchAudio {
         break;
       // --- phase 2: the monster's city weapons and its surge ---------------------------------
       case 'powerSurge': {
+        // The substation blows, arcs leap to the monster, the district's power whines down.
         const s = this.stageOf(e.kaiju);
-        // The monster takes the substation's power: the whine climbs, arcs jump, it lets go.
-        if (s) a.play('generator_overload', { x: s.k.x, y: 5, z: s.k.z, refDistance: REACH[s.stage] * 3, gain: 1 });
+        a.play('power_surge', { x: e.x, y: 6, z: e.z, refDistance: Math.max(45, REACH[s ? s.stage : 1] * 2), gain: 0.9 });
+        this.sayEvent('power.cut', e.tick);
         this.heat = 1;
         break;
       }
+      case 'kaijuHeld':
+        // The monster takes up a garage door: the radio warns the squads to come at it from the side.
+        if (e.reason === 'grab' && heldCityWeapon(e.held) === 'garagedoor') this.sayEvent('door.shield', e.tick);
+        break;
       case 'propaneBlast':
         // A thrown tank, or one going off in the hand (one set off where it stands is the city's).
-        if (e.how === 'thrown' || e.how === 'hand') a.play('explosion_l', { x: e.x, y: e.y, z: e.z, refDistance: 30 + e.radius * 3 });
+        if (e.how === 'thrown' || e.how === 'hand') a.play('propane_blast', { x: e.x, y: e.y, z: e.z, refDistance: 30 + e.radius * 3 });
         this.heat = 1;
         break;
       case 'kaijuFlinch': {
@@ -551,8 +707,8 @@ export class MatchAudio {
         a.play('structure_hit', { x: e.x, y: e.y, z: e.z, refDistance: 20, gain: 0.9, rate: 1.2 });
         break;
       case 'clubSwing':
-        // The sign's head striking soldiers: a heavy whack.
-        if (e.units > 0) a.play('car_crush', { x: e.x, y: 2, z: e.z, refDistance: 25, gain: 0.9, rate: 0.85 });
+        // The sign's head striking soldiers: a hollow bong of sheet metal.
+        if (e.units > 0) a.play('club_hit', { x: e.x, y: 2, z: e.z, refDistance: 25, gain: 1 });
         break;
       case 'signBroken':
         a.play('prop_break', { x: e.x, y: 3, z: e.z, refDistance: 25, gain: 1 });
@@ -562,33 +718,45 @@ export class MatchAudio {
         // Shots clanging off the garage door.
         if (this.time - this.lastClang > CLANG_GAP) {
           this.lastClang = this.time;
-          a.play('car_crush', { x: e.x, y: e.y, z: e.z, refDistance: 14, gain: 0.35, rate: 1.7 });
+          a.play('shield_clang', { x: e.x, y: e.y, z: e.z, refDistance: 14, gain: 0.7, rate: jitter(0.08) });
         }
         break;
       case 'shieldBroken':
-        a.play('car_crush', { x: e.x, y: 2, z: e.z, refDistance: 25, gain: 1, rate: 0.9 });
-        a.play('glass', { x: e.x, y: 2, z: e.z, refDistance: 18, gain: 0.5 });
+        // One clang too many: the door buckles and crumples.
+        a.play('shield_clang', { x: e.x, y: 2, z: e.z, refDistance: 25, gain: 1, rate: 0.8 });
+        a.play('car_crush', { x: e.x, y: 2, z: e.z, refDistance: 25, gain: 0.7, rate: 1.1 });
         break;
       case 'mastFall':
         // The squads' radios fill with static (their map shows nothing but static).
-        if (this.side() === 'humans') {
-          a.play('radio_close', { gain: 0.9, rate: 0.8 });
-          this.later(0.25, 'radio_open', { gain: 0.8, rate: 0.7 });
-          this.later(0.6, 'radio_close', { gain: 0.7, rate: 0.9 });
-        }
+        if (this.side() === 'humans') a.play('radio_static', { gain: 0.9 });
+        this.sayEvent('mast.down', e.tick);
         break;
       // --- phase 2: the army's supply crates ---------------------------------------------------
-      case 'crate':
-        if (e.phase === 'drop') a.play('jet_flyby', { x: e.x, y: e.height, z: e.z, refDistance: 90, gain: 0.45 });
-        else if (e.phase === 'land') a.play('kaiju_step_s1', { x: e.x, y: 0, z: e.z, refDistance: 14, gain: 0.6, rate: 1.3 });
-        else if (e.phase === 'take') {
-          a.play('takeover', { x: e.x, y: 1, z: e.z, refDistance: 20, gain: 0.9 });
-          // The player's own squad hears it whatever the distance (the HUD shows what it was).
-          if (e.squad === this.session?.role.squadId) a.play('volley_ready', { gain: 0.8, rate: 1.2 });
+      case 'crate': {
+        // The plane comes over and the chute snaps open; the crate thumps down; a squad opens it.
+        // The radio tells a squad its crate is coming, and reminds it if the crate lies untouched.
+        const mine = this.session?.role.squadId ?? -1;
+        if (e.phase === 'drop') {
+          a.play('supply_drop', { x: e.x, y: e.height, z: e.z, refDistance: 90, gain: 0.5 });
+          this.crateFor.set(e.id, e.squad);
+          if (mine >= 0 && e.squad === mine) this.sayEvent('crate.drop', e.tick + e.id);
+        } else if (e.phase === 'land') {
+          a.play('crate_land', { x: e.x, y: 0, z: e.z, refDistance: 16, gain: 0.9 });
+          if (mine >= 0 && this.crateFor.get(e.id) === mine) this.cratesDown.set(e.id, this.time);
+        } else {
+          if (e.phase === 'take') {
+            // The player's own squad hears it whatever the distance (the HUD shows what it was).
+            if (e.squad === mine) a.play('crate_take', { gain: 0.9 });
+            else a.play('crate_take', { x: e.x, y: 1, z: e.z, refDistance: 20, gain: 0.8 });
+          }
+          this.crateFor.delete(e.id);
+          this.cratesDown.delete(e.id);
         }
         break;
+      }
       case 'reinforce':
-        if (e.squad === this.session?.role.squadId) a.play('jet_flyby', { gain: 0.5 });
+        // The same plane, and the reinforcements' chutes.
+        if (e.squad === this.session?.role.squadId) a.play('supply_drop', { gain: 0.55 });
         break;
       case 'matchPhase':
         if (e.phase === 'briefing') {
@@ -628,6 +796,17 @@ export class MatchAudio {
   }
 
   /**
+   * A whoosh for an attack's wind-up (`e`, heard `age` seconds after it happened), started so
+   * that its loudest moment, `peak` seconds into it, comes as the wind-up ends and the strike
+   * comes through.
+   */
+  private strike(e: Extract<SimEvent, { type: 'kaijuAction' }>, age: number, id: string, peak: number, options: PlayOptions): void {
+    const wait = e.duration - Math.max(0, age) - peak;
+    if (wait > 0.02) this.later(wait, id, options);
+    else this.audio.play(id, options);
+  }
+
+  /**
    * A shot was fired: each weapon its own sound, once per salvo (a salvo is several shots on one
    * tick). The machine gun clatters, the big cannon booms deep, the missile pod roars off, and an
    * artillery shell whistles in, its whistle timed to end where it lands.
@@ -654,24 +833,22 @@ export class MatchAudio {
     if (salvo === this.lastSalvo) return;
     this.lastSalvo = salvo;
     const at = { x: e.x, y: e.y, z: e.z, refDistance: e.projectile === 'rocket' ? 12 : 30 };
-    if (e.projectile === 'rocket') a.play('rocket_launch', at);
-    else if (e.projectile === 'shell') a.play('tank_fire', at);
-    else if (e.projectile === 'tracer') {
-      a.play('tank_fire', { ...at, refDistance: 18, gain: 0.32, rate: 2.4 });
-    } else if (e.projectile === 'heavyShell') {
-      a.play('tank_fire', { ...at, refDistance: 45, gain: 1, rate: 0.7 });
-      a.play('explosion_s', { ...at, refDistance: 30, gain: 0.5, rate: 0.7 });
-    } else if (e.projectile === 'missile') {
+    if (e.projectile === 'rocket') a.play('rocket_launch', { ...at, rate: jitter() });
+    else if (e.projectile === 'shell') a.play('tank_fire', { ...at, rate: jitter() });
+    else if (e.projectile === 'tracer') a.play('mg_burst', { ...at, refDistance: 22, gain: 0.6, rate: jitter() });
+    else if (e.projectile === 'heavyShell') a.play('cannon_fire', { ...at, refDistance: 45, gain: 1 });
+    else if (e.projectile === 'missile') {
       a.play('rocket_launch', { ...at, refDistance: 25, gain: 1, rate: 0.85 });
       this.later(0.12, 'rocket_launch', { ...at, refDistance: 25, gain: 0.8, rate: 1.05 });
     }
   }
 
   /**
-   * The city's sounds for an event (phase 2): a building falling over (it gives way, then the
-   * crash and a deep thud along its length), the gas station's fireball (the blast, then the fire
-   * crackling for as long as it burns), a propane tank set off where it stands or crushed (one
-   * thrown or in the hand is the weapons' sound), a fallen mast's top coming down.
+   * The city's sounds for an event (phase 2): a building falling over (steel and concrete
+   * groaning as it tips, then the crash and a deep thud along its length), the gas station's
+   * fireball (the whoomp and roar, then the fire crackling for as long as it burns), a propane
+   * tank set off where it stands or crushed (one thrown or in the hand is the weapons' sound), a
+   * fallen mast's top coming down.
    */
   private cityEvent(e: SimEvent): void {
     const a = this.audio;
@@ -680,7 +857,7 @@ export class MatchAudio {
         const s = this.session?.mirror.city.structures[e.id];
         const h = s ? s.height : 40;
         if (e.phase === 'falling') {
-          a.play('crumble_m', { x: e.x, y: 2, z: e.z, refDistance: 20 + h * 0.5, gain: 0.8 });
+          a.play('building_groan', { x: e.x, y: h * 0.4, z: e.z, refDistance: 20 + h * 0.5, gain: 0.7 });
           break;
         }
         const mx = (e.x + e.topX) / 2;
@@ -691,19 +868,19 @@ export class MatchAudio {
         break;
       }
       case 'fireball': {
-        a.play('explosion_l', { x: e.x, y: 4, z: e.z, refDistance: 60, gain: 1.2, rate: 0.8 });
-        a.play('explosion_m', { x: e.x, y: 4, z: e.z, refDistance: 40, gain: 0.8 });
+        a.play('fireball', { x: e.x, y: 4, z: e.z, refDistance: 60, gain: 1.2 });
         if (a.unlocked) this.fires.push({ loop: a.loop('fire_loop', { x: e.x, y: 2, z: e.z, refDistance: 25, gain: 0.9 }), until: this.time + FIRE_SECONDS });
+        this.sayEvent('gas.station', e.tick);
         break;
       }
       case 'propaneBlast':
-        // Set off where it stood by a shot, or crushed underfoot (the small bang).
-        if (e.how === 'ground') a.play('explosion_l', { x: e.x, y: e.y, z: e.z, refDistance: 30 + e.radius * 3 });
-        else if (e.how === 'crushed') a.play('explosion_s', { x: e.x, y: e.y, z: e.z, refDistance: 20 + e.radius * 3 });
+        // Set off where it stood by a shot, or crushed underfoot (the small bang: quicker, quieter).
+        if (e.how === 'ground') a.play('propane_blast', { x: e.x, y: e.y, z: e.z, refDistance: 30 + e.radius * 3 });
+        else if (e.how === 'crushed') a.play('propane_blast', { x: e.x, y: e.y, z: e.z, refDistance: 20 + e.radius * 3, gain: 0.55, rate: 1.3 });
         break;
       case 'looseProp':
-        // The mast's top section lands: a clang of steel.
-        if (e.state === 'down' && e.cause === 'mast') a.play('structure_hit', { x: e.x, y: 1, z: e.z, refDistance: 30, gain: 1, rate: 0.7 });
+        // The mast's top section lands: a heavy clang of steel.
+        if (e.state === 'down' && e.cause === 'mast') a.play('shield_clang', { x: e.x, y: 1, z: e.z, refDistance: 30, gain: 1, rate: 0.6 });
         break;
       default:
         break;
@@ -718,24 +895,63 @@ export class MatchAudio {
   }
 
   /**
-   * Once per frame, the city's lasting sounds: the engine of the player's own tank (it climbs with
-   * the speed), the hum of a power substation the player stands by, and the fires burning down.
+   * Civilians squashed (render/crowd.ts, phase 3): a soft comic pop with the cartoon puff, never
+   * a cry (four pitches, picked at random, a little more for more people).
+   */
+  squash(x: number, y: number, z: number, count: number): void {
+    if (this.time - this.lastPop < POP_GAP) return;
+    this.lastPop = this.time;
+    this.audio.play('civ_pop', { x, y, z, refDistance: 10, gain: Math.min(1, 0.6 + count * 0.08), rate: jitter(0.08) });
+  }
+
+  /**
+   * A handful of civilians gulped down at the mouth: one big comic swallow, its size the kaiju's.
+   * The news reports the creature's appetite, calmly (the monster's player hears it).
+   */
+  gulp(x: number, y: number, z: number): void {
+    const stage = this.frame?.kaijus[0]?.stage ?? 1;
+    this.audio.play('kaiju_gulp', { x, y, z, refDistance: REACH[stage] * 0.6, gain: 1.2, rate: [1.2, 1, 0.8][stage - 1] });
+    this.sayEvent('civilians.eaten', this.eaten++);
+  }
+
+  /**
+   * Once per frame, the city's lasting sounds: the engine and tracks of the player's own tank
+   * (they climb with the speed), the air rushing past the player near top speed (and past the
+   * monster in its charge), the hum of a power substation the player stands by, and the fires
+   * burning down.
    */
   private updateCity(frame: FrameState): void {
     const a = this.audio;
     const playing = frame.match.phase === 'playing';
     const u = playing ? frame.localUnit : null;
     const def = u && u.alive ? unitTypeDef(u.type) : null;
+    const share = u && def ? Math.min(1.2, Math.hypot(u.vx, u.vz) / Math.max(0.1, def.speed)) : 0;
     if (u && def && def.body === 'vehicle' && a.unlocked) {
-      const share = Math.min(1.2, Math.hypot(u.vx, u.vz) / Math.max(0.1, def.speed));
       this.engine ??= a.loop('tank_engine_loop', { x: u.x, y: 1.5, z: u.z, refDistance: 12, gain: 0.5 });
       this.engine.setPosition(u.x, 1.5, u.z);
       // From an idle to a roar at full speed: the art notes ask for 1.0 to about 1.4.
       this.engine.setRate(0.95 + 0.45 * share);
       this.engine.setGain(0.4 + 0.45 * share);
-    } else if (this.engine) {
-      this.engine.stop(0.4);
+      // The tracks clank faster with the speed, and are still at a standstill.
+      this.tracks ??= a.loop('tank_tracks_loop', { x: u.x, y: 0.5, z: u.z, refDistance: 12, gain: 0 });
+      this.tracks.setPosition(u.x, 0.5, u.z);
+      this.tracks.setRate(0.6 + 0.6 * share);
+      this.tracks.setGain(Math.min(1, share * 1.4) * 0.85);
+    } else {
+      this.engine?.stop(0.4);
       this.engine = null;
+      this.tracks?.stop(0.3);
+      this.tracks = null;
+    }
+    // Air rushing past: the player's own unit when the streaks of air show, the monster in its run.
+    const k = playing ? frame.localKaiju : null;
+    const rush = k && k.alive && k.action === 'charge' && k.phase === 'charge' ? 0.75 : u && def ? windStrength(share) : 0;
+    if (rush > 0.01 && a.unlocked) {
+      this.wind ??= a.loop('speed_wind_loop', { gain: 0 });
+      this.wind.setGain(rush * 0.85);
+    } else if (this.wind) {
+      this.wind.stop(0.5);
+      this.wind = null;
     }
     // The nearest standing substation within earshot of the player's own body hums.
     const body = frame.localKaiju ?? frame.localUnit;
@@ -756,7 +972,7 @@ export class MatchAudio {
     if (hum && a.unlocked) {
       if (!this.hum || this.humAt !== hum) {
         this.hum?.stop(0.5);
-        this.hum = a.loop('dish_beam_loop', { x: hum.x, y: 4, z: hum.z, refDistance: 10, gain: 0.35, rate: 0.6 });
+        this.hum = a.loop('substation_hum_loop', { x: hum.x, y: 4, z: hum.z, refDistance: 10, gain: 0.9 });
         this.humAt = hum;
       }
     } else if (this.hum) {
@@ -774,6 +990,11 @@ export class MatchAudio {
   private stopCity(): void {
     this.engine?.stop(0.2);
     this.engine = null;
+    this.tracks?.stop(0.2);
+    this.tracks = null;
+    this.wind?.stop(0.2);
+    this.wind = null;
+    this.stunUntil = -1;
     this.hum?.stop(0.2);
     this.hum = null;
     this.humAt = null;
@@ -782,9 +1003,10 @@ export class MatchAudio {
     this.substations = null;
   }
 
-  /** A kaiju's foot came down. */
+  /** A kaiju's foot came down. In the charge's run the feet pound: harder and a little lower, the gallop. */
   step(k: SnapKaiju): void {
-    this.audio.play(`kaiju_step_s${k.stage}`, { x: k.x, y: 0, z: k.z, refDistance: REACH[k.stage] * 0.8, gain: 0.8 });
+    const run = k.action === 'charge' && k.phase === 'charge';
+    this.audio.play(`kaiju_step_s${k.stage}`, { x: k.x, y: 0, z: k.z, refDistance: REACH[k.stage] * 0.8, gain: run ? 1.05 : 0.8, rate: (run ? 0.93 : 1) * jitter(0.04) });
   }
 
   /** The kaiju went under the water or came up (sim/swim.ts): a big splash where it is. */
@@ -872,7 +1094,7 @@ export class MatchAudio {
     if (this.surgeOff > LOOP_GRACE) {
       this.surgeOff = 0;
       if (surger && a.unlocked) {
-        this.surge = a.loop('dish_beam_loop', { x: surger.x, y: 4, z: surger.z, refDistance: REACH[surger.stage] * 1.5, gain: 0.4, rate: 1.35 });
+        this.surge = a.loop('surge_crackle_loop', { x: surger.x, y: 4, z: surger.z, refDistance: REACH[surger.stage] * 1.5, gain: 0.8 });
       } else {
         this.surge?.stop(0.6);
         this.surge = null;
@@ -880,9 +1102,15 @@ export class MatchAudio {
     }
     if (this.surge && surger) {
       this.surge.setPosition(surger.x, kaijuStageDef(surger.kind, surger.stage).height * 0.6, surger.z);
-      // It crackles: the pitch wavers, and it fades with the last seconds of the surge.
-      this.surge.setRate(1.25 + Math.sin(this.time * 23) * 0.12);
-      this.surge.setGain(0.4 * Math.min(1, surger.surge / 1.5));
+      // It crackles over the hide, and fades with the last seconds of the surge.
+      this.surge.setGain(0.8 * Math.min(1, surger.surge / 1.5));
+    }
+
+    // The player's own squad's crate, still lying where it landed: the radio reminds them once.
+    for (const [id, landed] of this.cratesDown) {
+      if (this.time - landed < CRATE_REMINDER) continue;
+      this.cratesDown.delete(id);
+      if (playing) this.sayEvent('crate.land', frame.tick + id);
     }
 
     // Sounds that were due a moment after their event.

@@ -114,6 +114,26 @@ your back and tail, every move button flashes full, and a lightning bolt in a ri
 buttons runs down until the surge is over. Meanwhile your moves come back three times as fast
 and every hit lands harder.
 
+**How your attacks look.** Each attack comes in two or three versions, picked for you, that
+look different and do exactly the same: a swipe with the right claw, the left claw or both
+claws raking down; a stomp with either foot or a hop that lands on both; the tail swept either
+way round; a throw overhand or from the side; a roar with the head thrown up or thrust low;
+three ways to stumble at the end of a charge; three swings of the fast-food sign. The start of
+each attack always looks like that attack, so the army can still read what is coming. Bright
+arcs follow your claws and your tail through a strike, and a stomping foot lands with a flash.
+
+![Both claws raking down at sunset, an orange slash trail behind each hand](progress/phase3-monster-rake.jpg)
+
+**Your stripes glow with your rage:** faint when you are calm, bright when you are full of it.
+Once you have the beam and it is ready, they throb slowly, and the army can see it. A power
+surge turns them blue-white, and they flare white-hot when you burst out of the cocoon.
+
+**People in the street.** Little people run from you, and some freeze in fright first. Anyone
+under your feet, under a stomp, in a charge or under your tail's sweep vanishes in a puff (no
+harm is shown). A grab that closes on nothing you can hold, with people in reach, comes up with
+a handful of them, and you gulp them down. People change nothing in the game: they do not heal
+you and they score nothing.
+
 ![The cards at a molt: the beam, the roar and the charge, each over the key that picks it](progress/monster-molt-cards.png)
 
 **Squad**
@@ -159,8 +179,9 @@ fills as the gun reloads.
 
 ![A tank from behind: the white crosshair where you look, the cyan sight where the gun points while the turret swings round](progress/squad-tank-reticles.png)
 
-**Supply crates.** When a stage starts, and about every half minute after that, army crates
-come down by parachute onto the streets near the squads. You can see them from far off: a crate
+**Supply crates.** When a stage starts, and every so often after that (about every half minute
+in the first stage, two or three times as often in the later ones), army crates come down by
+parachute onto the streets near the squads. You can see them from far off: a crate
 on the ground sends up a cyan column of light and cyan smoke, and the picture of what is inside
 floats over it. They show on your map too. Drive any of your units onto a crate to take it for
 your squad (anyone's squad may take any crate). Its picture pops up over your crosshair.
@@ -210,6 +231,8 @@ see.
   diamonds are volleys being charged. The orange eye in the middle of the screen means a squad
   leader can see the monster up close. The orange triangle over the monster shows only while a
   squad leader has it in plain sight; it is not there all the time.
+- **Glowing stripes on the monster:** its rage. Faint means calm, bright means full; a slow
+  throb means it has the beam and can breathe it now. Blue-white means a power surge.
 - **Spines over two waves, top middle (monster only):** you are swimming under water. Faint
   while you are going down or coming up.
 - **Yellow diamonds at the edge of the monster's screen:** squads charging a volley at it, in
@@ -228,11 +251,27 @@ see.
 - **Grey snow on the map (army):** a radio mast has fallen; the map comes back after twenty
   seconds.
 - **Subtitles:** what the radio (army) and the television news (monster) say out loud, with
-  the speaker's name. The radio calls out what is happening in the fight; the news only breaks
-  in for the big moments (the start, a landmark falling, the monster growing, the last minute,
-  the end).
+  the speaker's name. The radio calls out what is happening in the fight (and tells a squad
+  when a supply crate is coming for it); the news only breaks in for the big moments (the
+  start, a landmark falling, the monster growing, the power going out, a gas station or a
+  radio mast going down, people eaten, the last minute, the end).
 
 ## The city
+
+**Where you are.** Every district has its own roof color: terracotta on Temple Hill, slate blue
+in Bellhaven, moss green in Hollowmere, charcoal in Northgate, brick red in Easter Green, faded
+teal at the Boardwalk, soot brown in the Cinder Works, and so on, a few shades apart from house
+to house. From the monster's height you can tell the neighborhoods apart by their roofs, and the
+map paints each district's ground in the same color. Low green hills ring the city to the west,
+north and east, with the river coming down between them, and the open sea lies to the south:
+from a street they show over the rooftops and tell you which edge of the city you are near.
+They are scenery only; nothing can go there.
+
+**Where the match starts.** The neighborhoods where the monster hatches are packed close:
+narrow streets with houses, bungalows and duplexes right up to the pavement, back lanes of
+gravel lined with garages behind them (a small monster can duck behind a garage; one swipe
+flattens it), and a firehouse, a motel and a diner on the busier streets. Sight lines are
+short: a squad can slip out of view, and so can the small monster.
 
 **Special buildings.** Every place a match can start has three buildings that are worth more
 than their size, a short walk from where the monster hatches. You can tell them from far off:
@@ -241,8 +280,8 @@ than their size, a short walk from where the monster hatches. You can tell them 
   blue. Wreck it and lightning leaps from it into the monster: for eight seconds every move
   comes back three times as fast, every hit lands harder and its stripes crackle;
 - a **gas station** (a red canopy over pumps) has lights that flicker over its pumps. Wreck it
-  and it goes up in a ball of fire that burns the houses round it and throws back any soldiers
-  near it (never the monster), then burns for a while under a column of black smoke;
+  and it goes up in a rolling fireball that burns the houses round it and throws back any
+  soldiers near it (never the monster), then burns for a while under a column of black smoke;
 - a **radio mast** (red and white, with red lamps that blink) falls over away from the monster
   when it is wrecked, crushing whatever it lands on. Its top section lies at the end of it: the
   small monster can pick it up and throw it. For twenty seconds the army's map shows only static.

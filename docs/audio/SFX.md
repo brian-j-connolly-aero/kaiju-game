@@ -7,8 +7,8 @@ generators, not this file. What the game code still has to do with these sounds 
 
 ## What is here
 
-- **91 sounds, 129 variants**, each as `.ogg` (Vorbis) and `.mp3`, 44.1 kHz, in
-  `client/public/assets/audio/sfx/`. Total size 8.2 MB for both formats together.
+- **129 sounds, 195 variants**, each as `.ogg` (Vorbis) and `.mp3`, 44.1 kHz, in
+  `client/public/assets/audio/sfx/`. Total size 10.9 MB for both formats together.
 - `client/public/assets/manifest.sfx.json`: the partial manifest (section `"sfx"`). Run
   `npm run assets:manifest` to merge it into `manifest.json`.
 - Everything is synthesized from code: no samples, no recordings, nothing to license.
@@ -28,13 +28,18 @@ the same code gives the same sounds. Intermediate WAV files go to `/tmp/mb-scrat
 Source layout (`tools/audio/sfx/mbsfx/`): `dsp.py` (noise, filters, oscillators, envelopes,
 synthetic impulse responses, limiter), `parts.py` (shared building blocks: thumps, bursts,
 whooshes, debris, crackle), `kaiju.py`, `humans.py`, `world.py`, `ui.py`, `tier2.py` (one small
-function per sound), `master.py` (levels, fades, loop layout, encoding), `analyze.py` (the checks
-and pictures), `docgen.py` (this file).
+function per sound), and for phases 1 to 3 `moves.py` (the monster's moves and attack looks),
+`army.py` (the pick-up weapons, crates, tracks, the roar's stun) and `city.py` (the special
+buildings, the city weapons, civilians, air at speed); `master.py` (levels, fades, loop layout,
+encoding), `analyze.py` (the checks and pictures), `docgen.py` (this file).
 
 ## For whoever wires these into the game
 
 - **Names.** A sound marked with variants has files `<id>_1`, `<id>_2`, `<id>_3`; pick one at
-  random each time. A sound with one variant is just `<id>`. The manifest lists the paths.
+  random each time (the game never takes the same one twice running). A sound with one variant
+  is just `<id>`. The manifest lists the paths. One exception: the three variants of
+  `kaiju_stumble_s1..s3` are the three stumble looks (forward onto a knee, spinning out,
+  sitting down hard), so the game plays the one its animation shows.
 - **Levels are already mixed.** `gain` is 1 for everything: a footstep is already quieter than an
   explosion, an ambience already sits under both. Scale whole groups in the mixer, not files.
   A sound that holds for seconds sits under the voice lines: the beam loop is 3 dB quieter than
@@ -46,8 +51,10 @@ and pictures), `docgen.py` (this file).
 - **One-shots start on the first sample.** An impact is at time zero, so trigger it on the
   frame of the hit. That includes the molt blast: trigger it on the blast frame, as the cocoon
   music stops. Where a sound leads up to its moment, the "loudest at" column says how long
-  before the moment to start it: the swipes, `jet_flyby` (1.2 s), `generator_overload` (2.2 s)
-  and `relic_open` (1.9 s).
+  before the moment to start it: the swipes, the rake, the tail sweep and `club_swing` (start
+  each that long before its strike), `jet_flyby` (1.2 s), `generator_overload` (2.2 s) and
+  `relic_open` (1.9 s). `supply_drop` is heard from the moment a crate leaves the plane, so its
+  plane is overhead 0.8 s in and the parachute snaps open at 0.9 s.
 - **Loops.** A loop file is `[0.25 s lead-in][loop body][0.25 s pad]`, the same layout as the
   music. Play from the start and loop between the two times in the manifest (`loop: [start, end]`,
   in seconds). The lead-in is the end of the body faded in and the pad is its beginning, so the
@@ -57,11 +64,17 @@ and pictures), `docgen.py` (this file).
 - **Playback rate.** `kaiju_hurt` is one size of animal: play it at about 1.2, 1.0 and 0.8 for
   stages 1, 2 and 3. `laser_charge_loop` is meant to rise with the charge, from 1.0 at empty to
   1.5 at full; `volley_ready` starts on the pitch the loop has reached by then and locks a
-  fourth above it. `tank_engine_loop`, `heli_loop` and `drone_loop` speed up with the vehicle.
+  fourth above it. `tank_engine_loop`, `heli_loop` and `drone_loop` speed up with the vehicle;
+  `tank_tracks_loop` too (about 0.6 to 1.2), and it is silent at a standstill. `kaiju_gulp` is
+  one size, like `kaiju_hurt`: 1.2, 1.0 and 0.8 for the three stages. `speed_wind_loop` is not
+  positional: raise it with the speed.
 - **In tune with the music.** The three `bell` variants are three bells (D, F and A, the home
   chord of the score), so picking one at random is right and several trucks ring a chord.
   `chant_loop` is eight beats at the music's 96 beats a minute, in its key: start it on a beat
   of the stage music where that is easy. `relic_open` ends on the only major chord in the game.
+  The four `civ_pop` pitches are D, F and A (the home chord) and a low A; `fire_bell` rings on D,
+  `stun_ring` on A and F, and the hum of `substation_hum_loop` and every electric arc sits on A
+  (110 Hz), the fifth of D.
 
 ## The signature roar
 
@@ -201,12 +214,12 @@ Lengths are of the encoded files. "Loudest at" is where the sound peaks, counted
 | `kaiju_step_s1` | 3 | 0.24 to 0.26 | mono |  | 8 to 18 | Each footfall at stage 1: a heavy thud with claw ticks. |
 | `kaiju_step_s2` | 3 | 0.94 to 1.02 | mono |  | 12 to 24 | Each footfall at stage 2: a boom that cracks the road. |
 | `kaiju_step_s3` | 3 | 2.22 to 2.45 | mono |  | 21 to 116 | Each footfall at stage 3: a seismic boom with a long ground shake. |
-| `kaiju_stomp_s1` | 1 | 1.05 | mono |  | 7 | Stomp impact at stage 1: boom, ground crack and the shockwave rolling outward. |
-| `kaiju_stomp_s2` | 1 | 1.90 | mono |  | 8 | Stomp impact at stage 2: boom, ground crack and the shockwave rolling outward. |
-| `kaiju_stomp_s3` | 1 | 3.63 | mono |  | 178 | Stomp impact at stage 3: boom, ground crack and the shockwave rolling outward. |
-| `kaiju_swipe_s1` | 1 | 0.42 | mono |  | 111 | Swipe at stage 1: claws through the air. Start it about 0.11 s before the hit frame. |
-| `kaiju_swipe_s2` | 1 | 0.69 | mono |  | 186 | Swipe at stage 2: claws through the air. Start it about 0.17 s before the hit frame. |
-| `kaiju_swipe_s3` | 1 | 1.06 | mono |  | 348 | Swipe at stage 3: claws through the air. Start it about 0.28 s before the hit frame. |
+| `kaiju_stomp_s1` | 3 | 1.05 to 1.10 | mono |  | 3 to 23 | Stomp impact at stage 1 (one foot): boom, ground crack and the shockwave rolling outward. The hop that lands on both feet is kaiju_hop. |
+| `kaiju_stomp_s2` | 3 | 1.90 to 2.01 | mono |  | 7 to 54 | Stomp impact at stage 2 (one foot): boom, ground crack and the shockwave rolling outward. The hop that lands on both feet is kaiju_hop. |
+| `kaiju_stomp_s3` | 3 | 3.63 to 4.05 | mono |  | 163 to 178 | Stomp impact at stage 3 (one foot): boom, ground crack and the shockwave rolling outward. The hop that lands on both feet is kaiju_hop. |
+| `kaiju_swipe_s1` | 3 | 0.42 | mono |  | 109 to 116 | Swipe at stage 1 (one claw): claws through the air. Start it about 0.11 s before the hit frame. The two-claw rake is kaiju_rake. |
+| `kaiju_swipe_s2` | 3 | 0.69 | mono |  | 166 to 191 | Swipe at stage 2 (one claw): claws through the air. Start it about 0.17 s before the hit frame. The two-claw rake is kaiju_rake. |
+| `kaiju_swipe_s3` | 3 | 1.06 | mono |  | 314 to 360 | Swipe at stage 3 (one claw): claws through the air. Start it about 0.28 s before the hit frame. The two-claw rake is kaiju_rake. |
 | `kaiju_grab` | 1 | 0.49 | mono |  | 139 | Grab: the claw closes on a car, wreck or chunk. |
 | `kaiju_throw` | 1 | 0.85 | mono |  | 203 | Throw: the heave and the object leaving the hand. |
 | `kaiju_eat` | 1 | 1.95 | mono |  | 1057 | Eat (2 s, rooted): three crunching bites and a swallow. |
@@ -218,6 +231,22 @@ Lengths are of the encoded files. "Loudest at" is where the sound peaks, counted
 | `kaiju_heartbeat_loop` | 1 | 1.68 per pass (2.18 file) | mono | 0.25 to 1.93 |  | Cocoon (10 s): loud heartbeat, falls off with distance. Two beats per pass. |
 | `kaiju_molt_blast` | 1 | 4.04 | stereo |  | 39 | The cocoon bursts: the blast wave (led in by 0.03 s of air rushing inward), shell fragments, and the bigger animal's first breath. Trigger it on the blast frame, the instant the cocoon music stops. |
 | `kaiju_death` | 1 | 5.78 | stereo |  | 2900 | The kaiju dies: the roar breaks up as it sinks, then the body hits the ground. |
+| `kaiju_rake_s1` | 1 | 0.57 | mono |  | 174 | The two-claw rake at stage 1 (swipe look 2): two cuts a moment apart, heavier than the swipe. Start it about 0.13 s before the strike. |
+| `kaiju_rake_s2` | 1 | 0.93 | mono |  | 310 | The two-claw rake at stage 2 (swipe look 2): two cuts a moment apart, heavier than the swipe. Start it about 0.20 s before the strike. |
+| `kaiju_rake_s3` | 1 | 1.39 | mono |  | 438 | The two-claw rake at stage 3 (swipe look 2): two cuts a moment apart, heavier than the swipe. Start it about 0.33 s before the strike. |
+| `kaiju_hop_s1` | 1 | 1.24 | mono |  | 73 | The stomp's hop at stage 1 (stomp look 2): landing on both feet, two booms a moment apart. Play it as the stomp lands. |
+| `kaiju_hop_s2` | 1 | 2.25 | mono |  | 98 | The stomp's hop at stage 2 (stomp look 2): landing on both feet, two booms a moment apart. Play it as the stomp lands. |
+| `kaiju_hop_s3` | 1 | 3.95 | mono |  | 128 | The stomp's hop at stage 3 (stomp look 2): landing on both feet, two booms a moment apart. Play it as the stomp lands. |
+| `kaiju_tail_s1` | 1 | 0.62 | mono |  | 215 | The tail sweep at stage 1: a deep sweep of air with a whip-crack at the tip. Start it about 0.20 s before the strike. |
+| `kaiju_tail_s2` | 1 | 0.95 | mono |  | 318 | The tail sweep at stage 2: a deep sweep of air with a whip-crack at the tip. Start it about 0.30 s before the strike. |
+| `kaiju_tail_s3` | 1 | 1.46 | mono |  | 473 | The tail sweep at stage 3: a deep sweep of air with a whip-crack at the tip. Start it about 0.45 s before the strike. |
+| `kaiju_charge_s1` | 1 | 1.68 | mono |  | 15 | The charge at stage 1, as the run begins: feet digging in, a bellow, a rush of air. |
+| `kaiju_charge_s2` | 1 | 2.76 | mono |  | 11 | The charge at stage 2, as the run begins: feet digging in, a bellow, a rush of air. |
+| `kaiju_charge_s3` | 1 | 4.30 | mono |  | 1445 | The charge at stage 3, as the run begins: feet digging in, a bellow, a rush of air. |
+| `kaiju_stumble_s1` | 3 | 1.13 to 1.38 | mono |  | 309 to 412 | The stumble that ends a charge at stage 1. Not picked at random: variant 1 is the look pitching forward onto a knee, 2 spinning out to the side, 3 sitting down hard on its tail. The fall lands about 0.3 s in. |
+| `kaiju_stumble_s2` | 3 | 1.79 to 2.38 | mono |  | 461 to 514 | The stumble that ends a charge at stage 2. Not picked at random: variant 1 is the look pitching forward onto a knee, 2 spinning out to the side, 3 sitting down hard on its tail. The fall lands about 0.3 s in. |
+| `kaiju_stumble_s3` | 3 | 2.86 to 3.72 | mono |  | 508 to 1023 | The stumble that ends a charge at stage 3. Not picked at random: variant 1 is the look pitching forward onto a knee, 2 spinning out to the side, 3 sitting down hard on its tail. The fall lands about 0.3 s in. |
+| `kaiju_gulp` | 1 | 0.49 | mono |  | 112 | A handful of civilians gulped down (the puff at the mouth): the jaws close, one big comic swallow and a little bubble. One size: play it at about 1.2, 1.0 and 0.8 for stages 1, 2 and 3. |
 
 ### Humans
 
@@ -237,6 +266,15 @@ Lengths are of the encoded files. "Loudest at" is where the sound peaks, counted
 | `member_down` | 3 | 0.31 to 0.40 | mono |  | 4 to 8 | A unit loses a member (a soldier or one tank of a troop): dull hit, kit clattering, a short falling tone. |
 | `shaken` | 1 | 0.95 | mono |  | 98 | A unit's nerve breaks (shaken for 4 s): a wavering, sinking tone with a rattle under it. |
 | `takeover` | 1 | 0.62 | mono |  | 158 | The player takes over a surviving sub-unit: swish, click, two rising notes. |
+| `mg_burst` | 3 | 0.80 to 0.86 | mono |  | 3 to 4 | The machine gun pick-up fires: a short burst of three or four rounds and the brass tinkling down. One per trigger pull; a held trigger makes a long rattle of them. |
+| `bullet_hit` | 3 | 0.32 to 0.34 | mono |  | 2 to 3 | A machine-gun round lands: a chip off concrete, a ricochet whining away, or a dull smack into hide or earth. Picked at random. |
+| `cannon_fire` | 2 | 1.81 to 1.86 | mono |  | 73 to 140 | The big cannon pick-up fires: a deeper boom than the tank gun, a long ring of the barrel and the report rolling round the streets. |
+| `tank_tracks_loop` | 1 | 2 per pass (2.50 file) | mono | 0.25 to 2.25 |  | A tank's tracks on the move (positional, under tank_engine_loop): links clanking over the sprockets, the road wheels rumbling, a squeal now and then. Silent at a standstill: raise level and rate with speed (rate about 0.6 slow to 1.3 at full speed). |
+| `supply_drop` | 1 | 5.67 | mono |  | 901 | A supply plane drops a crate or reinforcements: four propellers droning over and away, and a parachute snapping open 0.9 s in. The game hears of a drop only as the crate leaves the plane, so the plane is overhead almost at once. |
+| `crate_land` | 1 | 0.98 | mono |  | 7 | A supply crate lands: a heavy wooden thump, the kit inside knocking, a creak, the parachute settling over it. |
+| `crate_take` | 1 | 0.52 | mono |  | 422 | A squad takes a crate: two latches snap open, the lid knocks back, and what was inside is racked ready. |
+| `flare_pop` | 1 | 2.41 | mono |  | 4 | An artillery barrage is called: the marker's smoke flare pops and fizzes where the shells will land. |
+| `stun_ring` | 1 | 2.61 | mono |  | 67 | The player's own squad is stunned by the roar (2.5 s): the ears ring and the world wobbles and thuds, muffled. Not positional; once per stun, however many of the squad are stunned. |
 
 ### World
 
@@ -260,6 +298,18 @@ Lengths are of the encoded files. "Loudest at" is where the sound peaks, counted
 | `amb_sunset_loop` | 1 | 16 per pass (16.50 file) | stereo | 0.25 to 16.25 |  | Stage 2 ambience (sunset): thinner traffic, evening wind off the bay, a far foghorn, the first crickets. |
 | `amb_night_loop` | 1 | 16 per pass (16.50 file) | stereo | 0.25 to 16.25 |  | Stage 3 ambience (night): crickets, a low electric city hum, far wind. |
 | `wind_high_loop` | 1 | 10 per pass (10.50 file) | stereo | 0.25 to 10.25 |  | High-altitude wind for the stage 3 kaiju's head height and the pulled-back camera. |
+| `fireball` | 1 | 4.26 | mono |  | 37 | A gas station goes up: a deep rolling whoomp, a roar of flame swelling and dying into crackle (about 3 s). fire_loop carries the fire on after it. |
+| `propane_blast` | 1 | 2.36 | mono |  | 30 | A propane tank goes off: the bang of the tank bursting and a short roar of burning gas. Crushed underfoot it is the small bang: play it faster and quieter. |
+| `building_groan` | 1 | 3.42 | mono |  | 1466 | A tall building tips over (the 2 s of its fall): steel groaning as it bends, concrete cracking, a rumble building. The crash as it lands is crumble_l. |
+| `fire_bell` | 1 | 1.84 | mono |  | 945 | A firehouse comes down: its alarm bell clangs, then is cut short as the building falls on it. |
+| `substation_hum_loop` | 1 | 4 per pass (4.50 file) | mono | 0.25 to 4.25 |  | A power substation still standing (positional): the transformers' deep hum, the buzz of the lines and, now and then, the crackle of a spark jumping. |
+| `power_surge` | 1 | 3.38 | mono |  | 3 | The monster wrecks a power substation and takes its power: the transformer blows with a crack, arcs leap to the monster for a second and a half, then the district's power whines down. |
+| `surge_crackle_loop` | 1 | 2 per pass (2.50 file) | mono | 0.25 to 2.25 |  | The monster in a power surge (positional, while it lasts): electricity crackling over its hide and stripes. |
+| `shield_clang` | 3 | 0.42 to 0.51 | mono |  | 4 to 7 | A shot glances off the garage door the monster holds as a shield: a clang and the slats rattling. The same door thrown and landing, or the radio mast's top coming down: play it lower. |
+| `club_swing` | 1 | 0.78 | mono |  | 246 | The hatchling swings the fast-food sign: a big flat board pushing through the air, flapping as it goes. Start it about 0.24 s before the strike. |
+| `club_hit` | 1 | 0.76 | mono |  | 8 | The fast-food sign strikes soldiers: a hollow, wobbling bong of sheet metal and the crack of its plastic face. |
+| `civ_pop` | 4 | 0.12 to 0.16 | mono |  | 3 to 3 | Civilians squashed under the monster (a cartoon puff): a soft comic pop, a bubble bursting with a breath of air, never a cry. Four pitches, all in the music's key. |
+| `speed_wind_loop` | 1 | 4 per pass (4.50 file) | stereo | 0.25 to 4.25 |  | Air rushing past at speed: the player's own tank or soldier near its top speed, the monster in its charge. Not positional: raise it with the speed. |
 
 ### Interface and stings
 
@@ -281,6 +331,7 @@ Lengths are of the encoded files. "Loudest at" is where the sound peaks, counted
 | `sting_bar_mark` | 1 | 1.46 | stereo |  | 337 | The destruction bar passes a mark (a tower on the skyline falls): two heavy low brass hits and a bell. |
 | `sting_molt_ready` | 1 | 2.00 | stereo |  | 10 | A molt is available to the kaiju: a double heartbeat and an eerie rising shimmer. |
 | `camera_shutter` | 1 | 0.12 | mono |  | 12 | A reporter drone takes a photo: shutter open, mirror slap, shutter closed. |
+| `radio_static` | 1 | 1.41 | mono |  | 11 | The radio mast falls: the squads' radios fill with harsh static and a falling whine, and break up (their maps go to static at the same moment). |
 
 ### Tier 2: three more kaiju, three more factions
 
@@ -317,7 +368,7 @@ Checked on every file, in both formats:
 
 - **Peak** below -1 dB full scale (worst file: -1.27 dB, `unit_destroyed_2.ogg`).
 - **Loudness** within 1.5 dB of the sound's target, and variants of one sound within 1 dB of
-  each other (largest spread: 0.14 dB, `car_crush`). Loudness is measured
+  each other (largest spread: 0.32 dB, `bullet_hit`). Loudness is measured
   with the broadcast loudness weighting (K-weighting) over the loudest 200 ms of a one-shot, or
   over a whole pass of a loop.
 - **No DC offset** (largest: 0.00079 of full scale).
@@ -338,12 +389,27 @@ Compared within families (average of the variants, `.ogg`):
 | step | `kaiju_step_s1` | 0.25 | 349 | -22.6 |
 |  | `kaiju_step_s2` | 0.97 | 195 | -19.1 |
 |  | `kaiju_step_s3` | 2.31 | 147 | -16.6 |
-| swipe | `kaiju_swipe_s1` | 0.42 | 3031 | -22.3 |
-|  | `kaiju_swipe_s2` | 0.69 | 1432 | -19.3 |
-|  | `kaiju_swipe_s3` | 1.06 | 582 | -16.1 |
-| stomp | `kaiju_stomp_s1` | 1.05 | 372 | -16.5 |
-|  | `kaiju_stomp_s2` | 1.90 | 220 | -15.1 |
-|  | `kaiju_stomp_s3` | 3.63 | 165 | -12.5 |
+| swipe | `kaiju_swipe_s1` | 0.42 | 2991 | -22.3 |
+|  | `kaiju_swipe_s2` | 0.69 | 1389 | -19.2 |
+|  | `kaiju_swipe_s3` | 1.06 | 562 | -16.1 |
+| stomp | `kaiju_stomp_s1` | 1.08 | 373 | -16.5 |
+|  | `kaiju_stomp_s2` | 1.95 | 230 | -15.1 |
+|  | `kaiju_stomp_s3` | 3.86 | 171 | -12.6 |
+| rake | `kaiju_rake_s1` | 0.57 | 3022 | -20.8 |
+|  | `kaiju_rake_s2` | 0.93 | 1080 | -17.7 |
+|  | `kaiju_rake_s3` | 1.39 | 362 | -14.6 |
+| hop | `kaiju_hop_s1` | 1.24 | 331 | -16.1 |
+|  | `kaiju_hop_s2` | 2.25 | 172 | -14.6 |
+|  | `kaiju_hop_s3` | 3.95 | 154 | -12.2 |
+| tail | `kaiju_tail_s1` | 0.62 | 1493 | -21.2 |
+|  | `kaiju_tail_s2` | 0.95 | 647 | -18.1 |
+|  | `kaiju_tail_s3` | 1.46 | 278 | -15.1 |
+| charge | `kaiju_charge_s1` | 1.68 | 1180 | -15.6 |
+|  | `kaiju_charge_s2` | 2.76 | 704 | -14.1 |
+|  | `kaiju_charge_s3` | 4.30 | 466 | -12.7 |
+| stumble | `kaiju_stumble_s1` | 1.29 | 499 | -16.6 |
+|  | `kaiju_stumble_s2` | 2.08 | 306 | -15.1 |
+|  | `kaiju_stumble_s3` | 3.22 | 213 | -13.0 |
 | roar | `kaiju_roar_lizard_s1` | 1.67 | 1625 | -15.2 |
 |  | `kaiju_roar_lizard_s2` | 3.25 | 1093 | -13.7 |
 |  | `kaiju_roar_lizard_s3` | 5.31 | 866 | -12.2 |
@@ -402,6 +468,14 @@ Loops, measured across the loop point as the game will play them:
 | `kaiju_beam_loop` | mp3 | 0.23 | +0.3 | -15 | -18 |
 | `kaiju_heartbeat_loop` | ogg | 0.00 | -0.1 | -26 | -30 |
 | `kaiju_heartbeat_loop` | mp3 | 0.02 | +0.0 | -53 | -56 |
+| `tank_tracks_loop` | ogg | 0.26 | +0.0 | -30 | -32 |
+| `tank_tracks_loop` | mp3 | 0.18 | +0.0 | -41 | -40 |
+| `substation_hum_loop` | ogg | 0.03 | +0.0 | -20 | -22 |
+| `substation_hum_loop` | mp3 | 0.10 | -0.0 | -26 | -29 |
+| `surge_crackle_loop` | ogg | 0.19 | +0.3 | -7 | -10 |
+| `surge_crackle_loop` | mp3 | 0.08 | +0.5 | -16 | -19 |
+| `speed_wind_loop` | ogg | 1.24 | +0.0 | -11 | -13 |
+| `speed_wind_loop` | mp3 | 0.39 | +0.1 | -17 | -20 |
 | `burrow_loop` | ogg | 0.79 | -0.1 | -21 | -24 |
 | `burrow_loop` | mp3 | 0.24 | +0.0 | -55 | -57 |
 | `drone_loop` | ogg | 0.09 | +0.1 | -15 | -18 |
@@ -432,9 +506,13 @@ Pictures (decoded `.ogg` unless marked):
 - `docs/audio/sfx/roar_contour_moth.png`
 - `docs/audio/sfx/sheet_humans_1.png`
 - `docs/audio/sfx/sheet_humans_2.png`
+- `docs/audio/sfx/sheet_humans_3.png`
 - `docs/audio/sfx/sheet_kaiju_1.png`
 - `docs/audio/sfx/sheet_kaiju_2.png`
 - `docs/audio/sfx/sheet_kaiju_3.png`
+- `docs/audio/sfx/sheet_kaiju_4.png`
+- `docs/audio/sfx/sheet_kaiju_5.png`
+- `docs/audio/sfx/sheet_kaiju_6.png`
 - `docs/audio/sfx/sheet_tier2_1.png`
 - `docs/audio/sfx/sheet_tier2_2.png`
 - `docs/audio/sfx/sheet_ui_1.png`
@@ -443,6 +521,7 @@ Pictures (decoded `.ogg` unless marked):
 - `docs/audio/sfx/sheet_world_2.png`
 - `docs/audio/sfx/sheet_world_3.png`
 - `docs/audio/sfx/sheet_world_4.png`
+- `docs/audio/sfx/sheet_world_5.png`
 
 ## Known limits
 
@@ -450,7 +529,8 @@ Pictures (decoded `.ogg` unless marked):
 - Large impacts (stage 3 steps and stomps, large explosions, tank guns) carry most of their energy below 120 Hz. They are built with harmonics and a noisy mid layer so they still read on laptop speakers, but they will be noticeably thinner there than on headphones.
 - `crowd_panic_loop` is a cloud of synthetic vowel sounds. It reads as a distant crowd in a spectrogram; up close it may sound like a choir warming up. Keep it low in the mix.
 - Ambience loops are 16 s long. The bird phrases and the far foghorn (sunset) repeat every pass; if that becomes noticeable, play them quieter or generate longer loops (one number in `world.py`).
-- The hurt, stagger and death sounds exist at one size. The roar is the only utterance with a version per stage.
+- The hurt, stagger and death sounds exist at one size. The roar is the only utterance with a version per stage, with the charge's bellow and the stumble's grunts (phases 1 to 3).
+- The sounds of phases 1 to 3 (`moves.py`, `army.py`, `city.py`) were made to replace sounds the game had borrowed from other events. Their in-game levels were set against the sounds they sit beside (the stomp, the swipe, the explosions, a tank shot) in offline renders of the game's own mixer, not by ear (docs/STATUS.md, the phase 3 sound section). The building's groan, the power surge and the fire bell are the furthest from anything recorded: listen to those first.
 - The Tier 2 sounds were made from the design text, before the kaiju and units that use them exist in the game. Expect to adjust levels and lead times when they are wired in. The Crab, the Burrower and the Moth have a roar each and nothing else of their own yet: their hurt, stagger and death sounds are still the Lizard's.
 - `chant_loop` and the voices in `relic_open` are synthetic singers on open vowels, with no words. Like the crowd, they read as a choir in a spectrogram and may sound like an organ stop up close.
 - At stage 3 the Crab's and the Burrower's roars are dark sounds held at the same loudness as the others, which leaves their peaks little room: the limiter takes up to 4.0 dB off the loudest moments (`kaiju_roar_burrower_s3`, `kaiju_roar_crab_s3`). The pulses of those roars are a little flatter than designed; nothing clips.

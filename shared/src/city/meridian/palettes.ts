@@ -54,7 +54,15 @@ export type PaletteId =
   | 'harborVillage'
   | 'boardwalk'
   | 'beachVillage'
-  | 'fairground';
+  | 'fairground'
+  | 'suburbTight'
+  | 'gardenSuburbTight'
+  | 'oldSuburbTight'
+  | 'templeSlopeTight'
+  | 'rowhousesTight'
+  | 'workerRowsTight'
+  | 'harborVillageTight'
+  | 'beachVillageTight';
 
 export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
   // The tower cluster. The generator overrides the pick near the very center (tallest there).
@@ -228,6 +236,8 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
       { a: 'house_b', far: 4 },
       { a: 'house_c', far: 3 },
       { a: 'shop_a', far: 0.8 },
+      { a: 'bungalow_a', far: 1.5 },
+      { a: 'duplex_a', far: 1 },
     ],
     setback: 3,
     gap: [5, 9],
@@ -240,6 +250,8 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
       { a: 'house_b', far: 5 },
       { a: 'house_a', far: 3 },
       { a: 'shop_a', far: 0.7 },
+      { a: 'bungalow_a', far: 1.5 },
+      { a: 'duplex_a', far: 1 },
     ],
     setback: 4,
     gap: [6, 10],
@@ -254,6 +266,7 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
       { a: 'rowhouse_a', far: 1.5 },
       { a: 'shop_a', far: 1.2 },
       { a: 'shop_b', far: 0.5 },
+      { a: 'duplex_a', far: 1.2 },
     ],
     setback: 2,
     gap: [3.5, 7],
@@ -365,6 +378,7 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
       { a: 'house_a', far: 2.5 },
       { a: 'shop_a', far: 1.3 },
       { a: 'shop_b', far: 0.6 },
+      { a: 'bungalow_a', far: 1.5 },
     ],
     setback: 0.5,
     gap: [2.5, 6],
@@ -392,6 +406,7 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
       { a: 'house_a', far: 2 },
       { a: 'pavilion_a', far: 1.4 },
       { a: 'shop_a', far: 1.2 },
+      { a: 'bungalow_a', far: 2 },
     ],
     setback: 1.5,
     gap: [3.5, 7],
@@ -413,7 +428,138 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
     alleyEvery: 0,
     alley: 0,
   },
+
+  // --- Phase 3: the stage 1 square of every start (layout.ts `tight`), packed close. Each start
+  // keeps its own flavor, with the bungalow and the duplex among its houses, front gardens of a
+  // step or two, side gaps of a few meters and every few houses a passage through to the gardens
+  // and the back lane (`alley`). The diner, the motel and the firehouse are placed apart, on the
+  // busier streets (starts.ts); the garages line the back lanes (lanes.ts).
+  suburbTight: {
+    items: [
+      { a: 'house_a', far: 3 },
+      { a: 'house_b', far: 3 },
+      { a: 'bungalow_a', far: 3 },
+      { a: 'duplex_a', far: 2 },
+      { a: 'house_c', far: 2 },
+      { a: 'shop_a', far: 0.7 },
+    ],
+    setback: 0.5,
+    gap: [1.5, 3.5],
+    keep: 0.94,
+    alleyEvery: 5,
+    alley: 12,
+  },
+  gardenSuburbTight: {
+    items: [
+      { a: 'house_b', far: 4 },
+      { a: 'house_a', far: 2 },
+      { a: 'bungalow_a', far: 3 },
+      { a: 'duplex_a', far: 2.5 },
+      { a: 'shop_a', far: 0.6 },
+    ],
+    setback: 0.5,
+    gap: [1.25, 3],
+    keep: 0.94,
+    alleyEvery: 5,
+    alley: 12,
+  },
+  oldSuburbTight: {
+    items: [
+      { a: 'house_a', far: 4 },
+      { a: 'duplex_a', far: 3 },
+      { a: 'house_c', far: 2 },
+      { a: 'bungalow_a', far: 1.5 },
+      { a: 'rowhouse_a', far: 1.5 },
+      { a: 'shop_a', far: 1 },
+      { a: 'shop_b', far: 0.5 },
+    ],
+    setback: 0.5,
+    gap: [1.25, 3],
+    keep: 0.94,
+    alleyEvery: 5,
+    alley: 12,
+  },
+  templeSlopeTight: {
+    items: [
+      { a: 'house_b', far: 4 },
+      { a: 'house_a', far: 2 },
+      { a: 'bungalow_a', far: 2.5 },
+      { a: 'duplex_a', far: 1.5 },
+      { a: 'shrine_a', far: 1 },
+      { a: 'shop_a', far: 0.8 },
+    ],
+    setback: 0.5,
+    gap: [1.5, 3.5],
+    keep: 0.94,
+    alleyEvery: 5,
+    alley: 12,
+  },
+  rowhousesTight: {
+    items: [
+      { a: 'rowhouse_a', far: 2.5 },
+      { a: 'duplex_a', far: 2 },
+      { a: 'house_c', far: 3 },
+      { a: 'bungalow_a', far: 1.5 },
+      { a: 'shop_a', far: 0.8 },
+      { a: 'shop_b', far: 0.4 },
+    ],
+    setback: 0.5,
+    gap: [1, 2],
+    keep: 0.92,
+    alleyEvery: 4,
+    alley: 12,
+  },
+  workerRowsTight: {
+    items: [
+      { a: 'rowhouse_a', far: 2.5 },
+      { a: 'house_c', far: 3.5 },
+      { a: 'duplex_a', far: 1.5 },
+      { a: 'bungalow_a', far: 2 },
+      { a: 'shop_a', far: 1 },
+    ],
+    setback: 0,
+    gap: [1, 2.5],
+    keep: 0.92,
+    alleyEvery: 4,
+    alley: 12,
+  },
+  harborVillageTight: {
+    items: [
+      { a: 'house_c', far: 5 },
+      { a: 'bungalow_a', far: 3 },
+      { a: 'house_a', far: 1.5 },
+      { a: 'duplex_a', far: 1 },
+      { a: 'shop_a', far: 1.1 },
+      { a: 'shop_b', far: 0.5 },
+    ],
+    setback: 0.5,
+    gap: [1.25, 3],
+    keep: 0.94,
+    alleyEvery: 5,
+    alley: 12,
+  },
+  beachVillageTight: {
+    items: [
+      { a: 'house_c', far: 4 },
+      { a: 'bungalow_a', far: 3 },
+      { a: 'house_a', far: 1.5 },
+      { a: 'pavilion_a', far: 0.8 },
+      { a: 'shop_a', far: 1 },
+    ],
+    setback: 0.5,
+    gap: [1.25, 3],
+    keep: 0.94,
+    alleyEvery: 5,
+    alley: 12,
+  },
 };
+
+/**
+ * The garages along a back lane (lanes.ts), doors to the lane: their side gaps, the chance that a
+ * lot is built, and after every `every` garages a passage `passage` meters wide through to the
+ * gardens behind (so no garden is walled in).
+ */
+export const LANE_ROW = { a: 'garage_a', setback: 0.25, gap: [1, 2.5] as const, keep: 0.75, every: 4, passage: 12 };
 
 /** Buildings scattered in the yards behind the street fronts. */
 export interface Infill {
@@ -501,6 +647,7 @@ export const INFILLS: Readonly<Record<InfillId, Infill>> = {
     items: [
       { a: 'house_c', far: 3 },
       { a: 'house_a', far: 1 },
+      { a: 'garage_a', far: 1 },
     ],
     step: 21,
     keep: 0.6,

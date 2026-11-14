@@ -46,7 +46,9 @@ TONES = {
 }
 
 # District color families (CITY_ART.md section 3). "walls": tint colors a building of that
-# district may take; "roof": its roof region; "accent": awnings, doors, trim.
+# district may take; "roof": the roof pattern its buildings use (on ordinary buildings the kit
+# draws it in light grey and the game paints it in the district's roof color, District.roof in
+# the city data: kit.GREY_ROOFS); "accent": awnings, doors, trim.
 DISTRICTS = {
     "suburb":     dict(walls=["cream", "salmon", "sky", "mint", "peach", "lime", "white", "lilac"],
                        roof="tile_red", accent=["#d7263d", "#2f62c9", "#3fa652"]),
@@ -64,6 +66,21 @@ DISTRICTS = {
                        roof="tile_slate", accent=["#c5553d", "#2f7fd6", "#e3b23c"]),
     "boardwalk":  dict(walls=["white", "seafoam", "peach", "sky", "rose"],
                        roof="tile_slate", accent=["#d7263d", "#2f7fd6", "#f2a48b"]),
+}
+
+# The special buildings of phase 2 (tools/art/city_special.py).
+SPECIAL = {"substation_a", "gasstation_a", "radiomast_a"}
+# Ordinary archetypes whose roofs keep the art's own colors (no roof mask: kit.roof_masked), and
+# why. Landmarks and bridges never take a roof color either.
+OWN_ROOFS = {
+    "substation_a": "a special building: its look is the picture of its reward",
+    "gasstation_a": "a special building: its look is the picture of its reward",
+    "radiomast_a": "a special building: its look is the picture of its reward",
+    "tank_a": "a storage tank: its lid is the tank's own painted steel",
+    "tower_c": "its slanted roof is dark glass, part of the facade",
+    "pavilion_a": "its roof is a striped canvas tent, painted like the awnings",
+    "crane_a": "a harbor crane: no roof",
+    "container_a": "a container stack: no roof",
 }
 
 RUBBLE = ["#8d8d94", "#9a9aa1", "#7b7b82", "#a6a6ac"]   # the anchor and three neighbors

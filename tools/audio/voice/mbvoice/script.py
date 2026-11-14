@@ -1,4 +1,5 @@
-"""Loads the voice script (shared/src/defs/voiceLines.json, read-only here) and the
+"""Loads the voice script (shared/src/defs/voiceLines.json, read-only here; then the lines the
+client says for the events of phases 2 and 3, client/src/audio/eventLines.json) and the
 pronunciation respellings (pronounce.json)."""
 
 from __future__ import annotations
@@ -6,17 +7,21 @@ from __future__ import annotations
 import json
 import re
 
-from . import SCRIPT_JSON, VOICE_DIR
+from . import EVENT_JSON, SCRIPT_JSON, VOICE_DIR
 
 PRONOUNCE_JSON = VOICE_DIR / "pronounce.json"
 CAST_JSON = VOICE_DIR / "cast.json"
 
 
 def load_lines() -> list[dict]:
+    """The whole script: the simulation's lines, then the client's event lines. Both are built,
+    measured and documented the same way; their ids share one name space (the sound files)."""
     lines = json.loads(SCRIPT_JSON.read_text())
+    if EVENT_JSON.exists():
+        lines = lines + json.loads(EVENT_JSON.read_text())
     ids = [l["id"] for l in lines]
     if len(set(ids)) != len(ids):
-        raise SystemExit("voiceLines.json has duplicate ids")
+        raise SystemExit("voiceLines.json and eventLines.json have duplicate ids")
     return lines
 
 

@@ -304,37 +304,49 @@
     },
     "kaiju_stomp_s1": {
       "variants": [
-        "audio/sfx/kaiju_stomp_s1"
+        "audio/sfx/kaiju_stomp_s1_1",
+        "audio/sfx/kaiju_stomp_s1_2",
+        "audio/sfx/kaiju_stomp_s1_3"
       ],
       "gain": 1
     },
     "kaiju_stomp_s2": {
       "variants": [
-        "audio/sfx/kaiju_stomp_s2"
+        "audio/sfx/kaiju_stomp_s2_1",
+        "audio/sfx/kaiju_stomp_s2_2",
+        "audio/sfx/kaiju_stomp_s2_3"
       ],
       "gain": 1
     },
     "kaiju_stomp_s3": {
       "variants": [
-        "audio/sfx/kaiju_stomp_s3"
+        "audio/sfx/kaiju_stomp_s3_1",
+        "audio/sfx/kaiju_stomp_s3_2",
+        "audio/sfx/kaiju_stomp_s3_3"
       ],
       "gain": 1
     },
     "kaiju_swipe_s1": {
       "variants": [
-        "audio/sfx/kaiju_swipe_s1"
+        "audio/sfx/kaiju_swipe_s1_1",
+        "audio/sfx/kaiju_swipe_s1_2",
+        "audio/sfx/kaiju_swipe_s1_3"
       ],
       "gain": 1
     },
     "kaiju_swipe_s2": {
       "variants": [
-        "audio/sfx/kaiju_swipe_s2"
+        "audio/sfx/kaiju_swipe_s2_1",
+        "audio/sfx/kaiju_swipe_s2_2",
+        "audio/sfx/kaiju_swipe_s2_3"
       ],
       "gain": 1
     },
     "kaiju_swipe_s3": {
       "variants": [
-        "audio/sfx/kaiju_swipe_s3"
+        "audio/sfx/kaiju_swipe_s3_1",
+        "audio/sfx/kaiju_swipe_s3_2",
+        "audio/sfx/kaiju_swipe_s3_3"
       ],
       "gain": 1
     },
@@ -507,6 +519,266 @@
     "camera_shutter": {
       "variants": [
         "audio/sfx/camera_shutter"
+      ],
+      "gain": 1
+    },
+    "radio_static": {
+      "variants": [
+        "audio/sfx/radio_static"
+      ],
+      "gain": 1
+    },
+    "mg_burst": {
+      "variants": [
+        "audio/sfx/mg_burst_1",
+        "audio/sfx/mg_burst_2",
+        "audio/sfx/mg_burst_3"
+      ],
+      "gain": 1
+    },
+    "bullet_hit": {
+      "variants": [
+        "audio/sfx/bullet_hit_1",
+        "audio/sfx/bullet_hit_2",
+        "audio/sfx/bullet_hit_3"
+      ],
+      "gain": 1
+    },
+    "cannon_fire": {
+      "variants": [
+        "audio/sfx/cannon_fire_1",
+        "audio/sfx/cannon_fire_2"
+      ],
+      "gain": 1
+    },
+    "tank_tracks_loop": {
+      "variants": [
+        "audio/sfx/tank_tracks_loop"
+      ],
+      "gain": 1,
+      "loop": [
+        0.25,
+        2.25
+      ]
+    },
+    "supply_drop": {
+      "variants": [
+        "audio/sfx/supply_drop"
+      ],
+      "gain": 1
+    },
+    "crate_land": {
+      "variants": [
+        "audio/sfx/crate_land"
+      ],
+      "gain": 1
+    },
+    "crate_take": {
+      "variants": [
+        "audio/sfx/crate_take"
+      ],
+      "gain": 1
+    },
+    "flare_pop": {
+      "variants": [
+        "audio/sfx/flare_pop"
+      ],
+      "gain": 1
+    },
+    "stun_ring": {
+      "variants": [
+        "audio/sfx/stun_ring"
+      ],
+      "gain": 1
+    },
+    "fireball": {
+      "variants": [
+        "audio/sfx/fireball"
+      ],
+      "gain": 1
+    },
+    "propane_blast": {
+      "variants": [
+        "audio/sfx/propane_blast"
+      ],
+      "gain": 1
+    },
+    "building_groan": {
+      "variants": [
+        "audio/sfx/building_groan"
+      ],
+      "gain": 1
+    },
+    "fire_bell": {
+      "variants": [
+        "audio/sfx/fire_bell"
+      ],
+      "gain": 1
+    },
+    "substation_hum_loop": {
+      "variants": [
+        "audio/sfx/substation_hum_loop"
+      ],
+      "gain": 1,
+      "loop": [
+        0.25,
+        4.25
+      ]
+    },
+    "power_surge": {
+      "variants": [
+        "audio/sfx/power_surge"
+      ],
+      "gain": 1
+    },
+    "surge_crackle_loop": {
+      "variants": [
+        "audio/sfx/surge_crackle_loop"
+      ],
+      "gain": 1,
+      "loop": [
+        0.25,
+        2.25
+      ]
+    },
+    "shield_clang": {
+      "variants": [
+        "audio/sfx/shield_clang_1",
+        "audio/sfx/shield_clang_2",
+        "audio/sfx/shield_clang_3"
+      ],
+      "gain": 1
+    },
+    "club_swing": {
+      "variants": [
+        "audio/sfx/club_swing"
+      ],
+      "gain": 1
+    },
+    "club_hit": {
+      "variants": [
+        "audio/sfx/club_hit"
+      ],
+      "gain": 1
+    },
+    "civ_pop": {
+      "variants": [
+        "audio/sfx/civ_pop_1",
+        "audio/sfx/civ_pop_2",
+        "audio/sfx/civ_pop_3",
+        "audio/sfx/civ_pop_4"
+      ],
+      "gain": 1
+    },
+    "speed_wind_loop": {
+      "variants": [
+        "audio/sfx/speed_wind_loop"
+      ],
+      "gain": 1,
+      "loop": [
+        0.25,
+        4.25
+      ]
+    },
+    "kaiju_rake_s1": {
+      "variants": [
+        "audio/sfx/kaiju_rake_s1"
+      ],
+      "gain": 1
+    },
+    "kaiju_rake_s2": {
+      "variants": [
+        "audio/sfx/kaiju_rake_s2"
+      ],
+      "gain": 1
+    },
+    "kaiju_rake_s3": {
+      "variants": [
+        "audio/sfx/kaiju_rake_s3"
+      ],
+      "gain": 1
+    },
+    "kaiju_hop_s1": {
+      "variants": [
+        "audio/sfx/kaiju_hop_s1"
+      ],
+      "gain": 1
+    },
+    "kaiju_hop_s2": {
+      "variants": [
+        "audio/sfx/kaiju_hop_s2"
+      ],
+      "gain": 1
+    },
+    "kaiju_hop_s3": {
+      "variants": [
+        "audio/sfx/kaiju_hop_s3"
+      ],
+      "gain": 1
+    },
+    "kaiju_tail_s1": {
+      "variants": [
+        "audio/sfx/kaiju_tail_s1"
+      ],
+      "gain": 1
+    },
+    "kaiju_tail_s2": {
+      "variants": [
+        "audio/sfx/kaiju_tail_s2"
+      ],
+      "gain": 1
+    },
+    "kaiju_tail_s3": {
+      "variants": [
+        "audio/sfx/kaiju_tail_s3"
+      ],
+      "gain": 1
+    },
+    "kaiju_charge_s1": {
+      "variants": [
+        "audio/sfx/kaiju_charge_s1"
+      ],
+      "gain": 1
+    },
+    "kaiju_charge_s2": {
+      "variants": [
+        "audio/sfx/kaiju_charge_s2"
+      ],
+      "gain": 1
+    },
+    "kaiju_charge_s3": {
+      "variants": [
+        "audio/sfx/kaiju_charge_s3"
+      ],
+      "gain": 1
+    },
+    "kaiju_stumble_s1": {
+      "variants": [
+        "audio/sfx/kaiju_stumble_s1_1",
+        "audio/sfx/kaiju_stumble_s1_2",
+        "audio/sfx/kaiju_stumble_s1_3"
+      ],
+      "gain": 1
+    },
+    "kaiju_stumble_s2": {
+      "variants": [
+        "audio/sfx/kaiju_stumble_s2_1",
+        "audio/sfx/kaiju_stumble_s2_2",
+        "audio/sfx/kaiju_stumble_s2_3"
+      ],
+      "gain": 1
+    },
+    "kaiju_stumble_s3": {
+      "variants": [
+        "audio/sfx/kaiju_stumble_s3_1",
+        "audio/sfx/kaiju_stumble_s3_2",
+        "audio/sfx/kaiju_stumble_s3_3"
+      ],
+      "gain": 1
+    },
+    "kaiju_gulp": {
+      "variants": [
+        "audio/sfx/kaiju_gulp"
       ],
       "gain": 1
     },

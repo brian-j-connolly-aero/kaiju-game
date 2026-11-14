@@ -1,26 +1,42 @@
 /**
  * Buildings for Port Meridian. In order: the bridge decks, the hand-placed landmarks, a row of
  * buildings along both sides of every street (each lot takes an archetype from the palette of
- * the patch it stands in), and last the yards behind (factories, campus halls, stacks).
+ * the patch it stands in; in a start's stage 1 square, the patch's packed version), and last the
+ * yards behind (factories, campus halls, stacks; none in a start's square). The special
+ * buildings, the starts' shops and the back lanes' garages have files of their own.
  *
  * A building is only placed where it is clear of water, parks and plazas, of every street (far
- * enough back that a 9 m wide tank troop can drive it) and of every other building.
+ * enough back that an 18 m wide tank troop can drive it) and back lane, and of every other
+ * building.
  */
 
 import type { ArchetypeDef } from '../archetypes';
 import { archetypeDef, archetypeSpecial } from '../archetypes';
-import { createRng, hash32, rngFloat, rngRange, type Rng } from '../../math/rng';
+import * as RNG from '../../math/rng';
+import type { Rng } from '../../math/rng';
 import type { Vec2 } from '../../math/vec';
 import type { Structure } from '../types';
 import { toWorld } from './areas';
 import { DIR_COS, DIR_QUARTER, DIR_SIN, DIR_YAW, nearestDir } from './dirs';
-import { boxExtentX, boxExtentZ, boxesTouch, distSqPointBox, distSqPointSeg, distSqSegBox, len, pointInPolygon, quant, type Box } from './geo';
-import { boxOnGround, type Ground } from './ground';
+import * as GEO from './geo';
+import type { Box } from './geo';
+import * as GROUND from './ground';
+import type { Ground } from './ground';
 import { STAGES } from '../../defs/stages';
 import { ANCHORS, BUILD_LIMIT, DOWNTOWN, LANDMARKS, PATCHES, type PatchSpec } from './layout';
-import { INFILLS, PALETTES, type PaletteItem } from './palettes';
+import { INFILLS, PALETTES, type Infill, type PaletteItem } from './palettes';
 import type { RoadSpec } from './roadnet';
 import { patchPolygon } from './streets';
+
+// The functions the hot loops call, read once into this module: under the module loaders the
+// game and its tests run in, every read of an imported binding goes through a getter.
+const { createRng, hash32, rngFloat, rngRange } = RNG;
+const { boxExtentX, boxExtentZ, boxesTouch, distSqPointBox, distSqPointSeg, distSqSegBox, len, pointInPolygon, quant } = GEO;
+const { boxOnGround } = GROUND;
+
+/** The heading table, read once into this module (a read of the imported binding costs more in the hot loops). */
+const COS: readonly number[] = DIR_COS;
+const SIN: readonly number[] = DIR_SIN;
 
 /** A street of the finished network, as the builder needs it. */
 export interface Street {
@@ -38,13 +54,43 @@ export interface Street {
 const DRIVE_HALF = 12;
 /** ...and never closer to its edge than this. */
 const SIDEWALK = 3;
+/**
+ * Inside a start's stage 1 square (phase 3, "packed closer together where the match starts") the
+ * local streets are narrower and the houses stand nearer: no wall within this of the center
+ * line. A tank troop (18 m wide, the last stage's squad) still has a meter to spare each side;
+ * the avenues through and along the square keep DRIVE_HALF.
+ */
+export const TIGHT_DRIVE_HALF = 10;
+/** Their roadway, meters, and that of the closes (short dead ends) among them. */
+export const TIGHT_WIDTH = 9;
+export const TIGHT_CLOSE_WIDTH = 8;
+/** ...while the avenues through and along it keep front gardens this deep (the beltway's row must stay inside BUILD_LIMIT). */
+const TIGHT_AVENUE_SETBACK = 3;
+/** A back lane (lanes.ts) keeps buildings this far from its center line: 10 m between garage doors. */
+export const LANE_HALF = 5;
 /** Buildings keep this far from water, parks and plazas. */
 export const SHORE = 2.5;
 
 const HASH_CELL = 40;
 
 export function streetClearance(spec: RoadSpec): number {
-  return Math.max(spec.width / 2 + SIDEWALK, DRIVE_HALF);
+  if (spec.lane) return LANE_HALF;
+  return Math.max(spec.width / 2 + SIDEWALK, spec.tight ? TIGHT_DRIVE_HALF : DRIVE_HALF);
+}
+
+/**
+ * Phase 3: the local streets whose middle lies in a start's stage 1 square become tight streets
+ * (TIGHT_WIDTH, nearer houses). Done after the street plan, so the network is the same one: the
+ * same junctions and pieces as before, only narrower. Avenues and the hand-drawn streets keep
+ * their width.
+ */
+export function tightenStartStreets(streets: Street[], half: number): void {
+  for (const s of streets) {
+    const spec = s.spec;
+    if (spec.arterial || spec.kind !== 'street' || spec.ford || spec.lane) continue;
+    if (!inStartSquare(half, (s.ax + s.bx) / 2, (s.az + s.bz) / 2)) continue;
+    s.spec = { ...spec, width: spec.stub ? TIGHT_CLOSE_WIDTH : TIGHT_WIDTH, tight: true };
+  }
 }
 
 export interface PatchInfo {
@@ -80,15 +126,30 @@ export function patchInfos(): PatchInfo[] {
  * anything bigger, yet it would count toward the first mark of the bar.
  */
 export function inStartSquare(half: number, x: number, z: number): boolean {
+  const sq = startSquares(half);
+  for (let i = 0; i < sq.length; i += 4) if (x >= sq[i] && x <= sq[i + 1] && z >= sq[i + 2] && z <= sq[i + 3]) return true;
+  return false;
+}
+
+/** The stage 1 squares of every anchor, as [minX, maxX, minZ, maxZ, ...], worked out once per city size (asked for at every lot). */
+let squaresHalf = -1;
+let squares: Float64Array = new Float64Array(0);
+function startSquares(half: number): Float64Array {
+  if (half === squaresHalf) return squares;
   const h = STAGES[0].boundsHalfSize;
-  for (const a of ANCHORS) {
-    const ax = -a.at[0];
-    const az = a.at[1];
+  squares = new Float64Array(ANCHORS.length * 4);
+  for (let i = 0; i < ANCHORS.length; i++) {
+    const ax = -ANCHORS[i].at[0];
+    const az = ANCHORS[i].at[1];
     const cx = ax < -half + h ? -half + h : ax > half - h ? half - h : ax;
     const cz = az < -half + h ? -half + h : az > half - h ? half - h : az;
-    if (x >= cx - h && x <= cx + h && z >= cz - h && z <= cz + h) return true;
+    squares[i * 4] = cx - h;
+    squares[i * 4 + 1] = cx + h;
+    squares[i * 4 + 2] = cz - h;
+    squares[i * 4 + 3] = cz + h;
   }
-  return false;
+  squaresHalf = half;
+  return squares;
 }
 
 /**
@@ -142,6 +203,10 @@ function cellOf(b: Builder, v: number): number {
   return c < 0 ? 0 : c >= b.cols ? b.cols - 1 : c;
 }
 
+/**
+ * The builder for a street network. It keeps its own list of the streets (the road streets, then
+ * the back lanes `addLane` appends), so the caller's list stays the road graph.
+ */
 export function createBuilder(g: Ground, streets: Street[]): Builder {
   const cols = Math.ceil((g.half * 2) / HASH_CELL);
   const streetCells: number[][] = [];
@@ -150,18 +215,28 @@ export function createBuilder(g: Ground, streets: Street[]): Builder {
     streetCells.push([]);
     boxCells.push([]);
   }
-  const b: Builder = { g, half: g.half, cols, streets, streetCells, structures: [], boxes: [], boxCells, boxStamp: [], patches: patchInfos(), aprons: [], stamp: [], stampNow: 0 };
-  // A street is listed in every cell a building near it could fall in.
-  const reach = 26;
-  for (const s of streets) {
-    const c0 = cellOf(b, Math.min(s.ax, s.bx) - reach);
-    const c1 = cellOf(b, Math.max(s.ax, s.bx) + reach);
-    const r0 = cellOf(b, Math.min(s.az, s.bz) - reach);
-    const r1 = cellOf(b, Math.max(s.az, s.bz) + reach);
-    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) streetCells[r * cols + c].push(s.id);
-    b.stamp.push(0);
-  }
+  const b: Builder = { g, half: g.half, cols, streets: [], streetCells, structures: [], boxes: [], boxCells, boxStamp: [], patches: patchInfos(), aprons: [], stamp: [], stampNow: 0 };
+  for (const s of streets) registerStreet(b, s);
   return b;
+}
+
+/** Lists a street in every hash cell a building near it could fall in. Its id must be its index. */
+function registerStreet(b: Builder, s: Street): void {
+  const reach = 26;
+  const c0 = cellOf(b, Math.min(s.ax, s.bx) - reach);
+  const c1 = cellOf(b, Math.max(s.ax, s.bx) + reach);
+  const r0 = cellOf(b, Math.min(s.az, s.bz) - reach);
+  const r1 = cellOf(b, Math.max(s.az, s.bz) + reach);
+  for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) b.streetCells[r * b.cols + c].push(s.id);
+  b.streets.push(s);
+  b.stamp.push(0);
+}
+
+/** Adds a back lane (lanes.ts) after the road streets; returns its id. */
+export function addLane(b: Builder, ax: number, az: number, bx: number, bz: number, spec: RoadSpec): number {
+  const id = b.streets.length;
+  registerStreet(b, { id, ax, az, bx, bz, spec, deck: -1 });
+  return id;
 }
 
 /** True when the box keeps `extra` meters beyond the driving clearance from every street. */
@@ -347,8 +422,8 @@ function frontSide(b: Builder, s: Street, side: number, seed: number): void {
   const half = s.spec.width / 2;
   const rng = createRng(hash32(seed, 211, s.id, side + 1));
   const facing = nearestDir(-nx, -nz);
-  const fx = DIR_SIN[facing];
-  const fz = DIR_COS[facing];
+  const fx = SIN[facing];
+  const fz = COS[facing];
   const clear = streetClearance(s.spec) + 0.5;
   let at = rngRange(rng, 1, 5);
   let run = 0;
@@ -357,15 +432,19 @@ function frontSide(b: Builder, s: Street, side: number, seed: number): void {
     const px = s.ax + ux * at;
     const pz = s.az + uz * at;
     // Which patch is this lot in? Looked up a little way along and well back from the street.
-    const patch = patchAt(b.patches, px + ux * 5 + nx * (half + 15), pz + uz * 5 + nz * (half + 15));
+    const lookX = px + ux * 5 + nx * (half + 15);
+    const lookZ = pz + uz * 5 + nz * (half + 15);
+    const patch = patchAt(b.patches, lookX, lookZ);
     if (!patch) {
       at += 12;
       continue;
     }
-    const pal = PALETTES[patch.spec.palette];
-    const keep = pal.keep * (patch.spec.keep ?? 1);
+    // In a start's stage 1 square the patch's packed version (phase 3).
+    const tight = patch.spec.tight && inStartSquare(b.half, lookX, lookZ) ? patch.spec.tight : null;
+    const pal = PALETTES[tight ? tight.palette : patch.spec.palette];
+    const keep = pal.keep * ((tight ? tight.keep : patch.spec.keep) ?? 1);
     const core = patch.spec.palette === 'core' || patch.spec.palette === 'bayfront';
-    const gapScale = patch.spec.gap ?? 1;
+    const gapScale = (tight ? tight.gap : patch.spec.gap) ?? 1;
     const gapMin = pal.gap[0] * gapScale;
     const a = pick(pal.items, Math.min(1, closeness(px, pz, core) + (patch.spec.near ?? 0)), rng, l - at + 3);
     const roll = rngFloat(rng);
@@ -375,7 +454,9 @@ function frontSide(b: Builder, s: Street, side: number, seed: number): void {
     const d = a.footprint[1];
     // (Downtown is outside every stage 2 square: no juvenile walks its streets, so the towers stand at the pavement.)
     const tall = a.height > TALL && !core ? TALL_SETBACK : 0;
-    const front = clear + pal.setback + tall;
+    // In a start's square the houses come up to the local streets; the avenues keep a front garden.
+    const setback = tight && s.spec.kind === 'avenue' ? Math.max(pal.setback, TIGHT_AVENUE_SETBACK) : pal.setback;
+    const front = clear + setback + tall;
     const mx = px + ux * (w / 2) + nx * front;
     const mz = pz + uz * (w / 2) + nz * front;
     const box = scratchBox;
@@ -403,19 +484,19 @@ function frontSide(b: Builder, s: Street, side: number, seed: number): void {
       run++;
     }
     at += w + gap;
-    const rowEvery = patch.spec.rowEvery ?? pal.alleyEvery;
+    const rowEvery = (tight ? tight.rowEvery : patch.spec.rowEvery) ?? pal.alleyEvery;
     if (rowEvery > 0 && run >= rowEvery) {
-      at += (patch.spec.rowGap ?? pal.alley) - gap;
+      at += ((tight ? tight.rowGap : patch.spec.rowGap) ?? pal.alley) - gap;
       run = 0;
     }
   }
 }
 
-/** Rows along every street: avenues first (they get the unbroken fronts), then the rest. */
+/** Rows along every street: avenues first (they get the unbroken fronts), then the rest. Back lanes have rows of their own (lanes.ts). */
 export function buildFronts(b: Builder, seed: number): void {
   for (let pass = 0; pass < 2; pass++) {
     for (const s of b.streets) {
-      if (!s.spec.lots || s.spec.kind === 'bridge') continue;
+      if (!s.spec.lots || s.spec.kind === 'bridge' || s.spec.lane) continue;
       if ((s.spec.kind === 'avenue') !== (pass === 0)) continue;
       frontSide(b, s, 1, seed);
       frontSide(b, s, -1, seed);
@@ -423,33 +504,42 @@ export function buildFronts(b: Builder, seed: number): void {
   }
 }
 
-/** The yards: a loose grid of spots behind the street fronts. */
+/**
+ * The yards: a loose grid of spots behind the street fronts. A start's stage 1 square (phase 3)
+ * has none: its blocks are packed with front rows, and the deeper ones have a back lane lined
+ * with garages instead (lanes.ts).
+ */
 export function buildYards(b: Builder, seed: number): void {
   for (const patch of b.patches) {
     if (!patch.spec.infill) continue;
-    const fill = INFILLS[patch.spec.infill];
-    const rng = createRng(hash32(seed, 307, patch.index));
-    for (let z = patch.minZ + fill.step / 2; z < patch.maxZ; z += fill.step) {
-      for (let x = patch.minX + fill.step / 2; x < patch.maxX; x += fill.step) {
-        const jx = rngRange(rng, -0.3, 0.3) * fill.step;
-        const jz = rngRange(rng, -0.3, 0.3) * fill.step;
-        const turn = rngFloat(rng);
-        const roll = rngFloat(rng);
-        const near = Math.min(1, closeness(x, z, false) + (patch.spec.near ?? 0));
-        const a = pick(fill.items, near, rng, 1000);
-        // Yards fill up toward downtown and thin out toward the edge of town.
-        if (!a || roll >= fill.keep * (patch.spec.keep ?? 1) * (fill.gradient ? 0.4 + 0.6 * near : 1)) continue;
-        const px = quant(x + jx);
-        const pz = quant(z + jz);
-        if (patchAt(b.patches, px, pz) !== patch) continue;
-        if (a.cls !== 'house' && a.cls !== 'shop' && inStartSquare(b.half, px, pz)) continue;
-        const box: Box = { x: px, z: pz, hx: a.footprint[0] / 2, hz: a.footprint[1] / 2, dir: turn < 0.5 ? 0 : 32 };
-        if (!clearOfAprons(b, box, a.height)) continue;
-        if (!boxOnGround(b.g, box, SHORE, false, BUILD_LIMIT)) continue;
-        if (!clearOfStreets(b, box, fill.offStreet - SIDEWALK)) continue;
-        if (!clearOfBuildings(b, box, a.height > TALL ? Math.max(fill.gap, TALL_APART) : fill.gap)) continue;
-        addStructure(b, a, box);
-      }
+    yardGrid(b, patch, INFILLS[patch.spec.infill], createRng(hash32(seed, 307, patch.index)), patch.spec.keep ?? 1, patch.spec.tight ? -1 : 0, patch.minX, patch.maxX, patch.minZ, patch.maxZ);
+  }
+}
+
+/** One grid of yard spots over a rectangle of a patch: `square` -1 only outside the start squares, 0 everywhere. */
+function yardGrid(b: Builder, patch: PatchInfo, fill: Infill, rng: Rng, keepMult: number, square: number, x0: number, x1: number, z0: number, z1: number): void {
+  for (let z = z0 + fill.step / 2; z < z1; z += fill.step) {
+    for (let x = x0 + fill.step / 2; x < x1; x += fill.step) {
+      const jx = rngRange(rng, -0.3, 0.3) * fill.step;
+      const jz = rngRange(rng, -0.3, 0.3) * fill.step;
+      const turn = rngFloat(rng);
+      const roll = rngFloat(rng);
+      const near = Math.min(1, closeness(x, z, false) + (patch.spec.near ?? 0));
+      const a = pick(fill.items, near, rng, 1000);
+      // Yards fill up toward downtown and thin out toward the edge of town.
+      if (!a || roll >= fill.keep * keepMult * (fill.gradient ? 0.4 + 0.6 * near : 1)) continue;
+      const px = quant(x + jx);
+      const pz = quant(z + jz);
+      if (patchAt(b.patches, px, pz) !== patch) continue;
+      const inSquare = inStartSquare(b.half, px, pz);
+      if (square < 0 && inSquare) continue;
+      if (a.cls !== 'house' && a.cls !== 'shop' && inSquare) continue;
+      const box: Box = { x: px, z: pz, hx: a.footprint[0] / 2, hz: a.footprint[1] / 2, dir: turn < 0.5 ? 0 : 32 };
+      if (!clearOfAprons(b, box, a.height)) continue;
+      if (!boxOnGround(b.g, box, SHORE, false, BUILD_LIMIT)) continue;
+      if (!clearOfStreets(b, box, fill.offStreet - SIDEWALK)) continue;
+      if (!clearOfBuildings(b, box, a.height > TALL ? Math.max(fill.gap, TALL_APART) : fill.gap)) continue;
+      addStructure(b, a, box);
     }
   }
 }
@@ -459,13 +549,15 @@ export const TANK_CLEAR = 4.75;
 export const INFANTRY_CLEAR = 3.75;
 /**
  * A troop of tanks (radius 9 m) is deployed with 9.75 m of clear ground round it and needs a
- * little over its own radius to drive. Troops exist only at the last stage, whose line is the
+ * little over its own radius to drive; the raster asks for as much as the deployment (a way that
+ * is only just wide enough can fall between the cells' middles: phase 3 found one, a corridor
+ * 19 m wide behind a row of houses). Troops exist only at the last stage, whose line is the
  * edge of the city, and the squads line up within some tens of meters of that line: so yards big
  * enough for a troop are opened only in a band this deep along the edge. Ground with less room
  * than TROOP_NEARLY cannot hide a spot a troop could be put on between two cells of the raster.
  */
 export const TROOP_DEPLOY = 9.75;
-export const TROOP_CLEAR = 9.25;
+export const TROOP_CLEAR = 9.75;
 const TROOP_NEARLY = 8;
 /** The troop's round looks at the buildings this far inside the band as well (unmarked ground beyond counts as open). */
 const POCKET_BEYOND = 140;
@@ -500,6 +592,13 @@ interface PocketJob {
   least: number;
   /** Prefer a wall with other open ground behind it (a wide body gets through no other kind). */
   through: boolean;
+  /** Per structure: never taken out (a bridge deck, a landmark, a special building); half extents of its axis-aligned rectangle. */
+  fixed: Uint8Array;
+  extX: Float64Array;
+  extZ: Float64Array;
+  /** Per structure: the try it was last weighed in (`weighNow` counts the tries). */
+  weighed: Int32Array;
+  weighNow: number;
 }
 
 /** Classes the cells near a box (flags are kept). */
@@ -507,8 +606,8 @@ function pocketMark(job: PocketJob, id: number): void {
   const { b, n, cells } = job;
   const half = b.half;
   const box = b.boxes[id];
-  const c = DIR_COS[box.dir];
-  const s = DIR_SIN[box.dir];
+  const c = COS[box.dir];
+  const s = SIN[box.dir];
   const hx = box.hx;
   const hz = box.hz;
   const roomy = job.roomy;
@@ -633,9 +732,35 @@ function pocketProbe(job: PocketJob, seed: number, fits: number, open: number, f
   if (isOpen) end = -end;
   const roomy = job.roomy;
   const near = roomy + POCKET_CELL * 1.5;
-  for (let tries = 0; tries < job.tries && !isOpen && end >= job.least; tries++) {
+  // In a start's square (phase 3) even the smallest enclosed speck is opened: the packed blocks
+  // leave small courtyards a squad could be put down in.
+  const sx = -half + ((seed % n) + 0.5) * POCKET_CELL;
+  const sz = -half + (Math.floor(seed / n) + 0.5) * POCKET_CELL;
+  const least = job.least > 1 && inStartSquare(half, sx, sz) ? 1 : job.least;
+  for (let tries = 0; tries < job.tries && !isOpen && end >= least; tries++) {
     let best = -1;
     let bestThrough = false;
+    // Only a wall that comes within `near` of a cell of the pocket can be taken out: anything
+    // beyond the pocket's extent grown by that is passed over at once, and each wall is weighed
+    // once (which one wins does not depend on the order they are met in).
+    let pc0 = n;
+    let pc1 = -1;
+    let pr0 = n;
+    let pr1 = -1;
+    for (let q = 0; q < end; q++) {
+      const cellId = queue[q];
+      const col = cellId % n;
+      const row = (cellId - col) / n;
+      if (col < pc0) pc0 = col;
+      if (col > pc1) pc1 = col;
+      if (row < pr0) pr0 = row;
+      if (row > pr1) pr1 = row;
+    }
+    const minX = -half + pc0 * POCKET_CELL - near;
+    const maxX = -half + (pc1 + 1) * POCKET_CELL + near;
+    const minZ = -half + pr0 * POCKET_CELL - near;
+    const maxZ = -half + (pr1 + 1) * POCKET_CELL + near;
+    const weighed = ++job.weighNow;
     for (let q = 0; q < end; q++) {
       const cellId = queue[q];
       const x = -half + ((cellId % n) + 0.5) * POCKET_CELL;
@@ -648,10 +773,13 @@ function pocketProbe(job: PocketJob, seed: number, fits: number, open: number, f
           const list = b.boxCells[rr * b.cols + cc];
           for (let i = 0; i < list.length; i++) {
             const id = list[i];
-            const st = b.structures[id];
             // Bridge decks, landmarks and the special buildings (every start must keep its three) stay.
-            if (gone[id] || st.passable || st.landmark !== null || archetypeSpecial(st.archetype) !== null) continue;
-            if (id === best || distSqPointBox(x, z, b.boxes[id]) > near * near) continue;
+            if (gone[id] || job.fixed[id] || job.weighed[id] === weighed) continue;
+            const box = b.boxes[id];
+            if (box.x + job.extX[id] < minX || box.x - job.extX[id] > maxX || box.z + job.extZ[id] < minZ || box.z - job.extZ[id] > maxZ) continue;
+            if (distSqPointBox(x, z, box) > near * near) continue;
+            job.weighed[id] = weighed;
+            const st = b.structures[id];
             const through = job.through && pocketBehind(job, id);
             if (best >= 0 && bestThrough && !through) continue;
             const better = best < 0 || (through && !bestThrough);
@@ -807,7 +935,7 @@ function bandSweep(job: PocketJob, band: number): void {
  * One round of yard opening for one or two sizes of body. `band` > 0 keeps it to the buildings
  * within that many meters of the edge of the city. Removed buildings are noted in `gone`.
  */
-function runPockets(b: Builder, gone: Uint8Array, raster: Uint8Array, queue: Int32Array, roomy: number, tight: number, band: number): number {
+function runPockets(b: Builder, gone: Uint8Array, raster: Uint8Array, queue: Int32Array, roomy: number, tight: number, band: number, info: PocketInfo): number {
   const half = b.half;
   const n = Math.ceil((half * 2) / POCKET_CELL);
   raster.fill(0);
@@ -823,6 +951,11 @@ function runPockets(b: Builder, gone: Uint8Array, raster: Uint8Array, queue: Int
     tries: band > 0 ? 8 : 6,
     least: band > 0 ? 1 : POCKET_MIN_CELLS,
     through: band > 0,
+    fixed: info.fixed,
+    extX: info.extX,
+    extZ: info.extZ,
+    weighed: info.weighed,
+    weighNow: info.weighNow,
   };
   const cells = job.cells;
   const count = b.structures.length;
@@ -835,6 +968,12 @@ function runPockets(b: Builder, gone: Uint8Array, raster: Uint8Array, queue: Int
   }
   // The streets are open ground by definition.
   for (const st of b.streets) {
+    // (A back lane is open ground for a tank or infantry, never for a troop.)
+    if (st.spec.lane && band > 0) continue;
+    if (st.spec.tight || st.spec.lane) {
+      openRoadway(job, st);
+      continue;
+    }
     const l = len(st.bx - st.ax, st.bz - st.az);
     const steps = Math.max(1, Math.ceil(l / POCKET_CELL));
     for (let i = 0; i <= steps; i++) {
@@ -856,7 +995,44 @@ function runPockets(b: Builder, gone: Uint8Array, raster: Uint8Array, queue: Int
       if (!b.structures[id].passable && !gone[id]) pocketSweep(job, id);
     }
   }
+  info.weighNow = job.weighNow;
   return job.removed;
+}
+
+/** What the yard opener's rounds share about the structures (worked out once). */
+interface PocketInfo {
+  fixed: Uint8Array;
+  extX: Float64Array;
+  extZ: Float64Array;
+  weighed: Int32Array;
+  weighNow: number;
+}
+
+/**
+ * A tight street or a back lane (phase 3) is narrower than the ground the raster calls roomy for
+ * the biggest body that uses it, by less than a cell, so the cells along it that a body fits on
+ * need not touch one another. Every cell whose middle lies on its roadway (a lane: its open strip)
+ * that is not a wall is open ground: a body there can always drive out along it (every tight
+ * street is wider than a tank troop, every lane wider than a tank; the troop's round leaves the
+ * lanes out).
+ */
+function openRoadway(job: PocketJob, st: Street): void {
+  const { b, n, cells } = job;
+  const half = b.half;
+  const reach = st.spec.lane ? LANE_HALF - 1 : st.spec.width / 2;
+  const c0 = Math.max(0, Math.floor((Math.min(st.ax, st.bx) - reach + half) / POCKET_CELL));
+  const c1 = Math.min(n - 1, Math.floor((Math.max(st.ax, st.bx) + reach + half) / POCKET_CELL));
+  const r0 = Math.max(0, Math.floor((Math.min(st.az, st.bz) - reach + half) / POCKET_CELL));
+  const r1 = Math.min(n - 1, Math.floor((Math.max(st.az, st.bz) + reach + half) / POCKET_CELL));
+  for (let r = r0; r <= r1; r++) {
+    const z = -half + (r + 0.5) * POCKET_CELL;
+    for (let cc = c0; cc <= c1; cc++) {
+      const k = r * n + cc;
+      if ((cells[k] & FITS) === WALL) continue;
+      const x = -half + (cc + 0.5) * POCKET_CELL;
+      if (distSqPointSeg(x, z, st.ax, st.az, st.bx, st.bz) <= reach * reach) cells[k] |= TANK_OPEN | FOOT_OPEN;
+    }
+  }
 }
 
 /**
@@ -878,9 +1054,17 @@ export function openPockets(b: Builder): number {
   const n = Math.ceil((b.half * 2) / POCKET_CELL);
   const raster = new Uint8Array(n * n);
   const queue = new Int32Array(POCKET_OPEN_CELLS + 8);
+  const count = b.structures.length;
+  const info: PocketInfo = { fixed: new Uint8Array(count), extX: new Float64Array(count), extZ: new Float64Array(count), weighed: new Int32Array(count), weighNow: 0 };
+  for (let id = 0; id < count; id++) {
+    const st = b.structures[id];
+    info.fixed[id] = st.passable || st.landmark !== null || archetypeSpecial(st.archetype) !== null ? 1 : 0;
+    info.extX[id] = boxExtentX(b.boxes[id]);
+    info.extZ[id] = boxExtentZ(b.boxes[id]);
+  }
   // The troop's round comes last: a house taken out for a tank leaves a hole a troop could be put in.
-  let removed = runPockets(b, gone, raster, queue, TANK_CLEAR, INFANTRY_CLEAR, 0);
-  removed += runPockets(b, gone, raster, queue, TROOP_CLEAR, TROOP_NEARLY, TROOP_BAND);
+  let removed = runPockets(b, gone, raster, queue, TANK_CLEAR, INFANTRY_CLEAR, 0, info);
+  removed += runPockets(b, gone, raster, queue, TROOP_CLEAR, TROOP_NEARLY, TROOP_BAND, info);
   if (removed === 0) return 0;
   // Rebuild the lists without the removed buildings (ids stay equal to indexes).
   const structures = b.structures;
@@ -895,3 +1079,5 @@ export function openPockets(b: Builder): number {
   }
   return removed;
 }
+
+

@@ -8,17 +8,28 @@
  */
 
 import { STAGES } from '../../defs/stages';
-import { createRng, hash32, rngChance, rngFloat, rngInt, rngRange, type Rng } from '../../math/rng';
+import * as RNG from '../../math/rng';
+import type { Rng } from '../../math/rng';
 import type { Vec2 } from '../../math/vec';
 import type { Area, Prop, PropKindId } from '../types';
 import { PROP_KINDS } from '../props';
 import type { River } from './areas';
 import { patchAt, type Builder, type Street } from './build';
 import { DIR_COS, DIR_SIN, DIR_YAW, nearestDir, turnDir } from './dirs';
-import { distSqPointBox, distSqPointSeg, len, pointInPolygon, quant } from './geo';
-import { dryAround, G_LAND, G_PARK, G_PLAZA, groundAt } from './ground';
+import * as GEO from './geo';
+import * as GROUND from './ground';
 import { ANCHORS, EDGE } from './layout';
 import type { PaletteId } from './palettes';
+
+// The functions the hot loops call, read once into this module: under the module loaders the
+// game and its tests run in, every read of an imported binding goes through a getter.
+const { createRng, hash32, rngChance, rngFloat, rngInt, rngRange } = RNG;
+const { distSqPointBox, distSqPointSeg, len, pointInPolygon, quant } = GEO;
+const { dryAround, G_LAND, G_PARK, G_PLAZA, groundAt } = GROUND;
+
+/** The heading table, read once into this module (a read of the imported binding costs more in the hot loops). */
+const COS: readonly number[] = DIR_COS;
+const SIN: readonly number[] = DIR_SIN;
 
 /** Props stay inside this distance from the center on both axes. */
 const PROP_LIMIT = 1096;
@@ -62,14 +73,15 @@ function wallDistSq(b: Builder, x: number, z: number): number {
   return best;
 }
 
-/** True when the point lies on some street's roadway, grown by `pad`. */
-function onRoadway(b: Builder, x: number, z: number, pad: number): boolean {
+/** True when the point lies on some street's roadway (or a back lane's track, unless `roadsOnly`), grown by `pad`. */
+function onRoadway(b: Builder, x: number, z: number, pad: number, roadsOnly = false): boolean {
   const cell = 40;
   const c = Math.floor((x + b.half) / cell);
   const r = Math.floor((z + b.half) / cell);
   if (r < 0 || c < 0 || r >= b.cols || c >= b.cols) return false;
   for (const id of b.streetCells[r * b.cols + c]) {
     const s = b.streets[id];
+    if (roadsOnly && s.spec.lane) continue;
     const reach = s.spec.width / 2 + pad;
     if (distSqPointSeg(x, z, s.ax, s.az, s.bx, s.bz) < reach * reach) return true;
   }
@@ -123,7 +135,7 @@ function carKind(rng: Rng, palette: PaletteId | null, moving: boolean): PropKind
 }
 
 function furnishStreet(f: Furnisher, s: Street, seed: number): void {
-  if (s.spec.kind === 'bridge' || s.spec.ford) return;
+  if (s.spec.kind === 'bridge' || s.spec.ford || s.spec.lane) return;
   const dx = s.bx - s.ax;
   const dz = s.bz - s.az;
   const l = len(dx, dz);
@@ -135,7 +147,8 @@ function furnishStreet(f: Furnisher, s: Street, seed: number): void {
   const back = turnDir(along, 64);
   const rng = createRng(hash32(seed, 401, s.id));
   const beltway = s.spec.name === 'Meridian Beltway';
-  const mole = s.spec.width <= 9;
+  // (The mole and the pier: narrow, and nothing fronts them. A start's tight streets are as narrow.)
+  const mole = !s.spec.lots && s.spec.width <= 9;
 
   for (let side = -1; side <= 1; side += 2) {
     const nx = -uz * side;
@@ -308,21 +321,31 @@ function furnishAreas(f: Furnisher, areas: readonly Area[], seed: number): void 
   }
 }
 
+/**
+ * A structure's own random key: from where it stands, not from its place in the list, so that
+ * building more somewhere (phase 3's starts) leaves the gardens and city weapons elsewhere as
+ * they are.
+ */
+function spotKey(s: { x: number; z: number }): number {
+  return hash32(Math.round(s.x * 8), Math.round(s.z * 8));
+}
+
 /** A tree in the back garden and now and then a car in the drive. */
 function furnishGardens(f: Furnisher, seed: number): void {
   const b = f.b;
   for (let id = 0; id < b.structures.length; id++) {
     const s = b.structures[id];
-    if (s.cls !== 'house') continue;
+    // (A garage has no garden of its own.)
+    if (s.cls !== 'house' || s.archetype === 'garage_a') continue;
     const patch = patchAt(b.patches, s.x, s.z);
     if (!patch || !GARDENS.includes(patch.spec.palette)) continue;
-    const rng = createRng(hash32(seed, 601, id));
+    const rng = createRng(hash32(seed, 601, spotKey(s)));
     const box = b.boxes[id];
-    const fx = DIR_SIN[box.dir];
-    const fz = DIR_COS[box.dir];
+    const fx = SIN[box.dir];
+    const fz = COS[box.dir];
     // Local +X of the box is (cos, -sin).
-    const sx = DIR_COS[box.dir];
-    const sz = -DIR_SIN[box.dir];
+    const sx = COS[box.dir];
+    const sz = -SIN[box.dir];
     if (rngChance(rng, 0.2)) {
       const back = box.hz + rngRange(rng, 3, 6);
       const slide = rngRange(rng, -box.hx, box.hx);
@@ -333,8 +356,8 @@ function furnishGardens(f: Furnisher, seed: number): void {
       const out = box.hx + 2.3;
       const cx = s.x + sx * out * side + fx * (box.hz - 2.5);
       const cz = s.z + sz * out * side + fz * (box.hz - 2.5);
-      // Only houses on a street have a drive (not the cottages at the bottom of the gardens).
-      if (onRoadway(b, cx, cz, DRIVE_REACH)) put(f, rngChance(rng, 0.75) ? 'car_sedan' : 'car_van', cx, cz, box.dir);
+      // Only houses on a street have a drive (not the cottages at the bottom of the gardens, nor the garages on a back lane).
+      if (onRoadway(b, cx, cz, DRIVE_REACH, true)) put(f, rngChance(rng, 0.75) ? 'car_sedan' : 'car_van', cx, cz, box.dir);
     }
   }
 }
@@ -411,11 +434,11 @@ interface WeaponArea {
 /** Puts a weapon of `kind` beside structure `id` (the first legal spot of its list, inside `area` when one is given). */
 function weaponBeside(f: Furnisher, kind: PropKindId, id: number, turn: number, area: WeaponArea | null): boolean {
   const box = f.b.boxes[id];
-  const fx = DIR_SIN[box.dir];
-  const fz = DIR_COS[box.dir];
+  const fx = SIN[box.dir];
+  const fz = COS[box.dir];
   // Local +X of the box is (cos, -sin).
-  const sx = DIR_COS[box.dir];
-  const sz = -DIR_SIN[box.dir];
+  const sx = COS[box.dir];
+  const sz = -SIN[box.dir];
   for (const [ax, mx, az, mz] of WEAPON_SPOTS[kind]) {
     const lx = ax * box.hx + mx;
     const lz = az * box.hz + mz;
@@ -471,7 +494,7 @@ function furnishWeapons(f: Furnisher, seed: number): void {
       let placed = 0;
       for (let n = 0; n < pool.length && placed < count; n++) {
         const id = pool[(next + n) % pool.length];
-        if (weaponBeside(f, kind, id, (hash32(seed, 823, id) % 9) * 4 - 16, square)) {
+        if (weaponBeside(f, kind, id, (hash32(seed, 823, spotKey(b.structures[id])) % 9) * 4 - 16, square)) {
           placed++;
           if (kind !== 'foodsign') next = (next + n + 1) % pool.length;
         }
@@ -482,7 +505,7 @@ function furnishWeapons(f: Furnisher, seed: number): void {
   for (let id = 0; id < b.structures.length; id++) {
     const s = b.structures[id];
     if (inStart[id] || (s.cls !== 'house' && s.cls !== 'shop') || s.archetype === 'gasstation_a') continue;
-    const roll = hash32(seed, 827, id);
+    const roll = hash32(seed, 827, spotKey(s));
     if (roll % WEAPON_SCATTER !== 0) continue;
     const kind = WEAPONS_PER_START[(roll >>> 8) % WEAPONS_PER_START.length][0];
     weaponBeside(f, kind, id, ((roll >>> 16) % 9) * 4 - 16, null);

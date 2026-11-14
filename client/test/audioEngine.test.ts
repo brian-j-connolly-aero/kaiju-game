@@ -726,3 +726,23 @@ describe('loops', () => {
     expect((src.outputs[0] as FakeGain).gain.last?.timeConstant).toBeCloseTo(0.03, 6);
   });
 });
+
+describe('variants', () => {
+  it('never plays the same variant of a sound twice running, and plays the one asked for', async () => {
+    const { engine, ctx } = rig();
+    engine.preload(['tank_fire']);
+    await settle();
+    for (let i = 0; i < 30; i++) {
+      engine.play('tank_fire');
+      await pass(ctx, 0.2);
+    }
+    const played = ctx.startedFrom('tank_fire').map((s) => s.buffer?.url ?? '');
+    expect(played).toHaveLength(30);
+    expect(played.filter((url, i) => i > 0 && url === played[i - 1])).toEqual([]);
+    expect(new Set(played).size).toBe(3);
+    engine.play('tank_fire', { variant: 1 });
+    engine.play('tank_fire', { variant: 1 });
+    await pass(ctx, 0.2);
+    expect(ctx.startedFrom('tank_fire').slice(30).map((s) => s.buffer?.url)).toEqual(['audio/sfx/tank_fire_2.ogg', 'audio/sfx/tank_fire_2.ogg']);
+  });
+});

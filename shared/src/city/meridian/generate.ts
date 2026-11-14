@@ -13,13 +13,15 @@
 
 import { hash32 } from '../../math/rng';
 import type { Vec2 } from '../../math/vec';
-import { CITY_HALF, CITY_SEED, PROP_KIND_IDS, type CityData, type District, type NeighborhoodAnchor, type RoadEdge, type RoadNode } from '../types';
+import { CITY_HALF, CITY_SEED, PROP_KIND_IDS, type CityData, type District, type Lane, type NeighborhoodAnchor, type RoadEdge, type RoadNode } from '../types';
 import { buildAreas, buildRiver, toWorld } from './areas';
-import { buildDecks, buildFronts, buildLandmarks, buildYards, createBuilder, openPockets, type Street } from './build';
+import { buildDecks, buildFronts, buildLandmarks, buildYards, createBuilder, openPockets, tightenStartStreets, type Street } from './build';
 import { furnish } from './furnish';
 import { buildGround } from './ground';
-import { ANCHORS, DISTRICT_TINTS, DISTRICTS, DOWNTOWN } from './layout';
+import { buildLaneRows, LANE_WIDTH, planLanes } from './lanes';
+import { ANCHORS, DISTRICT_ROOFS, DISTRICT_TINTS, DISTRICTS, DOWNTOWN } from './layout';
 import { buildSpecials } from './specials';
+import { buildStartShops } from './starts';
 import { planStreets } from './streets';
 
 export function generatePortMeridian(seed: number = CITY_SEED): CityData {
@@ -45,14 +47,20 @@ export function generatePortMeridian(seed: number = CITY_SEED): CityData {
     streets.push({ id: streets.length, ax: a.x, az: a.z, bx: b.x, bz: b.z, spec: e.spec, deck: -1 });
   }
   const liveEdges = net.edges.filter((e) => e.alive);
+  // Phase 3: inside the starts' stage 1 squares the local streets are narrower, the houses nearer.
+  tightenStartStreets(streets, CITY_HALF);
 
   // --- Structures ------------------------------------------------------------------------------
   const builder = createBuilder(ground, streets);
+  // The back lanes of the starts first: every building keeps clear of them.
+  planLanes(builder);
   buildDecks(builder);
   buildLandmarks(builder);
-  // The special buildings of every start, before the street fronts fill in around them.
+  // The special buildings, and the starts' own shops, before the street fronts fill in around them.
   buildSpecials(builder, seed);
+  buildStartShops(builder, seed);
   buildFronts(builder, seed);
+  buildLaneRows(builder, seed);
   buildYards(builder, seed);
   openPockets(builder);
 
@@ -75,8 +83,18 @@ export function generatePortMeridian(seed: number = CITY_SEED): CityData {
   const props = furnish(builder, nodePoints, nodeStreets, areas, river, seed);
 
   // --- Districts, anchors ----------------------------------------------------------------------
-  const districts: District[] = DISTRICTS.map((d, id) => ({ id, zone: d.zone, name: d.name, polygon: d.poly.map(toWorld), tint: DISTRICT_TINTS[d.name] ?? 0xffffff }));
+  const districts: District[] = DISTRICTS.map((d, id) => ({
+    id,
+    zone: d.zone,
+    name: d.name,
+    polygon: d.poly.map(toWorld),
+    tint: DISTRICT_TINTS[d.name] ?? 0xffffff,
+    roof: DISTRICT_ROOFS[d.name] ?? 0xffffff,
+  }));
   const anchors: NeighborhoodAnchor[] = ANCHORS.map((a, id) => ({ id, name: a.name, x: -a.at[0], z: a.at[1] }));
+
+  const lanes: Lane[] = [];
+  for (const s of builder.streets) if (s.spec.lane) lanes.push({ ax: s.ax, az: s.az, bx: s.bx, bz: s.bz, width: LANE_WIDTH });
 
   return {
     seed,
@@ -88,12 +106,14 @@ export function generatePortMeridian(seed: number = CITY_SEED): CityData {
     districts,
     anchors,
     downtown: { x: -DOWNTOWN[0], z: DOWNTOWN[1] },
+    lanes,
   };
 }
 
 /**
  * A checksum of the WHOLE city: what cityChecksum covers (structures and props) plus the streets,
- * the areas, the districts and the anchors, all to the millimeter. Server and browser must agree
+ * the areas, the districts (with their building tints and roof colors), the anchors and the back
+ * lanes, all to the millimeter. Server and browser must agree
  * on this number too (shared/test/meridian.test.ts, and the browser check in docs/CITY.md).
  */
 export function meridianChecksum(city: CityData): number {
@@ -110,9 +130,12 @@ export function meridianChecksum(city: CityData): number {
     for (const p of a.polygon) h = hash32(h, mm(p.x), mm(p.z));
   }
   for (const d of city.districts) {
-    h = hash32(h, d.zone.length, d.polygon.length, d.tint ?? 0xffffff);
+    h = hash32(h, d.zone.length, d.polygon.length, d.tint ?? 0xffffff, d.roof ?? 0xffffff);
     for (const p of d.polygon) h = hash32(h, mm(p.x), mm(p.z));
   }
   for (const a of city.anchors) h = hash32(h, mm(a.x), mm(a.z));
+  const lanes = city.lanes ?? [];
+  h = hash32(h, lanes.length);
+  for (const l of lanes) h = hash32(h, mm(l.ax), mm(l.az), mm(l.bx), mm(l.bz), mm(l.width));
   return hash32(h, mm(city.downtown.x), mm(city.downtown.z));
 }

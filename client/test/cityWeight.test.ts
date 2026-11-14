@@ -78,6 +78,7 @@ function fakeAssets(): AssetStore {
     },
     modelTint: () => null,
     modelTints: () => [],
+    modelRoof: () => null,
     texture: () => new THREE.Texture(),
   };
   return fake as unknown as AssetStore;

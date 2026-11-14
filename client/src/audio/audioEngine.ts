@@ -55,6 +55,12 @@ export interface PlayOptions {
   refDistance?: number;
   /** Loops only: come in at full level at once (from the loop start) instead of swelling in. */
   sharp?: boolean;
+  /**
+   * One-shots only: which of the sound's variants to play (0 is the first), for sounds whose
+   * variants are not interchangeable (the stumble's three falls follow the animation's look).
+   * Left out, one is picked at random, never the one this sound played last.
+   */
+  variant?: number;
 }
 
 export interface LoopHandle {
@@ -120,8 +126,15 @@ const TAIL_HALVES_IN = 0.15;
 const LATE_SECONDS = 0.25;
 const VOICE_QUEUE_LIMIT = 4;
 const VOICE_STALE_SECONDS = 7;
+/**
+ * While a line is spoken, music and effects are lowered to these shares. Effects were at 0.65:
+ * measured in an offline render of the busiest stage 3 moment (an artillery barrage, a gas
+ * station fireball and a tower falling over under a radio line), the line then stood only 3 dB
+ * over everything else and under it for its worst half second; at 0.5 it stands 5 dB over, and
+ * over for every half second (docs/STATUS.md, the phase 3 sound section).
+ */
 const DUCK_MUSIC = 0.4;
-const DUCK_SFX = 0.65;
+const DUCK_SFX = 0.5;
 /** Decoded voice lines kept for reuse (about 0.7 MB each), besides the ones loaded ahead. */
 const VOICE_CACHE = 24;
 /** The lead with which music sources are scheduled. */
@@ -217,6 +230,8 @@ export class AudioEngine {
   private readonly loadLater = new Set<string>();
   private readonly warned = new Set<string>();
   private readonly voices: Voice[] = [];
+  /** The variant each sound played last (pickVariant), so the next one is another. */
+  private readonly lastVariant = new Map<string, number>();
   private noise: AudioBuffer | null = null;
   private readonly listener = { x: 0, y: 0, z: 0, set: false };
 
@@ -752,9 +767,24 @@ export class AudioEngine {
       start(null);
       return;
     }
-    const variant = entry.variants[Math.floor(Math.random() * entry.variants.length)];
+    const variant = entry.variants[this.pickVariant(id, entry.variants.length, options.variant)];
     if (this.ready.has(variant)) start(this.ready.get(variant) ?? null);
     else void this.load(variant).then(start);
+  }
+
+  /**
+   * Which variant of a sound to play: the one asked for, or one at random that is not the one
+   * this sound played last, so that steps, shots and pops never repeat the same file twice
+   * running (a run of identical sounds is what makes a repeat sound mechanical).
+   */
+  private pickVariant(id: string, count: number, wanted?: number): number {
+    if (wanted !== undefined) return Math.min(count - 1, Math.max(0, Math.floor(wanted)));
+    if (count <= 1) return 0;
+    const last = this.lastVariant.get(id);
+    let i = Math.floor(Math.random() * (last === undefined ? count : count - 1));
+    if (last !== undefined && i >= last) i++;
+    this.lastVariant.set(id, i);
+    return i;
   }
 
   /** Starts a looping effect. The handle keeps working (as a no-op) when there is no audio. */

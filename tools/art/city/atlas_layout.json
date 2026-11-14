@@ -40,6 +40,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": "glass_teal_dmg",
    "owner": "kit",
    "note": "tower glass, teal"
@@ -53,6 +54,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "damaged twin of glass_teal"
@@ -66,6 +68,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": "glass_dark_dmg",
    "owner": "kit",
    "note": "tower glass, dark"
@@ -79,6 +82,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "damaged twin of glass_dark"
@@ -92,6 +96,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": "glass_blue_dmg",
    "owner": "kit",
    "note": "office glass, sky blue, white spandrels"
@@ -105,6 +110,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "damaged twin of glass_blue"
@@ -118,6 +124,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": true,
+   "roof": false,
    "twin": "plaster_sash_dmg",
    "owner": "kit",
    "note": "plaster wall, white sash windows (tintable)"
@@ -131,6 +138,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": true,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "damaged twin of plaster_sash"
@@ -144,6 +152,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": "brick_sash_dmg",
    "owner": "kit",
    "note": "red brick, white windows, stone lintels"
@@ -157,6 +166,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "damaged twin of brick_sash"
@@ -170,6 +180,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": true,
+   "roof": false,
    "twin": "clapboard_dmg",
    "owner": "kit",
    "note": "painted boards, windows with shutters (tintable)"
@@ -183,6 +194,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": true,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "damaged twin of clapboard"
@@ -196,6 +208,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": "stone_grid_dmg",
    "owner": "kit",
    "note": "pale stone grid, deep office windows"
@@ -209,6 +222,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "damaged twin of stone_grid"
@@ -222,6 +236,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": "strip_concrete_dmg",
    "owner": "kit",
    "note": "concrete, ribbon windows"
@@ -235,6 +250,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "damaged twin of strip_concrete"
@@ -248,6 +264,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": "metal_clad_dmg",
    "owner": "kit",
    "note": "corrugated cladding, high strip windows"
@@ -261,6 +278,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "damaged twin of metal_clad"
@@ -274,6 +292,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": "brick_works_dmg",
    "owner": "kit",
    "note": "works brick, tall steel windows"
@@ -287,6 +306,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "damaged twin of brick_works"
@@ -300,6 +320,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": true,
+   "roof": false,
    "twin": "plaster_plain_dmg",
    "owner": "kit",
    "note": "plaster, no windows (tintable)"
@@ -313,6 +334,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": true,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "damaged twin of plaster_plain"
@@ -326,6 +348,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": "brick_plain_dmg",
    "owner": "kit",
    "note": "brick, no windows"
@@ -339,6 +362,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "damaged twin of brick_plain"
@@ -352,6 +376,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": "concrete_plain_dmg",
    "owner": "kit",
    "note": "concrete, no windows"
@@ -365,6 +390,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "damaged twin of concrete_plain"
@@ -378,6 +404,7 @@
    "bay_px": 16,
    "storey_px": 24,
    "tint": true,
+   "roof": false,
    "twin": "shopfront_dmg",
    "owner": "kit",
    "note": "shop window, display, blank sign band on top (tintable frame)"
@@ -391,6 +418,7 @@
    "bay_px": 16,
    "storey_px": 24,
    "tint": true,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "damaged twin of shopfront"
@@ -404,6 +432,7 @@
    "bay_px": 16,
    "storey_px": 24,
    "tint": false,
+   "roof": false,
    "twin": "lobby_dmg",
    "owner": "kit",
    "note": "stone and full-height glass"
@@ -417,6 +446,7 @@
    "bay_px": 16,
    "storey_px": 24,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "damaged twin of lobby"
@@ -430,6 +460,7 @@
    "bay_px": 16,
    "storey_px": 24,
    "tint": false,
+   "roof": false,
    "twin": "loading_dmg",
    "owner": "kit",
    "note": "concrete, high windows, dark plinth"
@@ -443,6 +474,7 @@
    "bay_px": 16,
    "storey_px": 24,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "damaged twin of loading"
@@ -456,6 +488,7 @@
    "bay_px": 16,
    "storey_px": 24,
    "tint": true,
+   "roof": false,
    "twin": "arcade_dmg",
    "owner": "kit",
    "note": "columns and shaded arches (tintable)"
@@ -469,6 +502,7 @@
    "bay_px": 16,
    "storey_px": 24,
    "tint": true,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "damaged twin of arcade"
@@ -482,6 +516,7 @@
    "bay_px": 16,
    "storey_px": 24,
    "tint": false,
+   "roof": false,
    "twin": "plinth_dmg",
    "owner": "kit",
    "note": "rusticated stone base, small windows"
@@ -495,6 +530,7 @@
    "bay_px": 16,
    "storey_px": 24,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "damaged twin of plinth"
@@ -508,6 +544,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "stone cornice with dentils"
@@ -521,6 +558,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": true,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "white painted cornice (tintable)"
@@ -534,6 +572,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "balcony / parapet railing, metal bars"
@@ -547,6 +586,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "glass balustrade"
@@ -560,6 +600,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "canvas stripes, 0.75 m"
@@ -573,6 +614,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": ""
@@ -586,6 +628,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": ""
@@ -599,6 +642,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": ""
@@ -612,6 +656,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "clay tiles, red"
@@ -625,6 +670,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "slate, blue grey"
@@ -638,6 +684,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "terracotta tiles (Temple Hill)"
@@ -651,6 +698,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "flat roof gravel"
@@ -664,6 +712,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "corrugated metal roof"
@@ -677,6 +726,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "glazed roof, iron frame"
@@ -690,6 +740,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "weathered copper, standing seams"
@@ -703,6 +754,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "dark tar roof, patches"
@@ -716,6 +768,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "broken-open floors (cavities)"
@@ -729,6 +782,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "broken concrete and brick"
@@ -742,6 +796,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "picture sign"
@@ -755,6 +810,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "picture sign"
@@ -768,6 +824,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "picture sign"
@@ -781,6 +838,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "picture sign"
@@ -794,6 +852,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "picture sign"
@@ -807,6 +866,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "picture sign"
@@ -820,6 +880,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "picture sign"
@@ -833,6 +894,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "picture sign"
@@ -846,6 +908,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "picture sign"
@@ -859,6 +922,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "picture sign"
@@ -872,6 +936,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "picture sign"
@@ -885,6 +950,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "picture sign"
@@ -898,6 +964,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "picture sign"
@@ -911,6 +978,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "picture sign"
@@ -924,6 +992,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "picture sign"
@@ -937,6 +1006,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "picture sign"
@@ -950,6 +1020,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": true,
+   "roof": false,
    "twin": "door_red_dmg",
    "owner": "kit",
    "note": "a door bay: replaces one window bay of a storey (door 1.125 x 2.25 m)"
@@ -963,6 +1034,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": true,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "damaged twin of door_red"
@@ -976,6 +1048,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": true,
+   "roof": false,
    "twin": "door_green_dmg",
    "owner": "kit",
    "note": "a door bay: replaces one window bay of a storey (door 1.125 x 2.25 m)"
@@ -989,6 +1062,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": true,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "damaged twin of door_green"
@@ -1002,6 +1076,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": true,
+   "roof": false,
    "twin": "door_blue_dmg",
    "owner": "kit",
    "note": "a door bay: replaces one window bay of a storey (door 1.125 x 2.25 m)"
@@ -1015,6 +1090,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": true,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "damaged twin of door_blue"
@@ -1028,6 +1104,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": "door_double_dmg",
    "owner": "kit",
    "note": "double glass door 2.25 x 2.625 m"
@@ -1041,6 +1118,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "damaged twin of door_double"
@@ -1054,6 +1132,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": "door_garage_dmg",
    "owner": "kit",
    "note": "garage 3 x 2.25 m"
@@ -1067,6 +1146,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "damaged twin of door_garage"
@@ -1080,6 +1160,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": "door_roller_dmg",
    "owner": "kit",
    "note": "loading door 3.75 x 3.75 m"
@@ -1093,6 +1174,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "damaged twin of door_roller"
@@ -1106,6 +1188,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": true,
+   "roof": false,
    "twin": "window_single_dmg",
    "owner": "kit",
    "note": "one window 1.5 x 1.875 m (gables, dormers)"
@@ -1119,6 +1202,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": true,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "damaged twin of window_single"
@@ -1132,6 +1216,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "louvres for plant rooms and AC boxes"
@@ -1145,6 +1230,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": "metal_plain_dmg",
    "owner": "kit",
    "note": "corrugated cladding, no windows"
@@ -1158,6 +1244,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "damaged twin of metal_plain"
@@ -1171,6 +1258,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "color #ffffff"
@@ -1184,6 +1272,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "color #fff4d6, glows #ffd27a"
@@ -1197,6 +1286,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "color #d7263d, glows #ff3a3a"
@@ -1210,6 +1300,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "color #f2a4c8, glows #ff5fb0"
@@ -1223,6 +1314,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "color #b4f0d8, glows #5dffc0"
@@ -1236,6 +1328,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "color #2c3e5c"
@@ -1249,6 +1342,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "color #6f8fb8, glows #ffe2a0"
@@ -1262,6 +1356,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "color #1d1f26"
@@ -1275,6 +1370,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "wooden water tank staves"
@@ -1288,9 +1384,262 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "kit",
    "note": "metal grille"
+  },
+  "roof_tile": {
+   "x": 448,
+   "y": 192,
+   "w": 64,
+   "h": 64,
+   "kind": "texture",
+   "bay_px": 16,
+   "storey_px": 16,
+   "tint": false,
+   "roof": true,
+   "twin": null,
+   "owner": "kit",
+   "note": "clay tiles, light grey: takes the district's roof color"
+  },
+  "roof_slate": {
+   "x": 512,
+   "y": 192,
+   "w": 64,
+   "h": 64,
+   "kind": "texture",
+   "bay_px": 16,
+   "storey_px": 16,
+   "tint": false,
+   "roof": true,
+   "twin": null,
+   "owner": "kit",
+   "note": "slates, light grey: takes the district's roof color"
+  },
+  "roof_terra": {
+   "x": 576,
+   "y": 192,
+   "w": 64,
+   "h": 64,
+   "kind": "texture",
+   "bay_px": 16,
+   "storey_px": 16,
+   "tint": false,
+   "roof": true,
+   "twin": null,
+   "owner": "kit",
+   "note": "round clay tiles, light grey: takes the district's roof color"
+  },
+  "roof_flat": {
+   "x": 640,
+   "y": 192,
+   "w": 64,
+   "h": 64,
+   "kind": "texture",
+   "bay_px": 16,
+   "storey_px": 16,
+   "tint": false,
+   "roof": true,
+   "twin": null,
+   "owner": "kit",
+   "note": "flat roof membrane (for gravel and tar), light grey: takes the district's roof color"
+  },
+  "roof_metal": {
+   "x": 704,
+   "y": 192,
+   "w": 64,
+   "h": 64,
+   "kind": "texture",
+   "bay_px": 16,
+   "storey_px": 16,
+   "tint": false,
+   "roof": true,
+   "twin": null,
+   "owner": "kit",
+   "note": "corrugated metal, light grey: takes the district's roof color"
+  },
+  "roof_plain": {
+   "x": 352,
+   "y": 224,
+   "w": 16,
+   "h": 16,
+   "kind": "swatch",
+   "bay_px": 16,
+   "storey_px": 16,
+   "tint": false,
+   "roof": true,
+   "twin": null,
+   "owner": "kit",
+   "note": "flat roof grey #d9d9d9 (small or plain roofs): takes the district's roof color"
+  },
+  "motel_front": {
+   "x": 0,
+   "y": 256,
+   "w": 64,
+   "h": 32,
+   "kind": "facade",
+   "bay_px": 16,
+   "storey_px": 16,
+   "tint": true,
+   "roof": false,
+   "twin": "motel_front_dmg",
+   "owner": "homes",
+   "note": "motel rooms: door and window per bay, two floors (tintable)"
+  },
+  "motel_front_dmg": {
+   "x": 64,
+   "y": 256,
+   "w": 64,
+   "h": 32,
+   "kind": "facade",
+   "bay_px": 16,
+   "storey_px": 16,
+   "tint": true,
+   "roof": false,
+   "twin": null,
+   "owner": "homes",
+   "note": "damaged twin of motel_front"
+  },
+  "fire_front": {
+   "x": 0,
+   "y": 288,
+   "w": 64,
+   "h": 40,
+   "kind": "facade",
+   "bay_px": 16,
+   "storey_px": 16,
+   "tint": false,
+   "roof": false,
+   "twin": "fire_front_dmg",
+   "owner": "homes",
+   "note": "firehouse front 13.25 x 7.5 m: two red engine doors, four windows, a bell"
+  },
+  "fire_front_dmg": {
+   "x": 64,
+   "y": 288,
+   "w": 64,
+   "h": 40,
+   "kind": "facade",
+   "bay_px": 16,
+   "storey_px": 16,
+   "tint": false,
+   "roof": false,
+   "twin": null,
+   "owner": "homes",
+   "note": "damaged twin of fire_front"
+  },
+  "diner_wall": {
+   "x": 0,
+   "y": 328,
+   "w": 64,
+   "h": 20,
+   "kind": "facade",
+   "bay_px": 16,
+   "storey_px": 16,
+   "tint": true,
+   "roof": false,
+   "twin": "diner_wall_dmg",
+   "owner": "homes",
+   "note": "diner body: window band over fluted panels, 4 bays x 3.3 m (tintable)"
+  },
+  "diner_wall_dmg": {
+   "x": 64,
+   "y": 328,
+   "w": 64,
+   "h": 20,
+   "kind": "facade",
+   "bay_px": 16,
+   "storey_px": 16,
+   "tint": true,
+   "roof": false,
+   "twin": null,
+   "owner": "homes",
+   "note": "damaged twin of diner_wall"
+  },
+  "door_rollup": {
+   "x": 0,
+   "y": 348,
+   "w": 16,
+   "h": 12,
+   "kind": "picture",
+   "bay_px": 16,
+   "storey_px": 16,
+   "tint": false,
+   "roof": false,
+   "twin": "door_rollup_dmg",
+   "owner": "homes",
+   "note": "ribbed roll-up garage door 3 x 2.25 m"
+  },
+  "door_rollup_dmg": {
+   "x": 16,
+   "y": 348,
+   "w": 16,
+   "h": 12,
+   "kind": "picture",
+   "bay_px": 16,
+   "storey_px": 16,
+   "tint": false,
+   "roof": false,
+   "twin": null,
+   "owner": "homes",
+   "note": "damaged twin of door_rollup"
+  },
+  "diner_chrome": {
+   "x": 32,
+   "y": 348,
+   "w": 32,
+   "h": 6,
+   "kind": "texture",
+   "bay_px": 16,
+   "storey_px": 16,
+   "tint": false,
+   "roof": false,
+   "twin": null,
+   "owner": "homes",
+   "note": "chrome roof edge, red neon line"
+  },
+  "diner_sign": {
+   "x": 64,
+   "y": 348,
+   "w": 32,
+   "h": 16,
+   "kind": "picture",
+   "bay_px": 16,
+   "storey_px": 16,
+   "tint": false,
+   "roof": false,
+   "twin": null,
+   "owner": "homes",
+   "note": "roof sign: a steaming cup"
+  },
+  "motel_sign": {
+   "x": 96,
+   "y": 348,
+   "w": 16,
+   "h": 24,
+   "kind": "picture",
+   "bay_px": 16,
+   "storey_px": 16,
+   "tint": false,
+   "roof": false,
+   "twin": null,
+   "owner": "homes",
+   "note": "pole sign: sleeping moon, sparkles, bed"
+  },
+  "steps": {
+   "x": 112,
+   "y": 348,
+   "w": 16,
+   "h": 16,
+   "kind": "texture",
+   "bay_px": 16,
+   "storey_px": 16,
+   "tint": false,
+   "roof": false,
+   "twin": null,
+   "owner": "homes",
+   "note": "stair treads"
   },
   "sp_fence": {
    "x": 256,
@@ -1301,6 +1650,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "industry",
    "note": "chain-link fence, 24 x 2.25 m"
@@ -1314,6 +1664,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "industry",
    "note": "mast bands, red on top"
@@ -1327,6 +1678,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "industry",
    "note": "flame sign (gas station)"
@@ -1340,6 +1692,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "industry",
    "note": "high-voltage warning sign"
@@ -1353,6 +1706,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "industry",
    "note": "fuel pump front 1.5 x 2.25 m"
@@ -1366,6 +1720,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "industry",
    "note": "gas bottle cage 3 x 1.9 m"
@@ -1379,6 +1734,7 @@
    "bay_px": 16,
    "storey_px": 16,
    "tint": false,
+   "roof": false,
    "twin": null,
    "owner": "industry",
    "note": "ribbed ceramic insulator"

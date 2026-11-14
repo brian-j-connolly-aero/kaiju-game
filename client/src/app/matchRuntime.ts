@@ -105,7 +105,13 @@ export class MatchRuntime {
     this.player = role === 'kaiju' ? new KaijuController(deps.thirdPerson) : role === 'human' ? new HumanController(deps.thirdPerson) : null;
     this.controller = this.player ?? this.drone;
     deps.renderer.beginMatch(deps.session.mirror, 1, deps.session.boundsFor(1));
-    deps.renderer.cues = { onStep: (k) => this.onStep(k), onSplash: (k) => this.matchAudio.splash(k), onGlass: (x, y, z, panes) => this.matchAudio.glass(x, y, z, panes) };
+    deps.renderer.cues = {
+      onStep: (k) => this.onStep(k),
+      onSplash: (k) => this.matchAudio.splash(k),
+      onGlass: (x, y, z, panes) => this.matchAudio.glass(x, y, z, panes),
+      onSquash: (x, y, z, count) => this.matchAudio.squash(x, y, z, count),
+      onGulp: (x, y, z) => this.matchAudio.gulp(x, y, z),
+    };
     // Whatever was pressed in the menus is not the first input of the match.
     deps.input.sampleTaken();
   }

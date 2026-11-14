@@ -192,16 +192,19 @@ for _s in (1, 2, 3):
         lambda rng, v, s=_s: _step(rng, s, v))
 
 
-def _stomp(rng: np.random.Generator, stage: int) -> np.ndarray:
+def _stomp(rng: np.random.Generator, stage: int, v: int = 1) -> np.ndarray:
+    # three takes, so that stomp after stomp does not repeat: as built first, a little lower with
+    # one more crack in the ground, a little higher and quicker
+    tune = (1.0, 0.93, 1.07)[v - 1]
     dur = {1: 0.95, 2: 1.7, 3: 3.0}[stage]
     n = n_(dur)
     f_hi, f_lo = {1: (135.0, 55.0), 2: (95.0, 36.0), 3: (70.0, 24.0)}[stage]
-    low = parts.thump(n, f_hi, f_lo, 0.05 * stage, {1: 0.4, 2: 0.85, 3: 1.6}[stage], attack=0.002 + 0.002 * stage,
-                      harm=0.35, sat=2.2)
-    hit = parts.burst(n, rng, {1: 6000, 2: 3500, 3: 2000}[stage], {1: 350, 2: 180, 3: 100}[stage], 0.03 * stage,
+    low = parts.thump(n, f_hi * tune, f_lo * tune, 0.05 * stage, {1: 0.4, 2: 0.85, 3: 1.6}[stage],
+                      attack=0.002 + 0.002 * stage, harm=0.35, sat=2.2)
+    hit = parts.burst(n, rng, {1: 6000, 2: 3500, 3: 2000}[stage], {1: 350, 2: 180, 3: 100}[stage] * tune, 0.03 * stage,
                       {1: 0.2, 2: 0.4, 3: 0.75}[stage])
     crack = np.zeros(n)                                       # the ground splits: sharp and bright
-    for i in range(2 + stage):
+    for i in range(2 + stage + (v == 2)):
         dsp.put(crack, dsp.click(rng, 1200 / stage, 8000 / stage, 0.02 * stage), rng.uniform(0, 0.03 * stage), rng.uniform(0.5, 1))
     # the shockwave rolls outward: a band of noise sweeping down
     ring_f = dsp.env([(0, {1: 1400, 2: 900, 3: 600}[stage]), (dur * 0.5, {1: 420, 2: 230, 3: 140}[stage]),
@@ -215,29 +218,39 @@ def _stomp(rng: np.random.Generator, stage: int) -> np.ndarray:
 
 
 for _s in (1, 2, 3):
-    sfx(f"kaiju_stomp_s{_s}", "kaiju", level={1: -16.5, 2: -15.0, 3: -12.5}[_s], group="stomp", clip=True,
-        use=f"Stomp impact at stage {_s}: boom, ground crack and the shockwave rolling outward.")(
-        lambda rng, v, s=_s: _stomp(rng, s))
+    sfx(f"kaiju_stomp_s{_s}", "kaiju", variants=3, level={1: -16.5, 2: -15.0, 3: -12.5}[_s], group="stomp", clip=True,
+        use=f"Stomp impact at stage {_s} (one foot): boom, ground crack and the shockwave rolling outward. "
+            "The hop that lands on both feet is kaiju_hop.")(
+        lambda rng, v, s=_s: _stomp(rng, s, v))
 
 
-def _swipe(rng: np.random.Generator, stage: int) -> np.ndarray:
+# when each swipe is at its loudest (seconds from its start): the client starts it that long
+# before the strike, so that the whoosh peaks as the claws come through
+SWIPE_PEAK = {1: 0.11, 2: 0.17, 3: 0.28}
+
+
+def _swipe(rng: np.random.Generator, stage: int, v: int = 1) -> np.ndarray:
+    # three takes: as built first, a little lower with the claws further apart, a little higher
+    # with them closer together (the flanging of three claws moves with their spacing)
+    tune = (1.0, 0.92, 1.08)[v - 1]
+    spread = (1.0, 1.22, 0.86)[v - 1]
     dur = {1: 0.42, 2: 0.66, 3: 1.05}[stage]
-    tp = {1: 0.11, 2: 0.17, 3: 0.28}[stage]
+    tp = SWIPE_PEAK[stage]
     n = n_(dur)
     fa, fb, fc_ = {1: (900, 3200, 1000), 2: (480, 1700, 450), 3: (210, 820, 170)}[stage]
-    path = dsp.env([(0, fa), (tp, fb), (dur, fc_)], n, "exp")
+    path = dsp.env([(0, fa * tune), (tp, fb * tune), (dur, fc_ * tune)], n, "exp")
     air = parts.whoosh(n, rng, path, 0.7) * dsp.hump(n, tp, 2.2, 1.7)
-    air = parts.comb(air, [2.1 * stage, 4.7 * stage], [0.7, 0.5])                # three claws: a hollow, flanged cut
+    air = parts.comb(air, [2.1 * stage * spread, 4.7 * stage * spread], [0.7, 0.5])     # three claws: a hollow, flanged cut
     edge = parts.whoosh(n, rng, path * 2.6, 0.4, slope=0.0) * dsp.hump(n, tp, 5.0, 3.5)
     mass = parts.whoosh(n, rng, path * 0.28, 0.6, slope=-6.0) * dsp.hump(n, tp * 1.15, 2.0, 1.5)
     return dsp.mix((air, 1.0), (edge, 0.4), (mass, {1: 0.35, 2: 0.8, 3: 1.3}[stage]))
 
 
 for _s in (1, 2, 3):
-    sfx(f"kaiju_swipe_s{_s}", "kaiju", level={1: -22.0, 2: -19.0, 3: -16.0}[_s], group="swipe",
-        use=f"Swipe at stage {_s}: claws through the air. Start it about "
-            f"{ {1: 0.11, 2: 0.17, 3: 0.28}[_s]:.2f} s before the hit frame.")(
-        lambda rng, v, s=_s: _swipe(rng, s))
+    sfx(f"kaiju_swipe_s{_s}", "kaiju", variants=3, level={1: -22.0, 2: -19.0, 3: -16.0}[_s], group="swipe",
+        use=f"Swipe at stage {_s} (one claw): claws through the air. Start it about "
+            f"{SWIPE_PEAK[_s]:.2f} s before the hit frame. The two-claw rake is kaiju_rake.")(
+        lambda rng, v, s=_s: _swipe(rng, s, v))
 
 
 # ---- body sounds -------------------------------------------------------------------------------

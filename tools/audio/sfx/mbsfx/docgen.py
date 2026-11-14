@@ -42,13 +42,18 @@ the same code gives the same sounds. Intermediate WAV files go to `/tmp/mb-scrat
 Source layout (`tools/audio/sfx/mbsfx/`): `dsp.py` (noise, filters, oscillators, envelopes,
 synthetic impulse responses, limiter), `parts.py` (shared building blocks: thumps, bursts,
 whooshes, debris, crackle), `kaiju.py`, `humans.py`, `world.py`, `ui.py`, `tier2.py` (one small
-function per sound), `master.py` (levels, fades, loop layout, encoding), `analyze.py` (the checks
-and pictures), `docgen.py` (this file).
+function per sound), and for phases 1 to 3 `moves.py` (the monster's moves and attack looks),
+`army.py` (the pick-up weapons, crates, tracks, the roar's stun) and `city.py` (the special
+buildings, the city weapons, civilians, air at speed); `master.py` (levels, fades, loop layout,
+encoding), `analyze.py` (the checks and pictures), `docgen.py` (this file).
 
 ## For whoever wires these into the game
 
 - **Names.** A sound marked with variants has files `<id>_1`, `<id>_2`, `<id>_3`; pick one at
-  random each time. A sound with one variant is just `<id>`. The manifest lists the paths.
+  random each time (the game never takes the same one twice running). A sound with one variant
+  is just `<id>`. The manifest lists the paths. One exception: the three variants of
+  `kaiju_stumble_s1..s3` are the three stumble looks (forward onto a knee, spinning out,
+  sitting down hard), so the game plays the one its animation shows.
 - **Levels are already mixed.** `gain` is 1 for everything: a footstep is already quieter than an
   explosion, an ambience already sits under both. Scale whole groups in the mixer, not files.
   A sound that holds for seconds sits under the voice lines: the beam loop is 3 dB quieter than
@@ -60,8 +65,10 @@ and pictures), `docgen.py` (this file).
 - **One-shots start on the first sample.** An impact is at time zero, so trigger it on the
   frame of the hit. That includes the molt blast: trigger it on the blast frame, as the cocoon
   music stops. Where a sound leads up to its moment, the "loudest at" column says how long
-  before the moment to start it: the swipes, `jet_flyby` (1.2 s), `generator_overload` (2.2 s)
-  and `relic_open` (1.9 s).
+  before the moment to start it: the swipes, the rake, the tail sweep and `club_swing` (start
+  each that long before its strike), `jet_flyby` (1.2 s), `generator_overload` (2.2 s) and
+  `relic_open` (1.9 s). `supply_drop` is heard from the moment a crate leaves the plane, so its
+  plane is overhead 0.8 s in and the parachute snaps open at 0.9 s.
 - **Loops.** A loop file is `[0.25 s lead-in][loop body][0.25 s pad]`, the same layout as the
   music. Play from the start and loop between the two times in the manifest (`loop: [start, end]`,
   in seconds). The lead-in is the end of the body faded in and the pad is its beginning, so the
@@ -71,11 +78,17 @@ and pictures), `docgen.py` (this file).
 - **Playback rate.** `kaiju_hurt` is one size of animal: play it at about 1.2, 1.0 and 0.8 for
   stages 1, 2 and 3. `laser_charge_loop` is meant to rise with the charge, from 1.0 at empty to
   1.5 at full; `volley_ready` starts on the pitch the loop has reached by then and locks a
-  fourth above it. `tank_engine_loop`, `heli_loop` and `drone_loop` speed up with the vehicle.
+  fourth above it. `tank_engine_loop`, `heli_loop` and `drone_loop` speed up with the vehicle;
+  `tank_tracks_loop` too (about 0.6 to 1.2), and it is silent at a standstill. `kaiju_gulp` is
+  one size, like `kaiju_hurt`: 1.2, 1.0 and 0.8 for the three stages. `speed_wind_loop` is not
+  positional: raise it with the speed.
 - **In tune with the music.** The three `bell` variants are three bells (D, F and A, the home
   chord of the score), so picking one at random is right and several trucks ring a chord.
   `chant_loop` is eight beats at the music's 96 beats a minute, in its key: start it on a beat
   of the stage music where that is easy. `relic_open` ends on the only major chord in the game.
+  The four `civ_pop` pitches are D, F and A (the home chord) and a low A; `fire_bell` rings on D,
+  `stun_ring` on A and F, and the hum of `substation_hum_loop` and every electric arc sits on A
+  (110 Hz), the fifth of D.
 
 ## The signature roar
 
@@ -184,7 +197,12 @@ LIMITS = [
     "Ambience loops are 16 s long. The bird phrases and the far foghorn (sunset) repeat every pass; "
     "if that becomes noticeable, play them quieter or generate longer loops (one number in `world.py`).",
     "The hurt, stagger and death sounds exist at one size. The roar is the only utterance with a "
-    "version per stage.",
+    "version per stage, with the charge's bellow and the stumble's grunts (phases 1 to 3).",
+    "The sounds of phases 1 to 3 (`moves.py`, `army.py`, `city.py`) were made to replace sounds the "
+    "game had borrowed from other events. Their in-game levels were set against the sounds they sit "
+    "beside (the stomp, the swipe, the explosions, a tank shot) in offline renders of the game's own "
+    "mixer, not by ear (docs/STATUS.md, the phase 3 sound section). The building's groan, the "
+    "power surge and the fire bell are the furthest from anything recorded: listen to those first.",
     "The Tier 2 sounds were made from the design text, before the kaiju and units that use them "
     "exist in the game. Expect to adjust levels and lead times when they are wired in. The Crab, "
     "the Burrower and the Moth have a roar each and nothing else of their own yet: their hurt, "

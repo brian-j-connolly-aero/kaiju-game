@@ -11,11 +11,13 @@ import type { PickupWeaponDef, WeaponDef } from './schema';
 export const CRATE_RULES = {
   /**
    * When a stage starts, one crate comes down for every squad, on a street near its leader. Then
-   * one every `every` seconds, for each squad still in the fight in turn, while fewer than
-   * `maxDown` (per stage) are coming down or lying about.
+   * one every `every` seconds (per stage), for each squad still in the fight in turn, while fewer
+   * than `maxDown` (per stage) are coming down or lying about. Stages 2 and 3 were every 30 s
+   * with 4 and 5 down until phase 3's pacing pass, which made something new happen to a squad
+   * about every 20 to 25 s at every stage (docs/BALANCE.md section 11).
    */
-  every: 30,
-  maxDown: [3, 4, 5] as PerStage<number>,
+  every: [30, 12, 15] as PerStage<number>,
+  maxDown: [3, 6, 8] as PerStage<number>,
   /** Seconds a crate takes to come down under its parachute, from this many meters up (straight down, at a steady speed). */
   fallTime: 4,
   dropHeight: 90,

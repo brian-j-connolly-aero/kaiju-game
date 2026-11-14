@@ -13,6 +13,12 @@ export interface ModelEntry {
    * the tint. Buildings also give `base`, the wall color the model was painted in.
    */
   tint?: { colors?: string[]; base?: string };
+  /**
+   * Buildings with roof faces (phase 3): vertex color alpha 0.5 marks the faces that take the
+   * district's roof color, multiplied by roof color / `base` (docs/art/client-notes-city.md
+   * section 2, "Roofs").
+   */
+  roof?: { base?: string };
   /** Kaiju: pose targets, degrees per node relative to the rest pose (ASSETS.md section 7). */
   poses?: Record<string, Record<string, [number, number, number]>>;
   /**

@@ -16,12 +16,18 @@
  * - standing buildings sway when the monster stomps near them (`wobble`), props hop at its
  *   footsteps (`hop`), and city weapons lying loose (dropped, or a mast's top) are drawn with the
  *   props (`setLoose`).
+ *
+ * Phase 3 (roofs colored by district): the roof faces a model marks (vertex color alpha 0.5) take
+ * the roof color of the district the building stands in, in one of a few shades picked by its id
+ * (`roofPaint`), one more value per instance beside the wall paint, so still one draw call per
+ * archetype and state; the falling pieces and the mounds carry it too.
  */
 
 import * as THREE from 'three';
 import {
   archetypeDef,
   archetypeModelId,
+  archetypeSpecial,
   ARCHETYPES,
   CITY_WEAPON_KINDS,
   hash32,
@@ -37,7 +43,7 @@ import type { AssetStore } from '../assets/assetStore';
 import type { CityMirror } from '../net/cityMirror';
 import { propAlive, propWrecked } from '../net/cityMirror';
 import type { LandmarkModel } from './landmarkPictures';
-import { INSTANCE_SHADE, type Materials } from './materials';
+import { INSTANCE_ROOF, INSTANCE_SHADE, PAINT_MASK, type Materials } from './materials';
 import { archetypeGeometry, type ArchetypeGeometry, type ChunkBox, type StatePart } from './structureGeometry';
 
 /**
@@ -81,6 +87,30 @@ export function wallPaint(tint: ModelTint | null, id: number, district: number):
   const paint = new THREE.Color(tone.r / Math.max(base.r, 0.02), tone.g / Math.max(base.g, 0.02), tone.b / Math.max(base.b, 0.02));
   return { tone, paint };
 }
+
+/**
+ * Shades of a district's roof color (multipliers on the linear color), one picked per building
+ * by its id, so a street of one district is not one flat color (docs/art/client-notes-city.md
+ * section 2, "Roofs").
+ */
+export const ROOF_SHADES: readonly number[] = [0.84, 0.92, 1.0, 1.1];
+
+/**
+ * The paint of structure `id`'s roof faces (phase 3, roofs colored by district): `tone` is the
+ * color its roofs show (the district's roof color `roof` in one of ROOF_SHADES, picked by the
+ * id), `paint` the instance value that turns the model's grey roofs (`base`, its manifest `roof`
+ * entry) into it, tone / base per channel (above 1 is fine). A model without roof faces (`base`
+ * null) or a district without a roof color keeps the art's own roofs: no tone, white paint.
+ */
+export function roofPaint(base: string | null, id: number, roof: number | undefined): { tone: THREE.Color | null; paint: THREE.Color } {
+  if (base === null || roof === undefined) return { tone: null, paint: new THREE.Color(1, 1, 1) };
+  const b = new THREE.Color(base);
+  const tone = new THREE.Color(roof).multiplyScalar(ROOF_SHADES[hash32(id, 92) % ROOF_SHADES.length]);
+  const paint = new THREE.Color(tone.r / Math.max(b.r, 0.02), tone.g / Math.max(b.g, 0.02), tone.b / Math.max(b.b, 0.02));
+  return { tone, paint };
+}
+
+const WHITE = new THREE.Color(1, 1, 1);
 
 /** Visual state index for a structure stage: 0 intact, 1 damaged (stages 1 and 2), 2 rubble. 3 is fallen over (set apart from the stage). */
 function stateOf(stage: number): number {
@@ -133,9 +163,10 @@ const CLASS_TONES: Record<StructureClass, number[]> = {
 };
 
 /**
- * How a batch's instance color is used. `tint`: the city atlas with a wall mask; the instance
- * color is the wall paint and `instanceShade` darkens every face (a real model). `tone`: a box
- * stand-in, the instance color is tone times shade. `shade`: any other part, grey by shade.
+ * How a batch's instance color is used. `tint`: the city atlas with the paint mask; the instance
+ * color is the wall paint, `instanceRoof` the roof paint and `instanceShade` darkens every face
+ * (a real model). `tone`: a box stand-in, the instance color is tone times shade. `shade`: any
+ * other part, grey by shade.
  */
 type PaintMode = 'tint' | 'tone' | 'shade';
 
@@ -147,6 +178,8 @@ interface StateMesh {
   mode: PaintMode;
   /** `tint` meshes: one shade per instance. */
   shade: THREE.InstancedBufferAttribute | null;
+  /** `tint` meshes: one roof paint per instance (three floats). */
+  roof: THREE.InstancedBufferAttribute | null;
   role: MeshRole;
 }
 
@@ -193,10 +226,14 @@ interface Chunk {
   bw: number;
   bh: number;
   bd: number;
-  /** The building's wall paint, for the piece's masked faces. */
+  /** The building's wall paint, for the piece's wall faces. */
   pr: number;
   pg: number;
   pb: number;
+  /** The building's roof paint, for the piece's roof faces. */
+  qr: number;
+  qg: number;
+  qb: number;
   age: number;
   /** Seconds after landing before it has sunk away. */
   rest: number;
@@ -306,6 +343,10 @@ export class CityView {
   private readonly tone: THREE.Color[] = [];
   /** Per structure: the instance color of a real model's masked walls (paint / the model's base). */
   private readonly paint: THREE.Color[] = [];
+  /** Per structure: the roof paint of a real model's roof faces (the district's roof color / the model's grey), white for none. */
+  private readonly roofPaints: THREE.Color[] = [];
+  /** Per structure: the color its roofs show, or null where the art keeps its own roofs. */
+  private readonly roofTone: (THREE.Color | null)[] = [];
   /** Structures falling or lying fallen, by id. */
   private readonly falls = new Map<number, Fall>();
   private readonly wobbles = new Map<number, Wobble>();
@@ -381,12 +422,16 @@ export class CityView {
     // Allocate the color buffer up front so every instance always has a color.
     mesh.setColorAt(0, tmpColor.set(0xffffff));
     let shade: THREE.InstancedBufferAttribute | null = null;
+    let roof: THREE.InstancedBufferAttribute | null = null;
     if (mode === 'tint') {
       shade = new THREE.InstancedBufferAttribute(new Float32Array(Math.max(1, count)).fill(1), 1);
       mesh.geometry.setAttribute(INSTANCE_SHADE, shade);
+      // The roof paint rides along as one more per-instance value: no extra draw call.
+      roof = new THREE.InstancedBufferAttribute(new Float32Array(Math.max(1, count) * 3).fill(1), 3);
+      mesh.geometry.setAttribute(INSTANCE_ROOF, roof);
     }
     this.group.add(mesh);
-    return { mesh, mode, shade, role };
+    return { mesh, mode, shade, roof, role };
   }
 
   private buildStructures(assets: AssetStore, materials: Materials): void {
@@ -408,28 +453,50 @@ export class CityView {
       ];
       this.batches.set(id, { def, geometry, count, states, fallen: null, tops: null });
     }
-    const districtTint = (x: number, z: number): number => {
-      for (const d of this.city.districts) if (d.tint !== undefined && insidePolygon(x, z, d.polygon)) return d.tint;
-      return 0xffffff;
-    };
     for (const s of this.city.structures) {
       const batch = this.batches.get(s.archetype);
       if (!batch) continue;
       this.slotBatch[s.id] = batch;
+      this.roofPaints[s.id] = WHITE;
+      this.roofTone[s.id] = null;
       if (batch.geometry.procedural) {
         const tones = CLASS_TONES[s.cls] ?? CLASS_TONES.house;
         this.tone[s.id] = new THREE.Color(tones[hash32(s.id, 77) % tones.length]);
         this.paint[s.id] = this.tone[s.id];
       } else {
         // Landmarks are one-offs, modeled in their final colors (docs/CITY.md section 2).
-        const tint = s.landmark === null ? assets.modelTint(archetypeModelId(batch.def)) : null;
-        const { tone, paint } = wallPaint(tint, s.id, s.landmark === null ? districtTint(s.x, s.z) : 0xffffff);
+        const ordinary = s.landmark === null;
+        const modelId = archetypeModelId(batch.def);
+        const where = ordinary ? this.districtColors(s.x, s.z) : null;
+        const { tone, paint } = wallPaint(ordinary ? assets.modelTint(modelId) : null, s.id, where?.tint ?? 0xffffff);
         this.tone[s.id] = tone;
         this.paint[s.id] = paint;
+        // Roofs take the district's roof color (phase 3); landmarks, bridges and the special
+        // buildings keep their own (their models mark no roof faces anyway).
+        if (where && s.cls !== 'bridge' && archetypeSpecial(s.archetype) === null) {
+          const roof = roofPaint(assets.modelRoof(modelId), s.id, where.roof);
+          this.roofPaints[s.id] = roof.paint;
+          this.roofTone[s.id] = roof.tone;
+        }
       }
       this.place(s, 0);
     }
     this.flush();
+  }
+
+  /** The building tint and the roof color of the district a point is in (the first district that has each). */
+  private districtColors(x: number, z: number): { tint: number; roof: number | undefined } {
+    let tint: number | undefined;
+    let roof: number | undefined;
+    for (const d of this.city.districts) {
+      const wantTint = tint === undefined && d.tint !== undefined;
+      const wantRoof = roof === undefined && d.roof !== undefined;
+      if ((!wantTint && !wantRoof) || !insidePolygon(x, z, d.polygon)) continue;
+      if (wantTint) tint = d.tint;
+      if (wantRoof) roof = d.roof;
+      if (tint !== undefined && roof !== undefined) break;
+    }
+    return { tint: tint ?? 0xffffff, roof };
   }
 
   /** The fallen batch of an archetype, made the first time one of its structures falls over. */
@@ -476,6 +543,11 @@ export class CityView {
         m.shade.setX(index, shade);
         m.shade.needsUpdate = true;
       }
+      if (m.roof) {
+        const roof = this.roofPaints[id] ?? WHITE;
+        m.roof.setXYZ(index, roof.r, roof.g, roof.b);
+        m.roof.needsUpdate = true;
+      }
     } else if (m.mode === 'tone') {
       const tone = stage >= 3 ? tmpColor.set(0xffffff) : tmpColor.copy(this.tone[id]);
       m.mesh.setColorAt(index, tone.multiplyScalar(shade));
@@ -514,7 +586,7 @@ export class CityView {
     const last = from.ids.length - 1;
     if (index !== last) {
       const moved = from.ids[last];
-      for (const { mesh, shade } of from.meshes) {
+      for (const { mesh, shade, roof } of from.meshes) {
         mesh.getMatrixAt(last, tmpMatrix);
         mesh.setMatrixAt(index, tmpMatrix);
         if (mesh.instanceColor) {
@@ -524,6 +596,10 @@ export class CityView {
         if (shade) {
           shade.setX(index, shade.getX(last));
           shade.needsUpdate = true;
+        }
+        if (roof) {
+          roof.setXYZ(index, roof.getX(last), roof.getY(last), roof.getZ(last));
+          roof.needsUpdate = true;
         }
       }
       from.ids[index] = moved;
@@ -668,6 +744,16 @@ export class CityView {
   /** The color a structure's walls show (for chunks, the map). */
   toneOf(id: number): THREE.Color {
     return this.tone[id] ?? tmpColor.set(0xffffff);
+  }
+
+  /** The color a structure's roofs show (its district's roof color in its shade), or null where the art keeps its own roofs. */
+  roofOf(id: number): THREE.Color | null {
+    return this.roofTone[id] ?? null;
+  }
+
+  /** The roof paint a structure's instances carry (roof color / the model's grey; white for none). Tests. */
+  roofPaintOf(id: number): THREE.Color {
+    return this.roofPaints[id] ?? WHITE;
   }
 
   /** The archetype geometry a structure is drawn with (its effect anchors, its top), or null. */
@@ -879,17 +965,18 @@ export class CityView {
     const sin = Math.sin(s.yaw);
     const tone = this.tone[s.id] ?? tmpColor.set(0xffffff);
     const paint = this.paint[s.id] ?? tone;
+    const roof = this.roofPaints[s.id] ?? WHITE;
     const boxes = batch.geometry.chunks;
     const sx = (s.hx * 2) / batch.def.footprint[0];
     const sy = s.height / batch.def.height;
     const sz = (s.hz * 2) / batch.def.footprint[1];
     for (const c of boxes) {
       if (fraction < 1 && this.rand() > fraction) continue;
-      this.addChunk(s, c, sx, sy, sz, cos, sin, tone, paint, fraction < 1);
+      this.addChunk(s, c, sx, sy, sz, cos, sin, tone, paint, roof, fraction < 1);
     }
   }
 
-  private addChunk(s: Structure, c: ChunkBox, sx: number, sy: number, sz: number, cos: number, sin: number, tone: THREE.Color, paint: THREE.Color, small: boolean): void {
+  private addChunk(s: Structure, c: ChunkBox, sx: number, sy: number, sz: number, cos: number, sin: number, tone: THREE.Color, paint: THREE.Color, roof: THREE.Color, small: boolean): void {
     if (this.chunks.length >= MAX_CHUNKS) this.chunks.shift();
     const lx = c.x * sx;
     const lz = c.z * sz;
@@ -926,6 +1013,9 @@ export class CityView {
       pr: paint.r,
       pg: paint.g,
       pb: paint.b,
+      qr: roof.r,
+      qg: roof.g,
+      qb: roof.b,
       age: -this.rand() * 0.25 * (c.y * sy > 20 ? 1 : 0.3),
       rest: 1.2 + this.rand() * 0.8,
       landed: false,
@@ -1029,12 +1119,15 @@ export class CityView {
       position[o + 2] = e[2] * x + e[6] * y + e[10] * z + e[14];
       uv[(start + v) * 2] = piece.uv[v * 2];
       uv[(start + v) * 2 + 1] = piece.uv[v * 2 + 1];
-      // The masked faces take the building's paint, as on the standing building.
+      // The masked faces take the building's paints, as on the standing building: the walls its
+      // wall color, the roofs its district's roof color (the three-level mask, materials.ts).
       const a = piece.color[v * 4 + 3];
+      const wall = a >= PAINT_MASK.wall;
+      const roofFace = !wall && a >= PAINT_MASK.roof;
       const q = (start + v) * 4;
-      color[q] = piece.color[v * 4] * (1 + (c.pr - 1) * a) * c.r;
-      color[q + 1] = piece.color[v * 4 + 1] * (1 + (c.pg - 1) * a) * c.g;
-      color[q + 2] = piece.color[v * 4 + 2] * (1 + (c.pb - 1) * a) * c.b;
+      color[q] = piece.color[v * 4] * (wall ? c.pr : roofFace ? c.qr : 1) * c.r;
+      color[q + 1] = piece.color[v * 4 + 1] * (wall ? c.pg : roofFace ? c.qg : 1) * c.g;
+      color[q + 2] = piece.color[v * 4 + 2] * (wall ? c.pb : roofFace ? c.qb : 1) * c.b;
       color[q + 3] = 1;
     }
     return start + count;

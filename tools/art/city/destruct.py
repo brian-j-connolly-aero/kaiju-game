@@ -6,7 +6,8 @@
              A hole cuts only what it reaches; small parts are cut at its edge (not dropped),
              and what it leaves visible from behind gets a back side (_back_sides)
     rubble   a low grey heap inside the footprint: a broken base, rough mounds, bent beams,
-             a few slabs of the building's own facade lying on top, plus the building's
+             a few slabs of the building's own facade lying on top (the first one a piece of
+             its roof, when the roof takes the district's color), plus the building's
              keepsake (b.keepsake) if it has one
     chunks   6 to 24 pieces that together approximate the intact building: its solids cut
              on a jittered grid, each piece textured from the face it came from, broken faces
@@ -354,11 +355,18 @@ def rubble(b, limit: int) -> Mesh:
                 if nrm[2] < -0.5:
                     continue
                 m += _map_once(poly, "rubble", greys[int(rng.integers(4))])
-        # slabs of the building's own facade lying on the heap
+        # slabs of the building's own facade lying on the heap; the first one is a piece of its
+        # roof when the roof takes the district's color (it keeps the roof mask), so a ruin
+        # still shows whose street it was
         walls = [f for f in b.intact.faces if f.tag == "wall" and f.region and f.area > 2.0]
         walls.sort(key=lambda f: -f.area)
+        roofs = [f for f in b.intact.faces if f.region and getattr(atlas.REGIONS.get(f.region), "roof", False)
+                 and f.area > 2.0]
+        roofs.sort(key=lambda f: -f.area)
         for k in range(min(n_slabs, len(walls))):
             src = walls[int(rng.integers(min(len(walls), 8)))]
+            if k == 0 and roofs:
+                src = roofs[0]
             m += _slab(src, rng, W, D, hh)
         # bent beams
         for _ in range(n_beams):

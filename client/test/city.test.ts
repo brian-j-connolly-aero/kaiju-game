@@ -1,36 +1,44 @@
 /**
  * The city as the client draws it (docs/art/client-notes-city.md): building paint (the model's
- * wall colors and the district tint on the masked walls), the damage shade, the three states as
- * instanced batches, the collapse pieces from the art's own chunk meshes, the night ground, and
- * the follow-ups of the city task: the lobby's sleeping seats, the autopilot's volleys, the
- * thrown object leaving the hand.
+ * wall colors and the district tint on the masked walls, the district's roof color on the
+ * roofs), the damage shade, the three states as instanced batches, the collapse pieces from the
+ * art's own chunk meshes, the night ground, and the follow-ups of the city task: the lobby's
+ * sleeping seats, the autopilot's volleys, the thrown object leaving the hand.
  */
 
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { archetypeModelId, getCity, type LobbyState, type SnapUnit } from '@mb/shared';
+import { archetypeModelId, archetypeSpecial, getCity, type LobbyState, type SnapUnit } from '@mb/shared';
 import type { AssetStore } from '../src/assets/assetStore';
 import { box, merge, paint } from '../src/assets/procedural/geo';
 import { proceduralModel } from '../src/assets/procedural/models';
 import type { RigModel } from '../src/assets/rigModel';
 import { seatAsleep } from '../src/app/screens/lobby';
 import { volleyPlan } from '../src/game/autoplay';
-import { CityView, insidePolygon, shadeOf, wallPaint } from '../src/render/cityView';
+import { CityView, insidePolygon, ROOF_SHADES, roofPaint, shadeOf, wallPaint } from '../src/render/cityView';
 import { buildGround, setGroundNight } from '../src/render/ground';
 import { pictureTriangles } from '../src/render/landmarkPictures';
-import { createMaterials, INSTANCE_SHADE } from '../src/render/materials';
+import { createMaterials, INSTANCE_ROOF, INSTANCE_SHADE, maskLevel } from '../src/render/materials';
 import { HAND_BLEND, handBlend } from '../src/render/projectilesView';
 import { hasIconArt } from '../src/ui/iconArt';
+import { districtGround } from '../src/ui/mapView';
 import { chunkMesh } from '../src/render/structureGeometry';
 
 const BASE = '#f3e3b3';
 const COLORS = ['#f3e3b3', '#f2a48b', '#a8d4f0'];
+/** The grey the art draws marked roofs in (the manifest's `roof.base`). */
+const ROOF_BASE = '#d9d9d9';
 
 /** A building file as the art kit makes it: intact, damaged, rubble and two chunks, all `city_atlas`. */
 function fakeBuilding(id: string): RigModel {
   const atlas = (g: THREE.BufferGeometry): { geometry: THREE.BufferGeometry; material: 'city_atlas' } => ({ geometry: g, material: 'city_atlas' });
-  // Walls masked (alpha 1), a roof that is not (alpha 0).
-  const intact = merge([box(4, 3, 4, 0xffffff, 0, 1.5, 0, 1), paint(new THREE.BoxGeometry(4.4, 0.4, 4.4).translate(0, 3.2, 0), 0xc8573b, 0)]);
+  // Walls masked for the wall color (alpha 1), a grey roof marked for the roof color (alpha 0.5),
+  // a chimney the art keeps (alpha 0).
+  const intact = merge([
+    box(4, 3, 4, 0xffffff, 0, 1.5, 0, 1),
+    paint(new THREE.BoxGeometry(4.4, 0.4, 4.4).translate(0, 3.2, 0), ROOF_BASE, 0.5),
+    box(0.5, 1, 0.5, 0x884433, 1, 3.8, 1, 0),
+  ]);
   const node = (name: string, parts: THREE.BufferGeometry[], position = new THREE.Vector3()): RigModel['nodes'][number] => ({
     name,
     parent: -1,
@@ -38,25 +46,26 @@ function fakeBuilding(id: string): RigModel {
     quaternion: new THREE.Quaternion(),
     parts: parts.map(atlas),
   });
-  const piece = (): THREE.BufferGeometry => box(1, 1, 1, 0xffffff, 0, 0, 0, 1);
+  const piece = (mask: number): THREE.BufferGeometry => box(1, 1, 1, mask === 0.5 ? ROOF_BASE : 0xffffff, 0, 0, 0, mask);
   return {
     id,
     nodes: [
       node('intact', [intact]),
       node('damaged', [intact.clone()]),
       node('rubble', [box(4, 0.6, 4, 0x888888, 0, 0.3, 0, 0)]),
-      node('chunk_00', [piece()], new THREE.Vector3(-1, 2.5, 0)),
-      node('chunk_01', [piece()], new THREE.Vector3(1, 0.5, 0)),
+      // A piece of the roof up top and a piece of wall below.
+      node('chunk_00', [piece(0.5)], new THREE.Vector3(-1, 2.5, 0)),
+      node('chunk_01', [piece(1)], new THREE.Vector3(1, 0.5, 0)),
     ],
     bounds: new THREE.Box3(new THREE.Vector3(-2, 0, -2), new THREE.Vector3(2, 3.4, 2)),
     procedural: false,
   };
 }
 
-function fakeAssets(): AssetStore {
+function fakeAssets(missing: readonly string[] = []): AssetStore {
   const models = new Map<string, RigModel>();
   const fake = {
-    hasModel: (id: string) => id.startsWith('bld_') || id.startsWith('lm_'),
+    hasModel: (id: string) => (id.startsWith('bld_') || id.startsWith('lm_')) && !missing.includes(id),
     model: (id: string) => {
       let m = models.get(id);
       if (!m) {
@@ -67,6 +76,7 @@ function fakeAssets(): AssetStore {
     },
     modelTint: (id: string) => (id.startsWith('bld_') || id.startsWith('lm_') ? { base: BASE, colors: COLORS } : null),
     modelTints: () => [],
+    modelRoof: (id: string) => (id.startsWith('bld_') ? ROOF_BASE : null),
     texture: () => new THREE.Texture(),
   };
   return fake as unknown as AssetStore;
@@ -117,6 +127,45 @@ describe('building paint', () => {
     ];
     expect(insidePolygon(5, 5, square)).toBe(true);
     expect(insidePolygon(15, 5, square)).toBe(false);
+  });
+});
+
+describe('roofs colored by district (phase 3)', () => {
+  it('reads the paint mask in three levels, with margins', () => {
+    expect([1, 0.9, 0.75].map(maskLevel)).toEqual(['wall', 'wall', 'wall']);
+    // Exact 0.5 in the files; 128/255 in a copy squeezed into bytes.
+    expect([0.5, 128 / 255, 0.3, 0.7].map(maskLevel)).toEqual(['roof', 'roof', 'roof', 'roof']);
+    expect([0, 0.1, 0.2].map(maskLevel)).toEqual(['none', 'none', 'none']);
+  });
+
+  it("turns the model's grey roof into the district's roof color, a few shades apart from building to building", () => {
+    const roof = 0x6b8a46;
+    const grey = new THREE.Color(ROOF_BASE);
+    const shades = new Set<number>();
+    for (let id = 0; id < 80; id++) {
+      const { tone, paint: p } = roofPaint(ROOF_BASE, id, roof);
+      expect(tone).not.toBeNull();
+      // The roof shows grey * paint = tone, and tone is the roof color in one of the shades.
+      const shade = (tone as THREE.Color).r / new THREE.Color(roof).r;
+      expect(ROOF_SHADES.some((s) => Math.abs(s - shade) < 1e-6)).toBe(true);
+      shades.add(Math.round(shade * 100));
+      expect(grey.r * p.r).toBeCloseTo((tone as THREE.Color).r, 5);
+      expect(grey.g * p.g).toBeCloseTo((tone as THREE.Color).g, 5);
+      expect(grey.b * p.b).toBeCloseTo((tone as THREE.Color).b, 5);
+    }
+    expect(shades.size).toBe(ROOF_SHADES.length);
+    // A district without a roof color, or a model with no roof faces: the art's own roofs.
+    expect(roofPaint(ROOF_BASE, 3, undefined).paint.getHex()).toBe(0xffffff);
+    expect(roofPaint(null, 3, roof).paint.getHex()).toBe(0xffffff);
+  });
+
+  it('gives every district of Port Meridian its own ground on the map, from its roof color', () => {
+    const districts = getCity().city.districts;
+    expect(districts.every((d) => d.roof !== undefined)).toBe(true);
+    const grounds = districts.map((d) => districtGround(d));
+    expect(new Set(grounds).size).toBe(districts.length);
+    // Dark enough for the night-blue map: the standing buildings (#9aa7bd) stay the brightest thing.
+    for (const g of grounds) expect(parseInt(g.slice(1, 3), 16) + parseInt(g.slice(3, 5), 16) + parseInt(g.slice(5, 7), 16)).toBeLessThan(0x9a + 0xa7 + 0xbd - 120);
   });
 });
 
@@ -219,6 +268,112 @@ describe('the city view on Port Meridian', () => {
     expect(view.toneOf(lm?.id ?? 0).getHex()).toBe(0xffffff);
   });
 
+  /** Where structure `id` is drawn now: its mesh and instance. */
+  const instanceOf = (id: number): { mesh: THREE.InstancedMesh; index: number } => {
+    const s = city.structures[id];
+    const m4 = new THREE.Matrix4();
+    for (const m of meshes()) {
+      if (m.material !== materials.cityTint) continue;
+      for (let i = 0; i < m.count; i++) {
+        m.getMatrixAt(i, m4);
+        if (Math.abs(m4.elements[12] - s.x) < 1e-3 && Math.abs(m4.elements[14] - s.z) < 1e-3) return { mesh: m, index: i };
+      }
+    }
+    throw new Error('structure not drawn');
+  };
+  const roofAt = (at: { mesh: THREE.InstancedMesh; index: number }): THREE.Color => {
+    const a = at.mesh.geometry.getAttribute(INSTANCE_ROOF) as THREE.BufferAttribute;
+    return new THREE.Color(a.getX(at.index), a.getY(at.index), a.getZ(at.index));
+  };
+
+  it("paints every ordinary building's roof in its district's roof color, as per-instance data (no extra batch)", () => {
+    const districtOf = (x: number, z: number) => city.districts.find((d) => insidePolygon(x, z, d.polygon));
+    // One house in every district that has houses: its instances carry the district's roof paint.
+    const seen = new Set<number>();
+    for (const s of city.structures) {
+      if (s.landmark !== null || s.cls !== 'house' || archetypeSpecial(s.archetype) !== null) continue;
+      const d = districtOf(s.x, s.z);
+      if (!d || d.roof === undefined || seen.has(d.id)) continue;
+      seen.add(d.id);
+      const expected = roofPaint(ROOF_BASE, s.id, d.roof).paint;
+      const carried = roofAt(instanceOf(s.id));
+      expect(carried.r).toBeCloseTo(expected.r, 5);
+      expect(carried.g).toBeCloseTo(expected.g, 5);
+      expect(carried.b).toBeCloseTo(expected.b, 5);
+      expect(view.roofOf(s.id)?.getHex()).toBe(roofPaint(ROOF_BASE, s.id, d.roof).tone?.getHex());
+    }
+    expect(seen.size).toBeGreaterThanOrEqual(6);
+    // Landmarks and the special buildings keep their own roofs.
+    const lm = city.structures.find((x) => x.landmark !== null);
+    const special = city.structures.find((x) => archetypeSpecial(x.archetype) !== null);
+    for (const s of [lm, special]) {
+      expect(s).toBeTruthy();
+      expect(view.roofOf(s?.id ?? 0)).toBeNull();
+      expect(roofAt(instanceOf(s?.id ?? 0)).getHex()).toBe(0xffffff);
+    }
+    // Every building batch carries the roof paint beside the shade.
+    for (const m of meshes().filter((x) => x.material === materials.cityTint)) expect(m.geometry.getAttribute(INSTANCE_ROOF)).toBeTruthy();
+  });
+
+  it('keeps the roof paint through damage, rubble, and another building taking its slot', () => {
+    const houses = city.structures.filter((x) => x.landmark === null && x.archetype === 'bungalow_a');
+    const [a, b] = houses;
+    const before = roofAt(instanceOf(b.id));
+    // a goes to rubble: the last of its batch moves into its slot, with its own roof paint.
+    view.setStage(a.id, 1, false);
+    view.setStage(a.id, 3, false);
+    view.flush();
+    expect(roofAt(instanceOf(b.id)).equals(before)).toBe(true);
+    const rubble = roofAt(instanceOf(a.id));
+    const own = view.roofPaintOf(a.id);
+    expect(rubble.r).toBeCloseTo(own.r, 5);
+    expect(rubble.g).toBeCloseTo(own.g, 5);
+    expect(rubble.b).toBeCloseTo(own.b, 5);
+    expect(own.getHex()).not.toBe(0xffffff);
+    view.reset();
+  });
+
+  it("drops the falling pieces' roofs in the roof color, their walls in the wall color", () => {
+    const s = city.structures.find((x) => x.landmark === null && x.cls === 'house' && view.roofOf(x.id) !== null);
+    expect(s).toBeTruthy();
+    const id = s?.id ?? 0;
+    view.setStage(id, 3, true);
+    view.flush();
+    view.update(0.01);
+    const pieces = view.group.children.find((o): o is THREE.Mesh => (o as THREE.Mesh).isMesh === true && !(o as THREE.InstancedMesh).isInstancedMesh && (o as THREE.Mesh).material === materials.cityAtlas);
+    const color = pieces?.geometry.getAttribute('color') as THREE.BufferAttribute;
+    // The roof piece's first 36 vertices (drawn in the grey the paint turns into the roof color),
+    // then the wall piece's (drawn white: it shows the wall paint itself). Each piece is a little
+    // dusty, by the same factor on all three channels: the ratios between channels are the paint's.
+    const roof = view.roofOf(id) as THREE.Color;
+    const tone = view.toneOf(id);
+    const base = new THREE.Color(BASE);
+    expect(color.getX(0) / color.getY(0)).toBeCloseTo(roof.r / roof.g, 4);
+    expect(color.getZ(0) / color.getY(0)).toBeCloseTo(roof.b / roof.g, 4);
+    expect(color.getX(36) / color.getY(36)).toBeCloseTo(tone.r / base.r / (tone.g / base.g), 4);
+    for (let i = 0; i < 200; i++) view.update(0.05);
+    view.reset();
+  });
+
+  it("draws a box stand-in for a new kind of building whose model is missing, through every state", () => {
+    const kinds = ['bungalow_a', 'duplex_a', 'garage_a', 'diner_a', 'firehouse_a', 'motel_a'];
+    const assets2 = fakeAssets(kinds.map((k) => `bld_${k}`));
+    const materials2 = createMaterials(assets2);
+    const view2 = new CityView(city, assets2, materials2);
+    const ofKinds = city.structures.filter((x) => kinds.includes(x.archetype));
+    expect(ofKinds.length).toBeGreaterThan(0);
+    for (const kind of kinds) expect(view2.geometryOf(ofKinds.find((x) => x.archetype === kind)?.id ?? -1)?.procedural).toBe(true);
+    const boxes = (): number =>
+      view2.group.children.reduce((n, o) => n + ((o as THREE.InstancedMesh).isInstancedMesh && (o as THREE.InstancedMesh).material === materials2.building ? (o as THREE.InstancedMesh).count : 0), 0);
+    expect(boxes()).toBe(ofKinds.length);
+    // Wrecked, a stand-in still shows (its damaged box, then its heap) and throws its pieces.
+    view2.setStage(ofKinds[0].id, 1, false);
+    view2.setStage(ofKinds[1].id, 3, true);
+    view2.flush();
+    expect(boxes()).toBe(ofKinds.length);
+    expect(view2.update(0.05)).toBeGreaterThan(0);
+  });
+
   it('lists the landmarks for the map pictures', () => {
     const landmarks = view.landmarkModels();
     const expected = new Set(city.structures.filter((s) => s.landmark !== null).map((s) => s.archetype));
@@ -250,10 +405,11 @@ describe('the ground at night', () => {
   it('dims the pale paving toward a warm grey, so it does not read as water under the moon', () => {
     const city = getCity().city;
     const ground = buildGround(city, fakeAssets());
-    const surfaces = ground.userData.nightSurfaces as { material: THREE.MeshLambertMaterial }[];
+    const surfaces = ground.userData.nightSurfaces as { material: THREE.MeshLambertMaterial; day?: THREE.Color }[];
     expect(surfaces.length).toBeGreaterThanOrEqual(4);
     setGroundNight(ground, 0);
-    for (const s of surfaces) expect(s.material.color.getHex()).toBe(0xffffff);
+    // By day every surface shows its texture as painted (the back lanes' gravel in its own warm tint).
+    for (const s of surfaces) expect(s.material.color.getHex()).toBe(s.day ? s.day.getHex() : 0xffffff);
     setGroundNight(ground, 1);
     const paving = surfaces[1].material.color;
     expect(paving.r).toBeLessThan(0.5);

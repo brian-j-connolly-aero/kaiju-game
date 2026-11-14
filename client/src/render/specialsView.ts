@@ -12,9 +12,10 @@
  * - The substation's burst (`powerSurge`): a blue-white flash, a ring and arcs of lightning that
  *   leap from the insulators to the monster for a second and a half. (The surge crackling on
  *   the monster's own body for its eight seconds is drawn with the monster.)
- * - The gas station's fireball (`fireball`): a white flash, a ball of flame that swells and rolls
- *   upward (a low-poly ball, in the model city's look), a shock ring, burning debris, then fire on
- *   the ruin and a column of black smoke for several seconds.
+ * - The gas station's fireball (`fireball`): a white flash, shock rings, then puffs of flame,
+ *   white-hot in the middle and orange round them, rolling up into a cap of dark smoke
+ *   (fireball.ts, phase 3), burning debris, then fire on the ruin and a column of black smoke for
+ *   several seconds.
  * - The radio mast: its fall is the city view's (it falls like any tall building, without its top,
  *   which tumbles off); here, sparks at the break while it falls and a shower of them where it lands.
  */
@@ -34,6 +35,7 @@ import {
 import type { AssetStore } from '../assets/assetStore';
 import { frameRect } from '../assets/spriteAtlas';
 import type { Effects } from './effects';
+import { Fireballs } from './fireball';
 import { LineBatch } from './lineBatch';
 import { QuadBatch } from './quadBatch';
 
@@ -67,18 +69,8 @@ interface Blaze {
   smokeTimer: number;
 }
 
-/** The ball of flame of a fireball: a low-poly ball that swells, rises and goes dark. */
-interface FlameBall {
-  mesh: THREE.Mesh;
-  x: number;
-  z: number;
-  radius: number;
-  t: number;
-}
-
 const BURST_TIME = 1.5;
 const BLAZE_TIME = 9;
-const BALL_TIME = 1.7;
 /** Lights of a special building are drawn out to this far (fog hides them sooner by day). */
 const LIGHT_RANGE = 2600;
 const SPARK_BLUE = 0xbfe4ff;
@@ -105,23 +97,6 @@ function fallbackAnchors(kind: SpecialKind, w: number, h: number, d: number): TH
   return [0.98, 0.65, 0.33].map((f) => new THREE.Vector3(0, h * f, 0));
 }
 
-/** A low-poly ball with flat warm facets, for the fireball. */
-function flameBallGeometry(): THREE.BufferGeometry {
-  // A polyhedron is built without an index already (converting it again only logs a warning).
-  const ball = new THREE.IcosahedronGeometry(1, 1);
-  const g = ball.index ? ball.toNonIndexed() : ball;
-  const count = g.getAttribute('position').count;
-  const colors = new Float32Array(count * 3);
-  const palette = [0xfff3b0, 0xffd060, 0xffa030, 0xff7a20, 0xffc850];
-  const c = new THREE.Color();
-  for (let f = 0; f < count / 3; f++) {
-    c.set(palette[(f * 7 + (f >> 2)) % palette.length]);
-    for (let v = 0; v < 3; v++) colors.set([c.r, c.g, c.b], (f * 3 + v) * 3);
-  }
-  g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  return g;
-}
-
 export class SpecialsView {
   readonly group = new THREE.Group();
   /** The lights' halos: added, one draw call (they carry the night). */
@@ -134,8 +109,8 @@ export class SpecialsView {
   private readonly byId = new Map<number, Special>();
   private readonly bursts: Burst[] = [];
   private readonly blazes: Blaze[] = [];
-  private readonly balls: FlameBall[] = [];
-  private readonly ballGeometry = flameBallGeometry();
+  /** The fireballs' puffs of flame and smoke: one mesh. */
+  readonly fireballs = new Fireballs();
   private readonly glowUv = [0, 0, 0, 0];
   private readonly tmp = new THREE.Vector3();
   private seed = 4242;
@@ -148,7 +123,7 @@ export class SpecialsView {
     this.cores = new QuadBatch(atlas.texture, { mode: 'facing', capacity: 128, renderOrder: 16 });
     const anim = [...assets.sprite('fx_glow').anims.values()][0];
     if (anim) frameRect(anim, 0, 0, this.glowUv, 0);
-    this.group.add(this.cores.mesh, this.lights.mesh, this.lines.mesh);
+    this.group.add(this.cores.mesh, this.lights.mesh, this.lines.mesh, this.fireballs.mesh);
     const prefix: Record<SpecialKind, string> = { substation: 'spark', gasstation: 'light', radiomast: 'lamp' };
     for (const s of city.structures) {
       const kind = archetypeSpecial(s.archetype);
@@ -187,8 +162,7 @@ export class SpecialsView {
   clear(): void {
     this.bursts.length = 0;
     this.blazes.length = 0;
-    for (const b of this.balls) b.mesh.removeFromParent();
-    this.balls.length = 0;
+    this.fireballs.clear();
   }
 
   // --- rewards -----------------------------------------------------------------------------------
@@ -224,8 +198,9 @@ export class SpecialsView {
   }
 
   /**
-   * The gas station goes up: a white flash, a ball of flame swelling to the blast's size and
-   * rolling up, a shock ring, burning bits, then fire on the ruin and black smoke for a while.
+   * The gas station goes up: a white flash, shock rings, torn metal and sparks, then the fireball
+   * itself, puffs of flame as big as the blast rolling up into dark smoke (fireball.ts), flames
+   * licking up from the ruin at once, and fire and black smoke on it for a while.
    */
   fireball(x: number, z: number, radius: number, effects: Effects): void {
     const r = Math.max(4, radius);
@@ -233,25 +208,10 @@ export class SpecialsView {
     effects.flash(x, r * 0.5, z, r * 3.2, 0xffffff, 0.22);
     effects.ring(x, z, r * 2.4, 0xffd9a0, 0.8, 1);
     effects.ring(x, z, r * 2, 0xffa050, 1.1, 0.7, r * 0.5);
-    effects.propaneBlast(x, 0.5, z, r * 0.6);
     effects.debris(x, r * 0.3, z, r * 1.2, 10, 0x6b5a4a, 1.2);
     effects.sparks(x, r * 0.3, z, r * 1.2, 14, 0xffc070, 0.9);
-    // Tongues of flame roll out of the ball's surface (the ball alone reads as a lamp).
-    for (let i = 0; i < 14; i++) {
-      const a = this.rand() * Math.PI * 2;
-      const up = this.rand() * 0.9 - 0.15;
-      const c = Math.cos(up);
-      const dx = Math.cos(a) * c;
-      const dy = Math.sin(up);
-      const dz = Math.sin(a) * c;
-      const out = r * (0.5 + this.rand() * 0.6);
-      effects.flame(x + dx * r * 0.55, r * 0.55 + dy * r * 0.55, z + dz * r * 0.55, r * (0.55 + this.rand() * 0.35), dx * out, dy * out + r * 0.5, dz * out, 0.8 + this.rand() * 0.6);
-    }
-    const mesh = new THREE.Mesh(this.ballGeometry, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, toneMapped: false }));
-    mesh.frustumCulled = false;
-    mesh.renderOrder = 15;
-    this.group.add(mesh);
-    this.balls.push({ mesh, x, z, radius: r, t: 0 });
+    for (let i = 0; i < 5; i++) effects.fire(x + (this.rand() - 0.5) * r * 0.6, 0, z + (this.rand() - 0.5) * r * 0.6, r * (0.3 + this.rand() * 0.2));
+    this.fireballs.burst(x, z, r);
     this.blazes.push({ x, z, radius: r * 0.55, t: 0, duration: BLAZE_TIME, fireTimer: 0, smokeTimer: 0 });
   }
 
@@ -261,7 +221,7 @@ export class SpecialsView {
    * Draws the lights of the special buildings still standing (`stageOf` gives a structure's
    * visual stage), the burst's arcs, the fireballs and the fires.
    */
-  update(dt: number, camera: THREE.Camera, stageOf: (id: number) => number, kaijus: readonly SnapKaiju[], effects: Effects, fog: { near: number; far: number }): void {
+  update(dt: number, camera: THREE.Camera, stageOf: (id: number) => number, kaijus: readonly SnapKaiju[], effects: Effects, fog: { near: number; far: number; color?: THREE.Color }): void {
     this.time += dt;
     const time = this.time;
     const cam = camera.position;
@@ -281,7 +241,10 @@ export class SpecialsView {
       else this.crackle(sp, stage, dt, time, far, dist, effects);
     }
     this.updateBursts(dt, kaijus, effects);
-    this.updateBalls(dt, effects);
+    // The fireballs' smoke is lit as brightly as the day is (the fog's color says how bright).
+    const f = fog.color;
+    const light = f ? Math.min(1, Math.max(0.25, 0.25 + 1.05 * (0.2126 * f.r + 0.7152 * f.g + 0.0722 * f.b))) : 1;
+    this.fireballs.update(dt, camera, light);
     this.updateBlazes(dt, effects);
     this.lines.setFog(fog.near, fog.far);
     this.lights.end();
@@ -393,39 +356,6 @@ export class SpecialsView {
         const width = Math.max(0.15, st.height * 0.025);
         this.arc(p.x, p.y, p.z, tx, ty, tz, width, fade);
         if (this.rand() < 0.4) effects.glowAt(tx, ty, tz, st.bodyRadius * 2, 0xbfe4ff, 0.08, fade);
-      }
-    }
-  }
-
-  private updateBalls(dt: number, effects: Effects): void {
-    for (let i = 0; i < this.balls.length; i++) {
-      const b = this.balls[i];
-      b.t += dt;
-      const u = b.t / BALL_TIME;
-      if (u >= 1) {
-        b.mesh.removeFromParent();
-        (b.mesh.material as THREE.Material).dispose();
-        this.balls.splice(i--, 1);
-        continue;
-      }
-      // Swells fast to most of the blast's size (the flames round it reach the rest), keeps
-      // rolling upward, burns down to a dark red and fades.
-      const swell = 1 - Math.pow(1 - Math.min(1, u * 3.2), 3);
-      const r = b.radius * (0.2 + 0.6 * swell + 0.12 * u);
-      b.mesh.position.set(b.x, b.radius * 0.35 + b.radius * 1.4 * u * u + r * 0.2, b.z);
-      b.mesh.scale.set(r, r * (0.9 + 0.1 * Math.sin(b.t * 9)), r);
-      b.mesh.rotation.set(b.t * 0.7, b.t * 1.3, 0);
-      const material = b.mesh.material as THREE.MeshBasicMaterial;
-      const heat = Math.max(0, 1 - u * 1.4);
-      material.color.setRGB(1, 0.35 + 0.65 * heat, 0.2 + 0.8 * heat * heat);
-      material.opacity = u < 0.55 ? 0.95 : 0.95 * (1 - (u - 0.55) / 0.45);
-      if (Math.floor(b.t * 20) !== Math.floor((b.t - dt) * 20)) {
-        effects.puff(b.x + (this.rand() - 0.5) * r, b.mesh.position.y + r * 0.6, b.z + (this.rand() - 0.5) * r, r * 0.7, 0x3a3230, 2.5, 0.6);
-        // Fresh flame licking out of it while it is hot.
-        if (u < 0.6) {
-          const a = this.rand() * Math.PI * 2;
-          effects.flame(b.x + Math.cos(a) * r * 0.8, b.mesh.position.y + (this.rand() - 0.3) * r, b.z + Math.sin(a) * r * 0.8, r * 0.6, Math.cos(a) * r * 0.5, r * 0.6, Math.sin(a) * r * 0.5, 0.6);
-        }
       }
     }
   }

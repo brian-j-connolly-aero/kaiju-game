@@ -1,0 +1,70 @@
+{
+  "models": {
+    "bld_bungalow_a": {
+      "file": "models/bld_bungalow_a.glb",
+      "kind": "structure",
+      "nodes": ["chunk_00", "chunk_01", "chunk_02", "chunk_03", "chunk_04", "chunk_05", "damaged", "intact", "rubble"],
+      "size": [10.0, 5.0, 9.0],
+      "tris": 70,
+      "chunks": 6,
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint", "blend": "multiply", "base": "#cfe8a0", "colors": ["#f3e3b3", "#f2a48b", "#a8d4f0", "#a9e5c5", "#f6c9a0", "#cfe8a0", "#f5f2ea", "#c9b5e8"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "suburb",
+      "roof": {"part": "roof", "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color", "blend": "multiply", "base": "#d9d9d9", "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id"}
+    },
+    "bld_diner_a": {
+      "file": "models/bld_diner_a.glb",
+      "kind": "structure",
+      "nodes": ["chunk_00", "chunk_01", "chunk_02", "chunk_03", "chunk_04", "chunk_05", "damaged", "intact", "rubble"],
+      "size": [16.0, 5.0, 10.0],
+      "tris": 64,
+      "chunks": 6,
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint", "blend": "multiply", "base": "#efb3b8", "colors": ["#f3e3b3", "#f2a48b", "#a8d4f0", "#a9e5c5", "#f6c9a0", "#cfe8a0", "#f5f2ea", "#c9b5e8"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "suburb",
+      "roof": {"part": "roof", "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color", "blend": "multiply", "base": "#d9d9d9", "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id"}
+    },
+    "bld_duplex_a": {
+      "file": "models/bld_duplex_a.glb",
+      "kind": "structure",
+      "nodes": ["chunk_00", "chunk_01", "chunk_02", "chunk_03", "chunk_04", "chunk_05", "damaged", "intact", "rubble"],
+      "size": [12.0, 7.0, 9.95],
+      "tris": 76,
+      "chunks": 6,
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint", "blend": "multiply", "base": "#f3e3b3", "colors": ["#f3e3b3", "#f2a48b", "#a8d4f0", "#a9e5c5", "#f6c9a0", "#cfe8a0", "#f5f2ea", "#c9b5e8"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "suburb",
+      "roof": {"part": "roof", "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color", "blend": "multiply", "base": "#d9d9d9", "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id"}
+    },
+    "bld_firehouse_a": {
+      "file": "models/bld_firehouse_a.glb",
+      "kind": "structure",
+      "nodes": ["chunk_00", "chunk_01", "chunk_02", "chunk_03", "chunk_04", "chunk_05", "chunk_06", "chunk_07", "damaged", "intact", "rubble"],
+      "size": [14.0, 12.0, 16.0],
+      "tris": 50,
+      "chunks": 8,
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint", "blend": "multiply", "base": "#ead2a0", "colors": ["#e6b566", "#ead2a0", "#f2a48b", "#f3e3b3", "#f6c9a0", "#e3c04f"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "oldtown",
+      "roof": {"part": "roof", "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color", "blend": "multiply", "base": "#d9d9d9", "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id"}
+    },
+    "bld_garage_a": {
+      "file": "models/bld_garage_a.glb",
+      "kind": "structure",
+      "nodes": ["chunk_00", "chunk_01", "chunk_02", "chunk_03", "chunk_04", "chunk_05", "damaged", "intact", "rubble"],
+      "size": [8.0, 4.0, 7.0],
+      "tris": 40,
+      "chunks": 6,
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint", "blend": "multiply", "base": "#f5f2ea", "colors": ["#f3e3b3", "#f2a48b", "#a8d4f0", "#a9e5c5", "#f6c9a0", "#cfe8a0", "#f5f2ea", "#c9b5e8"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "suburb",
+      "roof": {"part": "roof", "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color", "blend": "multiply", "base": "#d9d9d9", "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id"}
+    },
+    "bld_motel_a": {
+      "file": "models/bld_motel_a.glb",
+      "kind": "structure",
+      "nodes": ["chunk_00", "chunk_01", "chunk_02", "chunk_03", "chunk_04", "chunk_05", "chunk_06", "chunk_07", "damaged", "intact", "rubble"],
+      "size": [24.0, 7.009, 10.0],
+      "tris": 84,
+      "chunks": 8,
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint", "blend": "multiply", "base": "#b4e3dc", "colors": ["#f3e3b3", "#f2a48b", "#a8d4f0", "#a9e5c5", "#f6c9a0", "#cfe8a0", "#f5f2ea", "#c9b5e8"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "suburb",
+      "roof": {"part": "roof", "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color", "blend": "multiply", "base": "#d9d9d9", "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id"}
+    }
+  }
+}

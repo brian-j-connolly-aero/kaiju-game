@@ -378,6 +378,51 @@ export const ANCHORS: ReadonlyArray<{ name: string; at: Pt }> = [
 ];
 
 // ---------------------------------------------------------------------------------------------
+// Special buildings beyond the starting neighborhoods (phase 3; specials.ts places them)
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * The power substations, gas stations and radio masts outside the starting neighborhoods. In
+ * phase 2's bot matches something new happened to the monster only about every 30 s at stages 2
+ * and 3, and to a squad every 33 to 58 s (docs/BALANCE.md section 10); every start already has a
+ * trio in its stage 1 square (specials.ts). These are the numbers a pacing pass may tune.
+ */
+export const SPECIAL_SITES = {
+  /**
+   * For every start: one special at each of these distances (meters) beyond the point where the
+   * straight way from its anchor to downtown leaves its stage 1 square. The kinds go round in turn
+   * (substation, gas station, radio mast), each start beginning one further on, so every stage 2
+   * square holds at least one of each beyond its stage 1 square. In phase 2's bot matches the
+   * juvenile made its way toward downtown at about 2.4 m/s (6 m/s along its wanderings), so 65 m
+   * apart would be about one every 30 s; with the bot's own priorities (it goes for a special only
+   * when no squad is close: BOT_RULES.kaiju) twenty bot matches met one every 60 s at stage 2
+   * (docs/CITY.md section 13).
+   */
+  path: [20, 85, 150, 215] as readonly number[],
+  /** A site takes the best lot within this many meters of its point. */
+  reach: 75,
+  /** A site is left out when a special of its kind already stands within this many meters of its point (the stage 2 squares overlap). */
+  share: 90,
+  /** No two special buildings stand closer than this, middle to middle. */
+  apart: 50,
+  /** None stands within this many meters of a landmark. */
+  landmarkGap: 60,
+  /**
+   * For the titan at stage 3: one more at each of these points [east, north], in the districts
+   * round downtown it crosses on its way to the towers (Old Town, Wendside, Halcyon Gate, the
+   * Cinder Works, the Customs Quarter, the shore hotels). Kinds in turn.
+   */
+  outer: [
+    [-570, -210],
+    [-250, 420],
+    [330, 400],
+    [580, -150],
+    [380, -640],
+    [-470, -455],
+  ] as ReadonlyArray<Pt>,
+};
+
+// ---------------------------------------------------------------------------------------------
 // Districts (for names, map tint and the art direction)
 // ---------------------------------------------------------------------------------------------
 
@@ -493,6 +538,39 @@ export const DISTRICT_TINTS: Readonly<Record<string, number>> = {
   'The Boardwalk': 0xfcf6ee,
 };
 
+/**
+ * Roof color per district (District.roof, docs/CITY.md section 2; phase 3, "roofs colored by
+ * district"): the color the roofs of its ordinary buildings show, so that every district, and so
+ * every starting neighborhood, reads as its own place from the monster's height and on the map.
+ * Neighbors differ in hue or in lightness; the two starts that share a district share its roofs.
+ */
+export const DISTRICT_ROOFS: Readonly<Record<string, number>> = {
+  // Flat tops of the towers: steel grey.
+  Downtown: 0x7c8794,
+  // Old red clay tiles.
+  'Old Town': 0xb04e36,
+  // Terracotta on the terraces (Fennel Hill).
+  'Temple Hill': 0xcf7442,
+  // Moss green (Alder Row, Dovecote).
+  Hollowmere: 0x6b8a46,
+  // Charcoal (Ivy Court, Harrow Lane).
+  Northgate: 0x45484f,
+  // Brick red.
+  'Easter Green': 0x9c3530,
+  // Slate blue.
+  Bellhaven: 0x55709a,
+  // Plum slate over the red brick.
+  University: 0x6e5470,
+  // Pale aluminium.
+  'Halcyon Science Park': 0xb4bcc4,
+  // Soot, a warm brown-grey (Cinder Flats).
+  'The Cinder Works': 0x6a5c52,
+  // Rust on the sheds and the fishing quarter (Gull Point).
+  'The Docks': 0xa65a2c,
+  // Faded teal by the sea (Juniper Bay).
+  'The Boardwalk': 0x5c9c98,
+};
+
 // ---------------------------------------------------------------------------------------------
 // Patches: the procedural part is told what to grow where
 // ---------------------------------------------------------------------------------------------
@@ -563,6 +641,25 @@ export interface PatchSpec {
   cars?: number;
   /** A starting neighborhood: nothing taller than a house or shop is allowed here. */
   lowRise?: boolean;
+  /**
+   * Inside the stage 1 square of a start (phase 3, "packed closer together where the match
+   * starts"): the palette the lots there take instead, and the knobs that balance the ten
+   * starts (`keep` multiplies the palette's chance that a lot is built, `gap` its side gaps;
+   * `rowEvery` and `rowGap` as above). The streets there are narrower, the yards are left out
+   * (`infill` applies outside the square only) and the blocks deep enough get a back lane with
+   * garages (lanes.ts). Outside the square the patch keeps its own palette.
+   */
+  tight?: TightSpec;
+}
+
+export interface TightSpec {
+  palette: PaletteId;
+  keep?: number;
+  gap?: number;
+  rowEvery?: number;
+  rowGap?: number;
+  /** Multiplies the chance that a lot along a back lane gets its garage (palettes.ts `LANE_ROW`). */
+  garages?: number;
 }
 
 const EAST: Pt = [1, 0];
@@ -591,9 +688,10 @@ export const PATCHES: readonly PatchSpec[] = [
     palette: 'suburb',
     infill: 'backyards',
     lowRise: true,
+    tight: { palette: 'suburbTight', keep: 1.06 },
     keep: 1.192,
     gap: 0.8,
-    cars: 2.35,
+    cars: 2.4,
     kiosks: 0.5,
     streets: { type: 'lattice', origin: [0, 0], u: EAST, us: [-1010, -962, -878, -796], vs: [796, 878, 962, 1010], jitter: 4, wave: 8, closes: 0.5 },
   },
@@ -602,6 +700,7 @@ export const PATCHES: readonly PatchSpec[] = [
     rect: [-1056, -391, -736, 186],
     palette: 'oldSuburb',
     lowRise: true,
+    tight: { palette: 'oldSuburbTight', keep: 0.857, rowEvery: 4, rowGap: 13 },
     keep: 1.094,
     gap: 1,
     cars: 1,
@@ -622,6 +721,7 @@ export const PATCHES: readonly PatchSpec[] = [
     rect: [736, -391, 1056, -84],
     palette: 'workerRows',
     lowRise: true,
+    tight: { palette: 'workerRowsTight', keep: 0.747, garages: 0.8, rowEvery: 3, rowGap: 15 },
     keep: 0.557,
     gap: 1,
     cars: 1,
@@ -636,9 +736,10 @@ export const PATCHES: readonly PatchSpec[] = [
     palette: 'suburb',
     infill: 'backyards',
     lowRise: true,
+    tight: { palette: 'suburbTight', keep: 1.11 },
     keep: 1.204,
     gap: 0.8,
-    cars: 1.87,
+    cars: 2.2,
     kiosks: 0.5,
     streets: {
       type: 'lattice',
@@ -659,9 +760,10 @@ export const PATCHES: readonly PatchSpec[] = [
     palette: 'gardenSuburb',
     infill: 'backyards',
     lowRise: true,
+    tight: { palette: 'gardenSuburbTight', keep: 1.013 },
     keep: 1.131,
     gap: 0.8,
-    cars: 2.23,
+    cars: 2,
     kiosks: 0.5,
     streets: {
       type: 'polar',
@@ -682,6 +784,7 @@ export const PATCHES: readonly PatchSpec[] = [
     palette: 'templeSlope',
     infill: 'backyards',
     lowRise: true,
+    tight: { palette: 'templeSlopeTight', keep: 0.904, rowEvery: 4, rowGap: 13 },
     keep: 0.859,
     gap: 0.8,
     cars: 1,
@@ -692,6 +795,7 @@ export const PATCHES: readonly PatchSpec[] = [
     rect: [736, -1056, 1056, -419],
     palette: 'harborVillage',
     lowRise: true,
+    tight: { palette: 'harborVillageTight', keep: 1.037 },
     keep: 0.865,
     gap: 1.2,
     cars: 1,
@@ -714,9 +818,10 @@ export const PATCHES: readonly PatchSpec[] = [
     palette: 'suburb',
     infill: 'backyards',
     lowRise: true,
+    tight: { palette: 'suburbTight', keep: 0.901 },
     keep: 1.153,
     gap: 0.8,
-    cars: 1.55,
+    cars: 1.8,
     kiosks: 0.5,
     streets: { type: 'lattice', origin: [0, 0], u: EAST, us: [800, 884, 962, 1010], vs: [806, 890, 968, 1010], jitter: 4, wave: 8, closes: 0.5 },
   },
@@ -725,6 +830,7 @@ export const PATCHES: readonly PatchSpec[] = [
     rect: [-260, 736, 736, 1056],
     palette: 'rowhouses',
     lowRise: true,
+    tight: { palette: 'rowhousesTight', keep: 0.735, garages: 0.6, rowEvery: 3, rowGap: 15 },
     keep: 0.523,
     gap: 1,
     cars: 1,
@@ -747,6 +853,7 @@ export const PATCHES: readonly PatchSpec[] = [
     rect: [-1056, -770, -736, -419],
     palette: 'beachVillage',
     lowRise: true,
+    tight: { palette: 'beachVillageTight', keep: 0.861, garages: 0.5, rowEvery: 4, rowGap: 13 },
     keep: 0.912,
     gap: 1,
     cars: 1,

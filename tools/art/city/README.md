@@ -16,9 +16,13 @@ tools/art/city/
   budgets.py    triangle budget per archetype, and the city's counts
   check.py      the city check (on top of tools/art/validate.py)
   sheet.py      the city contact sheet, and lineup() for beauty shots
+  roofs.py      the roof pictures: every marked roof in a loud color; roofs in district colors
   count_city.ts counts the archetypes in the real city (npx tsx tools/art/city/count_city.ts)
 tools/art/city_kit.py      builds the atlases (runs first in build_all.sh)
 tools/art/city_samples.py  bld_house_a, bld_tower_a, bld_factory_a: worked examples
+tools/art/city/parts.py    parts the small-building families share: posts, porch roofs, dormers,
+                           a window on any wall, `part` / `tidy` for the damaged state
+tools/art/city_starts.py   the six small buildings of the starting neighborhoods (phase 3)
 ```
 
 Run everything with `/opt/mbtools/venv/bin/python`.
@@ -63,7 +67,7 @@ them all; `atlas.REGIONS` lists them).
 | --- | --- |
 | `b.block(w, d, h, at=(x, y, z0), facade=, ground=, ground_h=4.5, sides={}, roof="gravel" / None / False, parapet=0, parapet_region=, tint=, tone=)` | box body: walls in bands (optional 4.5 m ground storey, then the facade), flat top. `sides={"left": "plaster_plain"}` overrides one side, `None` leaves it out (against another block). `roof=False` when a pitched roof covers it. Returns a `Block` (`x0 x1 y0 y1 z0 z1 w d h cx cy`). |
 | `b.wall(p0, p1, z0, z1, region)` | one wall (p0 left, p1 right, seen from outside) |
-| `b.gable(blk, rise, along="x"/"y", roof=, window=True)` | pitched roof, gable ends, attic window, verge and fascia boards |
+| `b.gable(blk, rise, along="x"/"y", roof=, window=True)` | pitched roof, gable ends, attic window, verge and fascia boards. `roof=` names the pattern (`tile_red`, `tile_slate`, `tile_terra`, `metal`; flat tops `gravel`, `tar`): on an ordinary building the kit draws it in light grey and the game paints it in the district's roof color (section 2a) |
 | `b.hip(blk, rise, roof=)`, `b.upturns(blk, z)` | hipped roof; turned-up corners for shrines and the temple |
 | `b.shed(blk, rise, high="back")` | mono-pitch (lean-to) roof |
 | `b.sawtooth(blk, teeth, rise, roof="metal", glass="glass_roof")` | north-light factory roof |
@@ -86,6 +90,32 @@ them all; `atlas.REGIONS` lists them).
 `solid=True` (blocks and roofs are solid already) tells the kit that a part is a closed volume:
 chunks are cut from solids and the holes of the damaged state open into them.
 
+## 2a. Roofs take the district's color
+
+In the game the roofs of ordinary buildings are painted in their district's roof color
+(`District.roof` in the city data: terracotta on Temple Hill, slate blue in Bellhaven, moss
+green in Hollowmere...). You still ask for a roof by its look; the kit does the rest:
+
+- Every face on `tile_red`, `tile_slate`, `tile_terra`, `gravel`, `tar` or `metal` of an ordinary
+  building (any archetype that is not a landmark, a bridge or in `style.OWN_ROOFS`) is moved onto
+  the same pattern in light neutral grey (`roof_tile`, `roof_slate`, `roof_terra`, `roof_flat`,
+  `roof_metal`: `kit.GREY_ROOFS`, done in `kit.grey_roofs` right after your function) and gets
+  the roof mask, `COLOR_0` alpha 0.5, in every state: damaged, chunks, and the first slab on the
+  rubble, which the kit takes from the roof. So `b.gable`, `b.hip`, `b.shed`, `b.sawtooth`, a
+  block's `roof=`, a hand-made porch or dormer roof on `tile_red`... are all marked.
+- A plain roof face (a floating slab, a setback cap: no picture) asks for `region="roof_plain"`.
+- Use those regions for roofs only: walls, chimneys, plant rooms, water tanks, parapet tops,
+  solar panels and signs stay off them (corrugated walls are `metal_clad` or `metal_plain`).
+  Glass (`glass_roof`), copper and canvas (the awnings) are never painted.
+- An archetype whose roof keeps its own colors (or that has none) goes in `style.OWN_ROOFS`
+  with the reason; the city check then expects no roof faces on it.
+- Every grey roof averages `atlas.ROOF_BASE` (`#d9d9d9`, linear light), the `base` of the
+  manifest's `roof` entry, so the client's `roof color / base` shows the district's color.
+
+Look at `docs/art/previews/city_roofs_test.png` (`tools/art/city/roofs.py --test`): every marked
+roof face is loud green, so a missed roof stays grey and a wall caught by mistake turns green.
+`docs/art/previews/city_roofs_districts.png` shows the roofs in district colors.
+
 ## 3. The checklist
 
 1. **Fit**: the whole intact model, overhangs and masts included, fills the archetype's box
@@ -106,7 +136,9 @@ chunks are cut from solids and the holes of the damaged state open into them.
    crescent, no six-pointed star, nothing from a real faith, brand or building.
 8. **Night**: look at the NIGHT cells: windows lit, nothing else glowing by accident.
 9. **District**: `district=` sets the tint colors; `tone=` the default wall color the file shows.
-10. Run the checks (below). Both must PASS.
+10. **Roof**: the city check's `roof` line counts the roof triangles; the green sheet shows them
+    (section 2a).
+11. Run the checks (below). Both must PASS.
 
 ## 4. Running things
 
@@ -119,6 +151,7 @@ tools/art/city/check.py bld_house_a                 # the city check alone; --al
 tools/art/validate.py bld_house_a                   # the pipeline's contract check
 tools/art/city/sheet.py bld_house_a --out /tmp/mb-scratch/<you>/x.png   # re-render a sheet
 /opt/mbtools/venv/bin/python tools/art/city/budgets.py                # the budget table
+tools/art/city/roofs.py [--test | --districts] [--force]   # the two roof sheets (30 s; build_all.sh runs it)
 npm run assets:manifest                             # merge the manifests for the game
 ```
 
@@ -155,11 +188,25 @@ is shared by everyone, and the kit's regions never move.
   mesh such as the mast's `top`) and its own chunk list, for open or very thin shapes whose
   grid cells the kit would drop as nearly empty. Their atlas pictures (`sp_*`) are in
   `atlas_extra/special.py`, in the industry block.
+- **A slim part above the box** (the firehouse's hose tower): the simulation collides with the
+  archetype's box, so a model fills it and stays inside it. One slim part may stand above it
+  when the building needs it to be recognized: list the archetype in `TALL_PARTS` in
+  `tools/art/lib/contract.py` with the height the whole model then has. The kit's fit check,
+  the city check and the validator ask for that height (`b.top`; `b.H` stays the box); the
+  size class and the budget still come from the box. Keep it rare, and say so in
+  `docs/art/client-notes-city.md`.
+- **The starting neighborhoods** (`tools/art/city_starts.py`): six small buildings, each a few
+  big shapes; their pictures (`motel_front`, `fire_front`, `diner_wall`, `door_rollup`,
+  `diner_chrome`, `diner_sign`, `motel_sign`, `steps`) are in `atlas_extra/homes.py`. Put the
+  first bite (`b.bite_hint`) on the end away from the sign, so the damaged building keeps what
+  it is known by.
 - **Tall thin things** (crane, mast, wheel): beams, few of them; leave chunks and damage to
   the kit, and check the CHUNKS cell: a lattice is cut from its `solid` parts only.
 
 ## 7. What the client does with all this today
 
-The game already draws these files, with three known gaps (atlas upside down until the client
-sets `flipY = false`, every copy the same color until it applies the tint, chunks drawn as
-white boxes): `docs/art/client-notes-city.md`. Build to the files, not to the gaps.
+The game already draws these files (the three early gaps, the atlas upside down, every copy
+the same color and chunks drawn as white boxes, are fixed). Since phase 3 it also reads the
+roof level of the mask: every marked roof takes its district's roof color, a few shades apart
+from building to building (`docs/art/client-notes-city.md` section 2). Build to the files, not
+to the gaps.

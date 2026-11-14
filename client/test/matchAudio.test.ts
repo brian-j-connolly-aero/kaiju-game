@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   TICK_RATE,
@@ -15,8 +16,10 @@ import {
 } from '@mb/shared';
 import { emptyManifest } from '../src/assets/manifest';
 import { AudioEngine } from '../src/audio/audioEngine';
-import { CHAIR_AT, chargeTone, HEARING_MUSIC_AT, isRadioLine, MatchAudio, voiceAheadIds, type MatchAudioSession } from '../src/audio/matchAudio';
+import { EVENT_CUES, EVENT_LINE_PROBLEMS, EVENT_LINES, eventLine } from '../src/audio/eventVoice';
+import { CHAIR_AT, chargeTone, HEARING_MUSIC_AT, isRadioLine, MatchAudio, voiceAheadIds, WHOOSH_PEAK, type MatchAudioSession } from '../src/audio/matchAudio';
 import type { FrameState, LocalRole } from '../src/net/matchSession';
+import { attackVariant } from '../src/render/kaijuAnimator';
 import { FakeAudioContext, FakeGain, fakeFetch, type FakeFetch, type FakeSource } from './fakeAudio';
 
 /** Lengths of the real music files (seconds); one-shots have no loop points. */
@@ -61,6 +64,15 @@ const SFX = [
   'radio_close',
   'sting_nerve_break',
   'kaiju_stagger',
+  // phases 1 to 3
+  'kaiju_rake_s1',
+  'kaiju_hop_s1',
+  'stun_ring',
+  'shaken',
+  'supply_drop',
+  'crate_land',
+  'crate_take',
+  'radio_static',
 ];
 
 interface Rig {
@@ -97,11 +109,14 @@ function rig(role: Partial<LocalRole> = {}): Rig {
       }
     }
   }
+  // the stumble's three falls, one variant per look
+  manifest.sfx.kaiju_stumble_s1 = { variants: [1, 2, 3].map((n) => `audio/sfx/kaiju_stumble_s1_${n}`), gain: 1 };
+  for (const n of [1, 2, 3]) ctx.durations.set(`audio/sfx/kaiju_stumble_s1_${n}.ogg`, 1);
   for (const [id, loop] of Object.entries(SFX_LOOPS)) {
     manifest.sfx[id] = { variants: [`audio/sfx/${id}`], gain: 1, loop };
     ctx.durations.set(`audio/sfx/${id}.ogg`, loop[1] + 0.25);
   }
-  for (const l of VOICE_LINES) {
+  for (const l of [...VOICE_LINES, ...EVENT_LINES]) {
     manifest.voice[l.id] = { base: `audio/voice/${l.id}`, duration: 2.2 };
     ctx.durations.set(`audio/voice/${l.id}.ogg`, 2.2);
   }
@@ -716,5 +731,116 @@ describe('small things', () => {
     expect(loops.every((s) => !s.playing)).toBe(true);
     expect(r.engine.speaking).toBe(false);
     expect(r.ctx.playing().filter((s) => s.buffer?.url.includes('/voice/'))).toHaveLength(0);
+  });
+});
+
+describe('the moves of phases 1 and 3', () => {
+  /** The first tick from `from` on whose attack shows `look` (render/kaijuAnimator.ts, as every screen picks it). */
+  const tickWithLook = (action: 'swipe' | 'stomp', look: number, from: number): number => {
+    let t = from;
+    while (attackVariant(action, t, 0) !== look) t++;
+    return t;
+  };
+  const act = (tick: number, action: string, phase: string, duration: number): object => ({ type: 'kaijuAction', tick, kaiju: 0, action, phase, duration, x: 0, z: 0, yaw: 0 });
+
+  it('sounds the look every screen draws: the two-claw rake, the hop, the stumble its own fall', async () => {
+    const r = rig();
+    const rake = tickWithLook('swipe', 2, 900);
+    let f = frameOf({ tick: rake });
+    await r.frame(f);
+    r.event(act(rake, 'swipe', 'windup', 0.45));
+    await r.hold(f, 0.6);
+    const swipe = tickWithLook('swipe', 0, rake + 60);
+    f = frameOf({ tick: swipe });
+    await r.frame(f);
+    r.event(act(swipe, 'swipe', 'windup', 0.45));
+    await r.hold(f, 0.6);
+    expect(r.ctx.startedFrom('kaiju_rake_s1')).toHaveLength(1);
+    expect(r.ctx.startedFrom('kaiju_swipe_s1')).toHaveLength(1);
+    // The stomp's look is the one of the tick its wind-up began, reckoned back from its landing (0.9 s).
+    const hop = tickWithLook('stomp', 2, swipe + 60) + 27;
+    f = frameOf({ tick: hop });
+    await r.frame(f);
+    r.event(act(hop, 'stomp', 'active', 0.1));
+    await r.frame(f);
+    expect(r.ctx.startedFrom('kaiju_hop_s1')).toHaveLength(1);
+    expect(r.ctx.startedFrom('kaiju_stomp_s1')).toHaveLength(0);
+    const fall = hop + 60;
+    f = frameOf({ tick: fall });
+    await r.frame(f);
+    r.event(act(fall, 'charge', 'stumble', 1.2));
+    await r.frame(f);
+    expect(r.ctx.startedFrom('kaiju_stumble_s1').map((s) => s.buffer?.url)).toEqual([`audio/sfx/kaiju_stumble_s1_${attackVariant('charge', fall, 0) + 1}.ogg`]);
+  });
+
+  it('starts a whoosh early enough for it to peak as the strike comes through', async () => {
+    const r = rig();
+    const t = tickWithLook('swipe', 0, 900);
+    const f = frameOf({ tick: t });
+    await r.frame(f);
+    const asked = r.ctx.currentTime;
+    r.event(act(t, 'swipe', 'windup', 0.45));
+    await r.hold(f, 0.6);
+    const lead = (r.ctx.startedFrom('kaiju_swipe_s1')[0].startedAt ?? 0) - asked;
+    expect(Math.abs(lead - (0.45 - WHOOSH_PEAK.swipe[0]))).toBeLessThan(0.08);
+  });
+
+  it('rings the ears of a squad stunned by the roar once, and shakes it when the stun is over', async () => {
+    const r = rig();
+    const f = frameOf({ units: [unit({ id: 0 }), unit({ id: 1 }), unit({ id: 2, squad: 1 })] });
+    await r.frame(f);
+    for (const id of [0, 1, 2]) {
+      r.event({ type: 'unitStunned', tick: f.tick, unit: id, duration: 2.5 });
+      r.event({ type: 'unitShaken', tick: f.tick, unit: id });
+    }
+    await r.hold(f, 1);
+    expect(r.ctx.startedFrom('stun_ring')).toHaveLength(1);
+    expect(r.ctx.startedFrom('shaken')).toHaveLength(0);
+    await r.hold(f, 2);
+    expect(r.ctx.startedFrom('shaken')).toHaveLength(1);
+  });
+});
+
+describe('event lines: what the radio and the news say for phases 2 and 3', () => {
+  const said = (r: Rig): string[] => r.ctx.startedFrom('audio/voice/').map((s) => (s.buffer?.url ?? '').split('/').pop()?.replace('.ogg', '') ?? '');
+
+  it('is a valid script whose every line has its sound file, no id shared with the simulation, every cue spoken', () => {
+    expect(EVENT_LINE_PROBLEMS).toEqual([]);
+    const shipped = (JSON.parse(readFileSync(new URL('../public/assets/manifest.json', import.meta.url), 'utf8')) as { voice: Record<string, unknown> }).voice;
+    expect(EVENT_LINES.filter((l) => !shipped[l.id]).map((l) => l.id)).toEqual([]);
+    expect(EVENT_LINES.filter((l) => VOICE_LINES.some((v) => v.id === l.id)).map((l) => l.id)).toEqual([]);
+    expect(Object.keys(EVENT_CUES).filter((c) => !EVENT_LINES.some((l) => l.cue === c))).toEqual([]);
+  });
+
+  it("tells a squad its crate is coming and, once, that it lies untouched; another squad's crate is not its business", async () => {
+    const r = rig();
+    const f = frameOf();
+    await r.frame(f);
+    const tick = f.tick;
+    const crate = (id: number, phase: string, squad: number): object => ({ type: 'crate', tick: f.tick, id, kind: 'machineGun', x: 0, z: 0, phase, squad, unit: -1, player: -1, duration: 4, height: 90 });
+    r.event(crate(7, 'drop', 0));
+    r.event(crate(8, 'drop', 2));
+    await r.hold(f, 5);
+    r.event(crate(7, 'land', -1));
+    r.event(crate(8, 'land', -1));
+    await r.hold(f, 8);
+    const lines = said(r);
+    expect(lines[0]).toBe(eventLine('crate.drop', 'humans', tick + 7)?.id);
+    expect(lines.slice(1)).toEqual([expect.stringMatching(/^v_crate_land_\d$/)]);
+  });
+
+  it('gives the radio and the news each their own line for a fallen mast, picked by its tick, and not again within its gap', async () => {
+    for (const side of ['humans', 'kaiju'] as const) {
+      const r = rig(side === 'kaiju' ? { kind: 'kaiju', kaijuId: 0, squadId: -1, playerId: 0 } : {});
+      const f = frameOf();
+      await r.frame(f);
+      const fall = (tick: number): object => ({ type: 'mastFall', tick, structure: 3, x: 0, z: 0, yaw: 0, length: 24, duration: 2, topId: 1, topX: 0, topZ: 24, staticUntil: tick + 300, staticTime: 10, by: -1 });
+      const first = f.tick;
+      r.event(fall(f.tick));
+      await r.hold(f, 6);
+      r.event(fall(f.tick));
+      await r.hold(f, 6);
+      expect(said(r)).toEqual([eventLine('mast.down', side, first)?.id]);
+    }
   });
 });

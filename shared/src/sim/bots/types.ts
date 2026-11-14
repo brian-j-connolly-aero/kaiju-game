@@ -65,6 +65,8 @@ export interface BotState {
   blockedX: number;
   blockedZ: number;
   blockedFor: number;
+  /** Its firing spot is closer in than its band: no spot in the band had a line of fire (BOT_RULES.squad.innerStandoff). */
+  inner: boolean;
 
   // --- Kaiju bot ---------------------------------------------------------------------------
   goal: KaijuBotGoal;
@@ -156,6 +158,7 @@ export function createBotState(): BotState {
     blockedX: 0,
     blockedZ: 0,
     blockedFor: 0,
+    inner: false,
 
     goal: 'none',
     goalId: -1,

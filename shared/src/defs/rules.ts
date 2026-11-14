@@ -52,10 +52,11 @@ export const MATCH_RULES = {
    * about a fifth (section 9). Phase 2 (special buildings, city weapons, crates, rubble, falls)
    * made stage 2 a fifth longer and a lone titan's last segment a fifth shorter: p2 went from
    * 0.125 to 0.11 and p3 from 0.29 to 0.30 to put the stages back near where phase 1 left them
-   * (section 10).
+   * (section 10). Phase 3 packed the starting neighborhoods closer (each worth about a quarter
+   * more), so p1 went from 0.18 to 0.145 to keep stage 1 near two minutes (section 11).
    */
   bar: {
-    p1: 0.18,
+    p1: 0.145,
     p2: 0.11,
     p3: 0.3,
     growth: 1.6,

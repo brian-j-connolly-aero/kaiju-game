@@ -23,7 +23,11 @@
  *                    city weapons, power surge, crates, pick-up weapons, artillery and
  *                    reinforcements: x-weapons-kit, x-weapons-army, x-pickups in shotsWeapons.mjs;
  *                    the special buildings, rubble and falls, the monster's weight, the army's
- *                    speed: x-city-* in shotsCity.mjs)
+ *                    speed, and phase 3's roofs by district, packed starts and new buildings,
+ *                    hills, the fireball and the frame's cost: x-city-* in shotsCity.mjs;
+ *                    phase 3's monster looks, slash trails,
+ *                    glowing stripes, civilians squashed and eaten: x-monster-* in
+ *                    shotsMonster.mjs)
  *   --only TAGS      only the extras whose names start with one of these (comma separated, for
  *                    example `x-kaiju-swim,x-human-swim`), and none of the stage visits
  *   --dist DIR       serve this build of the client instead of client/dist
@@ -38,6 +42,7 @@ import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { disablePointerLock } from './driver.mjs';
 import { cityExtras } from './shotsCity.mjs';
+import { monsterExtras } from './shotsMonster.mjs';
 import { weaponExtras } from './shotsWeapons.mjs';
 import { CHROMIUM_ARGS } from './smoke.mjs';
 
@@ -1020,6 +1025,10 @@ async function main() {
     // Phase 2: the special buildings, rubble and falls, the monster's weight, the army's sense of
     // speed (shotsCity.mjs).
     await cityExtras(visit, opts.out);
+
+    // Phase 3: the monster's looks: every attack's looks, slash trails, glowing stripes, civilians
+    // squashed and eaten (shotsMonster.mjs).
+    await monsterExtras(visit, opts.out);
   }
 
   server.close();

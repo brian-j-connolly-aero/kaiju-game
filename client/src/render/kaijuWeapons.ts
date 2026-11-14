@@ -5,13 +5,15 @@
  *   HeldWeapon   a city weapon on the `hold` node, held by its grip node the way its manifest
  *                entry says (render/heldProps.ts): a tank hangs, a javelin points along the
  *                aim (the monster's own player sees a straight aim line out to its range), the
- *                fast-food sign is swung along the club's arc with a trail of light behind its
- *                head, the garage door is held up in front and dents, scorches and shakes as
+ *                fast-food sign is swung along the club's arc (one of three looks) with a slash
+ *                trail behind its head (render/kaijuTrails.ts, shared with the claws and the
+ *                tail), the garage door is held up in front and dents, scorches and shakes as
  *                shots hit it; a propane tank glows a warning red now and then (a shot near the
  *                hand sets it off)
  *   SurgeArcs    while a power surge lasts (the snapshot's `surge`): electric arcs crackle along
- *                the spines and tail, between the claws and down to the ground, and the glowing
- *                facets burn blue-white
+ *                the spines and tail, between the claws and down to the ground, the glowing
+ *                facets burn blue-white, and the arcs take over the glowing stripes and flash
+ *                the hide (both through the kaiju view's own body material, its `KaijuSkin`)
  */
 
 import * as THREE from 'three';
@@ -19,8 +21,9 @@ import { kaijuKindDef, kaijuStageDef, type KaijuActionId, type KaijuPhase, type 
 import type { AssetStore } from '../assets/assetStore';
 import type { Effects } from './effects';
 import { carryTilt, clubDirection, gripFor, gripRotation, reachFromGrip, type GripInfo } from './heldProps';
+import { addTrailPoint, clearTrail, createTrailPath, type TrailRibbons } from './kaijuTrails';
 import type { LineBatch } from './lineBatch';
-import type { Materials } from './materials';
+import type { KaijuSkin, Materials } from './materials';
 import { SceneRig } from './sceneRig';
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -39,6 +42,8 @@ const sphere = new THREE.Sphere();
 const shift = new THREE.Vector3();
 const shiftLocal = new THREE.Vector3();
 const invHold = new THREE.Quaternion();
+const swingTip = createTrailPath();
+const swingInner = createTrailPath();
 
 /** Turns `v`, given in a body's frame (x to its left, y up, z forward), into the world for heading `yaw`. */
 export function bodyToWorld(v: THREE.Vector3, yaw: number): THREE.Vector3 {
@@ -59,6 +64,8 @@ export interface HeldPose {
   phase: KaijuPhase;
   /** 0..1 through the phase (0 when open-ended). */
   u: number;
+  /** The look of the swing (render/kaijuAnimator.ts `attackVariant`; null: not known yet). */
+  variant?: number | null;
 }
 
 export interface HeldFrame {
@@ -137,7 +144,7 @@ export class HeldWeapon {
    * Places and turns the weapon for this frame. The kaiju's group must have up-to-date world
    * matrices (the hand's world position and turn are read from them).
    */
-  update(k: SnapKaiju, pose: HeldPose, dt: number, time: number, view: HeldFrame, lines: LineBatch): void {
+  update(k: SnapKaiju, pose: HeldPose, dt: number, time: number, view: HeldFrame, lines: LineBatch, ribbons: TrailRibbons | null = null): void {
     const rig = this.rig;
     const grip = this.grip;
     const hold = rig?.root.parent;
@@ -168,7 +175,7 @@ export class HeldWeapon {
       }
       case 'club': {
         const swinging = pose.action === 'club';
-        clubDirection(swinging ? pose.phase : 'idle', pose.u, dir, motion);
+        clubDirection(swinging ? pose.phase : 'idle', pose.u, dir, motion, pose.variant ?? 0);
         // The swing is aimed along the head (the club's arc is centered on the aim); held at rest
         // it follows the body.
         const yaw = swinging ? k.aimYaw : k.yaw;
@@ -229,16 +236,16 @@ export class HeldWeapon {
       }
     }
 
-    if (grip.hold === 'club' && pose.action === 'club') this.drawSwingTrail(k, pose, st.height, scale, lines);
+    if (grip.hold === 'club' && pose.action === 'club' && ribbons) this.drawSwingTrail(k, pose, st.height, scale, lines, ribbons, view.firstPerson);
     if (grip.hold === 'javelin' && view.local && pose.action !== 'throw') this.drawAimLine(k, lines, view.camera);
   }
 
   /**
-   * The club's trail: the arc the sign's head has swept so far in this swing, bright at the head
-   * and fading behind it (worked out from the swing itself, so it reads at any frame rate), and a
-   * fan of faint spokes from the middle of the sign. It fades out as the arm comes back.
+   * The club's trail (one of the monster's slash trails, render/kaijuTrails.ts): the arc the
+   * sign's head has swept so far in this swing, bright at the head and fading behind it (worked
+   * out from the swing itself, so it reads at any frame rate). It fades out as the arm comes back.
    */
-  private drawSwingTrail(k: SnapKaiju, pose: HeldPose, height: number, scale: number, lines: LineBatch): void {
+  private drawSwingTrail(k: SnapKaiju, pose: HeldPose, height: number, scale: number, lines: LineBatch, ribbons: TrailRibbons, firstPerson: boolean): void {
     let head: number;
     let fade: number;
     if (pose.phase === 'active') {
@@ -253,26 +260,20 @@ export class HeldWeapon {
     if (fade <= 0.01) return;
     const n = 14;
     const from = Math.max(0, head - 0.85);
-    const width = height * 0.09;
     const reach = this.reach * scale;
-    let lastX = 0;
-    let lastY = 0;
-    let lastZ = 0;
+    clearTrail(swingTip);
+    clearTrail(swingInner);
     for (let i = 0; i <= n; i++) {
       const f = from + ((head - from) * i) / n;
-      clubDirection('active', f, p0);
+      clubDirection('active', f, p0, undefined, pose.variant ?? 0);
       bodyToWorld(p0, k.aimYaw);
+      // The band between the sign's head and its middle.
       p1.copy(p0).multiplyScalar(reach * 0.45).add(holdPos);
       p0.multiplyScalar(reach).add(holdPos);
-      const a = (i / n) * fade;
-      if (i > 0) {
-        lines.push(lastX, lastY, lastZ, p0.x, p0.y, p0.z, width * (0.5 + a), 1, 0.82, 0.45, 0.9 * a);
-      }
-      if (i % 3 === 0) lines.push(p1.x, p1.y, p1.z, p0.x, p0.y, p0.z, width * 0.6, 1, 0.7, 0.35, 0.35 * a);
-      lastX = p0.x;
-      lastY = p0.y;
-      lastZ = p0.z;
+      addTrailPoint(swingTip, p0.x, p0.y, p0.z);
+      addTrailPoint(swingInner, p1.x, p1.y, p1.z);
     }
+    ribbons.ribbon(swingTip, swingInner, fade * (firstPerson ? 0.5 : 1), k.surge > 0, lines, firstPerson ? 0 : height * 0.03);
   }
 
   /**
@@ -350,9 +351,10 @@ const side = new THREE.Vector3();
 const lift = new THREE.Vector3();
 
 export class SurgeArcs {
-  private readonly materials: Materials;
   /** The glowing facets' surge material (no vertex colors: they burn blue-white whatever their paint). */
   private surgeGlow: THREE.MeshBasicMaterial | null = null;
+  /** The body material whose stripes and hide the surge lights (the kaiju view's own). */
+  private skin: KaijuSkin | null = null;
   private on = false;
   private seed = 2463534242;
   /** The arcs of the current burst (a new burst every few hundredths of a second). */
@@ -361,10 +363,6 @@ export class SurgeArcs {
   private flash = 0;
   /** Seconds to the next puff of the glow round the body. */
   private glowIn = 0;
-
-  constructor(materials: Materials) {
-    this.materials = materials;
-  }
 
   private rand(): number {
     this.seed ^= this.seed << 13;
@@ -380,10 +378,12 @@ export class SurgeArcs {
 
   /**
    * Draws a frame of the surge on `rig` (world matrices up to date). `ember` is the facets'
-   * ordinary material, given back when the surge is over.
+   * ordinary material, given back when the surge is over. While it lasts the surge sets the
+   * stripes' glow and the hide's flash of `skin` (the view sets the stripes from rage otherwise).
    */
-  update(k: SnapKaiju, rig: SceneRig, ember: THREE.Material | null, dt: number, lines: LineBatch, effects: Effects, visible: boolean): void {
+  update(k: SnapKaiju, rig: SceneRig, ember: THREE.Material | null, skin: KaijuSkin, dt: number, lines: LineBatch, effects: Effects, visible: boolean): void {
     this.glowIn -= dt;
+    this.skin = skin;
     const surging = k.alive && k.surge > 0 && k.phase !== 'cocoon' && visible;
     if (surging !== this.on) {
       this.on = surging;
@@ -392,7 +392,7 @@ export class SurgeArcs {
         for (const node of GLOW_NODES) rig.setNodeMaterial(node, 'glow', this.surgeGlow);
       } else {
         if (ember) for (const node of GLOW_NODES) rig.setNodeMaterial(node, 'glow', ember);
-        this.materials.kaiju.emissive.setRGB(0, 0, 0);
+        skin.flash.setRGB(0, 0, 0);
         this.arcs.length = 0;
       }
     }
@@ -414,12 +414,15 @@ export class SurgeArcs {
       lines.push(list[i], list[i + 1], list[i + 2], list[i + 3], list[i + 4], list[i + 5], width, 1, 1, 1, a);
     }
     // The facets burn blue-white and flicker; the hide flashes pale with each burst (a flash,
-    // not a tint: a lasting one would turn the orange hide pink).
+    // not a tint: a lasting one would turn the orange hide pink); the stripes carry the arcs'
+    // light, flaring with each burst.
     const flicker = 0.65 + this.rand() * 0.7;
     this.surgeGlow?.color.setRGB(0.75 * flicker + 0.3, 0.85 * flicker + 0.3, 1.5 * flicker + 0.4);
     this.flash = Math.max(0, this.flash - dt * 9);
     const sheen = 0.16 * this.flash * this.flash * strength;
-    this.materials.kaiju.emissive.setRGB(sheen, sheen, sheen * 1.15);
+    skin.flash.setRGB(sheen, sheen, sheen * 1.15);
+    const arcLight = (0.35 + 0.9 * this.flash) * strength * flicker;
+    skin.stripe.setRGB(0.55 * arcLight, 0.65 * arcLight, 1.1 * arcLight);
     // Patches of the same light flickering over the hide, along the spines and down the tail.
     if (this.glowIn <= 0) {
       this.glowIn = 0.08;
@@ -488,7 +491,7 @@ export class SurgeArcs {
 
   /** The surge is over for this view (the rig is going away, or the match ended). */
   reset(): void {
-    if (this.on) this.materials.kaiju.emissive.setRGB(0, 0, 0);
+    if (this.on) this.skin?.flash.setRGB(0, 0, 0);
     this.on = false;
     this.arcs.length = 0;
   }

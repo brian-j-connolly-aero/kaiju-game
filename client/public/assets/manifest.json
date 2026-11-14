@@ -53,6 +53,13 @@
         "intact",
         "rubble"
       ],
+      "roof": {
+        "base": "#d9d9d9",
+        "blend": "multiply",
+        "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id",
+        "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color",
+        "part": "roof"
+      },
       "size": [
         18,
         20.36,
@@ -70,7 +77,7 @@
           "#e3c04f"
         ],
         "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
-        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
         "part": "wall plaster"
       },
       "tris": 188
@@ -97,6 +104,13 @@
         "intact",
         "rubble"
       ],
+      "roof": {
+        "base": "#d9d9d9",
+        "blend": "multiply",
+        "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id",
+        "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color",
+        "part": "roof"
+      },
       "size": [
         16,
         28,
@@ -113,7 +127,7 @@
           "#efb3b8"
         ],
         "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
-        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
         "part": "wall plaster"
       },
       "tris": 198
@@ -136,6 +150,13 @@
         "intact",
         "rubble"
       ],
+      "roof": {
+        "base": "#d9d9d9",
+        "blend": "multiply",
+        "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id",
+        "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color",
+        "part": "roof"
+      },
       "size": [
         24.05,
         36.5,
@@ -152,7 +173,7 @@
           "#a8d4f0"
         ],
         "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
-        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
         "part": "wall plaster"
       },
       "tris": 184
@@ -242,6 +263,53 @@
       },
       "tris": 342
     },
+    "bld_bungalow_a": {
+      "chunks": 6,
+      "district": "suburb",
+      "file": "models/bld_bungalow_a.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "roof": {
+        "base": "#d9d9d9",
+        "blend": "multiply",
+        "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id",
+        "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color",
+        "part": "roof"
+      },
+      "size": [
+        10,
+        5,
+        9
+      ],
+      "tint": {
+        "base": "#cfe8a0",
+        "blend": "multiply",
+        "colors": [
+          "#f3e3b3",
+          "#f2a48b",
+          "#a8d4f0",
+          "#a9e5c5",
+          "#f6c9a0",
+          "#cfe8a0",
+          "#f5f2ea",
+          "#c9b5e8"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 70
+    },
     "bld_campus_a": {
       "chunks": 16,
       "district": "university",
@@ -268,6 +336,13 @@
         "intact",
         "rubble"
       ],
+      "roof": {
+        "base": "#d9d9d9",
+        "blend": "multiply",
+        "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id",
+        "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color",
+        "part": "roof"
+      },
       "size": [
         44,
         16,
@@ -282,7 +357,7 @@
           "#f3e3b3"
         ],
         "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
-        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
         "part": "wall plaster"
       },
       "tris": 172
@@ -321,7 +396,7 @@
           "#f2a48b"
         ],
         "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
-        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
         "part": "wall plaster"
       },
       "tris": 78
@@ -359,10 +434,104 @@
           "#f2a48b"
         ],
         "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
-        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
         "part": "wall plaster"
       },
       "tris": 244
+    },
+    "bld_diner_a": {
+      "chunks": 6,
+      "district": "suburb",
+      "file": "models/bld_diner_a.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "roof": {
+        "base": "#d9d9d9",
+        "blend": "multiply",
+        "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id",
+        "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color",
+        "part": "roof"
+      },
+      "size": [
+        16,
+        5,
+        10
+      ],
+      "tint": {
+        "base": "#efb3b8",
+        "blend": "multiply",
+        "colors": [
+          "#f3e3b3",
+          "#f2a48b",
+          "#a8d4f0",
+          "#a9e5c5",
+          "#f6c9a0",
+          "#cfe8a0",
+          "#f5f2ea",
+          "#c9b5e8"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 64
+    },
+    "bld_duplex_a": {
+      "chunks": 6,
+      "district": "suburb",
+      "file": "models/bld_duplex_a.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "roof": {
+        "base": "#d9d9d9",
+        "blend": "multiply",
+        "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id",
+        "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color",
+        "part": "roof"
+      },
+      "size": [
+        12,
+        7,
+        9.95
+      ],
+      "tint": {
+        "base": "#f3e3b3",
+        "blend": "multiply",
+        "colors": [
+          "#f3e3b3",
+          "#f2a48b",
+          "#a8d4f0",
+          "#a9e5c5",
+          "#f6c9a0",
+          "#cfe8a0",
+          "#f5f2ea",
+          "#c9b5e8"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 76
     },
     "bld_factory_a": {
       "chunks": 8,
@@ -382,6 +551,13 @@
         "intact",
         "rubble"
       ],
+      "roof": {
+        "base": "#d9d9d9",
+        "blend": "multiply",
+        "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id",
+        "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color",
+        "part": "roof"
+      },
       "size": [
         36.04,
         14,
@@ -397,7 +573,7 @@
           "#e3c04f"
         ],
         "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
-        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
         "part": "wall plaster"
       },
       "tris": 164
@@ -420,6 +596,13 @@
         "intact",
         "rubble"
       ],
+      "roof": {
+        "base": "#d9d9d9",
+        "blend": "multiply",
+        "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id",
+        "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color",
+        "part": "roof"
+      },
       "size": [
         43.85,
         18,
@@ -435,10 +618,104 @@
           "#e3c04f"
         ],
         "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
-        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
         "part": "wall plaster"
       },
       "tris": 192
+    },
+    "bld_firehouse_a": {
+      "chunks": 8,
+      "district": "oldtown",
+      "file": "models/bld_firehouse_a.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "roof": {
+        "base": "#d9d9d9",
+        "blend": "multiply",
+        "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id",
+        "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color",
+        "part": "roof"
+      },
+      "size": [
+        14,
+        12,
+        16
+      ],
+      "tint": {
+        "base": "#ead2a0",
+        "blend": "multiply",
+        "colors": [
+          "#e6b566",
+          "#ead2a0",
+          "#f2a48b",
+          "#f3e3b3",
+          "#f6c9a0",
+          "#e3c04f"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 50
+    },
+    "bld_garage_a": {
+      "chunks": 6,
+      "district": "suburb",
+      "file": "models/bld_garage_a.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "roof": {
+        "base": "#d9d9d9",
+        "blend": "multiply",
+        "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id",
+        "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color",
+        "part": "roof"
+      },
+      "size": [
+        8,
+        4,
+        7
+      ],
+      "tint": {
+        "base": "#f5f2ea",
+        "blend": "multiply",
+        "colors": [
+          "#f3e3b3",
+          "#f2a48b",
+          "#a8d4f0",
+          "#a9e5c5",
+          "#f6c9a0",
+          "#cfe8a0",
+          "#f5f2ea",
+          "#c9b5e8"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 40
     },
     "bld_gasstation_a": {
       "chunks": 13,
@@ -509,6 +786,13 @@
         "intact",
         "rubble"
       ],
+      "roof": {
+        "base": "#d9d9d9",
+        "blend": "multiply",
+        "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id",
+        "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color",
+        "part": "roof"
+      },
       "size": [
         9,
         6,
@@ -528,7 +812,7 @@
           "#c9b5e8"
         ],
         "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
-        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
         "part": "wall plaster"
       },
       "tris": 80
@@ -551,6 +835,13 @@
         "intact",
         "rubble"
       ],
+      "roof": {
+        "base": "#d9d9d9",
+        "blend": "multiply",
+        "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id",
+        "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color",
+        "part": "roof"
+      },
       "size": [
         11,
         7,
@@ -570,7 +861,7 @@
           "#c9b5e8"
         ],
         "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
-        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
         "part": "wall plaster"
       },
       "tris": 75
@@ -593,6 +884,13 @@
         "intact",
         "rubble"
       ],
+      "roof": {
+        "base": "#d9d9d9",
+        "blend": "multiply",
+        "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id",
+        "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color",
+        "part": "roof"
+      },
       "size": [
         8,
         5,
@@ -612,10 +910,59 @@
           "#c9b5e8"
         ],
         "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
-        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
         "part": "wall plaster"
       },
       "tris": 76
+    },
+    "bld_motel_a": {
+      "chunks": 8,
+      "district": "suburb",
+      "file": "models/bld_motel_a.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "roof": {
+        "base": "#d9d9d9",
+        "blend": "multiply",
+        "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id",
+        "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color",
+        "part": "roof"
+      },
+      "size": [
+        24,
+        7.009,
+        10
+      ],
+      "tint": {
+        "base": "#b4e3dc",
+        "blend": "multiply",
+        "colors": [
+          "#f3e3b3",
+          "#f2a48b",
+          "#a8d4f0",
+          "#a9e5c5",
+          "#f6c9a0",
+          "#cfe8a0",
+          "#f5f2ea",
+          "#c9b5e8"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 84
     },
     "bld_office_a": {
       "chunks": 16,
@@ -643,6 +990,13 @@
         "intact",
         "rubble"
       ],
+      "roof": {
+        "base": "#d9d9d9",
+        "blend": "multiply",
+        "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id",
+        "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color",
+        "part": "roof"
+      },
       "size": [
         20,
         42.33,
@@ -659,7 +1013,7 @@
           "#a8d4f0"
         ],
         "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
-        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
         "part": "wall plaster"
       },
       "tris": 180
@@ -682,6 +1036,13 @@
         "intact",
         "rubble"
       ],
+      "roof": {
+        "base": "#d9d9d9",
+        "blend": "multiply",
+        "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id",
+        "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color",
+        "part": "roof"
+      },
       "size": [
         24.08,
         55,
@@ -698,7 +1059,7 @@
           "#a8d4f0"
         ],
         "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
-        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
         "part": "wall plaster"
       },
       "tris": 122
@@ -737,6 +1098,13 @@
         "intact",
         "rubble"
       ],
+      "roof": {
+        "base": "#d9d9d9",
+        "blend": "multiply",
+        "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id",
+        "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color",
+        "part": "roof"
+      },
       "size": [
         22,
         68,
@@ -753,7 +1121,7 @@
           "#a8d4f0"
         ],
         "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
-        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
         "part": "wall plaster"
       },
       "tris": 292
@@ -790,7 +1158,7 @@
           "#efb3b8"
         ],
         "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
-        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
         "part": "wall plaster"
       },
       "tris": 90
@@ -859,6 +1227,13 @@
         "intact",
         "rubble"
       ],
+      "roof": {
+        "base": "#d9d9d9",
+        "blend": "multiply",
+        "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id",
+        "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color",
+        "part": "roof"
+      },
       "size": [
         7,
         8.8,
@@ -876,7 +1251,7 @@
           "#e3c04f"
         ],
         "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
-        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
         "part": "wall plaster"
       },
       "tris": 86
@@ -897,6 +1272,13 @@
         "intact",
         "rubble"
       ],
+      "roof": {
+        "base": "#d9d9d9",
+        "blend": "multiply",
+        "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id",
+        "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color",
+        "part": "roof"
+      },
       "size": [
         10.95,
         5,
@@ -916,7 +1298,7 @@
           "#c9b5e8"
         ],
         "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
-        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
         "part": "wall plaster"
       },
       "tris": 70
@@ -937,6 +1319,13 @@
         "intact",
         "rubble"
       ],
+      "roof": {
+        "base": "#d9d9d9",
+        "blend": "multiply",
+        "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id",
+        "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color",
+        "part": "roof"
+      },
       "size": [
         14,
         8,
@@ -954,7 +1343,7 @@
           "#e3c04f"
         ],
         "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
-        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
         "part": "wall plaster"
       },
       "tris": 74
@@ -977,6 +1366,13 @@
         "intact",
         "rubble"
       ],
+      "roof": {
+        "base": "#d9d9d9",
+        "blend": "multiply",
+        "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id",
+        "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color",
+        "part": "roof"
+      },
       "size": [
         12,
         10,
@@ -994,7 +1390,7 @@
           "#e3c04f"
         ],
         "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
-        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
         "part": "wall plaster"
       },
       "tris": 60
@@ -1017,6 +1413,13 @@
         "intact",
         "rubble"
       ],
+      "roof": {
+        "base": "#d9d9d9",
+        "blend": "multiply",
+        "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id",
+        "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color",
+        "part": "roof"
+      },
       "size": [
         10,
         11,
@@ -1033,7 +1436,7 @@
           "#ead2a0"
         ],
         "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
-        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
         "part": "wall plaster"
       },
       "tris": 112
@@ -1118,7 +1521,7 @@
           "#e3c04f"
         ],
         "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
-        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
         "part": "wall plaster"
       },
       "tris": 162
@@ -1157,6 +1560,13 @@
         "intact",
         "rubble"
       ],
+      "roof": {
+        "base": "#d9d9d9",
+        "blend": "multiply",
+        "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id",
+        "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color",
+        "part": "roof"
+      },
       "size": [
         25.6,
         95,
@@ -1173,7 +1583,7 @@
           "#a8d4f0"
         ],
         "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
-        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
         "part": "wall plaster"
       },
       "tris": 320
@@ -1202,6 +1612,13 @@
         "intact",
         "rubble"
       ],
+      "roof": {
+        "base": "#d9d9d9",
+        "blend": "multiply",
+        "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id",
+        "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color",
+        "part": "roof"
+      },
       "size": [
         30,
         130,
@@ -1218,7 +1635,7 @@
           "#a8d4f0"
         ],
         "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
-        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
         "part": "wall plaster"
       },
       "tris": 374
@@ -1257,7 +1674,7 @@
           "#a8d4f0"
         ],
         "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
-        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
         "part": "wall plaster"
       },
       "tris": 264
@@ -1280,6 +1697,13 @@
         "intact",
         "rubble"
       ],
+      "roof": {
+        "base": "#d9d9d9",
+        "blend": "multiply",
+        "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id",
+        "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color",
+        "part": "roof"
+      },
       "size": [
         30.08,
         11.15,
@@ -1296,7 +1720,7 @@
           "#f2a48b"
         ],
         "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
-        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
         "part": "wall plaster"
       },
       "tris": 152
@@ -4299,6 +4723,20 @@
         "audio/sfx/bell_3"
       ]
     },
+    "building_groan": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/building_groan"
+      ]
+    },
+    "bullet_hit": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/bullet_hit_1",
+        "audio/sfx/bullet_hit_2",
+        "audio/sfx/bullet_hit_3"
+      ]
+    },
     "burrow_loop": {
       "gain": 1,
       "loop": [
@@ -4313,6 +4751,13 @@
       "gain": 1,
       "variants": [
         "audio/sfx/camera_shutter"
+      ]
+    },
+    "cannon_fire": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/cannon_fire_1",
+        "audio/sfx/cannon_fire_2"
       ]
     },
     "car_crush": {
@@ -4331,6 +4776,39 @@
       ],
       "variants": [
         "audio/sfx/chant_loop"
+      ]
+    },
+    "civ_pop": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/civ_pop_1",
+        "audio/sfx/civ_pop_2",
+        "audio/sfx/civ_pop_3",
+        "audio/sfx/civ_pop_4"
+      ]
+    },
+    "club_hit": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/club_hit"
+      ]
+    },
+    "club_swing": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/club_swing"
+      ]
+    },
+    "crate_land": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/crate_land"
+      ]
+    },
+    "crate_take": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/crate_take"
       ]
     },
     "crowd_panic_loop": {
@@ -4411,6 +4889,12 @@
         "audio/sfx/explosion_s_3"
       ]
     },
+    "fire_bell": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/fire_bell"
+      ]
+    },
     "fire_loop": {
       "gain": 1,
       "loop": [
@@ -4419,6 +4903,18 @@
       ],
       "variants": [
         "audio/sfx/fire_loop"
+      ]
+    },
+    "fireball": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/fireball"
+      ]
+    },
+    "flare_pop": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/flare_pop"
       ]
     },
     "freeze_ray": {
@@ -4485,6 +4981,24 @@
         "audio/sfx/kaiju_brace"
       ]
     },
+    "kaiju_charge_s1": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_charge_s1"
+      ]
+    },
+    "kaiju_charge_s2": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_charge_s2"
+      ]
+    },
+    "kaiju_charge_s3": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_charge_s3"
+      ]
+    },
     "kaiju_death": {
       "gain": 1,
       "variants": [
@@ -4503,6 +5017,12 @@
         "audio/sfx/kaiju_grab"
       ]
     },
+    "kaiju_gulp": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_gulp"
+      ]
+    },
     "kaiju_heartbeat_loop": {
       "gain": 1,
       "loop": [
@@ -4511,6 +5031,24 @@
       ],
       "variants": [
         "audio/sfx/kaiju_heartbeat_loop"
+      ]
+    },
+    "kaiju_hop_s1": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_hop_s1"
+      ]
+    },
+    "kaiju_hop_s2": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_hop_s2"
+      ]
+    },
+    "kaiju_hop_s3": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_hop_s3"
       ]
     },
     "kaiju_hurt": {
@@ -4525,6 +5063,24 @@
       "gain": 1,
       "variants": [
         "audio/sfx/kaiju_molt_blast"
+      ]
+    },
+    "kaiju_rake_s1": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_rake_s1"
+      ]
+    },
+    "kaiju_rake_s2": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_rake_s2"
+      ]
+    },
+    "kaiju_rake_s3": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_rake_s3"
       ]
     },
     "kaiju_roar_burrower_s1": {
@@ -4632,37 +5188,91 @@
     "kaiju_stomp_s1": {
       "gain": 1,
       "variants": [
-        "audio/sfx/kaiju_stomp_s1"
+        "audio/sfx/kaiju_stomp_s1_1",
+        "audio/sfx/kaiju_stomp_s1_2",
+        "audio/sfx/kaiju_stomp_s1_3"
       ]
     },
     "kaiju_stomp_s2": {
       "gain": 1,
       "variants": [
-        "audio/sfx/kaiju_stomp_s2"
+        "audio/sfx/kaiju_stomp_s2_1",
+        "audio/sfx/kaiju_stomp_s2_2",
+        "audio/sfx/kaiju_stomp_s2_3"
       ]
     },
     "kaiju_stomp_s3": {
       "gain": 1,
       "variants": [
-        "audio/sfx/kaiju_stomp_s3"
+        "audio/sfx/kaiju_stomp_s3_1",
+        "audio/sfx/kaiju_stomp_s3_2",
+        "audio/sfx/kaiju_stomp_s3_3"
+      ]
+    },
+    "kaiju_stumble_s1": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_stumble_s1_1",
+        "audio/sfx/kaiju_stumble_s1_2",
+        "audio/sfx/kaiju_stumble_s1_3"
+      ]
+    },
+    "kaiju_stumble_s2": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_stumble_s2_1",
+        "audio/sfx/kaiju_stumble_s2_2",
+        "audio/sfx/kaiju_stumble_s2_3"
+      ]
+    },
+    "kaiju_stumble_s3": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_stumble_s3_1",
+        "audio/sfx/kaiju_stumble_s3_2",
+        "audio/sfx/kaiju_stumble_s3_3"
       ]
     },
     "kaiju_swipe_s1": {
       "gain": 1,
       "variants": [
-        "audio/sfx/kaiju_swipe_s1"
+        "audio/sfx/kaiju_swipe_s1_1",
+        "audio/sfx/kaiju_swipe_s1_2",
+        "audio/sfx/kaiju_swipe_s1_3"
       ]
     },
     "kaiju_swipe_s2": {
       "gain": 1,
       "variants": [
-        "audio/sfx/kaiju_swipe_s2"
+        "audio/sfx/kaiju_swipe_s2_1",
+        "audio/sfx/kaiju_swipe_s2_2",
+        "audio/sfx/kaiju_swipe_s2_3"
       ]
     },
     "kaiju_swipe_s3": {
       "gain": 1,
       "variants": [
-        "audio/sfx/kaiju_swipe_s3"
+        "audio/sfx/kaiju_swipe_s3_1",
+        "audio/sfx/kaiju_swipe_s3_2",
+        "audio/sfx/kaiju_swipe_s3_3"
+      ]
+    },
+    "kaiju_tail_s1": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_tail_s1"
+      ]
+    },
+    "kaiju_tail_s2": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_tail_s2"
+      ]
+    },
+    "kaiju_tail_s3": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_tail_s3"
       ]
     },
     "kaiju_throw": {
@@ -4699,12 +5309,32 @@
         "audio/sfx/member_down_3"
       ]
     },
+    "mg_burst": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/mg_burst_1",
+        "audio/sfx/mg_burst_2",
+        "audio/sfx/mg_burst_3"
+      ]
+    },
+    "power_surge": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/power_surge"
+      ]
+    },
     "prop_break": {
       "gain": 1,
       "variants": [
         "audio/sfx/prop_break_1",
         "audio/sfx/prop_break_2",
         "audio/sfx/prop_break_3"
+      ]
+    },
+    "propane_blast": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/propane_blast"
       ]
     },
     "radio_close": {
@@ -4717,6 +5347,12 @@
       "gain": 1,
       "variants": [
         "audio/sfx/radio_open"
+      ]
+    },
+    "radio_static": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/radio_static"
       ]
     },
     "relic_open": {
@@ -4745,6 +5381,14 @@
         "audio/sfx/shell_whoosh"
       ]
     },
+    "shield_clang": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/shield_clang_1",
+        "audio/sfx/shield_clang_2",
+        "audio/sfx/shield_clang_3"
+      ]
+    },
     "siren_loop": {
       "gain": 1,
       "loop": [
@@ -4753,6 +5397,16 @@
       ],
       "variants": [
         "audio/sfx/siren_loop"
+      ]
+    },
+    "speed_wind_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        4.25
+      ],
+      "variants": [
+        "audio/sfx/speed_wind_loop"
       ]
     },
     "splash": {
@@ -4793,6 +5447,38 @@
         "audio/sfx/structure_hit_3"
       ]
     },
+    "stun_ring": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/stun_ring"
+      ]
+    },
+    "substation_hum_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        4.25
+      ],
+      "variants": [
+        "audio/sfx/substation_hum_loop"
+      ]
+    },
+    "supply_drop": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/supply_drop"
+      ]
+    },
+    "surge_crackle_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        2.25
+      ],
+      "variants": [
+        "audio/sfx/surge_crackle_loop"
+      ]
+    },
     "takeover": {
       "gain": 1,
       "variants": [
@@ -4815,6 +5501,16 @@
         "audio/sfx/tank_fire_1",
         "audio/sfx/tank_fire_2",
         "audio/sfx/tank_fire_3"
+      ]
+    },
+    "tank_tracks_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        2.25
+      ],
+      "variants": [
+        "audio/sfx/tank_tracks_loop"
       ]
     },
     "ui_click": {
@@ -4971,6 +5667,14 @@
       "base": "audio/voice/v_callin_inbound_5",
       "duration": 3.479
     },
+    "v_civilians_eaten_1": {
+      "base": "audio/voice/v_civilians_eaten_1",
+      "duration": 5.115
+    },
+    "v_civilians_eaten_2": {
+      "base": "audio/voice/v_civilians_eaten_2",
+      "duration": 5.064
+    },
     "v_clock_10s_1": {
       "base": "audio/voice/v_clock_10s_1",
       "duration": 2.251
@@ -5083,6 +5787,22 @@
       "base": "audio/voice/v_collateral_human_9",
       "duration": 2.822
     },
+    "v_crate_drop_1": {
+      "base": "audio/voice/v_crate_drop_1",
+      "duration": 3.732
+    },
+    "v_crate_drop_2": {
+      "base": "audio/voice/v_crate_drop_2",
+      "duration": 3.689
+    },
+    "v_crate_land_1": {
+      "base": "audio/voice/v_crate_land_1",
+      "duration": 3.714
+    },
+    "v_crate_land_2": {
+      "base": "audio/voice/v_crate_land_2",
+      "duration": 3.499
+    },
     "v_crossfire_1": {
       "base": "audio/voice/v_crossfire_1",
       "duration": 3.692
@@ -5131,6 +5851,10 @@
       "base": "audio/voice/v_crossfire_9",
       "duration": 3.758
     },
+    "v_door_shield_1": {
+      "base": "audio/voice/v_door_shield_1",
+      "duration": 4.094
+    },
     "v_end_humans_clock_1": {
       "base": "audio/voice/v_end_humans_clock_1",
       "duration": 3.77
@@ -5178,6 +5902,18 @@
     "v_end_kaiju_4": {
       "base": "audio/voice/v_end_kaiju_4",
       "duration": 3.473
+    },
+    "v_gas_station_1": {
+      "base": "audio/voice/v_gas_station_1",
+      "duration": 3.314
+    },
+    "v_gas_station_2": {
+      "base": "audio/voice/v_gas_station_2",
+      "duration": 3.697
+    },
+    "v_gas_station_3": {
+      "base": "audio/voice/v_gas_station_3",
+      "duration": 4.598
     },
     "v_hearing_humans_win_1": {
       "base": "audio/voice/v_hearing_humans_win_1",
@@ -5399,6 +6135,18 @@
       "base": "audio/voice/v_landmark_down_6",
       "duration": 3.965
     },
+    "v_mast_down_1": {
+      "base": "audio/voice/v_mast_down_1",
+      "duration": 4.155
+    },
+    "v_mast_down_2": {
+      "base": "audio/voice/v_mast_down_2",
+      "duration": 4.039
+    },
+    "v_mast_down_3": {
+      "base": "audio/voice/v_mast_down_3",
+      "duration": 3.828
+    },
     "v_match_briefing_1": {
       "base": "audio/voice/v_match_briefing_1",
       "duration": 3.181
@@ -5534,6 +6282,18 @@
     "v_player_takeover_4": {
       "base": "audio/voice/v_player_takeover_4",
       "duration": 3.612
+    },
+    "v_power_cut_1": {
+      "base": "audio/voice/v_power_cut_1",
+      "duration": 3.671
+    },
+    "v_power_cut_2": {
+      "base": "audio/voice/v_power_cut_2",
+      "duration": 3.476
+    },
+    "v_power_cut_3": {
+      "base": "audio/voice/v_power_cut_3",
+      "duration": 3.877
     },
     "v_squad_wiped_1": {
       "base": "audio/voice/v_squad_wiped_1",

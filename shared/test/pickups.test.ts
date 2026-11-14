@@ -97,13 +97,13 @@ describe('supply crates', () => {
     expect(world.crates.map((x) => x.id)).not.toContain(c.id);
   });
 
-  it('drop one every 30 s for the squads in turn while fewer than the stage allows are down, and go when the stage ends', () => {
+  it('drop one every so often (more often at stages 2 and 3) for the squads in turn while fewer than the stage allows are down, and go when the stage ends', () => {
     const world = makeTestWorld({ crates: true });
     run(world, 1);
     expect(world.crates.length).toBe(4);
     // Clear the first ones away to watch the timed drops: one per period, squad after squad, up to three at stage 1.
     world.crates.length = 0;
-    const period = Math.round(CRATE_RULES.every * TICK_RATE);
+    const period = Math.round(CRATE_RULES.every[0] * TICK_RATE);
     let events = run(world, period * 4);
     expect(eventsOf(events, 'crate').filter((e) => e.phase === 'drop').map((e) => e.squad)).toEqual([0, 1, 2]);
     expect(world.crates.length).toBe(CRATE_RULES.maxDown[0]);
@@ -122,6 +122,15 @@ describe('supply crates', () => {
     events = run(world, TICK_RATE + 2);
     expect(eventsOf(events, 'stageChange').length).toBe(1);
     expect(eventsOf(events, 'crate').filter((e) => e.phase === 'drop').map((e) => e.squad)).toEqual([0, 1, 2, 3]);
+    // And drops them at its own pace, up to its own number (phase 3's pacing: docs/BALANCE.md section 11).
+    expect(CRATE_RULES.every[1]).toBeLessThan(CRATE_RULES.every[0]);
+    world.crates.length = 0;
+    const period2 = Math.round(CRATE_RULES.every[1] * TICK_RATE);
+    events = run(world, period2 * (CRATE_RULES.maxDown[1] + 1) - 3 * TICK_RATE);
+    const drops = eventsOf(events, 'crate').filter((e) => e.phase === 'drop');
+    expect(drops.length).toBe(CRATE_RULES.maxDown[1]);
+    expect(drops.map((e) => e.squad)).toEqual(Array.from({ length: CRATE_RULES.maxDown[1] }, (_, i) => i % 4));
+    expect(drops[1].tick - drops[0].tick).toBe(period2);
   });
 
   it('hold what the draw says: every kind turns up, and reinforcements are likelier for a squad that has lost units', () => {

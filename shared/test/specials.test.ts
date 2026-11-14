@@ -168,3 +168,75 @@ describe('the radio mast', () => {
     expect(k.known).toBe(true);
   });
 });
+
+describe('a bigger monster sets them off as well (phase 3: special buildings beyond the starting neighborhoods)', () => {
+  const mast: TestStructure = { archetype: 'radiomast_a', x: 0, z: 20, w: 8, d: 8, height: 24, hp: 120, value: 15 };
+
+  it('a juvenile that walks through a substation tramples it and gets the surge', () => {
+    const world = arena([substation]);
+    beginStage(world, 2);
+    const k = placeKaiju(world, 0, -24, 0);
+    parkUnits(world);
+    holdFire(world);
+    k.cooldowns.eat = 9;
+    const events = play(world, 5 * TICK_RATE, { moveZ: 1 });
+    expect(eventsOf(events, 'powerSurge')).toEqual([expect.objectContaining({ kaiju: 0, structure: 0, rage: REWARDS.surge.rage })]);
+    expect(world.structureHp[0]).toBe(0);
+    expect(k.surge).toBeGreaterThan(0);
+    expect(k.cooldowns.eat).toBe(0);
+  });
+
+  it("a titan right over a gas station is not hurt by its fireball, which still hurts a troop by it", () => {
+    const world = arena([{ archetype: 'gasstation_a', x: 0, z: 30, w: 26, d: 20, height: 7, hp: 160, value: 15 }]);
+    beginStage(world, 3);
+    // Its 26 m body reaches over the station.
+    const k = placeKaiju(world, 0, 0, 0);
+    parkUnits(world);
+    holdFire(world);
+    const u = placeUnit(world, 1, 22, 38);
+    u.hp = 10000;
+    u.maxHp = 10000;
+    const hp = k.hp;
+    const events = wreck(world, 0);
+    expect(eventsOf(events, 'fireball')).toHaveLength(1);
+    expect(eventsOf(events, 'kaijuHit')).toEqual([]);
+    expect(k.hp).toBe(hp);
+    expect(u.hp).toBeLessThan(10000);
+  });
+
+  it('the mast falls away from a titan right beside it and its top comes to lie clear of the titan', () => {
+    const world = arena([mast]);
+    beginStage(world, 3);
+    const k = placeKaiju(world, 6, 2, 0);
+    parkUnits(world);
+    holdFire(world);
+    const m = eventsOf(wreck(world, 0), 'mastFall')[0];
+    const before = Math.hypot(mast.x - k.x, mast.z - k.z);
+    const top = Math.hypot(m.topX - k.x, m.topZ - k.z);
+    // Away from it: its top a mast's length further out than the mast stood, and outside its body.
+    expect(top).toBeGreaterThan(before + mast.height / 2);
+    expect(top).toBeGreaterThan(k.radius + 4);
+    expect(world.match.staticUntil).toBe(world.tick + REWARDS.radiomast.staticTime * TICK_RATE);
+  });
+
+  it("the fallen top is the hatchling's only: a juvenile's hand leaves it and its feet crush it", () => {
+    const world = arena([mast]);
+    beginStage(world, 2);
+    placeKaiju(world, 0, 0, 0);
+    parkUnits(world);
+    holdFire(world);
+    const m = eventsOf(wreck(world, 0), 'mastFall')[0];
+    play(world, Math.round(m.duration * TICK_RATE) + 1);
+    expect(world.loose[m.topId].state).toBe('down');
+    // Just short of touching it, reaching for it: the hand comes back without it.
+    const k = placeKaiju(world, m.topX, m.topZ - 14, 0);
+    play(world, 2, { buttons: Btn.grab });
+    play(world, 30);
+    expect(k.held).toBeNull();
+    expect(world.loose[m.topId].state).toBe('down');
+    // Standing on it: gone.
+    placeKaiju(world, m.topX, m.topZ, 0);
+    const crushed = play(world, 2);
+    expect(eventsOf(crushed, 'looseProp')).toEqual([expect.objectContaining({ id: m.topId, state: 'gone', cause: 'crushed' })]);
+  });
+});

@@ -488,3 +488,41 @@ const FALLBACK_POSES = {
   renders are not in the repository; the contact sheets named in section 11 are the durable
   record.
 - Distances and anchor positions were read from the `.glb` files with `tools/art/lib/glb.py`.
+
+## 15. Glowing stripes (phase 3)
+
+`docs/ROADMAP.md` phase 3: "glowing stripes". The art marks the stripes, the client lights them.
+
+**The mark.** In `kaiju_lizard_s1`, `_s2` and `_s3` every face of the stripes carries COLOR_0
+alpha **0.5**; every other face keeps 1 (the files had 1 throughout before). The stripes are the
+rust zigzag bands round the torso (every ring at stages 1 and 2, every second ring on the titan)
+and over the shoulder hump, round the upper and lower arms and legs and the tail, the painted tip
+of the tail, and the two bands across the snout. Not marked: the finger and toe bands, the snout
+scutes' tops, the vents on the back. Counts, measured on the exported files:
+
+| | Stage 1 | Stage 2 | Stage 3 |
+| --- | --- | --- | --- |
+| stripe triangles (of all) | 150 (2,253) | 161 (2,413) | 183 (3,485) |
+| on the head (the snout bands) | 24 | 26 | 26 |
+
+Nothing else changed: the rebuild was checked against the files before it (node tree, pivots,
+every position, index and RGB color identical; the manifest entries, poses included, unchanged),
+and the validator and the art tests pass.
+
+**How it is made.** `tools/art/kaiju/parts.py`: `marked(color)` makes a stripe color (a `Marked`
+tuple); `paint()`, `bands()` and `zigzag()` there keep the mark, `finish()` keeps it through the
+shading and jitter, and `Rig.emit()` writes alpha `STRIPE_ALPHA` (0.5) on the marked faces after
+the node is made. `tools/art/kaiju/lizard.py` paints its stripes with `parts.marked(...)`. The
+kit in `tools/art/lib` is untouched (its own painting makes plain colors, so a color mixed from
+the stripe color, the vents', is not marked).
+
+**How the client lights it** (`client/src/render/materials.ts` `kaijuSkin`,
+`client/src/render/kaijuView.ts` `updateGlow`). Each kaiju view has its own body material: the
+shared rim light, plus a `stripe` glow added to faces whose alpha is from 0.25 to 0.75 and a
+`flash` over the whole hide. The stripe glow follows rage: a faint ember red at none (0.12),
+hot orange at full (0.75); a slow throb (0.7 to 1.25, about every 2.6 s) while the beam is
+picked and ready; blazing while the beam gathers and burns; a white-hot flare for about 2.4 s
+when a new body comes out of the cocoon. Seen from inside its own head it glows at 45%. During
+a power surge the surge's arcs take over: the stripes flicker blue-white with each burst, and
+the surge's flash over the hide, which used the shared material's emissive before, is the
+view's own `flash` now.

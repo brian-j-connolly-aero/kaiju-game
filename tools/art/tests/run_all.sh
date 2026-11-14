@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Runs the art pipeline's own tests: builders, axis conventions, rigs, buildings, validator.
+# Runs the art pipeline's own tests: builders, axis conventions, rigs, buildings, validator,
+# the city kit's roof mask and its tall parts.
 # Test models go to /tmp/mb-scratch/art-tests/, never into the game's assets.
 set -uo pipefail
 cd "$(dirname "$0")/../../.."
 PY=/opt/mbtools/venv/bin/python
 failed=""
-for t in test_builders test_conventions test_rig test_structure test_validator; do
+for t in test_builders test_conventions test_rig test_structure test_validator test_city_roofs test_tall_parts; do
   echo "=== $t"
   "$PY" "tools/art/tests/$t.py" || failed="$failed $t"
 done

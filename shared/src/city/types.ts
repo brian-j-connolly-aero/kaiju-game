@@ -169,6 +169,30 @@ export interface District {
    * neutral model per archetype takes the district's color family. Absent means white (no tint).
    */
   tint?: number;
+  /**
+   * Optional roof color, 0xRRGGBB (phase 3, docs/CITY.md section 2): the color the roofs of the
+   * ordinary buildings whose center lies in this district show (the faces a model marks as roof,
+   * vertex color alpha 0.5; a few shades apart from building to building, picked by the
+   * structure's id), so each district reads as its own place from above and on the map.
+   * Landmarks, bridges and the special buildings keep their own colors. One color per instance,
+   * no extra draw calls. Absent means the art's own roof color.
+   */
+  roof?: number;
+}
+
+/**
+ * A back lane (phase 3, docs/CITY.md section 6): a straight piece of a gravel track through the
+ * middle of a block in a starting neighborhood, lined with garages whose doors face it. Not a
+ * street: nothing routes along it (units and the kaiju cross it as open ground) and no building
+ * comes within 5 m of its middle line. For drawing only.
+ */
+export interface Lane {
+  ax: number;
+  az: number;
+  bx: number;
+  bz: number;
+  /** Width of the track, meters. */
+  width: number;
 }
 
 /** A low-rise spot where a match can start (stage 1 bounds are centered on one of these). */
@@ -191,6 +215,8 @@ export interface CityData {
   anchors: NeighborhoodAnchor[];
   /** Center of downtown; stage 2 bounds lean toward it. */
   downtown: Vec2;
+  /** Back lanes of the starting neighborhoods (Port Meridian since phase 3; the placeholder has none). */
+  lanes?: Lane[];
 }
 
 /** Ground types stored in the city index raster. */

@@ -295,6 +295,12 @@ export class AssetStore {
     return { base: tint.base, colors: this.modelTints(id) };
   }
 
+  /** The grey a building model's roofs were drawn in (its manifest `roof` entry), or null when it has no roof faces. */
+  modelRoof(id: string): string | null {
+    const base = this.manifest.models[id]?.roof?.base;
+    return typeof base === 'string' ? base : null;
+  }
+
   hasTexture(id: string): boolean {
     return this.realTextures.has(id);
   }

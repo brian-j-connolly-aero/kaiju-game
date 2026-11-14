@@ -9,6 +9,10 @@ import type { Vec2 } from '../../math/vec';
 import { DIR_COS, DIR_QUARTER, DIR_SIN } from './dirs';
 import type { Box } from './geo';
 
+/** The heading table, read once into this module (a read of the imported binding costs more in the hot loops). */
+const COS: readonly number[] = DIR_COS;
+const SIN: readonly number[] = DIR_SIN;
+
 /** Side of a cell, meters. */
 export const G_CELL = 2;
 export const G_LAND = 0;
@@ -144,8 +148,8 @@ export function boxOnGround(g: Ground, b: Box, margin: number, openOk: boolean, 
     }
     return true;
   }
-  const c = DIR_COS[b.dir];
-  const s = DIR_SIN[b.dir];
+  const c = COS[b.dir];
+  const s = SIN[b.dir];
   const hx = b.hx + margin;
   const hz = b.hz + margin;
   const nx = Math.max(1, Math.ceil((hx * 2) / G_CELL));

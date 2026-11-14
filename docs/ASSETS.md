@@ -13,8 +13,15 @@ Recreate with `tools/setup-asset-tools.sh` (keep that script current).
   export works; Cycles on CPU renders previews (use absolute output paths).
 - Audio: `fluidsynth` with `/usr/share/sounds/sf2/FluidR3_GM.sf2` (General MIDI: choir, strings,
   brass, timpani), `sox`, `ffmpeg` (Vorbis and MP3 encoders).
-- Speech: `RHVoice-test` (voices alan, bdl, clb, slt), `flite` (rms, slt, awb, kal16),
-  `pico2wave`, `festival` / `text2wave`, `espeak-ng`. No network speech services.
+- Speech: two neural speech engines that run on the processor through ONNX Runtime (Open
+  Neural Network Exchange) in the tools' Python: Kokoro-82M (with its pronouncing front end,
+  `misaki`) and Piper. They speak every line in the game (`tools/audio/voice/cast.json`). Their
+  voice files are not in the repository: the voice build downloads them once into
+  `/opt/mbtools/models`, each pinned by its hash, with a second speech recognizer and a
+  speaker-recognition model that it measures with (about 1.1 GB in all), and needs no network
+  after that (`tools/audio/voice/mbvoice/models.py`). The first, rule-based speech tools are
+  still installed for trials: `RHVoice-test` (voices alan, bdl, clb, slt), `flite` (rms, slt,
+  awb, kal16), `pico2wave`, `festival` / `text2wave`, `espeak-ng`. No network speech services.
 - Sources of truth are the generator scripts in `tools/art/` and `tools/audio/`. Outputs are
   committed under `client/public/assets/`. Everything must be reproducible by one script per
   family plus `tools/art/build_all.sh` and `tools/audio/build_all.sh`.
@@ -46,7 +53,22 @@ the humans and to charging volleys.
   **alpha of `COLOR_0`** says where it is: 1 = paint (multiply the tint color in), 0 = glass,
   tires, lights, trim (leave alone). It is a mask, not opacity: draw these with an opaque
   material. Buildings (`bld_*`, `lm_*`) whose manifest entry has `"tint"` use the same mask
-  for wall plaster (`docs/art/CITY_ART.md`). Every other model has alpha 1 throughout.
+  for wall plaster (`docs/art/CITY_ART.md`). Every other model has alpha 1 throughout, except
+  the lizard kaiju's stripe mark (below).
+- Roof mask (roadmap phase 3, roofs colored by district): ordinary buildings add a third level
+  to that mask, **0.5 = roof**, on every roof face in every state (intact, damaged, the collapse
+  chunks, the roof piece lying on the rubble). The client reads alpha above 0.75 as wall, 0.25
+  to 0.75 as roof and below 0.25 as neither, and multiplies roof faces by the district's roof
+  color (`District.roof` in the city data, a few shades apart by structure id) divided by the
+  `base` of the manifest entry's `"roof"`. Roof faces are drawn in light neutral greys that
+  average that base (`#d9d9d9`, in linear light), patterns such as tiles kept as lighter and
+  darker lines. Chimneys, plant rooms, water tanks, parapet tops, skylights, signs and trim
+  carry 0. Landmarks, bridges and the three special buildings keep their own roof colors and
+  have no 0.5 faces, as do the few ordinary archetypes listed with a reason in
+  `tools/art/city/style.py` (`OWN_ROOFS`: the storage tank, the crane, the container stack, the
+  glass-roofed `tower_c`, the striped pavilion). How the client draws it:
+  `docs/art/client-notes-city.md` section 2; how a building marks its roof:
+  `tools/art/README.md` section 9.
 - Animation is done in code. Models are **rigid segments under named nodes with pivots at the
   joints**; no armatures, no baked animation. Rest pose: neutral stance.
 - Triangle budgets: kaiju stage 1 and 2 up to 2500, stage 3 up to 4000; vehicles up to 500;
@@ -75,6 +97,15 @@ root
   ├ leg_R ─ shin_R ─ foot_R
   └ tail_1 ─ tail_2 ─ tail_3 ─ tail_4 ─ tail_5
 ```
+
+Stripe mark (roadmap phase 3, "glowing stripes"): on `kaiju_lizard_s1` to `_s3` every face of
+the rust zigzag stripes (round the torso and the shoulder hump, the upper and lower arms and
+legs, the tail, its tip, and the two bands across the snout) carries **COLOR_0 alpha 0.5**;
+the rest of the hide 1. As with the paint mask it is a mask, not opacity. The client reads 0.25
+to 0.75 as stripe and makes those faces glow with the monster's rage (150, 161 and 183 stripe
+triangles at stages 1, 2, 3). Made in `tools/art/kaiju/parts.py` (`marked`, kept through
+painting and shading, written on export); the glb carries nothing else new. How the client
+lights it: `docs/art/client-notes-kaiju-lizard.md` section 15.
 
 The snout and hands must be visible and good-looking from `cam_fp`. Also: `kaiju_cocoon.glb`
 and `kaiju_egg.glb` (1 m tall, scaled in code). Tier 2 kinds (`crab`, `burrower`, `moth`) define
@@ -129,6 +160,35 @@ half-built), `faith_belltruck` (`hull`, `bell`), `faith_float`, `faith_ark` (`ba
     to match this node: 8 m long, three legs 0.17 m thick standing 0.85 m from the axis at the
     break and 0.5 m at the tip, zig-zag braces in two 4 m bays, white `#f4f2ee` then red
     `#d7263d`.
+- The small buildings of the starting neighborhoods (roadmap phase 3, "more kinds of
+  buildings"; `tools/art/city_starts.py`, their atlas pictures in
+  `tools/art/city/atlas_extra/homes.py`; pictures in `docs/art/previews/bld_<id>.png`,
+  `docs/art/concept/city_starts_scale.png` and `docs/art/concept/city_starts_street.png`).
+  Ordinary structure files (`intact`, `damaged`, `rubble`, `chunk_NN`, one `city_atlas`
+  material, the wall mask and the roof mask), all in the small class (120 triangles per state),
+  front +Z. Signs are pictures: no letters or numbers.
+  - `bld_bungalow_a` (10 x 9 m, 5 m; house): one storey of painted boards under one low hipped
+    roof that also covers the deep porch across the whole front (four white posts), a red
+    door, a brick chimney.
+  - `bld_duplex_a` (12 x 10 m, 7 m; house): a semi-detached pair, two mirrored halves under one
+    long gable roof, a door at each outer end (one red, one blue) under its own small porch
+    roof, a white strip down the shared wall, two chimneys.
+  - `bld_garage_a` (8 x 7 m, 4 m; house): a detached two-car garage and workshop, its gable to
+    the street over two ribbed roll-up doors (the look of `prop_garagedoor`), a wrench on a
+    board in the gable, a window on one side and a door on the other.
+  - `bld_diner_a` (16 x 10 m, 5 m; shop): a roadside diner, one long pastel body with rounded
+    ends and a band of big windows all the way round (always lit at night), a chrome roof edge
+    with a red neon line, and a steaming cup on a board on the roof.
+  - `bld_firehouse_a` (14 x 16 m, 9 m; shop): a brick fire station with two tall red engine
+    doors and a brass bell between them, a low hipped roof, and a slim hose tower at the back
+    corner on the model's left. **The tower stands 12 m tall, 3 m above the archetype's box**
+    (the only building that does: `TALL_PARTS` in `tools/art/lib/contract.py`); the game still
+    collides with the 9 m box. Its brick keeps its own color (no wall mask); its roofs take
+    the district's color.
+  - `bld_motel_a` (24 x 10 m, 7 m; shop): a two-storey motel row, a door and a window per room
+    on both floors, an open walkway with a railing along the upper floor under one low roof, a
+    stair at the model's left end, and a sign on a pole at the right end (a sleeping moon,
+    three sparkles and a bed).
 - Props, one mesh each: `prop_car_sedan`, `prop_car_taxi`, `prop_car_van`, `prop_bus`,
   `prop_truck`, `prop_kiosk`, `prop_tree_a`, `prop_tree_b`, `prop_lamp`, `prop_trafficlight`,
   `prop_bench`, `prop_hydrant`, `prop_billboard`, `prop_busstop`, plus `prop_car_wreck`.
@@ -297,24 +357,38 @@ own, because the heartbeat is the positional effect `kaiju_heartbeat_loop`), `in
 (build, 20 s), `win_humans` (fanfare, 10 to 15 s), `win_kaiju` (ominous choir, 10 to 15 s),
 `hearing` (somber bureaucratic bed, 30 s loop).
 
-### Sound effects (`audio/sfx/`), synthesized, punchy, with 2 to 3 variants where marked *
+### Sound effects (`audio/sfx/`), synthesized, punchy, with 2 to 4 variants where marked *
 
-Kaiju: `kaiju_step_s1*`, `kaiju_step_s2*`, `kaiju_step_s3*`, `kaiju_swipe_s1..s3`,
-`kaiju_stomp_s1..s3`, `kaiju_roar_lizard_s1..s3` (one signature roar, growing with stage),
+Kaiju: `kaiju_step_s1*`, `kaiju_step_s2*`, `kaiju_step_s3*`, `kaiju_swipe_s1..s3*`,
+`kaiju_stomp_s1..s3*`, `kaiju_roar_lizard_s1..s3` (one signature roar, growing with stage),
 `kaiju_grab`, `kaiju_throw`, `kaiju_eat`, `kaiju_brace`, `kaiju_hurt*`, `kaiju_stagger`,
 `kaiju_beam_charge`, `kaiju_beam_loop`, `kaiju_heartbeat_loop`, `kaiju_molt_blast`, `kaiju_death`.
+The moves and attack looks of phases 1 and 3, each at the three sizes: `kaiju_rake_s1..s3` (the
+two-claw swipe), `kaiju_hop_s1..s3` (the stomp onto both feet), `kaiju_tail_s1..s3`,
+`kaiju_charge_s1..s3` (the bellow as the run begins), `kaiju_stumble_s1..s3` (three variants
+that are not interchangeable: variant 1, 2 and 3 are the stumble looks 0, 1 and 2, forward onto
+a knee, spinning out, sitting down hard), and `kaiju_gulp` (one size, played at the stage's rate).
 
 Humans: `rocket_launch*`, `tank_fire*`, `shell_whoosh`, `arty_incoming`, `arty_distant`,
 `laser_charge_loop`, `volley_ready`, `volley_fire`, `tank_engine_loop`, `march_loop`,
-`unit_destroyed*`, `member_down*`, `shaken`, `takeover`.
+`unit_destroyed*`, `member_down*`, `shaken`, `takeover`. Phases 1 and 2: `mg_burst*` (the
+machine gun pick-up), `bullet_hit*`, `cannon_fire*` (the big cannon), `tank_tracks_loop`,
+`supply_drop` (the plane and the parachute), `crate_land`, `crate_take`, `flare_pop` (the
+artillery marker), `stun_ring` (a squad stunned by the roar).
 
 World: `explosion_s*`, `explosion_m*`, `explosion_l*`, `structure_hit*`, `crumble_s*`,
 `crumble_m*`, `crumble_l*`, `glass*`, `car_crush*`, `prop_break*`, `splash`, `crowd_panic_loop`,
 `siren_loop`, `fire_loop`, `amb_day_loop`, `amb_sunset_loop`, `amb_night_loop`, `wind_high_loop`.
+Phases 2 and 3: `fireball` (a gas station), `propane_blast`, `building_groan` (a building
+falling over), `fire_bell` (a firehouse coming down), `substation_hum_loop`, `power_surge`,
+`surge_crackle_loop`, `shield_clang*` (the garage door), `club_swing` and `club_hit` (the
+fast-food sign), `civ_pop*` (civilians squashed: a soft comic pop, never a cry), and
+`speed_wind_loop` (air rushing past at speed).
 
 UI: `ui_click`, `ui_hover`, `ui_ready`, `ui_error`, `ui_wheel_open`, `ui_wheel_select`,
 `ui_join`, `ui_tick`, `ui_match_start`, `radio_open`, `radio_close`, `sting_crossfire`,
-`sting_nerve_break`, `sting_bar_mark`, `sting_molt_ready`, `camera_shutter`.
+`sting_nerve_break`, `sting_bar_mark`, `sting_molt_ready`, `camera_shutter`, `radio_static`
+(a radio mast falls).
 
 Tier 2: `kaiju_roar_crab_s1..s3`, `kaiju_roar_burrower_s1..s3`, `kaiju_roar_moth_s1..s3`,
 `heli_loop`, `jet_flyby`, `drone_loop`, `freeze_ray`, `dish_beam_loop`, `generator_overload`,
@@ -324,7 +398,11 @@ Tier 2: `kaiju_roar_crab_s1..s3`, `kaiju_roar_burrower_s1..s3`, `kaiju_roar_moth
 
 Script: `shared/src/defs/voiceLines.json`, an array of
 `{ "id", "cue", "audience": "humans" | "kaiju" | "all", "speaker", "text" }`, covering every cue
-in `DESIGN.md` §8 with at least 3 variants for frequent cues (about 220 lines in total). Lines are
+in `DESIGN.md` §8 with at least 3 variants for frequent cues (221 lines), and
+`client/src/audio/eventLines.json` in the same shape: the 16 lines the client says itself for
+moments of phases 2 and 3 that have no cue of the simulation's (their cues are listed in
+`client/src/audio/eventVoice.ts`; `DESIGN.md` §8, "Event lines"). The voice build reads,
+checks, builds and documents both together; a line id is unique across both. Lines are
 short (12 words or fewer; the hearing lines on the end screen may run to 20), deadly serious, and
 never acknowledge that anything is absurd. The writing rules, and how many lines each voice needs
 of its own, are in `docs/VOICE_SCRIPT.md`; the voice build checks them.
@@ -351,7 +429,10 @@ deep-merges every partial into `manifest.json`, which the client loads. Never ha
   the kaiju holds a city weapon, see section 3; `tint`: suggested paint colors for the vehicles with a paint mask, see
   section 3; `poses`: see below; buildings add `"base"` to `tint`, the authored wall color, so
   the client multiplies masked faces by color / base, and `"district"`, the archetype's home
-  district: `docs/art/client-notes-city.md`)
+  district; ordinary buildings with roof faces add `"roof": { "part": "roof", "mask": "..",
+  "blend": "multiply", "base": "#d9d9d9", "hint": ".." }`, the roof mask of section 3, whose
+  faces the client multiplies by the district's roof color / base:
+  `docs/art/client-notes-city.md`)
   - `"poses"` (optional, kaiju only): pose targets the animator blends toward instead of fixed
     joint angles, because each stage has its own proportions. Angles are degrees relative to the
     rest pose, in the game's axes, to be set as `node.rotation.set(x, y, z)` (three.js Euler

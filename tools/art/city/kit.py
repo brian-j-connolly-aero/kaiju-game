@@ -110,6 +110,8 @@ class Building:
         self.landmark = bool(a.get("landmark"))
         self.W, self.D = float(a["footprint"][0]), float(a["footprint"][1])
         self.H = float(a["height"])
+        import contract
+        self.top = contract.model_height(aid, self.H)     # above H only with a slim part (contract.TALL_PARTS)
         self.district = district
         fam = style.DISTRICTS[district]
         self.tone = hex_rgb(style.TONES.get(tone or fam["walls"][0], tone or "#ffffff"))
@@ -671,7 +673,7 @@ class Building:
         lo, hi = self.intact.bounds()
         size = hi - lo
         out = []
-        for label, got, want in (("width", size[0], self.W), ("depth", size[1], self.D), ("height", size[2], self.H)):
+        for label, got, want in (("width", size[0], self.W), ("depth", size[1], self.D), ("height", size[2], self.top)):
             tol = style.fit_tolerance(want)
             if abs(got - want) > tol:
                 out.append(f"{label} {got:.2f} m, archetype {want:g} m (tolerance {tol:.2f} m)")
@@ -695,6 +697,54 @@ def _plain_of(region: str) -> str:
 
 
 # =========================================================================================
+# roofs colored by district
+# =========================================================================================
+# The roof faces of an ordinary building take their district's roof color in the game. They are
+# drawn on light neutral grey regions (atlas: roof_tile, roof_slate, roof_terra, roof_flat,
+# roof_metal and the swatch roof_plain, each averaging atlas.ROOF_BASE) and carry the roof
+# mask, COLOR_0 alpha 0.5 (walls that take the building's color carry 1, everything else 0).
+# A building script asks for a roof by its look, as before ("tile_red", "tile_slate",
+# "tile_terra", "gravel", "tar", "metal"): for an ordinary building the kit moves every face on
+# those regions onto its grey twin (grey_roofs), dormer roofs and canopies included. A plain
+# roof face (a floating slab, a tier cap) asks for region="roof_plain". Landmarks, bridges and
+# the archetypes in style.OWN_ROOFS (the special buildings, a tank, a glass roof...) keep the
+# colored regions and no mask.
+GREY_ROOFS = {"tile_red": "roof_tile", "tile_slate": "roof_slate", "tile_terra": "roof_terra",
+              "gravel": "roof_flat", "tar": "roof_flat", "metal": "roof_metal"}
+ROOF_ALPHA = 0.5
+
+
+def roof_masked(aid: str) -> bool:
+    """Do this archetype's roofs take their district's roof color in the game?"""
+    a = archetype(aid)
+    return not a.get("landmark") and a.get("class") != "bridge" and aid not in style.OWN_ROOFS
+
+
+def is_roof(face) -> bool:
+    """A face on a grey roof region: it carries the roof mask."""
+    r = atlas.REGIONS.get(face.region) if face.region else None
+    return bool(r is not None and r.roof)
+
+
+def grey_roofs(b) -> int:
+    """Move the building's roof faces onto the grey roof regions (the same size, so the texture
+    coordinates move by an offset) in a neutral vertex color of the same lightness. Returns the
+    number of roof faces."""
+    for f in b.intact.faces:
+        grey = GREY_ROOFS.get(f.region)
+        if grey is None or not f.uv:
+            continue
+        src, dst = atlas.region(f.region), atlas.region(grey)
+        assert (src.w, src.h) == (dst.w, dst.h), f"grey roof {grey} must be the size of {f.region}"
+        du, dv = (dst.x - src.x) / atlas.W, -(dst.y - src.y) / atlas.H
+        f.uv = [(u + du, v + dv) for u, v in f.uv]
+        f.region = grey
+        y = 0.2126 * f.col[0] + 0.7152 * f.col[1] + 0.0722 * f.col[2]
+        f.col = (y, y, y)
+    return sum(1 for f in b.intact.faces if is_roof(f))
+
+
+# =========================================================================================
 # export
 # =========================================================================================
 def to_geo(mesh: Mesh):
@@ -708,7 +758,9 @@ def to_geo(mesh: Mesh):
 
 
 def make_node(name: str, mesh: Mesh, pivot=(0.0, 0.0, 0.0)):
-    """Create the node and write the tint mask (COLOR_0 alpha) per face."""
+    """Create the node and write the paint mask (COLOR_0 alpha) per face: 1 on walls that take
+    the building's color, ROOF_ALPHA (0.5) on roofs that take the district's roof color, 0 on
+    everything else."""
     import mb
     g = to_geo(mesh)
     if len(g.f) != len(mesh.faces):
@@ -717,7 +769,7 @@ def make_node(name: str, mesh: Mesh, pivot=(0.0, 0.0, 0.0)):
         mesh = Mesh(kept)
     ob = mb.node(name, g, pivot=pivot)
     colors = ob.data.color_attributes[mb.COLOR_ATTR]
-    flags = [1.0 if f.tint else 0.0 for f in mesh.faces]
+    flags = [ROOF_ALPHA if is_roof(f) else (1.0 if f.tint else 0.0) for f in mesh.faces]
     if len(flags) == len(ob.data.polygons):
         for poly in ob.data.polygons:
             a = flags[poly.index]
@@ -745,6 +797,7 @@ def building(aid: str, district: str = "suburb", tone: str | None = None, seed: 
         def build():
             b = Building(aid, district=district, tone=tone, seed=seed)
             fn(b)
+            roofs = grey_roofs(b) if roof_masked(aid) else 0
             problems = b.fit()
             if problems:
                 raise RuntimeError(f"{mid}: the intact model does not fill its archetype box: " + "; ".join(problems))
@@ -756,7 +809,8 @@ def building(aid: str, district: str = "suburb", tone: str | None = None, seed: 
                 lo, hi = ch.bounds()
                 make_node(f"chunk_{i:02d}", ch, pivot=tuple((lo + hi) / 2))
             REGISTRY[mid]["last"] = dict(tris=b.intact.tris, damaged=states.damaged.tris,
-                                         rubble=states.rubble.tris, chunks=[c.tris for c in states.chunks])
+                                         rubble=states.rubble.tris, chunks=[c.tris for c in states.chunks],
+                                         roof_faces=roofs)
         kind = "landmark" if archetype(aid).get("landmark") else "structure"
         REGISTRY[mid] = dict(id=aid, district=district, tone=tone, fn=fn, opts=opts,
                              tint=[style.TONES[t] for t in style.DISTRICTS[district]["walls"]],
@@ -799,13 +853,25 @@ def run_family(family: str, argv=None) -> int:
         b = Building(reg["id"], district=reg["district"], tone=reg["tone"])
         entry["tint"] = {
             "part": "wall plaster",
-            "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+            "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, "
+                    "0.25 to 0.75 = roof (see roof), below 0.25 = never tint",
             "blend": "multiply",
             "base": _hex(b.tone),
             "colors": reg["tint"],
             "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
         }
         entry["district"] = reg["district"]
+        if reg.get("last", {}).get("roof_faces"):
+            entry["roof"] = {
+                "part": "roof",
+                "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color",
+                "blend": "multiply",
+                "base": atlas.ROOF_BASE,
+                "hint": "multiply roof faces by roof color / base (per channel), the roof color being the "
+                        "district's (District.roof) in one of a few shades picked by the structure's id",
+            }
+        else:
+            entry.pop("roof", None)
     m = mb.Manifest(family)
     m.data = data
     m.write()

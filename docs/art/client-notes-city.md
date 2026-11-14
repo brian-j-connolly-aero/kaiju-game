@@ -3,7 +3,14 @@
 **Applied** (12 November, the client's city task): sections 1 to 4 are in the client as
 suggested (atlas read unflipped and mipmapped, masked wall tint with a separate damage shade,
 the real chunk meshes in one dynamic buffer). The tint also takes the district's building
-tint (`docs/CITY.md` section 2); landmarks keep their own colors. Section 6 is still open.
+tint (`docs/CITY.md` section 2); landmarks keep their own colors.
+
+**Applied in phase 3** (14 November, the city client task): roofs colored by district. The
+paint mask has three levels, 1 = wall, 0.5 = roof, 0 = neither, and the client reads them as
+section 2, "Roofs", suggests: one more per-instance color (`instanceRoof`) beside the wall paint
+and the damage shade, the four shades by `hash32(id, 92) % 4`, the falling pieces and the mounds
+painted the same way, and the map's district ground taken from the roof color. The six new
+buildings of section 8 draw, wreck, fall to pieces and leave mounds like the others.
 
 For the client engineer who comes after the building artists. What the building files
 (`bld_*.glb`, `lm_*.glb`, `textures/city_atlas.png`, `textures/city_atlas_emissive.png`) provide,
@@ -18,11 +25,14 @@ Chromium): `docs/art/previews/city_kit_in_game.png`. The look itself: `docs/art/
   except the chunks, whose node position is the chunk's own center (the mesh is centered on it).
 - **One material**, `city_atlas`, on every face. Faces without a picture point at the atlas's
   white swatch; their color is the vertex color.
-- `COLOR_0` is RGBA. RGB multiplies the atlas. **Alpha is a tint mask**: 1 on wall faces that
-  may take the building's color, 0 everywhere else (the same convention as the cars' paint
-  mask). The manifest entry says so:
+- `COLOR_0` is RGBA. RGB multiplies the atlas. **Alpha is a paint mask** with three levels:
+  1 on wall faces that may take the building's color, 0.5 on roof faces that take the
+  district's roof color (ordinary buildings only, section 2), 0 everywhere else (the walls
+  follow the same convention as the cars' paint mask). The manifest entry says so:
   `"tint": {"part": "wall plaster", "mask": "...", "blend": "multiply", "base": "#f3e3b3",
-  "colors": ["#f3e3b3", "#f2a48b", ...], "hint": "..."}`, plus `"district"`.
+  "colors": ["#f3e3b3", "#f2a48b", ...], "hint": "..."}`, plus `"district"`, and on buildings
+  with roof faces `"roof": {"part": "roof", "mask": "...", "blend": "multiply",
+  "base": "#d9d9d9", "hint": "..."}`.
 - `TEXCOORD_0` into the 1024 x 512 atlas, glTF convention (v = 0 is the **top** of the image).
 
 ## 1. Must fix: the atlas is sampled upside down (one line)
@@ -39,7 +49,7 @@ appear as in the contact sheets, at the right place and scale (left column: toda
 The procedural stand-in canvases for these two ids would then also be read unflipped, which is
 harmless (they are only used when the files are missing).
 
-## 2. Per-building wall colors (tint)
+## 2. Per-building wall colors (tint) and district roof colors (the paint mask)
 
 Today a structure with a real model gets the instance tone white (`cityView.ts`,
 `buildStructures`), so all 333 copies of `house_a` are the same cream house. The files carry
@@ -57,6 +67,73 @@ what is needed to vary them:
 - `toneOf()` (the map view, chunk colors) should return the tint for real models too, not
   white.
 - The masked faces are opaque: never make this material transparent, or alpha-0 faces vanish.
+
+### Roofs: the district's roof color (phase 3, applied)
+
+**In the client** (`client/src/render/materials.ts` `cityTint`, `cityView.ts` `roofPaint`): exactly
+as below. The shader reads the mask with the margins given here (`PAINT_MASK`); the roof paint is
+a per-instance attribute `instanceRoof` on every building batch (no extra draw call); the
+falling pieces take it on their 0.5 faces; the mounds keep the roof slab's mark, so a ruin shows
+a patch of its district's color. Roofs never glow at night (the emissive atlas is black under
+every grey roof region). Landmarks, bridges and the three special buildings get white (their
+models mark no roof faces anyway). The map (`client/src/ui/mapView.ts`) keeps its buildings in
+the colors of their state, so the district's roof color goes on the ground under them instead,
+sunk into the dark map. Checked in the browser by day, at sunset and at night, from a juvenile's
+and a titan's height over three corners of the city, damaged, in rubble, with pieces falling,
+and on the map (`node tools/playtest/shots.mjs --only x-city-roofs`).
+
+The roof faces of every ordinary building now carry **alpha 0.5**: pitched and flat roofs,
+dormer roofs, small canopy roofs, in every state (intact, damaged, the collapse chunks, and the
+first slab lying on the rubble, which is a piece of the roof so a ruin keeps a patch of its
+district's color). They are drawn in light neutral grey that averages `#d9d9d9` in linear
+light (the atlas's grey roofs: clay tiles, slates, round tiles, a flat membrane, corrugated
+metal, a plain grey), so a roof multiplied by `roof color / base` shows the district's color
+on average, with its tile, slate or seam pattern as lighter and darker lines. Chimneys, plant
+rooms, water tanks, parapet tops, skylights, signs, verge boards and undersides keep 0.
+
+Read the levels with margins: **above 0.75 = wall, 0.25 to 0.75 = roof, below 0.25 =
+neither** (the files hold exact floats 0, 0.5 and 1; a copy squeezed into bytes holds 128/255).
+
+What to draw, per instance, still in one batch per archetype and state (no extra draw calls):
+
+- `roofColor` = `District.roof` of the district the structure's center is in (the city data,
+  beside `District.tint`), times one of a few shades picked by the structure's id so a street
+  is not one flat color. Suggested, and what the picture below uses: four shades,
+  `[0.84, 0.92, 1.0, 1.1]` (multipliers on the linear color), picked by
+  `hash32(id, 92) % 4`.
+- `roofPaint = roofColor / base` per channel, `base` from the entry's `roof` (`#d9d9d9`).
+  Values above 1 are fine, as for the wall paint.
+- A district without a roof color, or a model without a `roof` entry: `roofPaint = (1, 1, 1)`
+  (the second case has no roof faces anyway).
+
+A shader that does both paints and the damage shade:
+
+```glsl
+// instanceColor: wall paint (tint / base); instanceRoof: roof paint; instanceShade: damage shade
+float wall = step(0.75, color.a);
+float roof = step(0.25, color.a) * (1.0 - wall);
+vec3 paint = mix(vec3(1.0), instanceColor.rgb, wall) * mix(vec3(1.0), instanceRoof, roof);
+vColor.rgb *= paint * instanceShade;
+```
+
+- **Falling chunks** carry roof faces too: when a chunk is written into the dynamic buffer,
+  multiply its 0.5 faces by its building's roof paint (and its 1 faces by the wall paint), or
+  roof pieces fall light grey.
+- **The map** sees buildings from above: for a model with a `roof` entry, `toneOf()` could
+  return the roof color, which is what the decision asks the map to show.
+- **Who has roof faces**: every ordinary building except those listed with a reason in
+  `tools/art/city/style.py` (`OWN_ROOFS`): the three special buildings, the storage tank (its
+  lid is the tank's own steel), the harbor crane and the container stack (no roof), `tower_c`
+  (its slanted roof is dark glass) and the pavilion (a striped canvas tent, painted like the
+  awnings). Landmarks and bridges have none. Copper crowns and lanterns (`office_c`,
+  `campus_a`), glass roofs and skylights, and the pool and sun-deck roof of `apartment_b` keep
+  their own colors too.
+
+Pictures: `docs/art/previews/city_roofs_test.png` (every ordinary building, intact, damaged,
+rubble and chunks, roof faces in a loud green: which faces carry the mask) and
+`docs/art/previews/city_roofs_districts.png` (one street in four districts' roof colors, then
+the Cinder Works and Downtown: what the client should end up drawing; made by
+`tools/art/city/roofs.py` with the colors of `shared/src/city/meridian/layout.ts`).
 
 ## 3. Collapse chunks: draw the real pieces
 
@@ -94,10 +171,8 @@ neighbors at a distance, where they are a pixel or two anyway.
 
 ## 6. Later
 
-- District roof colors (CITY.md: `house_b` has terracotta roofs on Temple Hill, red tile
-  elsewhere) need a second choice per instance. The cheapest route is two models (`house_b`
-  and a district variant) or a second mask channel (`COLOR_0` RGB of the roof faces set to a
-  marker); not done.
+- District roof colors: done in the models and in the client (phase 3; a third mask level,
+  section 2, "Roofs").
 - Bridges (class `bridge`, passable): with a model the client draws it like any building. The
   deck must sit at ground level in the file (units drive on the ground plane) and everything
   above it stays at the outer edges; nothing in the client changes.
@@ -119,4 +194,30 @@ draw correctly with no client change. On top of the usual nodes they carry ancho
   upper part, never beside it.
 - Their collapse chunks are hand-made parts (pumps, canopy slabs, transformer tanks, gantry
   posts, mast bays), not grid cuts, and all use the atlas like every other chunk.
+
+## 8. The small buildings of the starting neighborhoods (phase 3)
+
+`bld_bungalow_a`, `bld_duplex_a`, `bld_garage_a`, `bld_diner_a`, `bld_firehouse_a` and
+`bld_motel_a` are ordinary building files: they draw correctly with no client change, and take
+the wall color and the district's roof color through the same mask as every other building
+(section 2). No anchors, no extra nodes. Entries are in `manifest.city_starts.json` (merged into
+`manifest.json`), each with `tint`, `district` and `roof`.
+
+| Model | Size (width x depth, height) | Nodes | Triangles (whole / damaged / rubble) | Notes |
+| --- | --- | --- | --- | --- |
+| `bld_bungalow_a` | 10 x 9 m, 5 m | `intact`, `damaged`, `rubble`, `chunk_00`..`chunk_05` | 70 / 112 / 73 | The porch is open: the hatchling can see through it. Wall color on the boards. |
+| `bld_duplex_a` | 12 x 10 m, 7 m | the same, 6 chunks | 76 / 111 / 73 | Two doors, one red and one blue; the small porch roofs take the roof color too. |
+| `bld_garage_a` | 8 x 7 m, 4 m | the same, 6 chunks | 40 / 100 / 73 | The lowest building in the city: the hatchling looks over it. |
+| `bld_diner_a` | 16 x 10 m, 5 m | the same, 6 chunks | 64 / 120 / 71 | Rounded ends (the collision box is still the 16 x 10 m rectangle). The roof sign stands on the model's right half and reaches the full 5 m; the body is 3.25 m. Every window and the red line under the roof glow at night (emissive atlas). |
+| `bld_firehouse_a` | 14 x 16 m, **12 m** | the same, 8 chunks | 50 / 108 / 67 | The hose tower (2.8 m square, at the back corner on the model's left) is 3 m taller than the archetype's 9 m; the manifest `size` says 12. Use the archetype's 9 m for anything about collisions and the model's bounds for anything about drawing (culling, the wobble pivot, falling chunks). Brick: no wall color, by design. |
+| `bld_motel_a` | 24 x 10 m, 7 m | the same, 8 chunks | 84 / 102 / 71 | The walkway and stair are thin sheets drawn from both sides (two faces each). The sign's pole stands at the front right corner, inside the footprint. |
+
+The six add no draw calls beyond their own batches (one material, like every building).
+
+**In the client** (phase 3, the city client task): confirmed in the browser (`node
+tools/playtest/shots.mjs --only x-city-starts`): each draws whole in its district's roof color,
+damaged, falling to pieces and as a mound with its roof slab on top; the firehouse's hose tower
+draws at its full 12 m with no change (the instanced batches are never culled by bounds, the
+sway turns about the base, and its pieces are placed from the model). Whatever a model lacks, a
+box stand-in takes its place through every state (`client/test/city.test.ts`).
 

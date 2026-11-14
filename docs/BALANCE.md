@@ -22,7 +22,7 @@ npm run sim -- --seeds 8 --fast                # the short MB_FAST timers and ba
 npm run sim -- --seeds 3 --events --json       # event counts; reports as JSON
 npm run sim -- --seeds 20 --every-anchor       # match i starts at anchor i mod 10: every start equally often
 npm run sim -- --seeds 20 --nav                # also how the bots got about (stuck, wading, the bay, hanging back)
-npm run sim -- --seeds 20 --bar 0.18,0.11,0.30  # try other bar fractions for this run only
+npm run sim -- --seeds 20 --bar 0.145,0.11,0.30 # try other bar fractions for this run only
 npm run sim -- --seeds 20 --clock 576          # try another match clock (seconds) for this run only
 npm run sim -- --seeds 5 --city placeholder    # the old grid city (a development option)
 ```
@@ -57,7 +57,10 @@ plus or minus 11 points of noise; the three batches in section 4 show it.
 
 Since phase 1 (section 9) the owner wants every stage about a fifth shorter than section 8
 measured: contested stages near 2:35, 2:30 and 3:05, matches near 8:15, a 9:36 clock. Phase 2
-(section 10) was held to within about a tenth of where phase 1 left the stages.
+(section 10) was held to within about a tenth of where phase 1 left the stages, and phase 3
+(section 11) to within about a tenth of where phase 2 left them (2:01, 2:35 and 3:06; about 8
+minutes a match), with something new happening to the monster and to each squad about every 20
+to 25 seconds at every stage.
 
 ## 3. Before
 
@@ -957,3 +960,225 @@ beyond the starting neighborhoods, city weapons a juvenile can lift.
   round a heap faster than the bot does, or not at all.
 - The "something new" counts are for this definition of "in sight"; a player who watches the
   map or hears the radio notices more.
+
+## 11. Phase 3 pacing: the final pass (14 November, the pacing task)
+
+Phase 3 (`docs/ROADMAP.md`, "looks and sound") packed the ten starting neighborhoods close
+together (narrow streets, houses up to the pavement, back lanes lined with garages; each start
+worth about a quarter more), added six kinds of buildings, and put 44 more special buildings
+on the way from the starts to downtown (`docs/CITY.md` section 13). This pass, the last before
+the owner plays again, had three aims: keep the stage times within about a tenth of where phase
+2 left them (2:01, 2:35 and 3:06; a match of about 8 minutes); make something new happen to the
+monster and to each squad on average about every 20 to 25 seconds at every stage (phase 2 met
+that only at stage 1, section 10), with the data the game already has and no new mechanics;
+and check that the squad bots still fire their volleys in the packed streets. Balance waits for
+the owner's next playtest: it was only to be touched if the monster won outside about 30 to 70%.
+
+### Where phase 3 left the pace
+
+Measured first on the whole tree as the phase 3 builders left it (`npm run sim -- --seeds 20
+--every-anchor`, seeds 1 to 20 and 21 to 40, and `--unopposed`), with section 10's numbers:
+
+| | Stage 1 | Stage 2 | Stage 3 | Match | Kaiju wins |
+| --- | --- | --- | --- | --- | --- |
+| Phase 2 (section 10, 40 matches) | 2:01 | 2:35 | 3:06 | 7:56 | 16 of 40 |
+| Phase 3 as built, seeds 1 to 20 | 2:21 | 2:03 | 2:55 (9) | 7:35 | 9 of 20 (4 by the clock) |
+| Phase 3 as built, seeds 21 to 40 | 2:25 | 2:06 | 3:21 (10) | 8:02 | 10 of 20 (3 by the clock) |
+| Alone, phase 2 (segment filled after) | 2:13 | 1:47 | 2:28 | 6:49 | |
+| Alone, phase 3 as built | 2:33 | 1:52 | 2:56 | 7:43 | |
+
+(Stage 3 counts only the third stages the monster finished: the number in brackets.)
+
+- **Stage 1 got a fifth longer** (2:23 against 2:01; alone 2:33 against 2:13). The first mark is
+  a share of what the starting square is worth, and the packed squares are worth about a
+  quarter more (1721 to 1742 points against 1326 to 1415): the first mark went from about 247 to
+  312 points.
+- **Stage 2 got a fifth shorter** (2:04 against 2:35) though alone it hardly moved (1:52 against
+  1:47). The squads fought less well there: 17 charged volleys a match against 23 to 31, half
+  the staggers. The special buildings beyond the starts were part of it (radio masts put the
+  army's map to static for 10 to 12% of stage 2, against 2 to 4% in phase 2), and so were the
+  squad bots' troubles in the packed streets (below).
+- **Stage 3 held** (3:09 contested), though alone the titan took a fifth longer (2:56).
+- The monster won 19 of 40, 7 matches on the clock.
+
+### Found on the way: the squad bots in the packed streets
+
+In the packed starts a hatchling is hidden from most streets. Counted at the ten starts with a
+hatchling standing where it starts (street points every 5 m inside the stage 1 square; a line
+of fire from a rocket squad's muzzle to the hatchling's middle, top or knees;
+`/tmp/mb-scratch/pacing/los_scan.ts`):
+
+| Street points with a line of fire, by distance from the hatchling | 48 to 64 m | 64 to 80 m | 80 to 112 m | 112 to 144 m |
+| --- | --- | --- | --- | --- |
+| Phase 2 city | 90% | 78% | 50% | 25% |
+| Phase 3 city | 85% | 65% | 26% | 14% |
+
+The squad bot parks 80 to 144 m out at stage 1 (half to nine tenths of its range), so it found
+half as many places to fire from. In bot matches the squads fired 1.2 charged volleys per minute
+in the fight at stage 1 (phase 2: 1.8), and a fifth of the squads fired none in a whole stage 1.
+Watching them showed four faults, all fixed in `shared/src/sim/bots/squadBot.ts` (numbers in
+`BOT_RULES.squad`):
+
+- **It only looked at the middle of each street.** In a packed street a line of fire is often a
+  gap between two houses. It now looks at spots every 20 m along every street (`spotStep`) and
+  checks the 24 cheapest for a line, not 8 (`spotCandidates`).
+- **It parked where only its leader could see.** It now prefers a spot its squad-mates round
+  it would share the line from (to either side, or behind along the line), and only then one
+  where the leader alone sees the hatchling.
+- **With no line from anywhere in its band it never came closer.** Round a green in the middle of
+  a block it now looks closer in, down to 0.35 of its range but never inside 1.25 times the
+  distance it backs off at (`innerStandoff`, `innerMargin`), and parks there.
+- **It dithered.** With no line from any spot, it turned for whichever spot was cheapest from
+  where it stood, look after look (every 0.4 s), and arrived nowhere. Now it keeps going where it
+  was going and looks from another side once there.
+
+Two plain bugs turned up as well. A squad that backed off from the monster to a spot a step
+short of where it felt safe again (it stops within 3 m of where it drives to) stayed there,
+backing off, for the rest of the stage; now it goes back to work once it is at that spot. And a
+tank whose way lay straight behind it rocked left and right on the spot for ever (its hull
+answers the stick a tick late, and a hair either side of straight behind is a full turn either
+way: a troop that had driven down a narrow street to a crate, its squad-mates behind it, never
+came out); now it keeps turning the way it is turning until the way is in front. Two new tests
+in `shared/test/bots.test.ts` hold the first: an idle hatchling on the green of Dovecote (seed
+16), where two squads of four used to fire no charged volley, and a squad that backs off along a
+street that ends just inside its safe distance; the fast matches in `meridianPlay.test.ts`
+(nobody gives up a route) caught the rocking troop.
+
+Charged volleys per squad-minute in the fight, and squads that fired none in a stage (of those
+in the fight for at least a minute of it), over the same 40 bot matches:
+
+| | Stage 1 | Stage 2 | Stage 3 |
+| --- | --- | --- | --- |
+| Phase 2 (its city, bot and numbers) | 1.77; 22 of 157 | 2.66; 34 of 157 | 2.58; 25 of 156 |
+| Phase 3 as built (old bot, old numbers) | 1.22; 34 of 159 | 2.12; 34 of 155 | 2.43; 20 of 156 |
+| Old bot with this pass's numbers | 1.13; 50 of 159 | 1.74; 49 of 154 | 2.20; 26 of 152 |
+| **New bot with this pass's numbers (shipped)** | **1.55; 35 of 160** | **2.33; 30 of 154** | **2.17; 24 of 152** |
+
+With this pass's numbers (more crates to fetch, a shorter stage 1) the old bot would have fired
+a quarter fewer volleys again; the new one fires about a third more than the old at stage 1 and
+stage 2, and breaks the hatchling's nerve twice as often (0.9 staggers a match against 0.4).
+Squads spend 7 to 13% of their time fetching crates.
+
+**At a hatchling standing still** (phase 2's check: the monster player does nothing, fast
+stage 1, all ten starts, four squads each; `/tmp/mb-scratch/pacing/idle_many.ts`, seeds 1 to 12,
+480 squads): 25 squads fired no charged volley (5%), against 31 on the tree as built and 16 on
+phase 2's (3%). Over 20 seeds (800 squads) the old and the new bot leave the same number silent
+(36 and 37): the bot changes do not help there. Those squads are at starts where the hatchling
+stands on a green in the middle of a block (Cinder Flats, Gull Point, Dovecote, Bellhaven), the
+nearest streets with a view lie inside the distance a squad backs off at, and the bot parks only
+on streets; a person would walk onto the green. Phase 2's seed 7 check (`idle3.ts`): 3 squads of
+40 fired none (as built: 3; phase 2: 1).
+
+### What changed
+
+| Number | Before | After | Why |
+| --- | --- | --- | --- |
+| `MATCH_RULES.bar.p1` (`defs/rules.ts`) | 0.18 | 0.145 | Stage 1 back from about 2:23 to 2:00 (the packed starts are worth a quarter more). |
+| `CRATE_RULES.every` (`defs/pickups.ts`) | 30 s at every stage | 30 / 12 / 15 s | Something new for a squad more often at stages 2 and 3: with four squads in the fight each gets one every 48 s at stage 2 and every 60 s at stage 3, besides the one every squad gets when a stage starts. |
+| `CRATE_RULES.maxDown` | 3 / 4 / 5 | 3 / 6 / 8 | So the faster drops are not held up by crates nobody has taken yet. |
+| `BOT_RULES.squad.crateRange` (`defs/bots.ts`) | 60 m | 60 / 90 / 90 m | A crate comes down 25 to 90 m from the squad it is meant for; a tank reaches it in a few seconds, and a person would fetch it. On foot (stage 1) the bot still goes 60 m at most. |
+| `BOT_RULES.squad.spotCandidates`, `spotStep`, `innerStandoff`, `innerMargin` | 8; middles of streets; none | 24; every 20 m; 0.35; 1.25 | The squad bot in the packed streets (above). |
+| `p2`, `p3`, the clock, `SPECIAL_SITES`, the kaiju bot | | unchanged | |
+
+How the crates are shared did not change: one in turn for each squad still in the fight (88%
+of those taken at stage 2 went to the squad they were meant for). The special buildings beyond
+the starts were not changed either: at stage 2 the juvenile already met one about every 55 s and
+the monster had something new every 13 s; for a squad the static, surges and fireballs come
+mostly when it is near the monster, and more sites would mean more of the army's map in static.
+
+Trials for the crates (40 matches each, seeds 1 to 40, on the tree with the bot fixes but
+before the rocking-tank fix; "every" is the average time between new things for a squad; the
+stage 2 time depends on p1 too, the column after it):
+
+| Crates every (stage 1/2/3), at most down, where they land | Bot fetches within | Stage 2: squad every | Stage 3: squad every | Stage 2 time | p1 | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| 30 / 30 / 30 s, 3 / 4 / 5, 25 to 90 m (phase 2) | 60 m | 39 s | 29 s | 2:25 | 0.18 | |
+| 30 / 15 / 15 s, 3 / 6 / 8, 25 to 90 m | 60 m | 33 s | 22 s | 2:20 | 0.18 | |
+| 30 / 12 / 15 s, 3 / 6 / 8, 20 to 60 m | 60 m | 24 s | 22 s | 2:26 | 0.18 | crates at stage 1 land closer too, and the squads fire fewer volleys there |
+| 30 / 10 / 15 s, 3 / 6 / 8, 20 to 60 m | 60 m | 23 s | 22 s | 2:16 | 0.145 | squads volley a fifth less at stage 2 |
+| the same at 12 s, and the juvenile seeks special buildings while nobody is within 80 m (was 110) | 60 m | 25 s | 21 s | 2:22 | 0.145 | hardly more special buildings wrecked (125 against 122), no gain for the squads |
+| **30 / 12 / 15 s, 3 / 6 / 8, 25 to 90 m** | **60 / 90 / 90 m** | **24 s** | **22 s** | **2:24** | 0.145 | chosen |
+| 30 / 15 / 15 s, 3 / 6 / 8, 25 to 90 m | 60 / 90 / 90 m | 26 s | 21 s | 2:25 | 0.145 | |
+
+Trials for the bar, all with the crates landing 20 to 60 m away (the third row above):
+
+| p1 / p2 / p3 | Seeds | Stage 1 | Stage 2 | Stage 3 (completed) | Match | Kaiju wins |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0.18 / 0.11 / 0.30 | 1-20, 21-40 | 2:34, 2:28 | 2:31, 2:21 | 2:52 (7), 3:06 (10) | 8:03, 7:44 | 7, 10 of 20 |
+| 0.15 / 0.11 / 0.30 | 1-20, 21-40 | 2:11, 2:05 | 2:21, 2:14 | 3:05 (9), 3:06 (10) | 7:27, 7:25 | 9, 10 of 20 |
+| **0.145 / 0.11 / 0.30** | 1-20, 21-40 | **2:05, 2:05** | 2:25, 2:32 | 2:49 (11), 2:47 (9) | 7:38, 7:39 | 11, 9 of 20 |
+| 0.145 / 0.11 / 0.305 | 1-20, 21-40, 41-60 | 2:05, 2:05, 2:00 | 2:25, 2:32, 2:35 | 3:08 (13), 3:01 (10), 3:44 (8) | 7:35, 7:46, 7:38 | 13, 10, 8 of 20 |
+| 0.145 / 0.11 / 0.31 | 1-20, 21-40 | 2:05, 2:05 | 2:25, 2:32 | 3:26 (12), 3:10 (10) | 7:55, 7:48 | 12, 10 of 20 |
+
+p3 stayed at 0.30: the third stage swings by half a minute between batches of 20, and on the
+shipped tree it came out at 3:02. The second mark is `max(1.6 × P1, p2 × V(stage 2))`, and p2
+sets it at every start, so lowering p1 also made the second segment about 60 points (4%) longer.
+
+### The result (the tree as shipped)
+
+| | Stage 1 | Stage 2 | Stage 3 | Match | Kaiju wins |
+| --- | --- | --- | --- | --- | --- |
+| Phase 2 (section 10) | 2:01 | 2:35 | 3:06 | 7:56 | 16 of 40 (40%) |
+| Seeds 1 to 20 | 2:02 | 2:34 | 3:11 (12) | 7:41 | 12 of 20 (5 kills, 3 by the clock) |
+| Seeds 21 to 40 | 1:58 | 2:30 | 2:52 (10) | 7:33 | 10 of 20 (8 kills, 2 by the clock) |
+| All 40 | 2:00 (-1%) | 2:32 (-2%) | 3:02 (-2%) | 7:37 (-4%) | 22 of 40 (55%) |
+| Alone (`--unopposed`, 10 starts) | 2:05 (-6%) | 1:51 (+4%) | 2:45 (+11%) | 7:02 (+3%) | |
+
+- Every contested stage is within a few seconds of phase 2, and the match within 20 s. A lone
+  titan takes a tenth longer than in phase 2 (2:45 against 2:28; phase 1: 2:44).
+- The monster wins 55% (22 of 40); 5 matches of 40 ended on the clock (phase 2: 9). Not
+  lopsided, so balance was left alone, as the owner asked.
+- Navigation (`--nav`): units stuck 0.01 to 0.03% of their time (longest 7.5 s), as before; a
+  unit gave up a route 11 times in 40 matches (the tree as built: about once in 20), nearly all
+  of them squad-mates of tank troops at stage 3 that could not follow their leader. One, in a
+  courtyard it could not drive out of, gave up four times: the swarm's places are checked for
+  room, not for a way there (`swarmSlot` in `sim/squads.ts`, an open item from the city work).
+
+### Something happening every 20 seconds (before and after)
+
+Counted exactly as in section 10 (the same scratch script, now
+`/tmp/mb-scratch/pacing/trial.ts`), over the same 40 matches:
+
+| | Before: something new | Before: 20 s stretches with something | After: something new | After: 20 s stretches | After: longest quiet stretch (median) |
+| --- | --- | --- | --- | --- | --- |
+| Stage 1, monster | every 11 s | 85% | every 11 s | 85% | 31 s |
+| Stage 1, a squad | every 17 s | 69% | every 17 s | 68% | 44 s |
+| Stage 2, monster | every 23 s | 56% | every 13 s | 77% | 41 s |
+| Stage 2, a squad | every 42 s | 38% | every 24 s | 56% | 51 s |
+| Stage 3, monster | every 11 s | 72% | every 8 s | 84% | 33 s |
+| Stage 3, a squad | every 29 s | 42% | every 23 s | 53% | 61 s |
+
+(Phase 2, section 10: every 10 / 15 s at stage 1, 30 / 58 s at stage 2, 11 / 33 s at stage 3, for
+the monster and a squad.)
+
+The goal is met on average at every stage, for both sides. What fills it, per minute of play:
+at stage 2 a squad takes a crate 1.4 times, has a barrage or reinforcements 0.6 times, sees a
+special building go off 0.6 times; the monster sees a squad take a crate nearby 2.7 times, a
+barrage come down beside it 1.2 times, a special building pay out 1.1 times. At stage 3 a squad
+sees a building fall 1.4 times and takes a crate 1.0 times; the monster sees falls 6.4 times
+and crates 2.0 times. In 40 matches 650 crates came down at stage 2 and 544 were taken (103 were
+still lying there when the stage ended); at stage 3, 614 and 456. The juvenile set off a special
+building about every 55 s and the titan every 2 minutes. Quiet stretches still happen: half the
+squads have a stretch of 51 s (stage 2) or 61 s (stage 3) with nothing new, and a 20-second
+stretch with something in it is still a coin toss for a squad at stage 3 (53%).
+
+### Limits
+
+- Bots, not people. A crate every 48 s for each squad at stage 2 is a lot to fetch; the bots
+  spend 13% of their time at it and fire fewer volleys for it. People may take fewer (fewer
+  moments) or fight less (a weaker army).
+- The bot fixes bring the squads' volleys at a moving hatchling most of the way back, not all of
+  it (1.55 per minute against phase 2's 1.77), and do nothing for a hatchling standing still in
+  the middle of a green (above).
+- The counts use the phase 2 definition of "in sight" (180 / 300 / 600 m of the monster, 150 /
+  250 / 400 m of a squad's leader); a crate coming down near a squad counts only when taken.
+
+### Re-checked at the phase 3 integration
+
+After every phase 3 builder had finished (the sound, the monster's looks and the city on screen
+change nothing in the simulation), `npm run sim -- --seeds 20 --every-anchor` and the 40-match
+count above were run once more on the final tree. Both came out exactly as in this section
+(seeds 1 to 20: 2:02 / 2:34 / 3:11, 7:41, the monster winning 12 of 20; seeds 1 to 40: 2:00 /
+2:32 / 3:02, 7:37, 22 of 40, something new every 11 / 13 / 8 s for the monster and 17 / 24 / 23
+s for a squad), as a deterministic simulation should when nothing in it has changed. Nothing was
+retuned.

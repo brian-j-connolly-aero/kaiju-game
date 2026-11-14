@@ -31,6 +31,37 @@ WEAK_HOT = "#f3e9ff"        # the bright facets
 WEAK_DEEP = "#8f5cf2"       # the shaded facets
 WEAK_DIM = "#6a3fd0"        # deep inside (the bottom of the cocoon)
 
+# ---- the stripe mark ---------------------------------------------------------------------
+# The game makes Gragnor's stripes glow with its rage (docs/art/client-notes-kaiju-lizard.md,
+# "Glowing stripes"; docs/ASSETS.md section 3). Every face of a stripe carries COLOR_0 alpha
+# STRIPE_ALPHA, the rest of the hide 1, read like the city's paint mask: 0.25 to 0.75 is a
+# stripe. A stripe color is a Marked color: paint(), bands(), zigzag() and finish() here keep
+# the mark (the kit's own painting does not), and Rig.emit() writes it into the alpha.
+STRIPE_ALPHA = 0.5
+
+
+class Marked(tuple):
+    """An sRGB color (r, g, b) whose faces carry the stripe mark."""
+    __slots__ = ()
+
+
+def marked(color) -> Marked:
+    """`color` as a stripe color: faces painted with it glow in the game."""
+    return Marked(mb.palette.rgb(color))
+
+
+def _rgb(color):
+    """A color as the kit stores it, keeping the stripe mark."""
+    return color if isinstance(color, Marked) else mb.palette.rgb(color)
+
+
+def paint(g: mb.Geo, color, where=None) -> mb.Geo:
+    """Geo.paint that keeps the stripe mark of a Marked color."""
+    c = _rgb(color)
+    for i in g.select(where):
+        g.col[i] = c
+    return g
+
 
 # =========================================================================================
 # cross-sections and tubes
@@ -273,7 +304,7 @@ def bands(g: mb.Geo, p0, p1, count: int, colors, where=None) -> mb.Geo:
         k = int(math.floor(t * count))
         col = colors[k % len(colors)]
         if col is not None:
-            g.col[i] = mb.palette.rgb(col)
+            g.col[i] = _rgb(col)
     return g
 
 
@@ -284,7 +315,7 @@ def zigzag(g: mb.Geo, center, axis, color, where=None) -> mb.Geo:
     the stripe is a row of teeth pointing both ways: a tribal band for free."""
     c0, ax = V(center), V(axis).normalized()
     chosen = set(g.select(where))
-    col = mb.palette.rgb(color)
+    col = _rgb(color)
     nf, ncol, nmat, nuv = [], [], [], []
     for i, f in enumerate(g.f):
         done = False
@@ -311,11 +342,15 @@ def zigzag(g: mb.Geo, center, axis, color, where=None) -> mb.Geo:
 
 
 def finish(g: mb.Geo, seed: int = 1, jitter: float = 0.045, top: float = 1.07, bottom: float = 0.8) -> mb.Geo:
-    """Facet, add painted-in sky light and a little per-facet variation (vcol faces only)."""
+    """Facet, add painted-in sky light and a little per-facet variation (vcol faces only).
+    Stripe faces keep their mark (the kit's shading makes plain colors of them)."""
     g.triangulate()
+    stripes = [i for i, c in enumerate(g.col) if isinstance(c, Marked)]
     lit = [i for i in range(len(g.f)) if g.mat[i] == mb.MAT_VCOL]
     g.bake_light(top=top, bottom=bottom, where=lit)
     g.jitter(jitter, seed=seed, where=lit)
+    for i in stripes:
+        g.col[i] = Marked(g.col[i])
     return g
 
 
@@ -433,6 +468,19 @@ class Rig:
         return s
 
     def emit(self) -> None:
-        """Create the nodes in the current scene (parents first, as they were added)."""
+        """Create the nodes in the current scene (parents first, as they were added), with the
+        stripe mark in COLOR_0 alpha (STRIPE_ALPHA on stripe faces, 1 everywhere else)."""
         for name in self.names:
-            mb.node(name, self.geo[name], pivot=self.pivot[name], parent=self.parent[name])
+            g = self.geo[name]
+            ob = mb.node(name, g, pivot=self.pivot[name], parent=self.parent[name])
+            if g is None or ob.data is None or not any(isinstance(c, Marked) for c in g.col):
+                continue
+            polys = ob.data.polygons
+            if len(polys) != len(g.f):
+                raise RuntimeError(f"{name}: {len(polys)} polygons for {len(g.f)} faces: the stripe mark would be misplaced")
+            colors = ob.data.color_attributes[mb.COLOR_ATTR]
+            for poly in polys:
+                if isinstance(g.col[poly.index], Marked):
+                    for li in poly.loop_indices:
+                        c = colors.data[li].color
+                        colors.data[li].color = (c[0], c[1], c[2], STRIPE_ALPHA)

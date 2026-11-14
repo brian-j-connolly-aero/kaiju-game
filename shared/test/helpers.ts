@@ -49,6 +49,8 @@ export interface TestCityOptions {
   water?: Array<[number, number, number, number]>;
   /** Anchor positions; default one anchor at the origin. */
   anchors?: Array<[number, number]>;
+  /** Streets, each from (x0, z0) to (x1, z1), 10 m wide (the bots park on streets); default none. */
+  roads?: Array<[number, number, number, number]>;
 }
 
 /** An otherwise empty city containing exactly what the test asks for. */
@@ -85,7 +87,13 @@ export function makeTestCity(options: TestCityOptions = {}): BuiltCity {
     half: CITY_HALF,
     structures,
     props,
-    roads: { nodes: [], edges: [] },
+    roads: {
+      nodes: (options.roads ?? []).flatMap(([x0, z0, x1, z1], i) => [
+        { id: 2 * i, x: x0, z: z0 },
+        { id: 2 * i + 1, x: x1, z: z1 },
+      ]),
+      edges: (options.roads ?? []).map((_, i) => ({ id: i, a: 2 * i, b: 2 * i + 1, width: 10, kind: 'street' as const, bridge: -1 })),
+    },
     areas,
     districts: [],
     anchors: (options.anchors ?? [[0, 0]]).map(([x, z], id) => ({ id, name: `Anchor ${id}`, x, z })),

@@ -112,6 +112,8 @@ file is the newer intent: change `DESIGN.md` to match as each piece is built.
 
 ## Phase 3: looks and sound
 
+**Built** (14 November 2026; `docs/STATUS.md`, the phase 3 sections at its end; what to try at the next playtest: `docs/PLAYTEST.md`). The natural-sounding voices were already done in phase 1. In bot matches the stages take about 2:00 / 2:32 / 3:02, and something new happens to the monster about every 8 to 13 s and to a squad every 17 to 24 s at every stage (`docs/BALANCE.md` section 11).
+
 - Natural-sounding radio and news voices.
 - Two or three versions of each monster attack, slash trails, glowing stripes.
 - More kinds of buildings, packed closer together where the match starts; roofs colored by
