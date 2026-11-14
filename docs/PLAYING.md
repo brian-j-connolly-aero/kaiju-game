@@ -68,6 +68,7 @@ glows for the first 20 seconds of a match.
 | Roar | Q | Y |
 | Fire beam (when the flame meter is full) | E | Right bumper |
 | Shed your skin and grow (hold 1 second, when offered) | F | B |
+| Swim (stages 1 and 2) | No button: walk into deep water and you go under by yourself. Any monster button brings you up. | The same |
 
 **Squad**
 
@@ -115,6 +116,8 @@ small order pictures at the bottom left of the screen pop.
   leader can see the monster up close. The orange triangle over the monster (and a ring round
   it on the map) shows only while a squad has marked it, or a squad leader has it in plain
   sight; it is not there all the time any more.
+- **Spines over two waves, top middle (monster only):** you are swimming under water. Faint
+  while you are going down or coming up.
 - **Grey clouds:** smoke. Nobody sees through it, and the monster cannot see the soldiers and
   tanks inside it (their markers and laser lines disappear on its screen).
 - **Yellow diamonds at the edge of the monster's screen:** squads charging a volley at it, in
@@ -126,7 +129,7 @@ small order pictures at the bottom left of the screen pop.
   in for the big moments (the start, a landmark falling, the monster growing, the last minute,
   the end).
 
-## Five tips for the monster
+## Six tips for the monster
 
 1. Wreck buildings, not soldiers. Only the skyline wins; chasing tanks wastes the clock.
 2. Watch for yellow laser lines, and the yellow diamonds at the edge of your screen: a squad is
@@ -140,8 +143,15 @@ small order pictures at the bottom left of the screen pop.
    hand) to eat it and heal. Throw cars and building chunks
    at squads; save the beam for a row of tall buildings. The beam bucks and pulls to one side
    as it burns: keep steering it back.
+6. Swim. While you are small (stages 1 and 2), walk into the river, the bay or the moat that
+   runs round the edge of the city, and stand or walk without pressing anything: after a
+   second you sink until only your spines show. You swim faster than you walk, the army has
+   to come close to see you, and it can only hit the spines. You cannot attack, grab or burn
+   from the water, and you wreck nothing there, so it is for getting away and getting about:
+   the clock keeps running for the army. Press any monster button to come up (it takes about
+   half a second, then that button does its thing).
 
-## Six tips for the army
+## Seven tips for the army
 
 1. Pair up. Press 4 (hold and charge), wait until the yellow lightning bar is full, then fire
    at the same moment as another squad. Say "volley now" on voice chat.
@@ -155,3 +165,6 @@ small order pictures at the bottom left of the screen pop.
 6. Press R with your crosshair on the monster to mark it for everyone: for ten seconds every
    squad sees where it is and shoots straighter. Press G to throw smoke when it comes for your
    parked guns: it cannot see them in the cloud. Both take half a minute to come back.
+7. A monster in the water shows only a few spines and slips off the map unless someone is
+   close. Wait for it on the bank and shoot at the spines, or mark it. It cannot fight from
+   under the water, and every second it hides there is a second off the clock for you.

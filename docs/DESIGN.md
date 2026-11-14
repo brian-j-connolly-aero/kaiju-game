@@ -263,6 +263,42 @@ definition.
   below) take the unit damage and 60 nerve per second.
 - **Molt:** holding Molt for 1 s starts the cocoon where the kaiju stands; it drops what it holds.
 
+### Swimming (hide and travel)
+
+Owner's note after the second playtest: "all monsters should have some hide/travel mode,
+Grognar should be able to swim in the river, still hittable but only a few spines/a bit of
+hitbox exposed... Maybe big size doesn't have travel mode." The monster is slower than the army
+and has to hide, and wrecking the city takes its cover away: the water is cover that stays.
+As built (`shared/src/sim/swim.ts`, numbers in the kind's `swim` definition):
+
+- **Who and where.** The hatchling and the juvenile; the titan is too big for any water and
+  wades as before. Water is deep enough where it reaches 0.75 body radii from the kaiju's center
+  all round at stage 1 (3.6 m of water across) and 0.35 at stage 2 (6.3 m): the river, the bay
+  and the Old Moat (section 7). A bridge deck overhead does not matter: it swims under.
+- **No button.** It is automatic, so a new player has nothing to learn: a kaiju that stands or
+  walks in deep water without acting goes under in 1 s. Any kaiju button (strike, grab, block,
+  roar, special, molt) brings it up in 0.6 s, and the press is carried out as soon as it is up
+  (a roar pressed under water is a roar 0.6 s later). An action, a stagger, or leaving deep
+  water also brings it up. After it last acted it stays up 1.5 s before it goes down again, so
+  a fight in the river is a fight, not a bob up and down.
+- **Under** (and while going down or coming up) it cannot strike, grab, throw, eat, brace,
+  roar, breathe its beam or molt, it tramples nobody and wrecks nothing (no destruction, no bar,
+  no rage from the city; a bridge deck it swims under is safe). It moves at 1.1 times its land
+  top speed with no water slowdown (9.4 m/s at stage 1, against 4.3 wading; 15.4 m/s at stage
+  2, against 11.9), and turns at 0.8 of its rate. Nerve still slows it as usual.
+- **What shows** is a ridge of spines: the hit volume shrinks to what is above the water, 0.14
+  of its height (0.6 m at stage 1, 4.5 m at stage 2) over 0.55 of its radius. It can be hit,
+  only by a shot aimed at the spines; a blast catches it only when it reaches what shows.
+  Damage and nerve rules are unchanged.
+- **Seen.** Squads see it, and spot it (the scatter bonus), only within 0.4 of the usual
+  distances (100 m instead of 250, 60 m instead of 150), and only by a sight line to the
+  spines. At stage 2 the humans' map, which otherwise always shows the kaiju, shows it while it
+  is under only when a unit sees it, it made noise, or it is marked. (The orange marker over
+  the kaiju follows the server's `spotted` and `marked`, so it shows less while it swims; the
+  snapshot carries `submerge` for whatever else wants it.)
+- **No stalling.** Nothing it does in the water earns anything and the clock runs on: time
+  spent hiding is time the humans win by.
+
 **Tier 2 kaiju (same verbs, different numbers and one special each):**
 
 - **Krabulon (Crab):** front 150° arc takes ×0.25 damage and nerve; rear takes ×2.2. Sidesteps at
@@ -468,7 +504,7 @@ photos for the front page).
 
 **Map view:** toggles a top-down city map at any time. The game does not pause; the player's
 unit idles. Shows bounds, rubble, friendly units, smoke clouds, and the kaiju when it is known
-(always at stages 2 and 3; at stage 1 only while a human unit has line of sight within 250 m,
+(always at stages 2 and 3 unless it is swimming under water, section 4; at stage 1 only while a human unit has line of sight within 250 m,
 for 3 s after it roars, stomps or wrecks something, or while a squad has marked it), with a
 ring round it while it is marked. Move-to and call-in markers can be placed on the map: a left
 click places the order picked in the picker at the map's left side, which is the move-to
@@ -497,7 +533,9 @@ tick behind what it saw, and plays any slot it is handed at any moment.
   land together. It holds its fire on the move (stray rockets are the kaiju's gain), plants
   the squad afresh when the kaiju has walked out of the arcs, moves on when most of its guns
   have no clear line, drives away when the kaiju comes within 30% of range, and searches (last
-  known position, then around) while a hatchling is off the map. Into a staggered or cocooned
+  known position, then around) while a hatchling, or a kaiju under water, is off the map; when
+  the last known position is out in the water it goes to the near bank instead and waits there.
+  Its line of fire and its crosshair go to what shows of a swimming kaiju (the spines). Into a staggered or cocooned
   kaiju it fires as fast as the guns load. At level 3 it marks artillery a little ahead of the
   kaiju whenever the battery is ready, anywhere in the city. It marks the kaiju when it has it
   in sight and in the crosshair and nobody has marked it, at stage 1 or when its squad is at
@@ -514,7 +552,13 @@ tick behind what it saw, and plays any slot it is handed at any moment.
   units in reach (else on something big), eats below 70% health, and when the molt is offered
   looks for ground where fewer guns can see it and where its next body will have room, for
   16 s at most (smashing what stands in its way there, as it does when wrecking), then
-  cocoons.
+  cocoons. Swimming (stages 1 and 2): when its nerve is 70% full, or it is seen below 40%
+  health, and deep water lies within 10 radii (stage 1) or 8 radii (stage 2), it walks in,
+  presses nothing (so it goes under) and swims away from the squads, along stretches of deep
+  water it can reach in a straight line, for 8 s; then it goes back to work and does not swim
+  away again for 30 s. Water farther away cost it more than it gave back in the balance runs
+  (it turned its back on the guns to get there): with 45 and 28 radii it won 20% of matches
+  instead of about half.
 - **Handicap.** `MatchConfig.bots` handicaps either side from 0 (its best) to 1 (stands still):
   in between, the bot idles that share of the time. For the balance harness, tests and
   practice options. `MatchConfig.bots.triggerHappy` makes the squad bots play the lazy way
@@ -552,6 +596,11 @@ server and every client build the identical city from code. No building list goe
 - Structures collide as oriented boxes; props never block (vehicles and kaiju crush them).
 - The river is shallow: ground units wade at 50% speed; bridges are fast crossings and are
   destructible. Parks and water are open ground where misses cost nothing.
+- The Old Moat (owner's note after the second playtest: "water at all stages"): 20 m of water
+  outside the beltway along the west, north and east edges, so every stage 1 and stage 2 square
+  has water a kaiju can swim in (section 4, "Swimming") within about 165 m of where the match
+  starts, reachable along the streets without breaking anything. No street or building moved
+  for it; it took the place of the tree belt outside the beltway (docs/CITY.md section 11).
 - Civilians are client-only fleeing sprites with no effect on play.
 
 ## 8. Presentation rules
@@ -583,6 +632,7 @@ shortcut that a page cannot cancel).
 | Kaiju: roar | Q | Y |
 | Kaiju: beam (needs full rage) | E | RB |
 | Kaiju: molt (hold 1 s, when a molt is there) | F | B |
+| Kaiju: swim (stages 1 and 2) | no button: walk into deep water and it goes under; any kaiju button brings it up | the same |
 | Squad: fire (also the volley's trigger) | Left button | RT |
 | Squad: command wheel (hold, point, let go): orders to the three other units | Right button or Q | LB |
 | Squad: the open wheel's entry, by a click (the click does not fire) | Left button | RT |
@@ -620,7 +670,9 @@ every control of the player's role, each as the button's glyph on the device in 
 switches when the player picks up a controller) followed by a picture of what it does. A ring
 around a glyph means hold it; a small arrow means "then"; the HUD's three growing triangles
 mark a control that only exists at some stages (grabbing tanks and pieces of buildings from
-stage 2, the molt before stages 2 and 3, artillery at stage 3). The squad's card includes the
+stage 2, the molt before stages 2 and 3, swimming at stages 1 and 2, artillery at stage 3).
+Swimming has no button: its tile is the movement keys, an arrow, and the spines-over-waves
+picture; the HUD shows the same picture, in water blue, while the kaiju is under. The squad's card includes the
 volley (hold and charge, wait for the full charge, then the leader's own shot) and the drone.
 It has a button in the lobby (for the role picked there) and on the briefing screen, is open
 by itself for the whole briefing, and in a match opens and closes with its key while the game
