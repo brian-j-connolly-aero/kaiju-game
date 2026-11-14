@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Faction: Super Science. An atom: two crossed orbits, a heavy nucleus, two electrons riding one orbit. -->
+  <circle cx="32" cy="32" r="6" fill="currentColor" stroke="none"/>
+  <ellipse cx="32" cy="32" rx="28" ry="11.5" transform="rotate(-45 32 32)"/>
+  <ellipse cx="32" cy="32" rx="28" ry="11.5" transform="rotate(45 32 32)" stroke-dasharray="44.8 20" stroke-dashoffset="-10"/>
+  <circle cx="12.2" cy="12.2" r="4.5" fill="currentColor" stroke="none"/>
+  <circle cx="51.8" cy="51.8" r="4.5" fill="currentColor" stroke="none"/>
+</svg>

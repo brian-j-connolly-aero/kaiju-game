@@ -1,0 +1,1964 @@
+/*
+ * Placeholder styling for every screen and the HUD. Functional, not final: a UI specialist will
+ * restyle it. Color language (DESIGN.md section 8): humans cyan, kaiju orange, charging volleys
+ * yellow, rubble grey. No text besides names, the room code and subtitles.
+ */
+
+:root {
+  --human: #1ec8e0;
+  --kaiju: #ff7a1a;
+  --volley: #ffd91a;
+  --rubble: #8d8d94;
+  --danger: #ff3b5c;
+  --ink: #f4f6fb;
+  --panel: rgba(14, 18, 30, 0.78);
+  --panel-edge: rgba(255, 255, 255, 0.16);
+  /* The subtitle line: its text size, and the room three lines of it need (the end screen keeps that free). */
+  --subs-font: clamp(15px, 2.2vw, 24px);
+  --subs-band: calc(var(--subs-font) * 3.9 + 16px);
+  font-family: 'Trebuchet MS', 'Segoe UI', Verdana, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #101420;
+  color: var(--ink);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#view {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  image-rendering: pixelated;
+}
+
+#ui {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* --- shared pieces -------------------------------------------------------------------------- */
+
+.icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  line-height: 0;
+  vertical-align: middle;
+}
+
+.icon svg,
+.icon img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.glyph {
+  position: relative;
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  line-height: 0;
+}
+
+.glyph-label {
+  position: absolute;
+  /* Centered on the keycap's top face (41.5% down), not on the whole picture. */
+  inset: 0 0 17% 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.48em;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2vh;
+  pointer-events: auto;
+}
+
+.title {
+  font-size: clamp(22px, 5.2vw, 64px);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: var(--kaiju);
+  text-shadow: 0 3px 0 #5a1f00, 0 0 24px rgba(255, 122, 26, 0.4);
+  text-align: center;
+}
+
+.panel {
+  background: var(--panel);
+  border: 2px solid var(--panel-edge);
+  border-radius: 14px;
+  padding: 18px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: min(360px, 90vw);
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+}
+
+.row-icon {
+  font-size: 30px;
+  color: var(--human);
+}
+
+.field {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 22px;
+  font-weight: 700;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 2px solid var(--panel-edge);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink);
+  outline: none;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.field:focus {
+  border-color: var(--human);
+}
+
+.field.bad {
+  border-color: var(--danger);
+}
+
+.code-field {
+  text-transform: uppercase;
+  letter-spacing: 0.3em;
+  text-align: center;
+}
+
+.btn {
+  font: inherit;
+  font-size: 30px;
+  color: var(--ink);
+  background: var(--panel);
+  border: 2px solid var(--panel-edge);
+  border-radius: 12px;
+  padding: 8px 14px;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.btn:hover {
+  background: rgba(60, 70, 100, 0.9);
+}
+
+.btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.btn-big {
+  font-size: 44px;
+  padding: 10px 26px;
+}
+
+/* The join button beside the callsign when a friend arrives by invite (home screen). */
+.invite-join {
+  font-size: 36px;
+  padding: 6px 20px;
+}
+
+.btn.on,
+.btn.done {
+  border-color: var(--human);
+  color: var(--human);
+}
+
+.notice {
+  height: 40px;
+  font-size: 36px;
+  color: var(--danger);
+  text-align: center;
+}
+
+.notice.shake {
+  animation: shake 0.4s;
+}
+
+@keyframes shake {
+  25% {
+    transform: translateX(-8px);
+  }
+  75% {
+    transform: translateX(8px);
+  }
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* --- boot ----------------------------------------------------------------------------------- */
+
+.boot {
+  background: #101420;
+}
+
+.boot-icon {
+  font-size: 90px;
+  color: var(--kaiju);
+  animation: boot-breathe 1.6s ease-in-out infinite;
+}
+
+@keyframes boot-breathe {
+  50% {
+    transform: translateY(-6px) scale(1.06);
+  }
+}
+
+.boot-track {
+  position: relative;
+  width: min(420px, 70vw);
+  height: 14px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+/* A band of light that runs along the bar for as long as anything is loading. */
+.boot-track::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 30%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  animation: boot-sheen 1.3s linear infinite;
+}
+
+@keyframes boot-sheen {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(340%);
+  }
+}
+
+.boot-fill {
+  height: 100%;
+  width: 0;
+  background: var(--kaiju);
+  transition: width 0.25s;
+}
+
+/* Before the game's code has arrived there is nothing to measure: a short stub of the bar. */
+.boot-track.waiting .boot-fill {
+  width: 4%;
+}
+
+/* The game could not start (no 3D view in this browser, or a broken download). */
+.boot-failed {
+  font-size: 84px;
+  color: var(--danger);
+  animation: pulse 1.2s infinite;
+}
+
+.boot.failed .boot-icon {
+  filter: grayscale(1);
+  opacity: 0.5;
+}
+
+/* --- lobby ---------------------------------------------------------------------------------- */
+
+.lobby {
+  justify-content: space-between;
+  padding: 3vh 3vw;
+}
+
+.lobby-top,
+.lobby-bottom {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.room-code {
+  font-size: clamp(34px, 7vw, 76px);
+  font-weight: 900;
+  letter-spacing: 0.3em;
+  padding: 4px 22px 4px 30px;
+  background: var(--panel);
+  border: 2px solid var(--panel-edge);
+  border-radius: 14px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.lobby-mid {
+  display: flex;
+  gap: 3vw;
+  align-items: center;
+}
+
+.portrait {
+  width: min(30vh, 26vw);
+  height: min(30vh, 26vw);
+  border-radius: 16px;
+  background: var(--panel);
+  border: 2px solid var(--panel-edge);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-size: min(18vh, 16vw);
+  color: var(--kaiju);
+}
+
+.portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.seats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: min(380px, 56vw);
+}
+
+.seat {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  background: var(--panel);
+  border: 2px solid var(--panel-edge);
+  border-radius: 12px;
+  font-size: 22px;
+  font-weight: 700;
+  min-height: 52px;
+}
+
+.seat.me {
+  border-color: var(--ink);
+}
+
+.seat.ready {
+  box-shadow: inset 6px 0 0 #49d17d;
+}
+
+.seat.away {
+  opacity: 0.45;
+}
+
+/* An empty seat is played by a bot: shown as one, not as a missing person. */
+.seat.empty {
+  opacity: 0.7;
+  border-style: dashed;
+  gap: 6px;
+}
+
+.seat-role.bot {
+  color: var(--ink);
+}
+
+.seat-bot-role {
+  font-size: 20px;
+  color: var(--human);
+}
+
+/* Not ready for a while: the start does not wait for them. */
+.seat.asleep {
+  opacity: 0.75;
+}
+
+.flag.asleep {
+  color: #9db8ff;
+}
+
+.seat-role {
+  font-size: 30px;
+}
+
+.seat-role.kaiju,
+.role-toggle.kaiju {
+  color: var(--kaiju);
+}
+
+.seat-role.human,
+.role-toggle {
+  color: var(--human);
+}
+
+.seat-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The player's own name, as a field they can change: same size as the other names. */
+.seat-name-field {
+  font-size: inherit;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.seat-flags {
+  display: flex;
+  gap: 6px;
+  font-size: 24px;
+}
+
+.flag.host {
+  color: var(--volley);
+}
+
+.flag.ok {
+  color: #49d17d;
+}
+
+.flag.off {
+  color: var(--danger);
+}
+
+.start {
+  color: #49d17d;
+  border-color: #49d17d;
+}
+
+.ready-toggle.on {
+  color: #49d17d;
+  border-color: #49d17d;
+}
+
+.practice-toggle.on {
+  color: var(--kaiju);
+  border-color: var(--kaiju);
+}
+
+/* --- briefing ------------------------------------------------------------------------------- */
+
+.briefing {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 4vh 4vw 16vh;
+  pointer-events: none;
+}
+
+.briefing-sides {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--panel);
+  border: 2px solid var(--panel-edge);
+  border-radius: 14px;
+  padding: 14px 18px;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.briefing-side.kaiju {
+  color: var(--kaiju);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 26px;
+}
+
+.side-icon {
+  font-size: 40px;
+}
+
+.side-player {
+  color: var(--ink);
+  font-size: 18px;
+}
+
+.briefing-side.humans {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--human);
+}
+
+.side-squad {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.side-squad.me {
+  color: var(--ink);
+}
+
+/* --- HUD ------------------------------------------------------------------------------------ */
+
+.match {
+  pointer-events: none;
+}
+
+.hud {
+  position: absolute;
+  inset: 0;
+}
+
+.hud.cinematic .crosshair,
+.hud.cinematic .hud-bottom-right {
+  display: none;
+}
+
+.hud-top {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.hud-top-mid {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.bar {
+  position: relative;
+  width: min(560px, 62vw);
+  height: 46px;
+  padding: 0;
+}
+
+.bar svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.6));
+}
+
+/* The finished skyline (assets/ui/skyline.svg), inlined over the procedural one. */
+.bar {
+  color: #e9edf7;
+}
+
+.bar .sky-rubble {
+  color: var(--rubble);
+}
+
+.bar-edge-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--kaiju);
+}
+
+.bar-city {
+  fill: #e9edf7;
+}
+
+.bar-ruin {
+  fill: var(--rubble);
+}
+
+.bar-edge {
+  fill: var(--kaiju);
+}
+
+.bar-mark {
+  position: absolute;
+  top: 100%;
+  transform: translateX(-50%);
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.bar-mark.reached {
+  color: var(--kaiju);
+}
+
+.bar-mark.ready {
+  color: var(--volley);
+  animation: pulse 0.6s infinite;
+}
+
+.clock {
+  position: relative;
+  width: 110px;
+  height: 58px;
+  flex: none;
+}
+
+.clock-arc {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  top: 14%;
+  height: 172%;
+  border: 3px solid rgba(255, 255, 255, 0.55);
+  border-radius: 50%;
+  clip-path: inset(0 0 50% 0);
+}
+
+.clock-sun {
+  position: absolute;
+  font-size: 26px;
+  color: var(--volley);
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.8));
+}
+
+.clock-moon {
+  position: absolute;
+  right: -6px;
+  bottom: -10px;
+  font-size: 20px;
+  color: #c9d6ff;
+}
+
+/* Icons that stand straight on the sky get a thin dark edge (orange on a sunset vanishes). */
+.meter-icon,
+.bar-mark,
+.stage-pip,
+.clock-moon {
+  filter: drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000) drop-shadow(0 1px 1px #000);
+}
+
+.clock.late .clock-arc {
+  border-color: var(--danger);
+  animation: pulse 0.5s infinite;
+}
+
+.hud-top-right {
+  flex: none;
+  width: 110px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.stage {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  justify-content: flex-end;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+/* The way to the settings panel: a small gear with the button that opens it. */
+.hint.hint-menu {
+  flex-direction: row;
+  gap: 4px;
+  opacity: 0.65;
+}
+
+.hint.hint-menu .hint-icon {
+  width: 22px;
+  height: 22px;
+  font-size: 18px;
+  border: none;
+  border-radius: 0;
+  background: none;
+  filter: drop-shadow(0 1px 1px #000);
+}
+
+.hint.hint-menu .hint-glyph {
+  font-size: 20px;
+}
+
+.hud.cinematic .hint-menu {
+  display: none;
+}
+
+.stage-pip.on {
+  color: var(--kaiju);
+}
+
+.stage-pip-1 {
+  font-size: 18px;
+}
+
+.stage-pip-2 {
+  font-size: 28px;
+}
+
+.stage-pip-3 {
+  font-size: 42px;
+}
+
+.boss {
+  width: min(420px, 50vw);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 16px;
+}
+
+.boss-head {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  color: var(--kaiju);
+  font-weight: 800;
+  font-size: 16px;
+  text-shadow: 0 1px 2px #000;
+}
+
+.boss.lost {
+  opacity: 0.45;
+}
+
+.boss.staggered .boss-head {
+  color: #7dfcff;
+  animation: pulse 0.4s infinite;
+}
+
+.meter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.meter-icon {
+  font-size: 20px;
+}
+
+.meter-track {
+  flex: 1;
+  height: 12px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.meter-fill {
+  height: 100%;
+  width: 0;
+  background: var(--ink);
+}
+
+.boss-hp .meter-fill,
+.own-health .meter-fill {
+  background: #ff5468;
+}
+
+.boss-hp .meter-icon,
+.own-health .meter-icon {
+  color: #ff5468;
+}
+
+.boss-nerve .meter-fill,
+.own-nerve .meter-fill {
+  background: #7dfcff;
+}
+
+.boss-nerve .meter-icon,
+.own-nerve .meter-icon {
+  color: #7dfcff;
+}
+
+.own-nerve.danger .meter-track {
+  border-color: var(--danger);
+  animation: pulse 0.4s infinite;
+}
+
+.own-rage .meter-fill,
+.own-rage .meter-icon {
+  background: var(--kaiju);
+  color: var(--kaiju);
+}
+
+.own-rage .meter-icon {
+  background: none;
+}
+
+.own-rage.full .meter-track,
+.own-charge.full .meter-track {
+  border-color: var(--volley);
+  box-shadow: 0 0 10px var(--volley);
+}
+
+.own-charge .meter-fill {
+  background: var(--volley);
+}
+
+.own-charge .meter-icon {
+  color: var(--volley);
+}
+
+.own-reload .meter-fill {
+  background: var(--human);
+}
+
+.own-reload .meter-icon {
+  color: var(--human);
+}
+
+.hud-bottom-left {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  width: min(280px, 34vw);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.meters {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.orders {
+  display: flex;
+  gap: 8px;
+  font-size: 30px;
+  color: var(--human);
+  filter: drop-shadow(0 1px 2px #000);
+}
+
+.squads {
+  position: absolute;
+  top: 84px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.squad {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: rgba(14, 18, 30, 0.55);
+  color: #b9e9f2;
+}
+
+.squad.own {
+  color: #fff;
+  background: rgba(30, 200, 224, 0.28);
+}
+
+.squad.out {
+  opacity: 0.4;
+}
+
+.squad-pips {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.pip {
+  --hp: 1;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--human);
+  transform: scale(var(--hp));
+}
+
+.pip.driven {
+  outline: 2px solid #fff;
+  outline-offset: 1px;
+}
+
+.pip.charging {
+  background: var(--volley);
+  border-radius: 0;
+  transform: scale(var(--hp)) rotate(45deg);
+}
+
+.pip.shaken {
+  animation: pulse 0.25s infinite;
+}
+
+.pip.dead {
+  background: none;
+  border: 2px solid var(--rubble);
+  transform: none;
+}
+
+.hud-bottom-right {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+}
+
+.hints {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.hint-icon {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  font-size: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(14, 18, 30, 0.7);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  overflow: hidden;
+}
+
+.hint-cover {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 0;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.hint-glyph {
+  font-size: 24px;
+  filter: drop-shadow(0 1px 1px #000);
+}
+
+.hint.unavailable .hint-icon {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.hint.glow .hint-icon {
+  border-color: var(--volley);
+  color: var(--volley);
+  box-shadow: 0 0 12px var(--volley);
+  animation: pulse 0.7s infinite;
+}
+
+.hint.active .hint-icon {
+  border-color: var(--human);
+  color: var(--human);
+}
+
+.crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+}
+
+.crosshair-dot {
+  position: absolute;
+  left: -2px;
+  top: -2px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 2px #000;
+}
+
+.crosshair-ring {
+  position: absolute;
+  left: -13px;
+  top: -13px;
+  width: 26px;
+  height: 26px;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  box-shadow: 0 0 2px #000;
+  transition: transform 0.08s;
+}
+
+.crosshair.on-kaiju .crosshair-ring {
+  border-color: var(--kaiju);
+  border-radius: 0;
+  transform: rotate(45deg);
+}
+
+.crosshair.out-of-range .crosshair-ring {
+  opacity: 0.35;
+  border-style: dashed;
+}
+
+.crosshair.kick .crosshair-ring {
+  transform: scale(1.5);
+}
+
+.status {
+  position: absolute;
+  left: 50%;
+  top: 30%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 14px;
+  font-size: 52px;
+}
+
+.status-icon {
+  display: none;
+  filter: drop-shadow(0 2px 3px #000);
+}
+
+.status-icon.on {
+  display: inline-block;
+  animation: pulse 0.5s infinite;
+}
+
+.status-crossfire,
+.status-volley {
+  color: var(--volley);
+}
+
+.status-break {
+  color: #7dfcff;
+}
+
+.status-spotted {
+  color: var(--kaiju);
+  font-size: 30px;
+  animation: none !important;
+}
+
+.status-shaken,
+.status-offline,
+.status-callin {
+  color: var(--danger);
+}
+
+.status-eliminated {
+  color: var(--rubble);
+  font-size: 34px;
+  animation: none !important;
+}
+
+/* "Click": the mouse is free and a click on the view captures it. */
+.capture {
+  position: absolute;
+  left: 50%;
+  top: 57%;
+  transform: translateX(-50%);
+  width: 76px;
+  height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 46px;
+  border-radius: 50%;
+  background: rgba(8, 10, 18, 0.6);
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  filter: drop-shadow(0 2px 3px #000);
+  animation: pulse 0.9s infinite;
+}
+
+.hud.cinematic .capture {
+  display: none;
+}
+
+/* --- command wheel -------------------------------------------------------------------------- */
+
+.wheel {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+}
+
+.wheel-slice {
+  position: absolute;
+  width: 84px;
+  height: 84px;
+  margin: -42px 0 0 -42px;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 3px solid var(--panel-edge);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  color: var(--human);
+}
+
+.wheel-slice.on {
+  border-color: var(--human);
+  background: rgba(30, 200, 224, 0.35);
+  color: #fff;
+  transform: scale(1.15);
+}
+
+.wheel-up {
+  top: -110px;
+}
+
+.wheel-down {
+  top: 110px;
+}
+
+.wheel-left {
+  left: -110px;
+}
+
+.wheel-right {
+  left: 110px;
+}
+
+.wheel-left.wheel-slice,
+.wheel-left.on {
+  color: var(--volley);
+}
+
+.wheel-glyph {
+  font-size: 22px;
+  color: #fff;
+}
+
+.wheel-hub {
+  position: absolute;
+  left: -8px;
+  top: -8px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.wheel-pointer {
+  position: absolute;
+  left: -5px;
+  top: -5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+}
+
+/* --- map ------------------------------------------------------------------------------------ */
+
+.map {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 10, 18, 0.55);
+  pointer-events: auto;
+}
+
+.map canvas {
+  border: 3px solid var(--panel-edge);
+  border-radius: 10px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+  cursor: crosshair;
+  max-width: 96vw;
+  max-height: 96vh;
+}
+
+/* --- subtitles ------------------------------------------------------------------------------ */
+
+.subtitles {
+  position: absolute;
+  left: 50%;
+  bottom: 13vh;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: min(820px, 92vw);
+  padding: 8px 16px;
+  border-radius: 10px;
+  background: rgba(8, 10, 18, 0.72);
+  font-size: var(--subs-font);
+  text-align: center;
+  line-height: 1.3;
+  /* Subtitles are the one thing that must be read: no screen is ever drawn over them. */
+  z-index: 6;
+}
+
+/* On the end screen the subtitle has the bottom of the page to itself (the screen keeps it free). */
+body[data-screen='end'] .subtitles {
+  bottom: 2vh;
+}
+
+.subtitles-speaker {
+  color: var(--volley);
+  font-weight: 800;
+  margin-right: 0.6em;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* --- end screen ----------------------------------------------------------------------------- */
+
+.end {
+  justify-content: flex-start;
+  /* The band at the bottom belongs to the subtitles of the hearing. */
+  padding: 3vh 3vw calc(2vh + var(--subs-band));
+  gap: 2vh;
+  background: rgba(8, 10, 18, 0.45);
+  overflow: hidden;
+}
+
+.end-banner {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  font-size: clamp(44px, 9vh, 96px);
+  padding: 6px 26px;
+  border-radius: 16px;
+  background: var(--panel);
+  border: 3px solid var(--panel-edge);
+}
+
+.end-banner.kaiju {
+  color: var(--kaiju);
+  border-color: var(--kaiju);
+}
+
+.end-banner.humans {
+  color: var(--human);
+  border-color: var(--human);
+}
+
+.end-trophy {
+  color: var(--volley);
+  font-size: 0.7em;
+}
+
+.end-reason {
+  color: var(--ink);
+  font-size: 0.6em;
+}
+
+.end-banner.lost {
+  filter: saturate(0.6);
+}
+
+.end-mid {
+  display: flex;
+  gap: 3vw;
+  align-items: flex-start;
+  justify-content: center;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+}
+
+.tallies {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: min(480px, 52vw);
+  /* A long tally scrolls inside its own box instead of running down over the subtitles. */
+  max-height: 100%;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  pointer-events: auto;
+}
+
+.tallies > .tally {
+  flex: none;
+}
+
+.tally {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  background: var(--panel);
+  border: 2px solid var(--panel-edge);
+  border-radius: 12px;
+  font-weight: 700;
+}
+
+.tally.me {
+  border-color: var(--ink);
+}
+
+.tally-who {
+  font-size: 28px;
+}
+
+.tally-who.kaiju {
+  color: var(--kaiju);
+}
+
+.tally-who.human {
+  color: var(--human);
+}
+
+.tally-name {
+  width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tally-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  flex: 1;
+}
+
+.tally-group {
+  display: flex;
+  align-items: center;
+}
+
+.tally-icon {
+  font-size: 22px;
+  margin-right: 2px;
+}
+
+.tally-more {
+  height: 8px;
+  margin-left: 12px;
+  border-radius: 4px;
+  background: var(--ink);
+}
+
+.tally-none {
+  width: 30px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--rubble);
+  align-self: center;
+}
+
+.paper {
+  width: min(300px, 34vw);
+  background: #efe9d8;
+  color: #2a2620;
+  padding: 12px;
+  border-radius: 3px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  transform: rotate(2deg);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.squiggle {
+  height: 5px;
+  border-radius: 3px;
+  background: repeating-linear-gradient(90deg, #5d564a 0 9px, transparent 9px 12px, #5d564a 12px 26px, transparent 26px 30px);
+  margin-bottom: 5px;
+}
+
+.squiggle.big {
+  height: 16px;
+  background: #2a2620;
+  width: 76%;
+  margin: 0 auto 4px;
+}
+
+.squiggle.thin {
+  height: 2px;
+  background: #2a2620;
+}
+
+.squiggle.huge {
+  height: 13px;
+  background: repeating-linear-gradient(90deg, #2a2620 0 22px, transparent 22px 27px, #2a2620 27px 58px, transparent 58px 64px);
+}
+
+.squiggle.short {
+  width: 62%;
+}
+
+.paper-body {
+  display: flex;
+  gap: 8px;
+}
+
+.paper-photo {
+  flex: 2;
+  aspect-ratio: 4 / 3;
+  background: #8d8d94 center / cover no-repeat;
+  filter: grayscale(1) contrast(1.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 54px;
+  color: #efe9d8;
+}
+
+.paper-col {
+  flex: 1;
+}
+
+.paper-foot {
+  display: flex;
+  gap: 8px;
+}
+
+.end-back {
+  position: absolute;
+  left: 3vw;
+  top: 3vh;
+}
+
+/* --- settings ------------------------------------------------------------------------------- */
+
+.settings {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 10, 18, 0.45);
+  pointer-events: auto;
+  z-index: 8;
+}
+
+.settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 24px;
+  background: rgba(14, 18, 30, 0.96);
+  border: 2px solid var(--panel-edge);
+  border-radius: 16px;
+  min-width: min(420px, 86vw);
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.settings-icon {
+  font-size: 38px;
+  flex: none;
+}
+
+.settings-slider {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  margin: 0;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  --fill: 50%;
+}
+
+.settings-slider::-webkit-slider-runnable-track {
+  height: 10px;
+  border-radius: 5px;
+  background: linear-gradient(90deg, var(--human) var(--fill), rgba(255, 255, 255, 0.18) var(--fill));
+}
+
+.settings-slider::-moz-range-track {
+  height: 10px;
+  border-radius: 5px;
+  background: linear-gradient(90deg, var(--human) var(--fill), rgba(255, 255, 255, 0.18) var(--fill));
+}
+
+.settings-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  margin-top: -6px;
+  border-radius: 50%;
+  border: 2px solid #0e121e;
+  background: var(--ink);
+}
+
+.settings-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #0e121e;
+  background: var(--ink);
+}
+
+.settings-buttons {
+  justify-content: space-between;
+}
+
+.settings-done {
+  color: var(--human);
+  border-color: var(--human);
+  padding: 8px 26px;
+}
+
+/* The gear that opens the panel from the home screen and the lobby. */
+.settings-open {
+  position: absolute;
+  top: 2vh;
+  right: 2vw;
+  font-size: 28px;
+  padding: 8px 10px;
+}
+
+/* The button that opens the controls card: beside the gear in the lobby, top right on the briefing. */
+.controls-open {
+  position: absolute;
+  top: 2vh;
+  right: calc(2vw + 66px);
+  font-size: 28px;
+  padding: 8px 12px;
+  color: var(--volley);
+  border-color: var(--volley);
+  box-shadow: 0 0 10px rgba(255, 217, 26, 0.35);
+}
+
+.briefing .controls-open {
+  right: 2vw;
+}
+
+/* The briefing shows the card by itself: the portrait and the names step aside while it is open. */
+body:has(.controls:not(.hidden)) .briefing-portrait,
+body:has(.controls:not(.hidden)) .briefing-sides {
+  visibility: hidden;
+}
+
+/* --- controls card -------------------------------------------------------------------------- */
+
+.controls {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  /* Clear of the HUD's top row and of the subtitles. */
+  padding: max(70px, 11vh) 2vw var(--subs-band);
+  background: rgba(8, 10, 18, 0.4);
+  pointer-events: auto;
+  z-index: 7;
+}
+
+/* In a match: no mouse input at all, the pointer stays with the game. */
+.controls.passive {
+  pointer-events: none;
+  background: none;
+}
+
+.controls-card {
+  /* One unit: the size of a button glyph. */
+  --u: clamp(20px, 5.4vh, 42px);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--u) * 0.25);
+  width: min(calc(var(--u) * 30), 100%);
+  max-height: 100%;
+  padding: calc(var(--u) * 0.3) calc(var(--u) * 0.45);
+  background: rgba(14, 18, 30, 0.9);
+  border: 2px solid var(--panel-edge);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.controls-card.role-kaiju {
+  border-color: rgba(255, 122, 26, 0.55);
+}
+
+.controls-card.role-squad {
+  border-color: rgba(30, 200, 224, 0.55);
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 0.35);
+  font-size: var(--u);
+}
+
+.card-role.kaiju,
+.card-name.kaiju,
+.card-pic.kaiju {
+  color: var(--kaiju);
+}
+
+.card-role.human,
+.card-name.human,
+.card-pic.human {
+  color: var(--human);
+}
+
+.card-pic.volley {
+  color: var(--volley);
+}
+
+.card-pic.dim {
+  opacity: 0.45;
+}
+
+.card-name {
+  font-size: calc(var(--u) * 0.85);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.card-device {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+  opacity: 0.55;
+  font-size: calc(var(--u) * 0.8);
+}
+
+.card-close {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--volley);
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: calc(var(--u) * 0.18);
+}
+
+.role-kaiju .card-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.card-tile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(var(--u) * 1.75);
+  padding: calc(var(--u) * 0.14) calc(var(--u) * 0.2);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.card-tile.wide {
+  grid-column: span 2;
+}
+
+.card-tile.card-squad {
+  background: rgba(30, 200, 224, 0.08);
+}
+
+.card-tile.card-verbs {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.card-parts {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 0.2);
+  font-size: var(--u);
+}
+
+.card-glyph {
+  font-size: var(--u);
+}
+
+.card-pic {
+  font-size: calc(var(--u) * 1.05);
+}
+
+/* Controller glyphs draw the whole controller or pad: they need more room to show which button. */
+.controls-card[data-device='gamepad'] .card-glyph {
+  font-size: calc(var(--u) * 1.25);
+}
+
+.controls-card[data-device='gamepad'] .card-glyph.card-stick {
+  font-size: calc(var(--u) * 1.3);
+}
+
+/* A stick tilted: four small arrows around it. */
+.card-tilt {
+  display: inline-flex;
+  padding: calc(var(--u) * 0.2);
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cg fill='%23f4f6fb' opacity='0.8'%3E%3Cpath d='M20 0 L24 5 L16 5Z'/%3E%3Cpath d='M20 40 L24 35 L16 35Z'/%3E%3Cpath d='M0 20 L5 16 L5 24Z'/%3E%3Cpath d='M40 20 L35 16 L35 24Z'/%3E%3C/g%3E%3C/svg%3E")
+    center / 100% 100% no-repeat;
+}
+
+/* "Then": a small arrow between two pictures. */
+.card-then {
+  width: 0;
+  height: 0;
+  border-left: calc(var(--u) * 0.26) solid rgba(255, 255, 255, 0.55);
+  border-top: calc(var(--u) * 0.2) solid transparent;
+  border-bottom: calc(var(--u) * 0.2) solid transparent;
+}
+
+/* "Hold it": a ring that fills around the button. */
+.card-hold {
+  position: relative;
+  display: inline-flex;
+  padding: calc(var(--u) * 0.14);
+}
+
+.card-hold::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  /* Three quarters filled, and still: an animated ring halved the frame rate on a weak machine. */
+  background: conic-gradient(var(--volley) 0.72turn, rgba(255, 255, 255, 0.18) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
+}
+
+/* The movement keys as they sit on a keyboard. */
+.card-move {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: calc(var(--u) * 0.72);
+  line-height: 0;
+}
+
+.card-key {
+  font-size: calc(var(--u) * 0.72);
+}
+
+/* The stages a control is limited to: the HUD's three growing triangles. */
+.card-stages {
+  display: flex;
+  margin-left: calc(var(--u) * 0.1);
+  align-items: flex-end;
+  gap: 1px;
+  color: rgba(255, 255, 255, 0.22);
+}
+
+.card-stage.on {
+  color: var(--kaiju);
+}
+
+.card-stage-1 {
+  font-size: calc(var(--u) * 0.32);
+}
+
+.card-stage-2 {
+  font-size: calc(var(--u) * 0.42);
+}
+
+.card-stage-3 {
+  font-size: calc(var(--u) * 0.54);
+}
+
+/* The command wheel in miniature. */
+.card-wheel {
+  position: relative;
+  width: calc(var(--u) * 1.9);
+  height: calc(var(--u) * 1.9);
+  font-size: calc(var(--u) * 0.66);
+  color: var(--human);
+}
+
+.card-wheel .icon {
+  position: absolute;
+}
+
+.card-wheel-up {
+  left: 35%;
+  top: 0;
+}
+
+.card-wheel-right {
+  right: 0;
+  top: 35%;
+}
+
+.card-wheel-down {
+  left: 35%;
+  bottom: 0;
+}
+
+.card-wheel-left {
+  left: 0;
+  top: 35%;
+  color: var(--volley);
+}
+
+.hud-menus {
+  display: flex;
+  gap: 8px;
+}
+
+/* --- debug overlay -------------------------------------------------------------------------- */
+
+.debug-overlay {
+  position: fixed;
+  left: 8px;
+  top: 78px;
+  margin: 0;
+  padding: 6px 9px;
+  font: 11px/1.35 ui-monospace, Menlo, Consolas, monospace;
+  color: #c7ffd6;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 6px;
+  pointer-events: none;
+  white-space: pre;
+  z-index: 10;
+}
+
+/* --- small windows -------------------------------------------------------------------------- */
+
+@media (max-height: 600px) {
+  .lobby {
+    padding: 2vh 2vw;
+    gap: 1.5vh;
+  }
+
+  .room-code {
+    font-size: 34px;
+  }
+
+  .seats {
+    gap: 4px;
+  }
+
+  .seat {
+    min-height: 30px;
+    padding: 2px 12px;
+    font-size: 16px;
+  }
+
+  .lobby-top .btn {
+    font-size: 22px;
+  }
+
+  .seat-role {
+    font-size: 22px;
+  }
+
+  .btn-big {
+    font-size: 30px;
+    padding: 6px 20px;
+  }
+
+  .portrait {
+    width: 24vh;
+    height: 24vh;
+  }
+
+  .hint-icon {
+    width: 38px;
+    height: 38px;
+    font-size: 26px;
+  }
+
+  .hint-glyph {
+    font-size: 19px;
+  }
+
+  .subtitles {
+    bottom: 19vh;
+  }
+
+  .end {
+    padding: 2vh 2vw calc(2vh + var(--subs-band));
+    gap: 1vh;
+  }
+
+  .end-banner {
+    font-size: 34px;
+    padding: 2px 18px;
+  }
+
+  .end-back {
+    top: 2vh;
+    left: 2vw;
+  }
+
+  .tallies {
+    gap: 3px;
+  }
+
+  .tally {
+    padding: 1px 10px;
+    font-size: 14px;
+  }
+
+  .tally-who {
+    font-size: 22px;
+  }
+
+  .tally-icon {
+    font-size: 17px;
+    margin-right: 2px;
+  }
+
+  .tally-row {
+    gap: 4px 8px;
+  }
+
+  .capture {
+    top: 55%;
+    width: 56px;
+    height: 56px;
+    font-size: 34px;
+  }
+
+  .settings-panel {
+    gap: 8px;
+    padding: 10px 16px;
+  }
+
+  .settings-icon {
+    font-size: 28px;
+  }
+
+  .paper {
+    width: min(230px, 30vw);
+    padding: 8px;
+    gap: 5px;
+  }
+}

@@ -1,0 +1,5742 @@
+{
+  "models": {
+    "army_tank": {
+      "file": "models/army_tank.glb",
+      "kind": "vehicle",
+      "nodes": [
+        "hull",
+        "track_L",
+        "track_R",
+        "turret",
+        "barrel",
+        "muzzle"
+      ],
+      "size": [
+        3.9,
+        3.29,
+        8.03
+      ],
+      "tris": 498
+    },
+    "army_tank_wreck": {
+      "file": "models/army_tank_wreck.glb",
+      "kind": "vehicle",
+      "nodes": [
+        "army_tank_wreck"
+      ],
+      "size": [
+        6.043,
+        3.156,
+        6.798
+      ],
+      "tris": 460
+    },
+    "bld_apartment_a": {
+      "chunks": 12,
+      "district": "oldtown",
+      "file": "models/bld_apartment_a.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "chunk_08",
+        "chunk_09",
+        "chunk_10",
+        "chunk_11",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        18,
+        20.36,
+        14.15
+      ],
+      "tint": {
+        "base": "#ead2a0",
+        "blend": "multiply",
+        "colors": [
+          "#e6b566",
+          "#ead2a0",
+          "#f2a48b",
+          "#f3e3b3",
+          "#f6c9a0",
+          "#e3c04f"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 188
+    },
+    "bld_apartment_b": {
+      "chunks": 12,
+      "district": "boardwalk",
+      "file": "models/bld_apartment_b.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "chunk_08",
+        "chunk_09",
+        "chunk_10",
+        "chunk_11",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        16,
+        28,
+        16
+      ],
+      "tint": {
+        "base": "#f5f2ea",
+        "blend": "multiply",
+        "colors": [
+          "#f5f2ea",
+          "#b4e3dc",
+          "#f6c9a0",
+          "#a8d4f0",
+          "#efb3b8"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 198
+    },
+    "bld_apartment_c": {
+      "chunks": 8,
+      "district": "downtown",
+      "file": "models/bld_apartment_c.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        24.05,
+        36.5,
+        14
+      ],
+      "tint": {
+        "base": "#bdb9b0",
+        "blend": "multiply",
+        "colors": [
+          "#ddd6c6",
+          "#8fa0b5",
+          "#f5f2ea",
+          "#bdb9b0",
+          "#a8d4f0"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 184
+    },
+    "bld_bridge_a": {
+      "chunks": 16,
+      "district": "industry",
+      "file": "models/bld_bridge_a.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "chunk_08",
+        "chunk_09",
+        "chunk_10",
+        "chunk_11",
+        "chunk_12",
+        "chunk_13",
+        "chunk_14",
+        "chunk_15",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        16,
+        8,
+        74
+      ],
+      "tint": {
+        "base": "#bdb9b0",
+        "blend": "multiply",
+        "colors": [
+          "#bdb9b0",
+          "#8fa0b5",
+          "#ead2a0",
+          "#e3c04f"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 208
+    },
+    "bld_bridge_b": {
+      "chunks": 8,
+      "district": "harbor",
+      "file": "models/bld_bridge_b.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        22,
+        35.95,
+        110
+      ],
+      "tint": {
+        "base": "#ddd6c6",
+        "blend": "multiply",
+        "colors": [
+          "#a8d4f0",
+          "#b4e3dc",
+          "#f5f2ea",
+          "#8fa0b5",
+          "#f2a48b"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 342
+    },
+    "bld_campus_a": {
+      "chunks": 16,
+      "district": "university",
+      "file": "models/bld_campus_a.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "chunk_08",
+        "chunk_09",
+        "chunk_10",
+        "chunk_11",
+        "chunk_12",
+        "chunk_13",
+        "chunk_14",
+        "chunk_15",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        44,
+        16,
+        16.125
+      ],
+      "tint": {
+        "base": "#ddd6c6",
+        "blend": "multiply",
+        "colors": [
+          "#ddd6c6",
+          "#ead2a0",
+          "#f3e3b3"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 172
+    },
+    "bld_container_a": {
+      "chunks": 8,
+      "district": "harbor",
+      "file": "models/bld_container_a.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        13,
+        7.86,
+        25.8
+      ],
+      "tint": {
+        "base": "#f5f2ea",
+        "blend": "multiply",
+        "colors": [
+          "#a8d4f0",
+          "#b4e3dc",
+          "#f5f2ea",
+          "#8fa0b5",
+          "#f2a48b"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 78
+    },
+    "bld_crane_a": {
+      "chunks": 7,
+      "district": "harbor",
+      "file": "models/bld_crane_a.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        15.9,
+        46,
+        25.786
+      ],
+      "tint": {
+        "base": "#f5f2ea",
+        "blend": "multiply",
+        "colors": [
+          "#a8d4f0",
+          "#b4e3dc",
+          "#f5f2ea",
+          "#8fa0b5",
+          "#f2a48b"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 244
+    },
+    "bld_factory_a": {
+      "chunks": 8,
+      "district": "industry",
+      "file": "models/bld_factory_a.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        36.04,
+        14,
+        24.08
+      ],
+      "tint": {
+        "base": "#bdb9b0",
+        "blend": "multiply",
+        "colors": [
+          "#bdb9b0",
+          "#8fa0b5",
+          "#ead2a0",
+          "#e3c04f"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 164
+    },
+    "bld_factory_b": {
+      "chunks": 8,
+      "district": "industry",
+      "file": "models/bld_factory_b.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        43.85,
+        18,
+        29.705
+      ],
+      "tint": {
+        "base": "#bdb9b0",
+        "blend": "multiply",
+        "colors": [
+          "#bdb9b0",
+          "#8fa0b5",
+          "#ead2a0",
+          "#e3c04f"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 192
+    },
+    "bld_house_a": {
+      "chunks": 8,
+      "district": "suburb",
+      "file": "models/bld_house_a.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        9,
+        6,
+        10.075
+      ],
+      "tint": {
+        "base": "#f3e3b3",
+        "blend": "multiply",
+        "colors": [
+          "#f3e3b3",
+          "#f2a48b",
+          "#a8d4f0",
+          "#a9e5c5",
+          "#f6c9a0",
+          "#cfe8a0",
+          "#f5f2ea",
+          "#c9b5e8"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 80
+    },
+    "bld_house_b": {
+      "chunks": 8,
+      "district": "suburb",
+      "file": "models/bld_house_b.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        11,
+        7,
+        9
+      ],
+      "tint": {
+        "base": "#f6c9a0",
+        "blend": "multiply",
+        "colors": [
+          "#f3e3b3",
+          "#f2a48b",
+          "#a8d4f0",
+          "#a9e5c5",
+          "#f6c9a0",
+          "#cfe8a0",
+          "#f5f2ea",
+          "#c9b5e8"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 75
+    },
+    "bld_house_c": {
+      "chunks": 8,
+      "district": "suburb",
+      "file": "models/bld_house_c.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        8,
+        5,
+        8
+      ],
+      "tint": {
+        "base": "#a8d4f0",
+        "blend": "multiply",
+        "colors": [
+          "#f3e3b3",
+          "#f2a48b",
+          "#a8d4f0",
+          "#a9e5c5",
+          "#f6c9a0",
+          "#cfe8a0",
+          "#f5f2ea",
+          "#c9b5e8"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 76
+    },
+    "bld_office_a": {
+      "chunks": 16,
+      "district": "downtown",
+      "file": "models/bld_office_a.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "chunk_08",
+        "chunk_09",
+        "chunk_10",
+        "chunk_11",
+        "chunk_12",
+        "chunk_13",
+        "chunk_14",
+        "chunk_15",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        20,
+        42.33,
+        20
+      ],
+      "tint": {
+        "base": "#ddd6c6",
+        "blend": "multiply",
+        "colors": [
+          "#ddd6c6",
+          "#8fa0b5",
+          "#f5f2ea",
+          "#bdb9b0",
+          "#a8d4f0"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 180
+    },
+    "bld_office_b": {
+      "chunks": 8,
+      "district": "downtown",
+      "file": "models/bld_office_b.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        24.08,
+        55,
+        18
+      ],
+      "tint": {
+        "base": "#ddd6c6",
+        "blend": "multiply",
+        "colors": [
+          "#ddd6c6",
+          "#8fa0b5",
+          "#f5f2ea",
+          "#bdb9b0",
+          "#a8d4f0"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 122
+    },
+    "bld_office_c": {
+      "chunks": 24,
+      "district": "downtown",
+      "file": "models/bld_office_c.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "chunk_08",
+        "chunk_09",
+        "chunk_10",
+        "chunk_11",
+        "chunk_12",
+        "chunk_13",
+        "chunk_14",
+        "chunk_15",
+        "chunk_16",
+        "chunk_17",
+        "chunk_18",
+        "chunk_19",
+        "chunk_20",
+        "chunk_21",
+        "chunk_22",
+        "chunk_23",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        22,
+        68,
+        22.04
+      ],
+      "tint": {
+        "base": "#ddd6c6",
+        "blend": "multiply",
+        "colors": [
+          "#ddd6c6",
+          "#8fa0b5",
+          "#f5f2ea",
+          "#bdb9b0",
+          "#a8d4f0"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 292
+    },
+    "bld_pavilion_a": {
+      "chunks": 6,
+      "district": "boardwalk",
+      "file": "models/bld_pavilion_a.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        16,
+        7,
+        12
+      ],
+      "tint": {
+        "base": "#f5f2ea",
+        "blend": "multiply",
+        "colors": [
+          "#f5f2ea",
+          "#b4e3dc",
+          "#f6c9a0",
+          "#a8d4f0",
+          "#efb3b8"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 90
+    },
+    "bld_rowhouse_a": {
+      "chunks": 12,
+      "district": "oldtown",
+      "file": "models/bld_rowhouse_a.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "chunk_08",
+        "chunk_09",
+        "chunk_10",
+        "chunk_11",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        7,
+        8.8,
+        11
+      ],
+      "tint": {
+        "base": "#ead2a0",
+        "blend": "multiply",
+        "colors": [
+          "#e6b566",
+          "#ead2a0",
+          "#f2a48b",
+          "#f3e3b3",
+          "#f6c9a0",
+          "#e3c04f"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 86
+    },
+    "bld_shop_a": {
+      "chunks": 6,
+      "district": "suburb",
+      "file": "models/bld_shop_a.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        10.95,
+        5,
+        9.99
+      ],
+      "tint": {
+        "base": "#a9e5c5",
+        "blend": "multiply",
+        "colors": [
+          "#f3e3b3",
+          "#f2a48b",
+          "#a8d4f0",
+          "#a9e5c5",
+          "#f6c9a0",
+          "#cfe8a0",
+          "#f5f2ea",
+          "#c9b5e8"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 70
+    },
+    "bld_shop_b": {
+      "chunks": 6,
+      "district": "oldtown",
+      "file": "models/bld_shop_b.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        14,
+        8,
+        10.95
+      ],
+      "tint": {
+        "base": "#e6b566",
+        "blend": "multiply",
+        "colors": [
+          "#e6b566",
+          "#ead2a0",
+          "#f2a48b",
+          "#f3e3b3",
+          "#f6c9a0",
+          "#e3c04f"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 74
+    },
+    "bld_shop_c": {
+      "chunks": 8,
+      "district": "oldtown",
+      "file": "models/bld_shop_c.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        12,
+        10,
+        12
+      ],
+      "tint": {
+        "base": "#f2a48b",
+        "blend": "multiply",
+        "colors": [
+          "#e6b566",
+          "#ead2a0",
+          "#f2a48b",
+          "#f3e3b3",
+          "#f6c9a0",
+          "#e3c04f"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 60
+    },
+    "bld_shrine_a": {
+      "chunks": 8,
+      "district": "temple",
+      "file": "models/bld_shrine_a.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        10,
+        11,
+        10
+      ],
+      "tint": {
+        "base": "#f3e3b3",
+        "blend": "multiply",
+        "colors": [
+          "#f5f2ea",
+          "#efb3b8",
+          "#f3e3b3",
+          "#f6c9a0",
+          "#ead2a0"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 112
+    },
+    "bld_tank_a": {
+      "chunks": 8,
+      "district": "industry",
+      "file": "models/bld_tank_a.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        18,
+        14,
+        18
+      ],
+      "tint": {
+        "base": "#f5f2ea",
+        "blend": "multiply",
+        "colors": [
+          "#bdb9b0",
+          "#8fa0b5",
+          "#ead2a0",
+          "#e3c04f"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 162
+    },
+    "bld_tower_a": {
+      "chunks": 24,
+      "district": "downtown",
+      "file": "models/bld_tower_a.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "chunk_08",
+        "chunk_09",
+        "chunk_10",
+        "chunk_11",
+        "chunk_12",
+        "chunk_13",
+        "chunk_14",
+        "chunk_15",
+        "chunk_16",
+        "chunk_17",
+        "chunk_18",
+        "chunk_19",
+        "chunk_20",
+        "chunk_21",
+        "chunk_22",
+        "chunk_23",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        25.6,
+        95,
+        25.9
+      ],
+      "tint": {
+        "base": "#ddd6c6",
+        "blend": "multiply",
+        "colors": [
+          "#ddd6c6",
+          "#8fa0b5",
+          "#f5f2ea",
+          "#bdb9b0",
+          "#a8d4f0"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 320
+    },
+    "bld_tower_b": {
+      "chunks": 14,
+      "district": "downtown",
+      "file": "models/bld_tower_b.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "chunk_08",
+        "chunk_09",
+        "chunk_10",
+        "chunk_11",
+        "chunk_12",
+        "chunk_13",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        30,
+        130,
+        30.5
+      ],
+      "tint": {
+        "base": "#ddd6c6",
+        "blend": "multiply",
+        "colors": [
+          "#ddd6c6",
+          "#8fa0b5",
+          "#f5f2ea",
+          "#bdb9b0",
+          "#a8d4f0"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 374
+    },
+    "bld_tower_c": {
+      "chunks": 8,
+      "district": "downtown",
+      "file": "models/bld_tower_c.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        28.12,
+        165,
+        28.51
+      ],
+      "tint": {
+        "base": "#ddd6c6",
+        "blend": "multiply",
+        "colors": [
+          "#ddd6c6",
+          "#8fa0b5",
+          "#f5f2ea",
+          "#bdb9b0",
+          "#a8d4f0"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 264
+    },
+    "bld_warehouse_a": {
+      "chunks": 8,
+      "district": "harbor",
+      "file": "models/bld_warehouse_a.glb",
+      "kind": "structure",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        30.08,
+        11.15,
+        19.94
+      ],
+      "tint": {
+        "base": "#8fa0b5",
+        "blend": "multiply",
+        "colors": [
+          "#a8d4f0",
+          "#b4e3dc",
+          "#f5f2ea",
+          "#8fa0b5",
+          "#f2a48b"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 152
+    },
+    "kaiju_cocoon": {
+      "file": "models/kaiju_cocoon.glb",
+      "kind": "misc",
+      "nodes": [
+        "kaiju_cocoon",
+        "cocoon_glow"
+      ],
+      "size": [
+        0.921,
+        1,
+        0.949
+      ],
+      "tris": 452
+    },
+    "kaiju_egg": {
+      "file": "models/kaiju_egg.glb",
+      "kind": "misc",
+      "nodes": [
+        "kaiju_egg",
+        "egg_glow"
+      ],
+      "size": [
+        0.758,
+        1,
+        0.748
+      ],
+      "tris": 216
+    },
+    "kaiju_lizard_s1": {
+      "file": "models/kaiju_lizard_s1.glb",
+      "kind": "kaiju",
+      "nodes": [
+        "root",
+        "hips",
+        "leg_L",
+        "shin_L",
+        "foot_L",
+        "leg_R",
+        "shin_R",
+        "foot_R",
+        "tail_1",
+        "tail_2",
+        "tail_3",
+        "tail_4",
+        "tail_5",
+        "torso",
+        "arm_L",
+        "forearm_L",
+        "hand_L",
+        "arm_R",
+        "forearm_R",
+        "hand_R",
+        "hold",
+        "neck",
+        "head",
+        "cam_fp",
+        "jaw",
+        "mouth",
+        "spines",
+        "weak_point"
+      ],
+      "poses": {
+        "brace": {
+          "arm_L": [
+            -120,
+            6,
+            -18
+          ],
+          "arm_R": [
+            -120,
+            -6,
+            18
+          ],
+          "forearm_L": [
+            84,
+            28,
+            -24
+          ],
+          "forearm_R": [
+            84,
+            -28,
+            24
+          ],
+          "hand_L": [
+            20,
+            9,
+            -39
+          ],
+          "hand_R": [
+            20,
+            -9,
+            39
+          ],
+          "head": [
+            4,
+            0,
+            0
+          ],
+          "neck": [
+            4,
+            0,
+            0
+          ],
+          "torso": [
+            16,
+            0,
+            0
+          ]
+        },
+        "eat": {
+          "arm_L": [
+            -119,
+            6,
+            -21
+          ],
+          "arm_R": [
+            -119,
+            -6,
+            21
+          ],
+          "forearm_L": [
+            83,
+            32,
+            -22
+          ],
+          "forearm_R": [
+            83,
+            -32,
+            22
+          ],
+          "hand_L": [
+            17,
+            9,
+            -40
+          ],
+          "hand_R": [
+            17,
+            -9,
+            40
+          ],
+          "head": [
+            8,
+            0,
+            0
+          ],
+          "jaw": [
+            22,
+            0,
+            0
+          ],
+          "torso": [
+            10,
+            0,
+            0
+          ]
+        },
+        "fp_claws": {
+          "arm_L": [
+            -123,
+            14,
+            -19
+          ],
+          "arm_R": [
+            -123,
+            -14,
+            19
+          ],
+          "forearm_L": [
+            83,
+            32,
+            -13
+          ],
+          "forearm_R": [
+            83,
+            -32,
+            13
+          ],
+          "hand_L": [
+            -8,
+            15,
+            -10
+          ],
+          "hand_R": [
+            -8,
+            -15,
+            10
+          ]
+        },
+        "grab": {
+          "arm_R": [
+            -117,
+            30,
+            24
+          ],
+          "forearm_R": [
+            61,
+            -14,
+            7
+          ],
+          "hand_R": [
+            16,
+            -14,
+            70
+          ],
+          "torso": [
+            18,
+            10,
+            0
+          ]
+        },
+        "hold": {
+          "arm_R": [
+            -123,
+            -10,
+            19
+          ],
+          "forearm_R": [
+            85,
+            -31,
+            18
+          ],
+          "hand_R": [
+            4,
+            -6,
+            22
+          ]
+        },
+        "stagger": {
+          "arm_L": [
+            12,
+            0,
+            32
+          ],
+          "arm_R": [
+            12,
+            0,
+            -32
+          ],
+          "forearm_L": [
+            -10,
+            0,
+            0
+          ],
+          "forearm_R": [
+            -10,
+            0,
+            0
+          ],
+          "head": [
+            -20,
+            0,
+            0
+          ],
+          "jaw": [
+            20,
+            0,
+            0
+          ],
+          "leg_L": [
+            -8,
+            0,
+            0
+          ],
+          "leg_R": [
+            10,
+            0,
+            0
+          ],
+          "neck": [
+            -11,
+            0,
+            0
+          ],
+          "torso": [
+            -17,
+            0,
+            0
+          ]
+        },
+        "swipe_hit": {
+          "arm_R": [
+            -117,
+            54,
+            29
+          ],
+          "forearm_R": [
+            52,
+            -29,
+            28
+          ],
+          "hand_R": [
+            32,
+            -11,
+            70
+          ],
+          "head": [
+            0,
+            11,
+            0
+          ],
+          "torso": [
+            14,
+            43,
+            0
+          ]
+        },
+        "throw_release": {
+          "arm_R": [
+            -123,
+            -5,
+            15
+          ],
+          "forearm_R": [
+            85,
+            -19,
+            29
+          ],
+          "hand_R": [
+            14,
+            -6,
+            34
+          ],
+          "torso": [
+            16,
+            22,
+            0
+          ]
+        },
+        "throw_windup": {
+          "arm_R": [
+            -121,
+            -12,
+            17
+          ],
+          "forearm_R": [
+            84,
+            -30,
+            16
+          ],
+          "hand_R": [
+            -24,
+            -11,
+            4
+          ],
+          "torso": [
+            -12,
+            -28,
+            0
+          ]
+        }
+      },
+      "rig": "lizard",
+      "size": [
+        4.256,
+        4.5,
+        6.102
+      ],
+      "tris": 2253
+    },
+    "kaiju_lizard_s2": {
+      "file": "models/kaiju_lizard_s2.glb",
+      "kind": "kaiju",
+      "nodes": [
+        "root",
+        "hips",
+        "leg_L",
+        "shin_L",
+        "foot_L",
+        "leg_R",
+        "shin_R",
+        "foot_R",
+        "tail_1",
+        "tail_2",
+        "tail_3",
+        "tail_4",
+        "tail_5",
+        "torso",
+        "arm_L",
+        "forearm_L",
+        "hand_L",
+        "arm_R",
+        "forearm_R",
+        "hand_R",
+        "hold",
+        "neck",
+        "head",
+        "cam_fp",
+        "jaw",
+        "mouth",
+        "spines",
+        "weak_point"
+      ],
+      "poses": {
+        "brace": {
+          "arm_L": [
+            -97,
+            19,
+            -15
+          ],
+          "arm_R": [
+            -97,
+            -19,
+            15
+          ],
+          "forearm_L": [
+            54,
+            21,
+            1
+          ],
+          "forearm_R": [
+            54,
+            -21,
+            -1
+          ],
+          "hand_L": [
+            -3,
+            19,
+            -13
+          ],
+          "hand_R": [
+            -3,
+            -19,
+            13
+          ],
+          "head": [
+            4,
+            0,
+            0
+          ],
+          "neck": [
+            4,
+            0,
+            0
+          ],
+          "torso": [
+            16,
+            0,
+            0
+          ]
+        },
+        "eat": {
+          "arm_L": [
+            -100,
+            15,
+            -10
+          ],
+          "arm_R": [
+            -100,
+            -15,
+            10
+          ],
+          "forearm_L": [
+            66,
+            29,
+            -7
+          ],
+          "forearm_R": [
+            66,
+            -29,
+            7
+          ],
+          "hand_L": [
+            9,
+            5,
+            -44
+          ],
+          "hand_R": [
+            9,
+            -5,
+            44
+          ],
+          "head": [
+            8,
+            0,
+            0
+          ],
+          "jaw": [
+            22,
+            0,
+            0
+          ],
+          "torso": [
+            10,
+            0,
+            0
+          ]
+        },
+        "fp_claws": {
+          "arm_L": [
+            -97,
+            15,
+            -11
+          ],
+          "arm_R": [
+            -97,
+            -15,
+            11
+          ],
+          "forearm_L": [
+            53,
+            23,
+            3
+          ],
+          "forearm_R": [
+            53,
+            -23,
+            -3
+          ],
+          "hand_L": [
+            -22,
+            17,
+            -18
+          ],
+          "hand_R": [
+            -22,
+            -17,
+            18
+          ]
+        },
+        "grab": {
+          "arm_R": [
+            -103,
+            -17,
+            13
+          ],
+          "forearm_R": [
+            65,
+            -17,
+            8
+          ],
+          "hand_R": [
+            -26,
+            24,
+            7
+          ],
+          "torso": [
+            18,
+            10,
+            0
+          ]
+        },
+        "hold": {
+          "arm_R": [
+            -102,
+            -54,
+            8
+          ],
+          "forearm_R": [
+            57,
+            -45,
+            15
+          ],
+          "hand_R": [
+            21,
+            -65,
+            50
+          ]
+        },
+        "stagger": {
+          "arm_L": [
+            12,
+            0,
+            32
+          ],
+          "arm_R": [
+            12,
+            0,
+            -32
+          ],
+          "forearm_L": [
+            -10,
+            0,
+            0
+          ],
+          "forearm_R": [
+            -10,
+            0,
+            0
+          ],
+          "head": [
+            -20,
+            0,
+            0
+          ],
+          "jaw": [
+            20,
+            0,
+            0
+          ],
+          "leg_L": [
+            -8,
+            0,
+            0
+          ],
+          "leg_R": [
+            10,
+            0,
+            0
+          ],
+          "neck": [
+            -11,
+            0,
+            0
+          ],
+          "torso": [
+            -17,
+            0,
+            0
+          ]
+        },
+        "swipe_hit": {
+          "arm_R": [
+            -104,
+            -16,
+            12
+          ],
+          "forearm_R": [
+            68,
+            -15,
+            12
+          ],
+          "hand_R": [
+            11,
+            -1,
+            26
+          ],
+          "head": [
+            0,
+            11,
+            0
+          ],
+          "torso": [
+            14,
+            43,
+            0
+          ]
+        },
+        "throw_release": {
+          "arm_R": [
+            -102,
+            -22,
+            13
+          ],
+          "forearm_R": [
+            64,
+            -16,
+            2
+          ],
+          "hand_R": [
+            -26,
+            17,
+            11
+          ],
+          "torso": [
+            16,
+            22,
+            0
+          ]
+        },
+        "throw_windup": {
+          "arm_R": [
+            -105,
+            -46,
+            -1
+          ],
+          "forearm_R": [
+            83,
+            -33,
+            39
+          ],
+          "hand_R": [
+            -67,
+            -39,
+            30
+          ],
+          "torso": [
+            -12,
+            -28,
+            0
+          ]
+        }
+      },
+      "rig": "lizard",
+      "size": [
+        23.289,
+        32,
+        39.515
+      ],
+      "tris": 2413
+    },
+    "kaiju_lizard_s3": {
+      "file": "models/kaiju_lizard_s3.glb",
+      "kind": "kaiju",
+      "nodes": [
+        "root",
+        "hips",
+        "leg_L",
+        "shin_L",
+        "foot_L",
+        "leg_R",
+        "shin_R",
+        "foot_R",
+        "tail_1",
+        "tail_2",
+        "tail_3",
+        "tail_4",
+        "tail_5",
+        "torso",
+        "arm_L",
+        "forearm_L",
+        "hand_L",
+        "arm_R",
+        "forearm_R",
+        "hand_R",
+        "hold",
+        "neck",
+        "head",
+        "cam_fp",
+        "jaw",
+        "mouth",
+        "spines",
+        "weak_point"
+      ],
+      "poses": {
+        "brace": {
+          "arm_L": [
+            -103,
+            19,
+            -13
+          ],
+          "arm_R": [
+            -103,
+            -19,
+            13
+          ],
+          "forearm_L": [
+            75,
+            28,
+            -20
+          ],
+          "forearm_R": [
+            75,
+            -28,
+            20
+          ],
+          "hand_L": [
+            -17,
+            15,
+            -1
+          ],
+          "hand_R": [
+            -17,
+            -15,
+            1
+          ],
+          "head": [
+            4,
+            0,
+            0
+          ],
+          "neck": [
+            4,
+            0,
+            0
+          ],
+          "torso": [
+            16,
+            0,
+            0
+          ]
+        },
+        "eat": {
+          "arm_L": [
+            -100,
+            15,
+            -10
+          ],
+          "arm_R": [
+            -100,
+            -15,
+            10
+          ],
+          "forearm_L": [
+            66,
+            29,
+            -7
+          ],
+          "forearm_R": [
+            66,
+            -29,
+            7
+          ],
+          "hand_L": [
+            9,
+            -5,
+            -44
+          ],
+          "hand_R": [
+            9,
+            5,
+            44
+          ],
+          "head": [
+            8,
+            0,
+            0
+          ],
+          "jaw": [
+            22,
+            0,
+            0
+          ],
+          "torso": [
+            10,
+            0,
+            0
+          ]
+        },
+        "fp_claws": {
+          "arm_L": [
+            -97,
+            16,
+            -18
+          ],
+          "arm_R": [
+            -97,
+            -16,
+            18
+          ],
+          "forearm_L": [
+            55,
+            33,
+            7
+          ],
+          "forearm_R": [
+            55,
+            -33,
+            -7
+          ],
+          "hand_L": [
+            -23,
+            14,
+            -20
+          ],
+          "hand_R": [
+            -23,
+            -14,
+            20
+          ]
+        },
+        "grab": {
+          "arm_R": [
+            -104,
+            -13,
+            12
+          ],
+          "forearm_R": [
+            74,
+            -19,
+            27
+          ],
+          "hand_R": [
+            -20,
+            26,
+            -3
+          ],
+          "torso": [
+            18,
+            10,
+            0
+          ]
+        },
+        "hold": {
+          "arm_R": [
+            -105,
+            -48,
+            1
+          ],
+          "forearm_R": [
+            77,
+            -35,
+            35
+          ],
+          "hand_R": [
+            7,
+            -67,
+            50
+          ]
+        },
+        "stagger": {
+          "arm_L": [
+            12,
+            0,
+            32
+          ],
+          "arm_R": [
+            12,
+            0,
+            -32
+          ],
+          "forearm_L": [
+            -10,
+            0,
+            0
+          ],
+          "forearm_R": [
+            -10,
+            0,
+            0
+          ],
+          "head": [
+            -20,
+            0,
+            0
+          ],
+          "jaw": [
+            20,
+            0,
+            0
+          ],
+          "leg_L": [
+            -8,
+            0,
+            0
+          ],
+          "leg_R": [
+            10,
+            0,
+            0
+          ],
+          "neck": [
+            -11,
+            0,
+            0
+          ],
+          "torso": [
+            -17,
+            0,
+            0
+          ]
+        },
+        "swipe_hit": {
+          "arm_R": [
+            -104,
+            -15,
+            11
+          ],
+          "forearm_R": [
+            76,
+            -15,
+            26
+          ],
+          "hand_R": [
+            8,
+            2,
+            14
+          ],
+          "head": [
+            0,
+            11,
+            0
+          ],
+          "torso": [
+            14,
+            43,
+            0
+          ]
+        },
+        "throw_release": {
+          "arm_R": [
+            -105,
+            -17,
+            13
+          ],
+          "forearm_R": [
+            76,
+            -25,
+            20
+          ],
+          "hand_R": [
+            -27,
+            37,
+            3
+          ],
+          "torso": [
+            16,
+            22,
+            0
+          ]
+        },
+        "throw_windup": {
+          "arm_R": [
+            -107,
+            -32,
+            3
+          ],
+          "forearm_R": [
+            99,
+            -32,
+            54
+          ],
+          "hand_R": [
+            -64,
+            -42,
+            28
+          ],
+          "torso": [
+            -12,
+            -28,
+            0
+          ]
+        }
+      },
+      "rig": "lizard",
+      "size": [
+        95.583,
+        115,
+        145.71
+      ],
+      "tris": 3485
+    },
+    "lm_anchor_field": {
+      "chunks": 14,
+      "district": "boardwalk",
+      "file": "models/lm_anchor_field.glb",
+      "kind": "landmark",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "chunk_08",
+        "chunk_09",
+        "chunk_10",
+        "chunk_11",
+        "chunk_12",
+        "chunk_13",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        150,
+        29.95,
+        120
+      ],
+      "tint": {
+        "base": "#f5f2ea",
+        "blend": "multiply",
+        "colors": [
+          "#f5f2ea",
+          "#b4e3dc",
+          "#f6c9a0",
+          "#a8d4f0",
+          "#efb3b8"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 904
+    },
+    "lm_city_hall": {
+      "chunks": 9,
+      "district": "downtown",
+      "file": "models/lm_city_hall.glb",
+      "kind": "landmark",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "chunk_08",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        50,
+        45,
+        39.6
+      ],
+      "tint": {
+        "base": "#ddd6c6",
+        "blend": "multiply",
+        "colors": [
+          "#ddd6c6",
+          "#8fa0b5",
+          "#f5f2ea",
+          "#bdb9b0",
+          "#a8d4f0"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 1092
+    },
+    "lm_farewell_light": {
+      "chunks": 13,
+      "district": "harbor",
+      "file": "models/lm_farewell_light.glb",
+      "kind": "landmark",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "chunk_08",
+        "chunk_09",
+        "chunk_10",
+        "chunk_11",
+        "chunk_12",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        12,
+        48,
+        12.02
+      ],
+      "tint": {
+        "base": "#f5f2ea",
+        "blend": "multiply",
+        "colors": [
+          "#a8d4f0",
+          "#b4e3dc",
+          "#f5f2ea",
+          "#8fa0b5",
+          "#f2a48b"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 496
+    },
+    "lm_founders_clock": {
+      "chunks": 16,
+      "district": "university",
+      "file": "models/lm_founders_clock.glb",
+      "kind": "landmark",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "chunk_08",
+        "chunk_09",
+        "chunk_10",
+        "chunk_11",
+        "chunk_12",
+        "chunk_13",
+        "chunk_14",
+        "chunk_15",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        12,
+        62,
+        12
+      ],
+      "tint": {
+        "base": "#ddd6c6",
+        "blend": "multiply",
+        "colors": [
+          "#ddd6c6",
+          "#ead2a0",
+          "#f3e3b3"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 818
+    },
+    "lm_gasworks": {
+      "chunks": 13,
+      "district": "industry",
+      "file": "models/lm_gasworks.glb",
+      "kind": "landmark",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "chunk_08",
+        "chunk_09",
+        "chunk_10",
+        "chunk_11",
+        "chunk_12",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        56,
+        44,
+        55.45
+      ],
+      "tint": {
+        "base": "#bdb9b0",
+        "blend": "multiply",
+        "colors": [
+          "#bdb9b0",
+          "#8fa0b5",
+          "#ead2a0",
+          "#e3c04f"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 1366
+    },
+    "lm_grand_station": {
+      "chunks": 19,
+      "district": "downtown",
+      "file": "models/lm_grand_station.glb",
+      "kind": "landmark",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "chunk_08",
+        "chunk_09",
+        "chunk_10",
+        "chunk_11",
+        "chunk_12",
+        "chunk_13",
+        "chunk_14",
+        "chunk_15",
+        "chunk_16",
+        "chunk_17",
+        "chunk_18",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        110.8,
+        40,
+        50.2
+      ],
+      "tint": {
+        "base": "#ddd6c6",
+        "blend": "multiply",
+        "colors": [
+          "#ddd6c6",
+          "#8fa0b5",
+          "#f5f2ea",
+          "#bdb9b0",
+          "#a8d4f0"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 1190
+    },
+    "lm_halcyon_observatory": {
+      "chunks": 12,
+      "district": "university",
+      "file": "models/lm_halcyon_observatory.glb",
+      "kind": "landmark",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "chunk_08",
+        "chunk_09",
+        "chunk_10",
+        "chunk_11",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        40,
+        24.068,
+        40
+      ],
+      "tint": {
+        "base": "#f5f2ea",
+        "blend": "multiply",
+        "colors": [
+          "#ddd6c6",
+          "#ead2a0",
+          "#f3e3b3"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 774
+    },
+    "lm_kiln_point_power": {
+      "chunks": 16,
+      "district": "industry",
+      "file": "models/lm_kiln_point_power.glb",
+      "kind": "landmark",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "chunk_08",
+        "chunk_09",
+        "chunk_10",
+        "chunk_11",
+        "chunk_12",
+        "chunk_13",
+        "chunk_14",
+        "chunk_15",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        109.5,
+        82,
+        70
+      ],
+      "tint": {
+        "base": "#bdb9b0",
+        "blend": "multiply",
+        "colors": [
+          "#bdb9b0",
+          "#8fa0b5",
+          "#ead2a0",
+          "#e3c04f"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 1092
+    },
+    "lm_meridian_tower": {
+      "chunks": 8,
+      "district": "downtown",
+      "file": "models/lm_meridian_tower.glb",
+      "kind": "landmark",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        36,
+        220,
+        36
+      ],
+      "tint": {
+        "base": "#ddd6c6",
+        "blend": "multiply",
+        "colors": [
+          "#ddd6c6",
+          "#8fa0b5",
+          "#f5f2ea",
+          "#bdb9b0",
+          "#a8d4f0"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 838
+    },
+    "lm_sevenfold_temple": {
+      "chunks": 10,
+      "district": "temple",
+      "file": "models/lm_sevenfold_temple.glb",
+      "kind": "landmark",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "chunk_08",
+        "chunk_09",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        44,
+        52,
+        44
+      ],
+      "tint": {
+        "base": "#f3e3b3",
+        "blend": "multiply",
+        "colors": [
+          "#f5f2ea",
+          "#efb3b8",
+          "#f3e3b3",
+          "#f6c9a0",
+          "#ead2a0"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 1334
+    },
+    "lm_signal_mast": {
+      "chunks": 12,
+      "district": "suburb",
+      "file": "models/lm_signal_mast.glb",
+      "kind": "landmark",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "chunk_08",
+        "chunk_09",
+        "chunk_10",
+        "chunk_11",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        16.21,
+        160,
+        16.21
+      ],
+      "tint": {
+        "base": "#f5f2ea",
+        "blend": "multiply",
+        "colors": [
+          "#f3e3b3",
+          "#f2a48b",
+          "#a8d4f0",
+          "#a9e5c5",
+          "#f6c9a0",
+          "#cfe8a0",
+          "#f5f2ea",
+          "#c9b5e8"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 1094
+    },
+    "lm_tidewater_cathedral": {
+      "chunks": 17,
+      "district": "oldtown",
+      "file": "models/lm_tidewater_cathedral.glb",
+      "kind": "landmark",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "chunk_08",
+        "chunk_09",
+        "chunk_10",
+        "chunk_11",
+        "chunk_12",
+        "chunk_13",
+        "chunk_14",
+        "chunk_15",
+        "chunk_16",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        40,
+        58,
+        72.675
+      ],
+      "tint": {
+        "base": "#ead2a0",
+        "blend": "multiply",
+        "colors": [
+          "#e6b566",
+          "#ead2a0",
+          "#f2a48b",
+          "#f3e3b3",
+          "#f6c9a0",
+          "#e3c04f"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 1205
+    },
+    "lm_tidewheel": {
+      "chunks": 13,
+      "district": "boardwalk",
+      "file": "models/lm_tidewheel.glb",
+      "kind": "landmark",
+      "nodes": [
+        "chunk_00",
+        "chunk_01",
+        "chunk_02",
+        "chunk_03",
+        "chunk_04",
+        "chunk_05",
+        "chunk_06",
+        "chunk_07",
+        "chunk_08",
+        "chunk_09",
+        "chunk_10",
+        "chunk_11",
+        "chunk_12",
+        "damaged",
+        "intact",
+        "rubble"
+      ],
+      "size": [
+        63.9,
+        75.75,
+        14
+      ],
+      "tint": {
+        "base": "#f5f2ea",
+        "blend": "multiply",
+        "colors": [
+          "#f5f2ea",
+          "#b4e3dc",
+          "#f6c9a0",
+          "#a8d4f0",
+          "#efb3b8"
+        ],
+        "hint": "multiply masked faces by color / base (per channel): the wall then shows the color",
+        "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint",
+        "part": "wall plaster"
+      },
+      "tris": 816
+    },
+    "proj_arty": {
+      "file": "models/proj_arty.glb",
+      "kind": "projectile",
+      "nodes": [
+        "proj_arty"
+      ],
+      "size": [
+        0.36,
+        0.312,
+        1.52
+      ],
+      "tris": 74
+    },
+    "proj_rocket": {
+      "file": "models/proj_rocket.glb",
+      "kind": "projectile",
+      "nodes": [
+        "proj_rocket"
+      ],
+      "size": [
+        0.24,
+        0.24,
+        1.22
+      ],
+      "tris": 74
+    },
+    "proj_shell": {
+      "file": "models/proj_shell.glb",
+      "kind": "projectile",
+      "nodes": [
+        "proj_shell"
+      ],
+      "size": [
+        0.2,
+        0.173,
+        0.9
+      ],
+      "tris": 58
+    },
+    "prop_bench": {
+      "file": "models/prop_bench.glb",
+      "kind": "prop",
+      "nodes": [
+        "prop_bench"
+      ],
+      "size": [
+        1.72,
+        0.92,
+        0.7
+      ],
+      "tris": 64
+    },
+    "prop_billboard": {
+      "file": "models/prop_billboard.glb",
+      "kind": "prop",
+      "nodes": [
+        "prop_billboard"
+      ],
+      "size": [
+        6.6,
+        8.967,
+        0.805
+      ],
+      "tris": 76
+    },
+    "prop_bus": {
+      "file": "models/prop_bus.glb",
+      "kind": "prop",
+      "nodes": [
+        "prop_bus"
+      ],
+      "size": [
+        2.605,
+        3.2,
+        11.96
+      ],
+      "tint": {
+        "blend": "multiply",
+        "colors": [
+          "#d7263d",
+          "#2f62c9",
+          "#3fa652",
+          "#f3e3b3"
+        ],
+        "mask": "COLOR_0 alpha: 1 = paint (multiply the tint color in), 0 = never tint",
+        "part": "body paint"
+      },
+      "tris": 148
+    },
+    "prop_busstop": {
+      "file": "models/prop_busstop.glb",
+      "kind": "prop",
+      "nodes": [
+        "prop_busstop"
+      ],
+      "size": [
+        4.41,
+        3.128,
+        1.5
+      ],
+      "tris": 80
+    },
+    "prop_car_sedan": {
+      "file": "models/prop_car_sedan.glb",
+      "kind": "prop",
+      "nodes": [
+        "prop_car_sedan"
+      ],
+      "size": [
+        1.91,
+        1.5,
+        4.46
+      ],
+      "tint": {
+        "blend": "multiply",
+        "colors": [
+          "#e0372f",
+          "#2f62c9",
+          "#f5f5f0",
+          "#3fa652",
+          "#8f6fd0",
+          "#f29b85",
+          "#2a9d8f",
+          "#aab2bc"
+        ],
+        "mask": "COLOR_0 alpha: 1 = paint (multiply the tint color in), 0 = never tint",
+        "part": "body paint"
+      },
+      "tris": 118
+    },
+    "prop_car_taxi": {
+      "file": "models/prop_car_taxi.glb",
+      "kind": "prop",
+      "nodes": [
+        "prop_car_taxi"
+      ],
+      "size": [
+        1.91,
+        1.67,
+        4.46
+      ],
+      "tris": 140
+    },
+    "prop_car_van": {
+      "file": "models/prop_car_van.glb",
+      "kind": "prop",
+      "nodes": [
+        "prop_car_van"
+      ],
+      "size": [
+        2.25,
+        2.12,
+        5.14
+      ],
+      "tint": {
+        "blend": "multiply",
+        "colors": [
+          "#f5f5f0",
+          "#2f62c9",
+          "#e0372f",
+          "#9fe0c0",
+          "#b9a6e0"
+        ],
+        "mask": "COLOR_0 alpha: 1 = paint (multiply the tint color in), 0 = never tint",
+        "part": "body paint"
+      },
+      "tris": 140
+    },
+    "prop_car_wreck": {
+      "file": "models/prop_car_wreck.glb",
+      "kind": "prop",
+      "nodes": [
+        "prop_car_wreck"
+      ],
+      "size": [
+        2.429,
+        0.892,
+        4.98
+      ],
+      "tint": {
+        "blend": "multiply",
+        "colors": [
+          "#2a9d8f",
+          "#2f62c9",
+          "#3fa652",
+          "#8f6fd0",
+          "#9fe0c0",
+          "#aab2bc",
+          "#b9a6e0",
+          "#d7263d",
+          "#e0372f",
+          "#f29b85",
+          "#f3e3b3",
+          "#f5f5f0",
+          "#f7c21a"
+        ],
+        "hint": "use the paint color of the vehicle that was crushed (taxi: #f7c21a); wreckScale stretches this one wreck to the vehicle it was: [width, height, length] per prop kind, the instance's x, y, z scale",
+        "mask": "COLOR_0 alpha: 1 = paint (multiply the tint color in), 0 = never tint",
+        "part": "body paint",
+        "wreckScale": {
+          "bus": [
+            1.2,
+            1.8,
+            2.4
+          ],
+          "car_sedan": [
+            1,
+            1,
+            1
+          ],
+          "car_taxi": [
+            1,
+            1,
+            1
+          ],
+          "car_van": [
+            1.1,
+            1.3,
+            1.1
+          ],
+          "truck": [
+            1.2,
+            1.7,
+            1.75
+          ]
+        }
+      },
+      "tris": 148
+    },
+    "prop_hydrant": {
+      "file": "models/prop_hydrant.glb",
+      "kind": "prop",
+      "nodes": [
+        "prop_hydrant"
+      ],
+      "size": [
+        0.46,
+        0.9,
+        0.423
+      ],
+      "tris": 79
+    },
+    "prop_kiosk": {
+      "file": "models/prop_kiosk.glb",
+      "kind": "prop",
+      "nodes": [
+        "prop_kiosk"
+      ],
+      "size": [
+        2.8,
+        3.53,
+        3.02
+      ],
+      "tris": 77
+    },
+    "prop_lamp": {
+      "file": "models/prop_lamp.glb",
+      "kind": "prop",
+      "nodes": [
+        "prop_lamp"
+      ],
+      "size": [
+        1.19,
+        5.96,
+        0.54
+      ],
+      "tris": 76
+    },
+    "prop_trafficlight": {
+      "file": "models/prop_trafficlight.glb",
+      "kind": "prop",
+      "nodes": [
+        "prop_trafficlight"
+      ],
+      "size": [
+        0.56,
+        5,
+        0.56
+      ],
+      "tris": 68
+    },
+    "prop_tree_a": {
+      "file": "models/prop_tree_a.glb",
+      "kind": "prop",
+      "nodes": [
+        "prop_tree_a"
+      ],
+      "size": [
+        3.719,
+        6.941,
+        3.403
+      ],
+      "tris": 70
+    },
+    "prop_tree_b": {
+      "file": "models/prop_tree_b.glb",
+      "kind": "prop",
+      "nodes": [
+        "prop_tree_b"
+      ],
+      "size": [
+        4.5,
+        9,
+        3.897
+      ],
+      "tris": 50
+    },
+    "prop_truck": {
+      "file": "models/prop_truck.glb",
+      "kind": "prop",
+      "nodes": [
+        "prop_truck"
+      ],
+      "size": [
+        2.59,
+        3.3,
+        8.59
+      ],
+      "tint": {
+        "blend": "multiply",
+        "colors": [
+          "#2f62c9",
+          "#e0372f",
+          "#3fa652",
+          "#f5f5f0",
+          "#aab2bc"
+        ],
+        "mask": "COLOR_0 alpha: 1 = paint (multiply the tint color in), 0 = never tint",
+        "part": "body paint"
+      },
+      "tris": 150
+    }
+  },
+  "sprites": {
+    "civilian_1": {
+      "anims": {
+        "run": {
+          "col": 0,
+          "fps": 10,
+          "frames": 4,
+          "rows": [
+            0,
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "file": "sprites/civilians.png",
+      "frame": [
+        24,
+        32
+      ],
+      "worldHeight": 2.2
+    },
+    "civilian_2": {
+      "anims": {
+        "run": {
+          "col": 4,
+          "fps": 10,
+          "frames": 4,
+          "rows": [
+            0,
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "file": "sprites/civilians.png",
+      "frame": [
+        24,
+        32
+      ],
+      "worldHeight": 2.2
+    },
+    "civilian_3": {
+      "anims": {
+        "run": {
+          "col": 8,
+          "fps": 10,
+          "frames": 4,
+          "rows": [
+            0,
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "file": "sprites/civilians.png",
+      "frame": [
+        24,
+        32
+      ],
+      "worldHeight": 2.2
+    },
+    "civilian_4": {
+      "anims": {
+        "run": {
+          "col": 0,
+          "fps": 10,
+          "frames": 4,
+          "rows": [
+            4,
+            5,
+            6,
+            7
+          ]
+        }
+      },
+      "file": "sprites/civilians.png",
+      "frame": [
+        24,
+        32
+      ],
+      "worldHeight": 2.2
+    },
+    "civilian_5": {
+      "anims": {
+        "run": {
+          "col": 4,
+          "fps": 10,
+          "frames": 4,
+          "rows": [
+            4,
+            5,
+            6,
+            7
+          ]
+        }
+      },
+      "file": "sprites/civilians.png",
+      "frame": [
+        24,
+        32
+      ],
+      "worldHeight": 2.2
+    },
+    "civilian_6": {
+      "anims": {
+        "run": {
+          "col": 8,
+          "fps": 10,
+          "frames": 4,
+          "rows": [
+            4,
+            5,
+            6,
+            7
+          ]
+        }
+      },
+      "file": "sprites/civilians.png",
+      "frame": [
+        24,
+        32
+      ],
+      "worldHeight": 2.2
+    },
+    "fx_debris": {
+      "anims": {
+        "play": {
+          "col": 0,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            4
+          ]
+        }
+      },
+      "blend": "alpha",
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_debris_1": {
+      "anims": {
+        "play": {
+          "col": 0,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            4
+          ]
+        }
+      },
+      "blend": "alpha",
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_debris_2": {
+      "anims": {
+        "play": {
+          "col": 1,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            4
+          ]
+        }
+      },
+      "blend": "alpha",
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_debris_3": {
+      "anims": {
+        "play": {
+          "col": 2,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            4
+          ]
+        }
+      },
+      "blend": "alpha",
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_debris_4": {
+      "anims": {
+        "play": {
+          "col": 3,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            4
+          ]
+        }
+      },
+      "blend": "alpha",
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_dust": {
+      "anims": {
+        "play": {
+          "col": 0,
+          "fps": 8,
+          "frames": 6,
+          "rows": [
+            2
+          ]
+        }
+      },
+      "blend": "alpha",
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_explosion": {
+      "anims": {
+        "play": {
+          "col": 0,
+          "fps": 16,
+          "frames": 8,
+          "rows": [
+            0
+          ]
+        }
+      },
+      "blend": "alpha",
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_explosion_ground": {
+      "anims": {
+        "play": {
+          "col": 0,
+          "fps": 16,
+          "frames": 8,
+          "rows": [
+            5
+          ]
+        }
+      },
+      "blend": "alpha",
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_fire": {
+      "anims": {
+        "play": {
+          "col": 0,
+          "fps": 10,
+          "frames": 6,
+          "rows": [
+            3
+          ]
+        }
+      },
+      "blend": "alpha",
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_flash": {
+      "anims": {
+        "play": {
+          "col": 4,
+          "fps": 20,
+          "frames": 3,
+          "rows": [
+            4
+          ]
+        }
+      },
+      "blend": "alpha",
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_glow": {
+      "anims": {
+        "play": {
+          "col": 7,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            1
+          ]
+        }
+      },
+      "blend": "add",
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_laserdot": {
+      "anims": {
+        "play": {
+          "col": 6,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            2
+          ]
+        }
+      },
+      "blend": "add",
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_ring": {
+      "anims": {
+        "play": {
+          "col": 7,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            2
+          ]
+        }
+      },
+      "blend": "alpha",
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_shadow": {
+      "anims": {
+        "play": {
+          "col": 6,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            3
+          ]
+        }
+      },
+      "blend": "alpha",
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_smoke": {
+      "anims": {
+        "play": {
+          "col": 0,
+          "fps": 8,
+          "frames": 6,
+          "rows": [
+            1
+          ]
+        }
+      },
+      "blend": "alpha",
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_spark": {
+      "anims": {
+        "play": {
+          "col": 6,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            1
+          ]
+        }
+      },
+      "blend": "add",
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "fx_white": {
+      "anims": {
+        "play": {
+          "col": 7,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            3
+          ]
+        }
+      },
+      "blend": "alpha",
+      "file": "sprites/fx.png",
+      "frame": [
+        64,
+        64
+      ],
+      "worldHeight": 1
+    },
+    "mk_chevron": {
+      "anims": {
+        "play": {
+          "col": 3,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            0
+          ]
+        }
+      },
+      "file": "sprites/markers.png",
+      "frame": [
+        32,
+        32
+      ],
+      "worldHeight": 1
+    },
+    "mk_circle": {
+      "anims": {
+        "play": {
+          "col": 0,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            0
+          ]
+        }
+      },
+      "file": "sprites/markers.png",
+      "frame": [
+        32,
+        32
+      ],
+      "worldHeight": 1
+    },
+    "mk_cross": {
+      "anims": {
+        "play": {
+          "col": 4,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            0
+          ]
+        }
+      },
+      "file": "sprites/markers.png",
+      "frame": [
+        32,
+        32
+      ],
+      "worldHeight": 1
+    },
+    "mk_diamond": {
+      "anims": {
+        "play": {
+          "col": 2,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            0
+          ]
+        }
+      },
+      "file": "sprites/markers.png",
+      "frame": [
+        32,
+        32
+      ],
+      "worldHeight": 1
+    },
+    "mk_dot": {
+      "anims": {
+        "play": {
+          "col": 5,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            0
+          ]
+        }
+      },
+      "file": "sprites/markers.png",
+      "frame": [
+        32,
+        32
+      ],
+      "worldHeight": 1
+    },
+    "mk_triangle": {
+      "anims": {
+        "play": {
+          "col": 1,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            0
+          ]
+        }
+      },
+      "file": "sprites/markers.png",
+      "frame": [
+        32,
+        32
+      ],
+      "worldHeight": 1
+    },
+    "soldier_army_rifle": {
+      "anims": {
+        "die": {
+          "col": 14,
+          "fps": 6,
+          "frames": 4,
+          "rows": [
+            1
+          ]
+        },
+        "fire": {
+          "col": 12,
+          "fps": 8,
+          "frames": 2,
+          "rows": [
+            0,
+            1,
+            2,
+            3
+          ]
+        },
+        "idle": {
+          "col": 7,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            0,
+            1,
+            2,
+            3
+          ]
+        },
+        "walk": {
+          "col": 8,
+          "fps": 12,
+          "frames": 4,
+          "rows": [
+            0,
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "file": "sprites/army.png",
+      "frame": [
+        24,
+        32
+      ],
+      "worldHeight": 2.2
+    },
+    "soldier_army_rocket": {
+      "anims": {
+        "die": {
+          "col": 14,
+          "fps": 6,
+          "frames": 4,
+          "rows": [
+            0
+          ]
+        },
+        "fire": {
+          "col": 5,
+          "fps": 8,
+          "frames": 2,
+          "rows": [
+            0,
+            1,
+            2,
+            3
+          ]
+        },
+        "idle": {
+          "col": 0,
+          "fps": 1,
+          "frames": 1,
+          "rows": [
+            0,
+            1,
+            2,
+            3
+          ]
+        },
+        "walk": {
+          "col": 1,
+          "fps": 12,
+          "frames": 4,
+          "rows": [
+            0,
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "file": "sprites/army.png",
+      "frame": [
+        24,
+        32
+      ],
+      "worldHeight": 2.2
+    }
+  },
+  "textures": {
+    "city_atlas": {
+      "file": "textures/city_atlas.png"
+    },
+    "city_atlas_emissive": {
+      "file": "textures/city_atlas_emissive.png"
+    },
+    "clouds_a": {
+      "file": "textures/clouds_a.png",
+      "ring": {
+        "bottomDeg": -5,
+        "repeats": 4,
+        "sunGap": [
+          258,
+          72
+        ]
+      }
+    },
+    "clouds_b": {
+      "file": "textures/clouds_b.png",
+      "ring": {
+        "bottomDeg": -5,
+        "repeats": 3,
+        "sunGap": [
+          414,
+          58
+        ]
+      }
+    },
+    "ground_asphalt": {
+      "file": "textures/ground_asphalt.png",
+      "tile": true
+    },
+    "ground_far": {
+      "file": "textures/ground_far.png",
+      "tile": true
+    },
+    "ground_grass": {
+      "file": "textures/ground_grass.png",
+      "tile": true
+    },
+    "ground_plaza": {
+      "file": "textures/ground_plaza.png",
+      "tile": true
+    },
+    "ground_rubble": {
+      "file": "textures/ground_rubble.png",
+      "tile": true
+    },
+    "ground_sidewalk": {
+      "file": "textures/ground_sidewalk.png",
+      "tile": true
+    },
+    "ground_water": {
+      "file": "textures/ground_water.png",
+      "tile": true
+    }
+  },
+  "music": {
+    "briefing": {
+      "base": "audio/music/briefing",
+      "bpm": 96,
+      "duration": 20.5,
+      "loop": [
+        0.25,
+        20.25
+      ]
+    },
+    "cocoon": {
+      "base": "audio/music/cocoon",
+      "bpm": 96,
+      "duration": 12.5,
+      "mark": 10
+    },
+    "hearing": {
+      "base": "audio/music/hearing",
+      "bpm": 96,
+      "duration": 30.5,
+      "loop": [
+        0.25,
+        30.25
+      ]
+    },
+    "intermission": {
+      "base": "audio/music/intermission",
+      "bpm": 96,
+      "duration": 23.5,
+      "mark": 20
+    },
+    "lobby": {
+      "base": "audio/music/lobby",
+      "bpm": 96,
+      "duration": 80.5,
+      "loop": [
+        0.25,
+        80.25
+      ]
+    },
+    "stage1_base": {
+      "base": "audio/music/stage1_base",
+      "bpm": 96,
+      "duration": 80.5,
+      "group": "stage1",
+      "loop": [
+        0.25,
+        80.25
+      ]
+    },
+    "stage1_combat": {
+      "base": "audio/music/stage1_combat",
+      "bpm": 96,
+      "duration": 80.5,
+      "group": "stage1",
+      "loop": [
+        0.25,
+        80.25
+      ]
+    },
+    "stage2_base": {
+      "base": "audio/music/stage2_base",
+      "bpm": 96,
+      "duration": 80.5,
+      "group": "stage2",
+      "loop": [
+        0.25,
+        80.25
+      ]
+    },
+    "stage2_combat": {
+      "base": "audio/music/stage2_combat",
+      "bpm": 96,
+      "duration": 80.5,
+      "group": "stage2",
+      "loop": [
+        0.25,
+        80.25
+      ]
+    },
+    "stage3_base": {
+      "base": "audio/music/stage3_base",
+      "bpm": 96,
+      "duration": 80.5,
+      "group": "stage3",
+      "loop": [
+        0.25,
+        80.25
+      ]
+    },
+    "stage3_combat": {
+      "base": "audio/music/stage3_combat",
+      "bpm": 96,
+      "duration": 80.5,
+      "group": "stage3",
+      "loop": [
+        0.25,
+        80.25
+      ]
+    },
+    "win_humans": {
+      "base": "audio/music/win_humans",
+      "bpm": 96,
+      "duration": 14.5
+    },
+    "win_kaiju": {
+      "base": "audio/music/win_kaiju",
+      "bpm": 96,
+      "duration": 14.9
+    }
+  },
+  "sfx": {
+    "amb_day_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        16.25
+      ],
+      "variants": [
+        "audio/sfx/amb_day_loop"
+      ]
+    },
+    "amb_night_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        16.25
+      ],
+      "variants": [
+        "audio/sfx/amb_night_loop"
+      ]
+    },
+    "amb_sunset_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        16.25
+      ],
+      "variants": [
+        "audio/sfx/amb_sunset_loop"
+      ]
+    },
+    "arty_distant": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/arty_distant"
+      ]
+    },
+    "arty_incoming": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/arty_incoming"
+      ]
+    },
+    "bell": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/bell_1",
+        "audio/sfx/bell_2",
+        "audio/sfx/bell_3"
+      ]
+    },
+    "burrow_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        3.25
+      ],
+      "variants": [
+        "audio/sfx/burrow_loop"
+      ]
+    },
+    "camera_shutter": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/camera_shutter"
+      ]
+    },
+    "car_crush": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/car_crush_1",
+        "audio/sfx/car_crush_2",
+        "audio/sfx/car_crush_3"
+      ]
+    },
+    "chant_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        5.25
+      ],
+      "variants": [
+        "audio/sfx/chant_loop"
+      ]
+    },
+    "crowd_panic_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        6.25
+      ],
+      "variants": [
+        "audio/sfx/crowd_panic_loop"
+      ]
+    },
+    "crumble_l": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/crumble_l_1",
+        "audio/sfx/crumble_l_2",
+        "audio/sfx/crumble_l_3"
+      ]
+    },
+    "crumble_m": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/crumble_m_1",
+        "audio/sfx/crumble_m_2",
+        "audio/sfx/crumble_m_3"
+      ]
+    },
+    "crumble_s": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/crumble_s_1",
+        "audio/sfx/crumble_s_2",
+        "audio/sfx/crumble_s_3"
+      ]
+    },
+    "dish_beam_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        2.25
+      ],
+      "variants": [
+        "audio/sfx/dish_beam_loop"
+      ]
+    },
+    "drone_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        2.25
+      ],
+      "variants": [
+        "audio/sfx/drone_loop"
+      ]
+    },
+    "explosion_l": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/explosion_l_1",
+        "audio/sfx/explosion_l_2",
+        "audio/sfx/explosion_l_3"
+      ]
+    },
+    "explosion_m": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/explosion_m_1",
+        "audio/sfx/explosion_m_2",
+        "audio/sfx/explosion_m_3"
+      ]
+    },
+    "explosion_s": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/explosion_s_1",
+        "audio/sfx/explosion_s_2",
+        "audio/sfx/explosion_s_3"
+      ]
+    },
+    "fire_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        4.25
+      ],
+      "variants": [
+        "audio/sfx/fire_loop"
+      ]
+    },
+    "freeze_ray": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/freeze_ray"
+      ]
+    },
+    "generator_overload": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/generator_overload"
+      ]
+    },
+    "glass": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/glass_1",
+        "audio/sfx/glass_2",
+        "audio/sfx/glass_3"
+      ]
+    },
+    "gust": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/gust"
+      ]
+    },
+    "heli_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        2.25
+      ],
+      "variants": [
+        "audio/sfx/heli_loop"
+      ]
+    },
+    "jet_flyby": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/jet_flyby"
+      ]
+    },
+    "kaiju_beam_charge": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_beam_charge"
+      ]
+    },
+    "kaiju_beam_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        2.25
+      ],
+      "variants": [
+        "audio/sfx/kaiju_beam_loop"
+      ]
+    },
+    "kaiju_brace": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_brace"
+      ]
+    },
+    "kaiju_death": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_death"
+      ]
+    },
+    "kaiju_eat": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_eat"
+      ]
+    },
+    "kaiju_grab": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_grab"
+      ]
+    },
+    "kaiju_heartbeat_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        1.93
+      ],
+      "variants": [
+        "audio/sfx/kaiju_heartbeat_loop"
+      ]
+    },
+    "kaiju_hurt": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_hurt_1",
+        "audio/sfx/kaiju_hurt_2",
+        "audio/sfx/kaiju_hurt_3"
+      ]
+    },
+    "kaiju_molt_blast": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_molt_blast"
+      ]
+    },
+    "kaiju_roar_burrower_s1": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_roar_burrower_s1"
+      ]
+    },
+    "kaiju_roar_burrower_s2": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_roar_burrower_s2"
+      ]
+    },
+    "kaiju_roar_burrower_s3": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_roar_burrower_s3"
+      ]
+    },
+    "kaiju_roar_crab_s1": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_roar_crab_s1"
+      ]
+    },
+    "kaiju_roar_crab_s2": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_roar_crab_s2"
+      ]
+    },
+    "kaiju_roar_crab_s3": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_roar_crab_s3"
+      ]
+    },
+    "kaiju_roar_lizard_s1": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_roar_lizard_s1"
+      ]
+    },
+    "kaiju_roar_lizard_s2": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_roar_lizard_s2"
+      ]
+    },
+    "kaiju_roar_lizard_s3": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_roar_lizard_s3"
+      ]
+    },
+    "kaiju_roar_moth_s1": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_roar_moth_s1"
+      ]
+    },
+    "kaiju_roar_moth_s2": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_roar_moth_s2"
+      ]
+    },
+    "kaiju_roar_moth_s3": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_roar_moth_s3"
+      ]
+    },
+    "kaiju_stagger": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_stagger"
+      ]
+    },
+    "kaiju_step_s1": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_step_s1_1",
+        "audio/sfx/kaiju_step_s1_2",
+        "audio/sfx/kaiju_step_s1_3"
+      ]
+    },
+    "kaiju_step_s2": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_step_s2_1",
+        "audio/sfx/kaiju_step_s2_2",
+        "audio/sfx/kaiju_step_s2_3"
+      ]
+    },
+    "kaiju_step_s3": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_step_s3_1",
+        "audio/sfx/kaiju_step_s3_2",
+        "audio/sfx/kaiju_step_s3_3"
+      ]
+    },
+    "kaiju_stomp_s1": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_stomp_s1"
+      ]
+    },
+    "kaiju_stomp_s2": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_stomp_s2"
+      ]
+    },
+    "kaiju_stomp_s3": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_stomp_s3"
+      ]
+    },
+    "kaiju_swipe_s1": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_swipe_s1"
+      ]
+    },
+    "kaiju_swipe_s2": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_swipe_s2"
+      ]
+    },
+    "kaiju_swipe_s3": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_swipe_s3"
+      ]
+    },
+    "kaiju_throw": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/kaiju_throw"
+      ]
+    },
+    "laser_charge_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        1.25
+      ],
+      "variants": [
+        "audio/sfx/laser_charge_loop"
+      ]
+    },
+    "march_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        2.25
+      ],
+      "variants": [
+        "audio/sfx/march_loop"
+      ]
+    },
+    "member_down": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/member_down_1",
+        "audio/sfx/member_down_2",
+        "audio/sfx/member_down_3"
+      ]
+    },
+    "prop_break": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/prop_break_1",
+        "audio/sfx/prop_break_2",
+        "audio/sfx/prop_break_3"
+      ]
+    },
+    "radio_close": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/radio_close"
+      ]
+    },
+    "radio_open": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/radio_open"
+      ]
+    },
+    "relic_open": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/relic_open"
+      ]
+    },
+    "rocket_launch": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/rocket_launch_1",
+        "audio/sfx/rocket_launch_2",
+        "audio/sfx/rocket_launch_3"
+      ]
+    },
+    "shaken": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/shaken"
+      ]
+    },
+    "shell_whoosh": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/shell_whoosh"
+      ]
+    },
+    "siren_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        3.25
+      ],
+      "variants": [
+        "audio/sfx/siren_loop"
+      ]
+    },
+    "splash": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/splash"
+      ]
+    },
+    "sting_bar_mark": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/sting_bar_mark"
+      ]
+    },
+    "sting_crossfire": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/sting_crossfire"
+      ]
+    },
+    "sting_molt_ready": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/sting_molt_ready"
+      ]
+    },
+    "sting_nerve_break": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/sting_nerve_break"
+      ]
+    },
+    "structure_hit": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/structure_hit_1",
+        "audio/sfx/structure_hit_2",
+        "audio/sfx/structure_hit_3"
+      ]
+    },
+    "takeover": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/takeover"
+      ]
+    },
+    "tank_engine_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        2.25
+      ],
+      "variants": [
+        "audio/sfx/tank_engine_loop"
+      ]
+    },
+    "tank_fire": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/tank_fire_1",
+        "audio/sfx/tank_fire_2",
+        "audio/sfx/tank_fire_3"
+      ]
+    },
+    "ui_click": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/ui_click"
+      ]
+    },
+    "ui_error": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/ui_error"
+      ]
+    },
+    "ui_hover": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/ui_hover"
+      ]
+    },
+    "ui_join": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/ui_join"
+      ]
+    },
+    "ui_match_start": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/ui_match_start"
+      ]
+    },
+    "ui_ready": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/ui_ready"
+      ]
+    },
+    "ui_tick": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/ui_tick"
+      ]
+    },
+    "ui_wheel_open": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/ui_wheel_open"
+      ]
+    },
+    "ui_wheel_select": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/ui_wheel_select"
+      ]
+    },
+    "unit_destroyed": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/unit_destroyed_1",
+        "audio/sfx/unit_destroyed_2",
+        "audio/sfx/unit_destroyed_3"
+      ]
+    },
+    "volley_fire": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/volley_fire"
+      ]
+    },
+    "volley_ready": {
+      "gain": 1,
+      "variants": [
+        "audio/sfx/volley_ready"
+      ]
+    },
+    "wind_high_loop": {
+      "gain": 1,
+      "loop": [
+        0.25,
+        10.25
+      ],
+      "variants": [
+        "audio/sfx/wind_high_loop"
+      ]
+    }
+  },
+  "voice": {
+    "v_bar_near_1": {
+      "base": "audio/voice/v_bar_near_1",
+      "duration": 3.497
+    },
+    "v_bar_near_2": {
+      "base": "audio/voice/v_bar_near_2",
+      "duration": 3.636
+    },
+    "v_bar_near_3": {
+      "base": "audio/voice/v_bar_near_3",
+      "duration": 4.312
+    },
+    "v_bar_near_4": {
+      "base": "audio/voice/v_bar_near_4",
+      "duration": 4.078
+    },
+    "v_building_down_1": {
+      "base": "audio/voice/v_building_down_1",
+      "duration": 3.458
+    },
+    "v_building_down_2": {
+      "base": "audio/voice/v_building_down_2",
+      "duration": 3.118
+    },
+    "v_building_down_3": {
+      "base": "audio/voice/v_building_down_3",
+      "duration": 3.348
+    },
+    "v_building_down_4": {
+      "base": "audio/voice/v_building_down_4",
+      "duration": 2.925
+    },
+    "v_building_down_5": {
+      "base": "audio/voice/v_building_down_5",
+      "duration": 4.138
+    },
+    "v_building_down_6": {
+      "base": "audio/voice/v_building_down_6",
+      "duration": 3.638
+    },
+    "v_building_down_7": {
+      "base": "audio/voice/v_building_down_7",
+      "duration": 2.61
+    },
+    "v_building_down_8": {
+      "base": "audio/voice/v_building_down_8",
+      "duration": 4.819
+    },
+    "v_callin_inbound_1": {
+      "base": "audio/voice/v_callin_inbound_1",
+      "duration": 2.926
+    },
+    "v_callin_inbound_2": {
+      "base": "audio/voice/v_callin_inbound_2",
+      "duration": 2.659
+    },
+    "v_callin_inbound_3": {
+      "base": "audio/voice/v_callin_inbound_3",
+      "duration": 3.226
+    },
+    "v_callin_inbound_4": {
+      "base": "audio/voice/v_callin_inbound_4",
+      "duration": 3.701
+    },
+    "v_callin_inbound_5": {
+      "base": "audio/voice/v_callin_inbound_5",
+      "duration": 3.191
+    },
+    "v_clock_10s_1": {
+      "base": "audio/voice/v_clock_10s_1",
+      "duration": 2.227
+    },
+    "v_clock_10s_2": {
+      "base": "audio/voice/v_clock_10s_2",
+      "duration": 2.209
+    },
+    "v_clock_10s_3": {
+      "base": "audio/voice/v_clock_10s_3",
+      "duration": 1.632
+    },
+    "v_clock_10s_4": {
+      "base": "audio/voice/v_clock_10s_4",
+      "duration": 3.468
+    },
+    "v_clock_1min_1": {
+      "base": "audio/voice/v_clock_1min_1",
+      "duration": 3.85
+    },
+    "v_clock_1min_2": {
+      "base": "audio/voice/v_clock_1min_2",
+      "duration": 3.265
+    },
+    "v_clock_1min_3": {
+      "base": "audio/voice/v_clock_1min_3",
+      "duration": 3.868
+    },
+    "v_clock_1min_4": {
+      "base": "audio/voice/v_clock_1min_4",
+      "duration": 2.787
+    },
+    "v_clock_3min_1": {
+      "base": "audio/voice/v_clock_3min_1",
+      "duration": 4.144
+    },
+    "v_clock_3min_2": {
+      "base": "audio/voice/v_clock_3min_2",
+      "duration": 3.361
+    },
+    "v_clock_3min_3": {
+      "base": "audio/voice/v_clock_3min_3",
+      "duration": 3.49
+    },
+    "v_clock_3min_4": {
+      "base": "audio/voice/v_clock_3min_4",
+      "duration": 3.698
+    },
+    "v_cocoon_start_1": {
+      "base": "audio/voice/v_cocoon_start_1",
+      "duration": 3.52
+    },
+    "v_cocoon_start_2": {
+      "base": "audio/voice/v_cocoon_start_2",
+      "duration": 3.148
+    },
+    "v_cocoon_start_3": {
+      "base": "audio/voice/v_cocoon_start_3",
+      "duration": 3.764
+    },
+    "v_cocoon_start_4": {
+      "base": "audio/voice/v_cocoon_start_4",
+      "duration": 4.204
+    },
+    "v_collateral_human_1": {
+      "base": "audio/voice/v_collateral_human_1",
+      "duration": 3.741
+    },
+    "v_collateral_human_10": {
+      "base": "audio/voice/v_collateral_human_10",
+      "duration": 2.097
+    },
+    "v_collateral_human_11": {
+      "base": "audio/voice/v_collateral_human_11",
+      "duration": 3.49
+    },
+    "v_collateral_human_12": {
+      "base": "audio/voice/v_collateral_human_12",
+      "duration": 2.09
+    },
+    "v_collateral_human_2": {
+      "base": "audio/voice/v_collateral_human_2",
+      "duration": 3.867
+    },
+    "v_collateral_human_3": {
+      "base": "audio/voice/v_collateral_human_3",
+      "duration": 2.699
+    },
+    "v_collateral_human_4": {
+      "base": "audio/voice/v_collateral_human_4",
+      "duration": 4.263
+    },
+    "v_collateral_human_5": {
+      "base": "audio/voice/v_collateral_human_5",
+      "duration": 3.685
+    },
+    "v_collateral_human_6": {
+      "base": "audio/voice/v_collateral_human_6",
+      "duration": 4.47
+    },
+    "v_collateral_human_7": {
+      "base": "audio/voice/v_collateral_human_7",
+      "duration": 4.564
+    },
+    "v_collateral_human_8": {
+      "base": "audio/voice/v_collateral_human_8",
+      "duration": 2.871
+    },
+    "v_collateral_human_9": {
+      "base": "audio/voice/v_collateral_human_9",
+      "duration": 3.049
+    },
+    "v_crossfire_1": {
+      "base": "audio/voice/v_crossfire_1",
+      "duration": 4.032
+    },
+    "v_crossfire_10": {
+      "base": "audio/voice/v_crossfire_10",
+      "duration": 1.899
+    },
+    "v_crossfire_11": {
+      "base": "audio/voice/v_crossfire_11",
+      "duration": 3.39
+    },
+    "v_crossfire_12": {
+      "base": "audio/voice/v_crossfire_12",
+      "duration": 2.98
+    },
+    "v_crossfire_2": {
+      "base": "audio/voice/v_crossfire_2",
+      "duration": 2.641
+    },
+    "v_crossfire_3": {
+      "base": "audio/voice/v_crossfire_3",
+      "duration": 4.232
+    },
+    "v_crossfire_4": {
+      "base": "audio/voice/v_crossfire_4",
+      "duration": 3.13
+    },
+    "v_crossfire_5": {
+      "base": "audio/voice/v_crossfire_5",
+      "duration": 3.437
+    },
+    "v_crossfire_6": {
+      "base": "audio/voice/v_crossfire_6",
+      "duration": 4.42
+    },
+    "v_crossfire_7": {
+      "base": "audio/voice/v_crossfire_7",
+      "duration": 4.32
+    },
+    "v_crossfire_8": {
+      "base": "audio/voice/v_crossfire_8",
+      "duration": 3.361
+    },
+    "v_crossfire_9": {
+      "base": "audio/voice/v_crossfire_9",
+      "duration": 3.775
+    },
+    "v_end_humans_clock_1": {
+      "base": "audio/voice/v_end_humans_clock_1",
+      "duration": 4.55
+    },
+    "v_end_humans_clock_2": {
+      "base": "audio/voice/v_end_humans_clock_2",
+      "duration": 2.941
+    },
+    "v_end_humans_clock_3": {
+      "base": "audio/voice/v_end_humans_clock_3",
+      "duration": 3.775
+    },
+    "v_end_humans_clock_4": {
+      "base": "audio/voice/v_end_humans_clock_4",
+      "duration": 3.816
+    },
+    "v_end_humans_kill_1": {
+      "base": "audio/voice/v_end_humans_kill_1",
+      "duration": 4.213
+    },
+    "v_end_humans_kill_2": {
+      "base": "audio/voice/v_end_humans_kill_2",
+      "duration": 1.994
+    },
+    "v_end_humans_kill_3": {
+      "base": "audio/voice/v_end_humans_kill_3",
+      "duration": 4.346
+    },
+    "v_end_humans_kill_4": {
+      "base": "audio/voice/v_end_humans_kill_4",
+      "duration": 3.549
+    },
+    "v_end_kaiju_1": {
+      "base": "audio/voice/v_end_kaiju_1",
+      "duration": 4.722
+    },
+    "v_end_kaiju_2": {
+      "base": "audio/voice/v_end_kaiju_2",
+      "duration": 2.755
+    },
+    "v_end_kaiju_3": {
+      "base": "audio/voice/v_end_kaiju_3",
+      "duration": 4.129
+    },
+    "v_end_kaiju_4": {
+      "base": "audio/voice/v_end_kaiju_4",
+      "duration": 3.861
+    },
+    "v_hearing_humans_win_1": {
+      "base": "audio/voice/v_hearing_humans_win_1",
+      "duration": 8.593
+    },
+    "v_hearing_humans_win_2": {
+      "base": "audio/voice/v_hearing_humans_win_2",
+      "duration": 6.688
+    },
+    "v_hearing_humans_win_3": {
+      "base": "audio/voice/v_hearing_humans_win_3",
+      "duration": 7.718
+    },
+    "v_hearing_kaiju_win_1": {
+      "base": "audio/voice/v_hearing_kaiju_win_1",
+      "duration": 7.176
+    },
+    "v_hearing_kaiju_win_2": {
+      "base": "audio/voice/v_hearing_kaiju_win_2",
+      "duration": 7.773
+    },
+    "v_hearing_kaiju_win_3": {
+      "base": "audio/voice/v_hearing_kaiju_win_3",
+      "duration": 6.568
+    },
+    "v_kaiju_brace_1": {
+      "base": "audio/voice/v_kaiju_brace_1",
+      "duration": 3.939
+    },
+    "v_kaiju_brace_2": {
+      "base": "audio/voice/v_kaiju_brace_2",
+      "duration": 3.1
+    },
+    "v_kaiju_brace_3": {
+      "base": "audio/voice/v_kaiju_brace_3",
+      "duration": 3.501
+    },
+    "v_kaiju_brace_4": {
+      "base": "audio/voice/v_kaiju_brace_4",
+      "duration": 5.055
+    },
+    "v_kaiju_brace_5": {
+      "base": "audio/voice/v_kaiju_brace_5",
+      "duration": 3.608
+    },
+    "v_kaiju_brace_6": {
+      "base": "audio/voice/v_kaiju_brace_6",
+      "duration": 2.952
+    },
+    "v_kaiju_lost_1": {
+      "base": "audio/voice/v_kaiju_lost_1",
+      "duration": 4.509
+    },
+    "v_kaiju_lost_2": {
+      "base": "audio/voice/v_kaiju_lost_2",
+      "duration": 2.876
+    },
+    "v_kaiju_lost_3": {
+      "base": "audio/voice/v_kaiju_lost_3",
+      "duration": 3.096
+    },
+    "v_kaiju_lost_4": {
+      "base": "audio/voice/v_kaiju_lost_4",
+      "duration": 4.793
+    },
+    "v_kaiju_lost_5": {
+      "base": "audio/voice/v_kaiju_lost_5",
+      "duration": 2.43
+    },
+    "v_kaiju_lost_6": {
+      "base": "audio/voice/v_kaiju_lost_6",
+      "duration": 3.622
+    },
+    "v_kaiju_lowhp_1": {
+      "base": "audio/voice/v_kaiju_lowhp_1",
+      "duration": 3.215
+    },
+    "v_kaiju_lowhp_2": {
+      "base": "audio/voice/v_kaiju_lowhp_2",
+      "duration": 2.535
+    },
+    "v_kaiju_lowhp_3": {
+      "base": "audio/voice/v_kaiju_lowhp_3",
+      "duration": 4.209
+    },
+    "v_kaiju_lowhp_4": {
+      "base": "audio/voice/v_kaiju_lowhp_4",
+      "duration": 4.275
+    },
+    "v_kaiju_roar_1": {
+      "base": "audio/voice/v_kaiju_roar_1",
+      "duration": 3.932
+    },
+    "v_kaiju_roar_2": {
+      "base": "audio/voice/v_kaiju_roar_2",
+      "duration": 3.007
+    },
+    "v_kaiju_roar_3": {
+      "base": "audio/voice/v_kaiju_roar_3",
+      "duration": 3.762
+    },
+    "v_kaiju_roar_4": {
+      "base": "audio/voice/v_kaiju_roar_4",
+      "duration": 2.545
+    },
+    "v_kaiju_roar_5": {
+      "base": "audio/voice/v_kaiju_roar_5",
+      "duration": 4.307
+    },
+    "v_kaiju_roar_6": {
+      "base": "audio/voice/v_kaiju_roar_6",
+      "duration": 4.029
+    },
+    "v_kaiju_roar_7": {
+      "base": "audio/voice/v_kaiju_roar_7",
+      "duration": 4.225
+    },
+    "v_kaiju_roar_8": {
+      "base": "audio/voice/v_kaiju_roar_8",
+      "duration": 4.274
+    },
+    "v_kaiju_special_1": {
+      "base": "audio/voice/v_kaiju_special_1",
+      "duration": 2.268
+    },
+    "v_kaiju_special_2": {
+      "base": "audio/voice/v_kaiju_special_2",
+      "duration": 2.019
+    },
+    "v_kaiju_special_3": {
+      "base": "audio/voice/v_kaiju_special_3",
+      "duration": 4.2
+    },
+    "v_kaiju_special_4": {
+      "base": "audio/voice/v_kaiju_special_4",
+      "duration": 3.523
+    },
+    "v_kaiju_special_5": {
+      "base": "audio/voice/v_kaiju_special_5",
+      "duration": 2.213
+    },
+    "v_kaiju_special_6": {
+      "base": "audio/voice/v_kaiju_special_6",
+      "duration": 2.085
+    },
+    "v_kaiju_special_7": {
+      "base": "audio/voice/v_kaiju_special_7",
+      "duration": 3.454
+    },
+    "v_kaiju_spotted_1": {
+      "base": "audio/voice/v_kaiju_spotted_1",
+      "duration": 2.782
+    },
+    "v_kaiju_spotted_10": {
+      "base": "audio/voice/v_kaiju_spotted_10",
+      "duration": 2.089
+    },
+    "v_kaiju_spotted_11": {
+      "base": "audio/voice/v_kaiju_spotted_11",
+      "duration": 3.104
+    },
+    "v_kaiju_spotted_12": {
+      "base": "audio/voice/v_kaiju_spotted_12",
+      "duration": 1.99
+    },
+    "v_kaiju_spotted_2": {
+      "base": "audio/voice/v_kaiju_spotted_2",
+      "duration": 4.211
+    },
+    "v_kaiju_spotted_3": {
+      "base": "audio/voice/v_kaiju_spotted_3",
+      "duration": 2.745
+    },
+    "v_kaiju_spotted_4": {
+      "base": "audio/voice/v_kaiju_spotted_4",
+      "duration": 4.754
+    },
+    "v_kaiju_spotted_5": {
+      "base": "audio/voice/v_kaiju_spotted_5",
+      "duration": 3.675
+    },
+    "v_kaiju_spotted_6": {
+      "base": "audio/voice/v_kaiju_spotted_6",
+      "duration": 3.018
+    },
+    "v_kaiju_spotted_7": {
+      "base": "audio/voice/v_kaiju_spotted_7",
+      "duration": 3.379
+    },
+    "v_kaiju_spotted_8": {
+      "base": "audio/voice/v_kaiju_spotted_8",
+      "duration": 3.093
+    },
+    "v_kaiju_spotted_9": {
+      "base": "audio/voice/v_kaiju_spotted_9",
+      "duration": 3.603
+    },
+    "v_landmark_down_1": {
+      "base": "audio/voice/v_landmark_down_1",
+      "duration": 4.051
+    },
+    "v_landmark_down_2": {
+      "base": "audio/voice/v_landmark_down_2",
+      "duration": 3.618
+    },
+    "v_landmark_down_3": {
+      "base": "audio/voice/v_landmark_down_3",
+      "duration": 3.065
+    },
+    "v_landmark_down_4": {
+      "base": "audio/voice/v_landmark_down_4",
+      "duration": 4.795
+    },
+    "v_landmark_down_5": {
+      "base": "audio/voice/v_landmark_down_5",
+      "duration": 4.032
+    },
+    "v_landmark_down_6": {
+      "base": "audio/voice/v_landmark_down_6",
+      "duration": 4.015
+    },
+    "v_match_briefing_1": {
+      "base": "audio/voice/v_match_briefing_1",
+      "duration": 3.298
+    },
+    "v_match_briefing_2": {
+      "base": "audio/voice/v_match_briefing_2",
+      "duration": 2.924
+    },
+    "v_match_briefing_3": {
+      "base": "audio/voice/v_match_briefing_3",
+      "duration": 2.814
+    },
+    "v_match_briefing_4": {
+      "base": "audio/voice/v_match_briefing_4",
+      "duration": 2.947
+    },
+    "v_match_briefing_5": {
+      "base": "audio/voice/v_match_briefing_5",
+      "duration": 2.409
+    },
+    "v_match_briefing_6": {
+      "base": "audio/voice/v_match_briefing_6",
+      "duration": 3.2
+    },
+    "v_match_start_1": {
+      "base": "audio/voice/v_match_start_1",
+      "duration": 3.804
+    },
+    "v_match_start_2": {
+      "base": "audio/voice/v_match_start_2",
+      "duration": 3.363
+    },
+    "v_match_start_3": {
+      "base": "audio/voice/v_match_start_3",
+      "duration": 2.881
+    },
+    "v_match_start_4": {
+      "base": "audio/voice/v_match_start_4",
+      "duration": 3.098
+    },
+    "v_molt_available_1": {
+      "base": "audio/voice/v_molt_available_1",
+      "duration": 3.64
+    },
+    "v_molt_available_2": {
+      "base": "audio/voice/v_molt_available_2",
+      "duration": 3.31
+    },
+    "v_molt_available_3": {
+      "base": "audio/voice/v_molt_available_3",
+      "duration": 3.378
+    },
+    "v_molt_available_4": {
+      "base": "audio/voice/v_molt_available_4",
+      "duration": 3.918
+    },
+    "v_molt_blast_1": {
+      "base": "audio/voice/v_molt_blast_1",
+      "duration": 4.079
+    },
+    "v_molt_blast_2": {
+      "base": "audio/voice/v_molt_blast_2",
+      "duration": 4.05
+    },
+    "v_molt_blast_3": {
+      "base": "audio/voice/v_molt_blast_3",
+      "duration": 4.238
+    },
+    "v_molt_blast_4": {
+      "base": "audio/voice/v_molt_blast_4",
+      "duration": 3.955
+    },
+    "v_nerve_break_1": {
+      "base": "audio/voice/v_nerve_break_1",
+      "duration": 2.349
+    },
+    "v_nerve_break_10": {
+      "base": "audio/voice/v_nerve_break_10",
+      "duration": 2.368
+    },
+    "v_nerve_break_11": {
+      "base": "audio/voice/v_nerve_break_11",
+      "duration": 2.401
+    },
+    "v_nerve_break_12": {
+      "base": "audio/voice/v_nerve_break_12",
+      "duration": 2.46
+    },
+    "v_nerve_break_2": {
+      "base": "audio/voice/v_nerve_break_2",
+      "duration": 2.131
+    },
+    "v_nerve_break_3": {
+      "base": "audio/voice/v_nerve_break_3",
+      "duration": 2.477
+    },
+    "v_nerve_break_4": {
+      "base": "audio/voice/v_nerve_break_4",
+      "duration": 2.465
+    },
+    "v_nerve_break_5": {
+      "base": "audio/voice/v_nerve_break_5",
+      "duration": 3.555
+    },
+    "v_nerve_break_6": {
+      "base": "audio/voice/v_nerve_break_6",
+      "duration": 3.381
+    },
+    "v_nerve_break_7": {
+      "base": "audio/voice/v_nerve_break_7",
+      "duration": 3.378
+    },
+    "v_nerve_break_8": {
+      "base": "audio/voice/v_nerve_break_8",
+      "duration": 3.224
+    },
+    "v_nerve_break_9": {
+      "base": "audio/voice/v_nerve_break_9",
+      "duration": 2.146
+    },
+    "v_player_takeover_1": {
+      "base": "audio/voice/v_player_takeover_1",
+      "duration": 4.182
+    },
+    "v_player_takeover_2": {
+      "base": "audio/voice/v_player_takeover_2",
+      "duration": 3.148
+    },
+    "v_player_takeover_3": {
+      "base": "audio/voice/v_player_takeover_3",
+      "duration": 3.285
+    },
+    "v_player_takeover_4": {
+      "base": "audio/voice/v_player_takeover_4",
+      "duration": 3.473
+    },
+    "v_squad_wiped_1": {
+      "base": "audio/voice/v_squad_wiped_1",
+      "duration": 4.101
+    },
+    "v_squad_wiped_2": {
+      "base": "audio/voice/v_squad_wiped_2",
+      "duration": 3.167
+    },
+    "v_squad_wiped_3": {
+      "base": "audio/voice/v_squad_wiped_3",
+      "duration": 3.125
+    },
+    "v_squad_wiped_4": {
+      "base": "audio/voice/v_squad_wiped_4",
+      "duration": 4.142
+    },
+    "v_squad_wiped_5": {
+      "base": "audio/voice/v_squad_wiped_5",
+      "duration": 3.407
+    },
+    "v_stage_2_1": {
+      "base": "audio/voice/v_stage_2_1",
+      "duration": 3.797
+    },
+    "v_stage_2_2": {
+      "base": "audio/voice/v_stage_2_2",
+      "duration": 4.215
+    },
+    "v_stage_2_3": {
+      "base": "audio/voice/v_stage_2_3",
+      "duration": 4.448
+    },
+    "v_stage_2_4": {
+      "base": "audio/voice/v_stage_2_4",
+      "duration": 4.081
+    },
+    "v_stage_3_1": {
+      "base": "audio/voice/v_stage_3_1",
+      "duration": 4.327
+    },
+    "v_stage_3_2": {
+      "base": "audio/voice/v_stage_3_2",
+      "duration": 4.088
+    },
+    "v_stage_3_3": {
+      "base": "audio/voice/v_stage_3_3",
+      "duration": 3.425
+    },
+    "v_stage_3_4": {
+      "base": "audio/voice/v_stage_3_4",
+      "duration": 4.046
+    },
+    "v_stagger_end_1": {
+      "base": "audio/voice/v_stagger_end_1",
+      "duration": 4.75
+    },
+    "v_stagger_end_2": {
+      "base": "audio/voice/v_stagger_end_2",
+      "duration": 2.116
+    },
+    "v_stagger_end_3": {
+      "base": "audio/voice/v_stagger_end_3",
+      "duration": 3.323
+    },
+    "v_stagger_end_4": {
+      "base": "audio/voice/v_stagger_end_4",
+      "duration": 3.974
+    },
+    "v_stagger_end_5": {
+      "base": "audio/voice/v_stagger_end_5",
+      "duration": 2.74
+    },
+    "v_stagger_end_6": {
+      "base": "audio/voice/v_stagger_end_6",
+      "duration": 3.688
+    },
+    "v_unit_lost_1": {
+      "base": "audio/voice/v_unit_lost_1",
+      "duration": 3.755
+    },
+    "v_unit_lost_10": {
+      "base": "audio/voice/v_unit_lost_10",
+      "duration": 2.291
+    },
+    "v_unit_lost_11": {
+      "base": "audio/voice/v_unit_lost_11",
+      "duration": 3.471
+    },
+    "v_unit_lost_12": {
+      "base": "audio/voice/v_unit_lost_12",
+      "duration": 2.745
+    },
+    "v_unit_lost_2": {
+      "base": "audio/voice/v_unit_lost_2",
+      "duration": 2.155
+    },
+    "v_unit_lost_3": {
+      "base": "audio/voice/v_unit_lost_3",
+      "duration": 3.033
+    },
+    "v_unit_lost_4": {
+      "base": "audio/voice/v_unit_lost_4",
+      "duration": 3.355
+    },
+    "v_unit_lost_5": {
+      "base": "audio/voice/v_unit_lost_5",
+      "duration": 2.749
+    },
+    "v_unit_lost_6": {
+      "base": "audio/voice/v_unit_lost_6",
+      "duration": 5.149
+    },
+    "v_unit_lost_7": {
+      "base": "audio/voice/v_unit_lost_7",
+      "duration": 3.882
+    },
+    "v_unit_lost_8": {
+      "base": "audio/voice/v_unit_lost_8",
+      "duration": 3.844
+    },
+    "v_unit_lost_9": {
+      "base": "audio/voice/v_unit_lost_9",
+      "duration": 2.426
+    },
+    "v_volley_fired_1": {
+      "base": "audio/voice/v_volley_fired_1",
+      "duration": 1.271
+    },
+    "v_volley_fired_10": {
+      "base": "audio/voice/v_volley_fired_10",
+      "duration": 3.433
+    },
+    "v_volley_fired_11": {
+      "base": "audio/voice/v_volley_fired_11",
+      "duration": 4.608
+    },
+    "v_volley_fired_12": {
+      "base": "audio/voice/v_volley_fired_12",
+      "duration": 2.524
+    },
+    "v_volley_fired_13": {
+      "base": "audio/voice/v_volley_fired_13",
+      "duration": 3.085
+    },
+    "v_volley_fired_14": {
+      "base": "audio/voice/v_volley_fired_14",
+      "duration": 2.366
+    },
+    "v_volley_fired_15": {
+      "base": "audio/voice/v_volley_fired_15",
+      "duration": 2.786
+    },
+    "v_volley_fired_16": {
+      "base": "audio/voice/v_volley_fired_16",
+      "duration": 3.155
+    },
+    "v_volley_fired_2": {
+      "base": "audio/voice/v_volley_fired_2",
+      "duration": 1.939
+    },
+    "v_volley_fired_3": {
+      "base": "audio/voice/v_volley_fired_3",
+      "duration": 3.535
+    },
+    "v_volley_fired_4": {
+      "base": "audio/voice/v_volley_fired_4",
+      "duration": 2.89
+    },
+    "v_volley_fired_5": {
+      "base": "audio/voice/v_volley_fired_5",
+      "duration": 2.36
+    },
+    "v_volley_fired_6": {
+      "base": "audio/voice/v_volley_fired_6",
+      "duration": 2.893
+    },
+    "v_volley_fired_7": {
+      "base": "audio/voice/v_volley_fired_7",
+      "duration": 2.54
+    },
+    "v_volley_fired_8": {
+      "base": "audio/voice/v_volley_fired_8",
+      "duration": 3.639
+    },
+    "v_volley_fired_9": {
+      "base": "audio/voice/v_volley_fired_9",
+      "duration": 3.689
+    },
+    "v_volley_ready_1": {
+      "base": "audio/voice/v_volley_ready_1",
+      "duration": 1.93
+    },
+    "v_volley_ready_10": {
+      "base": "audio/voice/v_volley_ready_10",
+      "duration": 4.77
+    },
+    "v_volley_ready_11": {
+      "base": "audio/voice/v_volley_ready_11",
+      "duration": 4.007
+    },
+    "v_volley_ready_12": {
+      "base": "audio/voice/v_volley_ready_12",
+      "duration": 1.901
+    },
+    "v_volley_ready_13": {
+      "base": "audio/voice/v_volley_ready_13",
+      "duration": 2.927
+    },
+    "v_volley_ready_14": {
+      "base": "audio/voice/v_volley_ready_14",
+      "duration": 2.61
+    },
+    "v_volley_ready_15": {
+      "base": "audio/voice/v_volley_ready_15",
+      "duration": 2.515
+    },
+    "v_volley_ready_16": {
+      "base": "audio/voice/v_volley_ready_16",
+      "duration": 3.723
+    },
+    "v_volley_ready_2": {
+      "base": "audio/voice/v_volley_ready_2",
+      "duration": 2.838
+    },
+    "v_volley_ready_3": {
+      "base": "audio/voice/v_volley_ready_3",
+      "duration": 2.88
+    },
+    "v_volley_ready_4": {
+      "base": "audio/voice/v_volley_ready_4",
+      "duration": 3.834
+    },
+    "v_volley_ready_5": {
+      "base": "audio/voice/v_volley_ready_5",
+      "duration": 1.995
+    },
+    "v_volley_ready_6": {
+      "base": "audio/voice/v_volley_ready_6",
+      "duration": 3.523
+    },
+    "v_volley_ready_7": {
+      "base": "audio/voice/v_volley_ready_7",
+      "duration": 2.925
+    },
+    "v_volley_ready_8": {
+      "base": "audio/voice/v_volley_ready_8",
+      "duration": 3.296
+    },
+    "v_volley_ready_9": {
+      "base": "audio/voice/v_volley_ready_9",
+      "duration": 3.098
+    }
+  },
+  "ui": {
+    "cmd_fireatwill": {
+      "file": "ui/cmd_fireatwill.svg"
+    },
+    "cmd_follow": {
+      "file": "ui/cmd_follow.svg"
+    },
+    "cmd_holdcharge": {
+      "file": "ui/cmd_holdcharge.svg"
+    },
+    "cmd_moveto": {
+      "file": "ui/cmd_moveto.svg"
+    },
+    "fac_air": {
+      "file": "ui/fac_air.svg"
+    },
+    "fac_army": {
+      "file": "ui/fac_army.svg"
+    },
+    "fac_faith": {
+      "file": "ui/fac_faith.svg"
+    },
+    "fac_science": {
+      "file": "ui/fac_science.svg"
+    },
+    "gp_a": {
+      "file": "ui/gp_a.svg"
+    },
+    "gp_b": {
+      "file": "ui/gp_b.svg"
+    },
+    "gp_back": {
+      "file": "ui/gp_back.svg"
+    },
+    "gp_dpad": {
+      "file": "ui/gp_dpad.svg"
+    },
+    "gp_dpad_down": {
+      "file": "ui/gp_dpad_down.svg"
+    },
+    "gp_dpad_left": {
+      "file": "ui/gp_dpad_left.svg"
+    },
+    "gp_dpad_right": {
+      "file": "ui/gp_dpad_right.svg"
+    },
+    "gp_dpad_up": {
+      "file": "ui/gp_dpad_up.svg"
+    },
+    "gp_lb": {
+      "file": "ui/gp_lb.svg"
+    },
+    "gp_ls": {
+      "file": "ui/gp_ls.svg"
+    },
+    "gp_lt": {
+      "file": "ui/gp_lt.svg"
+    },
+    "gp_rb": {
+      "file": "ui/gp_rb.svg"
+    },
+    "gp_rs": {
+      "file": "ui/gp_rs.svg"
+    },
+    "gp_rt": {
+      "file": "ui/gp_rt.svg"
+    },
+    "gp_start": {
+      "file": "ui/gp_start.svg"
+    },
+    "gp_x": {
+      "file": "ui/gp_x.svg"
+    },
+    "gp_y": {
+      "file": "ui/gp_y.svg"
+    },
+    "k_brace": {
+      "file": "ui/k_brace.svg"
+    },
+    "k_eat": {
+      "file": "ui/k_eat.svg"
+    },
+    "k_grab": {
+      "file": "ui/k_grab.svg"
+    },
+    "k_molt": {
+      "file": "ui/k_molt.svg"
+    },
+    "k_roar": {
+      "file": "ui/k_roar.svg"
+    },
+    "k_special": {
+      "file": "ui/k_special.svg"
+    },
+    "k_stomp": {
+      "file": "ui/k_stomp.svg"
+    },
+    "k_swipe": {
+      "file": "ui/k_swipe.svg"
+    },
+    "k_throw": {
+      "file": "ui/k_throw.svg"
+    },
+    "kb_key": {
+      "file": "ui/kb_key.svg"
+    },
+    "lb_back": {
+      "file": "ui/lb_back.svg"
+    },
+    "lb_bot": {
+      "file": "ui/lb_bot.svg"
+    },
+    "lb_create": {
+      "file": "ui/lb_create.svg"
+    },
+    "lb_host": {
+      "file": "ui/lb_host.svg"
+    },
+    "lb_human": {
+      "file": "ui/lb_human.svg"
+    },
+    "lb_join": {
+      "file": "ui/lb_join.svg"
+    },
+    "lb_kaiju": {
+      "file": "ui/lb_kaiju.svg"
+    },
+    "lb_link": {
+      "file": "ui/lb_link.svg"
+    },
+    "lb_play": {
+      "file": "ui/lb_play.svg"
+    },
+    "lb_ready": {
+      "file": "ui/lb_ready.svg"
+    },
+    "ms_left": {
+      "file": "ui/ms_left.svg"
+    },
+    "ms_middle": {
+      "file": "ui/ms_middle.svg"
+    },
+    "ms_move": {
+      "file": "ui/ms_move.svg"
+    },
+    "ms_right": {
+      "file": "ui/ms_right.svg"
+    },
+    "portrait_army": {
+      "file": "ui/portrait_army.png"
+    },
+    "portrait_lizard": {
+      "file": "ui/portrait_lizard.png"
+    },
+    "skyline": {
+      "file": "ui/skyline.svg"
+    },
+    "st_callin": {
+      "file": "ui/st_callin.svg"
+    },
+    "st_camera": {
+      "file": "ui/st_camera.svg"
+    },
+    "st_charge": {
+      "file": "ui/st_charge.svg"
+    },
+    "st_crossfire": {
+      "file": "ui/st_crossfire.svg"
+    },
+    "st_health": {
+      "file": "ui/st_health.svg"
+    },
+    "st_map": {
+      "file": "ui/st_map.svg"
+    },
+    "st_moon": {
+      "file": "ui/st_moon.svg"
+    },
+    "st_nerve": {
+      "file": "ui/st_nerve.svg"
+    },
+    "st_rage": {
+      "file": "ui/st_rage.svg"
+    },
+    "st_reload": {
+      "file": "ui/st_reload.svg"
+    },
+    "st_shaken": {
+      "file": "ui/st_shaken.svg"
+    },
+    "st_spotted": {
+      "file": "ui/st_spotted.svg"
+    },
+    "st_sun": {
+      "file": "ui/st_sun.svg"
+    },
+    "st_veteran": {
+      "file": "ui/st_veteran.svg"
+    },
+    "tl_apartment": {
+      "file": "ui/tl_apartment.svg"
+    },
+    "tl_bridge": {
+      "file": "ui/tl_bridge.svg"
+    },
+    "tl_car": {
+      "file": "ui/tl_car.svg"
+    },
+    "tl_factory": {
+      "file": "ui/tl_factory.svg"
+    },
+    "tl_house": {
+      "file": "ui/tl_house.svg"
+    },
+    "tl_kiosk": {
+      "file": "ui/tl_kiosk.svg"
+    },
+    "tl_landmark": {
+      "file": "ui/tl_landmark.svg"
+    },
+    "tl_office": {
+      "file": "ui/tl_office.svg"
+    },
+    "tl_shop": {
+      "file": "ui/tl_shop.svg"
+    },
+    "tl_tower": {
+      "file": "ui/tl_tower.svg"
+    },
+    "ui_asleep": {
+      "file": "ui/ui_asleep.svg"
+    },
+    "ui_clock": {
+      "file": "ui/ui_clock.svg"
+    },
+    "ui_controls": {
+      "file": "ui/ui_controls.svg"
+    },
+    "ui_copy": {
+      "file": "ui/ui_copy.svg"
+    },
+    "ui_fullscreen": {
+      "file": "ui/ui_fullscreen.svg"
+    },
+    "ui_invert": {
+      "file": "ui/ui_invert.svg"
+    },
+    "ui_lowres": {
+      "file": "ui/ui_lowres.svg"
+    },
+    "ui_newspaper": {
+      "file": "ui/ui_newspaper.svg"
+    },
+    "ui_offline": {
+      "file": "ui/ui_offline.svg"
+    },
+    "ui_outdated": {
+      "file": "ui/ui_outdated.svg"
+    },
+    "ui_rise": {
+      "file": "ui/ui_rise.svg"
+    },
+    "ui_settings": {
+      "file": "ui/ui_settings.svg"
+    },
+    "ui_sink": {
+      "file": "ui/ui_sink.svg"
+    },
+    "ui_skull": {
+      "file": "ui/ui_skull.svg"
+    },
+    "ui_sound": {
+      "file": "ui/ui_sound.svg"
+    },
+    "ui_trophy": {
+      "file": "ui/ui_trophy.svg"
+    },
+    "ui_warning": {
+      "file": "ui/ui_warning.svg"
+    }
+  }
+}

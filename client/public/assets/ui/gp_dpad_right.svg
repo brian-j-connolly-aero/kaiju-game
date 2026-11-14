@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Device: gamepad directional pad, right. An outlined cross; the arm to press is solid (the device of gp_a to gp_y). -->
+  <path d="M23 7H41V23H57V41H41V57H23V41H7V23H23Z"/>
+  <path fill="currentColor" d="M41 23H57V41H41Z"/>
+</svg>

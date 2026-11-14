@@ -1,0 +1,89 @@
+/** Weapons and projectile types (DESIGN.md section 5, the Army table). */
+
+import { DEG } from '../math/angle';
+import type { ProjectileTypeId, WeaponId } from './ids';
+import { COMBAT_RULES } from './rules';
+import type { ProjectileTypeDef, WeaponDef } from './schema';
+
+export const PROJECTILE_TYPES: Readonly<Record<ProjectileTypeId, ProjectileTypeDef>> = {
+  rocket: { id: 'rocket', flight: 'flat', speed: 55, gravity: 0, radius: 0.4, ttl: 7, model: 'proj_rocket' },
+  shell: { id: 'shell', flight: 'flat', speed: 110, gravity: 0, radius: 0.4, ttl: 9, model: 'proj_shell' },
+  arty: {
+    id: 'arty',
+    flight: 'arc',
+    speed: 90,
+    gravity: COMBAT_RULES.gravity,
+    radius: 0.6,
+    ttl: 12,
+    model: 'proj_arty',
+  },
+  // Speed comes from the kaiju's throw action; the model is whatever was thrown.
+  thrown: { id: 'thrown', flight: 'thrown', speed: 0, gravity: COMBAT_RULES.gravity, radius: 1, ttl: 20, model: null },
+};
+
+/**
+ * Nerve and structure damage are tuned with the balance harness (docs/BALANCE.md). Nerve: one
+ * squad's full-charge volley stays under the kaiju's nerve capacity from any side and even as
+ * a one-player crossfire (54 from the front, 92 from behind or crossed), so it takes two squads
+ * to break it.
+ * Structure damage: a stray projectile dents a building rather than flattening it, so misses
+ * cost the humans the bar without filling it for the kaiju.
+ */
+export const WEAPONS: Readonly<Record<WeaponId, WeaponDef>> = {
+  army_rocket_launchers: {
+    id: 'army_rocket_launchers',
+    projectile: 'rocket',
+    maxShots: 3,
+    membersPerShot: 3.4,
+    damage: 3.2,
+    nerve: 1.8,
+    range: 160,
+    cooldown: 2.6,
+    splashRadius: 3,
+    structureDamage: 3,
+    aimErrorAtWill: 3.5 * DEG,
+    aimErrorVolley: 1.2 * DEG,
+  },
+  army_tank_gun: {
+    id: 'army_tank_gun',
+    projectile: 'shell',
+    maxShots: 1,
+    membersPerShot: 1,
+    damage: 9.5,
+    nerve: 5.4,
+    range: 420,
+    cooldown: 3.2,
+    splashRadius: 5,
+    structureDamage: 25,
+    aimErrorAtWill: 2.5 * DEG,
+    aimErrorVolley: 0.9 * DEG,
+  },
+  army_troop_guns: {
+    id: 'army_troop_guns',
+    projectile: 'shell',
+    maxShots: 3,
+    membersPerShot: 1,
+    damage: 3.2,
+    nerve: 1.6,
+    range: 600,
+    cooldown: 3.2,
+    splashRadius: 5,
+    structureDamage: 25,
+    aimErrorAtWill: 2.5 * DEG,
+    aimErrorVolley: 0.9 * DEG,
+  },
+};
+
+export function weaponDef(id: WeaponId): WeaponDef {
+  return WEAPONS[id];
+}
+
+export function projectileTypeDef(id: ProjectileTypeId): ProjectileTypeDef {
+  return PROJECTILE_TYPES[id];
+}
+
+/** Projectiles one trigger pull fires for a unit with this many members left. */
+export function shotsForMembers(weapon: WeaponDef, members: number): number {
+  if (members <= 0) return 0;
+  return Math.min(weapon.maxShots, Math.ceil(members / weapon.membersPerShot));
+}

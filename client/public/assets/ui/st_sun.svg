@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Status: sun, the daytime end of the match clock. -->
+  <circle cx="32" cy="32" r="8.5" fill="currentColor"/>
+  <path d="M32 6.5V14M32 50V57.5M6.5 32H14M50 32H57.5M14 14L19.3 19.3M44.7 19.3L50 14M14 50L19.3 44.7M44.7 44.7L50 50"/>
+</svg>

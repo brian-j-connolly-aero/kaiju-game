@@ -1,0 +1,11 @@
+{
+  "models": {
+    "prop_hydrant": {
+      "file": "models/prop_hydrant.glb",
+      "kind": "prop",
+      "nodes": ["prop_hydrant"],
+      "size": [0.46, 0.9, 0.423],
+      "tris": 79
+    }
+  }
+}

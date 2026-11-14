@@ -1,0 +1,2276 @@
+[
+ {
+  "group": "radio_voices",
+  "label": "bdl",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "bdl"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0
+  },
+  "line_set": "radio",
+  "lines": 93,
+  "words": 789,
+  "wer_raw": 8.4,
+  "wer_processed": 12.7,
+  "f0_median_hz": 127.0,
+  "words_per_second": 2.95,
+  "peak_over_loudness_db": 14.2
+ },
+ {
+  "group": "radio_voices",
+  "label": "bdl rate 0.92 pitch 0.9",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "bdl",
+   "rate": 0.92,
+   "pitch": 0.9
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0
+  },
+  "line_set": "radio",
+  "lines": 93,
+  "words": 789,
+  "wer_raw": 7.9,
+  "wer_processed": 15.1,
+  "f0_median_hz": 115.1,
+  "words_per_second": 2.72,
+  "peak_over_loudness_db": 14.4
+ },
+ {
+  "group": "radio_voices",
+  "label": "bdl rate 0.88 pitch 0.82",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "bdl",
+   "rate": 0.88,
+   "pitch": 0.82
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0
+  },
+  "line_set": "radio",
+  "lines": 93,
+  "words": 789,
+  "wer_raw": 8.2,
+  "wer_processed": 12.2,
+  "f0_median_hz": 103.2,
+  "words_per_second": 2.6,
+  "peak_over_loudness_db": 14.7
+ },
+ {
+  "group": "radio_voices",
+  "label": "bdl rate 0.85 pitch 0.75",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "bdl",
+   "rate": 0.85,
+   "pitch": 0.75
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0
+  },
+  "line_set": "radio",
+  "lines": 93,
+  "words": 789,
+  "wer_raw": 9.4,
+  "wer_processed": 14.4,
+  "f0_median_hz": 94.7,
+  "words_per_second": 2.51,
+  "peak_over_loudness_db": 15.0
+ },
+ {
+  "group": "radio_voices",
+  "label": "alan",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "alan"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0
+  },
+  "line_set": "radio",
+  "lines": 93,
+  "words": 789,
+  "wer_raw": 17.7,
+  "wer_processed": 33.3,
+  "f0_median_hz": 137.9,
+  "words_per_second": 2.7,
+  "peak_over_loudness_db": 14.6
+ },
+ {
+  "group": "radio_voices",
+  "label": "alan rate 0.92 pitch 0.9",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "alan",
+   "rate": 0.92,
+   "pitch": 0.9
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0
+  },
+  "line_set": "radio",
+  "lines": 93,
+  "words": 789,
+  "wer_raw": 17.4,
+  "wer_processed": 37.1,
+  "f0_median_hz": 126.0,
+  "words_per_second": 2.49,
+  "peak_over_loudness_db": 14.7
+ },
+ {
+  "group": "radio_voices",
+  "label": "clb",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "clb"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0
+  },
+  "line_set": "radio",
+  "lines": 93,
+  "words": 789,
+  "wer_raw": 14.4,
+  "wer_processed": 27.8,
+  "f0_median_hz": 183.9,
+  "words_per_second": 2.61,
+  "peak_over_loudness_db": 14.8
+ },
+ {
+  "group": "radio_voices",
+  "label": "clb rate 1.06",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "clb",
+   "rate": 1.06
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0
+  },
+  "line_set": "radio",
+  "lines": 93,
+  "words": 789,
+  "wer_raw": 12.0,
+  "wer_processed": 28.8,
+  "f0_median_hz": 183.9,
+  "words_per_second": 2.76,
+  "peak_over_loudness_db": 14.8
+ },
+ {
+  "group": "radio_voices",
+  "label": "rhvoice slt",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "slt"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0
+  },
+  "line_set": "radio",
+  "lines": 93,
+  "words": 789,
+  "wer_raw": 17.1,
+  "wer_processed": 58.7,
+  "f0_median_hz": 175.8,
+  "words_per_second": 2.89,
+  "peak_over_loudness_db": 14.0
+ },
+ {
+  "group": "radio_voices",
+  "label": "rms",
+  "voice": {
+   "engine": "flite",
+   "voice": "rms"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0
+  },
+  "line_set": "radio",
+  "lines": 93,
+  "words": 789,
+  "wer_raw": 13.7,
+  "wer_processed": 28.0,
+  "f0_median_hz": 106.7,
+  "words_per_second": 2.78,
+  "peak_over_loudness_db": 14.0
+ },
+ {
+  "group": "radio_voices",
+  "label": "rms shift -1",
+  "voice": {
+   "engine": "flite",
+   "voice": "rms",
+   "shift_st": -1.0
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0
+  },
+  "line_set": "radio",
+  "lines": 93,
+  "words": 789,
+  "wer_raw": 22.8,
+  "wer_processed": 43.2,
+  "f0_median_hz": 101.9,
+  "words_per_second": 2.79,
+  "peak_over_loudness_db": 12.8
+ },
+ {
+  "group": "radio_voices",
+  "label": "rms shift -2",
+  "voice": {
+   "engine": "flite",
+   "voice": "rms",
+   "shift_st": -2.0
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0
+  },
+  "line_set": "radio",
+  "lines": 93,
+  "words": 789,
+  "wer_raw": 45.9,
+  "wer_processed": 66.3,
+  "f0_median_hz": 97.0,
+  "words_per_second": 2.79,
+  "peak_over_loudness_db": 12.6
+ },
+ {
+  "group": "radio_voices",
+  "label": "rms pitch only -2",
+  "voice": {
+   "engine": "flite",
+   "voice": "rms",
+   "pitch_st": -2.0
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0
+  },
+  "line_set": "radio",
+  "lines": 93,
+  "words": 789,
+  "wer_raw": 16.7,
+  "wer_processed": 38.4,
+  "f0_median_hz": 97.0,
+  "words_per_second": 2.79,
+  "peak_over_loudness_db": 12.8
+ },
+ {
+  "group": "radio_voices",
+  "label": "awb",
+  "voice": {
+   "engine": "flite",
+   "voice": "awb"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0
+  },
+  "line_set": "radio",
+  "lines": 93,
+  "words": 789,
+  "wer_raw": 24.6,
+  "wer_processed": 49.2,
+  "f0_median_hz": 126.0,
+  "words_per_second": 2.98,
+  "peak_over_loudness_db": 14.6
+ },
+ {
+  "group": "radio_voices",
+  "label": "awb rate 0.92",
+  "voice": {
+   "engine": "flite",
+   "voice": "awb",
+   "rate": 0.92
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0
+  },
+  "line_set": "radio",
+  "lines": 93,
+  "words": 789,
+  "wer_raw": 26.0,
+  "wer_processed": 47.0,
+  "f0_median_hz": 126.0,
+  "words_per_second": 2.74,
+  "peak_over_loudness_db": 14.5
+ },
+ {
+  "group": "radio_voices",
+  "label": "pico en-US",
+  "voice": {
+   "engine": "pico",
+   "voice": "en-US"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0
+  },
+  "line_set": "radio",
+  "lines": 93,
+  "words": 789,
+  "wer_raw": 31.2,
+  "wer_processed": 77.9,
+  "f0_median_hz": 168.4,
+  "words_per_second": 2.68,
+  "peak_over_loudness_db": 12.6
+ },
+ {
+  "group": "anchor_voices",
+  "label": "rhvoice slt",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "slt"
+  },
+  "chain": "broadcast",
+  "overrides": {},
+  "line_set": "anchor",
+  "lines": 82,
+  "words": 836,
+  "wer_raw": 6.1,
+  "wer_processed": 7.9,
+  "f0_median_hz": 173.9,
+  "words_per_second": 3.01,
+  "peak_over_loudness_db": 10.9
+ },
+ {
+  "group": "anchor_voices",
+  "label": "rhvoice slt rate 0.94",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "slt",
+   "rate": 0.94
+  },
+  "chain": "broadcast",
+  "overrides": {},
+  "line_set": "anchor",
+  "lines": 82,
+  "words": 836,
+  "wer_raw": 5.4,
+  "wer_processed": 7.7,
+  "f0_median_hz": 173.9,
+  "words_per_second": 2.82,
+  "peak_over_loudness_db": 10.8
+ },
+ {
+  "group": "anchor_voices",
+  "label": "rhvoice clb",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "clb"
+  },
+  "chain": "broadcast",
+  "overrides": {},
+  "line_set": "anchor",
+  "lines": 82,
+  "words": 836,
+  "wer_raw": 6.5,
+  "wer_processed": 9.6,
+  "f0_median_hz": 181.8,
+  "words_per_second": 2.69,
+  "peak_over_loudness_db": 10.4
+ },
+ {
+  "group": "anchor_voices",
+  "label": "pico en-US",
+  "voice": {
+   "engine": "pico",
+   "voice": "en-US"
+  },
+  "chain": "broadcast",
+  "overrides": {},
+  "line_set": "anchor",
+  "lines": 82,
+  "words": 836,
+  "wer_raw": 15.4,
+  "wer_processed": 19.3,
+  "f0_median_hz": 170.2,
+  "words_per_second": 2.91,
+  "peak_over_loudness_db": 13.1
+ },
+ {
+  "group": "anchor_voices",
+  "label": "pico en-US rate 0.92",
+  "voice": {
+   "engine": "pico",
+   "voice": "en-US",
+   "rate": 0.92
+  },
+  "chain": "broadcast",
+  "overrides": {},
+  "line_set": "anchor",
+  "lines": 82,
+  "words": 836,
+  "wer_raw": 16.7,
+  "wer_processed": 18.7,
+  "f0_median_hz": 170.2,
+  "words_per_second": 2.69,
+  "peak_over_loudness_db": 13.1
+ },
+ {
+  "group": "anchor_voices",
+  "label": "festival slt",
+  "voice": {
+   "engine": "festival",
+   "voice": "cmu_us_slt_arctic_hts"
+  },
+  "chain": "broadcast",
+  "overrides": {},
+  "line_set": "anchor",
+  "lines": 82,
+  "words": 836,
+  "wer_raw": 14.8,
+  "wer_processed": 11.2,
+  "f0_median_hz": 175.8,
+  "words_per_second": 2.95,
+  "peak_over_loudness_db": 13.3
+ },
+ {
+  "group": "chair_voices",
+  "label": "alan",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "alan"
+  },
+  "chain": "hall",
+  "overrides": {
+   "wet_db": -12.0,
+   "early_db": -9.0,
+   "duck_db": 0.0
+  },
+  "line_set": "chair",
+  "lines": 34,
+  "words": 381,
+  "wer_raw": 10.0,
+  "wer_processed": 36.2,
+  "f0_median_hz": 136.8,
+  "words_per_second": 3.02,
+  "peak_over_loudness_db": 12.2
+ },
+ {
+  "group": "chair_voices",
+  "label": "alan rate 0.88 pitch 0.85",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "alan",
+   "rate": 0.88,
+   "pitch": 0.85
+  },
+  "chain": "hall",
+  "overrides": {},
+  "line_set": "chair",
+  "lines": 34,
+  "words": 381,
+  "wer_raw": 10.0,
+  "wer_processed": 36.7,
+  "f0_median_hz": 117.6,
+  "words_per_second": 2.66,
+  "peak_over_loudness_db": 13.1
+ },
+ {
+  "group": "chair_voices",
+  "label": "alan rate 0.82 pitch 0.78",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "alan",
+   "rate": 0.82,
+   "pitch": 0.78
+  },
+  "chain": "hall",
+  "overrides": {
+   "wet_db": -12.0,
+   "early_db": -9.0,
+   "duck_db": 0.0
+  },
+  "line_set": "chair",
+  "lines": 34,
+  "words": 381,
+  "wer_raw": 11.0,
+  "wer_processed": 33.9,
+  "f0_median_hz": 108.8,
+  "words_per_second": 2.48,
+  "peak_over_loudness_db": 13.3
+ },
+ {
+  "group": "chair_voices",
+  "label": "awb rate 0.88",
+  "voice": {
+   "engine": "flite",
+   "voice": "awb",
+   "rate": 0.88
+  },
+  "chain": "hall",
+  "overrides": {
+   "wet_db": -12.0,
+   "early_db": -9.0,
+   "duck_db": 0.0
+  },
+  "line_set": "chair",
+  "lines": 34,
+  "words": 381,
+  "wer_raw": 16.5,
+  "wer_processed": 48.0,
+  "f0_median_hz": 128.0,
+  "words_per_second": 2.8,
+  "peak_over_loudness_db": 12.7
+ },
+ {
+  "group": "chair_voices",
+  "label": "awb rate 0.88 shift -2",
+  "voice": {
+   "engine": "flite",
+   "voice": "awb",
+   "rate": 0.88,
+   "shift_st": -2.0
+  },
+  "chain": "hall",
+  "overrides": {
+   "wet_db": -12.0,
+   "early_db": -9.0,
+   "duck_db": 0.0
+  },
+  "line_set": "chair",
+  "lines": 34,
+  "words": 381,
+  "wer_raw": 41.2,
+  "wer_processed": 72.2,
+  "f0_median_hz": 114.3,
+  "words_per_second": 2.8,
+  "peak_over_loudness_db": 12.5
+ },
+ {
+  "group": "chair_voices",
+  "label": "pico en-US rate 0.9 pitch 0.78",
+  "voice": {
+   "engine": "pico",
+   "voice": "en-US",
+   "rate": 0.9,
+   "pitch": 0.78
+  },
+  "chain": "hall",
+  "overrides": {
+   "wet_db": -12.0,
+   "early_db": -9.0,
+   "duck_db": 0.0
+  },
+  "line_set": "chair",
+  "lines": 34,
+  "words": 381,
+  "wer_raw": 18.9,
+  "wer_processed": 34.6,
+  "f0_median_hz": 132.2,
+  "words_per_second": 2.63,
+  "peak_over_loudness_db": 12.2
+ },
+ {
+  "group": "chair_voices",
+  "label": "pico en-GB rate 0.88 pitch 0.75",
+  "voice": {
+   "engine": "pico",
+   "voice": "en-GB",
+   "rate": 0.88,
+   "pitch": 0.75
+  },
+  "chain": "hall",
+  "overrides": {
+   "wet_db": -12.0,
+   "early_db": -9.0,
+   "duck_db": 0.0
+  },
+  "line_set": "chair",
+  "lines": 34,
+  "words": 381,
+  "wer_raw": 32.5,
+  "wer_processed": 54.9,
+  "f0_median_hz": 133.3,
+  "words_per_second": 2.66,
+  "peak_over_loudness_db": 11.5
+ },
+ {
+  "group": "chair_voices",
+  "label": "bdl rate 0.84 pitch 0.8",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "bdl",
+   "rate": 0.84,
+   "pitch": 0.8
+  },
+  "chain": "hall",
+  "overrides": {
+   "wet_db": -12.0,
+   "early_db": -9.0,
+   "duck_db": 0.0
+  },
+  "line_set": "chair",
+  "lines": 34,
+  "words": 381,
+  "wer_raw": 4.2,
+  "wer_processed": 18.4,
+  "f0_median_hz": 99.4,
+  "words_per_second": 2.67,
+  "peak_over_loudness_db": 13.1
+ },
+ {
+  "group": "chair_voices",
+  "label": "rms rate 0.9",
+  "voice": {
+   "engine": "flite",
+   "voice": "rms",
+   "rate": 0.9
+  },
+  "chain": "hall",
+  "overrides": {
+   "wet_db": -12.0,
+   "early_db": -9.0,
+   "duck_db": 0.0
+  },
+  "line_set": "chair",
+  "lines": 34,
+  "words": 381,
+  "wer_raw": 6.8,
+  "wer_processed": 22.6,
+  "f0_median_hz": 106.0,
+  "words_per_second": 2.51,
+  "peak_over_loudness_db": 11.7
+ },
+ {
+  "group": "sweep_radio",
+  "label": "rms: first pass (drive 7, static -30, not ducked)",
+  "voice": {
+   "engine": "flite",
+   "voice": "rms"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 15.6,
+  "wer_processed": 25.5,
+  "f0_median_hz": 106.7,
+  "words_per_second": 2.86,
+  "peak_over_loudness_db": 14.2
+ },
+ {
+  "group": "sweep_radio",
+  "label": "rms: band 300 to 3800 Hz",
+  "voice": {
+   "engine": "flite",
+   "voice": "rms"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0,
+   "band_hz": [
+    300.0,
+    3800.0
+   ]
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 15.6,
+  "wer_processed": 23.6,
+  "f0_median_hz": 106.7,
+  "words_per_second": 2.86,
+  "peak_over_loudness_db": 13.9
+ },
+ {
+  "group": "sweep_radio",
+  "label": "rms: band 250 to 4200 Hz",
+  "voice": {
+   "engine": "flite",
+   "voice": "rms"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0,
+   "band_hz": [
+    250.0,
+    4200.0
+   ]
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 16.0,
+  "wer_processed": 25.8,
+  "f0_median_hz": 106.7,
+  "words_per_second": 2.86,
+  "peak_over_loudness_db": 13.6
+ },
+ {
+  "group": "sweep_radio",
+  "label": "rms: band 400 to 3000 Hz",
+  "voice": {
+   "engine": "flite",
+   "voice": "rms"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0,
+   "band_hz": [
+    400.0,
+    3000.0
+   ]
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 15.3,
+  "wer_processed": 23.6,
+  "f0_median_hz": 106.7,
+  "words_per_second": 2.86,
+  "peak_over_loudness_db": 14.0
+ },
+ {
+  "group": "sweep_radio",
+  "label": "rms: gentler filter slopes",
+  "voice": {
+   "engine": "flite",
+   "voice": "rms"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0,
+   "hp_order": 2,
+   "lp_order": 4
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 15.3,
+  "wer_processed": 24.7,
+  "f0_median_hz": 106.7,
+  "words_per_second": 2.86,
+  "peak_over_loudness_db": 15.1
+ },
+ {
+  "group": "sweep_radio",
+  "label": "rms: no presence peak",
+  "voice": {
+   "engine": "flite",
+   "voice": "rms"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0,
+   "presence_db": 0.0
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 14.9,
+  "wer_processed": 28.7,
+  "f0_median_hz": 106.7,
+  "words_per_second": 2.86,
+  "peak_over_loudness_db": 14.0
+ },
+ {
+  "group": "sweep_radio",
+  "label": "rms: no compression",
+  "voice": {
+   "engine": "flite",
+   "voice": "rms"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0,
+   "comp_ratio": 1.0
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 14.9,
+  "wer_processed": 31.3,
+  "f0_median_hz": 106.7,
+  "words_per_second": 2.86,
+  "peak_over_loudness_db": 17.1
+ },
+ {
+  "group": "sweep_radio",
+  "label": "rms: drive 0 dB",
+  "voice": {
+   "engine": "flite",
+   "voice": "rms"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 0.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 14.9,
+  "wer_processed": 19.6,
+  "f0_median_hz": 106.7,
+  "words_per_second": 2.86,
+  "peak_over_loudness_db": 14.6
+ },
+ {
+  "group": "sweep_radio",
+  "label": "rms: drive 12 dB",
+  "voice": {
+   "engine": "flite",
+   "voice": "rms"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 12.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 15.6,
+  "wer_processed": 39.3,
+  "f0_median_hz": 106.7,
+  "words_per_second": 2.86,
+  "peak_over_loudness_db": 13.5
+ },
+ {
+  "group": "sweep_radio",
+  "label": "rms: static -40 dB",
+  "voice": {
+   "engine": "flite",
+   "voice": "rms"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -40.0,
+   "static_duck_db": 0.0
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 15.6,
+  "wer_processed": 21.8,
+  "f0_median_hz": 106.7,
+  "words_per_second": 2.86,
+  "peak_over_loudness_db": 14.2
+ },
+ {
+  "group": "sweep_radio",
+  "label": "rms: static -24 dB",
+  "voice": {
+   "engine": "flite",
+   "voice": "rms"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -24.0,
+   "static_duck_db": 0.0
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 15.6,
+  "wer_processed": 28.7,
+  "f0_median_hz": 106.7,
+  "words_per_second": 2.86,
+  "peak_over_loudness_db": 14.2
+ },
+ {
+  "group": "sweep_radio",
+  "label": "clb: first pass (drive 7, static -30, not ducked)",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "clb"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 12.4,
+  "wer_processed": 28.4,
+  "f0_median_hz": 183.9,
+  "words_per_second": 2.68,
+  "peak_over_loudness_db": 14.8
+ },
+ {
+  "group": "sweep_radio",
+  "label": "clb: band 300 to 3800 Hz",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "clb"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0,
+   "band_hz": [
+    300.0,
+    3800.0
+   ]
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 13.5,
+  "wer_processed": 25.1,
+  "f0_median_hz": 183.9,
+  "words_per_second": 2.68,
+  "peak_over_loudness_db": 15.0
+ },
+ {
+  "group": "sweep_radio",
+  "label": "clb: band 250 to 4200 Hz",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "clb"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0,
+   "band_hz": [
+    250.0,
+    4200.0
+   ]
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 12.4,
+  "wer_processed": 29.1,
+  "f0_median_hz": 183.9,
+  "words_per_second": 2.68,
+  "peak_over_loudness_db": 15.0
+ },
+ {
+  "group": "sweep_radio",
+  "label": "clb: band 400 to 3000 Hz",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "clb"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0,
+   "band_hz": [
+    400.0,
+    3000.0
+   ]
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 13.5,
+  "wer_processed": 32.4,
+  "f0_median_hz": 183.9,
+  "words_per_second": 2.68,
+  "peak_over_loudness_db": 14.7
+ },
+ {
+  "group": "sweep_radio",
+  "label": "clb: gentler filter slopes",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "clb"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0,
+   "hp_order": 2,
+   "lp_order": 4
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 13.5,
+  "wer_processed": 25.5,
+  "f0_median_hz": 183.9,
+  "words_per_second": 2.68,
+  "peak_over_loudness_db": 15.7
+ },
+ {
+  "group": "sweep_radio",
+  "label": "clb: no presence peak",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "clb"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0,
+   "presence_db": 0.0
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 12.4,
+  "wer_processed": 32.0,
+  "f0_median_hz": 183.9,
+  "words_per_second": 2.68,
+  "peak_over_loudness_db": 14.5
+ },
+ {
+  "group": "sweep_radio",
+  "label": "clb: no compression",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "clb"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0,
+   "comp_ratio": 1.0
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 13.5,
+  "wer_processed": 43.3,
+  "f0_median_hz": 183.9,
+  "words_per_second": 2.68,
+  "peak_over_loudness_db": 17.9
+ },
+ {
+  "group": "sweep_radio",
+  "label": "clb: drive 0 dB",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "clb"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 0.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 13.5,
+  "wer_processed": 22.9,
+  "f0_median_hz": 183.9,
+  "words_per_second": 2.68,
+  "peak_over_loudness_db": 15.3
+ },
+ {
+  "group": "sweep_radio",
+  "label": "clb: drive 12 dB",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "clb"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 12.0,
+   "static_db": -30.0,
+   "static_duck_db": 0.0
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 13.5,
+  "wer_processed": 57.8,
+  "f0_median_hz": 183.9,
+  "words_per_second": 2.68,
+  "peak_over_loudness_db": 14.0
+ },
+ {
+  "group": "sweep_radio",
+  "label": "clb: static -40 dB",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "clb"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -40.0,
+   "static_duck_db": 0.0
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 12.4,
+  "wer_processed": 19.3,
+  "f0_median_hz": 183.9,
+  "words_per_second": 2.68,
+  "peak_over_loudness_db": 14.8
+ },
+ {
+  "group": "sweep_radio",
+  "label": "clb: static -24 dB",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "clb"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 7.0,
+   "static_db": -24.0,
+   "static_duck_db": 0.0
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 12.4,
+  "wer_processed": 42.9,
+  "f0_median_hz": 183.9,
+  "words_per_second": 2.68,
+  "peak_over_loudness_db": 14.8
+ },
+ {
+  "group": "chair_voices2",
+  "label": "pico en-US rate 0.9 pitch 0.78",
+  "voice": {
+   "engine": "pico",
+   "voice": "en-US",
+   "rate": 0.9,
+   "pitch": 0.78
+  },
+  "chain": "hall",
+  "overrides": {
+   "wet_db": -12.0,
+   "early_db": -18.0,
+   "duck_db": 12.0
+  },
+  "line_set": "hearing",
+  "lines": 6,
+  "words": 94,
+  "wer_raw": 26.6,
+  "wer_processed": 25.5,
+  "f0_median_hz": 132.2,
+  "words_per_second": 2.57,
+  "peak_over_loudness_db": 11.6
+ },
+ {
+  "group": "chair_voices2",
+  "label": "pico en-US rate 0.9, pitch and formants -2 semitones",
+  "voice": {
+   "engine": "pico",
+   "voice": "en-US",
+   "rate": 0.9,
+   "shift_st": -2.0
+  },
+  "chain": "hall",
+  "overrides": {
+   "wet_db": -12.0,
+   "early_db": -18.0,
+   "duck_db": 12.0
+  },
+  "line_set": "hearing",
+  "lines": 6,
+  "words": 94,
+  "wer_raw": 17.0,
+  "wer_processed": 24.5,
+  "f0_median_hz": 150.9,
+  "words_per_second": 2.58,
+  "peak_over_loudness_db": 10.0
+ },
+ {
+  "group": "chair_voices2",
+  "label": "pico en-US rate 0.9, pitch and formants -3 semitones",
+  "voice": {
+   "engine": "pico",
+   "voice": "en-US",
+   "rate": 0.9,
+   "shift_st": -3.0
+  },
+  "chain": "hall",
+  "overrides": {
+   "wet_db": -12.0,
+   "early_db": -18.0,
+   "duck_db": 12.0
+  },
+  "line_set": "hearing",
+  "lines": 6,
+  "words": 94,
+  "wer_raw": 18.1,
+  "wer_processed": 21.3,
+  "f0_median_hz": 142.9,
+  "words_per_second": 2.57,
+  "peak_over_loudness_db": 9.9
+ },
+ {
+  "group": "chair_voices2",
+  "label": "pico en-US rate 0.9, pitch and formants -4 semitones",
+  "voice": {
+   "engine": "pico",
+   "voice": "en-US",
+   "rate": 0.9,
+   "shift_st": -4.0
+  },
+  "chain": "hall",
+  "overrides": {
+   "wet_db": -12.0,
+   "early_db": -18.0,
+   "duck_db": 12.0
+  },
+  "line_set": "hearing",
+  "lines": 6,
+  "words": 94,
+  "wer_raw": 18.1,
+  "wer_processed": 34.0,
+  "f0_median_hz": 135.6,
+  "words_per_second": 2.57,
+  "peak_over_loudness_db": 10.1
+ },
+ {
+  "group": "chair_voices2",
+  "label": "pico en-US rate 0.9, pitch and formants -5 semitones",
+  "voice": {
+   "engine": "pico",
+   "voice": "en-US",
+   "rate": 0.9,
+   "shift_st": -5.0
+  },
+  "chain": "hall",
+  "overrides": {
+   "wet_db": -12.0,
+   "early_db": -18.0,
+   "duck_db": 12.0
+  },
+  "line_set": "hearing",
+  "lines": 6,
+  "words": 94,
+  "wer_raw": 28.7,
+  "wer_processed": 35.1,
+  "f0_median_hz": 128.0,
+  "words_per_second": 2.58,
+  "peak_over_loudness_db": 10.0
+ },
+ {
+  "group": "chair_voices2",
+  "label": "pico en-US rate 0.9 pitch 0.9, pitch and formants -3 semitones",
+  "voice": {
+   "engine": "pico",
+   "voice": "en-US",
+   "rate": 0.9,
+   "pitch": 0.9,
+   "shift_st": -3.0
+  },
+  "chain": "hall",
+  "overrides": {
+   "wet_db": -12.0,
+   "early_db": -18.0,
+   "duck_db": 12.0
+  },
+  "line_set": "hearing",
+  "lines": 6,
+  "words": 94,
+  "wer_raw": 16.0,
+  "wer_processed": 18.1,
+  "f0_median_hz": 128.0,
+  "words_per_second": 2.57,
+  "peak_over_loudness_db": 10.2
+ },
+ {
+  "group": "chair_voices2",
+  "label": "pico en-GB rate 0.9, pitch and formants -4 semitones",
+  "voice": {
+   "engine": "pico",
+   "voice": "en-GB",
+   "rate": 0.9,
+   "shift_st": -4.0
+  },
+  "chain": "hall",
+  "overrides": {
+   "wet_db": -12.0,
+   "early_db": -18.0,
+   "duck_db": 12.0
+  },
+  "line_set": "hearing",
+  "lines": 6,
+  "words": 94,
+  "wer_raw": 43.6,
+  "wer_processed": 58.5,
+  "f0_median_hz": 140.4,
+  "words_per_second": 2.62,
+  "peak_over_loudness_db": 9.3
+ },
+ {
+  "group": "chair_voices2",
+  "label": "alan rate 0.84 pitch 0.8",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "alan",
+   "rate": 0.84,
+   "pitch": 0.8
+  },
+  "chain": "hall",
+  "overrides": {
+   "wet_db": -12.0,
+   "early_db": -18.0,
+   "duck_db": 12.0
+  },
+  "line_set": "hearing",
+  "lines": 6,
+  "words": 94,
+  "wer_raw": 14.9,
+  "wer_processed": 19.1,
+  "f0_median_hz": 113.5,
+  "words_per_second": 2.53,
+  "peak_over_loudness_db": 13.1
+ },
+ {
+  "group": "chair_voices2",
+  "label": "kal16 rate 0.9",
+  "voice": {
+   "engine": "flite",
+   "voice": "kal16",
+   "rate": 0.9
+  },
+  "chain": "hall",
+  "overrides": {
+   "wet_db": -12.0,
+   "early_db": -18.0,
+   "duck_db": 12.0
+  },
+  "line_set": "hearing",
+  "lines": 6,
+  "words": 94,
+  "wer_raw": 16.0,
+  "wer_processed": 20.2,
+  "f0_median_hz": 98.8,
+  "words_per_second": 2.91,
+  "peak_over_loudness_db": 15.6
+ },
+ {
+  "group": "sweep_radio3",
+  "label": "alan: band 300 to 4200 Hz",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "alan"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 3.0,
+   "static_db": -30.0,
+   "static_duck_db": 10.0,
+   "band_hz": [
+    300.0,
+    4200.0
+   ]
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 18.2,
+  "wer_processed": 23.3,
+  "f0_median_hz": 137.9,
+  "words_per_second": 2.76,
+  "peak_over_loudness_db": 14.7
+ },
+ {
+  "group": "sweep_radio3",
+  "label": "alan: band 300 to 4800 Hz",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "alan"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 3.0,
+   "static_db": -30.0,
+   "static_duck_db": 10.0,
+   "band_hz": [
+    300.0,
+    4800.0
+   ]
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 18.5,
+  "wer_processed": 22.2,
+  "f0_median_hz": 137.9,
+  "words_per_second": 2.76,
+  "peak_over_loudness_db": 14.6
+ },
+ {
+  "group": "sweep_radio3",
+  "label": "alan: band 200 to 3800 Hz",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "alan"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 3.0,
+   "static_db": -30.0,
+   "static_duck_db": 10.0,
+   "band_hz": [
+    200.0,
+    3800.0
+   ]
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 18.5,
+  "wer_processed": 24.0,
+  "f0_median_hz": 137.9,
+  "words_per_second": 2.76,
+  "peak_over_loudness_db": 14.6
+ },
+ {
+  "group": "sweep_radio3",
+  "label": "alan: band 300 to 3800 Hz, no presence peak",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "alan"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 3.0,
+   "static_db": -30.0,
+   "static_duck_db": 10.0,
+   "band_hz": [
+    300.0,
+    3800.0
+   ],
+   "presence_db": 0.0
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 18.9,
+  "wer_processed": 21.5,
+  "f0_median_hz": 137.9,
+  "words_per_second": 2.76,
+  "peak_over_loudness_db": 14.7
+ },
+ {
+  "group": "sweep_radio3",
+  "label": "alan: band 300 to 3800 Hz, gentler low-pass",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "alan"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 3.0,
+   "static_db": -30.0,
+   "static_duck_db": 10.0,
+   "band_hz": [
+    300.0,
+    3800.0
+   ],
+   "lp_order": 4
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 18.9,
+  "wer_processed": 21.5,
+  "f0_median_hz": 137.9,
+  "words_per_second": 2.76,
+  "peak_over_loudness_db": 14.8
+ },
+ {
+  "group": "sweep_radio3",
+  "label": "alan: band 300 to 3800 Hz, rate 0.94",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "alan",
+   "rate": 0.94
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 3.0,
+   "static_db": -30.0,
+   "static_duck_db": 10.0,
+   "band_hz": [
+    300.0,
+    3800.0
+   ]
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 20.0,
+  "wer_processed": 24.0,
+  "f0_median_hz": 137.9,
+  "words_per_second": 2.59,
+  "peak_over_loudness_db": 14.8
+ },
+ {
+  "group": "sweep_hall2",
+  "label": "pico low: wet -14, early -18, ducked 10 dB",
+  "voice": {
+   "engine": "pico",
+   "voice": "en-US",
+   "rate": 0.9,
+   "pitch": 0.78
+  },
+  "chain": "hall",
+  "overrides": {
+   "wet_db": -14.0,
+   "early_db": -18.0,
+   "duck_db": 10.0
+  },
+  "line_set": "chair",
+  "lines": 34,
+  "words": 381,
+  "wer_raw": 18.9,
+  "wer_processed": 21.3,
+  "f0_median_hz": 132.2,
+  "words_per_second": 2.63,
+  "peak_over_loudness_db": 11.3
+ },
+ {
+  "group": "sweep_hall2",
+  "label": "pico low: wet -11, early -18, ducked 12 dB",
+  "voice": {
+   "engine": "pico",
+   "voice": "en-US",
+   "rate": 0.9,
+   "pitch": 0.78
+  },
+  "chain": "hall",
+  "overrides": {
+   "wet_db": -11.0,
+   "early_db": -18.0,
+   "duck_db": 12.0
+  },
+  "line_set": "chair",
+  "lines": 34,
+  "words": 381,
+  "wer_raw": 18.9,
+  "wer_processed": 22.6,
+  "f0_median_hz": 132.2,
+  "words_per_second": 2.63,
+  "peak_over_loudness_db": 11.3
+ },
+ {
+  "group": "sweep_hall2",
+  "label": "pico low: wet -11, early -20, ducked 14 dB",
+  "voice": {
+   "engine": "pico",
+   "voice": "en-US",
+   "rate": 0.9,
+   "pitch": 0.78
+  },
+  "chain": "hall",
+  "overrides": {
+   "wet_db": -11.0,
+   "early_db": -20.0,
+   "duck_db": 14.0
+  },
+  "line_set": "chair",
+  "lines": 34,
+  "words": 381,
+  "wer_raw": 18.9,
+  "wer_processed": 24.1,
+  "f0_median_hz": 132.2,
+  "words_per_second": 2.63,
+  "peak_over_loudness_db": 11.3
+ },
+ {
+  "group": "sweep_hall2",
+  "label": "pico low: wet -8, early -20, ducked 16 dB",
+  "voice": {
+   "engine": "pico",
+   "voice": "en-US",
+   "rate": 0.9,
+   "pitch": 0.78
+  },
+  "chain": "hall",
+  "overrides": {
+   "wet_db": -8.0,
+   "early_db": -20.0,
+   "duck_db": 16.0
+  },
+  "line_set": "chair",
+  "lines": 34,
+  "words": 381,
+  "wer_raw": 18.9,
+  "wer_processed": 22.0,
+  "f0_median_hz": 132.2,
+  "words_per_second": 2.63,
+  "peak_over_loudness_db": 11.4
+ },
+ {
+  "group": "sweep_radio2",
+  "label": "rms: second pass (drive 3, static -30 ducked 10)",
+  "voice": {
+   "engine": "flite",
+   "voice": "rms"
+  },
+  "chain": "radio",
+  "overrides": {},
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 14.9,
+  "wer_processed": 16.0,
+  "f0_median_hz": 106.7,
+  "words_per_second": 2.86,
+  "peak_over_loudness_db": 14.5
+ },
+ {
+  "group": "sweep_radio2",
+  "label": "rms: static not ducked",
+  "voice": {
+   "engine": "flite",
+   "voice": "rms"
+  },
+  "chain": "radio",
+  "overrides": {
+   "static_duck_db": 0.0
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 14.9,
+  "wer_processed": 21.1,
+  "f0_median_hz": 106.7,
+  "words_per_second": 2.86,
+  "peak_over_loudness_db": 14.5
+ },
+ {
+  "group": "sweep_radio2",
+  "label": "rms: static ducked 16 dB",
+  "voice": {
+   "engine": "flite",
+   "voice": "rms"
+  },
+  "chain": "radio",
+  "overrides": {
+   "static_duck_db": 16.0
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 14.9,
+  "wer_processed": 14.5,
+  "f0_median_hz": 106.7,
+  "words_per_second": 2.86,
+  "peak_over_loudness_db": 14.5
+ },
+ {
+  "group": "sweep_radio2",
+  "label": "rms: static -34 ducked 10",
+  "voice": {
+   "engine": "flite",
+   "voice": "rms"
+  },
+  "chain": "radio",
+  "overrides": {
+   "static_db": -34.0
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 14.9,
+  "wer_processed": 13.5,
+  "f0_median_hz": 106.7,
+  "words_per_second": 2.86,
+  "peak_over_loudness_db": 14.5
+ },
+ {
+  "group": "sweep_radio2",
+  "label": "rms: drive 0 dB",
+  "voice": {
+   "engine": "flite",
+   "voice": "rms"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 0.0
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 14.9,
+  "wer_processed": 16.4,
+  "f0_median_hz": 106.7,
+  "words_per_second": 2.86,
+  "peak_over_loudness_db": 14.6
+ },
+ {
+  "group": "sweep_radio2",
+  "label": "rms: drive 6 dB",
+  "voice": {
+   "engine": "flite",
+   "voice": "rms"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 6.0
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 15.6,
+  "wer_processed": 19.6,
+  "f0_median_hz": 106.7,
+  "words_per_second": 2.86,
+  "peak_over_loudness_db": 14.3
+ },
+ {
+  "group": "sweep_radio2",
+  "label": "rms: band 300 to 3800 Hz",
+  "voice": {
+   "engine": "flite",
+   "voice": "rms"
+  },
+  "chain": "radio",
+  "overrides": {
+   "band_hz": [
+    300.0,
+    3800.0
+   ]
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 16.0,
+  "wer_processed": 15.3,
+  "f0_median_hz": 106.7,
+  "words_per_second": 2.86,
+  "peak_over_loudness_db": 14.2
+ },
+ {
+  "group": "sweep_radio2",
+  "label": "clb: second pass (drive 3, static -30 ducked 10)",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "clb"
+  },
+  "chain": "radio",
+  "overrides": {},
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 12.4,
+  "wer_processed": 17.5,
+  "f0_median_hz": 183.9,
+  "words_per_second": 2.68,
+  "peak_over_loudness_db": 15.1
+ },
+ {
+  "group": "sweep_radio2",
+  "label": "clb: static not ducked",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "clb"
+  },
+  "chain": "radio",
+  "overrides": {
+   "static_duck_db": 0.0
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 12.4,
+  "wer_processed": 22.5,
+  "f0_median_hz": 183.9,
+  "words_per_second": 2.68,
+  "peak_over_loudness_db": 15.1
+ },
+ {
+  "group": "sweep_radio2",
+  "label": "clb: static ducked 16 dB",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "clb"
+  },
+  "chain": "radio",
+  "overrides": {
+   "static_duck_db": 16.0
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 12.4,
+  "wer_processed": 15.6,
+  "f0_median_hz": 183.9,
+  "words_per_second": 2.68,
+  "peak_over_loudness_db": 15.1
+ },
+ {
+  "group": "sweep_radio2",
+  "label": "clb: static -34 ducked 10",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "clb"
+  },
+  "chain": "radio",
+  "overrides": {
+   "static_db": -34.0
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 13.5,
+  "wer_processed": 16.4,
+  "f0_median_hz": 183.9,
+  "words_per_second": 2.68,
+  "peak_over_loudness_db": 15.1
+ },
+ {
+  "group": "sweep_radio2",
+  "label": "clb: drive 0 dB",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "clb"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 0.0
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 13.5,
+  "wer_processed": 16.0,
+  "f0_median_hz": 183.9,
+  "words_per_second": 2.68,
+  "peak_over_loudness_db": 15.3
+ },
+ {
+  "group": "sweep_radio2",
+  "label": "clb: drive 6 dB",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "clb"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 6.0
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 12.4,
+  "wer_processed": 17.5,
+  "f0_median_hz": 183.9,
+  "words_per_second": 2.68,
+  "peak_over_loudness_db": 14.9
+ },
+ {
+  "group": "sweep_radio2",
+  "label": "clb: band 300 to 3800 Hz",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "clb"
+  },
+  "chain": "radio",
+  "overrides": {
+   "band_hz": [
+    300.0,
+    3800.0
+   ]
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 13.5,
+  "wer_processed": 14.2,
+  "f0_median_hz": 183.9,
+  "words_per_second": 2.68,
+  "peak_over_loudness_db": 15.3
+ },
+ {
+  "group": "sweep_radio2",
+  "label": "alan: second pass (drive 3, static -30 ducked 10)",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "alan"
+  },
+  "chain": "radio",
+  "overrides": {},
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 18.5,
+  "wer_processed": 28.7,
+  "f0_median_hz": 137.9,
+  "words_per_second": 2.76,
+  "peak_over_loudness_db": 15.0
+ },
+ {
+  "group": "sweep_radio2",
+  "label": "alan: static not ducked",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "alan"
+  },
+  "chain": "radio",
+  "overrides": {
+   "static_duck_db": 0.0
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 18.5,
+  "wer_processed": 29.5,
+  "f0_median_hz": 137.9,
+  "words_per_second": 2.76,
+  "peak_over_loudness_db": 15.0
+ },
+ {
+  "group": "sweep_radio2",
+  "label": "alan: static ducked 16 dB",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "alan"
+  },
+  "chain": "radio",
+  "overrides": {
+   "static_duck_db": 16.0
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 18.5,
+  "wer_processed": 29.1,
+  "f0_median_hz": 137.9,
+  "words_per_second": 2.76,
+  "peak_over_loudness_db": 15.0
+ },
+ {
+  "group": "sweep_radio2",
+  "label": "alan: static -34 ducked 10",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "alan"
+  },
+  "chain": "radio",
+  "overrides": {
+   "static_db": -34.0
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 18.5,
+  "wer_processed": 28.0,
+  "f0_median_hz": 137.9,
+  "words_per_second": 2.76,
+  "peak_over_loudness_db": 15.0
+ },
+ {
+  "group": "sweep_radio2",
+  "label": "alan: drive 0 dB",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "alan"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 0.0
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 18.5,
+  "wer_processed": 27.6,
+  "f0_median_hz": 137.9,
+  "words_per_second": 2.76,
+  "peak_over_loudness_db": 15.2
+ },
+ {
+  "group": "sweep_radio2",
+  "label": "alan: drive 6 dB",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "alan"
+  },
+  "chain": "radio",
+  "overrides": {
+   "drive_db": 6.0
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 18.5,
+  "wer_processed": 29.5,
+  "f0_median_hz": 137.9,
+  "words_per_second": 2.76,
+  "peak_over_loudness_db": 14.7
+ },
+ {
+  "group": "sweep_radio2",
+  "label": "alan: band 300 to 3800 Hz",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "alan"
+  },
+  "chain": "radio",
+  "overrides": {
+   "band_hz": [
+    300.0,
+    3800.0
+   ]
+  },
+  "line_set": "radio sample",
+  "lines": 31,
+  "words": 275,
+  "wer_raw": 18.5,
+  "wer_processed": 24.7,
+  "f0_median_hz": 137.9,
+  "words_per_second": 2.76,
+  "peak_over_loudness_db": 14.9
+ },
+ {
+  "group": "sweep_hall",
+  "label": "alan: first pass (wet -12, early -9, no ducking)",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "alan",
+   "rate": 0.88,
+   "pitch": 0.85
+  },
+  "chain": "hall",
+  "overrides": {},
+  "line_set": "chair",
+  "lines": 34,
+  "words": 381,
+  "wer_raw": 10.0,
+  "wer_processed": 36.7,
+  "f0_median_hz": 117.6,
+  "words_per_second": 2.66,
+  "peak_over_loudness_db": 13.1
+ },
+ {
+  "group": "sweep_hall",
+  "label": "alan: ducked 8 dB",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "alan",
+   "rate": 0.88,
+   "pitch": 0.85
+  },
+  "chain": "hall",
+  "overrides": {
+   "duck_db": 8.0
+  },
+  "line_set": "chair",
+  "lines": 34,
+  "words": 381,
+  "wer_raw": 10.0,
+  "wer_processed": 21.0,
+  "f0_median_hz": 117.6,
+  "words_per_second": 2.66,
+  "peak_over_loudness_db": 12.8
+ },
+ {
+  "group": "sweep_hall",
+  "label": "alan: ducked 14 dB",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "alan",
+   "rate": 0.88,
+   "pitch": 0.85
+  },
+  "chain": "hall",
+  "overrides": {
+   "duck_db": 14.0
+  },
+  "line_set": "chair",
+  "lines": 34,
+  "words": 381,
+  "wer_raw": 10.0,
+  "wer_processed": 13.9,
+  "f0_median_hz": 117.6,
+  "words_per_second": 2.66,
+  "peak_over_loudness_db": 12.7
+ },
+ {
+  "group": "sweep_hall",
+  "label": "alan: wet -18, early -15",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "alan",
+   "rate": 0.88,
+   "pitch": 0.85
+  },
+  "chain": "hall",
+  "overrides": {
+   "wet_db": -18.0,
+   "early_db": -15.0
+  },
+  "line_set": "chair",
+  "lines": 34,
+  "words": 381,
+  "wer_raw": 10.0,
+  "wer_processed": 23.1,
+  "f0_median_hz": 117.6,
+  "words_per_second": 2.66,
+  "peak_over_loudness_db": 12.9
+ },
+ {
+  "group": "sweep_hall",
+  "label": "alan: wet -18, early -15, ducked 8 dB",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "alan",
+   "rate": 0.88,
+   "pitch": 0.85
+  },
+  "chain": "hall",
+  "overrides": {
+   "wet_db": -18.0,
+   "early_db": -15.0,
+   "duck_db": 8.0
+  },
+  "line_set": "chair",
+  "lines": 34,
+  "words": 381,
+  "wer_raw": 10.0,
+  "wer_processed": 14.2,
+  "f0_median_hz": 117.6,
+  "words_per_second": 2.66,
+  "peak_over_loudness_db": 12.7
+ },
+ {
+  "group": "sweep_hall",
+  "label": "alan: wet -15, early -18, ducked 10 dB",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "alan",
+   "rate": 0.88,
+   "pitch": 0.85
+  },
+  "chain": "hall",
+  "overrides": {
+   "wet_db": -15.0,
+   "early_db": -18.0,
+   "duck_db": 10.0
+  },
+  "line_set": "chair",
+  "lines": 34,
+  "words": 381,
+  "wer_raw": 10.0,
+  "wer_processed": 12.1,
+  "f0_median_hz": 117.6,
+  "words_per_second": 2.66,
+  "peak_over_loudness_db": 12.6
+ },
+ {
+  "group": "sweep_hall",
+  "label": "alan: wet -24, early -20",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "alan",
+   "rate": 0.88,
+   "pitch": 0.85
+  },
+  "chain": "hall",
+  "overrides": {
+   "wet_db": -24.0,
+   "early_db": -20.0
+  },
+  "line_set": "chair",
+  "lines": 34,
+  "words": 381,
+  "wer_raw": 10.0,
+  "wer_processed": 14.4,
+  "f0_median_hz": 117.6,
+  "words_per_second": 2.66,
+  "peak_over_loudness_db": 12.8
+ },
+ {
+  "group": "sweep_hall",
+  "label": "alan: decay 1.4 s",
+  "voice": {
+   "engine": "rhvoice",
+   "voice": "alan",
+   "rate": 0.88,
+   "pitch": 0.85
+  },
+  "chain": "hall",
+  "overrides": {
+   "rt60_s": 1.4,
+   "rt60_high_s": 0.8
+  },
+  "line_set": "chair",
+  "lines": 34,
+  "words": 381,
+  "wer_raw": 10.0,
+  "wer_processed": 31.2,
+  "f0_median_hz": 117.6,
+  "words_per_second": 2.66,
+  "peak_over_loudness_db": 13.1
+ }
+]

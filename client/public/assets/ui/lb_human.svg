@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Lobby: the human side. A helmeted head (circle = human). -->
+  <path fill="currentColor" stroke="none" d="M3 35.5Q3 33 5.5 32.4A27 27 0 0 1 58.5 32.4Q61 33 61 35.5V36.5Q61 38 59.5 38H4.5Q3 38 3 36.5Z"/>
+  <path fill="currentColor" stroke="none" fill-rule="evenodd" d="M7 42H57A27 27 0 0 1 7 42ZM19.8 47.5a3.2 3.2 0 1 0 6.4 0a3.2 3.2 0 1 0-6.4 0ZM37.8 47.5a3.2 3.2 0 1 0 6.4 0a3.2 3.2 0 1 0-6.4 0Z"/>
+</svg>

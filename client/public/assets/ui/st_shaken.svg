@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Status: shaken. A rattled face (circle = human) with a wavering mouth and tremble marks. -->
+  <circle cx="32" cy="33" r="18"/>
+  <circle cx="25" cy="27" r="3" fill="currentColor" stroke="none"/>
+  <circle cx="39" cy="27" r="3" fill="currentColor" stroke="none"/>
+  <path d="M25 40.5Q28.5 35.5 32 40.5T39 40.5"/>
+  <path d="M7.5 22Q2.5 33 7.5 44M56.5 22Q61.5 33 56.5 44"/>
+</svg>

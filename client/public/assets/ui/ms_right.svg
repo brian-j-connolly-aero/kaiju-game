@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Device: right mouse button. -->
+  <rect x="15.5" y="4.5" width="33" height="55" rx="16.5"/>
+  <path d="M15.5 27.5H48.5M32 4.5V27.5"/>
+  <path fill="currentColor" d="M32 4.5A16.5 16.5 0 0 1 48.5 21V27.5H32Z"/>
+</svg>

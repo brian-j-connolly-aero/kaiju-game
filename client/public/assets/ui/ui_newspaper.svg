@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- System: the front page. A newspaper page: headline, photo, lines of print. -->
+  <rect x="8.5" y="5.5" width="47" height="53" rx="4"/>
+  <path d="M17 15.5H47"/>
+  <path fill="currentColor" stroke="none" d="M15 24H31.5V42H15Z"/>
+  <path d="M38.5 26.5H47M38.5 39.5H47"/>
+  <path d="M17 50H47"/>
+</svg>

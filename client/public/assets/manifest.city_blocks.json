@@ -1,0 +1,94 @@
+{
+  "models": {
+    "bld_apartment_a": {
+      "file": "models/bld_apartment_a.glb",
+      "kind": "structure",
+      "nodes": ["chunk_00", "chunk_01", "chunk_02", "chunk_03", "chunk_04", "chunk_05", "chunk_06", "chunk_07", "chunk_08", "chunk_09", "chunk_10", "chunk_11", "damaged", "intact", "rubble"],
+      "size": [18.0, 20.36, 14.15],
+      "tris": 188,
+      "chunks": 12,
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint", "blend": "multiply", "base": "#ead2a0", "colors": ["#e6b566", "#ead2a0", "#f2a48b", "#f3e3b3", "#f6c9a0", "#e3c04f"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "oldtown"
+    },
+    "bld_apartment_b": {
+      "file": "models/bld_apartment_b.glb",
+      "kind": "structure",
+      "nodes": ["chunk_00", "chunk_01", "chunk_02", "chunk_03", "chunk_04", "chunk_05", "chunk_06", "chunk_07", "chunk_08", "chunk_09", "chunk_10", "chunk_11", "damaged", "intact", "rubble"],
+      "size": [16.0, 28.0, 16.0],
+      "tris": 198,
+      "chunks": 12,
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint", "blend": "multiply", "base": "#f5f2ea", "colors": ["#f5f2ea", "#b4e3dc", "#f6c9a0", "#a8d4f0", "#efb3b8"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "boardwalk"
+    },
+    "bld_apartment_c": {
+      "file": "models/bld_apartment_c.glb",
+      "kind": "structure",
+      "nodes": ["chunk_00", "chunk_01", "chunk_02", "chunk_03", "chunk_04", "chunk_05", "chunk_06", "chunk_07", "damaged", "intact", "rubble"],
+      "size": [24.05, 36.5, 14.0],
+      "tris": 184,
+      "chunks": 8,
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint", "blend": "multiply", "base": "#bdb9b0", "colors": ["#ddd6c6", "#8fa0b5", "#f5f2ea", "#bdb9b0", "#a8d4f0"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "downtown"
+    },
+    "bld_campus_a": {
+      "file": "models/bld_campus_a.glb",
+      "kind": "structure",
+      "nodes": ["chunk_00", "chunk_01", "chunk_02", "chunk_03", "chunk_04", "chunk_05", "chunk_06", "chunk_07", "chunk_08", "chunk_09", "chunk_10", "chunk_11", "chunk_12", "chunk_13", "chunk_14", "chunk_15", "damaged", "intact", "rubble"],
+      "size": [44.0, 16.0, 16.125],
+      "tris": 172,
+      "chunks": 16,
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint", "blend": "multiply", "base": "#ddd6c6", "colors": ["#ddd6c6", "#ead2a0", "#f3e3b3"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "university"
+    },
+    "bld_office_a": {
+      "file": "models/bld_office_a.glb",
+      "kind": "structure",
+      "nodes": ["chunk_00", "chunk_01", "chunk_02", "chunk_03", "chunk_04", "chunk_05", "chunk_06", "chunk_07", "chunk_08", "chunk_09", "chunk_10", "chunk_11", "chunk_12", "chunk_13", "chunk_14", "chunk_15", "damaged", "intact", "rubble"],
+      "size": [20.0, 42.33, 20.0],
+      "tris": 180,
+      "chunks": 16,
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint", "blend": "multiply", "base": "#ddd6c6", "colors": ["#ddd6c6", "#8fa0b5", "#f5f2ea", "#bdb9b0", "#a8d4f0"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "downtown"
+    },
+    "bld_office_b": {
+      "file": "models/bld_office_b.glb",
+      "kind": "structure",
+      "nodes": ["chunk_00", "chunk_01", "chunk_02", "chunk_03", "chunk_04", "chunk_05", "chunk_06", "chunk_07", "damaged", "intact", "rubble"],
+      "size": [24.08, 55.0, 18.0],
+      "tris": 122,
+      "chunks": 8,
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint", "blend": "multiply", "base": "#ddd6c6", "colors": ["#ddd6c6", "#8fa0b5", "#f5f2ea", "#bdb9b0", "#a8d4f0"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "downtown"
+    },
+    "bld_office_c": {
+      "file": "models/bld_office_c.glb",
+      "kind": "structure",
+      "nodes": ["chunk_00", "chunk_01", "chunk_02", "chunk_03", "chunk_04", "chunk_05", "chunk_06", "chunk_07", "chunk_08", "chunk_09", "chunk_10", "chunk_11", "chunk_12", "chunk_13", "chunk_14", "chunk_15", "chunk_16", "chunk_17", "chunk_18", "chunk_19", "chunk_20", "chunk_21", "chunk_22", "chunk_23", "damaged", "intact", "rubble"],
+      "size": [22.0, 68.0, 22.04],
+      "tris": 292,
+      "chunks": 24,
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint", "blend": "multiply", "base": "#ddd6c6", "colors": ["#ddd6c6", "#8fa0b5", "#f5f2ea", "#bdb9b0", "#a8d4f0"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "downtown"
+    },
+    "bld_tower_b": {
+      "file": "models/bld_tower_b.glb",
+      "kind": "structure",
+      "nodes": ["chunk_00", "chunk_01", "chunk_02", "chunk_03", "chunk_04", "chunk_05", "chunk_06", "chunk_07", "chunk_08", "chunk_09", "chunk_10", "chunk_11", "chunk_12", "chunk_13", "damaged", "intact", "rubble"],
+      "size": [30.0, 130.0, 30.5],
+      "tris": 374,
+      "chunks": 14,
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint", "blend": "multiply", "base": "#ddd6c6", "colors": ["#ddd6c6", "#8fa0b5", "#f5f2ea", "#bdb9b0", "#a8d4f0"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "downtown"
+    },
+    "bld_tower_c": {
+      "file": "models/bld_tower_c.glb",
+      "kind": "structure",
+      "nodes": ["chunk_00", "chunk_01", "chunk_02", "chunk_03", "chunk_04", "chunk_05", "chunk_06", "chunk_07", "damaged", "intact", "rubble"],
+      "size": [28.12, 165.0, 28.51],
+      "tris": 264,
+      "chunks": 8,
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint", "blend": "multiply", "base": "#ddd6c6", "colors": ["#ddd6c6", "#8fa0b5", "#f5f2ea", "#bdb9b0", "#a8d4f0"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "downtown"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Kaiju verb: brace. The kaiju's spined hide as a solid shield; shots glance off it. -->
+  <path fill="currentColor" d="M29 6L46.5 12V30C46.5 43 39 51.5 29 57 19 51.5 11.5 43 11.5 30V12Z"/>
+  <path fill="currentColor" stroke="none" d="M12 13L2.5 17 12 22.5ZM12 24L2.5 28.5 12 33.5ZM12 35L3.5 40.5 14.5 44Z"/>
+  <path d="M52 11.5L55.5 5M53.5 21L59.5 18.5M53.5 30.5L59.5 33"/>
+</svg>

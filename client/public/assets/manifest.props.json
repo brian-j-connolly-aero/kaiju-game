@@ -1,0 +1,107 @@
+{
+  "models": {
+    "prop_bench": {
+      "file": "models/prop_bench.glb",
+      "kind": "prop",
+      "nodes": ["prop_bench"],
+      "size": [1.72, 0.92, 0.7],
+      "tris": 64
+    },
+    "prop_billboard": {
+      "file": "models/prop_billboard.glb",
+      "kind": "prop",
+      "nodes": ["prop_billboard"],
+      "size": [6.6, 8.967, 0.805],
+      "tris": 76
+    },
+    "prop_bus": {
+      "file": "models/prop_bus.glb",
+      "kind": "prop",
+      "nodes": ["prop_bus"],
+      "size": [2.605, 3.2, 11.96],
+      "tris": 148,
+      "tint": {"part": "body paint", "mask": "COLOR_0 alpha: 1 = paint (multiply the tint color in), 0 = never tint", "blend": "multiply", "colors": ["#d7263d", "#2f62c9", "#3fa652", "#f3e3b3"]}
+    },
+    "prop_busstop": {
+      "file": "models/prop_busstop.glb",
+      "kind": "prop",
+      "nodes": ["prop_busstop"],
+      "size": [4.41, 3.128, 1.5],
+      "tris": 80
+    },
+    "prop_car_sedan": {
+      "file": "models/prop_car_sedan.glb",
+      "kind": "prop",
+      "nodes": ["prop_car_sedan"],
+      "size": [1.91, 1.5, 4.46],
+      "tris": 118,
+      "tint": {"part": "body paint", "mask": "COLOR_0 alpha: 1 = paint (multiply the tint color in), 0 = never tint", "blend": "multiply", "colors": ["#e0372f", "#2f62c9", "#f5f5f0", "#3fa652", "#8f6fd0", "#f29b85", "#2a9d8f", "#aab2bc"]}
+    },
+    "prop_car_taxi": {
+      "file": "models/prop_car_taxi.glb",
+      "kind": "prop",
+      "nodes": ["prop_car_taxi"],
+      "size": [1.91, 1.67, 4.46],
+      "tris": 140
+    },
+    "prop_car_van": {
+      "file": "models/prop_car_van.glb",
+      "kind": "prop",
+      "nodes": ["prop_car_van"],
+      "size": [2.25, 2.12, 5.14],
+      "tris": 140,
+      "tint": {"part": "body paint", "mask": "COLOR_0 alpha: 1 = paint (multiply the tint color in), 0 = never tint", "blend": "multiply", "colors": ["#f5f5f0", "#2f62c9", "#e0372f", "#9fe0c0", "#b9a6e0"]}
+    },
+    "prop_car_wreck": {
+      "file": "models/prop_car_wreck.glb",
+      "kind": "prop",
+      "nodes": ["prop_car_wreck"],
+      "size": [2.429, 0.892, 4.98],
+      "tris": 148,
+      "tint": {"part": "body paint", "mask": "COLOR_0 alpha: 1 = paint (multiply the tint color in), 0 = never tint", "blend": "multiply", "colors": ["#2a9d8f", "#2f62c9", "#3fa652", "#8f6fd0", "#9fe0c0", "#aab2bc", "#b9a6e0", "#d7263d", "#e0372f", "#f29b85", "#f3e3b3", "#f5f5f0", "#f7c21a"], "hint": "use the paint color of the vehicle that was crushed (taxi: #f7c21a); wreckScale stretches this one wreck to the vehicle it was: [width, height, length] per prop kind, the instance's x, y, z scale", "wreckScale": {"car_sedan": [1, 1, 1], "car_taxi": [1, 1, 1], "car_van": [1.1, 1.3, 1.1], "truck": [1.2, 1.7, 1.75], "bus": [1.2, 1.8, 2.4]}}
+    },
+    "prop_kiosk": {
+      "file": "models/prop_kiosk.glb",
+      "kind": "prop",
+      "nodes": ["prop_kiosk"],
+      "size": [2.8, 3.53, 3.02],
+      "tris": 77
+    },
+    "prop_lamp": {
+      "file": "models/prop_lamp.glb",
+      "kind": "prop",
+      "nodes": ["prop_lamp"],
+      "size": [1.19, 5.96, 0.54],
+      "tris": 76
+    },
+    "prop_trafficlight": {
+      "file": "models/prop_trafficlight.glb",
+      "kind": "prop",
+      "nodes": ["prop_trafficlight"],
+      "size": [0.56, 5.0, 0.56],
+      "tris": 68
+    },
+    "prop_tree_a": {
+      "file": "models/prop_tree_a.glb",
+      "kind": "prop",
+      "nodes": ["prop_tree_a"],
+      "size": [3.719, 6.941, 3.403],
+      "tris": 70
+    },
+    "prop_tree_b": {
+      "file": "models/prop_tree_b.glb",
+      "kind": "prop",
+      "nodes": ["prop_tree_b"],
+      "size": [4.5, 9.0, 3.897],
+      "tris": 50
+    },
+    "prop_truck": {
+      "file": "models/prop_truck.glb",
+      "kind": "prop",
+      "nodes": ["prop_truck"],
+      "size": [2.59, 3.3, 8.59],
+      "tris": 150,
+      "tint": {"part": "body paint", "mask": "COLOR_0 alpha: 1 = paint (multiply the tint color in), 0 = never tint", "blend": "multiply", "colors": ["#2f62c9", "#e0372f", "#3fa652", "#f5f5f0", "#aab2bc"]}
+    }
+  }
+}

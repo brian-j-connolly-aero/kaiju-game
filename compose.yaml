@@ -1,0 +1,62 @@
+# Monster Battle 9001: the game server plus a Cloudflare Tunnel that lets friends reach it.
+# Works with "podman compose" and "docker compose". The owner's guide is docs/HOSTING.md;
+# host/start.cmd (Windows) and host/start.sh (Linux, WSL) run this for you.
+#
+#   Quick tunnel (default, no account needed):
+#     docker compose up -d --build            (or: podman compose up -d --build)
+#     the tunnel's log shows a https://<random words>.trycloudflare.com address
+#
+#   Named tunnel (your own domain; put TUNNEL_TOKEN in a file called .env, see .env.example):
+#     docker compose --profile named up -d --build game named-tunnel
+#
+# Settings are read from .env next to this file when it exists (never commit it).
+
+name: monster-battle
+
+services:
+  game:
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: monster-battle-9001:local
+    restart: unless-stopped
+    # A tiny init process passes stop requests on and cleans up after the server.
+    init: true
+    stop_grace_period: 10s
+    ports:
+      # The host's own browser opens http://localhost:2567 (MB_PORT in .env changes it).
+      - "${MB_PORT:-2567}:2567"
+    environment:
+      PORT: "2567"
+      MB_QUIET: "${MB_QUIET:-0}"
+      # Your own address (named tunnel), so invites copied in the game use it. Empty: the game
+      # learns the quick tunnel's address from the requests that come through it.
+      MB_PUBLIC_URL: "${MB_PUBLIC_URL:-}"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:2567/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # Quick tunnel: Cloudflare hands out a random address that changes on every start.
+  tunnel:
+    image: docker.io/cloudflare/cloudflared:2026.10.7
+    restart: unless-stopped
+    command: ["tunnel", "--no-autoupdate", "--url", "http://game:2567"]
+    stop_grace_period: 5s
+    depends_on:
+      - game
+
+  # Named tunnel: your own address on your own domain. Started only when asked for
+  # (--profile named), and only with a token in .env.
+  named-tunnel:
+    image: docker.io/cloudflare/cloudflared:2026.10.7
+    restart: unless-stopped
+    profiles: ["named"]
+    command: ["tunnel", "--no-autoupdate", "run"]
+    stop_grace_period: 5s
+    environment:
+      TUNNEL_TOKEN: "${TUNNEL_TOKEN:-}"
+    depends_on:
+      - game

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Faction: Coalition of Faiths. Two hands pressed together, seen from the side (the thumb and a sliver of the far hand show), a cuff below, light around the fingertips. No symbol of any one faith. -->
+  <g transform="rotate(10 30 36)">
+    <path fill="currentColor" stroke="none" d="M20 45V22Q20 12 28 8 36 12 36 22V33.5H39V30Q39 25.5 43.5 22.5 47.5 26 47 31.5L45 45Z"/>
+    <path fill="currentColor" stroke="none" d="M13.5 45V23Q13.5 13.5 20 9.5L22 12Q17 16 17 23V45Z"/>
+    <path fill="currentColor" stroke="none" d="M13 48.5H46L47.3 58.5H11.7Z"/>
+  </g>
+  <path d="M17.5 10.5L12.5 5M11 22L4.5 19.5M43 9.5L48 4.5M53 19L59.5 16.5"/>
+</svg>

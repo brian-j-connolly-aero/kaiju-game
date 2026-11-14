@@ -1,0 +1,206 @@
+/**
+ * The HTTP side of the one port: a health check, the built client when there is one, and a
+ * fallback so any page address opens the game. Matchmaking requests and the WebSocket upgrade
+ * are handled by the room library on the same server before a request ever gets here.
+ *
+ * Every address is relative to wherever the page was loaded from, so the same build works on
+ * localhost, on a LAN address and behind a tunnel or reverse proxy on a single hostname.
+ */
+
+import { pageIdOf, ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH } from '@mb/shared';
+import { existsSync, readFileSync, statSync } from 'node:fs';
+import { extname, join } from 'node:path';
+import express, { type Application, type NextFunction, type Request, type Response } from 'express';
+import type { PerfReport } from '../room/perf';
+import type { PublicAddress } from './publicUrl';
+
+export interface HealthInfo {
+  ok: true;
+  game: string;
+  protocol: number;
+  /** The build stamp a page must carry to join (shared/src/net/build.ts). */
+  build: string;
+  /** Seconds since the server started. */
+  uptime: number;
+  rooms: number;
+  players: number;
+  fast: boolean;
+  /** Timing of the room loop over the most recent match updates (room/perf.ts). */
+  perf: PerfReport;
+  /**
+   * The address friends open (MB_PUBLIC_URL, or the quick tunnel's address learned from
+   * requests that came through it; http/publicUrl.ts), or null while it is not known.
+   */
+  publicUrl: string | null;
+}
+
+export interface AppOptions {
+  /** Folder with the built client (it need not exist yet), or null to serve no page. */
+  clientDir: string | null;
+  health: () => HealthInfo;
+  /** Learns the public address from requests that come through a quick tunnel (http/publicUrl.ts). */
+  publicAddress?: PublicAddress;
+  /** Room chatter; may be switched off. */
+  log?: (line: string) => void;
+}
+
+/** File names the bundler stamps with a content hash never change, so browsers may keep them. */
+const HASHED_ASSET = /-[A-Za-z0-9_-]{8}\.(?:js|css|woff2?)$/;
+
+/**
+ * Kinds of file the client build also ships gzip-compressed, as `<name>.gz` next to the original
+ * (scripts/precompress.mjs). The models, the code and the data shrink to about a quarter, so a
+ * friend's first load over the tunnel is four times lighter. Pictures and sounds are already
+ * compressed and are always sent as they are.
+ */
+const PRECOMPRESSED = new Set(['.js', '.css', '.json', '.glb', '.svg']);
+
+function cacheControlFor(filePath: string): string {
+  return HASHED_ASSET.test(filePath) ? 'public, max-age=31536000, immutable' : 'no-cache';
+}
+
+/**
+ * Sends `<file>.gz` with `Content-Encoding: gzip` when the browser accepts gzip and the build
+ * made one; otherwise passes the request on to the plain file. `X-File-Size` carries the
+ * original size, which the model loader reads to draw an honest loading bar.
+ */
+function precompressed(dir: string) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if ((req.method !== 'GET' && req.method !== 'HEAD') || !PRECOMPRESSED.has(extname(req.path))) {
+      next();
+      return;
+    }
+    // Whichever file is sent, caches must keep the two versions apart.
+    res.vary('Accept-Encoding');
+    if (!req.acceptsEncodings('gzip')) {
+      next();
+      return;
+    }
+    let rel: string;
+    try {
+      rel = decodeURIComponent(req.path).replace(/^\/+/, '');
+    } catch {
+      next();
+      return;
+    }
+    // Only plain paths inside the client folder; sendFile refuses ".." as well.
+    if (rel === '' || rel.includes('\0') || rel.split('/').some((part) => part === '..' || part.startsWith('.'))) {
+      next();
+      return;
+    }
+    let size: number;
+    try {
+      const plain = statSync(join(dir, rel));
+      if (!plain.isFile() || !statSync(join(dir, `${rel}.gz`)).isFile()) throw new Error('no pair');
+      size = plain.size;
+    } catch {
+      next();
+      return;
+    }
+    res.type(extname(rel));
+    res.setHeader('Content-Encoding', 'gzip');
+    res.setHeader('X-File-Size', String(size));
+    res.setHeader('Cache-Control', cacheControlFor(rel));
+    res.sendFile(`${rel}.gz`, { root: dir }, (err) => {
+      if (!err || res.headersSent) return;
+      res.removeHeader('Content-Encoding');
+      res.removeHeader('X-File-Size');
+      res.removeHeader('Content-Type');
+      next();
+    });
+  };
+}
+
+const NO_CLIENT_NOTE =
+  'Monster Battle 9001: the game server is running, but the game page has not been built yet.\n' +
+  'Run "npm run build" and reload, or use "npm run dev" while developing.\n';
+
+/**
+ * The page part of the build stamp for the page this server serves: the hashed name of the
+ * script its index.html starts, or '' when there is no built page (development, tests). Read
+ * afresh every time, so a client rebuilt while the server runs is noticed.
+ */
+export function servedPageId(clientDir: string | null): string {
+  if (!clientDir) return '';
+  let html: string;
+  try {
+    html = readFileSync(join(clientDir, 'index.html'), 'utf8');
+  } catch {
+    return '';
+  }
+  for (const tag of html.matchAll(/<script\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/gi)) {
+    const id = pageIdOf(tag[1]);
+    if (id) return id;
+  }
+  return '';
+}
+
+/** The room code a page address ends in ("/BCDF", "/join/bcdf/"), or '' when it does not end in one. */
+export function roomCodeInPath(path: string): string {
+  const last = path.split('/').filter(Boolean).pop() ?? '';
+  const code = last.toUpperCase();
+  if (code.length !== ROOM_CODE_LENGTH) return '';
+  for (const letter of code) if (!ROOM_CODE_ALPHABET.includes(letter)) return '';
+  return code;
+}
+
+export function configureApp(app: Application, options: AppOptions): void {
+  app.disable('x-powered-by');
+
+  // Every page load and health check that came through the quick tunnel says which address it
+  // came in on. The start scripts ask /healthz through the tunnel for exactly this reason.
+  const publicAddress = options.publicAddress;
+  if (publicAddress) {
+    app.use((req: Request, _res: Response, next: NextFunction) => {
+      if (publicAddress.observe(req.headers.host)) options.log?.(`public address: ${publicAddress.get() ?? ''}`);
+      next();
+    });
+  }
+
+  app.get('/healthz', (_req: Request, res: Response) => {
+    res.set('Cache-Control', 'no-store');
+    res.json(options.health());
+  });
+
+  const dir = options.clientDir;
+  if (dir) {
+    app.use(precompressed(dir));
+    app.use(
+      express.static(dir, {
+        index: false,
+        setHeaders(res, filePath) {
+          res.setHeader('Cache-Control', cacheControlFor(filePath));
+        },
+      }),
+    );
+  }
+
+  // The root, and any other address a browser navigates to, opens the game. A request for a
+  // missing file (it has an extension) and a request that does not ask for a page stay a 404,
+  // so a missing model or sound is reported as missing instead of as a web page.
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const isRead = req.method === 'GET' || req.method === 'HEAD';
+    const asksForPage = extname(req.path) === '' && (req.headers.accept ?? '').includes('text/html');
+    if (!isRead || !(req.path === '/' || asksForPage)) {
+      next();
+      return;
+    }
+    if (req.path !== '/') {
+      // The page finds its script and assets relative to its own address, so it only works at
+      // the root: send every deeper address there. Somebody who typed the room code as a path
+      // ("host/BCDF" instead of "host/#BCDF") still lands in that room.
+      const query = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
+      const code = roomCodeInPath(req.path);
+      res.set('Cache-Control', 'no-store');
+      res.redirect(302, `/${query}${code ? `#${code}` : ''}`);
+      return;
+    }
+    if (dir && existsSync(join(dir, 'index.html'))) {
+      res.set('Cache-Control', 'no-cache');
+      // Relative to `root`, so a dot folder somewhere above the client is not mistaken for a hidden file.
+      res.sendFile('index.html', { root: dir });
+    } else {
+      res.type('text/plain').send(NO_CLIENT_NOTE);
+    }
+  });
+}
