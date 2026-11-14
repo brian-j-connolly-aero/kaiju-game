@@ -2,9 +2,13 @@
  * The command wheel: four pictograms around a hub (DESIGN.md section 5). Follow me is up,
  * move to is right, fire at will is down, hold fire and charge is left; each also shows the
  * glyph of its direct button.
+ *
+ * These are orders to the squad's three other units, not weapons (the leader has one weapon,
+ * on Fire). The pictures say so: the hub is the three of them, in the army's cyan circles, and
+ * the two orders they are following right now (one movement, one fire mode) carry a cyan dot.
  */
 
-import type { CommandId } from '@mb/shared';
+import type { CommandId, SnapSquad } from '@mb/shared';
 import { glyphFor, type Bindings, type ButtonAction, type InputDevice } from '../game/input/actions';
 import type { WheelState } from '../game/controllers/humanController';
 import { el, glyph, icon, setGlyph } from './icons';
@@ -19,27 +23,33 @@ const ENTRIES: Array<{ id: CommandId; icon: string; action: ButtonAction; place:
 export class CommandWheel {
   readonly root = el('div', 'wheel hidden');
   private readonly slices = new Map<CommandId, { root: HTMLElement; glyph: HTMLElement; action: ButtonAction }>();
+  private readonly hub = el('div', 'wheel-hub', [el('div', 'wheel-mate'), el('div', 'wheel-mate'), el('div', 'wheel-mate')]);
   private readonly pointer = el('div', 'wheel-pointer');
   private lastDevice = '';
 
   constructor() {
     for (const entry of ENTRIES) {
       const g = glyph(null, 'wheel-glyph');
-      const slice = el('div', `wheel-slice wheel-${entry.place}`, [icon(entry.icon), g]);
+      const slice = el('div', `wheel-slice wheel-${entry.place}`, [icon(entry.icon), g, el('div', 'wheel-now')]);
       this.slices.set(entry.id, { root: slice, glyph: g, action: entry.action });
       this.root.append(slice);
     }
-    this.root.append(el('div', 'wheel-hub'), this.pointer);
+    this.root.append(this.hub, this.pointer);
   }
 
-  update(state: WheelState, bindings: Bindings, device: InputDevice): void {
+  /** `squad` is the player's own squad (its standing orders are marked), or null. */
+  update(state: WheelState, bindings: Bindings, device: InputDevice, squad: SnapSquad | null = null): void {
     this.root.classList.toggle('hidden', !state.open);
     if (!state.open) return;
     if (device !== this.lastDevice) {
       this.lastDevice = device;
       for (const slice of this.slices.values()) setGlyph(slice.glyph, glyphFor(bindings, slice.action, device));
     }
-    for (const [id, slice] of this.slices) slice.root.classList.toggle('on', state.highlight === id);
+    for (const [id, slice] of this.slices) {
+      slice.root.classList.toggle('on', state.highlight === id);
+      const now = squad !== null && (id === 'follow' ? squad.moveOrder === 'follow' : id === 'moveTo' ? squad.moveOrder === 'moveTo' : id === 'fireAtWill' ? squad.fireMode !== 'charge' : squad.fireMode === 'charge');
+      slice.root.classList.toggle('now', now);
+    }
     this.pointer.style.transform = `translate(${(state.x * 70).toFixed(1)}px, ${(-state.y * 70).toFixed(1)}px)`;
   }
 }

@@ -28,7 +28,9 @@ import type { ActionState } from '../input/actions';
 import { clearOfWalls, easeClearance } from './cameraClearance';
 import { aimCamera, setLens, type ControlContext, type Controller, type InputSample } from './types';
 
-const PITCH_LIMIT = 80 * DEG;
+/** How far the view may look up or down, in both cameras. */
+export const HUMAN_PITCH_LIMIT = 80 * DEG;
+const PITCH_LIMIT = HUMAN_PITCH_LIMIT;
 const AIM_RANGE = 900;
 
 export interface WheelState {

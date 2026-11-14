@@ -190,6 +190,11 @@ export class InputManager {
     if (!this.everLocked && this.lockRefusals >= LOCK_GIVE_UP) this.lockGivenUp = true;
   }
 
+  private onPageButton(e: Event): boolean {
+    const t = e.target as HTMLElement | null;
+    return t !== null && (t.tagName === 'BUTTON' || t.tagName === 'A' || t.tagName === 'SELECT');
+  }
+
   private typing(e: Event): boolean {
     const t = e.target as HTMLElement | null;
     return t !== null && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA');
@@ -197,6 +202,9 @@ export class InputManager {
 
   private readonly onKeyDown = (e: KeyboardEvent): void => {
     if (this.typing(e)) return;
+    // In the menus Enter and Space press the focused page button; they are not game keys then
+    // (Enter would also open the controls card).
+    if (!this.gameKeys && (e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'Space') && this.onPageButton(e)) return;
     this.keys.add(e.code);
     this.tapped.add(e.code);
     this.state.device = 'keyboard';

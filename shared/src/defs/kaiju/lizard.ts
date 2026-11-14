@@ -213,7 +213,8 @@ export const LIZARD: KaijuKindDef = {
       cooldown: 0,
       rageCost: 100,
       moveMult: 0,
-      // Polish pass (docs/STATUS.md section 15): wider, slower to steer, and it fights back.
+      // Wider, slower to steer, and it fights back (docs/STATUS.md, "Polish pass: the monster's
+      // combat feel").
       turnMult: 0.25,
       range: [60, 220, 600],
       width: [2.2, 7.5, 21],

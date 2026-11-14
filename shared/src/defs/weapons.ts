@@ -26,8 +26,8 @@ export const PROJECTILE_TYPES: Readonly<Record<ProjectileTypeId, ProjectileTypeD
  * 1 and 2: one squad's full-charge volley stays under the kaiju's nerve capacity from any side
  * and even as a one-player crossfire (54 from the front, 92 from behind or crossed). Level 3 is
  * counted per tank, the way a player sees it: each tank of a troop is worth nearly what a level 2
- * tank is, so a charged volley of about ten tanks breaks the titan from the front (docs/STATUS.md
- * section 15). One squad still never breaks it alone in a match where another squad is left:
+ * tank is, so a charged volley of about ten tanks breaks the titan from the front (docs/STATUS.md,
+ * "Polish pass: the monster's combat feel"). One squad still never breaks it alone in a match where another squad is left:
  * that is the two-squad rule in the damage system.
  * Structure damage: a stray projectile dents a building rather than flattening it, so misses
  * cost the humans the bar without filling it for the kaiju.

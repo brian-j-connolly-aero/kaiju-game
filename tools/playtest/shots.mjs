@@ -217,12 +217,13 @@ async function main() {
       await sleep(150);
       await page.keyboard.up('KeyQ');
       await sleep(250);
-      await shot('1-shockwave');
-      await sleep(400);
-      await shot('2-units-jolt');
+      // Counted before the pictures: a screenshot can take longer than a unit stays shaken.
       const shaken = await page.evaluate(() => window.__mb.internals.ctx.client.local.world.units.slice(0, 8).filter((u) => u.shaken > 0).length);
       console.log(`shots: x-kaiju-roar: ${shaken} of 8 units shaken by the roar`);
       if (shaken === 0) throw new Error('x-kaiju-roar: the roar shook no unit');
+      await shot('1-shockwave');
+      await sleep(400);
+      await shot('2-units-jolt');
       await sleep(1500);
       await shot('3-backing-off');
     });

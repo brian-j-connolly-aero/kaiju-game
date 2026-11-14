@@ -271,7 +271,8 @@ describe('the Army (DESIGN.md section 5)', () => {
       expect(damage).toBeGreaterThanOrEqual(38);
       expect(damage).toBeLessThan(38.5);
       // Tuned per level with the balance harness (docs/BALANCE.md). Level 3 is counted per tank
-      // since the polish pass (docs/STATUS.md section 15): see the next test.
+      // since the polish pass (docs/STATUS.md, "Polish pass: the monster's combat feel"): see
+      // the next test.
       if (level.level === 3) continue;
       expect(nerve).toBeGreaterThanOrEqual(19);
       expect(nerve).toBeLessThanOrEqual(22);

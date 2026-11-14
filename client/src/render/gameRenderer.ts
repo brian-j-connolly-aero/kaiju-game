@@ -576,9 +576,9 @@ export class GameRenderer {
         }
       } else {
         // The unit jolts: a puff of dust kicked up, a pale flash and a small ring round it.
-        fx.dust(p.x, 0.5, p.z, p.r * 1.4, 4, 0xe0d4c0);
-        fx.ring(p.x, p.z, p.r * 2.5, 0xffe0a0, 0.45, 0.9);
-        fx.glowAt(p.x, p.r * 0.8 + 1, p.z, p.r * 2.2, 0xfff0c8, 0.18, 0.9);
+        fx.dust(p.x, 0.5, p.z, p.r * 1.4, 5, 0xe0d4c0);
+        fx.ring(p.x, p.z, p.r * 2.5, 0xffe0a0, 0.8, 0.9);
+        fx.glowAt(p.x, p.r * 0.8 + 1, p.z, p.r * 2.2, 0xfff0c8, 0.5, 0.9);
       }
     }
   }

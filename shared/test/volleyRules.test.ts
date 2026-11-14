@@ -236,7 +236,8 @@ describe('it takes two squads to break the kaiju', () => {
   });
 });
 
-describe('a volley of about ten tanks (the polish pass, docs/STATUS.md section 15)', () => {
+// The polish pass after the first playtest: docs/STATUS.md, "Polish pass: the monster's combat feel".
+describe('a volley of about ten tanks', () => {
   /** Wears a unit down to `members` (0: destroyed) the way fire would. */
   function wear(world: World, id: number, members: number): void {
     const u = world.units[id];

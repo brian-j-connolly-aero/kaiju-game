@@ -39,21 +39,24 @@ arc reaches the moon at the end of the night.
 
 Gragnor shrugs off scattered fire. What breaks it is two squads firing **charged volleys** at
 it within a few seconds of each other: then it staggers, helpless for five seconds, with its
-weak point glowing, and takes four times the damage. That is the army's whole game.
+weak point glowing, and takes four times the damage. That is the army's whole game. (If yours
+is the last squad standing, your volleys alone are enough.)
 
 ## Controls
 
-Press **H** (or click the left stick on a controller) at any time to open the controls card;
-press it again to close it. The game keeps running behind it.
+Press **H** or **Enter** (or click the left stick on a controller) at any time to open the
+controls card; press it again to close it. The game keeps running behind it. Its picture, a card
+with its button under it, is always the last picture at the bottom right of the screen, and it
+glows for the first 20 seconds of a match.
 
 | What | Keyboard and mouse | Controller |
 | --- | --- | --- |
 | Move | W A S D, or the arrow keys | Left stick |
 | Look and aim | Mouse | Right stick |
 | Map | M or Tab | Back (View) |
-| First or third person view | V | Click the right stick |
+| First or third person view (you keep looking the same way) | V | Click the right stick |
 | Settings | Escape | Start (Menu) |
-| Controls card | H | Click the left stick |
+| Controls card | H or Enter | Click the left stick |
 
 **Monster**
 
@@ -71,11 +74,17 @@ press it again to close it. The game keeps running behind it.
 | What | Keyboard and mouse | Controller |
 | --- | --- | --- |
 | Fire (also sets off your squad's volley) | Left button | Right trigger |
-| Command wheel (hold, point, let go) | Right button, or Q | Left bumper |
+| Command wheel: orders to your three other units (hold, point, let go) | Right button, or Q | Left bumper |
 | Follow me / Move to / Fire at will / Hold and charge | 1 / 2 / 3 / 4 | D-pad up / right / down / left |
 | Artillery (stage 3 only) | E | X |
 | On the open map: move here / artillery here | Left click / right click | A / X |
 | When your squad is wiped out, as a camera drone: up / down | Space / C | A / B |
+
+Your squad has one weapon (rockets at first, then a tank gun, then a troop of tanks), always on
+Fire; there is nothing to switch. The command wheel is not a weapon picker: its four pictures
+are orders for the other three units of your squad (the three blue circles in its middle). The
+two orders they are following right now have a blue dot, and when you give a new one the two
+small order pictures at the bottom left of the screen pop.
 
 ![The squad's controls card](progress/controls-squad.png)
 
@@ -106,14 +115,16 @@ press it again to close it. The game keeps running behind it.
 ## Five tips for the monster
 
 1. Wreck buildings, not soldiers. Only the skyline wins; chasing tanks wastes the clock.
-2. Watch for yellow laser lines: a squad is charging a volley. Roar to wipe their charge, or
-   brace and face them.
+2. Watch for yellow laser lines: a squad is charging a volley. Roar: every soldier and tank
+   inside the orange shockwave flinches, loses its charge, stops firing for a few seconds and
+   backs away. Or brace and face them.
 3. Face the guns. Hits on your back and sides hurt much more than hits on your front.
 4. Shed your skin somewhere quiet. For ten seconds you are a helpless cocoon, but when you
    burst out, every squad close by is blown away.
 5. Hold the right button next to a car, a kiosk or a wrecked tank (or with something in your
    hand) to eat it and heal. Throw cars and building chunks
-   at squads; save the beam for a row of tall buildings.
+   at squads; save the beam for a row of tall buildings. The beam bucks and pulls to one side
+   as it burns: keep steering it back.
 
 ## Five tips for the army
 
@@ -122,6 +133,7 @@ press it again to close it. The game keeps running behind it.
 2. Come at it from different sides. Its back takes the most damage, and shots from two
    directions shake its nerve faster.
 3. When it staggers (it freezes and its weak spot glows), everybody fires everything.
-4. Spread out. A roar wipes the charge of everyone near it, and a stomp throws squads around.
+4. Spread out. A roar shakes everyone near it (no firing for a few seconds, charge gone), and
+   a stomp throws squads around.
 5. Every miss lands somewhere, and the city is the monster's score. Aim at the monster, not at
    the building behind it. At stage 3, use E or the map's right click for artillery.

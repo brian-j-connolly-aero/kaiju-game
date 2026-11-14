@@ -5,9 +5,15 @@
  * not snap the view around: the head swings to its limit and the body lumbers after it.
  *
  * First person sits on the rig's `cam_fp` node (own snout and claws in view); the toggle gives
- * a chase camera behind the body. In the chase camera the aim sent to the server runs from the
- * kaiju's eye (its mouth while the beam is on) to whatever the camera's center ray lands on, so
- * the crosshair shows where a throw or the beam goes.
+ * a chase camera behind the body. Both cameras look in exactly the same direction (`viewYaw`,
+ * `viewPitch`: the head's), with the same limits, so the toggle changes where the camera sits
+ * and never where the player is looking. The chase camera hangs behind a point above the
+ * kaiju's shoulders along that direction. In the chase camera the aim sent to the server runs
+ * from the kaiju's eye to whatever the camera's center ray lands on, so the crosshair shows
+ * where a throw goes.
+ *
+ * While the head is not the player's (the beam drags it, or the kaiju is staggered) both
+ * cameras ride the head as the server has it, and the mouse only says where it should go.
  */
 
 import type * as THREE from 'three';
@@ -18,9 +24,8 @@ import {
   createAimPoint,
   DEG,
   kaijuEyePoint,
-  kaijuMouthPoint,
+  kaijuKindDef,
   kaijuStageDef,
-  lerpAngle,
   resolveAimPoint,
   wrapAngle,
   type AimPoint,
@@ -31,19 +36,15 @@ import { aimCamera, setLens, type ControlContext, type Controller, type InputSam
 
 /** How far the desired heading may run ahead of the body: enough to ask for a turn-around. */
 const MAX_HEADING_LEAD = 150 * DEG;
-const PITCH_LIMIT = 62 * DEG;
+/** How far the view may look up or down, in both cameras. */
+export const KAIJU_PITCH_LIMIT = 62 * DEG;
+const PITCH_LIMIT = KAIJU_PITCH_LIMIT;
 /** How high the chase camera may rise over a wall behind the kaiju, in body heights. */
 const MAX_LIFT = 2;
-
-/** Where the chase camera wants to be and what it looks at, before walls. */
-interface ChasePose {
-  x: number;
-  y: number;
-  z: number;
-  lookX: number;
-  lookY: number;
-  lookZ: number;
-}
+/** The chase camera hangs from a point this many body heights up, over the shoulders. */
+const CHASE_PIVOT = 1.25;
+/** The lowest the chase camera goes (body heights): looking up, it slides along the ground. */
+const CHASE_FLOOR = 0.12;
 
 /**
  * The lift (body heights) that takes a chase camera at `wanted`, hanging from `pivot` above
@@ -72,10 +73,16 @@ export class KaijuController implements Controller {
   /** What is sent to the server: the view in first person, the crosshair's target in third. */
   sendYaw = 0;
   sendPitch = 0;
+  /**
+   * Where both cameras look: the head's direction. The wanted heading clamped to the head's
+   * reach from the body (DESIGN.md section 4), or the head as the server has it while the
+   * player does not steer it.
+   */
+  viewYaw = 0;
+  viewPitch = 0;
   /** Where the crosshair lands (third person). */
   readonly aimPoint: AimPoint = createAimPoint();
   private started = false;
-  private chaseYaw = 0;
   private orbit = 0;
   /** How much of the way from the body to the wanted camera position is free of walls (eased). */
   private clear = 1;
@@ -84,7 +91,8 @@ export class KaijuController implements Controller {
   /** How far in the cocoon camera has come to stay clear of the buildings around (eased). */
   private orbitClear = 1;
   private readonly pivot = { x: 0, y: 0, z: 0 };
-  private readonly chase: ChasePose = { x: 0, y: 0, z: 0, lookX: 0, lookY: 0, lookZ: 0 };
+  /** Where the chase camera is this frame. */
+  private readonly chase = { x: 0, y: 0, z: 0 };
   private readonly eye = { x: 0, y: 0, z: 0 };
 
   constructor(thirdPerson = false) {
@@ -96,6 +104,24 @@ export class KaijuController implements Controller {
     return !this.thirdPerson && this.clear < 0.999;
   }
 
+  /** Whether the player steers the head right now (not while the beam drags it, or helpless). */
+  private headFree(k: SnapKaiju): boolean {
+    if (k.phase === 'stagger' || k.phase === 'cocoon' || k.phase === 'dead') return false;
+    const def = kaijuKindDef(k.kind);
+    return !(k.action === 'special' && k.phase === def.actions.special.activePhase);
+  }
+
+  /** The direction both cameras look this frame (see `viewYaw`). */
+  private placeView(k: SnapKaiju): void {
+    if (this.headFree(k)) {
+      this.viewYaw = clampAngleAround(this.aimYaw, k.yaw, kaijuKindDef(k.kind).headLeadMax);
+      this.viewPitch = this.aimPitch;
+    } else {
+      this.viewYaw = k.aimYaw;
+      this.viewPitch = clamp(k.aimPitch, -PITCH_LIMIT, PITCH_LIMIT);
+    }
+  }
+
   update(ctx: ControlContext): void {
     const k = ctx.frame.localKaiju;
     const input = ctx.input;
@@ -103,7 +129,6 @@ export class KaijuController implements Controller {
     if (!this.started) {
       this.started = true;
       this.aimYaw = k.yaw;
-      this.chaseYaw = k.yaw;
     }
     if (input.pressed.camera) {
       this.thirdPerson = !this.thirdPerson;
@@ -121,10 +146,12 @@ export class KaijuController implements Controller {
     this.aimPitch = clamp(this.aimPitch, -PITCH_LIMIT, PITCH_LIMIT);
     this.sendYaw = this.aimYaw;
     this.sendPitch = this.aimPitch;
+    this.placeView(k);
     if (this.thirdPerson && k.phase !== 'cocoon' && k.phase !== 'dead') {
-      this.chaseYaw = lerpAngle(this.chaseYaw, this.aimYaw, 1 - Math.exp(-ctx.dt * 9));
       this.placeChase(ctx, k);
-      if (!input.aimOverride) this.aimFromCamera(ctx, k);
+      // (While the head is not the player's the camera rides it, and aiming from the camera
+      // would steer the head by its own picture: the mouse's wish goes out as it is.)
+      if (!input.aimOverride && this.headFree(k)) this.aimFromCamera(ctx, k);
     }
     ctx.session.aimYaw = this.sendYaw;
     ctx.session.aimPitch = this.sendPitch;
@@ -151,23 +178,22 @@ export class KaijuController implements Controller {
   }
 
   /**
-   * The chase camera for this frame: behind and above along the lazily turning heading. A wall
-   * behind the kaiju does not pull the camera in against its back (the view would be nothing
-   * but spines); the camera rises over the wall instead, and looks down past the shoulders.
-   * Only when no height up to MAX_LIFT clears it (a titan wading through towers) does it come in.
+   * The chase camera for this frame: it hangs behind a point over the kaiju's shoulders, back
+   * along the view direction, and looks along it (so the crosshair is the same line as in
+   * first person, seen from behind). Looking up it slides down toward the ground instead of
+   * going under it. A wall behind the kaiju does not pull the camera in against its back (the
+   * view would be nothing but spines); the camera rises over the wall instead. Only when no
+   * height up to MAX_LIFT clears it (a titan wading through towers) does it come in.
    */
   private placeChase(ctx: ControlContext, k: SnapKaiju): void {
     const st = kaijuStageDef(k.kind, k.stage);
     const back = st.height * 2.3 + st.bodyRadius * 2;
-    const up = st.height * 1.15;
-    const cp = Math.cos(this.aimPitch * 0.6);
+    const cp = Math.cos(this.viewPitch);
     const p = this.chase;
-    p.x = k.x - Math.sin(this.chaseYaw) * back * cp;
-    p.y = Math.max(st.height * 0.25, up - Math.sin(this.aimPitch * 0.6) * back * 0.5);
-    p.z = k.z - Math.cos(this.chaseYaw) * back * cp;
-    p.lookX = k.x + Math.sin(this.chaseYaw) * st.height * 1.5;
-    p.lookY = st.height * 0.7;
-    p.lookZ = k.z + Math.cos(this.chaseYaw) * st.height * 1.5;
+    const pivotY = st.height * CHASE_PIVOT;
+    p.x = k.x - Math.sin(this.viewYaw) * back * cp;
+    p.y = Math.max(st.height * CHASE_FLOOR, pivotY - Math.sin(this.viewPitch) * back);
+    p.z = k.z - Math.cos(this.viewYaw) * back * cp;
     const near = Math.max(0.3, st.height * 0.05);
     this.pivot.x = k.x;
     this.pivot.y = st.height * 0.85;
@@ -188,14 +214,11 @@ export class KaijuController implements Controller {
     }
   }
 
-  /** Third person: aim from the kaiju's eye (or mouth, for the beam) at what the crosshair is on. */
+  /** Third person: aim from the kaiju's eye at what the crosshair is on. */
   private aimFromCamera(ctx: ControlContext, k: SnapKaiju): void {
     const p = this.chase;
-    const dx = p.lookX - p.x;
-    const dy = p.lookY - p.y;
-    const dz = p.lookZ - p.z;
-    const yaw = Math.atan2(dx, dz);
-    const pitch = Math.atan2(dy, Math.hypot(dx, dz));
+    const yaw = this.viewYaw;
+    const pitch = this.viewPitch;
     const st = kaijuStageDef(k.kind, k.stage);
     resolveAimPoint(ctx.session.mirror.query, p.x, p.y, p.z, yaw, pitch, st.height * 40, this.aimPoint);
     const a = this.aimPoint;
@@ -205,18 +228,16 @@ export class KaijuController implements Controller {
       this.sendPitch = clamp(pitch, -PITCH_LIMIT, PITCH_LIMIT);
       return;
     }
-    // The eye (or mouth) moves with the aim heading; one refinement is plenty.
-    const beam = k.action === 'special';
-    const source = { kind: k.kind, stage: k.stage, x: k.x, z: k.z, aimYaw: this.aimYaw };
+    // The eye moves with the aim heading; one refinement is plenty.
+    const source = { kind: k.kind, stage: k.stage, x: k.x, z: k.z, aimYaw: this.viewYaw };
     for (let i = 0; i < 2; i++) {
-      if (beam) kaijuMouthPoint(source, this.eye);
-      else kaijuEyePoint(source, this.eye);
+      kaijuEyePoint(source, this.eye);
       const ex = a.x - this.eye.x;
       const ez = a.z - this.eye.z;
       const flat = Math.hypot(ex, ez);
       if (flat < st.bodyRadius) {
-        this.sendYaw = this.aimYaw;
-        this.sendPitch = this.aimPitch;
+        this.sendYaw = this.viewYaw;
+        this.sendPitch = this.viewPitch;
         return;
       }
       source.aimYaw = Math.atan2(ex, ez);
@@ -272,13 +293,13 @@ export class KaijuController implements Controller {
         camera.position.z = k.z + (camera.position.z - k.z) * this.clear;
       }
       setLens(camera, 72, near, 9000);
-      aimCamera(camera, k.aimYaw, k.aimPitch);
+      this.placeView(k);
+      aimCamera(camera, this.viewYaw, this.viewPitch);
     } else {
       const p = this.chase;
       camera.position.set(p.x, p.y, p.z);
       setLens(camera, 60, Math.max(0.3, st.height * 0.05), 9000);
-      camera.up.set(0, 1, 0);
-      camera.lookAt(p.lookX, p.lookY, p.lookZ);
+      aimCamera(camera, this.viewYaw, this.viewPitch);
     }
   }
 }

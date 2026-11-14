@@ -158,7 +158,7 @@ export class MatchScreen implements Screen {
     hud.update(frame, runtime.session, view, ctx.now());
     const human = runtime.activeHuman;
     if (human) {
-      wheel.update(human.wheel, ctx.input.bindings, input.device);
+      wheel.update(human.wheel, ctx.input.bindings, input.device, frame.squads[runtime.session.role.squadId] ?? null);
       if (human.wheel.open !== this.wheelWasOpen) {
         this.wheelWasOpen = human.wheel.open;
         ctx.audio.play(human.wheel.open ? 'ui_wheel_open' : 'ui_wheel_select');
