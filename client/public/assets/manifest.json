@@ -5459,18 +5459,6 @@
     }
   },
   "ui": {
-    "cmd_fireatwill": {
-      "file": "ui/cmd_fireatwill.svg"
-    },
-    "cmd_follow": {
-      "file": "ui/cmd_follow.svg"
-    },
-    "cmd_holdcharge": {
-      "file": "ui/cmd_holdcharge.svg"
-    },
-    "cmd_moveto": {
-      "file": "ui/cmd_moveto.svg"
-    },
     "fac_air": {
       "file": "ui/fac_air.svg"
     },
@@ -5642,9 +5630,6 @@
     "st_map": {
       "file": "ui/st_map.svg"
     },
-    "st_mark": {
-      "file": "ui/st_mark.svg"
-    },
     "st_moon": {
       "file": "ui/st_moon.svg"
     },
@@ -5659,9 +5644,6 @@
     },
     "st_shaken": {
       "file": "ui/st_shaken.svg"
-    },
-    "st_smoke": {
-      "file": "ui/st_smoke.svg"
     },
     "st_spotted": {
       "file": "ui/st_spotted.svg"

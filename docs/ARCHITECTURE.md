@@ -128,8 +128,8 @@ squads; bots fill empty slots), the city seed, the starting anchor (or -1 for ra
 timers (`MatchTuning`; `fastTuning()` is the `MB_FAST` set) and, optionally, bot handicaps
 (`bots`: 0 is a bot at its best, 1 leaves it standing still; `idleBots()` for tests; and
 `bots.triggerHappy`, a harness profile in which squad bots hold the trigger instead of
-charging volleys). `queueCommand(world, player, command)` is kept for old callers and does
-nothing: since phase 1 there are no squad commands (no wheel, no map orders).
+charging volleys). There are no squad commands since phase 1 (no wheel, no map orders): a
+squad is steered only by its player's input.
 
 People coming and going is one hook: `setPlayerBot(world, player, bot)`. With `true` a bot takes
 the slot over from the next tick, with a blank mind, from whatever state the slot is in (a
@@ -474,9 +474,7 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
   kaijuKind? }`, `setFaction { faction }`, `ready { ready }`, `setOptions { botKaiju? }` (host),
   `start {}` (host; everyone else connected must be ready or `waited`, section 4.1), `toLobby {}`
   (host, on the end screen); in a match `input` (30 Hz):
-  `{ seq, moveX, moveZ, aimYaw, aimPitch, buttons, card? }` and `command` (`SquadCommand`:
-  the old squad orders; the server still accepts and drops it, but no client sends it since the
-  army's phase 1 client, and it is to be removed with the server's handler); any time
+  `{ seq, moveX, moveZ, aimYaw, aimPitch, buttons, card? }`; any time
   `ping { t }`. `draftPick { card }` is accepted and ignored until
   drafts exist. Payload types: `ClientMessages` in `shared/src/net/protocol.ts`. The server
   ignores anything malformed, unknown or out of turn; it never answers with an error.
@@ -513,7 +511,9 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
   monster's old brace, roar and beam; 7 to 9, the squad's old artillery, smoke and mark) are
   free and `sanitizeInput` drops them; the input's old `wheel` and `marker` fields are gone too.
   `card` (1 to 3) is the monster's one-shot molt card pick. The server cleans every input with
-  `sanitizeInput` and every command with `sanitizeCommand` (and then drops the command).
+  `sanitizeInput`. (The old squad `command` message and its validation were removed with the
+  orders in phase 1; a page from before that which still sends one is ignored like any unknown
+  message.)
 - Server helpers: `snapshotOfWorld` + `encodeSnapshot` (encode once, then `setSnapshotAck` per
   client), `welcomeFor(world, player)`. Client helpers: `decodeSnapshot`, `decodeCityState` +
   `cityStateFromWire` (the live city state for local queries and prediction).

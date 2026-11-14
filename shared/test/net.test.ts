@@ -34,6 +34,7 @@ import {
   KAIJU_PHASES,
   makeRoomCode,
   MATCH_PHASES,
+  MATCH_RULES,
   MAX_AIM_PITCH,
   peekSnapshotTick,
   pickKaijuSeat,
@@ -577,7 +578,7 @@ describe('lobby', () => {
     expect(config.players.slice(2).every((p) => p.bot && p.role === 'human')).toBe(true);
     expect(slotBySeat).toEqual([1, 0, -1, -1, -1]);
     expect(config.anchor).toBe(3);
-    expect(config.tuning.clock).toBe(720);
+    expect(config.tuning.clock).toBe(MATCH_RULES.clock);
     // A valid config: the simulation accepts it.
     expect(createWorld({ seed: 1, config }).players.length).toBe(5);
 
@@ -585,6 +586,6 @@ describe('lobby', () => {
     const practice = buildMatchConfig(lobby, -1);
     expect(practice.config.players[0].bot).toBe(true);
     expect(practice.slotBySeat).toEqual([1, 2, -1, -1, -1]);
-    expect(practice.config.tuning.clock).toBeLessThan(720);
+    expect(practice.config.tuning.clock).toBeLessThan(MATCH_RULES.clock);
   });
 });

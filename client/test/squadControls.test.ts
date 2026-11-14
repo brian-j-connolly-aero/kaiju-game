@@ -181,7 +181,7 @@ describe('the squad leader’s two buttons, with the pointer captured', () => {
     expect(frame() & Btn.volley).toBe(0);
   });
 
-  it('sends nothing for the old squad keys (the wheel, the number keys, smoke, mark, artillery)', () => {
+  it('sends nothing for keys that are not the squad’s (the monster’s move and card keys, the old order keys)', () => {
     for (const [code, key] of [
       ['KeyQ', 'q'],
       ['Digit1', '1'],

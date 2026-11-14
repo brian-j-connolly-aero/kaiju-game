@@ -209,8 +209,6 @@ export interface ActionState {
    */
   lookX: number;
   lookY: number;
-  /** The same vertical movement before the inverted-look setting (for an on-screen pointer; the command wheel's was the last, and nothing reads it now). */
-  pointerY: number;
   /** The device used most recently (button glyphs follow it). */
   device: InputDevice;
   /**
@@ -236,7 +234,6 @@ export function createActionState(): ActionState {
     moveZ: 0,
     lookX: 0,
     lookY: 0,
-    pointerY: 0,
     device: 'keyboard',
     aimOverride: null,
   };

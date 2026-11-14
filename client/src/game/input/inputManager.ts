@@ -378,7 +378,6 @@ export class InputManager {
     s.moveZ = moveZ;
     s.lookX = lookX;
     s.lookY = this.invertY ? -lookY : lookY;
-    s.pointerY = lookY;
     s.aimOverride = null;
 
     this.autopilot?.(s, dt);

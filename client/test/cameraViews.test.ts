@@ -119,7 +119,6 @@ function frameInput(input: ActionState, look: { x?: number; y?: number } = {}, p
   }
   input.lookX = look.x ?? 0;
   input.lookY = look.y ?? 0;
-  input.pointerY = look.y ?? 0;
   return input;
 }
 

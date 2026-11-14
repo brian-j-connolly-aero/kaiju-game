@@ -95,7 +95,7 @@ describe('manifest and placeholder art', () => {
   });
 
   it('has placeholder art without text for any icon id', () => {
-    for (const id of ['cmd_follow', 'k_swipe', 'st_health', 'lb_ready', 'tl_tower', 'gp_rt', 'something_new']) {
+    for (const id of ['k_charge', 'k_swipe', 'st_health', 'lb_ready', 'tl_tower', 'gp_rt', 'something_new']) {
       const art = iconArt(id);
       expect(art.length).toBeGreaterThan(20);
       expect(art).not.toContain('<text');

@@ -34,7 +34,7 @@ describe('createWorld', () => {
     expect(world.tick).toBe(0);
     expect(world.match.phase).toBe('briefing');
     expect(world.match.stage).toBe(1);
-    expect(world.match.clock).toBe(720);
+    expect(world.match.clock).toBe(MATCH_RULES.clock);
     expect(world.match.phaseTime).toBe(10);
     expect(world.kaijus.length).toBe(1);
     expect(world.squads.length).toBe(4);

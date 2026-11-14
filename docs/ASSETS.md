@@ -157,8 +157,6 @@ marks). No text inside icons. No third-party icon sets.
   tank from above with arrows forward and back: W and S), `sq_turn` (a tank from above turning,
   curved arrows: A and D), `sq_turret` (a tank's turret swinging round toward a ring where the
   mouse looks).
-- Commands (the old command wheel's orders: no longer drawn since phase 1, kept for the
-  record): `cmd_follow`, `cmd_moveto`, `cmd_fireatwill`, `cmd_holdcharge`.
 - Kaiju verbs: `k_swipe`, `k_stomp`, `k_grab`, `k_throw`, `k_eat`, `k_brace`, `k_roar`,
   `k_special`, `k_molt`, `k_swim` (swimming: a row of spines over the waves; the HUD shows it
   while the kaiju is under water, and the controls card pairs it with deep water), `k_charge`
@@ -168,9 +166,10 @@ marks). No text inside icons. No third-party icon sets.
   `k_brace`; an empty move slot shows `k_molt`, faint.
 - Status: `st_health`, `st_nerve`, `st_rage`, `st_charge`, `st_reload` (one shell: the reload
   meter and the player's own shot), `st_veteran`, `st_spotted`, `st_crossfire`, `st_callin`,
-  `st_shaken`, `st_map`, `st_camera`, `st_sun`, `st_moon`, `st_smoke` (a squad's smoke: a
-  canister and its cloud) and `st_mark` (mark the kaiju: the marker over a kaiju triangle), the
-  last two no longer drawn since smoke and marking went in phase 1.
+  `st_shaken`, `st_map`, `st_camera`, `st_sun`, `st_moon`. (`st_callin` is shown only when an
+  artillery mission is on its way; nothing starts one until phase 2's artillery radio. The old
+  command wheel's four order icons, `cmd_*`, and the smoke and mark icons, `st_smoke` and
+  `st_mark`, were deleted with those controls in phase 1.)
 - Lobby: `lb_kaiju`, `lb_human`, `lb_ready`, `lb_host`, `lb_bot`, `lb_link`, `lb_play`, `lb_back`,
   `lb_create`, `lb_join`.
 - Factions: `fac_army`, `fac_air`, `fac_science`, `fac_faith`.

@@ -57,7 +57,6 @@ const BAR_BOX = { width: 560, height: 46 };
 
 /** The contract: docs/ASSETS.md section 5. `tint` is the color the group wears in the game. */
 const GROUPS = [
-  { id: 'commands', title: 'Commands', tint: 'human', icons: ['cmd_follow', 'cmd_moveto', 'cmd_fireatwill', 'cmd_holdcharge'] },
   {
     id: 'kaiju',
     title: 'Kaiju verbs',
@@ -139,7 +138,6 @@ const COLORS = {
 
 /** A few icons wear a color of their own in the game: the color language, doubled by the shape. */
 const OWN_TINT = {
-  cmd_holdcharge: 'volley',
   st_charge: 'volley',
   st_reload: 'human',
   st_rage: 'kaiju',
@@ -437,12 +435,12 @@ async function sheetRealSizes(page, file) {
   const strips = [];
   const add = (label, sky, html) => strips.push({ label, bg: SKIES[sky] || sky, html });
 
-  // Button glyphs: .wheel-glyph 18 px, .hint-glyph 24 px (19 px on small screens).
+  // Button glyphs: 18 px (small glyphs), .hint-glyph 24 px (19 px on small screens).
   const pad = GROUPS.find((g) => g.id === 'gamepad').icons;
   const mouse = ['ms_left', 'ms_right', 'ms_middle', 'ms_move'];
   for (const px of [18, 19, 24]) {
     add(
-      `button glyphs at ${px} px (${px === 18 ? 'command wheel' : px === 19 ? 'verb hints, small screens' : 'verb hints'}): ${pad.join(' ')} | ${mouse.join(' ')} | kb_key W, M, 1`,
+      `button glyphs at ${px} px (${px === 18 ? 'small glyphs' : px === 19 ? 'verb hints, small screens' : 'verb hints'}): ${pad.join(' ')} | ${mouse.join(' ')} | kb_key W, M, 1`,
       px === 19 ? 'afternoon' : C.darkPanel,
       [...pad, ...mouse].map((n) => `<span style="margin-right:6px;${shadow}">${ic(n, px, C.ink)}</span>`).join('') +
         ['W', 'M', '1'].map((l) => `<span style="margin-right:6px;${shadow}">${keycap(l, px, C.ink)}</span>`).join(''),
@@ -454,7 +452,7 @@ async function sheetRealSizes(page, file) {
   const marks = [['k_molt', 'rgba(255,255,255,.55)'], ['k_molt', C.kaiju], ['k_molt', C.volley], ['lb_kaiju', 'rgba(255,255,255,.55)'], ['lb_kaiju', C.kaiju]];
   for (const sky of ['afternoon', 'sunset', 'night']) {
     add(
-      `HUD on the ${sky} sky: meters 20 px (health, nerve, rage, charge, reload) | bar marks 18 px (k_molt idle, reached, ready; lb_kaiju idle, reached) | clock sun 26, moon 20 | stage pips 18, 28, 42 | orders 30 px`,
+      `HUD on the ${sky} sky: meters 20 px (health, nerve, rage, charge, reload) | bar marks 18 px (k_molt idle, reached, ready; lb_kaiju idle, reached) | clock sun 26, moon 20 | stage pips 18, 28, 42`,
       sky,
       meters.map(([n, c]) => `<span style="margin-right:8px;${shadow}">${ic(n, 20, c)}</span>`).join('') +
         gap(14) +
@@ -462,9 +460,7 @@ async function sheetRealSizes(page, file) {
         gap(14) +
         `<span style="margin-right:8px;filter:drop-shadow(0 0 4px rgba(0,0,0,.8))">${ic('st_sun', 26, C.volley)}</span>${ic('st_moon', 20, C.moon)}` +
         gap(14) +
-        [18, 28, 42].map((px) => `<span style="margin-right:4px">${ic('lb_kaiju', px, C.kaiju)}</span>`).join('') +
-        gap(14) +
-        ['cmd_follow', 'cmd_moveto', 'cmd_fireatwill', 'cmd_holdcharge'].map((n) => `<span style="margin-right:8px;filter:drop-shadow(0 1px 2px #000)">${ic(n, 30, C.human)}</span>`).join(''),
+        [18, 28, 42].map((px) => `<span style="margin-right:4px">${ic('lb_kaiju', px, C.kaiju)}</span>`).join(''),
     );
   }
 
@@ -472,7 +468,7 @@ async function sheetRealSizes(page, file) {
   const tile = (n, px, box, color, border = 'rgba(255,255,255,.3)') =>
     `<span style="display:inline-flex;align-items:center;justify-content:center;width:${box}px;height:${box}px;border-radius:10px;background:rgba(14,18,30,.7);border:2px solid ${border};margin-right:6px">${ic(n, px, color)}</span>`;
   const kaijuVerbs = [...GROUPS.find((g) => g.id === 'kaiju').icons, 'st_camera'];
-  const humanVerbs = ['cmd_fireatwill', 'cmd_holdcharge', 'st_callin', 'st_map', 'st_camera'];
+  const humanVerbs = ['st_reload', 'st_charge', 'st_map', 'st_camera'];
   for (const [px, box] of [[32, 46], [26, 38]]) {
     add(
       `verb hints, ${px} px in a ${box} px tile: ${kaijuVerbs.join(' ')} | ${humanVerbs.join(' ')}`,
@@ -488,24 +484,6 @@ async function sheetRealSizes(page, file) {
       ['k_special', 'k_molt'].map((n) => tile(n, 26, 38, C.volley, C.volley)).join('') +
       tile('k_brace', 26, 38, C.human, C.human),
   );
-
-  // Command wheel: 84 px discs, 40 px icons, 18 px glyphs; on a gamepad the four d-pad directions.
-  const disc = (n, color, glyphHtml, on) =>
-    `<span style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;width:84px;height:84px;border-radius:50%;background:${
-      on ? 'rgba(30,200,224,.35)' : 'rgba(14,18,30,.78)'
-    };border:3px solid ${on ? C.human : 'rgba(255,255,255,.16)'};margin-right:10px">${ic(n, 40, on ? '#fff' : color)}${glyphHtml}</span>`;
-  const wheel = (glyphs) =>
-    disc('cmd_follow', C.human, glyphs[0]) +
-    disc('cmd_moveto', C.human, glyphs[1]) +
-    disc('cmd_fireatwill', C.human, glyphs[2]) +
-    disc('cmd_holdcharge', C.volley, glyphs[3]) +
-    disc('cmd_moveto', C.human, glyphs[1], true);
-  add(
-    'command wheel on a gamepad: up follow, right move to, down fire at will, left hold and charge; last disc: selected',
-    'afternoon',
-    wheel(['gp_dpad_up', 'gp_dpad_right', 'gp_dpad_down', 'gp_dpad_left'].map((n) => ic(n, 18, '#fff'))),
-  );
-  add('command wheel on a keyboard: keys 1 to 4', 'night', wheel(['1', '2', '3', '4'].map((l) => keycap(l, 18, '#fff'))));
 
   // Status pictures: 52 px (spotted 30, eliminated 34), straight on the picture.
   const status = [
@@ -610,19 +588,6 @@ async function sheetClientFixes(page, file) {
     `${ic('kb_key', px, C.ink)}<span style="position:absolute;inset:${inset};display:flex;align-items:center;justify-content:center;font-size:${px * 0.48}px;font-weight:700;line-height:1;${font}">${label}</span></span>`;
   const keys = (inset) => [19, 24, 40].map((px) => ['W', 'M', 'Q', '1', '␣', '⇧', '⏎'].map((l) => key(l, px, inset)).join('')).join('<span style="display:inline-block;width:10px"></span>');
   add('Note 4. Key letter (.glyph-label) at 19, 24 and 40 px: inset 0 now, inset 0 0 17% 0 wanted', C.darkPanel, keys('0'), keys('0 0 17% 0'));
-
-  // Note 5. The reload meter and the fire hint: the fire-at-will command now, the single shell wanted.
-  const reload = (n) =>
-    `<span style="display:inline-flex;align-items:center;gap:6px;margin-right:18px"><span style="filter:drop-shadow(0 1px 1px #000)">${ic(n, 20, C.human)}</span>` +
-    `<span style="display:inline-block;width:120px;height:12px;border-radius:7px;border:2px solid rgba(255,255,255,.35);background:rgba(0,0,0,.55);overflow:hidden"><i style="display:block;width:60%;height:100%;background:${C.human}"></i></span></span>` +
-    `<span style="display:inline-flex;align-items:center;justify-content:center;width:46px;height:46px;border-radius:10px;background:rgba(14,18,30,.7);border:2px solid rgba(255,255,255,.3)">${ic(n, 32, C.ink)}</span>`;
-  add('Note 5. Reload meter (20 px) and fire hint (32 px): cmd_fireatwill now, st_reload wanted', 'afternoon', reload('cmd_fireatwill'), reload('st_reload'));
-
-  // Note 6. The command wheel on a gamepad: four identical glyphs now, the four directions wanted.
-  const disc = (n, color, g) =>
-    `<span style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;width:84px;height:84px;border-radius:50%;background:rgba(14,18,30,.78);border:3px solid rgba(255,255,255,.16);margin-right:10px">${ic(n, 40, color)}${ic(g, 18, '#fff')}</span>`;
-  const wheel = (g) => disc('cmd_follow', C.human, g[0]) + disc('cmd_moveto', C.human, g[1]) + disc('cmd_fireatwill', C.human, g[2]) + disc('cmd_holdcharge', C.volley, g[3]);
-  add('Note 6. Command wheel on a gamepad (PAD_ICONS): gp_dpad four times now, gp_dpad_up / right / down / left wanted', 'night', wheel(['gp_dpad', 'gp_dpad', 'gp_dpad', 'gp_dpad']), wheel(['gp_dpad_up', 'gp_dpad_right', 'gp_dpad_down', 'gp_dpad_left']));
 
   // Note 7. Orange and pale icons straight on the sky: one soft shadow now, a dark outline wanted.
   const hud = (filter, markFilter) =>
@@ -743,19 +708,10 @@ async function sheetInContext(page, file) {
     verb('k_molt', keycap('E', 22, C.onDark), true) +
     `</div></div>`;
 
-  const spoke = (icon, color, glyph, style) =>
-    `<div style="position:absolute;${style};display:flex;flex-direction:column;align-items:center;gap:2px">${ic(icon, 44, color)}${ic(glyph, 20, C.onDark)}</div>`;
   const unit = (extra) => `<div class="chip"><i style="width:14px;height:14px;border-radius:7px;background:${C.human}"></i>${extra}</div>`;
   const humanHud =
     `<div class="scene human">` +
     `<div style="position:absolute;left:70px;top:12px">${skylineBar(420, 0.34, 'skyB')}</div>` +
-    `<div style="position:absolute;left:170px;top:92px;width:220px;height:220px;border-radius:110px;background:rgba(10,12,18,.62)">` +
-    spoke('cmd_follow', C.human, 'gp_dpad_up', 'left:88px;top:6px') +
-    spoke('cmd_moveto', C.human, 'gp_dpad_right', 'right:10px;top:74px') +
-    spoke('cmd_fireatwill', C.human, 'gp_dpad_down', 'left:88px;bottom:6px') +
-    spoke('cmd_holdcharge', C.volley, 'gp_dpad_left', 'left:10px;top:74px') +
-    `<div style="position:absolute;left:94px;top:94px">${ic('gp_lb', 32, C.onDark)}</div>` +
-    `</div>` +
     `<div style="position:absolute;left:12px;bottom:10px;display:flex;flex-direction:column;gap:5px">` +
     unit(ic('st_health', 16, C.onDark)) +
     unit(ic('st_veteran', 16, C.onDark) + ic('st_charge', 16, C.volley)) +
@@ -765,7 +721,6 @@ async function sheetInContext(page, file) {
     `<div style="position:absolute;right:12px;top:92px;display:flex;flex-direction:column;gap:8px;align-items:flex-end">` +
     `<div class="chip">${ic('st_spotted', 26, C.kaiju)}</div>` +
     `<div class="chip">${ic('st_crossfire', 26, C.volley)}</div>` +
-    `<div class="chip">${ic('st_callin', 26, C.onDark)}${ic('gp_rb', 20, C.onDark)}</div>` +
     `</div>` +
     `<div class="row" style="position:absolute;right:12px;bottom:10px">${ic('st_map', 26, C.onDark)}${ic('gp_back', 20, C.onDark)}<span style="width:8px"></span>${ic('st_camera', 26, C.onDark)}${ic('gp_rs', 20, C.onDark)}</div>` +
     `</div>`;
@@ -796,7 +751,7 @@ async function sheetInContext(page, file) {
       `<h1>UI pictograms in context</h1><p class="note">A mock-up to judge the set in use, not the real screens. Humans cyan, kaiju orange, volley yellow; ` +
       `keycaps get their letter from code.</p>` +
       `<h2>Kaiju view: bar, clock, meters, verbs with their buttons</h2><div class="row" style="align-items:flex-start;gap:12px">${kaijuHud}` +
-      `<div><h2 style="margin-top:0">Human view: command wheel, squad, alerts</h2>${humanHud}</div></div>` +
+      `<div><h2 style="margin-top:0">Human view: squad, alerts</h2>${humanHud}</div></div>` +
       `<h2>Lobby</h2>${lobby}` +
       `<h2>End screen tally</h2><div style="background:#e9e4d6;border-radius:6px;padding:10px 12px;display:flex;flex-wrap:wrap;align-items:center;max-width:1132px;row-gap:6px">${tally}</div>`,
   );

@@ -6,10 +6,10 @@ A giant monster, Gragnor, hatches in the harbour city of Port Meridian and tries
 Four army squads try to stop it before the night is over. One player is the monster; the other
 four each lead a squad of four units, and the computer fills any empty seat.
 
-A match is three stages, about ten to twelve minutes in all. Every time Gragnor sheds its skin
-it grows: from a creature the size of a bus, to one taller than the houses, to one that wades
-through skyscrapers. The army grows with it: soldiers with rockets, then tanks, then whole tank
-companies.
+A match is three stages, about eight minutes in all (ten at most). Every time Gragnor sheds
+its skin it grows: from a creature the size of a bus, to one taller than the houses, to one that
+wades through skyscrapers. The army grows with it: soldiers with rockets, then tanks, then whole
+tank companies.
 
 You need a computer (not a phone or tablet) with a keyboard and mouse, or a game controller,
 and an up-to-date Chrome, Edge or Firefox. Nothing to install. Turn the sound on: the radio

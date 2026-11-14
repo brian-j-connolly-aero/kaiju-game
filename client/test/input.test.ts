@@ -290,7 +290,7 @@ describe('the captured mouse', () => {
     expect(input.pointerLocked).toBe(true);
   });
 
-  it('applies the sensitivity and inverted look settings, and leaves the wheel pointer upright', async () => {
+  it('applies the sensitivity and inverted look settings', async () => {
     await capture();
     input.sensitivity = 2;
     browser.mouseMove(100, 50);
@@ -302,7 +302,6 @@ describe('the captured mouse', () => {
     s = input.poll(FRAME);
     expect(s.lookX).toBeCloseTo(100 * MOUSE_SENSITIVITY * 2, 9);
     expect(s.lookY).toBeCloseTo(50 * MOUSE_SENSITIVITY * 2, 9);
-    expect(s.pointerY).toBeCloseTo(-50 * MOUSE_SENSITIVITY * 2, 9);
   });
 
   it('leaves Tab and Space to the browser in the menus and keeps them for the game in a match', () => {

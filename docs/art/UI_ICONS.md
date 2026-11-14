@@ -37,7 +37,6 @@ at its own size here, not at 32:
 
 | Where | Size in pixels | Icons |
 | --- | --- | --- |
-| Button glyphs on the command wheel | 18 | `gp_*`, `ms_*`, `kb_key` |
 | Button glyphs under the verbs | 24 (19 on small screens) | `gp_*`, `ms_*`, `kb_key` |
 | Marks under the destruction bar | 18 | `k_molt`, `lb_kaiju` |
 | Stage pips | 18, 28, 42 | `lb_kaiju` |
@@ -45,9 +44,7 @@ at its own size here, not at 32:
 | Clock | 26 and 20 | `st_sun`, `st_moon` |
 | End screen tally | 22 | `tl_*` |
 | Lobby seats, flags, buttons, notices | 22 to 44 | `lb_*`, `fac_*`, `ui_offline`, `ui_warning`, `ui_copy` |
-| Standing orders | 30 | `cmd_*` |
-| Verb hints | 32 (26 on small screens) | `k_*`, `cmd_*`, `st_callin`, `st_map`, `st_camera` |
-| Command wheel | 40 | `cmd_*` |
+| Verb hints | 32 (26 on small screens) | `k_*`, `st_map`, `st_camera` |
 | Status pictures | 52 (spotted 30, eliminated 34) | `st_crossfire`, `st_shaken`, `st_nerve`, `st_charge`, `st_callin`, `st_spotted`, `ui_offline`, `ui_skull` |
 | End banner | 26 to 67 | `lb_kaiju`, `lb_human`, `ui_trophy`, `tl_tower`, `ui_skull`, `ui_clock` |
 
@@ -69,27 +66,18 @@ wherever the idea appears:
 
 | Shape | Means | Where |
 | --- | --- | --- |
-| Circle | a human unit | `cmd_follow` (the leader), `cmd_holdcharge` (the units), `st_shaken`, `lb_human` |
+| Circle | a human unit | `st_shaken`, `lb_human` |
 | Triangle | the kaiju | `lb_kaiju`, `st_spotted` (the pupil), `st_crossfire` (the target), `k_molt` (inside the cocoon) |
-| Diamond | a volley | `cmd_holdcharge` (the aim point), `st_charge` |
-| Shell | a shot | `cmd_fireatwill` (three in flight), `st_callin` (two falling), `st_reload` (one, standing) |
+| Diamond | a volley | `st_charge` |
+| Shell | a shot | `st_callin` (two falling), `st_reload` (one, standing) |
 
 Two more things are shared on purpose: the Lizard's head (`k_eat`, `k_roar`, `k_special`, and
 lowered in `k_charge`) and its clawed hand (`k_grab` closing, `k_throw` open).
 
 ## The icons
 
-### Commands (the radial wheel)
-
-| File | Meaning | What is drawn |
-| --- | --- | --- |
-| `cmd_follow` | Follow me | Three chevrons trailing a leader (circle) |
-| `cmd_moveto` | Move to this position | An arrow dropping onto a ground marker |
-| `cmd_fireatwill` | Fire at will | Three shells in flight, staggered, each with a speed tick: everyone shoots when they can |
-| `cmd_holdcharge` | Hold fire and charge a volley | Three units aiming their beams at one diamond |
-
-`cmd_fireatwill` and `cmd_holdcharge` are a pair on purpose: three shots each on its own time
-against three units holding on one target.
+(The command wheel's four order icons, `cmd_*`, and the smoke and mark icons were deleted in
+phase 1 with those controls: the squad has two buttons now, `docs/ROADMAP.md`.)
 
 ### Kaiju verbs
 
@@ -208,8 +196,8 @@ Notes for whoever wires the glyphs:
   position, not a letter, so it stays right on pads that print other symbols there.
 - Bumper against trigger: a bumper is **one** bar; a trigger is a thin line **plus** a tab above
   it. Left against right: the side the bar sits on.
-- The command wheel binds its four commands to the four directions of the directional pad; use
-  the four `gp_dpad_<direction>` glyphs there, not `gp_dpad`.
+- The monster's molt cards are picked with three directions of the directional pad (left, up,
+  right); use the `gp_dpad_<direction>` glyphs there, not `gp_dpad`.
 - **Putting the letter on `kb_key`:** the top face of the keycap is centered on **(32, 26.5)** of
   the 64 × 64 box, that is 50% across and 41.4% down. A bold letter about 0.4 to 0.48 of the
   icon's height fits. Either lay web-page (HTML) text over the icon centered on that point (a box with

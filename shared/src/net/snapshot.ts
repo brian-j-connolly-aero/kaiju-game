@@ -6,7 +6,9 @@
  * The layout is fixed and little-endian; `encodeSnapshot` and `decodeSnapshot` are exact
  * inverses up to the quantization noted on each field.
  *
- *   header   u8 magic 'M', u8 version, u32 tick, u32 ackSeq
+ *   header   u8 magic 'M', u8 version (SNAPSHOT_VERSION), u32 tick, u32 ackSeq (two numbers in
+ *            one: the low 24 bits the input sequence played or dropped up to, the top 8 bits the
+ *            inputs after it the server will drop; see `Snapshot.ackSeq`)
  *   match    u8 phase, u8 stage, u16 clock (0.1 s), u16 phaseTime (0.01 s), f32 barPoints,
  *            f32 x 3 marks, u8 marksReached, u8 winner, u8 endReason
  *   counts   u8 kaijus, u8 squads, u8 units

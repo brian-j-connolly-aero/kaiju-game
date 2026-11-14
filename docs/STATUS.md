@@ -4,19 +4,20 @@ Living status file. Keep it short and true: when you finish a task, update what 
 the stubs you filled in, and add any decision the docs left open. Contracts live in
 `ARCHITECTURE.md`; numbers live in `DESIGN.md` and `shared/src/defs/`.
 
-Last updated by: the game server task (everything about `server/`), simulation part 1 (the
-kaiju, damage and nerve, city destruction, projectiles) and simulation part 2 (the human side:
-squads, commands, sub-unit behavior, weapons, volleys, call-ins, lives, veterans, spotting),
-simulation part 3 (match flow and the molt, bots, voice lines, the balance harness and the
-tuning: `docs/BALANCE.md`), the city switch (section 10: the game now plays in Port Meridian) and
-the client core task (everything in `client/`, `tools/playtest/`, `tools/build-manifest.mjs`:
-section 7), the integration task (section 8: what was run end to end, what was measured,
-what is still wrong) and the client's city task (section 11: Port Meridian drawn from its art,
-the last client follow-ups), the client polish (section 12) and the release round (section 13:
-the image rebuilt and played against, compressed downloads, the player guide); the rest is
-from the scaffold task.
+Last updated by: the phase 1 integration (the last section: both sides' phase 1 work run
+together, the leftovers of the old controls removed, matches cut by about a fifth, the game
+played end to end in the browser), after the phase 1 tasks that came out of the first
+multiplayer playtest (`docs/ROADMAP.md`: the monster's new controls and moves and the army's
+two buttons, swarm and tank driving, each in the simulation and on screen; the on-foot stutter
+fix and third person by default; natural voices, started early) and the polish passes before
+them. Earlier: the game server task (everything about `server/`), simulation parts 1 to 3 (the
+kaiju, damage and nerve, the city, projectiles; the squads; match flow, bots, voice lines, the
+balance harness: `docs/BALANCE.md`), the city switch (section 10: the game plays in Port
+Meridian), the client core task (section 7), the integration task (section 8), the client's
+city task (section 11), the client polish (section 12), the release round (section 13) and the
+last fixes before the first playtest (section 14); the rest is from the scaffold task.
 
-**Read section 11.1 first: it says whether `npm run check` passes right now.**
+**Read the last section first: it says whether `npm run check` passes right now.**
 
 ## 1. How to run things
 
@@ -25,7 +26,7 @@ from the scaffold task.
 | `npm install` | Installs the pinned toolchain and the server's dependencies (Express, the room library). |
 | `npm run check` | Type checks all three workspaces, runs `scripts/lint.mjs`, runs every test. The gate. |
 | `npm test` | `vitest run`: every test in `shared/test`, `server/test` and `client/test`, about 40 seconds (the server's integration tests and the whole-match simulation tests take most of it). |
-| `npm run sim` | The balance harness: full bot-versus-bot matches, headless, a few hundred times real speed, one table row per match plus a summary. Options after `--`: `--seeds N` (default 5), `--seed N`, `--unopposed` (no squads), `--kaiju-handicap H`, `--human-handicap H` (0 best, 1 stands still), `--trigger-happy` (squads hold the trigger instead of charging volleys), `--fast`, `--anchor N`, `--every-anchor` (every start in turn), `--bar P1,P2,P3` (other bar fractions for one run), `--nav` (how the bots got about), `--city placeholder` (the old grid city), `--max-minutes N`, `--events`, `--json`. 20 matches take 25 to 50 s depending on what else the machine is doing. How to read it: `docs/BALANCE.md`. |
+| `npm run sim` | The balance harness: full bot-versus-bot matches, headless, a few hundred times real speed, one table row per match plus a summary. Options after `--`: `--seeds N` (default 5), `--seed N`, `--unopposed` (no squads), `--kaiju-handicap H`, `--human-handicap H` (0 best, 1 stands still), `--trigger-happy` (squads hold the trigger instead of charging volleys), `--fast`, `--anchor N`, `--every-anchor` (every start in turn), `--bar P1,P2,P3` (other bar fractions for one run), `--clock S` (another match clock for one run), `--nav` (how the bots got about), `--city placeholder` (the old grid city), `--max-minutes N`, `--events`, `--json`. 20 matches take 25 to 50 s depending on what else the machine is doing. How to read it: `docs/BALANCE.md`. |
 | `npx vitest run server/test` | Only the server tests: 115 tests, about 18 seconds (four files start a real server on a free port and connect real clients; `process.test.ts` starts the entry point as a process of its own). `MB_TEST_SPEED=1 npx vitest run server/test/lifecycle.test.ts` plays the full five-client match in real time (about 3 minutes). |
 | `npm run dev` | Starts the server (`tsx watch`, port 2567) and the client (Vite, port 5173) side by side with hot reload; open the Vite address. Vite forwards matchmaking and the WebSocket to the server, so the page talks to its own origin exactly as in production. |
 | `npm run build`, `npm start` | Bundles the server to `server/dist/index.js`, builds the client to `client/dist` (and writes a gzip copy, `<file>.gz`, of every model, script, style sheet, data file and vector icon there: `scripts/precompress.mjs`; the server sends it to browsers that accept gzip); `npm start` runs the bundle, which serves the built client and the game on one port (`PORT`, default 2567). Environment variables: `ARCHITECTURE.md` section 4.4. |
@@ -178,7 +179,6 @@ remains is marked `STUB(<area>):` where it lives.
 | Where | What is missing | For |
 | --- | --- | --- |
 | `server/src/room/gameRoom.ts` | `STUB(server)`: the `draftPick` message is accepted and ignored. When the simulation has upgrade drafts, pass the pick on (and add a draft step to the intermission). | Tier 2 |
-| `client/src/ui/commandWheel.ts`, `client/src/ui/hud.ts` (two places), `client/src/ui/mapView.ts` | `STUB(client)`: the command wheel, the order pictures, the artillery, smoke and mark pictures and the map's artillery are left in place but have nothing behind them since the army's phase 1 simulation (no squad orders, no smoke or mark, no artillery button). The army client rework removes them and adds the volley meter. | Phase 1, army client |
 
 Placeholders (not `STUB`-tagged; each file says so at the top):
 
@@ -532,12 +532,12 @@ Server
   tiny and smoothed), but the city generator must never branch on such a value.
 - The snapshot holds at most 255 units and uses one byte for unit ids: fine for Tier 1 (16) and
   for the 8-squad future (32).
-- The balance is tuned for bot against bot in Port Meridian (`docs/BALANCE.md` section 8):
-  kaiju wins 47% of 60 matches, stages of about 3:15 / 3:05 / 3:50, matches of about 10:20,
-  18 kills in 60. A kaiju bot or squads that hesitate 30% of the time lose 9 of 10;
-  trigger-happy squads lose 20 of 20. Real players will move it. Numbers nobody has tuned yet:
-  action move multipliers, wade damage, rage per bar segment, prop values, archetype hp and
-  value.
+- The balance was tuned for bot against bot in Port Meridian before phase 1 (`docs/BALANCE.md`
+  section 8). Phase 1 changed both sides' controls and only the pace was cut since (section 9):
+  with the 9:36 clock and `p3` 0.29 the kaiju bot wins 20 of 40, stages of about 2:02 / 2:27 /
+  3:00, matches of about 7:30, 16 kills in 40. Balance waits for the owner's next playtest; real
+  players will move it. Numbers nobody has tuned yet: action move multipliers, wade damage, rage
+  per bar segment, prop values, archetype hp and value, and everything new in phase 1.
 - Nerve breaks only when charged volleys (60% charge or more) from two different squads land
   within 5 s of each other (`DESIGN.md` sections 3 and 5). A bot kaiju is staggered about 1.6 /
   3 / 3.5 times a stage. Four idle people, or the client's autopilot squad (which holds the
@@ -655,10 +655,12 @@ client/src/game/
   controllers/      kaijuController, humanController, droneController, cinematicCamera, types (shake, lens),
                     cameraClearance (holds a first-person or chase camera short of a standing wall)
   autoplay.ts       the autopilot for both sides and the drone
-client/src/ui/      hud.ts, commandWheel.ts, mapView.ts, subtitles.ts, settingsPanel.ts, icons.ts,
+client/src/ui/      hud.ts, mapView.ts (view only), subtitles.ts, settingsPanel.ts, icons.ts,
                     iconArt.ts (stand-in icons), controlsCard.ts (every control of a role, as pictures),
                     kaijuKit.ts (the monster's buttons on the HUD: the kit, the two move slots, molt),
-                    moltCards.ts (the molt card picker: three cards, picked by key, d-pad or click)
+                    moltCards.ts (the molt card picker: three cards, picked by key, d-pad or click),
+                    volleyMeter.ts (the squad's volley meter round the crosshair), gunReticle.ts (a tank
+                    gun's own sight)
 client/src/kaiju.css                the monster's HUD kit, card picker and controls-card pieces (next to styles.css)
 client/src/audio/   audioEngine.ts (effects with voice limits, staged music, voice queue with ducking, limiter, master
                     volume, cache of decoded files), matchAudio.ts (events and frame state -> sound); see 7.6

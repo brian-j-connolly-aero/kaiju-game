@@ -65,7 +65,8 @@ describe('stages (DESIGN.md section 2)', () => {
   });
 
   it('carry the match rules', () => {
-    expect(MATCH_RULES.clock).toBe(12 * 60);
+    // 9:36: a fifth off the first 12:00 after the first multiplayer playtest (docs/BALANCE.md section 9).
+    expect(MATCH_RULES.clock).toBe(576);
     expect(MATCH_RULES.briefing).toBe(10);
     expect(MATCH_RULES.intermission).toBe(8);
     expect(MATCH_RULES.intermissionWithDraft).toBe(20);
@@ -74,7 +75,7 @@ describe('stages (DESIGN.md section 2)', () => {
     expect(MATCH_RULES.blastShoveRadius).toBe(7);
     expect(MATCH_RULES.redeployMinKaijuDist).toBe(250);
     // The three fractions are tuned with the balance harness (docs/BALANCE.md).
-    expect(MATCH_RULES.bar).toMatchObject({ p1: 0.18, p2: 0.125, p3: 0.31, growth: 1.6, display: [0.21, 0.57, 1] });
+    expect(MATCH_RULES.bar).toMatchObject({ p1: 0.18, p2: 0.125, p3: 0.29, growth: 1.6, display: [0.21, 0.57, 1] });
     expect(MATCH_RULES.maxPlayers).toBe(5);
     expect(SNAPSHOT_EVERY_TICKS).toBe(2);
   });

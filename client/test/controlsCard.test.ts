@@ -110,10 +110,6 @@ describe('the controls card', () => {
     for (const id of ['drive', 'turn', 'turret']) expect(tile(id).stages, id).toEqual([2, 3]);
     expect(cardActions([tile('drive')])).toEqual(new Set(['moveForward', 'moveBack']));
     expect(cardActions([tile('turn')])).toEqual(new Set(['moveLeft', 'moveRight']));
-    // Nothing of the old controls is left: no wheel, no orders, no smoke, no mark, no artillery.
-    for (const action of ['wheel', 'cmdFollow', 'cmdMoveTo', 'cmdFireAtWill', 'cmdHoldCharge', 'smoke', 'mark', 'callIn', 'confirm']) {
-      expect((BUTTON_ACTIONS as readonly string[]).includes(action), action).toBe(false);
-    }
   });
 
   it('has a glyph for every button on both devices', () => {

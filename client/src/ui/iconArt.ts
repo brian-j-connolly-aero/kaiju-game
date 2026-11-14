@@ -24,11 +24,6 @@ function cogPath(cx: number, cy: number, outer: number, inner: number, hole: num
 }
 
 const ART: Record<string, string> = {
-  // --- commands ---
-  cmd_follow: `<circle cx="46" cy="32" r="7" ${F}/><path d="M10 18 L24 32 L10 46 M24 18 L38 32 L24 46" ${S}/>`,
-  cmd_moveto: `<path d="M22 54 L22 12 L50 22 L22 32" ${S}/><ellipse cx="22" cy="54" rx="12" ry="4" ${S}/>`,
-  cmd_fireatwill: `<path d="M12 50 L30 32 M12 32 L40 32 M12 14 L30 32" ${S}/><path d="M44 20 L54 14 M46 32 L58 32 M44 44 L54 50" ${S}/>`,
-  cmd_holdcharge: `<path d="M32 6 L56 32 L32 58 L8 32 Z" ${S}/><path d="M24 38 L32 22 L32 34 L40 28 L32 44" ${S}/>`,
   // --- the squad's controls (docs/ROADMAP.md phase 1: Fire and Volley, tank driving) ---
   // A soldier with a launcher on the shoulder: the squad on foot (stage 1).
   sq_foot: `<circle cx="28" cy="12" r="7" ${F}/><path d="M28 21 L28 40 M28 40 L20 58 M28 40 L36 58 M28 27 L18 38" ${S}/><path d="M14 30 L54 20" ${S} stroke-width="7"/>`,
@@ -69,8 +64,6 @@ const ART: Record<string, string> = {
   st_charge: `<path d="M32 8 L52 32 L32 56 L12 32 Z" ${F}/>`,
   st_veteran: `<path d="M12 26 L32 10 L52 26 M12 44 L32 28 L52 44" ${S}/>`,
   st_spotted: `<path d="M4 32 Q32 6 60 32 Q32 58 4 32 Z" ${S}/><circle cx="32" cy="32" r="8" ${F}/>`,
-  st_smoke: `<path d="M15 43 Q6 43 7 35 Q8 27 17 28 Q18 18 28 18 Q36 11 44 19 Q55 18 56 29 Q61 37 53 43 Z" ${S}/><rect x="26" y="48" width="12" height="11" rx="2" ${F}/>`,
-  st_mark: `<path d="M20 5 L44 5 L32 20 Z" ${F}/><path d="M32 30 L52 59 L12 59 Z" ${S}/><path d="M8 12 L4 8 M56 12 L60 8 M10 22 L4 22 M54 22 L60 22" ${S}/>`,
   st_crossfire: `<path d="M8 8 L56 56 M56 8 L8 56" ${S}/><path d="M56 56 L42 54 M56 56 L54 42 M8 56 L22 54 M8 56 L10 42" ${S}/>`,
   st_callin: `<circle cx="32" cy="38" r="16" ${S}/><path d="M32 4 L32 30 M24 22 L32 30 L40 22" ${S}/>`,
   st_shaken: `<path d="M8 20 Q16 10 24 20 T40 20 T56 20 M8 34 Q16 24 24 34 T40 34 T56 34 M8 48 Q16 38 24 48 T40 48 T56 48" ${S}/>`,

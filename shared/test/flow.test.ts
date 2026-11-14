@@ -10,6 +10,7 @@ import {
   createAimPoint,
   DT,
   endMatch,
+  MATCH_RULES,
   noteKaijuNoise,
   resolveAimPoint,
   say,
@@ -163,14 +164,14 @@ describe('match flow', () => {
     const events = run(world, 30 * 10 - 2);
     expect(events).toEqual([]);
     expect(world.match.phase).toBe('briefing');
-    expect(world.match.clock).toBe(720);
+    expect(world.match.clock).toBe(MATCH_RULES.clock);
     const start = run(world, 2);
     expect(start.map((e) => e.type)).toEqual(['matchPhase', 'voice']);
     expect(start[0]).toMatchObject({ type: 'matchPhase', phase: 'playing', stage: 1 });
     expect(voiceCues(start)).toEqual(['match.start']);
     expect(world.match.phase).toBe('playing');
     run(world, 30);
-    expect(world.match.clock).toBeCloseTo(719, 6);
+    expect(world.match.clock).toBeCloseTo(MATCH_RULES.clock - 1, 6);
     expect(world.match.elapsed).toBeCloseTo(1, 6);
     expect(world.match.stageTime[0]).toBeCloseTo(1, 6);
   });

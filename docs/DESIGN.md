@@ -41,8 +41,9 @@ Phases: `lobby` → `briefing` (voiced, about 10 s) → `playing` (stage 1) → 
   for automated testing).
 - **Kaiju role:** players can volunteer; otherwise it rotates (never the same player twice in a
   row unless they volunteer). The host (first player in the room) starts the match.
-- **Clock:** 12:00 total, counts down during `playing` (including the cocoon), pauses during
-  `briefing` and `intermission`. At 0:00 the humans win.
+- **Clock:** 9:36 total (12:00 until the first multiplayer playtest; the owner asked for
+  matches about a fifth shorter), counts down during `playing` (including the cocoon), pauses
+  during `briefing` and `intermission`. At 0:00 the humans win.
 - **Kaiju win:** the destruction bar reaches the third mark. **Human win:** kaiju health reaches 0
   at any stage (including in the cocoon), or the clock expires.
 - **No rubber banding** of any kind.
@@ -75,16 +76,18 @@ squares clamped to the city, drawn as a thin glowing quarantine line; nobody can
   that land on it cost nothing.
 - Marks are computed per match from the value actually present, so every neighborhood is fair:
   `P1 = 0.18 × V(stage 1 bounds)`, `P2 = max(1.6 × P1, 0.125 × V(stage 2 bounds))`,
-  `P3 = max(1.6 × P2, 0.31 × V(whole city))`. The three fractions are the pace knob; they were
-  tuned with the balance harness in Port Meridian (`docs/BALANCE.md` section 8).
+  `P3 = max(1.6 × P2, 0.29 × V(whole city))`. The three fractions are the pace knob; they were
+  tuned with the balance harness in Port Meridian (`docs/BALANCE.md` sections 8 and 9).
 - Display: a skyline with three towers. Points 0..P1 map to the first 21% of its width, P1..P2 to
   21..57%, P2..P3 to 57..100% (these are the doc's 15 / 40 / 70 marks, rescaled so the third
   tower is the end of the bar).
-- Tuning target: an unopposed kaiju fills a stage's segment in 100 to 130 s; a typical contested
-  stage lasts about 200 to 230 s; a full match about 10 to 12 minutes. Measured with
-  `npm run sim` (bot against bot, Port Meridian, every start in turn): alone 122 / 122 / 182 s
-  for the three segments; contested stages of about 3:15 / 3:05 / 3:50; 10:19 on average; the
-  kaiju winning 47% of 60 matches. `docs/BALANCE.md` section 8 has the tables.
+- Tuning target (since phase 1: every stage about a fifth shorter than before, the owner's word
+  after the first multiplayer playtest): contested stages of about 2:35 / 2:30 / 3:05 and a
+  match of about 8:15; a kaiju left alone fills a stage's segment in about two minutes. Measured
+  with `npm run sim` (bot against bot, Port Meridian, every start in turn, 40 matches):
+  contested stages of about 2:02 / 2:27 / 3:00 and 7:31 on average (stage 1 is shorter than the
+  aim because the squad-mates' stray fire fills the bar too); alone 123 / 117 / 164 s for the
+  three segments; the kaiju winning 20 of 40. `docs/BALANCE.md` section 9 has the tables.
 
 ### The molt
 

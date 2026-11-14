@@ -19,14 +19,18 @@ export const MATCH_RULES = {
   squadsPerKaiju: 4,
   unitsPerSquad: 4,
 
-  /** Seconds on the clock; it runs only while the phase is 'playing' (including the cocoon). */
-  clock: 720,
+  /**
+   * Seconds on the clock (9:36); it runs only while the phase is 'playing' (including the
+   * cocoon). Cut from 720 by a fifth after the first multiplayer playtest (docs/BALANCE.md
+   * section 9).
+   */
+  clock: 576,
   briefing: 10,
   /** Intermission without drafts (Tier 1) and with drafts (Tier 2). */
   intermission: 8,
   intermissionWithDraft: 20,
 
-  /** Seconds the Molt input must be held is in the kaiju's molt action; this is the cocoon. */
+  /** The cocoon, seconds (the molt starts with one press of Molt). */
   cocoon: 10,
   /** Blast wave radii, in multiples of the NEW body radius. */
   blastKillRadius: 3.5,
@@ -43,13 +47,14 @@ export const MATCH_RULES = {
   /**
    * Destruction bar marks: P1 = p1 * V(stage 1), P2 = max(growth * P1, p2 * V(stage 2)), ...
    * Tuned with the balance harness on Port Meridian so that a kaiju left alone fills the first
-   * two segments in about two minutes and contested matches come out about even at about ten
-   * minutes (docs/BALANCE.md section 8).
+   * two segments in about two minutes and contested matches come out about even (docs/BALANCE.md
+   * section 8); p3 was lowered from 0.31 after the first multiplayer playtest to cut stage 3 by
+   * about a fifth (section 9).
    */
   bar: {
     p1: 0.18,
     p2: 0.125,
-    p3: 0.31,
+    p3: 0.29,
     growth: 1.6,
     /** Where the three marks sit along the skyline display, 0..1. */
     display: [0.21, 0.57, 1] as PerStage<number>,
