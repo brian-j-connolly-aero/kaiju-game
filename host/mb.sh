@@ -7,7 +7,8 @@
 #   host/mb.sh logs      show the most recent messages from the game and the tunnel
 #   host/mb.sh link      print the links again
 #
-# Uses podman if it works, otherwise docker. Guide: docs/HOSTING.md.
+# Uses Podman if it works and has a compose program ("podman compose", or the separate
+# podman-compose for older Podman), otherwise Docker. Guide: docs/HOSTING.md.
 
 set -u
 
@@ -30,22 +31,68 @@ PUBLIC_URL="$(env_value MB_PUBLIC_URL)"
 LOCAL_URL="http://localhost:$PORT"
 
 # ---- container engine -----------------------------------------------------------------------
-ENGINE=""
+ENGINE=""        # podman or docker
+COMPOSE=()       # the compose program, as the words to run
+ENGINE_NOTE=""   # one line shown at start when the setup is one this was not tried with
+
+podman_version() { podman --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+' | head -n 1; }
+podman_is_old() {
+  # True for Podman before 4.7, which has no "podman compose" of its own (Ubuntu 22.04 has 3.4).
+  local v major minor
+  v="$(podman_version)"; major="${v%%.*}"; minor="${v#*.}"
+  case "$major$minor" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$major" -lt 4 ] || { [ "$major" -eq 4 ] && [ "$minor" -lt 7 ]; }
+}
+
 find_engine() {
-  local have_podman=0 have_docker=0
+  local have_podman=0 have_docker=0 podman_ok=0 docker_ok=0
   command -v podman >/dev/null 2>&1 && have_podman=1
   command -v docker >/dev/null 2>&1 && have_docker=1
   if [ $have_podman = 0 ] && [ $have_docker = 0 ]; then
     fail "Neither Podman nor Docker is installed.
-Install one of them, then run this again:
-  - Podman:  on Ubuntu or WSL type   sudo apt install podman podman-compose
-  - Docker:  install Docker Desktop on Windows and turn on its WSL integration,
-             or on Linux follow https://docs.docker.com/engine/install/"
+Install one of them, then run this again (docs/HOSTING.md, section 9, has the details):
+  - Ubuntu 24.04 or newer, also in WSL:   sudo apt install podman podman-compose
+  - Ubuntu 22.04, also in WSL:            sudo apt install docker.io docker-compose-v2
+  - Or install Docker Desktop on Windows and turn on its WSL integration."
   fi
-  if [ $have_podman = 1 ] && podman info >/dev/null 2>&1; then
-    ENGINE=podman
-  elif [ $have_docker = 1 ] && docker info >/dev/null 2>&1; then
-    ENGINE=docker
+  [ $have_podman = 1 ] && podman info >/dev/null 2>&1 && podman_ok=1
+  [ $have_docker = 1 ] && docker info >/dev/null 2>&1 && docker_ok=1
+
+  # Podman first, then Docker. Each one also needs its compose program.
+  if [ $podman_ok = 1 ] && podman compose version >/dev/null 2>&1; then
+    ENGINE=podman; COMPOSE=(podman compose)
+  elif [ $podman_ok = 1 ] && command -v podman-compose >/dev/null 2>&1; then
+    # Older Podman has no "podman compose"; the separate podman-compose program does that job.
+    ENGINE=podman; COMPOSE=(podman-compose)
+    if podman_is_old; then
+      ENGINE_NOTE="Note: Podman $(podman_version) is older than this was tried with. If the start fails, docs/HOSTING.md section 9 lists what to use instead."
+    fi
+  elif [ $docker_ok = 1 ] && docker compose version >/dev/null 2>&1; then
+    ENGINE=docker; COMPOSE=(docker compose)
+  elif [ $podman_ok = 1 ] && podman_is_old && [ $have_docker = 1 ] && [ $docker_ok = 0 ]; then
+    fail "Docker is installed but not answering (and this computer's Podman is too old to use).
+Try these, then run this again:
+  - Start it:   sudo service docker start
+  - If it says 'permission denied':   sudo usermod -aG docker \$USER
+    then close this terminal and open a new one."
+  elif [ $podman_ok = 1 ] && podman_is_old; then
+    fail "Podman works, but this computer has Podman $(podman_version), which is too old to start
+the game by itself (Ubuntu 22.04 comes with it, and has no podman-compose to add).
+Either of these fixes it:
+  - Use Docker instead:
+        sudo apt update
+        sudo apt install docker.io docker-compose-v2
+        sudo usermod -aG docker \$USER
+    then close this terminal, open a new one and run this again.
+  - Or use Ubuntu 24.04 or newer, where   sudo apt install podman podman-compose   works.
+docs/HOSTING.md, section 9, has the details."
+  elif [ $podman_ok = 1 ]; then
+    fail "Podman works, but its compose part is missing.
+Install it with   sudo apt update && sudo apt install podman-compose
+(or in Podman Desktop: Settings, Resources, Compose, Setup)."
+  elif [ $docker_ok = 1 ]; then
+    fail "Docker works, but its compose part is missing. Install the Docker Compose plugin
+(it comes with Docker Desktop; on Ubuntu:   sudo apt install docker-compose-v2)."
   elif [ $have_podman = 1 ]; then
     fail "Podman is installed but not answering.
 If you use Podman Desktop on Windows, open it and press Start on the Podman machine.
@@ -53,19 +100,11 @@ On Linux, check that   podman info   works for your user."
   else
     fail "Docker is installed but not running.
 Open Docker Desktop and wait until it says it is running, then try again.
-(On Linux without Docker Desktop:   sudo systemctl start docker)"
-  fi
-  if ! $ENGINE compose version >/dev/null 2>&1; then
-    if [ $ENGINE = podman ]; then
-      fail "Podman works, but its compose part is missing.
-Install it with   sudo apt install podman-compose   (or in Podman Desktop: Settings, Resources, Compose, Setup)."
-    else
-      fail "Docker works, but its compose part is missing. Install the Docker Compose plugin
-(it comes with Docker Desktop; on Linux:   sudo apt install docker-compose-plugin)."
-    fi
+(On Linux without Docker Desktop:   sudo service docker start
+ If it says 'permission denied':   sudo usermod -aG docker \$USER   and open a new terminal.)"
   fi
 }
-compose() { $ENGINE compose "$@"; }
+compose() { "${COMPOSE[@]}" "$@"; }
 
 # ---- helpers --------------------------------------------------------------------------------
 fetch_ok() {
@@ -161,6 +200,7 @@ current_link() {
 do_start() {
   find_engine
   say "Using $ENGINE. Building the game if anything changed (the first time takes a few minutes) ..."
+  [ -z "$ENGINE_NOTE" ] || say "$ENGINE_NOTE"
   if [ -n "$TOKEN" ]; then
     # Named tunnel: your own address. The quick tunnel is not needed.
     compose stop tunnel >/dev/null 2>&1

@@ -213,9 +213,27 @@ host/logs.sh        recent messages
 host/mb.sh link     print the links again
 ```
 
-The scripts use Podman if it works, otherwise Docker. On Ubuntu (also inside WSL) Podman is
-installed with `sudo apt install podman podman-compose`. Docker Desktop on Windows also works
-from WSL once its WSL integration is turned on.
+The scripts use Podman if it works, otherwise Docker. What to install depends on the Ubuntu
+version, also inside WSL (`lsb_release -ds` shows which one you have):
+
+- **Ubuntu 24.04 or newer:** `sudo apt install podman podman-compose`. This is the setup the
+  scripts were tried with (Podman 4.9).
+- **Ubuntu 22.04:** its Podman (version 3.4) is too old and it offers no `podman-compose`, so
+  use Docker there:
+  ```
+  sudo apt update
+  sudo apt install docker.io docker-compose-v2
+  sudo usermod -aG docker $USER
+  ```
+  Then close the terminal and open a new one. If the start script says Docker is not running,
+  start it with `sudo service docker start`. Podman can stay installed; the script picks
+  Docker by itself. (This route was checked against Ubuntu's package lists, not run.)
+- Docker Desktop on Windows also works from WSL once its WSL integration is turned on.
+
+Play in a browser on Windows, at http://localhost:2567: WSL passes that address through. Keep
+the WSL terminal window open while you host, because Windows may stop WSL (and the game with
+it) when its last window closes. Put the game folder on WSL's own disk (for example in your
+home folder), not under `/mnt/c`, where building is much slower.
 
 ## 10. Without containers (for people who have Node.js)
 
