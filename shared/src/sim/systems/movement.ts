@@ -6,7 +6,10 @@
  * - a kaiju destroys structures up to its trample height and every prop it steps on;
  * - a wading kaiju (the titan) deals contact damage to the taller structures it pushes through;
  * - vehicles crush props; infantry walks around them;
- * - a swimming kaiju (sim/swim.ts) wrecks nothing at all.
+ * - a swimming kaiju (sim/swim.ts) wrecks nothing at all;
+ * - a charging kaiju runs straight ahead (`kaijuMoveInput`), smashes what is low enough for
+ *   the charge (cause 'charge'), and is stopped dead by anything else: its stumble starts on
+ *   the next tick (`act.chargeBlocked`, read by the kaiju action system).
  * It also points the kaiju's head: at the player's aim, within the head lead of the body, and
  * only at the special's reduced turn rate while a special (the beam) is running, with the
  * beam's own shake, pull and kick on top (`beamShake`).
@@ -22,7 +25,16 @@ import { modMult } from '../../defs/upgrades';
 import { clampAngleAround, turnToward, wrapAngle } from '../../math/angle';
 import { approach } from '../../math/scalar';
 import { beamShake, type BeamShake } from '../beam';
-import { createMoveResult, kaijuMoveParams, stepMovement, unitMoveParams, type MoveParams } from '../movement';
+import {
+  createMoveResult,
+  kaijuMoveInput,
+  kaijuMoveParams,
+  stepMovement,
+  unitMoveParams,
+  type MoveInput,
+  type MoveParams,
+  type UnitMoveState,
+} from '../movement';
 import { kaijuSwimming } from '../swim';
 import type { World } from '../types';
 
@@ -30,6 +42,8 @@ const params = {} as MoveParams;
 const result = createMoveResult();
 const propIds: number[] = [];
 const shake: BeamShake = { yaw: 0, pitch: 0 };
+const driveInput: MoveInput = { moveX: 0, moveZ: 0, aimYaw: 0 };
+const unitState: UnitMoveState = { alive: false, rooted: false, stun: 0, driven: false };
 
 export function movementSystem(world: World): void {
   if (world.match.phase !== 'playing') return;
@@ -40,9 +54,16 @@ export function movementSystem(world: World): void {
     if (!k.alive) continue;
     const input = world.players[k.player].input;
     kaijuMoveParams(k, bounds, k.mods, params);
-    stepMovement(k, input, DT, city, params, result);
+    stepMovement(k, kaijuMoveInput(k, input, driveInput), DT, city, params, result);
     k.wading = result.wading;
     k.inWater = result.inWater;
+    const charging = k.action === 'charge' && k.phase === 'charge';
+    if (charging && result.blocked) {
+      // Too tall to smash (or the edge of the bounds): it stops dead and stumbles.
+      k.vx = 0;
+      k.vz = 0;
+      k.act.chargeBlocked = true;
+    }
 
     // The head follows the player's aim but can only lead the body so far.
     const helpless = k.phase === 'stagger' || k.phase === 'cocoon' || k.phase === 'dead';
@@ -79,7 +100,7 @@ export function movementSystem(world: World): void {
     // A swimming kaiju wrecks nothing: it passes under a bridge deck (sim/swim.ts).
     if (kaijuSwimming(k)) continue;
     for (const id of result.trampled) {
-      world.structureHits.push({ id, damage: Infinity, by: k.player, cause: 'trample' });
+      world.structureHits.push({ id, damage: Infinity, by: k.player, cause: charging ? 'charge' : 'trample' });
     }
     if (result.waded.length > 0) {
       const dps = kaijuStageDef(k.kind, k.stage).wadeContactDps * modMult(k.mods, 'structureDamage');
@@ -90,20 +111,27 @@ export function movementSystem(world: World): void {
       }
     }
     propsInCircle(city, k.x, k.z, k.radius, propIds);
-    for (const id of propIds) world.propHits.push({ id, by: k.player, cause: 'trample' });
+    for (const id of propIds) world.propHits.push({ id, by: k.player, cause: charging ? 'charge' : 'trample' });
   }
 
   for (const u of world.units) {
     if (!u.alive) continue;
     const def = unitTypeDef(u.type);
     const squad = world.squads[u.squad];
-    unitMoveParams(def, u, bounds, squad.mods, params);
-    // A sub-unit that has dropped behind its place in the formation closes up a little faster
-    // than the column moves (the orders system says when). Never the driven unit.
+    unitState.alive = u.alive;
+    unitState.rooted = u.rooted;
+    unitState.stun = u.stun;
+    // The driven unit of a vehicle level drives like a tank (sim/movement.ts).
+    unitState.driven = squad.driven === u.id;
+    unitMoveParams(def, unitState, bounds, squad.mods, params);
+    // A squad-mate that has dropped behind its place in the swarm closes up a little faster
+    // than the leader goes (the orders system says when). Never the driven unit.
     if (u.nav.hurry !== 1) params.topSpeed *= u.nav.hurry;
     stepMovement(u, u.control, DT, city, params, result);
     u.inWater = result.inWater;
-    u.aimYaw = u.control.aimYaw;
+    // A driven tank's turret has swung toward the aim at its own rate in stepMovement; every
+    // other unit's weapon points where its control says (squad-mates turn theirs in the orders system).
+    if (params.steer !== 'tank') u.aimYaw = u.control.aimYaw;
     u.aimPitch = u.control.aimPitch;
     if (def.body === 'vehicle') {
       propsInCircle(city, u.x, u.z, u.radius, propIds);

@@ -23,9 +23,10 @@
  * - at 0 hp it dies (phase 'dead'); the match flow system ends the match.
  *
  * Units: hp and members, nerve (leaks; at capacity the unit is shaken: cannot fire, loses its
- * charge), death (vehicles leave a wreck), and 15 nerve to friends near a unit that is destroyed.
- * This system counts `unit.shaken` down and puts the unit back to 'idle'; the orders system
- * decides how a shaken unit behaves. A squad whose last unit dies is marked eliminated here, in
+ * charge), the roar's stun (`hit.stun`: frozen, charge gone; its shaking waits until the stun
+ * is over), death (vehicles leave a wreck), and 15 nerve to friends near a unit that is
+ * destroyed. This system counts `unit.stun` and then `unit.shaken` down and puts the unit back
+ * to 'idle'; the orders system decides how a shaken unit behaves. A squad whose last unit dies is marked eliminated here, in
  * the same tick, so the radio can say so; handing the player a surviving unit (takeover) is the
  * orders system's job.
  *
@@ -54,7 +55,7 @@ const ANGLE_EPS = 1e-9;
 const VALUE_EPS = 1e-9;
 
 /** Damage kinds that come from a kaiju's own body; everything else is weapon fire from a unit. */
-const KAIJU_DAMAGE_KINDS: readonly DamageKind[] = ['swipe', 'stomp', 'thrown', 'beam', 'trample', 'wade', 'roar', 'blast'];
+const KAIJU_DAMAGE_KINDS: readonly DamageKind[] = ['swipe', 'stomp', 'thrown', 'beam', 'trample', 'wade', 'roar', 'blast', 'charge', 'tailSweep', 'collapse'];
 /** Damage dealt a little every tick; its hit events are thinned out. */
 const CONTINUOUS_KINDS: readonly DamageKind[] = ['beam', 'trample', 'wade'];
 
@@ -158,11 +159,11 @@ function staggerKaiju(world: World, k: Kaiju, by: PlayerId): void {
   k.phaseTime = 0;
   k.phaseDuration = COMBAT_RULES.staggerDuration;
   k.actionTime = 0;
-  k.act.holdLive = false;
-  k.act.throwBuffer = 0;
   k.act.meal = false;
   k.act.beamLength = 0;
   k.act.beamBlocker = -1;
+  k.act.chargeBlocked = false;
+  k.act.actionButton = 0;
   world.match.breaks++;
   const breaker = world.players[by];
   if (breaker) breaker.tally.breaks++;
@@ -192,8 +193,8 @@ function killKaiju(k: Kaiju): void {
   k.vx = 0;
   k.vz = 0;
   k.moltAvailable = false;
-  k.act.holdLive = false;
-  k.act.throwBuffer = 0;
+  k.forceMolt = false;
+  k.act.actionButton = 0;
   k.act.beamLength = 0;
   k.act.beamBlocker = -1;
 }
@@ -312,6 +313,7 @@ function destroyUnit(world: World, u: Unit, cause: DamageKind, by: PlayerId): vo
   u.wreck = def.body === 'vehicle';
   u.nerve = 0;
   u.shaken = 0;
+  u.stun = 0;
   u.charge = 0;
   u.rooted = false;
   u.vx = 0;
@@ -377,7 +379,18 @@ function hitUnit(world: World, u: Unit, hit: Hit): void {
     return;
   }
   if (hit.resetsCharge) u.charge = 0;
+  // roar stun: frozen for a moment; the shaking the same roar brings waits until it is over.
+  if (hit.stun !== undefined && hit.stun > 0) stunUnit(world, u, hit.stun);
   if (hit.nerve > 0) addUnitNerve(world, u, hit.nerve * modMult(mods, 'nerveTaken'), hit.player);
+}
+
+/** A roar's stun (DESIGN.md section 4): it cannot move or fire, and its charge is gone. A longer stun is not cut shorter. */
+function stunUnit(world: World, u: Unit, seconds: number): void {
+  u.stun = Math.max(u.stun, seconds);
+  u.charge = 0;
+  // Its laser goes out with the charge (the orders system lets go of its plant).
+  if (u.state === 'charging') u.state = 'idle';
+  emit(world, { type: 'unitStunned', unit: u.id, duration: seconds });
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -460,7 +473,10 @@ export function damageSystem(world: World): void {
 
   for (const u of world.units) {
     if (!u.alive) continue;
-    if (u.shaken > 0) {
+    if (u.stun > 0) {
+      // roar stun: its shaking (and the nerve leak) wait until the stun is over.
+      u.stun = u.stun - DT > TIME_EPS ? u.stun - DT : 0;
+    } else if (u.shaken > 0) {
       u.shaken = Math.max(0, u.shaken - DT);
       if (u.shaken <= TIME_EPS) {
         u.shaken = 0;

@@ -30,8 +30,8 @@ import { lerp } from '../math/scalar';
 import { Btn } from '../net/input';
 import type { InputState, Kaiju } from './types';
 
-/** The buttons that bring a swimming kaiju up: every kaiju action button. */
-export const SWIM_SURFACE_BUTTONS = Btn.strike | Btn.grab | Btn.block | Btn.roar | Btn.special | Btn.molt;
+/** The buttons that bring a swimming kaiju up: every kaiju button (net/input.ts). */
+export const SWIM_SURFACE_BUTTONS = Btn.strike | Btn.grab | Btn.stomp | Btn.move1 | Btn.move2 | Btn.molt;
 
 /** What the helpers need of a kaiju. Kaiju and snapshot kaiju both satisfy it. */
 export interface SwimBody {

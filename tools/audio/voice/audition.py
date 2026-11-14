@@ -1,13 +1,16 @@
 #!/opt/mbtools/venv/bin/python
 """Audition of every installed synthesizer voice on the real script.
 
-  audition.py raw                 every main voice on all lines, unprocessed
+  audition.py neural              every neural voice (Kokoro, Piper) and the first cast's voices on
+                                  a 32-line sample, unprocessed
+  audition.py raw                 every older synthesizer voice on all lines, unprocessed
   audition.py espeak              every espeak-ng variant on a 24-line sample
   audition.py summary             collect the per-voice results into docs/audio/voice/audition.json
+                                  (a group whose results are not cached here keeps its recorded ones)
 
 For each voice: synthesize, trim, transcribe with pocketsphinx, count word errors against the
-subtitle text; also pitch, speaking rate and bandwidth. Results are cached per voice in
-$MB_SCRATCH/audition/ so an interrupted run resumes."""
+subtitle text; also pitch, how much the pitch moves within a line, speaking rate and bandwidth.
+Results are cached per voice in $MB_SCRATCH/audition/ so an interrupted run resumes."""
 
 from __future__ import annotations
 
@@ -44,6 +47,30 @@ MAIN = {
     "espeak en-gb-scotland": {"engine": "espeak", "voice": "en-gb-scotland"},
 }
 
+# Neural voices: every English Kokoro voice, the Piper voices whose recordings and base model are
+# public domain, CC0 or CC BY 4.0 (mbvoice/models.py), and the six voices of the first cast at their
+# cast settings, for comparison on the same sample.
+_KOKORO_EN = ["af_heart", "af_bella", "af_nicole", "af_aoede", "af_kore", "af_sarah", "af_alloy", "af_nova",
+              "af_sky", "af_jessica", "af_river", "am_fenrir", "am_michael", "am_puck", "am_echo", "am_eric",
+              "am_liam", "am_onyx", "am_santa", "am_adam", "bf_emma", "bf_isabella", "bf_alice", "bf_lily",
+              "bm_fable", "bm_george", "bm_lewis", "bm_daniel"]
+_PIPER_EN = ["en_GB-alba-medium", "en_GB-cori-high", "en_US-bryce-medium", "en_US-john-medium",
+             "en_US-norman-medium", "en_US-joe-medium", "en_US-mike-medium"]
+NEURAL = {
+    **{f"kokoro {v}": {"engine": "kokoro", "voice": v} for v in _KOKORO_EN},
+    **{f"piper {v}": {"engine": "piper", "voice": v} for v in _PIPER_EN},
+    "first cast: Overlord (rhvoice bdl)": {"engine": "rhvoice", "voice": "bdl", "rate": 0.85, "pitch": 0.72},
+    "first cast: Granite (flite rms)": {"engine": "flite", "voice": "rms", "rate": 1.06},
+    "first cast: Beacon (rhvoice clb)": {"engine": "rhvoice", "voice": "clb", "rate": 1.15},
+    "first cast: Tempest (rhvoice alan)": {"engine": "rhvoice", "voice": "alan"},
+    "first cast: Anchor (rhvoice slt)": {"engine": "rhvoice", "voice": "slt", "rate": 0.94},
+    "first cast: Chair (pico en-US)": {"engine": "pico", "voice": "en-US", "rate": 0.9, "pitch": 0.9, "shift_st": -3.0},
+}
+
+
+def neural_sample(lines: list[dict]) -> list[dict]:
+    return lines[::7]
+
 
 def espeak_variants() -> dict:
     import subprocess
@@ -59,11 +86,12 @@ def espeak_variants() -> dict:
 def audition_one(args) -> dict:
     name, voice, lines = args
     AUD.mkdir(parents=True, exist_ok=True)
-    cache = AUD / (name.replace(" ", "_").replace("+", "-").replace("/", "_") + f"_{len(lines)}.json")
+    import re
+    cache = AUD / (re.sub(r"[^A-Za-z0-9_.-]+", "_", name.replace("+", "-")) + f"_{len(lines)}.json")
     if cache.exists():
         return json.loads(cache.read_text())
     errs = words = 0
-    f0s, durs, rolls = [], [], []
+    f0s, durs, rolls, spreads = [], [], [], []
     per_line = {}
     failed = 0
     for line in lines:
@@ -83,6 +111,8 @@ def audition_one(args) -> dict:
         f = dsp.f0_track(x, sr)
         if len(f):
             f0s.append(f)
+        if len(f) >= 10:            # how far the pitch moves within the line: 10th to 90th percentile
+            spreads.append(12 * np.log2(np.percentile(f, 90) / np.percentile(f, 10)))
         durs.append((len(x) / sr, n))
         rolls.append(dsp.rolloff(x, sr, 0.99))
         per_line[line["id"]] = {"hyp": hyp, "errors": e, "words": n, "seconds": round(len(x) / sr, 3)}
@@ -93,6 +123,7 @@ def audition_one(args) -> dict:
         "f0_median_hz": round(float(np.median(f0)), 1),
         "f0_p10_hz": round(float(np.percentile(f0, 10)), 1),
         "f0_p90_hz": round(float(np.percentile(f0, 90)), 1),
+        "f0_spread_st": round(float(np.median(spreads)), 1) if spreads else 0.0,
         "words_per_second": round(sum(n for _, n in durs) / max(sum(d for d, _ in durs), 1e-9), 2),
         "sample_rate": sr if durs else 0,
         "rolloff99_hz": round(float(np.median(rolls)), 0) if rolls else 0,
@@ -103,6 +134,8 @@ def audition_one(args) -> dict:
 
 
 def run(cands: dict, lines: list[dict], procs: int = 2) -> list[dict]:
+    from mbvoice.synth import split_threads
+    split_threads(procs)
     jobs = [(n, v, lines) for n, v in cands.items()]
     out = []
     with Pool(procs) as pool:
@@ -114,27 +147,45 @@ def run(cands: dict, lines: list[dict], procs: int = 2) -> list[dict]:
     return out
 
 
+def cached(cands: dict, lines: list[dict]) -> list[dict] | None:
+    """The cached results of every candidate, or None if any is missing."""
+    import re
+    out = []
+    for name in cands:
+        c = AUD / (re.sub(r"[^A-Za-z0-9_.-]+", "_", name.replace("+", "-")) + f"_{len(lines)}.json")
+        if not c.exists():
+            return None
+        r = json.loads(c.read_text())
+        r.pop("per_line", None)
+        out.append(r)
+    return sorted(out, key=lambda r: r["wer"])
+
+
 def main() -> None:
     mode = sys.argv[1] if len(sys.argv) > 1 else "raw"
     lines = load_lines()
     sample = lines[::8][:24]
-    if mode == "raw":
+    if mode == "neural":
+        run(NEURAL, neural_sample(lines))
+    elif mode == "raw":
         run(MAIN, lines)
     elif mode == "espeak":
         run(espeak_variants(), sample)
     elif mode == "summary":
-        res = {"main": [], "espeak_variants": []}
-        for r in run(MAIN, lines, 1):
-            r.pop("per_line")
-            res["main"].append(r)
-        for r in run(espeak_variants(), sample, 1):
-            r.pop("per_line")
-            res["espeak_variants"].append(r)
-        res["main"].sort(key=lambda r: r["wer"])
-        res["espeak_variants"].sort(key=lambda r: r["wer"])
+        target = DOC_DIR / "audition.json"
+        res = json.loads(target.read_text()) if target.exists() else {}
+        for key, cands, ls in (("neural", NEURAL, neural_sample(lines)), ("main", MAIN, lines),
+                               ("espeak_variants", espeak_variants(), sample)):
+            got = cached(cands, ls)
+            if got is not None:
+                res[key] = got
+            elif key in res:
+                print(f"{key}: not every result is cached in {AUD}; keeping the recorded ones")
+            else:
+                print(f"{key}: no results; run audition.py {'raw' if key == 'main' else key.split('_')[0]} first")
         DOC_DIR.mkdir(parents=True, exist_ok=True)
-        (DOC_DIR / "audition.json").write_text(json.dumps(res, indent=1) + "\n")
-        print("wrote", DOC_DIR / "audition.json")
+        target.write_text(json.dumps(res, indent=1) + "\n")
+        print("wrote", target)
 
 
 if __name__ == "__main__":

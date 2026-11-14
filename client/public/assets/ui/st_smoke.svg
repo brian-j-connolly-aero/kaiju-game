@@ -1,5 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
-  <!-- Squad: smoke. A canister on the ground and the cloud billowing out of it. -->
-  <path d="M15 43Q6 43 7 35 8 27 17 28 18 18 28 18 36 11 44 19 55 18 56 29 61 37 53 43Z"/>
-  <rect x="26" y="48" width="12" height="11" rx="2" fill="currentColor" stroke="none"/>
-</svg>

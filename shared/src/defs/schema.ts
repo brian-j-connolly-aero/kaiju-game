@@ -12,6 +12,7 @@ import type {
   FactionId,
   FlightModel,
   KaijuKindId,
+  KaijuMove,
   KaijuPhase,
   Level,
   PerStage,
@@ -134,6 +135,24 @@ export interface KaijuStageDef {
   mouthForward: number;
   /** Height at which a held object is carried and from which it is thrown. */
   handHeight: number;
+  /** Where the head and the tail are, for the hit volume (sim/kaijuBody.ts). */
+  hit: KaijuHitShape;
+}
+
+/**
+ * The parts of the body that reach out beyond its upright capsule, as capsules (sim/kaijuBody.ts;
+ * DESIGN.md section 4, "The hit volume"). Measured on the model (meters). A point is
+ * [forward, height]: how far ahead of the body's axis (negative: behind), and how high.
+ */
+export interface KaijuHitShape {
+  /** Head and neck: one capsule from `neck` to `snout`, along the heading the head looks (the aim). */
+  neck: readonly [number, number];
+  snout: readonly [number, number];
+  headRadius: number;
+  /** Tail: a capsule between each two points in turn (root first, sloping down to the tip), along the body's facing. */
+  tail: ReadonlyArray<readonly [number, number]>;
+  /** One radius per tail capsule (one fewer than the points). */
+  tailRadii: readonly number[];
 }
 
 /** How a kaiju kind takes damage (DESIGN.md section 3). */
@@ -158,17 +177,13 @@ export interface KaijuDamageProfile {
   rearMult: number;
 }
 
-/** Which input drives a verb. */
-export type KaijuButton = 'strike' | 'grab' | 'block' | 'roar' | 'special' | 'molt';
-
 /**
- * How the button is read (the full tap and hold rules are in net/input.ts):
- * - tap: starts on press; it is the action unless the hold partner takes over.
- * - hold: takes over once the button has been down for `holdTime`.
- * - press: starts on the press edge.
- * - level: runs for as long as the button is down.
+ * Which button starts a verb (the full rules are in net/input.ts: one move per button, no
+ * tap-versus-hold). The starting kit has fixed buttons: Strike (swipe; throw with something in
+ * the hand), Grab (grab; eat with something in the hand), Stomp and Molt. A move picked at a
+ * molt is a 'slot' verb: it is on the move button of the slot it was put in (`Kaiju.moves`).
  */
-export type Gesture = 'tap' | 'hold' | 'press' | 'level';
+export type KaijuButton = 'strike' | 'grab' | 'stomp' | 'molt' | 'slot';
 
 export interface ActionTiming {
   /** The tell: time from the start until the effect begins. */
@@ -181,13 +196,14 @@ export interface ActionTiming {
 
 interface KaijuActionBase {
   button: KaijuButton;
-  gesture: Gesture;
-  /** Seconds the button must be held for a hold gesture; 0 otherwise. */
-  holdTime: number;
+  /** True when it lasts for as long as its button is down (the brace); otherwise one press starts it and it runs its course. */
+  whileHeld: boolean;
   timing: ActionTiming;
   /** Phase the state machine shows while `timing.active` runs. */
   activePhase: KaijuPhase;
-  /** Seconds before the action can be used again, counted from when it starts. */
+  /** Phase shown while `timing.recover` runs; 'recover' when left out (the charge ends in a 'stumble'). */
+  recoverPhase?: KaijuPhase;
+  /** Seconds before the action can be used again, counted from when it starts (the charge: from the end of its stumble). */
   cooldown: number;
   rageCost: number;
   /** Movement speed multiplier for the whole action; 0 means rooted. */
@@ -268,6 +284,47 @@ export interface RoarActionDef extends KaijuActionBase {
   unitNerve: number;
   /** A roar always clears the volley charge of units it reaches. */
   resetsCharge: boolean;
+  /**
+   * Seconds every unit it reaches is stunned: it cannot move or fire and does not answer its
+   * controls. Its shaking (from `unitNerve`) starts when the stun is over.
+   */
+  stunTime: number;
+}
+
+/**
+ * A lumbering charge (DESIGN.md section 4): a wind-up in which it is rooted but can turn, a run
+ * straight ahead (the active phase, 'charge') that it steers only slowly and can end early with
+ * another press, and a stumble (the recovery, 'stumble') in which it can do nothing.
+ */
+export interface ChargeActionDef extends KaijuActionBase {
+  id: 'charge';
+  /** Turn rate multiplier during the wind-up (`moveMult` roots it then, and in the stumble). */
+  windupTurnMult: number;
+  /** The run: top speed as a multiple of the walking top speed, reached in `rampTime` seconds from a standstill. */
+  speedMult: number;
+  rampTime: number;
+  /** Turn rate multiplier during the run. */
+  runTurnMult: number;
+  /** The run smashes structures up to this tall; a taller one stops it at once, unless the body wades through it. */
+  smashHeight: PerStage<number>;
+  /** Units it runs into, each once per charge: damage, nerve, and how far they are thrown aside (body radii). */
+  unitDamage: number;
+  unitNerve: number;
+  throwAside: number;
+}
+
+/** A quick sweep of the tail over the rear half (DESIGN.md section 4). */
+export interface TailSweepActionDef extends KaijuActionBase {
+  id: 'tailSweep';
+  /** Full opening angle of the arc, centered behind the body. */
+  arc: number;
+  /** Reach behind the body's axis, in body radii. */
+  reach: number;
+  unitDamage: number;
+  unitNerve: number;
+  /** How far a unit is knocked outward, in body radii, at the body (half that at the end of the reach). */
+  knockback: number;
+  structureDamage: PerStage<number>;
 }
 
 /** The Lizard's special. Other kinds add their own member to KaijuSpecialDef. */
@@ -293,7 +350,7 @@ export interface BeamSpecialDef extends KaijuActionBase {
 
 export type KaijuSpecialDef = BeamSpecialDef;
 
-/** Starts the cocoon. `holdTime` is how long the Molt input must be held. */
+/** Starts the cocoon: one press of Molt while a molt is offered. */
 export interface MoltActionDef extends KaijuActionBase {
   id: 'molt';
 }
@@ -307,7 +364,9 @@ export type KaijuActionDef =
   | BraceActionDef
   | RoarActionDef
   | KaijuSpecialDef
-  | MoltActionDef;
+  | MoltActionDef
+  | ChargeActionDef
+  | TailSweepActionDef;
 
 /** One entry per verb, each with its own precise type. */
 export interface KaijuActionSet {
@@ -320,6 +379,8 @@ export interface KaijuActionSet {
   roar: RoarActionDef;
   special: KaijuSpecialDef;
   molt: MoltActionDef;
+  charge: ChargeActionDef;
+  tailSweep: TailSweepActionDef;
 }
 
 export interface KaijuKindDef {
@@ -342,6 +403,12 @@ export interface KaijuKindDef {
   /** Damage per second to units inside the body radius while the kaiju is moving. */
   trampleDps: number;
   actions: KaijuActionSet;
+  /**
+   * Molt cards (DESIGN.md section 4): the three moves the first molt offers, in card order; the
+   * second molt offers the two of those not taken, and beside them one of `second`, drawn with
+   * the match's random numbers when the offer is made.
+   */
+  cards: { first: readonly KaijuMove[]; second: readonly KaijuMove[] };
   /** Swimming, the hide-and-travel mode in deep water; absent for a kind that cannot swim. */
   swim?: KaijuSwimDef;
 }
@@ -381,7 +448,6 @@ export interface KaijuSwimDef {
 export interface FactionLevelDef {
   level: Level;
   unitType: UnitTypeId;
-  callIns: readonly CallInId[];
 }
 
 export interface FactionDef {
@@ -399,10 +465,27 @@ export type UnitVisual =
 /**
  * How a body turns (see sim/movement.ts):
  * - aim: the body turns toward the aim heading (kaiju).
- * - heading: the body turns toward where it wants to go and drives along its heading (vehicles).
+ * - heading: the body turns toward where it wants to go and drives along its heading (vehicles
+ *   under the squad's own steering: the sub-units).
  * - free: moves in any direction at once and faces where it moves (infantry).
+ * - tank: driven by hand (the player's own vehicle, `UnitTypeDef.drive`): the stick's forward
+ *   axis is the throttle along the hull, its side axis turns the hull, and the turret swings
+ *   toward the aim at its own rate.
  */
-export type SteerModel = 'aim' | 'heading' | 'free';
+export type SteerModel = 'aim' | 'heading' | 'free' | 'tank';
+
+/** How the player's own vehicle handles: real tank driving (docs/ROADMAP.md, phase 1). */
+export interface TankDriveDef {
+  /** Hull turn at full stick, radians per second. The hull turns on the spot when it is not moving. */
+  turnRate: number;
+  /** How fast the turret swings toward the aim, radians per second. */
+  turretRate: number;
+  /** Speeding up, and slowing down (or stopping to reverse), along the hull, meters per second squared. */
+  accel: number;
+  brake: number;
+  /** Top speed in reverse, as a share of the top speed. */
+  reverseMult: number;
+}
 
 export interface UnitTypeDef {
   id: UnitTypeId;
@@ -419,9 +502,12 @@ export interface UnitTypeDef {
   radius: number;
   /** Height of the hit volume. */
   height: number;
+  /** How sub-units steer (and the driven unit too, when there is no `drive`). */
   steer: SteerModel;
   /** Radians per second (ignored by 'free' steering). */
   turnRate: number;
+  /** Vehicles: the driven unit handles like a tank ('tank' steering) with these numbers. */
+  drive?: TankDriveDef;
   /** Height of the first-person camera and of the aim ray origin. */
   eyeHeight: number;
   /** Height projectiles leave from. */

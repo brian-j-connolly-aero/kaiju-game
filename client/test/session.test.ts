@@ -78,7 +78,6 @@ class Rig {
       sendInput: (input) => {
         if (!this.dropInput(input)) this.toServer.push({ at: this.now + this.oneWay, input });
       },
-      sendCommand: () => undefined,
       onEvent: (event) => this.released.push({ event, past: this.session.catchingUp }),
       onCityResync: () => undefined,
     });
@@ -264,8 +263,10 @@ describe("the local kaiju's own wind-up", () => {
 
   it('shows a brace from the press to the release without a gap', () => {
     const rig = new Rig({ role: 'kaiju', roundTripMs: 120 });
+    // The brace is a move picked at a molt, held on its move button (net/input.ts).
+    rig.world.kaijus[0].moves = ['brace', 'none'];
     rig.run(1);
-    rig.control = { ...rig.control, buttons: Btn.block };
+    rig.control = { ...rig.control, buttons: Btn.move1 };
     const phases: string[] = [];
     rig.run(0.8, (frame, now) => phases.push(shown(rig, frame, now).phase));
     const first = phases.indexOf('brace');

@@ -12,8 +12,8 @@ from .scriptdoc import BRIEFING_BUDGET, WINDOW_SECONDS
 
 FIRST_SCRIPT_LINES = 181        # size of the script before the audio review (section 10)
 
-ENGINE_NAMES = {"rhvoice": "RHVoice", "flite": "Flite", "pico": "Pico (pico2wave)",
-                "festival": "Festival", "espeak": "eSpeak NG"}
+ENGINE_NAMES = {"kokoro": "Kokoro-82M", "piper": "Piper", "rhvoice": "RHVoice", "flite": "Flite",
+                "pico": "Pico (pico2wave)", "festival": "Festival", "espeak": "eSpeak NG"}
 ORDER = ["Overlord", "Granite", "Beacon", "Tempest", "Anchor", "Chair"]
 
 WHO = {
@@ -27,7 +27,16 @@ WHO = {
 
 
 def _voice_text(v: dict) -> str:
-    parts = [f"{ENGINE_NAMES.get(v['engine'], v['engine'])} `{v.get('voice', '')}`"]
+    name = v.get("voice", "")
+    if "+" in name:                      # a Kokoro blend: "a:7+b:3"
+        mix = [p.partition(":") for p in name.split("+")]
+        total = sum(float(w or 1) for _, _, w in mix)
+        name = " + ".join(f"{n} {100 * float(w or 1) / total:.0f}%" for n, _, w in mix)
+    parts = [f"{ENGINE_NAMES.get(v['engine'], v['engine'])} `{name}`"]
+    if v.get("speaker") is not None:
+        parts.append(f"speaker {v['speaker']}")
+    if v.get("accent"):
+        parts.append(f"{v['accent'].upper()} pronunciation")
     if v.get("rate", 1.0) != 1.0:
         parts.append(f"rate {v['rate']:g}")
     if v.get("pitch", 1.0) != 1.0:
@@ -83,46 +92,93 @@ def write(lines: list[dict], cast: dict, pron: dict, state: dict, report: dict) 
     for s in speakers:
         sp = cast["speakers"][s]
         g = summ.get("speaker:" + s, {})
-        rows.append([f"**{s}**", WHO.get(s, ("", ""))[0], WHO.get(s, ("", ""))[1], _voice_text(sp["voice"]),
+        orders = sp.get("orders") or {}
+        voice = _voice_text(sp["voice"]) + (f"; orders at rate {orders['rate']:g}" if "rate" in orders else "")
+        rows.append([f"**{s}**", WHO.get(s, ("", ""))[0], WHO.get(s, ("", ""))[1], voice,
                      sp["chain"], f"{f0[s]:.0f}", g.get("words_per_second", ""), count[s]])
-    add(_table(["Character", "Heard by", "Who they are", "Synthesizer voice", "Chain", "Pitch (Hz)",
+    add(_table(["Character", "Heard by", "Who they are", "Voice", "Chain", "Pitch (Hz)",
                 "Pace (words/s)", "Lines"], rows, "lllllrrr"))
     add("")
-    add(notes.CAST_NOTES)
+    # measured numbers the hand-written notes quote, per character and for everything
+    fmt = {"all_wer": summ.get("all", {}).get("wer_ogg", 0), "all_wer2": summ.get("all", {}).get("wer2_ogg", 0)}
+    for s in speakers:
+        g = summ.get("speaker:" + s, {})
+        fmt.update({f"{s.lower()}_f0": f0[s], f"{s.lower()}_wer": g.get("wer_ogg", 0),
+                    f"{s.lower()}_wer2": g.get("wer2_ogg", 0), f"{s.lower()}_wps": g.get("words_per_second", 0)})
+    add(notes.CAST_NOTES.format(**fmt))
+
+    # ---------------------------------------------------------------- telling the radio voices apart
+    rv = report.get("radio_voices") or {}
+    first = _load("first_cast.json")
+    if rv.get("names"):
+        add("### Telling the radio voices apart\n")
+        add(notes.VOICE_PRINTS_INTRO)
+        add(_table(["Voice print similarity"] + rv["names"],
+                   [[f"**{a}**"] + [f"**{v:.2f}**" if a == b else f"{v:.2f}" for b, v in zip(rv["names"], row)]
+                    for a, row in zip(rv["names"], rv["matrix"])], "l" + "r" * len(rv["names"])))
+        add("")
+        cross = [(rv["matrix"][i][j], rv["names"][i], rv["names"][j]) for i in range(len(rv["names"]))
+                 for j in range(i + 1, len(rv["names"]))]
+        hi = max(cross)
+        old = (first or {}).get("radio_voices") or {}
+        old_hi = max(((old["matrix"][i][j], old["names"][i], old["names"][j]) for i in range(len(old["names"]))
+                      for j in range(i + 1, len(old["names"]))), default=None) if old.get("names") else None
+        old_text = (f"For comparison, the closest pair in the first cast, measured the same way on its shipped "
+                    f"files, was {old_hi[1]} and {old_hi[2]} at {old_hi[0]:.2f}." if old_hi else "")
+        add(notes.VOICE_PRINTS_AFTER.format(
+            hi=hi[0], hi_a=hi[1], hi_b=hi[2], lo=min(cross)[0],
+            self_min=min(rv["matrix"][i][i] for i in range(len(rv["names"]))), old=old_text))
+
+    # ---------------------------------------------------------------- before and after
+    if first:
+        add("### Before and after: the first voices and the neural ones\n")
+        add(notes.BEFORE_AFTER_INTRO)
+        rows = []
+        for key, name in [("speaker:" + s, s) for s in speakers] + [("all", "**Everything**")]:
+            a, b = first["summary"].get(key), summ.get(key)
+            if not a or not b:
+                continue
+            fv = first["cast"].get(name, {}).get("voice") if key != "all" else None
+            nv = cast["speakers"][name]["voice"] if key != "all" else None
+            rows.append([name, _voice_text(fv) if fv else "", _voice_text(nv) if nv else "",
+                         f"{a['wer_ogg']:.1f}", f"{b['wer_ogg']:.1f}", f"{a['wer2_ogg']:.1f}", f"{b['wer2_ogg']:.1f}",
+                         f"{a['words_per_second']:.2f}", f"{b['words_per_second']:.2f}"])
+        add(_table(["Character", "First voice", "Neural voice", "pocketsphinx, before (%)", "pocketsphinx, now (%)",
+                    "Second recognizer, before (%)", "Second recognizer, now (%)", "Pace before (words/s)",
+                    "Pace now (words/s)"], rows, "lllrrrrrr"))
+        add("")
+        add(notes.BEFORE_AFTER_AFTER.format(
+            ps_before=first["summary"]["all"]["wer_ogg"], ps_now=summ.get("all", {}).get("wer_ogg", 0),
+            p2_before=first["summary"]["all"]["wer2_ogg"], p2_now=summ.get("all", {}).get("wer2_ogg", 0),
+            ogg_before=first["ogg_bytes"] / 1e6, mp3_before=first["mp3_bytes"] / 1e6,
+            ogg_now=ogg_bytes / 1e6, mp3_now=mp3_bytes / 1e6))
 
     aud = _load("audition.json")
-    if aud:
-        add("### Audition: every installed voice on the whole script, unprocessed\n")
-        add(notes.AUDITION_INTRO)
-        rows = [[r["name"], f"{100 * r['wer']:.1f}", f"{r['f0_median_hz']:.0f}", r["words_per_second"],
-                 r["sample_rate"], notes.AUDITION_REMARKS.get(r["name"], "")] for r in aud["main"]]
-        add(_table(["Voice", "Word error rate (%)", "Pitch (Hz)", "Pace (words/s)", "Sample rate (Hz)", "Verdict"],
-                   rows, "lrrrrl"))
+    if aud and aud.get("neural"):
+        add("### Audition: every neural voice on a sample of the script, unprocessed\n")
+        add(notes.NEURAL_AUDITION_INTRO.format(lines=aud["neural"][0]["lines"]))
+        order = sorted(aud["neural"], key=lambda r: (not r["name"].startswith("first cast"), r["wer"]))
+        rows = [[r["name"], f"{100 * r['wer']:.1f}", f"{r['f0_median_hz']:.0f}", f"{r.get('f0_spread_st', 0):.1f}",
+                 r["words_per_second"], r["sample_rate"], notes.NEURAL_REMARKS.get(r["name"], "")] for r in order]
+        add(_table(["Voice", "Word errors, pocketsphinx (%)", "Pitch (Hz)", "Pitch movement (semitones)",
+                    "Pace (words/s)", "Sample rate (Hz)", "Verdict"], rows, "lrrrrrl"))
         add("")
-        if aud.get("espeak_variants"):
-            ev = aud["espeak_variants"]
-            best = ", ".join(f"`{r['voice']['voice'].split('+')[1]}` {100 * r['wer']:.0f}%" for r in ev[:8])
-            worst = ", ".join(f"`{r['voice']['voice'].split('+')[1]}` {100 * r['wer']:.0f}%" for r in ev[-4:])
-            add(notes.ESPEAK_VARIANTS.format(n=len(ev), lines=ev[0]["lines"], best=best, worst=worst,
-                                             median=100 * ev[len(ev) // 2]["wer"]))
+        add(notes.NEURAL_AUDITION_AFTER)
     exps = _load("experiments.json")
-    if exps:
-        add("### Casting experiments: candidate settings through the character's own chain\n")
-        add(notes.EXPERIMENTS_INTRO)
-        titles = {"radio_voices": "Radio candidates (all 93 military lines, first-pass radio chain)",
-                  "anchor_voices": "Anchor candidates (all 82 news lines, broadcast chain)",
-                  "chair_voices": "Chair candidates, first round (6 hearing lines plus 28 news lines, first-pass hall)",
-                  "chair_voices2": "Chair candidates, second round (the 6 hearing lines, final hall chain)"}
-        for g, title in titles.items():
+    if exps and any(r["group"].startswith("neural") for r in exps):
+        add("### Casting rounds: the shortlist through each character's own chain\n")
+        add(notes.NEURAL_EXPERIMENTS_INTRO)
+        for g, title in notes.NEURAL_EXPERIMENT_TITLES.items():
             rs = [r for r in exps if r["group"] == g]
             if not rs:
                 continue
             add(f"**{title}**\n")
-            rows = [[r["label"], r["wer_raw"], r["wer_processed"], f"{r['f0_median_hz']:.0f}", r["words_per_second"]]
-                    for r in rs]
-            add(_table(["Candidate", "Unprocessed (%)", "Through the chain (%)", "Pitch (Hz)", "Pace (words/s)"],
-                       rows, "lrrrr"))
+            rows = [[r["label"], r["lines"], r["wer_raw"], r["wer_processed"], r.get("wer2_processed", ""),
+                     f"{r['f0_median_hz']:.0f}", r["words_per_second"]] for r in rs]
+            add(_table(["Candidate", "Lines", "pocketsphinx, unprocessed (%)", "pocketsphinx, through the chain (%)",
+                        "Second recognizer, through the chain (%)", "Pitch (Hz)", "Pace (words/s)"], rows, "lrrrrrr"))
             add("")
+        add(notes.NEURAL_EXPERIMENTS_AFTER)
 
     # ---------------------------------------------------------------- chains
     add("## 2. The processing chains\n")
@@ -144,10 +200,11 @@ def write(lines: list[dict], cast: dict, pron: dict, state: dict, report: dict) 
     if exps:
         sweep_titles = [
             ("sweep_radio", "Radio, first pass: one change at a time from 7 dB of drive and an unducked bed at -30 dB "
-                            "(31 military lines, Granite's and Beacon's voices)"),
+                            "(31 military lines; Flite `rms` and RHVoice `clb`, the first Granite and Beacon)"),
             ("sweep_radio2", "Radio, second pass: one change at a time from 3 dB of drive and a bed at -30 dB that "
-                             "drops 10 dB under the words (same 31 lines; Granite's, Beacon's and Tempest's voices)"),
-            ("sweep_radio3", "Radio, Tempest's voice only: looking for what costs it words (same 31 lines)"),
+                             "drops 10 dB under the words (same 31 lines; the first Granite, Beacon and Tempest)"),
+            ("sweep_radio3", "Radio, the first Tempest's voice only (RHVoice `alan`): looking for what costs it words "
+                             "(same 31 lines)"),
             ("sweep_hall", "Hall, first pass: reverberation level and ducking (6 hearing lines plus 28 news lines, "
                            "RHVoice `alan` slowed and lowered)"),
             ("sweep_hall2", "Hall with the voice first tried for the chair (Pico lowered with its own pitch control)"),
@@ -171,10 +228,12 @@ def write(lines: list[dict], cast: dict, pron: dict, state: dict, report: dict) 
         ms = [by_id[l["id"]] for l in lines if l["speaker"] == s and "lead_s" in by_id[l["id"]]]
         lead = sum(m["lead_s"] for m in ms) / max(len(ms), 1)
         tail = sum(m["tail_s"] for m in ms) / max(len(ms), 1)
-        rows.append([s, sp.get("max_pause_ms", 320), sp.get("min_pause_ms", 0) or "", f"{lead:.2f}", f"{tail:.2f}"])
-    add(_table(["Character", "Longest pause allowed (ms)", "Sentence pause at least (ms)",
-                "Before the first word (s)", "After the last word (s)"], rows, "lrrrr"))
+        rows.append([s, sp.get("max_pause_ms", 320), (sp.get("orders") or {}).get("max_pause_ms", ""),
+                     sp.get("min_pause_ms", 0) or "", f"{lead:.2f}", f"{tail:.2f}"])
+    add(_table(["Character", "Longest pause allowed (ms)", "In orders (ms)", "Sentence pause at least (ms)",
+                "Before the first word (s)", "After the last word (s)"], rows, "lrrrrr"))
     add("")
+    add(notes.ORDERS)
 
     # ---------------------------------------------------------------- client
     add("## 3. For the client\n")
@@ -198,11 +257,22 @@ def write(lines: list[dict], cast: dict, pron: dict, state: dict, report: dict) 
                       ("chain:hall", "**All hall lines**"), ("all", "**Everything**")]:
         g = summ.get(key)
         if g:
-            rows.append([name, g["lines"], g["words"], g["wer_raw"], g["wer_processed"], g["wer_ogg"], g["wer_mp3"]])
+            rows.append([name, g["lines"], g["words"], g["wer_raw"], g["wer_processed"], g["wer_ogg"], g["wer_mp3"],
+                         g.get("wer2_raw", ""), g.get("wer2_ogg", "")])
     add(_table(["Voice or chain", "Lines", "Words", "Unprocessed (%)", "Finished master (%)",
-                "Decoded .ogg (%)", "Decoded .mp3 (%)"], rows, "lrrrrrr"))
+                "Decoded .ogg (%)", "Decoded .mp3 (%)", "Second recognizer, unprocessed (%)",
+                "Second recognizer, .ogg (%)"], rows, "lrrrrrrrr"))
     add("")
     add(notes.ASR_READING)
+    second = [(l, by_id[l["id"]]) for l in lines if by_id[l["id"]].get("ogg", {}).get("errors2")]
+    if second:
+        add(notes.SECOND_MISSES_INTRO)
+        add(_table(["Line", "Voice", "Subtitle", "What the second recognizer heard (.ogg)", "Errors"],
+                   [[f"`{l['id']}`", l["speaker"], l["text"], m["ogg"]["hyp2"] or "(nothing)",
+                     f"{m['ogg']['errors2']}/{m['words']}"] for l, m in second]))
+        add("")
+    else:
+        add(notes.SECOND_MISSES_NONE)
 
     # ---------------------------------------------------------------- weakest
     add("### Weakest lines\n")
@@ -219,8 +289,10 @@ def write(lines: list[dict], cast: dict, pron: dict, state: dict, report: dict) 
     rows = []
     for rate, errs, l, m, rec in [t for t in scored if t[1] >= 2][:25]:
         rows.append([f"`{l['id']}`", l["speaker"], l["text"], m["ogg"]["hyp"] or "(nothing)",
-                     f"{errs}/{rec['words']}", f"{rec['raw']['errors']}/{rec['words']}"])
-    add(_table(["Line", "Voice", "Subtitle", "What the recognizer heard (.ogg)", "Errors", "Unprocessed"], rows))
+                     f"{errs}/{rec['words']}", f"{rec['raw']['errors']}/{rec['words']}",
+                     f"{m['ogg'].get('errors2', 0)}/{rec['words']}"])
+    add(_table(["Line", "Voice", "Subtitle", "What pocketsphinx heard (.ogg)", "Errors", "Unprocessed",
+                "Second recognizer (.ogg)"], rows))
     add("")
     clean = sum(1 for t in scored if t[1] == 0)
     one = sum(1 for t in scored if t[1] == 1)
@@ -314,15 +386,13 @@ def write(lines: list[dict], cast: dict, pron: dict, state: dict, report: dict) 
         used = e.get("ogg" + OGG_QUALITY, e["ogg3"])
         add(notes.ENCODING_AFTER.format(
             kb_per_line=ogg_bytes / 1000 / max(len(measured), 1), peak_limit=PEAK_LIMIT_DBTP,
-            ogg0_peak=e["ogg0"]["true_peak_max_db"], ogg_peak=used["true_peak_max_db"],
-            ogg3_radio=e["ogg3"]["wer_radio"], ogg0_radio=e["ogg0"]["wer_radio"],
-            mp35_radio=e["mp35"]["wer_radio"], mp38_radio=e["mp38"]["wer_radio"],
+            ogg0_peak=e["ogg0"]["true_peak_max_db"], ogg1_peak=e["ogg1"]["true_peak_max_db"],
+            ogg2_peak=e["ogg2"]["true_peak_max_db"], ogg_peak=used["true_peak_max_db"],
+            wer_lo=min(r["wer_all"] for r in enc["settings"]), wer_hi=max(r["wer_all"] for r in enc["settings"]),
             mp35_anchor=e["mp35"]["spectrum_lost_anchor_pct"], mp36_anchor=e["mp36"]["spectrum_lost_anchor_pct"],
             mp37_anchor=e["mp37"]["spectrum_lost_anchor_pct"], ogg_anchor=used["spectrum_lost_anchor_pct"],
-            ogg_saving=100.0 * (1 - e["ogg2"]["megabytes"] / e["ogg3"]["megabytes"]),
-            ogg_cost=e["ogg2"]["wer_all"] - e["ogg3"]["wer_all"],
             mp3_saving=100.0 * (1 - e["mp36"]["megabytes"] / e["mp35"]["megabytes"]),
-            mp3_cost=e["mp36"]["wer_all"] - e["mp35"]["wer_all"]))
+            mp3_lost_ratio=e["mp36"]["spectrum_lost_anchor_pct"] / max(e["mp35"]["spectrum_lost_anchor_pct"], 1e-9)))
     sheets = sorted(p.name for p in DOC_DIR.glob("sheet_*.png"))
     if sheets:
         add("Spectrogram sheets (three lines per voice; synthesizer output on the left, finished clip on the right): "
@@ -330,15 +400,45 @@ def write(lines: list[dict], cast: dict, pron: dict, state: dict, report: dict) 
 
     add("## 7. What is weak, and what to do about it\n")
     wer = lambda s: summ.get("speaker:" + s, {}).get("wer_ogg", 0)
-    add(notes.WEAK_POINTS.format(tempest_wer=wer("Tempest")))
+    add(notes.WEAK_POINTS.format(**fmt))
     add("## 8. Swapping the synthesizer\n")
     add(notes.SWAP)
     add("## 9. Rebuilding\n")
     add(notes.REBUILD.format(out=OUT_DIR.relative_to(OUT_DIR.parents[4])))
     add("## 10. What the audio review changed\n")
+    # the review's results were measured on the first voices: quoted from that build, not this one
+    fs = (first or {}).get("summary", {})
     add(notes.REVIEW.format(win_min=min(orders), win_max=max(orders), window=max(WINDOW_SECONDS.values()),
                             new_lines=len(lines) - FIRST_SCRIPT_LINES, lines=len(lines),
-                            tempest_wer=wer("Tempest"), granite_wer=wer("Granite"),
-                            all_wer=summ.get("all", {}).get("wer_ogg", 0),
+                            tempest_wer=fs.get("speaker:Tempest", {}).get("wer_ogg", wer("Tempest")),
+                            granite_wer=fs.get("speaker:Granite", {}).get("wer_ogg", wer("Granite")),
+                            all_wer=fs.get("all", {}).get("wer_ogg", summ.get("all", {}).get("wer_ogg", 0)),
                             brief_h=brief["humans"], brief_max=BRIEFING_BUDGET))
+    if first:
+        add("## 11. The first voices\n")
+        add(notes.FIRST_VOICES_INTRO)
+        rows = []
+        for s in speakers:
+            fv = first["cast"].get(s)
+            g = first["summary"].get("speaker:" + s)
+            if fv and g:
+                rows.append([f"**{s}**", _voice_text(fv["voice"]), fv["chain"], g["wer_raw"], g["wer_ogg"],
+                             g["wer2_ogg"], g["words_per_second"]])
+        add(_table(["Character", "Synthesizer voice", "Chain", "pocketsphinx, unprocessed (%)",
+                    "pocketsphinx, .ogg (%)", "Second recognizer, .ogg (%)", "Pace (words/s)"], rows, "lllrrrr"))
+        add("")
+        if aud and aud.get("main"):
+            add(notes.AUDITION_INTRO)
+            rows = [[r["name"], f"{100 * r['wer']:.1f}", f"{r['f0_median_hz']:.0f}", r["words_per_second"],
+                     r["sample_rate"], notes.AUDITION_REMARKS.get(r["name"], "")] for r in aud["main"]]
+            add(_table(["Voice", "Word error rate (%)", "Pitch (Hz)", "Pace (words/s)", "Sample rate (Hz)",
+                        "Verdict"], rows, "lrrrrl"))
+            add("")
+            if aud.get("espeak_variants"):
+                ev = aud["espeak_variants"]
+                best = ", ".join(f"`{r['voice']['voice'].split('+')[1]}` {100 * r['wer']:.0f}%" for r in ev[:8])
+                worst = ", ".join(f"`{r['voice']['voice'].split('+')[1]}` {100 * r['wer']:.0f}%" for r in ev[-4:])
+                add(notes.ESPEAK_VARIANTS.format(n=len(ev), lines=ev[0]["lines"], best=best, worst=worst,
+                                                 median=100 * ev[len(ev) // 2]["wer"]))
+        add(notes.FIRST_VOICES_AFTER)
     DOC.write_text("\n".join(doc).rstrip() + "\n")

@@ -34,10 +34,14 @@ describe('the captured mouse', () => {
     input.wantCapture = true;
   }
 
-  /** Clicks the view, lets the browser grant the pointer, lets go, and lets the settle time pass. */
+  /**
+   * Clicks the view, lets the browser grant the pointer (and report its jump, the cursor put
+   * back where it was, as Chromium does), lets go, and lets the settle time pass.
+   */
   async function capture(): Promise<void> {
     browser.mouseDown(0);
     await browser.settle();
+    browser.mouseMove(-480, -270);
     browser.mouseUp(0);
     browser.advance(200);
     input.poll(FRAME);
@@ -206,6 +210,34 @@ describe('the captured mouse', () => {
     expect(input.poll(FRAME).lookX).toBe(0);
   });
 
+  it('throws away the jump a browser reports once the pointer is captured, however late a busy page gets it', async () => {
+    // (The molt cards let the pointer go and take it back twice a match: no leap of the view.)
+    browser.mouseDown(0);
+    await browser.settle();
+    browser.mouseUp(0);
+    // Chromium's jump, the whole way back to where the cursor was, half a second after the lock.
+    browser.advance(600);
+    browser.mouseMove(-480, -270);
+    let s = input.poll(FRAME);
+    expect(s.lookX).toBe(0);
+    expect(s.lookY).toBe(0);
+    // Only that one: what the mouse does next turns the view.
+    browser.mouseMove(10, 0);
+    s = input.poll(FRAME);
+    expect(s.lookX).toBeCloseTo(10 * MOUSE_SENSITIVITY, 9);
+    // And again after the pointer is let go and taken back.
+    input.unlockPointer();
+    await browser.settle();
+    browser.mouseDown(0);
+    await browser.settle();
+    browser.mouseUp(0);
+    browser.advance(600);
+    browser.mouseMove(300, 200);
+    expect(input.poll(FRAME).lookX).toBe(0);
+    browser.mouseMove(-4, 0);
+    expect(input.poll(FRAME).lookX).toBeCloseTo(-4 * MOUSE_SENSITIVITY, 9);
+  });
+
   it('works without pointer lock: buttons act at once and the view turns while a button is held', () => {
     input.detach();
     uninstall();
@@ -258,7 +290,7 @@ describe('the captured mouse', () => {
     expect(input.pointerLocked).toBe(true);
   });
 
-  it('applies the sensitivity and inverted look settings, and leaves the wheel pointer upright', async () => {
+  it('applies the sensitivity and inverted look settings', async () => {
     await capture();
     input.sensitivity = 2;
     browser.mouseMove(100, 50);
@@ -270,7 +302,6 @@ describe('the captured mouse', () => {
     s = input.poll(FRAME);
     expect(s.lookX).toBeCloseTo(100 * MOUSE_SENSITIVITY * 2, 9);
     expect(s.lookY).toBeCloseTo(50 * MOUSE_SENSITIVITY * 2, 9);
-    expect(s.pointerY).toBeCloseTo(-50 * MOUSE_SENSITIVITY * 2, 9);
   });
 
   it('leaves Tab and Space to the browser in the menus and keeps them for the game in a match', () => {
@@ -390,15 +421,16 @@ describe('30 Hz input samples', () => {
 
   it('keeps a held button down in every sample and never sends buttons while the map is open', () => {
     const controller = new KaijuController();
-    browser.keyDown('Space', ' ');
+    // Q: the first move button (a brace there is held).
+    browser.keyDown('KeyQ', 'q');
     for (let i = 0; i < 5; i++) {
       const ctx = { input: input.poll(FRAME), mapOpen: false } as ControlContext;
-      expect(controller.sample(ctx).buttons & Btn.block).toBe(Btn.block);
+      expect(controller.sample(ctx).buttons & Btn.move1).toBe(Btn.move1);
       input.sampleTaken();
     }
     const ctx = { input: input.poll(FRAME), mapOpen: true } as ControlContext;
     expect(controller.sample(ctx).buttons).toBe(0);
-    browser.keyUp('Space', ' ');
+    browser.keyUp('KeyQ', 'q');
   });
 
   it('limits the ticks of one frame and reports how far the present is past the newest tick', () => {
@@ -456,12 +488,12 @@ describe('keycap letters', () => {
     browser.keyDown('KeyQ', 'a');
     browser.keyDown('KeyM', ',');
     browser.keyDown('KeyW', 'z');
-    expect(glyphFor(input.bindings, 'roar', 'keyboard')).toEqual({ icon: 'kb_key', label: 'A' });
+    expect(glyphFor(input.bindings, 'move1', 'keyboard')).toEqual({ icon: 'kb_key', label: 'A' });
     expect(glyphFor(input.bindings, 'map', 'keyboard')).toEqual({ icon: 'kb_key', label: ',' });
     expect(glyphFor(input.bindings, 'moveForward', 'keyboard')).toEqual({ icon: 'kb_key', label: 'Z' });
     expect(keyLayoutVersion()).toBeGreaterThan(before);
     // The position still does the same thing: bindings are by position.
-    expect(input.poll(FRAME).down.roar).toBe(true);
+    expect(input.poll(FRAME).down.move1).toBe(true);
     // Named keys keep their symbol; a key that types nothing printable teaches nothing; the
     // digit row keeps its digits (on this keyboard the "1" key types "&" without Shift).
     browser.keyDown('Space', ' ');
@@ -469,7 +501,7 @@ describe('keycap letters', () => {
     browser.keyDown('Digit1', '&');
     expect(keyGlyph('Space').label).toBe('␣');
     expect(keyGlyph('KeyE').label).toBe('E');
-    expect(glyphFor(input.bindings, 'cmdFollow', 'keyboard')).toEqual({ icon: 'kb_key', label: '1' });
+    expect(glyphFor(input.bindings, 'card1', 'keyboard')).toEqual({ icon: 'kb_key', label: '1' });
     // A character typed with AltGr or Ctrl held is not what the keycap shows.
     browser.window.dispatch('keydown', { code: 'KeyE', key: '€', target: browser.other, ...({ ctrlKey: true, altKey: true } as object) });
     expect(keyGlyph('KeyE').label).toBe('E');

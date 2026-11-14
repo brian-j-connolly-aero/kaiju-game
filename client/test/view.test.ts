@@ -141,9 +141,11 @@ describe('view details', () => {
     for (const id of ['st_reload', 'gp_dpad_up', 'gp_dpad_right', 'gp_dpad_down', 'gp_dpad_left', 'ui_lowres']) {
       expect(iconArt(id), id).not.toBe(iconArt('something_new'));
     }
-    // The four commands on the directional pad each show their own arm of it.
+    // The squad's two buttons show the mouse button or trigger they are on.
     const b = defaultBindings();
-    const pads = (['cmdFollow', 'cmdMoveTo', 'cmdFireAtWill', 'cmdHoldCharge'] as const).map((a) => glyphFor(b, a, 'gamepad')?.icon);
-    expect(new Set(pads)).toEqual(new Set(['gp_dpad_up', 'gp_dpad_right', 'gp_dpad_down', 'gp_dpad_left']));
+    expect(glyphFor(b, 'fire', 'keyboard')?.icon).toBe('ms_left');
+    expect(glyphFor(b, 'volley', 'keyboard')?.icon).toBe('ms_right');
+    expect(glyphFor(b, 'fire', 'gamepad')?.icon).toBe('gp_rt');
+    expect(glyphFor(b, 'volley', 'gamepad')?.icon).toBe('gp_lt');
   });
 });

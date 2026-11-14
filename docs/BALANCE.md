@@ -21,7 +21,8 @@ npm run sim -- --seeds 8 --fast                # the short MB_FAST timers and ba
 npm run sim -- --seeds 3 --events --json       # event counts; reports as JSON
 npm run sim -- --seeds 20 --every-anchor       # match i starts at anchor i mod 10: every start equally often
 npm run sim -- --seeds 20 --nav                # also how the bots got about (stuck, wading, the bay, hanging back)
-npm run sim -- --seeds 20 --bar 0.18,0.125,0.31  # try other bar fractions for this run only
+npm run sim -- --seeds 20 --bar 0.18,0.125,0.29  # try other bar fractions for this run only
+npm run sim -- --seeds 20 --clock 576          # try another match clock (seconds) for this run only
 npm run sim -- --seeds 5 --city placeholder    # the old grid city (a development option)
 ```
 
@@ -52,6 +53,9 @@ plus or minus 11 points of noise; the three batches in section 4 show it.
 | Neither side wins more than about 65% with equal bots, over about 20 seeds | default run |
 | Scattered fire alone rarely kills; coordinated volleys do | health lost in and out of staggers; kills |
 | Undisciplined fire is clearly worse than charged, coordinated volleys at breaking the kaiju's nerve | `--trigger-happy` against the default run: staggers, wins |
+
+Since phase 1 (section 9) the owner wants every stage about a fifth shorter than section 8
+measured: contested stages near 2:35, 2:30 and 3:05, matches near 8:15, a 9:36 clock.
 
 ## 3. Before
 
@@ -695,3 +699,124 @@ hesitant squads still won 5 of 10): the real city's streets cost a hesitant squa
 - **Move-to in odd places**: 0.7% of random move-to trips take more than three times the
   straight drive (pockets against the stage 1 line, far out in the bay). Bots never order
   these; a person can, and then re-orders.
+
+## 9. Phase 1 pacing: a fifth shorter (14 November, the phase 1 integration)
+
+The owner's word after the first multiplayer playtest (`docs/ROADMAP.md`): every stage ran about
+20% too long, so matches get about 20% shorter, as a rough cut now (tuned again in phase 3).
+Balance itself waits for the owner's next playtest; it is only reported here. The aim, a fifth
+off the last measured numbers (section 8): contested stages near 2:35, 2:30 and 3:05, a match
+near 8:15, and the clock cut in proportion (12:00 to 9:36). The levers allowed: the three bar
+fractions and the clock. `npm run sim` gained `--clock S` to try a clock without editing the
+rules (like `--bar`).
+
+### Where phase 1 left the pace
+
+Measured first, on the whole phase 1 tree (the monster's one-move buttons and molt cards, the
+army's two buttons and swarm, never alone) with section 8's numbers unchanged. Phase 1 had
+already moved the stages a long way, and not evenly:
+
+| | Stage 1 | Stage 2 | Stage 3 | Match | Kaiju wins |
+| --- | --- | --- | --- | --- | --- |
+| Section 8 (before phase 1) | 3:15 | 3:05 | 3:50 | 10:20 | 47% of 60 |
+| Phase 1, old clock and bar, seeds 1 to 20 | 2:02 | 2:25 | 4:47 | 8:49 | 11 of 20 |
+| Phase 1, old clock and bar, seeds 21 to 40 | 2:02 | 2:30 | 4:30 | 8:12 | 6 of 20 |
+
+(Stage times are for stages the kaiju completed. Seeds 1 to 20 and 21 to 40 with
+`--every-anchor`: every start twice in each batch.)
+
+- **Stages 1 and 2 got shorter by themselves.** The squad-mates now fire at will all the time,
+  and every miss that lands in the city fills the bar (DESIGN.md section 2: damage counts
+  "whoever caused it"): collateral at stage 1 went from 47 to 145 points a match. A contested
+  hatchling now fills its segment faster (1:39) than one left alone (2:03).
+- **Stage 3 got longer.** Faster squads with a volley button catch a titan more often: 7.9 to
+  8.6 staggers and 48 to 55 volleys a stage 3, against 4.6 and 33 before.
+- A kaiju left alone is unchanged: 2:03 / 1:57 / 3:05 for the three segments.
+
+### What changed
+
+| Number (`shared/src/defs/rules.ts`) | Before | After | Why |
+| --- | --- | --- | --- |
+| `MATCH_RULES.clock` | 720 (12:00) | 576 (9:36) | A fifth off, as asked. |
+| `MATCH_RULES.bar.p3` | 0.31 | 0.29 | Stage 3 from about 4:40 to about 3:00. |
+| `p1`, `p2` | 0.18, 0.125 | unchanged | Already at or under the aim, see below. |
+
+Trials, seeds 1 to 20, every start, all with the 9:36 clock (stage 1 2:02 and stage 2 2:25 in
+all of them; the bar is the only thing that differs):
+
+| p3 | Kaiju wins | Match | Stage 3 (completed) | Stage 3 alone |
+| --- | --- | --- | --- | --- |
+| 0.31 | 6 of 20 (7 by the clock) | 8:29 | 4:12 (6 completed) | 3:05 |
+| 0.30 | 8 of 20 | 8:03 | 3:24 | |
+| **0.29** | **11 of 20** | **7:33** | **3:02** | **2:44** |
+| 0.28 | 12 of 20 | 7:24 | 2:52 | 2:32 |
+| 0.27 | 14 of 20 | 7:07 | 2:43 | |
+| 0.25 | 14 of 20 | 7:01 | 2:24 | 2:17 |
+| 0.23 | 15 of 20 | 6:44 | 2:19 | 2:02 |
+
+Raising `p1` to bring stage 1 up to the 2:35 aim was tried and dropped: at 0.20 stage 1 took
+2:16 contested and 2:16 alone, but stage 2 grew to 2:47 (its mark is at least 1.6 times the
+first) and the kaiju won 7 of 20; at 0.21, 2:23 and 2:53, and 6 of 20. Making the first stage
+longer, and slower for a hatchling on its own, is the opposite of what the playtest asked for.
+
+### The result
+
+| | Stage 1 | Stage 2 | Stage 3 | Match | Kaiju wins |
+| --- | --- | --- | --- | --- | --- |
+| Aim | 2:35 | 2:30 | 3:05 | 8:15 | (not tuned) |
+| Seeds 1 to 20 | 2:02 | 2:25 | 3:02 | 7:33 | 11 of 20 (7 kills, 2 by the clock) |
+| Seeds 21 to 40 | 2:02 | 2:29 | 2:59 | 7:29 | 9 of 20 (9 kills, 2 by the clock) |
+| Alone (`--unopposed`, 10 starts) | 2:03 | 1:57 | 2:44 | 7:06 | |
+
+- Stages 2 and 3 are on the aim. Stage 1 is half a minute under it, so the average match is
+  about 7:30, 45 s under the aim of 8:15: about a quarter shorter than section 8's 10:20
+  rather than a fifth. If the owner's next playtest finds stage 1 rushed, `p1` is the lever (about 0.21 for
+  2:35; it lengthens stage 2 too, see above).
+- The kaiju won 20 of 40 (50%), with the old clock and bar 17 of 40 (43%). Not degenerate, so
+  nothing else was touched. With 20 matches a win rate carries about 11 points of noise either
+  way (section 1).
+- 4 matches of 40 ended on the clock, against 2 of 40 with the old clock and bar.
+
+Seeds 1 to 20, `npm run sim -- --seeds 20 --every-anchor`:
+
+```
+seed  start         winner          length          stage time    staggers  units lost  bar % at stage end      kaiju hp lost
+----  ------------  --------------  ------  ------------------  ----------  ----------  ------------------  -----------------
+1     Alder Row     humans (kill)     7:03  1:59 / 2:55 / 2:08   2 / 6 / 7   2 / 1 / 0        22 / 57 / 60  226 / 1211 / 1397
+2     Bellhaven     humans (kill)     6:12  2:05 / 2:08 / 1:59   2 / 3 / 8   0 / 0 / 0        22 / 57 / 62   273 / 540 / 1399
+3     Cinder Flats  humans (kill)     5:34     2:01 / 3:33 / -   2 / 7 / -   0 / 0 / -         22 / 57 / -     381 / 1716 / -
+4     Dovecote      kaiju (bar)       6:54  2:10 / 2:23 / 2:21   3 / 1 / 0   0 / 0 / 0       22 / 57 / 100     295 / 287 / 81
+5     Easter Green  kaiju (bar)       7:25  2:47 / 1:40 / 2:58   4 / 0 / 2   0 / 0 / 0       22 / 57 / 100    787 / 106 / 438
+6     Fennel Hill   kaiju (bar)       6:38  2:01 / 2:17 / 2:20   2 / 0 / 0   0 / 1 / 0       22 / 57 / 100     337 / 227 / 42
+7     Gull Point    humans (kill)     6:42  1:56 / 2:13 / 2:33   2 / 1 / 7   0 / 3 / 0        21 / 57 / 82   360 / 301 / 1317
+8     Harrow Lane   humans (clock)    9:36  1:46 / 2:02 / 5:48  2 / 3 / 11   0 / 1 / 4        22 / 57 / 94   241 / 392 / 1564
+9     Ivy Court     kaiju (bar)       8:55  2:05 / 3:30 / 3:20   4 / 4 / 3   4 / 6 / 0       21 / 57 / 100    501 / 568 / 569
+10    Juniper Bay   kaiju (bar)       7:39  1:25 / 3:19 / 2:55   0 / 4 / 1   2 / 0 / 0       21 / 57 / 100    101 / 560 / 353
+11    Alder Row     kaiju (bar)       8:29  1:49 / 2:18 / 4:22   1 / 2 / 8   1 / 4 / 0       22 / 57 / 100   152 / 278 / 1079
+12    Bellhaven     kaiju (bar)       7:39  2:09 / 1:42 / 3:48   1 / 1 / 4   4 / 0 / 0       21 / 57 / 100    250 / 204 / 807
+13    Cinder Flats  humans (clock)    9:36  1:38 / 3:11 / 4:47   0 / 6 / 9   1 / 3 / 1        22 / 57 / 91   81 / 1150 / 1629
+14    Dovecote      kaiju (bar)       6:18  2:14 / 1:30 / 2:34   2 / 0 / 0   1 / 0 / 0       22 / 57 / 100     378 / 35 / 181
+15    Easter Green  kaiju (bar)       8:46  3:21 / 2:22 / 3:03   7 / 2 / 1   0 / 6 / 0       22 / 57 / 100   1047 / 238 / 261
+16    Fennel Hill   humans (kill)     7:21  1:41 / 2:23 / 3:17   1 / 2 / 8   0 / 4 / 0        21 / 57 / 92   216 / 447 / 1473
+17    Gull Point    humans (kill)     8:46  2:01 / 3:49 / 2:56  2 / 10 / 8   0 / 0 / 0        22 / 57 / 82  344 / 1826 / 1478
+18    Harrow Lane   kaiju (bar)       6:45  1:24 / 2:28 / 2:54   1 / 2 / 0   0 / 3 / 0       21 / 57 / 100    228 / 356 / 199
+19    Ivy Court     humans (kill)     8:18  2:26 / 2:01 / 3:51   3 / 1 / 9   0 / 0 / 2        22 / 57 / 98   449 / 293 / 1473
+20    Juniper Bay   kaiju (bar)       6:24  1:50 / 1:49 / 2:44   2 / 2 / 0   1 / 2 / 2       22 / 58 / 100    262 / 272 / 168
+
+kaiju wins 11/20 (55%)   human wins 9 (45%): 7 by kill, 2 by the clock
+mean match length 7:33   shortest 5:34   longest 9:36
+stage 1: reached 20, completed 20, segment filled after 1:39, stage time when completed 2:02; per match: staggers 2.1, volleys 28.6, units lost 0.8, kaiju hp lost 345 (healed 48), collateral 145 points, swum 1 s (0.1 dives)
+stage 2: reached 20, completed 19, segment filled after 2:08, stage time when completed 2:25; per match: staggers 2.9, volleys 26.9, units lost 1.7, kaiju hp lost 550 (healed 172), collateral 525 points, swum 3 s (0.6 dives)
+stage 3: reached 19, completed 11, segment filled after 3:02, stage time when completed 3:02; per match: staggers 4.5, volleys 30.9, units lost 0.5, kaiju hp lost 837 (healed 316), collateral 1383 points, swum 0 s (0.0 dives)
+```
+
+### Limits
+
+- Bots, not people. The squad bots release full volleys and pair them; four people may well do
+  less (or more), and a person new to the monster wrecks more slowly than its bot. The owner's
+  next playtest is the real measure.
+- Stage 1 is short because of the squads' own stray fire. That is the rule as it stands
+  ("whoever caused it"); if it should change, it is a balance question for after the playtest.
+- Stage 3 is very sensitive to `p3` (0.31 to 0.27 took it from 4:12 to 2:43): a titan that
+  reaches the downtown towers before the squads close in finishes quickly, one that does not is
+  staggered again and again.

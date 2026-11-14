@@ -7,6 +7,8 @@
  *   MB_FAST=1       short match timers and a small destruction bar, for automated playtests;
  *                   the end screen also returns to the lobby sooner
  *   MB_LATENCY      simulated round-trip latency in milliseconds, for tests (default 0)
+ *   MB_JITTER       simulated jitter, for tests: every message is held back a random 0 to this
+ *                   many milliseconds more, each way, still arriving in order (default 0)
  *   MB_SPEED        simulation seconds per real second, for headless tests only (default 1);
  *                   real clients cannot predict at any other speed
  *   MB_GRACE        seconds a dropped player's seat is kept (default 45)
@@ -41,6 +43,8 @@ export interface ServerConfig {
   host: string | undefined;
   fast: boolean;
   latencyMs: number;
+  /** Up to this many milliseconds more for each message, each way, at random (net/server.ts). */
+  jitterMs: number;
   speed: number;
   graceSeconds: number;
   endScreenSeconds: number;
@@ -89,6 +93,7 @@ export function defaultConfig(overrides: Partial<ServerConfig> = {}): ServerConf
     host: undefined,
     fast,
     latencyMs: 0,
+    jitterMs: 0,
     speed: 1,
     graceSeconds: DEFAULT_GRACE_SECONDS,
     endScreenSeconds: fast ? FAST_END_SCREEN_SECONDS : DEFAULT_END_SCREEN_SECONDS,
@@ -133,6 +138,8 @@ export function configFromEnv(env: Record<string, string | undefined>, overrides
   if (env.HOST) fromEnv.host = env.HOST;
   const latency = numberFrom(env, 'MB_LATENCY');
   if (latency !== undefined) fromEnv.latencyMs = latency;
+  const jitter = numberFrom(env, 'MB_JITTER');
+  if (jitter !== undefined) fromEnv.jitterMs = jitter;
   const speed = numberFrom(env, 'MB_SPEED');
   if (speed !== undefined) {
     if (speed < 0.1 || speed > 100) throw new Error(`MB_SPEED must be between 0.1 and 100, got "${env.MB_SPEED}"`);

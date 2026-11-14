@@ -6,7 +6,6 @@ import {
   decodeSnapshot,
   encodeSnapshot,
   markVeterans,
-  queueCommand,
   snapshotOfWorld,
   UNIT_TYPES,
   type DamageKind,
@@ -64,9 +63,8 @@ describe('unit damage and losses', () => {
     expect(b.nerve).toBeGreaterThan(0);
     expect(world.players[HUMAN_PLAYER].tally.unitsLost).toBe(1);
     expect(world.players[KAIJU_PLAYER].tally.kills).toBe(1);
-    // The dead take no orders: nothing moves it, plants it or fires it.
-    lead(world, 1, { wheel: 'holdCharge' });
-    lead(world, 30, { buttons: Btn.fire });
+    // The dead do nothing: nothing moves it, plants it or fires it.
+    lead(world, 30, { buttons: Btn.fire | Btn.volley });
     expect(a).toMatchObject({ alive: false, rooted: false, charge: 0, state: 'dead', x: 12, z: 0 });
     expect(b.rooted).toBe(true);
   });
@@ -76,31 +74,31 @@ describe('lives: the squad is the life pool', () => {
   it('hands the player the nearest surviving unit when the driven one dies', () => {
     const world = field();
     const [leader, a, b, c] = [0, 1, 2, 3].map((id) => world.units[id]);
-    lead(world, 1, { wheel: 'holdCharge' });
-    lead(world, 120);
+    lead(world, 120, { buttons: Btn.volley });
     expect(a.charge).toBeGreaterThan(COMBAT_RULES.volleyMinCharge);
 
     strike(world, 0, 500, 'stomp');
-    let events = lead(world, 1, { moveZ: 1 });
+    let events = lead(world, 1, { moveZ: 1, buttons: Btn.volley });
     expect(leader.alive).toBe(false);
     expect(world.squads[0].driven).toBe(0);
     expect(world.squads[0].eliminated).toBe(false);
 
     // The next tick the player is in the unit that stood closest.
-    events = lead(world, 1, { moveZ: 1, buttons: Btn.fire });
+    events = lead(world, 1, { moveZ: 1, buttons: Btn.fire | Btn.volley });
     expect(eventsOf(events, 'takeover')).toMatchObject([{ player: HUMAN_PLAYER, squad: 0, fromUnit: 0, toUnit: 1 }]);
     expect(eventsOf(events, 'voice').map((e) => e.cue)).toContain('player.takeover');
     expect(world.squads[0].driven).toBe(1);
-    // It was on hold-and-charge a moment ago: now it is the player's, free to move, with no charge.
+    // It was planted and charging a moment ago: now it is the player's, free to move, with no charge.
     expect(a).toMatchObject({ rooted: false, charge: 0 });
     expect(a.state).not.toBe('charging');
     // The stick and trigger that were held for the dead unit do not act in the tick of the switch.
     expect(eventsOf(events, 'projectileSpawn')).toEqual([]);
     expect([a.x, a.z]).toEqual([12, 0]);
 
-    // From then on it obeys the player, and its shot is the trigger for the two that are left.
-    events = lead(world, 30, { moveZ: 1, aimYaw: 0, buttons: Btn.fire });
+    // From then on it obeys the player, and the two that are left still charge for its volley.
+    events = lead(world, 30, { moveZ: 1, aimYaw: 0, buttons: Btn.volley });
     expect(a.z).toBeGreaterThan(3);
+    events = lead(world, 1, { aimYaw: 0 });
     expect(eventsOf(events, 'volley')).toMatchObject([{ squad: 0, units: [2, 3] }]);
     expect(b.alive && c.alive).toBe(true);
     const snap = decodeSnapshot(encodeSnapshot(snapshotOfWorld(world)));
@@ -133,12 +131,11 @@ describe('lives: the squad is the life pool', () => {
     expect(eventsOf(events, 'voice').map((e) => e.cue)).toContain('squad.wiped');
     expect(eventsOf(events, 'takeover')).toEqual([]);
 
-    // Out: sticks, triggers and the command wheel do nothing.
-    queueCommand(world, HUMAN_PLAYER, { type: 'moveTo', x: 50, z: 50 });
-    events = lead(world, 60, { moveZ: 1, buttons: Btn.fire | Btn.callIn, wheel: 'holdCharge' });
+    // Out: sticks and buttons do nothing.
+    events = lead(world, 60, { moveZ: 1, buttons: Btn.fire | Btn.volley });
+    events.push(...lead(world, 1));
     expect(eventsOf(events, 'projectileSpawn').filter((e) => e.player === HUMAN_PLAYER)).toEqual([]);
     expect(eventsOf(events, 'takeover')).toEqual([]);
-    expect(squad.fireMode).toBe('atWill');
     expect(world.units[0]).toMatchObject({ alive: false, x: 0, z: 0 });
     const snap = decodeSnapshot(encodeSnapshot(snapshotOfWorld(world)));
     expect(snap.squads[0]).toMatchObject({ eliminated: true, driven: -1 });
@@ -147,11 +144,12 @@ describe('lives: the squad is the life pool', () => {
 
     // The molt brings everybody back, fresh, at the new level.
     beginStage(world, 2);
-    expect(squad).toMatchObject({ eliminated: false, driven: 0, level: 2, moveOrder: 'follow', fireMode: 'atWill' });
-    for (const id of squad.units) expect(world.units[id]).toMatchObject({ alive: true, type: 'army_tank', hp: UNIT_TYPES.army_tank.hp });
+    expect(squad).toMatchObject({ eliminated: false, driven: 0, level: 2 });
+    for (const id of squad.units) expect(world.units[id]).toMatchObject({ alive: true, type: 'army_tank', hp: UNIT_TYPES.army_tank.hp, rooted: false });
     world.match.bounds = world.match.stageBounds[2];
     const leader = world.units[0];
     const z = leader.z;
+    // A tank now: the throttle drives it along its hull.
     lead(world, 30, { moveZ: 1, aimYaw: leader.yaw });
     expect(Math.hypot(leader.vx, leader.vz)).toBeGreaterThan(5);
     expect(leader.z).not.toBe(z);

@@ -17,13 +17,12 @@ import {
   NEVER_PRESSED_TICKS,
   playerKaiju,
   playerSquad,
-  queueCommand,
   setPlayerBot,
   snapshotOfWorld,
-  SQUAD_RULES,
   stageBounds,
   SYSTEM_ORDER,
   TICK_RATE,
+  UNIT_TYPES,
   valueInBounds,
   type SimEvent,
 } from '../src/index';
@@ -35,7 +34,7 @@ describe('createWorld', () => {
     expect(world.tick).toBe(0);
     expect(world.match.phase).toBe('briefing');
     expect(world.match.stage).toBe(1);
-    expect(world.match.clock).toBe(720);
+    expect(world.match.clock).toBe(MATCH_RULES.clock);
     expect(world.match.phaseTime).toBe(10);
     expect(world.kaijus.length).toBe(1);
     expect(world.squads.length).toBe(4);
@@ -59,8 +58,6 @@ describe('createWorld', () => {
       expect(playerSquad(world, squad.player)).toBe(squad);
       expect(squad.level).toBe(1);
       expect(squad.driven).toBe(squad.units[0]);
-      expect(squad.moveOrder).toBe('follow');
-      expect(squad.fireMode).toBe('atWill');
       squad.units.forEach((id, slot) => {
         const u = world.units[id];
         expect(id).toBe(squad.id * 4 + slot);
@@ -187,13 +184,13 @@ describe('input intake', () => {
     expect(s.heldTicks[strike]).toBe(1);
     expect(s.sincePressTicks[strike]).toBe(0);
 
-    applyInput(s, input({ seq: 2, buttons: Btn.strike | Btn.roar }));
-    expect(s.pressed).toBe(Btn.roar);
+    applyInput(s, input({ seq: 2, buttons: Btn.strike | Btn.stomp }));
+    expect(s.pressed).toBe(Btn.stomp);
     expect(s.heldTicks[strike]).toBe(2);
-    expect(s.heldTicks[BtnIndex.roar]).toBe(1);
+    expect(s.heldTicks[BtnIndex.stomp]).toBe(1);
     expect(s.sincePressTicks[strike]).toBe(1);
 
-    applyInput(s, input({ seq: 3, buttons: Btn.roar }));
+    applyInput(s, input({ seq: 3, buttons: Btn.stomp }));
     expect(s.released).toBe(Btn.strike);
     expect(s.pressed).toBe(0);
     expect(s.heldTicks[strike]).toBe(0);
@@ -201,22 +198,22 @@ describe('input intake', () => {
     expect(s.sincePressTicks[strike]).toBe(2);
 
     applyInput(s, input({ seq: 4, buttons: 0 }));
-    expect(s.released).toBe(Btn.roar);
+    expect(s.released).toBe(Btn.stomp);
     expect(s.lastHeldTicks[strike]).toBe(2);
     expect(s.seq).toBe(4);
   });
 
   it('repeats the last sample when a tick has no input', () => {
     const s = createInputState();
-    applyInput(s, input({ seq: 9, moveZ: 1, aimYaw: 0.5, buttons: Btn.block }));
+    applyInput(s, input({ seq: 9, moveZ: 1, aimYaw: 0.5, buttons: Btn.move1 }));
     applyInput(s, null);
     applyInput(s, undefined);
     expect(s.seq).toBe(9);
     expect(s.moveZ).toBe(1);
     expect(s.aimYaw).toBe(0.5);
-    expect(s.buttons).toBe(Btn.block);
+    expect(s.buttons).toBe(Btn.move1);
     expect(s.pressed).toBe(0);
-    expect(s.heldTicks[BtnIndex.block]).toBe(3);
+    expect(s.heldTicks[BtnIndex.move1]).toBe(3);
   });
 
   it('tells a tap from a hold the way the kaiju verbs need', () => {
@@ -247,94 +244,6 @@ describe('input intake', () => {
     expect(unit.aimPitch).toBe(0.2);
     // Sub-units are not touched by the player's stick.
     expect(world.units[squad.units[1]].control.moveX).toBe(0);
-  });
-
-  it('turns wheel picks, markers and queued commands into this tick\'s commands', () => {
-    const world = makeTestWorld();
-    const p = world.players[HUMAN_PLAYER];
-    world.step([null, input({ seq: 1, wheel: 'holdCharge' })]);
-    expect(p.commands).toEqual([{ type: 'holdCharge' }]);
-    world.step([null, input({ seq: 2 })]);
-    expect(p.commands).toEqual([]);
-
-    world.step([null, input({ seq: 3, wheel: 'moveTo', marker: { x: 12, z: -34 } })]);
-    expect(p.commands).toEqual([{ type: 'moveTo', x: 12, z: -34 }]);
-
-    queueCommand(world, HUMAN_PLAYER, { type: 'follow' });
-    queueCommand(world, HUMAN_PLAYER, { type: 'fireAtWill' });
-    world.step([null, input({ seq: 4, wheel: 'holdCharge' })]);
-    expect(p.commands).toEqual([{ type: 'follow' }, { type: 'fireAtWill' }, { type: 'holdCharge' }]);
-    world.step([null, input({ seq: 5 })]);
-    expect(p.commands).toEqual([]);
-
-    // The kaiju player cannot issue squad commands.
-    queueCommand(world, KAIJU_PLAYER, { type: 'follow' });
-    world.step([input({ seq: 1, wheel: 'follow' }), null]);
-    expect(world.players[KAIJU_PLAYER].commands).toEqual([]);
-  });
-
-  it('places a move-to marker where the aim ray meets the ground when none is given', () => {
-    const world = makeTestWorld();
-    const squad = playerSquad(world, HUMAN_PLAYER);
-    if (!squad) throw new Error('no squad');
-    const unit = world.units[squad.driven];
-    const aimYaw = 0.3;
-    const aimPitch = -0.1;
-    world.step([null, input({ seq: 1, aimYaw, aimPitch, wheel: 'moveTo' })]);
-    const cmd = world.players[HUMAN_PLAYER].commands[0];
-    expect(cmd.type).toBe('moveTo');
-    if (cmd.type !== 'moveTo') return;
-    // Eye height 1.7 m looking 0.1 rad down: the ray lands 1.7 / tan(0.1) m ahead.
-    const reach = 1.7 / Math.tan(0.1);
-    expect(cmd.x).toBeCloseTo(unit.x + Math.sin(aimYaw) * reach, 6);
-    expect(cmd.z).toBeCloseTo(unit.z + Math.cos(aimYaw) * reach, 6);
-  });
-
-  it('sends a move-to with the crosshair on the sky a short way ahead, not to the far edge of the map', () => {
-    const world = makeTestWorld();
-    const squad = playerSquad(world, HUMAN_PLAYER);
-    if (!squad) throw new Error('no squad');
-    const unit = world.units[squad.driven];
-    // Well to one side of the kaiju in the middle of the zone: the sky with nothing near the crosshair.
-    const aimYaw = Math.atan2(-unit.x, -unit.z) + 1.2;
-    for (const aimPitch of [0.4, 0]) {
-      world.step([null, input({ seq: 1, aimYaw, aimPitch, wheel: 'moveTo' })]);
-      const cmd = world.players[HUMAN_PLAYER].commands[0];
-      expect(cmd.type).toBe('moveTo');
-      if (cmd.type !== 'moveTo') return;
-      expect(cmd.x).toBeCloseTo(unit.x + Math.sin(aimYaw) * SQUAD_RULES.markerSkyReach, 6);
-      expect(cmd.z).toBeCloseTo(unit.z + Math.cos(aimYaw) * SQUAD_RULES.markerSkyReach, 6);
-    }
-  });
-
-  it('sends a move-to with the crosshair on a kaiju to the ground under it', () => {
-    const world = makeTestWorld();
-    const squad = playerSquad(world, HUMAN_PLAYER);
-    if (!squad) throw new Error('no squad');
-    const unit = world.units[squad.driven];
-    const k = world.kaijus[0];
-    k.x = unit.x;
-    k.z = unit.z + 60;
-    // Level with its chest: the old ray went through it and on to the horizon.
-    world.step([null, input({ seq: 1, aimYaw: 0, aimPitch: Math.atan2(k.height * 0.6 - 1.7, 60), wheel: 'moveTo' })]);
-    const cmd = world.players[HUMAN_PLAYER].commands[0];
-    expect(cmd).toMatchObject({ type: 'moveTo' });
-    if (cmd.type !== 'moveTo') return;
-    expect(cmd.x).toBeCloseTo(k.x, 6);
-    expect(cmd.z).toBeCloseTo(k.z, 6);
-  });
-
-  it('only offers the call-in button when the squad has a call-in (level 3)', () => {
-    const world = makeTestWorld();
-    world.step([null, input({ seq: 1, buttons: Btn.callIn, marker: { x: 5, z: 6 } })]);
-    expect(world.players[HUMAN_PLAYER].commands).toEqual([]);
-    world.step([null, input({ seq: 2 })]);
-    world.match.stage = 3;
-    world.step([null, input({ seq: 3, buttons: Btn.callIn, marker: { x: 5, z: 6 } })]);
-    expect(world.players[HUMAN_PLAYER].commands).toEqual([{ type: 'callIn', callIn: 'artillery', x: 5, z: 6 }]);
-    // Holding the button does not repeat the request.
-    world.step([null, input({ seq: 4, buttons: Btn.callIn, marker: { x: 5, z: 6 } })]);
-    expect(world.players[HUMAN_PLAYER].commands).toEqual([]);
   });
 
   it('lets a bot take over a slot and hands it back', () => {
@@ -457,7 +366,7 @@ describe('movement under player input', () => {
     run(world, 150, [null, input({ moveZ: 1, aimYaw: 0 })]);
     expect(unit.z).toBeGreaterThan(505);
     expect(Math.abs(unit.x - 500)).toBeLessThan(1e-6);
-    expect(Math.hypot(unit.vx, unit.vz)).toBeCloseTo(6.5, 6);
+    expect(Math.hypot(unit.vx, unit.vz)).toBeCloseTo(UNIT_TYPES.army_rocket_infantry.speed, 6);
     expect(bitGet(world.propAlive, 0)).toBe(true);
     // The sub-units fall in behind their leader; the bot squads (whose leaders stand still) stay put.
     const follower = world.units[squad.units[1]];

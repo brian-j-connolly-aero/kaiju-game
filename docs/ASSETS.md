@@ -149,14 +149,27 @@ Hand-written SVG, 64 × 64 viewBox, single color via `currentColor`, thick strok
 32 px and at the sizes the client really draws them (down to 18 px for button glyphs and bar
 marks). No text inside icons. No third-party icon sets.
 
-- Commands: `cmd_follow`, `cmd_moveto`, `cmd_fireatwill`, `cmd_holdcharge`.
+- The squad's controls (phase 1; only placeholders in `client/src/ui/iconArt.ts` so far, art
+  wanted): `sq_foot` (a soldier with a launcher: the squad on foot, stage 1), `sq_charge` (three
+  squad-mates planted, their lasers meeting at one point: the volley charging), `sq_meter` (the
+  volley meter's diamond filled past its notch), `sq_meter_low` (the same short of the notch: a
+  weak shot), `sq_burst` (three shots meeting in one burst: the volley fired), `sq_drive` (a
+  tank from above with arrows forward and back: W and S), `sq_turn` (a tank from above turning,
+  curved arrows: A and D), `sq_turret` (a tank's turret swinging round toward a ring where the
+  mouse looks).
 - Kaiju verbs: `k_swipe`, `k_stomp`, `k_grab`, `k_throw`, `k_eat`, `k_brace`, `k_roar`,
   `k_special`, `k_molt`, `k_swim` (swimming: a row of spines over the waves; the HUD shows it
-  while the kaiju is under water, and the controls card pairs it with deep water).
+  while the kaiju is under water, and the controls card pairs it with deep water), `k_charge`
+  (the Lizard's head lowered like a ram with its spines laid back, speed lines behind it) and
+  `k_tailsweep` (the spiked tail lashing round in an arc, two motion lines after it). The moves
+  a molt card gives use `k_special` (the beam), `k_roar`, `k_charge`, `k_tailsweep` and
+  `k_brace`; an empty move slot shows `k_molt`, faint.
 - Status: `st_health`, `st_nerve`, `st_rage`, `st_charge`, `st_reload` (one shell: the reload
   meter and the player's own shot), `st_veteran`, `st_spotted`, `st_crossfire`, `st_callin`,
-  `st_shaken`, `st_map`, `st_camera`, `st_sun`, `st_moon`, `st_smoke` (a squad's smoke: a
-  canister and its cloud), `st_mark` (mark the kaiju: the marker over a kaiju triangle).
+  `st_shaken`, `st_map`, `st_camera`, `st_sun`, `st_moon`. (`st_callin` is shown only when an
+  artillery mission is on its way; nothing starts one until phase 2's artillery radio. The old
+  command wheel's four order icons, `cmd_*`, and the smoke and mark icons, `st_smoke` and
+  `st_mark`, were deleted with those controls in phase 1.)
 - Lobby: `lb_kaiju`, `lb_human`, `lb_ready`, `lb_host`, `lb_bot`, `lb_link`, `lb_play`, `lb_back`,
   `lb_create`, `lb_join`.
 - Factions: `fac_army`, `fac_air`, `fac_science`, `fac_faith`.

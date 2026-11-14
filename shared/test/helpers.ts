@@ -19,7 +19,6 @@ import {
   type Prop,
   type PropKindId,
   PROP_KINDS,
-  queueCommand,
   type SimEvent,
   type Structure,
   type StructureClass,
@@ -190,13 +189,18 @@ export function parkUnits(world: World, except: number[] = []): void {
 }
 
 /**
- * Orders every squad to hold fire and charge, the way its player would with the command wheel,
- * so that sub-units stand planted where a test puts them instead of following their leader and
- * shooting at the kaiju. It takes effect on the next step. (A sub-unit that gets shaken still
- * backs off; use a squad's driven unit, ids 0, 4, 8 and 12, for a target that must not move.)
+ * Keeps every squad from shooting back, for tests that are about something else. The squads
+ * take no orders (their squad-mates shoot at will on their own), so this keeps every
+ * squad-mate's weapon from ever coming ready, until the next stage refills the squads. The
+ * leaders are bots standing idle, or a person whose buttons the test holds. Squad-mates stay
+ * where a test puts them as long as their leader does not move (a fresh deployment has not
+ * formed up). (A squad-mate that gets shaken still backs off; use a squad's driven unit, ids 0,
+ * 4, 8 and 12, for a target that must not move.)
  */
 export function holdFire(world: World): void {
-  for (const p of world.players) if (p.role === 'human') queueCommand(world, p.id, { type: 'holdCharge' });
+  for (const squad of world.squads) {
+    for (const id of squad.units) if (id !== squad.driven) world.units[id].cooldown = 1e9;
+  }
 }
 
 /**

@@ -13,8 +13,6 @@ import {
   createWorld,
   DT,
   encodeSnapshot,
-  queueCommand,
-  sanitizeCommand,
   sanitizeInput,
   SNAPSHOT_EVERY_TICKS,
   snapshotOfWorld,
@@ -148,11 +146,17 @@ export function createLocalLink(options: LocalMatchOptions, subscribe: (link: Ro
         const input = sanitizeInput(payload);
         if (!input) return;
         queue.push(input);
-        // The same rule as the server: a queue that has fallen behind jumps to the present.
-        if (queue.length > 5) queue.splice(0, queue.length - 2);
-      } else if (type === 'command') {
-        const command = sanitizeCommand(payload);
-        if (command) queueCommand(world, playerId, command);
+        // A queue that has fallen behind (a slow page sends several inputs a frame) jumps to the
+        // present. What the inputs it drops carried is not lost: their buttons and a molt card
+        // ride on the first input kept, so a quick tap or a card pick still counts once.
+        if (queue.length > 5) {
+          const dropped = queue.splice(0, queue.length - 2);
+          const kept = queue[0];
+          for (const d of dropped) {
+            kept.buttons |= d.buttons;
+            if (d.card && !kept.card) kept.card = d.card;
+          }
+        }
       } else if (type === 'ping') {
         const t = (payload as ClientMessages['ping']).t;
         setTimeout(() => emit('pong', { t, tick: world.tick }), 0);

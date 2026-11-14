@@ -2,8 +2,8 @@
 
 A party game for five people in the web browser. One player is Gragnor, a giant monster that
 hatches in the harbour city of Port Meridian and tries to flatten it; the other four lead army
-squads that try to stop it before the night is over. A match is three stages, about ten to
-twelve minutes. Empty seats are played by the computer.
+squads that try to stop it before the night is over. A match is three stages, about eight
+minutes (ten at most). Empty seats are played by the computer.
 
 The game runs on one computer (the host's). Friends join from their own browsers through a
 link; they install nothing. The game never contacts any outside service while it runs.
@@ -22,7 +22,9 @@ controls and tips for both sides. In the game, H opens the controls card.
 
 ## For developers
 
-- `docs/requirements.md`: the owner's design brief. `docs/DESIGN.md`: rules and numbers.
+- `docs/requirements.md`: the owner's design brief. `docs/ROADMAP.md`: the owner's decisions
+  after the first multiplayer playtest, and the work planned from them (newer than the brief).
+  `docs/DESIGN.md`: rules and numbers.
 - `docs/ARCHITECTURE.md`: how the code is laid out. `docs/ASSETS.md`: the art and sound contract.
 - `docs/STATUS.md`: what is built, what was tested, what is still open.
 

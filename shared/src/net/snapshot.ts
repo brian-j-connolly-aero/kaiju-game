@@ -6,26 +6,26 @@
  * The layout is fixed and little-endian; `encodeSnapshot` and `decodeSnapshot` are exact
  * inverses up to the quantization noted on each field.
  *
- *   header   u8 magic 'M', u8 version, u32 tick, u32 ackSeq
+ *   header   u8 magic 'M', u8 version (SNAPSHOT_VERSION), u32 tick, u32 ackSeq (two numbers in
+ *            one: the low 24 bits the input sequence played or dropped up to, the top 8 bits the
+ *            inputs after it the server will drop; see `Snapshot.ackSeq`)
  *   match    u8 phase, u8 stage, u16 clock (0.1 s), u16 phaseTime (0.01 s), f32 barPoints,
  *            f32 x 3 marks, u8 marksReached, u8 winner, u8 endReason
  *   counts   u8 kaijus, u8 squads, u8 units
  *   kaiju    u8 id, u8 player, u8 kind, u8 stage, u8 flags, u8 action, u8 phase, u8 heldKind,
  *            u16 heldRef, f32 x, z, vx, vz, yaw, aimYaw, aimPitch, hp, maxHp, nerve, rage,
- *            phaseTime, phaseDuration, u16 nerveImmune (0.01 s), u16 x 9 cooldowns (0.01 s),
- *            u8 submerge (1 / 255)
- *   squad    u8 id, u8 player, u8 faction, u8 level, u8 flags, u8 moveOrder, u8 fireMode,
- *            u8 driven (255 = none), i16 moveTargetX, i16 moveTargetZ (0.1 m),
- *            u16 x 2 call-in cooldowns (0.01 s), u16 smoke cooldown, u16 mark cooldown (0.01 s)
+ *            phaseTime, phaseDuration, u16 nerveImmune (0.01 s), u16 x 11 cooldowns (0.01 s,
+ *            one per verb in KAIJU_ACTION_IDS order), u8 submerge (1 / 255), u8 x 2 moves,
+ *            u8 x 3 offer (KAIJU_MOVE_IDS codes; 'none' for an empty slot or card)
+ *   squad    u8 id, u8 player, u8 faction, u8 level, u8 flags, u8 driven (255 = none)
  *   unit     u8 id, u8 squad, u8 type, u8 state, u8 flags, f32 x, z, vx, vz, u16 y (0.1 m),
- *            i16 yaw, i16 aimYaw, i16 aimPitch (pi / 32768), u16 hp, u16 maxHp (0.1),
+ *            f32 yaw, i16 aimYaw, i16 aimPitch (pi / 32768), u16 hp, u16 maxHp (0.1),
  *            u8 members, u8 nerve (0.5), u8 shaken (0.05 s), u8 charge (1 / 255),
- *            u8 cooldown (0.05 s)
- *   smokes   u8 count, then per cloud: u16 id, u8 squad, i16 x, i16 z (0.1 m), u16 radius,
- *            u16 height (0.1 m), u16 seconds left (0.01 s)
+ *            u8 cooldown (0.05 s), u8 stun (0.05 s)
  *
- * Positions and velocities are full 32-bit floats so a client can replay its own inputs from a
- * snapshot without drift. `ackSeq` is the only per-client field; the server encodes once and
+ * Positions, velocities and a unit's hull heading are full 32-bit floats so a client can replay
+ * its own inputs from a snapshot without drift (a tank drives along its hull, and its speed
+ * along the hull is the velocity's share along `yaw`). `ackSeq` is the only per-client field; the server encodes once and
  * patches it for each client with `setSnapshotAck`.
  *
  * Changing this layout means bumping SNAPSHOT_VERSION. Appending ids to the arrays in
@@ -37,28 +37,26 @@ import { PROP_KIND_IDS } from '../city/types';
 import {
   END_REASONS,
   FACTION_IDS,
-  FIRE_MODES,
   HELD_KINDS,
   idOf,
   KAIJU_ACTION_IDS,
   KAIJU_KIND_IDS,
+  KAIJU_MOVE_IDS,
   KAIJU_PHASES,
   MATCH_PHASES,
-  MOVE_ORDERS,
   UNIT_STATES,
   UNIT_TYPE_IDS,
   WINNERS,
   WRECK_KINDS,
   type EndReason,
   type FactionId,
-  type FireMode,
   type KaijuActionId,
   type KaijuKindId,
+  type KaijuMoveId,
   type KaijuPhase,
   type KaijuVerb,
   type Level,
   type MatchPhase,
-  type MoveOrder,
   type PerStage,
   type StageId,
   type UnitState,
@@ -88,7 +86,7 @@ import {
 } from './bytes';
 
 export const SNAPSHOT_MAGIC = 0x4d;
-export const SNAPSHOT_VERSION = 2;
+export const SNAPSHOT_VERSION = 3;
 /** Byte offset of the u32 ackSeq in an encoded snapshot. */
 const ACK_OFFSET = 6;
 
@@ -123,10 +121,8 @@ export interface SnapKaiju {
   inWater: boolean;
   /** The humans' map may show it. */
   known: boolean;
-  /** A player-driven unit has it in sight, or a squad has marked it (scatter bonus). */
+  /** A player-driven unit has it in sight (scatter bonus). */
   spotted: boolean;
-  /** A squad has marked it for the whole army (sim/abilities.ts). */
-  marked: boolean;
   x: number;
   z: number;
   vx: number;
@@ -151,6 +147,10 @@ export interface SnapKaiju {
   cooldowns: Record<KaijuVerb, number>;
   /** Swimming (sim/swim.ts): 0 standing up, 1 all the way under (1 / 255 steps). */
   submerge: number;
+  /** The moves picked at the molts, on the first and second move buttons; 'none' for an empty slot (sim/moltCards.ts). */
+  moves: [KaijuMoveId, KaijuMoveId];
+  /** The molt cards on offer (cards 1 to 3 in order), from the start of the cocoon until one is picked; empty otherwise. */
+  offer: KaijuMoveId[];
 }
 
 export interface SnapSquad {
@@ -161,31 +161,8 @@ export interface SnapSquad {
   eliminated: boolean;
   /** A bot is driving this squad right now. */
   bot: boolean;
-  moveOrder: MoveOrder;
-  fireMode: FireMode;
   /** Unit id the player drives, or -1. */
   driven: number;
-  /** Destination of a 'moveTo' order (0.1 m steps). */
-  moveTargetX: number;
-  moveTargetZ: number;
-  /** Seconds until the faction level's first and second call-in are ready (0.01 s steps). */
-  callInCooldowns: [number, number];
-  /** Seconds until the squad's smoke and its mark are ready (0.01 s steps). */
-  smokeCooldown: number;
-  markCooldown: number;
-}
-
-/** A smoke cloud standing now (sim/abilities.ts). */
-export interface SnapSmoke {
-  id: number;
-  squad: number;
-  /** 0.1 m steps. */
-  x: number;
-  z: number;
-  radius: number;
-  height: number;
-  /** Seconds it still stands (0.01 s steps). */
-  timer: number;
 }
 
 export interface SnapUnit {
@@ -195,11 +172,12 @@ export interface SnapUnit {
   state: UnitState;
   alive: boolean;
   veteran: boolean;
-  /** This is the unit its squad's player drives. */
+  /** This is the unit its squad's player drives (a vehicle then drives like a tank: `unitMoveParams`). */
   driven: boolean;
+  /** Planted for the squad's volley (never the driven unit). */
   rooted: boolean;
   inWater: boolean;
-  /** Its targeting laser is on (charging a volley). */
+  /** Its targeting laser is on (planted, charging a volley). */
   laser: boolean;
   /** Dead vehicle whose wreck is still on the field. */
   wreck: boolean;
@@ -209,7 +187,9 @@ export interface SnapUnit {
   vz: number;
   /** Altitude (0.1 m steps). */
   y: number;
+  /** Body (hull) heading, full precision. */
   yaw: number;
+  /** Where the weapon points (pi / 32768 steps): for the driven tank, its turret. */
   aimYaw: number;
   aimPitch: number;
   /** 0.1 hp steps. */
@@ -220,21 +200,29 @@ export interface SnapUnit {
   nerve: number;
   /** Seconds left shaken (0.05 s steps, at most 12.75). */
   shaken: number;
-  /** 0..1 in 1/255 steps. */
+  /** Volley charge, 0..1 in 1/255 steps. A squad's volley meter is `volleyMeter(units, squad)`. */
   charge: number;
   /** Seconds until the weapon is ready (0.05 s steps, at most 12.75). */
   cooldown: number;
+  /** A roar has stunned it: it cannot move or fire and does not answer its controls. */
+  stunned: boolean;
+  /** Seconds left of the stun (0.05 s steps). */
+  stun: number;
 }
 
 export interface Snapshot {
   tick: number;
-  /** Sequence number of the last input the server applied for the receiving client. */
+  /**
+   * The receiving client's acknowledgement, two numbers in one: the low 24 bits are the input
+   * sequence number up to which the server has played or dropped every input, the top 8 bits
+   * how many inputs after it the server will drop (`packedAck` in server/src/room/inputQueue.ts,
+   * `readAck` in client/src/net/prediction.ts; ARCHITECTURE.md section 4.3).
+   */
   ackSeq: number;
   match: SnapMatch;
   kaijus: SnapKaiju[];
   squads: SnapSquad[];
   units: SnapUnit[];
-  smokes: SnapSmoke[];
 }
 
 const K_ALIVE = 1;
@@ -243,7 +231,8 @@ const K_WADING = 4;
 const K_WATER = 8;
 const K_KNOWN = 16;
 const K_SPOTTED = 32;
-const K_MARKED = 128;
+/** Card slots in the kaiju record. */
+const OFFER_SLOTS = 3;
 
 const S_ELIMINATED = 1;
 const S_BOT = 2;
@@ -255,6 +244,7 @@ const U_ROOTED = 8;
 const U_WATER = 16;
 const U_LASER = 32;
 const U_WRECK = 64;
+const U_STUNNED = 128;
 
 function heldRef(held: HeldObject | null): number {
   if (!held) return 0;
@@ -300,8 +290,7 @@ function writeKaiju(w: ByteWriter, k: SnapKaiju): void {
       (k.wading ? K_WADING : 0) |
       (k.inWater ? K_WATER : 0) |
       (k.known ? K_KNOWN : 0) |
-      (k.spotted ? K_SPOTTED : 0) |
-      (k.marked ? K_MARKED : 0),
+      (k.spotted ? K_SPOTTED : 0),
   );
   writeU8(w, KAIJU_ACTION_IDS.indexOf(k.action));
   writeU8(w, KAIJU_PHASES.indexOf(k.phase));
@@ -323,6 +312,9 @@ function writeKaiju(w: ByteWriter, k: SnapKaiju): void {
   writeU16(w, quantize(k.nerveImmune, 100, 65535));
   for (const verb of VERBS) writeU16(w, quantize(k.cooldowns[verb], 100, 65535));
   writeU8(w, quantize(k.submerge, 255, 255));
+  writeU8(w, Math.max(0, KAIJU_MOVE_IDS.indexOf(k.moves[0])));
+  writeU8(w, Math.max(0, KAIJU_MOVE_IDS.indexOf(k.moves[1])));
+  for (let i = 0; i < OFFER_SLOTS; i++) writeU8(w, Math.max(0, KAIJU_MOVE_IDS.indexOf(k.offer[i] ?? 'none')));
 }
 
 function readKaiju(r: ByteReader): SnapKaiju {
@@ -352,6 +344,12 @@ function readKaiju(r: ByteReader): SnapKaiju {
   const cooldowns = {} as Record<KaijuVerb, number>;
   for (const verb of VERBS) cooldowns[verb] = readU16(r) / 100;
   const submerge = readU8(r) / 255;
+  const moves: [KaijuMoveId, KaijuMoveId] = [idOf(KAIJU_MOVE_IDS, readU8(r)), idOf(KAIJU_MOVE_IDS, readU8(r))];
+  const offer: KaijuMoveId[] = [];
+  for (let i = 0; i < OFFER_SLOTS; i++) {
+    const card = idOf(KAIJU_MOVE_IDS, readU8(r));
+    if (card !== 'none') offer.push(card);
+  }
   return {
     id,
     player,
@@ -363,7 +361,6 @@ function readKaiju(r: ByteReader): SnapKaiju {
     inWater: (flags & K_WATER) !== 0,
     known: (flags & K_KNOWN) !== 0,
     spotted: (flags & K_SPOTTED) !== 0,
-    marked: (flags & K_MARKED) !== 0,
     x,
     z,
     vx,
@@ -383,6 +380,8 @@ function readKaiju(r: ByteReader): SnapKaiju {
     held: heldFrom(heldKind, ref),
     cooldowns,
     submerge,
+    moves,
+    offer,
   };
 }
 
@@ -396,15 +395,7 @@ function writeSquad(w: ByteWriter, s: SnapSquad): void {
   writeU8(w, FACTION_IDS.indexOf(s.faction));
   writeU8(w, s.level);
   writeU8(w, (s.eliminated ? S_ELIMINATED : 0) | (s.bot ? S_BOT : 0));
-  writeU8(w, MOVE_ORDERS.indexOf(s.moveOrder));
-  writeU8(w, FIRE_MODES.indexOf(s.fireMode));
   writeU8(w, s.driven < 0 ? NO_UNIT : s.driven);
-  writeI16(w, quantizeI16(s.moveTargetX, 10));
-  writeI16(w, quantizeI16(s.moveTargetZ, 10));
-  writeU16(w, quantize(s.callInCooldowns[0], 100, 65535));
-  writeU16(w, quantize(s.callInCooldowns[1], 100, 65535));
-  writeU16(w, quantize(s.smokeCooldown, 100, 65535));
-  writeU16(w, quantize(s.markCooldown, 100, 65535));
 }
 
 function readSquad(r: ByteReader): SnapSquad {
@@ -413,15 +404,7 @@ function readSquad(r: ByteReader): SnapSquad {
   const faction = idOf(FACTION_IDS, readU8(r));
   const level = clampStage(readU8(r));
   const flags = readU8(r);
-  const moveOrder = idOf(MOVE_ORDERS, readU8(r));
-  const fireMode = idOf(FIRE_MODES, readU8(r));
   const driven = readU8(r);
-  const moveTargetX = readI16(r) / 10;
-  const moveTargetZ = readI16(r) / 10;
-  const c0 = readU16(r) / 100;
-  const c1 = readU16(r) / 100;
-  const smokeCooldown = readU16(r) / 100;
-  const markCooldown = readU16(r) / 100;
   return {
     id,
     player,
@@ -429,36 +412,8 @@ function readSquad(r: ByteReader): SnapSquad {
     level,
     eliminated: (flags & S_ELIMINATED) !== 0,
     bot: (flags & S_BOT) !== 0,
-    moveOrder,
-    fireMode,
     driven: driven === NO_UNIT ? -1 : driven,
-    moveTargetX,
-    moveTargetZ,
-    callInCooldowns: [c0, c1],
-    smokeCooldown,
-    markCooldown,
   };
-}
-
-function writeSmoke(w: ByteWriter, c: SnapSmoke): void {
-  writeU16(w, c.id & 0xffff);
-  writeU8(w, c.squad);
-  writeI16(w, quantizeI16(c.x, 10));
-  writeI16(w, quantizeI16(c.z, 10));
-  writeU16(w, quantize(c.radius, 10, 65535));
-  writeU16(w, quantize(c.height, 10, 65535));
-  writeU16(w, quantize(c.timer, 100, 65535));
-}
-
-function readSmoke(r: ByteReader): SnapSmoke {
-  const id = readU16(r);
-  const squad = readU8(r);
-  const x = readI16(r) / 10;
-  const z = readI16(r) / 10;
-  const radius = readU16(r) / 10;
-  const height = readU16(r) / 10;
-  const timer = readU16(r) / 100;
-  return { id, squad, x, z, radius, height, timer };
 }
 
 function writeUnit(w: ByteWriter, u: SnapUnit): void {
@@ -474,14 +429,15 @@ function writeUnit(w: ByteWriter, u: SnapUnit): void {
       (u.rooted ? U_ROOTED : 0) |
       (u.inWater ? U_WATER : 0) |
       (u.laser ? U_LASER : 0) |
-      (u.wreck ? U_WRECK : 0),
+      (u.wreck ? U_WRECK : 0) |
+      (u.stunned ? U_STUNNED : 0),
   );
   writeF32(w, u.x);
   writeF32(w, u.z);
   writeF32(w, u.vx);
   writeF32(w, u.vz);
   writeU16(w, quantize(u.y, 10, 65535));
-  writeI16(w, quantizeI16(u.yaw, ANGLE_SCALE));
+  writeF32(w, u.yaw);
   writeI16(w, quantizeI16(u.aimYaw, ANGLE_SCALE));
   writeI16(w, quantizeI16(u.aimPitch, ANGLE_SCALE));
   writeU16(w, quantize(u.hp, 10, 65535));
@@ -491,6 +447,7 @@ function writeUnit(w: ByteWriter, u: SnapUnit): void {
   writeU8(w, quantize(u.shaken, 20, 255));
   writeU8(w, quantize(u.charge, 255, 255));
   writeU8(w, quantize(u.cooldown, 20, 255));
+  writeU8(w, quantize(u.stun, 20, 255));
 }
 
 function readUnit(r: ByteReader): SnapUnit {
@@ -504,7 +461,7 @@ function readUnit(r: ByteReader): SnapUnit {
   const vx = readF32(r);
   const vz = readF32(r);
   const y = readU16(r) / 10;
-  const yaw = readI16(r) / ANGLE_SCALE;
+  const yaw = readF32(r);
   const aimYaw = readI16(r) / ANGLE_SCALE;
   const aimPitch = readI16(r) / ANGLE_SCALE;
   const hp = readU16(r) / 10;
@@ -514,6 +471,7 @@ function readUnit(r: ByteReader): SnapUnit {
   const shaken = readU8(r) / 20;
   const charge = readU8(r) / 255;
   const cooldown = readU8(r) / 20;
+  const stun = readU8(r) / 20;
   return {
     id,
     squad,
@@ -541,14 +499,16 @@ function readUnit(r: ByteReader): SnapUnit {
     shaken,
     charge,
     cooldown,
+    stunned: (flags & U_STUNNED) !== 0,
+    stun,
   };
 }
 
 export function encodeSnapshot(s: Snapshot): Uint8Array {
-  if (s.kaijus.length > 255 || s.squads.length > 255 || s.units.length > 255 || s.smokes.length > 255) {
+  if (s.kaijus.length > 255 || s.squads.length > 255 || s.units.length > 255) {
     throw new Error('snapshot has too many entities for the wire format');
   }
-  const w = createWriter(64 + s.kaijus.length * 90 + s.squads.length * 20 + s.units.length * 40 + s.smokes.length * 16);
+  const w = createWriter(64 + s.kaijus.length * 100 + s.squads.length * 8 + s.units.length * 46);
   writeU8(w, SNAPSHOT_MAGIC);
   writeU8(w, SNAPSHOT_VERSION);
   writeU32(w, s.tick >>> 0);
@@ -573,8 +533,6 @@ export function encodeSnapshot(s: Snapshot): Uint8Array {
   for (const k of s.kaijus) writeKaiju(w, k);
   for (const q of s.squads) writeSquad(w, q);
   for (const u of s.units) writeUnit(w, u);
-  writeU8(w, s.smokes.length);
-  for (const c of s.smokes) writeSmoke(w, c);
   return finishWriter(w);
 }
 
@@ -606,9 +564,6 @@ export function decodeSnapshot(bytes: Uint8Array): Snapshot {
   for (let i = 0; i < kaijuCount; i++) kaijus.push(readKaiju(r));
   for (let i = 0; i < squadCount; i++) squads.push(readSquad(r));
   for (let i = 0; i < unitCount; i++) units.push(readUnit(r));
-  const smokeCount = readU8(r);
-  const smokes: SnapSmoke[] = [];
-  for (let i = 0; i < smokeCount; i++) smokes.push(readSmoke(r));
 
   return {
     tick,
@@ -617,7 +572,6 @@ export function decodeSnapshot(bytes: Uint8Array): Snapshot {
     kaijus,
     squads,
     units,
-    smokes,
   };
 }
 

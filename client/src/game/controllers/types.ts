@@ -1,7 +1,7 @@
 /** What every local player controller shares. */
 
 import type * as THREE from 'three';
-import type { CommandId, GroundMarker, SnapSquad } from '@mb/shared';
+import type { SnapSquad } from '@mb/shared';
 import type { FrameState, MatchSession } from '../../net/matchSession';
 import type { GameRenderer } from '../../render/gameRenderer';
 import type { ActionState } from '../input/actions';
@@ -35,8 +35,8 @@ export interface InputSample {
   aimYaw: number;
   aimPitch: number;
   buttons: number;
-  wheel?: CommandId;
-  marker?: GroundMarker;
+  /** Kaiju: the molt card picked since the last sample, 1 to 3 (net/input.ts: one-shot). */
+  card?: number;
 }
 
 export interface Controller {

@@ -18,13 +18,19 @@
 # which synthesizer voice and chain), pronounce.json (respellings fed to the synthesizer; the
 # subtitle text never changes). build_state.json remembers what each line was built from.
 # Intermediate WAV files go to $MB_SCRATCH (default /tmp/mb-scratch/voice), never the repository.
+# The neural voice models and the measuring models (about 1.1 GB) are downloaded from Hugging Face
+# into $MB_MODELS (default /opt/mbtools/models) the first time they are needed, never the
+# repository; after that the build needs no network. The speech model uses $MB_TTS_THREADS
+# processor threads in all (default 2).
 # Needs the asset tools (tools/setup-asset-tools.sh). See docs/audio/VOICE.md.
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 py="${MB_PYTHON:-/opt/mbtools/venv/bin/python}"
 [ -x "$py" ] || { echo "missing $py: run tools/setup-asset-tools.sh" >&2; exit 1; }
-for tool in ffmpeg ffprobe RHVoice-test flite pico2wave; do
+for tool in ffmpeg ffprobe; do
   command -v "$tool" >/dev/null || { echo "missing $tool: run tools/setup-asset-tools.sh" >&2; exit 1; }
 done
+"$py" -c "import onnxruntime, kokoro_onnx, misaki, spacy, en_core_web_sm, piper, sherpa_onnx" 2>/dev/null \
+  || { echo "missing the neural voice packages: run tools/setup-asset-tools.sh" >&2; exit 1; }
 export PYTHONDONTWRITEBYTECODE=1
 exec "$py" "$here/build.py" "$@"

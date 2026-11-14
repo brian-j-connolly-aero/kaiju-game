@@ -14,6 +14,10 @@
  *
  * While the head is not the player's (the beam drags it, or the kaiju is staggered) both
  * cameras ride the head as the server has it, and the mouse only says where it should go.
+ *
+ * The buttons (net/input.ts): one move per button, no tap-versus-hold. Strike, Grab, Stomp, the
+ * two move buttons and Molt go out as they are held; a molt card picked on the card picker
+ * (ui/moltCards.ts: a key, a d-pad direction or a click) rides on exactly one input.
  */
 
 import type * as THREE from 'three';
@@ -47,6 +51,9 @@ const CHASE_PIVOT = 1.25;
 const CHASE_FLOOR = 0.12;
 /** Swimming: the first-person eye never goes lower than this over the water (body heights). */
 const SWIM_EYE = 0.1;
+/** The chase camera's lens, and how much wider it opens during a charge's run (degrees). */
+const CHASE_FOV = 60;
+const CHARGE_FOV = 12;
 
 /**
  * The lift (body heights) that takes a chase camera at `wanted`, hanging from `pivot` above
@@ -95,10 +102,29 @@ export class KaijuController implements Controller {
   private readonly pivot = { x: 0, y: 0, z: 0 };
   /** Where the chase camera is this frame. */
   private readonly chase = { x: 0, y: 0, z: 0 };
+  /** Where the body was when `chase` was placed (the camera keeps its place relative to it). */
+  private readonly chaseFrom = { x: 0, z: 0 };
   private readonly eye = { x: 0, y: 0, z: 0 };
+  /** The molt card (1 to 3) the next input sample carries, once; 0 for none. */
+  private card = 0;
+  /** How far the lens has opened for a charge's run, 0..1 (eased). */
+  private rush = 0;
 
   constructor(thirdPerson = false) {
     this.thirdPerson = thirdPerson;
+  }
+
+  /**
+   * Picks molt card `n` (1 to 3): the next input sample carries it to the server, and only that
+   * one (the server ignores a pick without an offer standing).
+   */
+  pickCard(n: number): void {
+    if (n >= 1 && n <= 3) this.card = n;
+  }
+
+  /** A card picked and not yet sent (tests, and the HUD's picture of the pick). */
+  get pendingCard(): number {
+    return this.card;
   }
 
   /** First person with the camera pulled back inside the skull by a wall ahead. */
@@ -160,15 +186,20 @@ export class KaijuController implements Controller {
   }
 
   sample(ctx: ControlContext): InputSample {
+    // A picked card goes out once, with whatever else this sample says (the map may be open).
+    const card = this.card;
+    this.card = 0;
+    const out: InputSample = { moveX: 0, moveZ: 0, aimYaw: this.sendYaw, aimPitch: this.sendPitch, buttons: 0 };
+    if (card > 0) out.card = card;
+    if (ctx.mapOpen) return out;
     // The latch, not the instant: a click that began and ended between two samples is in this one.
     const d = ctx.input.held;
-    if (ctx.mapOpen) return { moveX: 0, moveZ: 0, aimYaw: this.sendYaw, aimPitch: this.sendPitch, buttons: 0 };
     let buttons = 0;
     if (d.strike) buttons |= Btn.strike;
     if (d.grab) buttons |= Btn.grab;
-    if (d.block) buttons |= Btn.block;
-    if (d.roar) buttons |= Btn.roar;
-    if (d.special) buttons |= Btn.special;
+    if (d.stomp) buttons |= Btn.stomp;
+    if (d.move1) buttons |= Btn.move1;
+    if (d.move2) buttons |= Btn.move2;
     if (d.molt) buttons |= Btn.molt;
     // The stick is relative to the view; the server reads it relative to the aim it is sent.
     const turn = this.aimYaw - this.sendYaw;
@@ -176,7 +207,10 @@ export class KaijuController implements Controller {
     const s = Math.sin(turn);
     const mx = ctx.input.moveX;
     const mz = ctx.input.moveZ;
-    return { moveX: mx * c - mz * s, moveZ: mz * c + mx * s, aimYaw: this.sendYaw, aimPitch: this.sendPitch, buttons };
+    out.moveX = mx * c - mz * s;
+    out.moveZ = mz * c + mx * s;
+    out.buttons = buttons;
+    return out;
   }
 
   /**
@@ -214,6 +248,16 @@ export class KaijuController implements Controller {
       p.y = this.pivot.y + (p.y - this.pivot.y) * this.clear;
       p.z = this.pivot.z + (p.z - this.pivot.z) * this.clear;
     }
+    this.chaseFrom.x = k.x;
+    this.chaseFrom.z = k.z;
+  }
+
+  /** The lens opens a little while the kaiju runs in a charge (a sense of its speed), and eases back. */
+  private rushLens(k: SnapKaiju, dt: number): number {
+    const running = k.action === 'charge' && k.phase === 'charge';
+    this.rush += ((running ? 1 : 0) - this.rush) * (1 - Math.exp(-dt * (running ? 5 : 2.5)));
+    if (this.rush < 0.002) this.rush = 0;
+    return this.rush * CHARGE_FOV;
   }
 
   /** Third person: aim from the kaiju's eye at what the crosshair is on. */
@@ -278,6 +322,7 @@ export class KaijuController implements Controller {
     }
     this.orbit = k.yaw + Math.PI;
     this.orbitClear = 1;
+    const wider = this.rushLens(k, ctx.dt);
     if (!this.thirdPerson) {
       // In the head: the camera rides the rig's anchor and looks where the head looks.
       const anchor = ctx.renderer.kaijuCamAnchor(k.id);
@@ -296,13 +341,16 @@ export class KaijuController implements Controller {
         camera.position.x = k.x + (camera.position.x - k.x) * this.clear;
         camera.position.z = k.z + (camera.position.z - k.z) * this.clear;
       }
-      setLens(camera, 72, near, 9000);
+      setLens(camera, 72 + wider, near, 9000);
       this.placeView(k);
       aimCamera(camera, this.viewYaw, this.viewPitch);
     } else {
+      // Placed in `update` from the body as it was then; the frame's input steps have moved the
+      // drawn body since (MatchSession.refreshLocal), so the camera moves with it, and never
+      // trails it by a frame (which shows as a shiver in a charge).
       const p = this.chase;
-      camera.position.set(p.x, p.y, p.z);
-      setLens(camera, 60, Math.max(0.3, st.height * 0.05), 9000);
+      camera.position.set(p.x + (k.x - this.chaseFrom.x), p.y, p.z + (k.z - this.chaseFrom.z));
+      setLens(camera, CHASE_FOV + wider, Math.max(0.3, st.height * 0.05), 9000);
       aimCamera(camera, this.viewYaw, this.viewPitch);
     }
   }

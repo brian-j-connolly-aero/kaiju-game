@@ -161,6 +161,7 @@ export class GameRenderer {
   private lastRoar = { x: 0, z: 0, radius: 0, time: -1e9 };
   private readonly ringUv = [0, 0, 0, 0];
   private readonly triangleUv = [0, 0, 0, 0];
+  private readonly starUv = [0, 0, 0, 0];
   private resolution: number;
   private quality = 1;
   private readonly size = { w: 0, h: 0 };
@@ -200,6 +201,7 @@ export class GameRenderer {
     };
     first('fx_ring', this.ringUv);
     first('mk_triangle', this.triangleUv);
+    first('fx_spark', this.starUv);
     this.camera.position.set(0, 300, -500);
     this.camera.lookAt(0, 0, 0);
     this.applyStage(1, true);
@@ -448,14 +450,45 @@ export class GameRenderer {
         if (!k) break;
         const st = kaijuStageDef(k.kind, k.stage);
         const def = kaijuKindDef(k.kind);
+        const r = st.bodyRadius;
         if (e.action === 'stomp' && e.phase === 'active') {
-          const radius = def.actions.stomp.radius * st.bodyRadius;
+          const radius = def.actions.stomp.radius * r;
           fx.ring(e.x, e.z, radius, 0xfff1d0, 0.55);
           fx.dust(e.x, 0.3, e.z, radius * 0.6, 14);
         } else if (e.action === 'swipe' && e.phase === 'active') {
-          const reach = def.actions.swipe.reach * st.bodyRadius * 0.7;
-          fx.dust(e.x + Math.sin(e.yaw) * reach, st.handHeight * 0.6, e.z + Math.cos(e.yaw) * reach, st.bodyRadius * 0.8, 5);
+          const reach = def.actions.swipe.reach * r * 0.7;
+          fx.dust(e.x + Math.sin(e.yaw) * reach, st.handHeight * 0.6, e.z + Math.cos(e.yaw) * reach, r * 0.8, 5);
+        } else if (e.action === 'charge' && e.phase === 'charge') {
+          // The rush begins: the ground bursts under its feet.
+          fx.ring(e.x, e.z, r * 2.2, 0xf1e2c4, 0.45, 0.8);
+          fx.dust(e.x - Math.sin(e.yaw) * r * 0.6, 0.2, e.z - Math.cos(e.yaw) * r * 0.6, r * 1.1, 8);
+        } else if (e.action === 'charge' && e.phase === 'stumble') {
+          // The run ends in a stumble: it ploughs into the ground ahead.
+          const ax = e.x + Math.sin(e.yaw) * r * 1.4;
+          const az = e.z + Math.cos(e.yaw) * r * 1.4;
+          fx.dust(ax, 0.3, az, r * 1.4, 14, 0xc9bca2);
+          fx.ring(ax, az, r * 3, 0xf1e2c4, 0.6, 0.85);
+        } else if (e.action === 'tailSweep' && e.phase === 'active') {
+          // The tail lashes across the rear half: dust thrown up along its arc, and a ring
+          // segment of light where it passes. (`yaw` points straight behind the body.)
+          const reach = def.actions.tailSweep.reach * r;
+          for (let j = 0; j <= 8; j++) {
+            const a = e.yaw - Math.PI / 2 + (j / 8) * Math.PI;
+            const d = reach * 0.75;
+            fx.dust(e.x + Math.sin(a) * d, 0.3, e.z + Math.cos(a) * d, r * 0.55, 2, 0xd4c8b2);
+          }
+          fx.ring(e.x, e.z, reach, 0xffd9a0, 0.4, 0.7);
         }
+        break;
+      }
+      case 'cityCollapse': {
+        // Never alone: with every squad gone, the city gives way around the kaiju. A slow wave of
+        // dust rolls out from it while the buildings nearest it fall one after another.
+        const k = this.kaijuAt(e.kaiju);
+        const r = k ? kaijuStageDef(k.kind, k.stage).bodyRadius : 3;
+        // (The buildings' own dust, as each one falls, is the structureStage's.)
+        fx.ring(e.x, e.z, r * 16, 0xd8cfbd, e.duration, 0.8);
+        fx.ring(e.x, e.z, r * 9, 0xffe0b0, e.duration * 0.7, 0.6);
         break;
       }
       case 'roar': {
@@ -527,20 +560,6 @@ export class GameRenderer {
       case 'volley':
         fx.ring(e.x, e.z, 6 + e.charge * 8, 0xffd91a, 0.4);
         break;
-      case 'smoke':
-        // The canister bursts; the screen itself is drawn from the snapshots while it stands.
-        fx.dust(e.x, 0.5, e.z, e.radius * 0.6, 8, 0xd6d6d0);
-        break;
-      case 'mark': {
-        // The squads see the marker pulse over it as it is marked (the kaiju is not told).
-        const k = this.lastFrame?.kaijus[e.kaiju];
-        if (k && this.lastView && e.kaiju !== this.lastView.localKaiju) {
-          const h = kaijuStageDef(k.kind, k.stage).height;
-          fx.ring(k.x, k.z, kaijuStageDef(k.kind, k.stage).bodyRadius * 3, 0xff7a1a, 0.7, 0.9);
-          fx.glowAt(k.x, h * 1.2, k.z, h * 0.8, 0xff7a1a, 0.4, 0.8);
-        }
-        break;
-      }
       case 'callin': {
         if (e.phase === 'marked') {
           // Kept until the mission reports 'done' (or, if that never comes, a while after the barrage).
@@ -599,6 +618,36 @@ export class GameRenderer {
     }
   }
 
+  /**
+   * The roar's stun on units: three yellow stars circling over every stunned unit for as long as
+   * the stun lasts (the snapshot's `stunned`), sized with the distance like the markers (a little
+   * bigger) so a titan's eye reads them across the city, and a pulsing yellow ring on the ground
+   * under it.
+   */
+  private drawDaze(frame: FrameState, view: RenderView, time: number): void {
+    const cam = this.camera.position;
+    for (const u of frame.units) {
+      if (!u.alive || !u.stunned) continue;
+      // (Not over the player's own unit seen from inside it.)
+      if (u.id === view.localUnit && view.hideLocalLead) continue;
+      const def = unitTypeDef(u.type);
+      const dist = Math.hypot(u.x - cam.x, u.z - cam.z);
+      // Half as big again as the unit's own marker, which sits just under the stars.
+      const marker = Math.min(40, Math.max(1.6, dist * 0.022));
+      const size = Math.min(60, Math.max(2.4, dist * 0.034));
+      const top = u.y + def.height + 1.2 + marker + size * 0.9;
+      const radius = size * 1.0;
+      for (let j = 0; j < 3; j++) {
+        const a = time * 4.5 + (j / 3) * Math.PI * 2 + u.id;
+        const bob = Math.sin(a * 2) * size * 0.15;
+        const star = size * (1.3 + 0.2 * Math.sin(time * 9 + j * 2));
+        this.markers.push(u.x + Math.sin(a) * radius, top + bob, u.z + Math.cos(a) * radius, star, star, this.starUv, 0, 1, 0.86, 0.15, 1, time * 3 + j);
+      }
+      const pulse = 0.45 + 0.3 * Math.sin(time * 9 + u.id);
+      this.decals.push(u.x, 0.22, u.z, def.radius * 3.2 + 2, def.radius * 3.2 + 2, this.ringUv, 0, 1, 0.88, 0.2, pulse);
+    }
+  }
+
   /** First-person camera anchor of a kaiju (the rig's `cam_fp`), valid after `update`. */
   kaijuCamAnchor(id: number): THREE.Vector3 | null {
     return this.kaijuViews[id]?.camAnchor ?? null;
@@ -643,18 +692,15 @@ export class GameRenderer {
         if (k.phase !== 'cocoon' || k.id === view.localKaiju || view.seesKaiju) {
           this.decals.push(k.x, 0.12, k.z, st.bodyRadius * 3.4, st.bodyRadius * 3.4, this.ringShadowUv(), 0, 0, 0, 0, 0.6);
         }
-        // An orange triangle over the kaiju, far away, only while a squad has marked it or a
-        // squad leader has it in plain sight (the spotting rules): not always (polish pass 2).
-        // A mark makes it bigger and pulse.
+        // An orange triangle over the kaiju, far away, only while a squad leader has it in plain
+        // sight (the spotting rules): not always (polish pass 2).
         const dist = Math.hypot(k.x - this.camera.position.x, k.z - this.camera.position.z);
-        if (k.id !== view.localKaiju && (k.marked || k.spotted) && k.alive && dist > st.height * 5) {
-          const size = Math.min(k.marked ? 44 : 30, Math.max(3, dist * (k.marked ? 0.026 : 0.018)));
-          const glow = k.marked ? 0.75 + 0.25 * Math.sin(time * 6) : 0.85;
-          this.markers.push(k.x, st.height + size, k.z, size, size, this.triangleUv, 0, 1, 0.48, 0.1, glow);
+        if (k.id !== view.localKaiju && k.spotted && k.alive && dist > st.height * 5) {
+          const size = Math.min(30, Math.max(3, dist * 0.018));
+          this.markers.push(k.x, st.height + size, k.z, size, size, this.triangleUv, 0, 1, 0.48, 0.1, 0.85);
         }
       });
       for (let i = frame.kaijus.length; i < this.kaijuViews.length; i++) this.kaijuViews[i]?.hide();
-      this.effects.setClouds(frame.smokes);
 
       this.units.update(
         frame.units,
@@ -667,11 +713,12 @@ export class GameRenderer {
           hideLocalLead: view.hideLocalLead,
           city: query,
           kaijus: frame.kaijus,
-          veil: view.localKaiju >= 0 ? frame.smokes : null,
         },
         this.lines,
         this.effects,
       );
+
+      this.drawDaze(frame, view, time);
 
       // The crowd is kept around the kaiju and runs from it, but only where the viewer may know
       // where it is: a squad that has lost the kaiju gets its crowd around its own camera and
@@ -685,12 +732,7 @@ export class GameRenderer {
         this.crowd.update(dt, time, query, frame.bounds, known ? frame.kaijus : NO_KAIJUS, known ? focus.x : cam.x, known ? focus.z : cam.z, spread, 25 + st.height * 3, this.camera);
       }
 
-      // Squad move-to markers and call-in marks on the ground.
-      for (const squad of frame.squads) {
-        if (squad.id !== view.localSquad || squad.moveOrder !== 'moveTo') continue;
-        const pulse = 0.6 + 0.3 * Math.sin(time * 5);
-        this.decals.push(squad.moveTargetX, 0.2, squad.moveTargetZ, 9, 9, this.ringUv, 0, 0.12, 0.78, 0.88, pulse);
-      }
+      // Call-in marks on the ground.
       for (let i = 0; i < this.marks.length; i++) {
         const m = this.marks[i];
         if (m.until < time) {

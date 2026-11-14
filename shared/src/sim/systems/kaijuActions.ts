@@ -4,29 +4,42 @@
  * Every verb runs through the same three timed phases taken from its definition: wind-up (the
  * tell), the effect (instant, or an active phase that lasts), recovery. A `kaijuAction` event
  * goes out at every phase change, the first one at the START of the wind-up so clients can show
- * the tell. Nothing can be cancelled once it has begun: only a stagger (the damage system) or
- * death cuts an action short.
+ * the tell. Nothing can be cancelled once it has begun: only a stagger (the damage system),
+ * the city giving way (never alone) or death cuts an action short, and a second press of the
+ * charge's button ends its run early (into its stumble).
  *
- *   idle -> windup -> [effect] -> active phase ('active' | 'eat' | 'roar' | 'special') -> recover -> idle
- *   idle -> brace (while Block is down) -> idle
- *   idle -> cocoon (Molt held, when a molt is available); the match flow system ends the cocoon
+ *   idle -> windup -> [effect] -> active phase ('active' | 'eat' | 'roar' | 'special' | 'charge') -> recover ('recover' | 'stumble') -> idle
+ *   idle -> brace (while the brace's move button is down) -> idle
+ *   idle -> cocoon (Molt pressed when a molt is available); the match flow system ends the cocoon
  *
- * Reading the buttons (the full contract is the header of net/input.ts):
- * - Strike: the press starts a Swipe wind-up. If the button is still down `stomp.holdTime`
- *   after the action began, the Swipe becomes a Stomp and keeps the time already spent. With
- *   something in the hand, Strike throws it.
- * - Grab, empty hand: the press starts a Grab. Grab, something in the hand: letting go before
- *   `eat.holdTime` throws it. Either way, a hold of `eat.holdTime` goes on to Eat (what is in the
- *   hand, else an edible in reach) once the kaiju is free; each hold is judged once.
- * - Block: Brace for as long as it is down. Bracing is exclusive: release it to act.
- * - Roar, Special: on the press, when off cooldown and (Special) rage covers the cost.
- * - Molt: held for `molt.holdTime` while `moltAvailable`.
+ * Reading the buttons, one move per button (the full contract is the header of net/input.ts):
+ * - Strike: Swipe; with something in the hand, Throw.
+ * - Grab: with something in the hand, Eat it; else Grab when something can be picked up in
+ *   reach, else Eat when something edible is in reach (and the meal is off cooldown), else a
+ *   Grab that closes on nothing.
+ * - Stomp: Stomp.
+ * - Move 1 and Move 2: the moves picked at the molts (`kaiju.moves`): the beam (the special:
+ *   rage must cover its cost), roar, charge, tail sweep (each off cooldown), brace (for as long
+ *   as the button is down; bracing is exclusive). An empty slot does nothing.
+ * - Molt: one press while `moltAvailable` starts the cocoon, and the molt cards are offered
+ *   (sim/moltCards.ts). A card pick (`input.card`) is taken in every phase, the intermission
+ *   included, while an offer stands.
  * - A press made while another action runs is remembered for INPUT_BUFFER_TICKS, and for as
  *   long as the button stays down.
  * - Swimming (sim/swim.ts): nothing starts while the kaiju is in the water going down, under or
  *   coming up. A press made then brings it up and is acted on as soon as it is up.
- * When several are wanted on the same tick the order is: molt, brace, special, roar, strike,
- * throw, grab, eat.
+ * When several are wanted on the same tick the order is: molt, brace, move 1, move 2, stomp,
+ * strike, grab.
+ *
+ * The charge: the wind-up roots it (it can still turn), the run ('charge') drives it straight
+ * ahead (the movement system, `kaijuMoveInput`) for up to `timing.active`, and it ends in a
+ * stumble ('stumble', the recovery) when the time is up, when a wall it cannot smash or the
+ * bounds stop it (the movement system sets `act.chargeBlocked`), or when its button is pressed
+ * again. Its cooldown counts from the end of the stumble.
+ *
+ * Never alone (DESIGN.md section 2): once the city has given way (`kaiju.forceMolt`, set by the
+ * match flow system), the cocoon starts by itself as soon as the kaiju is up out of the water
+ * and not staggered, cutting short whatever it was doing.
  *
  * Effects (who gets hit) live in sim/kaijuEffects.ts. Timings: a phase of d seconds ends on the
  * first tick at which d has fully passed (0.45 s is 14 ticks at 30 Hz).
@@ -37,26 +50,31 @@
  * reached `phaseDuration` on to the blast wave and the next stage.
  */
 
-import type { KaijuButton, KaijuKindDef } from '../../defs/schema';
+import type { KaijuKindDef } from '../../defs/schema';
 import type { KaijuPhase, KaijuVerb } from '../../defs/ids';
 import { KAIJU_ACTION_IDS } from '../../defs/ids';
-import { kaijuKindDef } from '../../defs/kaiju/index';
+import { kaijuKindDef, kaijuMoveVerb } from '../../defs/kaiju/index';
 import { DT } from '../../defs/rules';
 import { LAST_STAGE } from '../../defs/stages';
 import { modMult } from '../../defs/upgrades';
-import { Btn, BtnIndex, INPUT_BUFFER_TICKS } from '../../net/input';
+import { PI, wrapAngle } from '../../math/angle';
+import { Btn, BtnIndex, INPUT_BUFFER_TICKS, type ButtonName } from '../../net/input';
 import {
   beamTick,
-  canEat,
+  chargeTick,
   dropHeld,
   eatFinish,
   eatStart,
+  findEdible,
+  findGrabTarget,
   grabEffect,
   roarEffect,
   stompEffect,
   swipeEffect,
+  tailSweepEffect,
   throwEffect,
 } from '../kaijuEffects';
+import { offerCards, pickCard } from '../moltCards';
 import { updateSwim } from '../swim';
 import type { InputState, Kaiju, World } from '../types';
 import { emit } from '../worldOps';
@@ -66,13 +84,10 @@ const TIME_EPS = 1e-6;
 
 const VERBS: readonly KaijuVerb[] = KAIJU_ACTION_IDS.filter((id): id is KaijuVerb => id !== 'none');
 
-/** Seconds a button has been down since its press (0 on the press tick and while it is up). */
-function heldSeconds(input: InputState, button: KaijuButton): number {
-  const ticks = input.heldTicks[BtnIndex[button]];
-  return ticks > 0 ? (ticks - 1) * DT : 0;
-}
+/** The two move buttons, by slot. */
+const MOVE_BUTTONS: readonly ['move1', 'move2'] = ['move1', 'move2'];
 
-function isDown(input: InputState, button: KaijuButton): boolean {
+function isDown(input: InputState, button: ButtonName): boolean {
   return (input.buttons & Btn[button]) !== 0;
 }
 
@@ -80,20 +95,20 @@ function isDown(input: InputState, button: KaijuButton): boolean {
  * A press of this button is waiting to be used: not yet spent, and either made within the
  * buffer or still held down (holding a button through another action means "as soon as I can").
  */
-function freshPress(k: Kaiju, input: InputState, button: KaijuButton): boolean {
-  if ((k.act.usedPress & Btn[button]) !== 0) return false;
-  if ((k.act.swimPress & Btn[button]) !== 0) return true;
+function freshPress(k: Kaiju, input: InputState, button: ButtonName): boolean {
+  const bit = Btn[button];
+  if ((k.act.usedPress & bit) !== 0) return false;
+  if ((k.act.swimPress & bit) !== 0) return true;
   return input.sincePressTicks[BtnIndex[button]] <= INPUT_BUFFER_TICKS || isDown(input, button);
 }
 
-function announce(world: World, k: Kaiju, action: KaijuVerb, phase: KaijuPhase, duration: number, elapsed = 0): void {
+function announce(world: World, k: Kaiju, action: KaijuVerb, phase: KaijuPhase, duration: number): void {
   emit(world, {
     type: 'kaijuAction',
     kaiju: k.id,
     action,
     phase,
     duration,
-    ...(elapsed > 0 ? { elapsed } : {}),
     x: k.x,
     z: k.z,
     yaw: k.actionYaw,
@@ -110,25 +125,33 @@ function enterIdle(world: World, k: Kaiju, ended: KaijuVerb): void {
   setPhase(k, 'idle', 0);
   k.action = 'none';
   k.actionTime = 0;
-  k.act.holdLive = false;
+  k.act.actionButton = 0;
   announce(world, k, ended, 'idle', 0);
 }
 
 function enterRecover(world: World, k: Kaiju, def: KaijuKindDef, verb: KaijuVerb): void {
-  const recover = def.actions[verb].timing.recover;
+  const action = def.actions[verb];
+  const recover = action.timing.recover;
   if (recover > 0) {
-    setPhase(k, 'recover', recover);
-    announce(world, k, verb, 'recover', recover);
+    const phase = action.recoverPhase ?? 'recover';
+    setPhase(k, phase, recover);
+    announce(world, k, verb, phase, recover);
   } else {
-    enterIdle(world, k, verb);
+    endAction(world, k, def, verb);
   }
+}
+
+/** The action is over: back to idle. The charge's cooldown counts from here. */
+function endAction(world: World, k: Kaiju, def: KaijuKindDef, verb: KaijuVerb): void {
+  if (verb === 'charge') k.cooldowns.charge = def.actions.charge.cooldown * modMult(k.mods, 'actionCooldown');
+  enterIdle(world, k, verb);
 }
 
 /** The wind-up is over: the effect goes off, and the active phase begins if the verb has one. */
 function enterActive(world: World, k: Kaiju, def: KaijuKindDef, verb: KaijuVerb): void {
   const action = def.actions[verb];
-  // The effect is aimed where the head points at this moment.
-  k.actionYaw = k.aimYaw;
+  // The effect is aimed where the head points at this moment; the tail sweeps behind the body.
+  k.actionYaw = verb === 'tailSweep' ? wrapAngle(k.yaw + PI) : k.aimYaw;
   setPhase(k, action.activePhase, action.timing.active);
   announce(world, k, verb, action.activePhase, action.timing.active);
 
@@ -151,6 +174,14 @@ function enterActive(world: World, k: Kaiju, def: KaijuKindDef, verb: KaijuVerb)
     case 'roar':
       roarEffect(world, k, def);
       break;
+    case 'tailSweep':
+      tailSweepEffect(world, k, def);
+      break;
+    case 'charge':
+      // The run begins: nobody has been run into yet.
+      k.act.chargeHits.length = 0;
+      k.act.chargeBlocked = false;
+      break;
     default:
       // brace and molt never come through here; a special's effect runs every tick of its active phase.
       break;
@@ -158,7 +189,7 @@ function enterActive(world: World, k: Kaiju, def: KaijuKindDef, verb: KaijuVerb)
   if (!(action.timing.active > 0)) enterRecover(world, k, def, verb);
 }
 
-/** The active phase has run its time: effects that land at the end, then recovery. */
+/** The active phase has run its time (or the charge was stopped): effects that land at the end, then recovery. */
 function leaveActive(world: World, k: Kaiju, def: KaijuKindDef, verb: KaijuVerb): void {
   if (verb === 'eat') {
     if (k.act.meal) eatFinish(k, def);
@@ -166,22 +197,26 @@ function leaveActive(world: World, k: Kaiju, def: KaijuKindDef, verb: KaijuVerb)
   } else if (verb === 'special') {
     k.act.beamLength = 0;
     k.act.beamBlocker = -1;
+  } else if (verb === 'charge') {
+    k.act.chargeBlocked = false;
   }
   enterRecover(world, k, def, verb);
 }
 
 /** Starts a verb: cooldown, rage cost, the tell. `button` is the button whose press started it. */
-function startAction(world: World, k: Kaiju, def: KaijuKindDef, input: InputState, verb: KaijuVerb, button: KaijuButton): void {
+function startAction(world: World, k: Kaiju, def: KaijuKindDef, verb: KaijuVerb, button: ButtonName): void {
   const action = def.actions[verb];
   k.action = verb;
   k.actionTime = 0;
   k.actionYaw = k.aimYaw;
-  k.cooldowns[verb] = action.cooldown * modMult(k.mods, 'actionCooldown');
+  // The charge's cooldown counts from the end of its stumble: until then it reads as all of it.
+  const t = action.timing;
+  const busy = verb === 'charge' ? t.windup + t.active + t.recover : 0;
+  k.cooldowns[verb] = (busy + action.cooldown) * modMult(k.mods, 'actionCooldown');
   if (action.rageCost > 0) k.rage = Math.max(0, k.rage - action.rageCost);
   k.act.usedPress |= Btn[button];
   k.act.swimPress = 0;
-  k.act.holdLive = isDown(input, button);
-  k.act.throwBuffer = 0;
+  k.act.actionButton = Btn[button];
   if (action.timing.windup > 0) {
     setPhase(k, 'windup', action.timing.windup);
     announce(world, k, verb, 'windup', action.timing.windup);
@@ -190,30 +225,47 @@ function startAction(world: World, k: Kaiju, def: KaijuKindDef, input: InputStat
   }
 }
 
-function startBrace(world: World, k: Kaiju): void {
+function startBrace(world: World, k: Kaiju, button: ButtonName): void {
   k.action = 'brace';
   k.actionTime = 0;
   k.actionYaw = k.aimYaw;
-  k.act.holdLive = false;
+  k.act.actionButton = Btn[button];
+  k.act.usedPress |= Btn[button];
   setPhase(k, 'brace', 0);
   announce(world, k, 'brace', 'brace', 0);
 }
 
-/** The molt: the kaiju seals itself in. From here on it is helpless until the match flow system lets it out. */
+/** Whatever the kaiju was doing is cut short, the way a stagger does it (no closing `kaijuAction`). */
+function cutAction(k: Kaiju): void {
+  k.act.meal = false;
+  k.act.beamLength = 0;
+  k.act.beamBlocker = -1;
+  k.act.chargeBlocked = false;
+  k.act.actionButton = 0;
+}
+
+/**
+ * The molt: the kaiju seals itself in and the molt cards are offered. From here on it is
+ * helpless until the match flow system lets it out.
+ */
 function startCocoon(world: World, k: Kaiju): void {
+  cutAction(k);
   dropHeld(world, k);
   const duration = world.config.tuning.cocoon;
   k.moltAvailable = false;
+  k.forceMolt = false;
   k.action = 'molt';
   k.actionTime = 0;
   k.actionYaw = k.yaw;
   k.vx = 0;
   k.vz = 0;
-  k.act.holdLive = false;
-  k.act.throwBuffer = 0;
+  k.act.usedPress |= Btn.molt;
+  // Presses kept from the water (never alone brings it up with one) are spent.
+  k.act.swimPress = 0;
   setPhase(k, 'cocoon', duration);
   announce(world, k, 'molt', 'cocoon', duration);
   emit(world, { type: 'cocoon', kaiju: k.id, x: k.x, z: k.z, duration });
+  offerCards(world, k);
 }
 
 /** Advances the action that is running. */
@@ -224,32 +276,27 @@ function advance(world: World, k: Kaiju, def: KaijuKindDef, input: InputState): 
     setPhase(k, 'idle', 0);
     return;
   }
-  const action = def.actions[verb];
-  if (k.act.holdLive && !isDown(input, action.button)) k.act.holdLive = false;
   const done = k.phaseTime >= k.phaseDuration - TIME_EPS;
 
   switch (k.phase) {
-    case 'windup': {
-      const stomp = def.actions.stomp;
-      if (verb === 'swipe' && k.act.holdLive && k.actionTime >= stomp.holdTime - TIME_EPS) {
-        // Still holding Strike: the swipe becomes a stomp and keeps the time already spent.
-        k.action = 'stomp';
-        k.phaseDuration = stomp.timing.windup;
-        k.cooldowns.stomp = stomp.cooldown * modMult(k.mods, 'actionCooldown');
-        k.act.holdLive = false;
-        announce(world, k, 'stomp', 'windup', stomp.timing.windup, k.phaseTime);
-        if (k.phaseTime >= k.phaseDuration - TIME_EPS) enterActive(world, k, def, 'stomp');
-      } else if (done) {
-        enterActive(world, k, def, verb);
-      }
+    case 'windup':
+      if (done) enterActive(world, k, def, verb);
       break;
-    }
     case 'brace':
-      if (!isDown(input, action.button)) enterIdle(world, k, verb);
+      if ((input.buttons & k.act.actionButton) === 0) enterIdle(world, k, verb);
       break;
     case 'recover':
-      if (done) enterIdle(world, k, verb);
+    case 'stumble':
+      if (done) endAction(world, k, def, verb);
       break;
+    case 'charge': {
+      // A second press of its button ends the run early; so does a wall, or the time.
+      const again = (input.pressed & k.act.actionButton) !== 0;
+      if (again) k.act.usedPress |= k.act.actionButton;
+      if (done || again || k.act.chargeBlocked) leaveActive(world, k, def, verb);
+      else chargeTick(world, k, def.actions.charge);
+      break;
+    }
     default:
       // An active phase. The beam burns on every tick of it.
       if (verb === 'special' && def.actions.special.special === 'beam') beamTick(world, k, def.actions.special);
@@ -258,47 +305,52 @@ function advance(world: World, k: Kaiju, def: KaijuKindDef, input: InputState): 
   }
 }
 
+/** Whether a move picked at a molt can start now: off cooldown, and (the special) rage enough for it. */
+function moveReady(k: Kaiju, def: KaijuKindDef, verb: KaijuVerb): boolean {
+  if (k.cooldowns[verb] > 0) return false;
+  const cost = def.actions[verb].rageCost;
+  return !(cost > 0) || k.rage >= cost - TIME_EPS;
+}
+
 /** Reads the buttons of an idle kaiju and starts at most one action. */
 function startFromInput(world: World, k: Kaiju, def: KaijuKindDef, input: InputState): void {
-  const a = def.actions;
-  const mem = k.act;
-
-  if (k.moltAvailable && world.match.stage < LAST_STAGE && heldSeconds(input, a.molt.button) >= a.molt.holdTime - TIME_EPS) {
+  if (k.moltAvailable && world.match.stage < LAST_STAGE && freshPress(k, input, 'molt')) {
     startCocoon(world, k);
     return;
   }
-  if (isDown(input, a.brace.button)) {
-    startBrace(world, k);
+  // The moves in the slots. The brace lasts while its button is down and is exclusive.
+  for (let slot = 0; slot < MOVE_BUTTONS.length; slot++) {
+    if (kaijuMoveVerb(k.moves[slot]) === 'brace' && isDown(input, MOVE_BUTTONS[slot])) {
+      startBrace(world, k, MOVE_BUTTONS[slot]);
+      return;
+    }
+  }
+  for (let slot = 0; slot < MOVE_BUTTONS.length; slot++) {
+    const verb = kaijuMoveVerb(k.moves[slot]);
+    if (verb === 'none' || verb === 'brace') continue;
+    if (freshPress(k, input, MOVE_BUTTONS[slot]) && moveReady(k, def, verb)) {
+      startAction(world, k, def, verb, MOVE_BUTTONS[slot]);
+      return;
+    }
+  }
+  if (freshPress(k, input, 'stomp')) {
+    startAction(world, k, def, 'stomp', 'stomp');
     return;
   }
-  if (freshPress(k, input, a.special.button) && k.cooldowns.special <= 0 && k.rage >= a.special.rageCost - TIME_EPS) {
-    startAction(world, k, def, input, 'special', a.special.button);
-    return;
-  }
-  if (freshPress(k, input, a.roar.button) && k.cooldowns.roar <= 0) {
-    startAction(world, k, def, input, 'roar', a.roar.button);
-    return;
-  }
-  if (freshPress(k, input, a.swipe.button)) {
+  if (freshPress(k, input, 'strike')) {
     // With something in the hand, Strike throws it.
-    startAction(world, k, def, input, k.held ? 'throw' : 'swipe', a.swipe.button);
+    startAction(world, k, def, k.held ? 'throw' : 'swipe', 'strike');
     return;
   }
-  if (mem.throwBuffer > 0 && k.held) {
-    startAction(world, k, def, input, 'throw', a.throw.button);
-    return;
-  }
-  // Empty hands reach first; the hold that follows a grab is judged once the grab is over.
-  if (!k.held && freshPress(k, input, a.grab.button)) {
-    startAction(world, k, def, input, 'grab', a.grab.button);
-    return;
-  }
-  const grabBit = Btn[a.eat.button];
-  if ((mem.usedHold & grabBit) === 0 && heldSeconds(input, a.eat.button) >= a.eat.holdTime - TIME_EPS) {
-    // A hold is judged once. Whatever comes of it, letting go afterwards does not throw.
-    mem.usedHold |= grabBit;
-    mem.usedPress |= grabBit;
-    if (k.cooldowns.eat <= 0 && canEat(world, k, def)) startAction(world, k, def, input, 'eat', a.eat.button);
+  if (freshPress(k, input, 'grab')) {
+    if (k.held) {
+      // With something in the hand, Grab eats it (when the last meal is far enough behind).
+      if (k.cooldowns.eat <= 0) startAction(world, k, def, 'eat', 'grab');
+      return;
+    }
+    // Something to pick up wins; with nothing, something to eat off the ground; with neither the hand closes on nothing.
+    const eatInstead = !findGrabTarget(world, k, def) && k.cooldowns.eat <= 0 && findEdible(world, k, def) !== null;
+    startAction(world, k, def, eatInstead ? 'eat' : 'grab', 'grab');
   }
 }
 
@@ -306,8 +358,6 @@ function updateKaiju(world: World, k: Kaiju): void {
   const def = kaijuKindDef(k.kind);
   const input = world.players[k.player].input;
   const mem = k.act;
-
-  if (mem.throwBuffer > 0) mem.throwBuffer--;
 
   for (const verb of VERBS) {
     if (k.cooldowns[verb] > 0) {
@@ -319,20 +369,17 @@ function updateKaiju(world: World, k: Kaiju): void {
   k.phaseTime += DT;
   if (k.phase !== 'idle') k.actionTime += DT;
 
+  // Never alone: it comes up out of the water first (a kept press of Molt brings it up).
+  if (k.forceMolt && k.submerge > 0) mem.swimPress |= Btn.molt;
   // Going under or coming up (it comes up for anything but standing idle in deep water).
   updateSwim(world.cityQuery, k, input);
 
   if (k.phase === 'stagger' || k.phase === 'cocoon' || k.phase === 'dead') return;
 
-  // A Grab tap with something in the hand (a press that did not start a grab, let go before the
-  // eat hold) is a throw; remember it briefly if the kaiju is busy.
-  const throwBit = Btn[def.actions.throw.button];
-  if ((input.released & throwBit) !== 0 && k.held && (mem.usedPress & throwBit) === 0) {
-    const held = Math.max(0, input.lastHeldTicks[BtnIndex[def.actions.throw.button]] - 1) * DT;
-    if (held < def.actions.eat.holdTime - TIME_EPS) {
-      mem.throwBuffer = INPUT_BUFFER_TICKS;
-      mem.usedPress |= throwBit;
-    }
+  // Never alone: the city has given way and the cocoon starts by itself, whatever it was doing.
+  if (k.forceMolt && k.submerge <= 0 && world.match.stage < LAST_STAGE) {
+    startCocoon(world, k);
+    return;
   }
 
   if (k.phase !== 'idle') advance(world, k, def, input);
@@ -346,11 +393,12 @@ function updateKaiju(world: World, k: Kaiju): void {
 export function kaijuActionSystem(world: World): void {
   const playing = world.match.phase === 'playing';
   for (const k of world.kaijus) {
+    const input = world.players[k.player].input;
     // A new press of a button makes it count again. Tracked in every phase, so a press made
     // during an intermission is not mistaken for one that was already used.
-    const pressed = world.players[k.player].input.pressed;
-    k.act.usedPress &= ~pressed;
-    k.act.usedHold &= ~pressed;
+    k.act.usedPress &= ~input.pressed;
+    // A molt card counts from the start of the cocoon to the end of the intermission.
+    if (input.card > 0 && k.offer.length > 0 && k.alive) pickCard(world, k, input.card - 1);
     if (playing && k.alive) updateKaiju(world, k);
   }
 }

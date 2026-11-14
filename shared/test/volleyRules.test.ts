@@ -23,8 +23,8 @@ import { eventsOf, input, makeTestCity, parkUnits, placeKaiju, placeUnit } from 
 
 /**
  * The rules that make a charged, coordinated volley the way to break the kaiju's nerve
- * (DESIGN.md sections 3 and 5): a hasty shot is fire at will whatever the fire mode, and it
- * takes charged volleys from two squads to break it.
+ * (DESIGN.md sections 3 and 5): a volley let go early is worth what fire at will is worth, and
+ * it takes charged volleys from two squads to break it.
  *
  * Everything here is played by four people (scripted) around a kaiju that stands still on open
  * ground at the origin, facing +Z: the most favorable case for the squads there is.
@@ -35,8 +35,12 @@ const CHARGE_TICKS = Math.round(COMBAT_RULES.chargeTime * TICK_RATE);
 
 interface Field {
   world: World;
-  /** Steps once. `buttons[s]` is what squad s holds; every leader keeps its crosshair on the middle of the kaiju. */
-  step(buttons: number[], wheel?: PlayerInput['wheel']): SimEvent[];
+  /**
+   * Steps once. `buttons[s]` is what squad s holds; every leader keeps its crosshair on the
+   * middle of the kaiju. Squads that take no part in the test hold the volley button for good:
+   * planted where they were parked, they never fire.
+   */
+  step(buttons: number[]): SimEvent[];
   events: SimEvent[];
 }
 
@@ -75,9 +79,8 @@ function field(stage: StageId, bearings: number[]): Field {
   const f: Field = {
     world,
     events: [],
-    step(buttons, wheel) {
-      // Squads that take no part in the test hold their fire where they were parked.
-      const frame = [input(), ...aims.map((a, s) => input({ ...a, buttons: buttons[s] ?? 0, wheel: s < bearings.length ? wheel : wheel ? 'holdCharge' : undefined }))];
+    step(buttons) {
+      const frame = [input(), ...aims.map((a, s) => input({ ...a, buttons: s < bearings.length ? (buttons[s] ?? 0) : Btn.volley }))];
       const events = world.step(frame);
       f.events.push(...events);
       return events;
@@ -88,12 +91,20 @@ function field(stage: StageId, bearings: number[]): Field {
 
 const ALL_ROUND = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
 const FIRE4 = [Btn.fire, Btn.fire, Btn.fire, Btn.fire];
+const VOLLEY4 = [Btn.volley, Btn.volley, Btn.volley, Btn.volley];
+/** Ticks a hasty player holds the volley button before letting go: well short of a charged volley. */
+const HASTY = Math.round(0.3 * CHARGE_TICKS);
 
-/** Everybody simply holds Fire for `seconds`, in the given fire mode. */
-function holdTheTrigger(stage: StageId, mode: 'holdCharge' | 'fireAtWill', seconds: number, bearings = ALL_ROUND): Field {
+/**
+ * Everybody shoots without ever charging, for `seconds`: holding Fire (the squad-mates shooting
+ * at will), or also letting go of the volley button every time it has been held a moment.
+ */
+function neverCharge(stage: StageId, way: 'fire' | 'hasty', seconds: number, bearings = ALL_ROUND): Field {
   const f = field(stage, bearings);
-  f.step([], mode);
-  for (let t = 0; t < seconds * TICK_RATE; t++) f.step(FIRE4);
+  for (let t = 0; t < seconds * TICK_RATE; t++) {
+    const volley = way === 'hasty' && t % (HASTY + 1) !== HASTY ? Btn.volley : 0;
+    f.step(FIRE4.map((b) => b | volley));
+  }
   return f;
 }
 
@@ -101,26 +112,23 @@ function charged(f: Field, squads: number): boolean {
   return f.world.squads.slice(0, squads).every((sq) => sq.units.every((id) => id === sq.driven || f.world.units[id].charge >= 1));
 }
 
-describe('holding the trigger against charging a volley', () => {
-  it('a hasty volley is fire at will: half nerve, no bonus until the charge is well over half', () => {
+describe('shooting without charging', () => {
+  it('a volley let go early is ragged: no volley, half nerve, no bonus until the charge is well over half', () => {
     expect(volleyStrength(0)).toBe(0);
     expect(volleyStrength(COMBAT_RULES.volleyMinCharge - 0.01)).toBe(0);
     expect(volleyStrength(1)).toBe(1);
     expect(volleyStrength((1 + COMBAT_RULES.volleyMinCharge) / 2)).toBeCloseTo(0.5, 9);
-    // Holding Fire can never charge a volley: the guns reload faster than the charge counts.
-    for (const w of Object.values(WEAPONS)) expect(w.cooldown / COMBAT_RULES.chargeTime).toBeLessThan(COMBAT_RULES.volleyMinCharge - 0.05);
 
     for (const stage of [1, 2, 3] as const) {
       const weapon = WEAPONS[UNIT_TYPES[field(stage, [0]).world.units[0].type].weapon];
-      // One squad in front, Fire held from the moment the squad is planted.
+      // One squad in front, its player letting go of the volley button as soon as it is pressed.
       const f = field(stage, [0]);
-      f.step([], 'holdCharge');
-      for (let t = 0; t < 12 * TICK_RATE; t++) f.step([Btn.fire]);
+      for (let t = 0; t < 12 * TICK_RATE; t++) f.step([t % (HASTY + 1) !== HASTY ? Btn.volley : 0]);
       expect(eventsOf(f.events, 'volley')).toEqual([]);
       const spawns = eventsOf(f.events, 'projectileSpawn');
       expect(spawns.length).toBeGreaterThanOrEqual(12);
       expect(spawns.every((s) => !s.volley)).toBe(true);
-      // The sub-units did fire with the leader, and each of their hits is worth half its nerve.
+      // The squad-mates did fire, and each of their hits is worth half its nerve; the leader's own, all of it.
       const subHits = eventsOf(f.events, 'kaijuHit');
       const nerves = new Set(subHits.map((h) => Math.round(h.nerve * 1000) / 1000));
       expect([...nerves].sort()).toEqual([weapon.nerve * COMBAT_RULES.atWillNerveMult, weapon.nerve].sort());
@@ -128,24 +136,24 @@ describe('holding the trigger against charging a volley', () => {
     }
   });
 
-  it('never breaks the kaiju in a minute of four squads holding Fire, in either fire mode; synchronized full volleys break it in seconds', () => {
+  it('never breaks the kaiju in a minute of four squads that never charge; synchronized full volleys break it in seconds', () => {
     for (const stage of [1, 2, 3] as const) {
-      for (const mode of ['holdCharge', 'fireAtWill'] as const) {
-        const lazy = holdTheTrigger(stage, mode, 60);
-        expect(eventsOf(lazy.events, 'nerveBreak'), `stage ${stage}, ${mode}`).toEqual([]);
+      for (const way of ['fire', 'hasty'] as const) {
+        const lazy = neverCharge(stage, way, 60);
+        expect(eventsOf(lazy.events, 'nerveBreak'), `stage ${stage}, ${way}`).toEqual([]);
         // Scattered fire slows it: its nerve is up, and it is still standing.
-        expect(lazy.world.kaijus[0].nerve).toBeGreaterThan(CAP * 0.3);
+        expect(lazy.world.kaijus[0].nerve, `stage ${stage}, ${way}`).toBeGreaterThan(CAP * 0.3);
         expect(lazy.world.kaijus[0].alive).toBe(true);
       }
 
       const f = field(stage, ALL_ROUND);
       const k = f.world.kaijus[0];
-      f.step([], 'holdCharge');
       let first = -1;
       for (let t = 0; t < 60 * TICK_RATE && k.alive; t++) {
-        // Everybody fires together when everybody is charged; into the stagger, as the guns load.
-        const fire = k.phase === 'stagger' || (k.nerveImmune <= 0.05 && charged(f, 4));
-        const events = f.step(fire ? FIRE4 : []);
+        // Everybody charges and lets go together when everybody is charged; into the stagger,
+        // everybody fires as the guns load.
+        const go = k.phase === 'stagger' || (k.nerveImmune <= 0.05 && charged(f, 4));
+        const events = f.step(go ? FIRE4 : VOLLEY4);
         if (first < 0 && eventsOf(events, 'nerveBreak').length > 0) first = t / TICK_RATE;
       }
       expect(first, `stage ${stage}`).toBeGreaterThan(0);
@@ -154,16 +162,6 @@ describe('holding the trigger against charging a volley', () => {
       // stage 3 the first shells of a volley now break it, so the rest land on the weak point).
       const breaks = eventsOf(f.events, 'nerveBreak').length;
       expect(breaks, `stage ${stage}`).toBeGreaterThanOrEqual(k.alive ? 4 : 3);
-    }
-  });
-
-  it('stays a reasonable way to do plain damage: held fire on hold-and-charge hurts at least as much as fire at will', () => {
-    for (const stage of [1, 2, 3] as const) {
-      const held = holdTheTrigger(stage, 'holdCharge', 30);
-      const atWill = holdTheTrigger(stage, 'fireAtWill', 30);
-      const lost = (f: Field): number => f.world.kaijus[0].maxHp - f.world.kaijus[0].hp;
-      expect(lost(atWill)).toBeGreaterThan(100);
-      expect(lost(held)).toBeGreaterThanOrEqual(lost(atWill));
     }
   });
 });
@@ -196,12 +194,13 @@ describe('it takes two squads to break the kaiju', () => {
         const eye = u.y + UNIT_TYPES[u.type].eyeHeight;
         const aim = { aimYaw: yawFromTo(u.x, u.z, 0, 0), aimPitch: Math.atan2(k.height / 2 - eye, Math.hypot(u.x, u.z)) };
         const frame = (partial: Partial<PlayerInput>): Array<PlayerInput | null> => [input(), input({ ...aim, ...partial })];
-        f.events.push(...world.step(frame({ wheel: 'holdCharge' })));
-        for (let t = 0; t < CHARGE_TICKS + 5; t++) world.step(frame({}));
+        for (let t = 0; t < CHARGE_TICKS + 5; t++) f.events.push(...world.step(frame({ buttons: Btn.volley })));
         let peak = 0;
         for (let t = 0; t < 8 * TICK_RATE; t++) {
-          f.events.push(...world.step(frame({ buttons: t < 2 ? Btn.fire : 0 })));
+          f.events.push(...world.step(frame({})));
           peak = Math.max(peak, k.nerve);
+          // What follows the volley is not part of it: the squad-mates, free again, would fire at will.
+          if (t === 0) for (const id of world.squads[0].units) world.units[id].cooldown = 1e9;
         }
         expect(eventsOf(f.events, 'volley').length).toBe(1);
         expect(eventsOf(f.events, 'nerveBreak'), `stage ${stage}, bearings ${bearings.join(' ')}`).toEqual([]);
@@ -218,8 +217,8 @@ describe('it takes two squads to break the kaiju', () => {
       // The first squad behind the kaiju, the second in front of it.
       const f = field(stage, [Math.PI, 0]);
       const k = f.world.kaijus[0];
-      f.step([], 'holdCharge');
-      for (let t = 0; t < 60 * TICK_RATE; t++) f.step(charged(f, 1) ? [Btn.fire] : []);
+      // The second squad stands by, planted, while the first one keeps at it.
+      for (let t = 0; t < 60 * TICK_RATE; t++) f.step([charged(f, 1) ? 0 : Btn.volley, Btn.volley]);
       expect(eventsOf(f.events, 'volley').length).toBeGreaterThanOrEqual(8);
       expect(eventsOf(f.events, 'nerveBreak'), `stage ${stage}`).toEqual([]);
       expect(k.alive).toBe(true);
@@ -227,7 +226,7 @@ describe('it takes two squads to break the kaiju', () => {
       // Both squads now: the second one's volley is what was missing.
       let broke = -1;
       for (let t = 0; t < 20 * TICK_RATE && broke < 0; t++) {
-        const events = f.step(charged(f, 2) ? [Btn.fire, Btn.fire] : []);
+        const events = f.step(charged(f, 2) ? [0, 0] : [Btn.volley, Btn.volley]);
         if (eventsOf(events, 'nerveBreak').length > 0) broke = t / TICK_RATE;
       }
       expect(broke, `stage ${stage}`).toBeGreaterThanOrEqual(0);
@@ -250,7 +249,7 @@ describe('a volley of about ten tanks', () => {
   /**
    * Stage 3, the kaiju standing still facing the squads. `members[s][i]`: tanks left in unit i of
    * squad s (the squad's leader is unit 0); a squad listed as null has been wiped out. Only the
-   * first `firing` squads charge and fire one volley together; the others stand by, parked.
+   * first `firing` squads charge and fire one volley together; the others stand by, planted.
    */
   function lateVolley(members: Array<number[] | null>, firing: number, bearingsDeg: number[]) {
     const f = field(3, bearingsDeg.slice(0, firing).map((d) => (d * Math.PI) / 180));
@@ -260,11 +259,11 @@ describe('a volley of about ten tanks', () => {
     for (let s = 0; s < 4; s++) expect(world.squads[s].eliminated).toBe(members[s] === null);
     let tanks = 0;
     for (let s = 0; s < firing; s++) for (const id of world.squads[s].units) tanks += world.units[id].alive ? world.units[id].members : 0;
-    f.step([], 'holdCharge');
-    for (let t = 0; t < CHARGE_TICKS + 5; t++) f.step([]);
-    const fire = Array.from({ length: firing }, () => Btn.fire);
-    f.step(fire);
+    const hold = Array.from({ length: firing }, () => Btn.volley);
+    for (let t = 0; t < CHARGE_TICKS + 5; t++) f.step(hold);
     f.step([]);
+    // What follows the volley is not part of it: the squad-mates, free again, would fire at will.
+    for (const u of world.units) u.cooldown = 1e9;
     let nerve = 0;
     for (let t = 0; t < 8 * TICK_RATE; t++) {
       for (const h of eventsOf(f.step([]), 'kaijuHit')) nerve += h.nerve;

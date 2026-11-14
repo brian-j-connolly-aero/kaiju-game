@@ -65,7 +65,8 @@ describe('stages (DESIGN.md section 2)', () => {
   });
 
   it('carry the match rules', () => {
-    expect(MATCH_RULES.clock).toBe(12 * 60);
+    // 9:36: a fifth off the first 12:00 after the first multiplayer playtest (docs/BALANCE.md section 9).
+    expect(MATCH_RULES.clock).toBe(576);
     expect(MATCH_RULES.briefing).toBe(10);
     expect(MATCH_RULES.intermission).toBe(8);
     expect(MATCH_RULES.intermissionWithDraft).toBe(20);
@@ -74,7 +75,7 @@ describe('stages (DESIGN.md section 2)', () => {
     expect(MATCH_RULES.blastShoveRadius).toBe(7);
     expect(MATCH_RULES.redeployMinKaijuDist).toBe(250);
     // The three fractions are tuned with the balance harness (docs/BALANCE.md).
-    expect(MATCH_RULES.bar).toMatchObject({ p1: 0.18, p2: 0.125, p3: 0.31, growth: 1.6, display: [0.21, 0.57, 1] });
+    expect(MATCH_RULES.bar).toMatchObject({ p1: 0.18, p2: 0.125, p3: 0.29, growth: 1.6, display: [0.21, 0.57, 1] });
     expect(MATCH_RULES.maxPlayers).toBe(5);
     expect(SNAPSHOT_EVERY_TICKS).toBe(2);
   });
@@ -113,7 +114,7 @@ describe('the one rule set (DESIGN.md section 3)', () => {
       shakenDuration: 4,
       friendlyLossNerve: 15,
       friendlyLossRadius: 40,
-      chargeTime: 6,
+      chargeTime: 4.5,
       volleyDamagePerCharge: 1,
       volleyNervePerCharge: 2,
       scatterSlowedMult: 0.6,
@@ -123,7 +124,6 @@ describe('the one rule set (DESIGN.md section 3)', () => {
       rageMax: 100,
       rageDamagePerPoint: 12,
     });
-    expect(COMBAT_RULES.chargeHalfArc).toBeCloseTo(35 * DEG, 12);
   });
 });
 
@@ -141,7 +141,7 @@ describe('squad rules the design leaves to the build', () => {
     expect(Math.PI / UNIT_TYPES.army_tank.turnRate).toBeLessThan(SQUAD_RULES.stuckTime);
     // The slot tolerance is tighter than the spacing, or neighbours would settle on each other.
     expect(SQUAD_RULES.slotTolerance).toBeLessThan(1);
-    expect(SQUAD_RULES.formationStagger).toBeLessThan(1);
+    expect(SQUAD_RULES.swarmSide).toBeLessThan(1);
   });
 });
 
@@ -167,9 +167,22 @@ describe('the Lizard (DESIGN.md sections 2 and 4)', () => {
       expect(a[id].id).toBe(id);
       expect(kaijuActionDef('lizard', id as KaijuVerb)).toBe(a[id]);
     }
+    // One move per button (docs/ROADMAP.md, phase 1): the starting kit, and the moves picked at a molt on a slot.
+    expect(Object.fromEntries(Object.values(a).map((v) => [v.id, v.button]))).toEqual({
+      swipe: 'strike',
+      throw: 'strike',
+      grab: 'grab',
+      eat: 'grab',
+      stomp: 'stomp',
+      molt: 'molt',
+      special: 'slot',
+      roar: 'slot',
+      brace: 'slot',
+      charge: 'slot',
+      tailSweep: 'slot',
+    });
+    expect(Object.values(a).filter((v) => v.whileHeld).map((v) => v.id)).toEqual(['brace']);
     expect(a.swipe).toMatchObject({
-      button: 'strike',
-      gesture: 'tap',
       timing: { windup: 0.45, active: 0.15, recover: 0.5 },
       reach: 2.5,
       unitDamage: 70,
@@ -178,9 +191,6 @@ describe('the Lizard (DESIGN.md sections 2 and 4)', () => {
     });
     expect(a.swipe.arc).toBeCloseTo(120 * DEG, 12);
     expect(a.stomp).toMatchObject({
-      button: 'strike',
-      gesture: 'hold',
-      holdTime: 0.35,
       timing: { windup: 0.9, active: 0.1, recover: 0.9 },
       radius: 3.6,
       unitDamageCenter: 100,
@@ -190,7 +200,7 @@ describe('the Lizard (DESIGN.md sections 2 and 4)', () => {
       structureDamage: [55, 420, 2600],
       moveMult: 0,
     });
-    expect(a.grab).toMatchObject({ button: 'grab', gesture: 'tap', reach: 2.5, vehicleFromStage: 2, chunkFromStage: 2 });
+    expect(a.grab).toMatchObject({ reach: 2.5, vehicleFromStage: 2, chunkFromStage: 2 });
     expect(a.grab.timing.windup).toBe(0.4);
     expect(a.grab.arc).toBeCloseTo(100 * DEG, 12);
     expect(a.throw).toMatchObject({
@@ -200,10 +210,10 @@ describe('the Lizard (DESIGN.md sections 2 and 4)', () => {
       structureDamage: [60, 350, 1500],
     });
     expect(a.throw.timing.windup + a.throw.timing.active + a.throw.timing.recover).toBeCloseTo(0.5, 12);
-    expect(a.eat).toMatchObject({ button: 'grab', gesture: 'hold', holdTime: 0.5, heal: 80, cooldown: 10, moveMult: 0 });
+    expect(a.eat).toMatchObject({ heal: 80, cooldown: 10, moveMult: 0 });
     expect(a.eat.timing.active).toBe(2);
-    expect(a.brace).toMatchObject({ button: 'block', gesture: 'level', moveMult: 0, turnMult: 0.3, activePhase: 'brace' });
-    expect(a.roar).toMatchObject({ gesture: 'press', cooldown: 18, radius: [40, 110, 280], unitNerve: 100, resetsCharge: true });
+    expect(a.brace).toMatchObject({ moveMult: 0, turnMult: 0.3, activePhase: 'brace' });
+    expect(a.roar).toMatchObject({ cooldown: 18, radius: [40, 110, 280], unitNerve: 100, resetsCharge: true, stunTime: 2.5 });
     expect(a.roar.timing.active).toBe(1.2);
     expect(a.special).toMatchObject({
       special: 'beam',
@@ -219,7 +229,27 @@ describe('the Lizard (DESIGN.md sections 2 and 4)', () => {
     expect([a.special.wobbleYaw, a.special.wobblePitch, a.special.driftYaw, a.special.kickPitch].map((x) => +((x ?? 0) / DEG).toFixed(6))).toEqual([4, 1.5, 6, 4]);
     expect((a.special.wobbleYaw ?? 0) + (a.special.driftYaw ?? 0)).toBeLessThan(LIZARD.headLeadMax / 3);
     expect(a.special.timing).toMatchObject({ windup: 0.8, active: 3 });
-    expect(a.molt).toMatchObject({ button: 'molt', gesture: 'hold', holdTime: 1, activePhase: 'cocoon' });
+    expect(a.molt).toMatchObject({ activePhase: 'cocoon' });
+    // The two new moves (docs/ROADMAP.md, phase 1).
+    expect(a.charge).toMatchObject({
+      timing: { windup: 0.8, active: 3, recover: 1.2 },
+      activePhase: 'charge',
+      recoverPhase: 'stumble',
+      cooldown: 12,
+      moveMult: 0,
+      turnMult: 0,
+      speedMult: 2,
+      rampTime: 0.5,
+      runTurnMult: 0.25,
+      smashHeight: [9, 30, 70],
+      unitDamage: 90,
+      unitNerve: 40,
+    });
+    expect(a.tailSweep).toMatchObject({ cooldown: 6, reach: 3, unitDamage: 60, unitNerve: 30, structureDamage: a.swipe.structureDamage });
+    expect(a.tailSweep.timing.windup).toBe(0.35);
+    expect(a.tailSweep.arc).toBeCloseTo(180 * DEG, 12);
+    // The molt cards: the beam, the roar or the charge first; the brace or the tail sweep join the second offer.
+    expect(LIZARD.cards).toEqual({ first: ['beam', 'roar', 'charge'], second: ['brace', 'tailSweep'] });
   });
 
   it('is the only registered kind for now, and unknown kinds fail loudly', () => {
@@ -233,19 +263,44 @@ describe('the Lizard (DESIGN.md sections 2 and 4)', () => {
 describe('the Army (DESIGN.md section 5)', () => {
   it('fields the right unit at each level', () => {
     expect(ARMY.levels.map((l) => l.unitType)).toEqual(['army_rocket_infantry', 'army_tank', 'army_tank_troop']);
-    expect(ARMY.levels.map((l) => l.callIns)).toEqual([[], [], ['artillery']]);
-    expect(factionLevelDef('army', 3).callIns).toEqual(['artillery']);
+    expect(factionLevelDef('army', 3).unitType).toBe('army_tank_troop');
     expect(PLAYABLE_FACTIONS).toEqual(['army']);
     expect(factionDef('army').name).toBe('Army');
     expect(() => factionDef('faith')).toThrow(/not registered/);
     expect(FACTION_IDS).toEqual(['army', 'air', 'science', 'faith']);
   });
 
+  it('is 10 to 20% faster than the kaiju at every stage (the owner\'s rule: a squad can always get away)', () => {
+    for (const kind of PLAYABLE_KAIJU_KINDS) {
+      const kaiju = kaijuKindDef(kind);
+      ARMY.levels.forEach((level, i) => {
+        const ratio = UNIT_TYPES[level.unitType].speed / kaiju.stages[i].topSpeed;
+        expect(ratio, `${kind}, level ${level.level}`).toBeGreaterThanOrEqual(1.1);
+        expect(ratio, `${kind}, level ${level.level}`).toBeLessThanOrEqual(1.2);
+      });
+    }
+  });
+
+  it('drives the player\'s own tank like a tank at the vehicle levels; rocket infantry moves with the view', () => {
+    expect(UNIT_TYPES.army_rocket_infantry.drive).toBeUndefined();
+    for (const id of ['army_tank', 'army_tank_troop'] as const) {
+      const drive = UNIT_TYPES[id].drive;
+      if (!drive) throw new Error(`${id} has no tank driving`);
+      expect([drive.accel, drive.brake, drive.reverseMult]).toEqual([10, 16, 0.5]);
+      // Sub-units keep their own steering.
+      expect(UNIT_TYPES[id].steer).toBe('heading');
+    }
+    expect(UNIT_TYPES.army_tank.drive?.turnRate).toBeCloseTo(75 * DEG, 12);
+    expect(UNIT_TYPES.army_tank.drive?.turretRate).toBeCloseTo(140 * DEG, 12);
+    expect(UNIT_TYPES.army_tank_troop.drive?.turnRate).toBeCloseTo(55 * DEG, 12);
+    expect(UNIT_TYPES.army_tank_troop.drive?.turretRate).toBeCloseTo(110 * DEG, 12);
+  });
+
   it('matches the unit and weapon table', () => {
     const [l1, l2, l3] = ARMY.levels.map((l) => UNIT_TYPES[l.unitType]);
-    expect([l1.hp, l1.speed, l1.radius, l1.members]).toEqual([100, 6.5, 3, 10]);
-    expect([l2.hp, l2.speed, l2.radius, l2.members]).toEqual([100, 15, 4, 1]);
-    expect([l3.hp, l3.speed, l3.radius, l3.members]).toEqual([300, 15, 9, 3]);
+    expect([l1.hp, l1.speed, l1.radius, l1.members]).toEqual([100, 9.8, 3, 10]);
+    expect([l2.hp, l2.speed, l2.radius, l2.members]).toEqual([100, 16.1, 4, 1]);
+    expect([l3.hp, l3.speed, l3.radius, l3.members]).toEqual([300, 25.3, 9, 3]);
     const w = [l1, l2, l3].map((u) => WEAPONS[u.weapon]);
     expect(w.map((x) => x.maxShots)).toEqual([3, 1, 3]);
     expect(w.map((x) => x.damage)).toEqual([3.2, 9.5, 3.2]);

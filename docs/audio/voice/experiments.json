@@ -1415,6 +1415,456 @@
   "peak_over_loudness_db": 15.6
  },
  {
+  "group": "neural_overlord",
+  "label": "kokoro am_onyx",
+  "voice": {
+   "engine": "kokoro",
+   "voice": "am_onyx"
+  },
+  "chain": "radio",
+  "overrides": {
+   "band_hz": [
+    260.0,
+    4000.0
+   ],
+   "drive_db": 2.0,
+   "static_db": -38.0
+  },
+  "line_set": "Overlord",
+  "lines": 50,
+  "words": 420,
+  "wer_raw": 15.5,
+  "wer_processed": 23.1,
+  "f0_median_hz": 95.2,
+  "words_per_second": 2.85,
+  "peak_over_loudness_db": 14.3,
+  "wer2_processed": 0.5
+ },
+ {
+  "group": "neural_overlord",
+  "label": "kokoro am_onyx rate 0.9",
+  "voice": {
+   "engine": "kokoro",
+   "voice": "am_onyx",
+   "rate": 0.9
+  },
+  "chain": "radio",
+  "overrides": {
+   "band_hz": [
+    260.0,
+    4000.0
+   ],
+   "drive_db": 2.0,
+   "static_db": -38.0
+  },
+  "line_set": "Overlord",
+  "lines": 50,
+  "words": 420,
+  "wer_raw": 15.0,
+  "wer_processed": 24.3,
+  "f0_median_hz": 94.1,
+  "words_per_second": 2.63,
+  "peak_over_loudness_db": 14.3,
+  "wer2_processed": 0.5
+ },
+ {
+  "group": "neural_overlord2",
+  "label": "am_onyx rate 0.9, Overlord's radio",
+  "voice": {
+   "engine": "kokoro",
+   "voice": "am_onyx",
+   "rate": 0.9
+  },
+  "chain": "radio",
+  "overrides": {
+   "band_hz": [
+    260.0,
+    4000.0
+   ],
+   "drive_db": 2.0,
+   "static_db": -38.0
+  },
+  "line_set": "Overlord sample",
+  "lines": 25,
+  "words": 217,
+  "wer_raw": 14.3,
+  "wer_processed": 24.4,
+  "f0_median_hz": 94.7,
+  "words_per_second": 2.64,
+  "peak_over_loudness_db": 14.5,
+  "wer2_processed": 0.9
+ },
+ {
+  "group": "neural_overlord2",
+  "label": "am_onyx rate 0.9, presence 7 dB",
+  "voice": {
+   "engine": "kokoro",
+   "voice": "am_onyx",
+   "rate": 0.9
+  },
+  "chain": "radio",
+  "overrides": {
+   "band_hz": [
+    260.0,
+    4000.0
+   ],
+   "drive_db": 2.0,
+   "static_db": -38.0,
+   "presence_db": 7.0
+  },
+  "line_set": "Overlord sample",
+  "lines": 25,
+  "words": 217,
+  "wer_raw": 14.3,
+  "wer_processed": 23.5,
+  "f0_median_hz": 94.7,
+  "words_per_second": 2.64,
+  "peak_over_loudness_db": 14.7,
+  "wer2_processed": 0.9
+ },
+ {
+  "group": "neural_overlord2",
+  "label": "am_onyx rate 0.9, presence 7 dB, band to 4.5 kHz",
+  "voice": {
+   "engine": "kokoro",
+   "voice": "am_onyx",
+   "rate": 0.9
+  },
+  "chain": "radio",
+  "overrides": {
+   "band_hz": [
+    260.0,
+    4500.0
+   ],
+   "drive_db": 2.0,
+   "static_db": -38.0,
+   "presence_db": 7.0
+  },
+  "line_set": "Overlord sample",
+  "lines": 25,
+  "words": 217,
+  "wer_raw": 14.3,
+  "wer_processed": 20.7,
+  "f0_median_hz": 94.7,
+  "words_per_second": 2.64,
+  "peak_over_loudness_db": 14.7,
+  "wer2_processed": 0.9
+ },
+ {
+  "group": "neural_overlord2",
+  "label": "am_onyx rate 0.9, presence 9 dB at 2.4 kHz",
+  "voice": {
+   "engine": "kokoro",
+   "voice": "am_onyx",
+   "rate": 0.9
+  },
+  "chain": "radio",
+  "overrides": {
+   "band_hz": [
+    260.0,
+    4000.0
+   ],
+   "drive_db": 2.0,
+   "static_db": -38.0,
+   "presence_db": 9.0,
+   "presence_hz": 2400.0
+  },
+  "line_set": "Overlord sample",
+  "lines": 25,
+  "words": 217,
+  "wer_raw": 14.3,
+  "wer_processed": 23.5,
+  "f0_median_hz": 94.7,
+  "words_per_second": 2.64,
+  "peak_over_loudness_db": 14.8,
+  "wer2_processed": 0.5
+ },
+ {
+  "group": "neural_overlord2",
+  "label": "am_echo rate 0.85, Overlord's radio",
+  "voice": {
+   "engine": "kokoro",
+   "voice": "am_echo",
+   "rate": 0.85
+  },
+  "chain": "radio",
+  "overrides": {
+   "band_hz": [
+    260.0,
+    4000.0
+   ],
+   "drive_db": 2.0,
+   "static_db": -38.0
+  },
+  "line_set": "Overlord sample",
+  "lines": 25,
+  "words": 217,
+  "wer_raw": 9.7,
+  "wer_processed": 21.2,
+  "f0_median_hz": 112.7,
+  "words_per_second": 2.73,
+  "peak_over_loudness_db": 15.5,
+  "wer2_processed": 0.0
+ },
+ {
+  "group": "neural_squads",
+  "label": "kokoro am_echo rate 0.95",
+  "voice": {
+   "engine": "kokoro",
+   "voice": "am_echo",
+   "rate": 0.95
+  },
+  "chain": "radio",
+  "overrides": {},
+  "line_set": "squads sample",
+  "lines": 40,
+  "words": 295,
+  "wer_raw": 7.8,
+  "wer_processed": 12.2,
+  "f0_median_hz": 112.7,
+  "words_per_second": 2.94,
+  "peak_over_loudness_db": 14.8,
+  "wer2_processed": 0.7
+ },
+ {
+  "group": "neural_squads",
+  "label": "kokoro am_liam rate 0.9",
+  "voice": {
+   "engine": "kokoro",
+   "voice": "am_liam",
+   "rate": 0.9
+  },
+  "chain": "radio",
+  "overrides": {},
+  "line_set": "squads sample",
+  "lines": 40,
+  "words": 295,
+  "wer_raw": 21.4,
+  "wer_processed": 22.4,
+  "f0_median_hz": 123.1,
+  "words_per_second": 3.21,
+  "peak_over_loudness_db": 14.5,
+  "wer2_processed": 2.4
+ },
+ {
+  "group": "neural_squads",
+  "label": "kokoro am_michael rate 0.9",
+  "voice": {
+   "engine": "kokoro",
+   "voice": "am_michael",
+   "rate": 0.9
+  },
+  "chain": "radio",
+  "overrides": {},
+  "line_set": "squads sample",
+  "lines": 40,
+  "words": 295,
+  "wer_raw": 19.0,
+  "wer_processed": 23.1,
+  "f0_median_hz": 125.0,
+  "words_per_second": 2.91,
+  "peak_over_loudness_db": 13.9,
+  "wer2_processed": 0.0
+ },
+ {
+  "group": "neural_squads",
+  "label": "kokoro am_fenrir rate 0.9",
+  "voice": {
+   "engine": "kokoro",
+   "voice": "am_fenrir",
+   "rate": 0.9
+  },
+  "chain": "radio",
+  "overrides": {},
+  "line_set": "squads sample",
+  "lines": 40,
+  "words": 295,
+  "wer_raw": 12.2,
+  "wer_processed": 19.3,
+  "f0_median_hz": 142.9,
+  "words_per_second": 3.48,
+  "peak_over_loudness_db": 14.6,
+  "wer2_processed": 2.4
+ },
+ {
+  "group": "neural_squads",
+  "label": "piper en_US-bryce-medium",
+  "voice": {
+   "engine": "piper",
+   "voice": "en_US-bryce-medium"
+  },
+  "chain": "radio",
+  "overrides": {},
+  "line_set": "squads sample",
+  "lines": 40,
+  "words": 295,
+  "wer_raw": 10.8,
+  "wer_processed": 16.3,
+  "f0_median_hz": 135.6,
+  "words_per_second": 2.31,
+  "peak_over_loudness_db": 14.7,
+  "wer2_processed": 0.7
+ },
+ {
+  "group": "neural_squads",
+  "label": "kokoro af_alloy rate 0.9",
+  "voice": {
+   "engine": "kokoro",
+   "voice": "af_alloy",
+   "rate": 0.9
+  },
+  "chain": "radio",
+  "overrides": {},
+  "line_set": "squads sample",
+  "lines": 40,
+  "words": 295,
+  "wer_raw": 10.5,
+  "wer_processed": 11.2,
+  "f0_median_hz": 145.5,
+  "words_per_second": 2.87,
+  "peak_over_loudness_db": 14.4,
+  "wer2_processed": 1.4
+ },
+ {
+  "group": "neural_squads",
+  "label": "kokoro af_sky rate 0.9",
+  "voice": {
+   "engine": "kokoro",
+   "voice": "af_sky",
+   "rate": 0.9
+  },
+  "chain": "radio",
+  "overrides": {},
+  "line_set": "squads sample",
+  "lines": 40,
+  "words": 295,
+  "wer_raw": 10.5,
+  "wer_processed": 15.6,
+  "f0_median_hz": 168.4,
+  "words_per_second": 3.09,
+  "peak_over_loudness_db": 14.6,
+  "wer2_processed": 1.4
+ },
+ {
+  "group": "neural_squads",
+  "label": "piper en_GB-alba-medium",
+  "voice": {
+   "engine": "piper",
+   "voice": "en_GB-alba-medium"
+  },
+  "chain": "radio",
+  "overrides": {},
+  "line_set": "squads sample",
+  "lines": 40,
+  "words": 295,
+  "wer_raw": 35.9,
+  "wer_processed": 53.2,
+  "f0_median_hz": 200.0,
+  "words_per_second": 2.86,
+  "peak_over_loudness_db": 14.3,
+  "wer2_processed": 1.4
+ },
+ {
+  "group": "neural_anchor",
+  "label": "kokoro af_heart rate 0.85",
+  "voice": {
+   "engine": "kokoro",
+   "voice": "af_heart",
+   "rate": 0.85
+  },
+  "chain": "broadcast",
+  "overrides": {},
+  "line_set": "anchor sample",
+  "lines": 43,
+  "words": 427,
+  "wer_raw": 6.8,
+  "wer_processed": 5.9,
+  "f0_median_hz": 200.0,
+  "words_per_second": 2.85,
+  "peak_over_loudness_db": 15.7,
+  "wer2_processed": 0.2
+ },
+ {
+  "group": "neural_anchor",
+  "label": "kokoro af_bella rate 0.85",
+  "voice": {
+   "engine": "kokoro",
+   "voice": "af_bella",
+   "rate": 0.85
+  },
+  "chain": "broadcast",
+  "overrides": {},
+  "line_set": "anchor sample",
+  "lines": 43,
+  "words": 427,
+  "wer_raw": 6.6,
+  "wer_processed": 8.9,
+  "f0_median_hz": 197.5,
+  "words_per_second": 2.78,
+  "peak_over_loudness_db": 15.9,
+  "wer2_processed": 0.0
+ },
+ {
+  "group": "neural_chair",
+  "label": "kokoro bm_george rate 0.85",
+  "voice": {
+   "engine": "kokoro",
+   "voice": "bm_george",
+   "rate": 0.85
+  },
+  "chain": "hall",
+  "overrides": {},
+  "line_set": "chair",
+  "lines": 35,
+  "words": 393,
+  "wer_raw": 19.1,
+  "wer_processed": 20.1,
+  "f0_median_hz": 144.1,
+  "words_per_second": 2.46,
+  "peak_over_loudness_db": 11.9,
+  "wer2_processed": 0.5
+ },
+ {
+  "group": "neural_chair",
+  "label": "kokoro bm_lewis rate 0.85",
+  "voice": {
+   "engine": "kokoro",
+   "voice": "bm_lewis",
+   "rate": 0.85
+  },
+  "chain": "hall",
+  "overrides": {},
+  "line_set": "chair",
+  "lines": 35,
+  "words": 393,
+  "wer_raw": 24.4,
+  "wer_processed": 25.7,
+  "f0_median_hz": 115.1,
+  "words_per_second": 2.57,
+  "peak_over_loudness_db": 14.2,
+  "wer2_processed": 0.8
+ },
+ {
+  "group": "neural_chair",
+  "label": "kokoro bm_fable rate 0.85",
+  "voice": {
+   "engine": "kokoro",
+   "voice": "bm_fable",
+   "rate": 0.85
+  },
+  "chain": "hall",
+  "overrides": {},
+  "line_set": "chair",
+  "lines": 35,
+  "words": 393,
+  "wer_raw": 19.8,
+  "wer_processed": 23.9,
+  "f0_median_hz": 127.0,
+  "words_per_second": 2.51,
+  "peak_over_loudness_db": 13.7,
+  "wer2_processed": 0.8
+ },
+ {
   "group": "sweep_radio3",
   "label": "alan: band 300 to 4200 Hz",
   "voice": {

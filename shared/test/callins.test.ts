@@ -1,17 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   beginStage,
-  Btn,
   CALLINS,
   callInFallTime,
   COMBAT_RULES,
-  decodeSnapshot,
-  encodeSnapshot,
   LIZARD,
   PROJECTILE_TYPES,
-  queueCommand,
-  snapshotOfWorld,
+  resolveMarkerPoint,
   SQUAD_RULES,
+  startCallIn,
   stepProjectile,
   TICK_RATE,
   type PlayerInput,
@@ -19,7 +16,7 @@ import {
   type StageId,
   type World,
 } from '../src/index';
-import { eventsOf, HUMAN_PLAYER, input, makeTestWorld, parkUnits, placeKaiju, placeUnit, run, type TestWorldOptions } from './helpers';
+import { eventsOf, holdFire, HUMAN_PLAYER, input, makeTestWorld, parkUnits, placeKaiju, placeUnit, run, type TestWorldOptions } from './helpers';
 
 const ARTY = CALLINS.artillery;
 
@@ -38,26 +35,20 @@ function lead(world: World, ticks: number, partial: Partial<PlayerInput> = {}): 
   return run(world, ticks, [null, input(partial)]);
 }
 
-/** Places a marker with the call-in button and lets go of it again. */
+/**
+ * Starts a mission for the first squad between two ticks (the artillery radio of phase 2 will
+ * call `startCallIn` from inside a tick) and returns the events it emitted.
+ */
 function callIn(world: World, x: number, z: number): SimEvent[] {
-  return [...lead(world, 1, { buttons: Btn.callIn, marker: { x, z } }), ...lead(world, 1)];
+  const before = world.events.length;
+  startCallIn(world, world.squads[0], 'artillery', x, z);
+  return world.events.slice(before);
 }
 
 describe('the artillery call-in', () => {
-  it('exists only at level 3', () => {
-    for (const stage of [1, 2] as const) {
-      const world = field({}, stage);
-      const events = callIn(world, 100, 300);
-      queueCommand(world, HUMAN_PLAYER, { type: 'callIn', callIn: 'artillery', x: 100, z: 300 });
-      events.push(...lead(world, 30));
-      expect(eventsOf(events, 'callin')).toEqual([]);
-      expect(world.callIns).toEqual([]);
-    }
-  });
-
   it('marks the ground, waits out the delay, then lands its shells over the duration inside the scatter radius', () => {
     const world = field();
-    const start = world.tick + 1;
+    const start = world.tick;
     const events = callIn(world, 100, 300);
     expect(eventsOf(events, 'callin')).toMatchObject([
       { id: 1, callIn: 'artillery', squad: 0, player: HUMAN_PLAYER, x: 100, z: 300, phase: 'marked', delay: ARTY.delay },
@@ -65,9 +56,7 @@ describe('the artillery call-in', () => {
     // Stage 3 tightens the scatter; nothing else does here (the kaiju is far away, unseen and calm).
     const radius = ARTY.scatterRadius * 0.6;
     expect(eventsOf(events, 'callin')[0].radius).toBeCloseTo(radius, 9);
-    expect(eventsOf(events, 'voice').map((e) => e.cue)).toContain('callin.inbound');
     expect(world.callIns.length).toBe(1);
-    expect(world.squads[0].callInCooldowns[0]).toBeCloseTo(ARTY.cooldown - 2 / TICK_RATE, 6);
 
     events.push(...lead(world, Math.round((ARTY.delay + ARTY.duration + 2) * TICK_RATE)));
     const spawns = eventsOf(events, 'projectileSpawn');
@@ -113,97 +102,11 @@ describe('the artillery call-in', () => {
     expect(world.callIns).toEqual([]);
   });
 
-  it('has a cooldown per player', () => {
-    const world = field();
-    callIn(world, 100, 300);
-    // Asking again does nothing until the cooldown is over.
-    let events = callIn(world, 150, 300);
-    events.push(...lead(world, Math.round((ARTY.cooldown - 1) * TICK_RATE) - 4));
-    expect(eventsOf(events, 'callin').filter((e) => e.phase === 'marked')).toEqual([]);
-    expect(world.squads[0].callInCooldowns[0]).toBeGreaterThan(0);
-    const snap = decodeSnapshot(encodeSnapshot(snapshotOfWorld(world)));
-    expect(snap.squads[0].callInCooldowns[0]).toBeCloseTo(world.squads[0].callInCooldowns[0], 1);
-
-    lead(world, TICK_RATE + 2);
-    expect(world.squads[0].callInCooldowns[0]).toBe(0);
-    events = callIn(world, 150, 300);
-    expect(eventsOf(events, 'callin')).toMatchObject([{ id: 2, phase: 'marked', x: 150 }]);
-
-    // Another player's guns are their own: a command message works like the button.
-    queueCommand(world, 2, { type: 'callIn', callIn: 'artillery', x: -50, z: 200 });
-    events = lead(world, 1);
-    expect(eventsOf(events, 'callin')).toMatchObject([{ id: 3, squad: 1, player: 2, phase: 'marked' }]);
-  });
-
-  it('places the marker where the crosshair meets the ground when the input carries none, inside the bounds', () => {
-    const world = field();
-    const leader = world.units[0];
-    const eye = 2.8;
-    const events = lead(world, 1, { buttons: Btn.callIn, aimYaw: 0.5, aimPitch: -Math.atan2(eye, 200) });
-    const e = eventsOf(events, 'callin')[0];
-    expect(e.x).toBeCloseTo(leader.x + Math.sin(0.5) * 200, 3);
-    expect(e.z).toBeCloseTo(leader.z + Math.cos(0.5) * 200, 3);
-
-    const edge = field();
-    edge.match.bounds = edge.match.stageBounds[0];
-    const b = edge.match.bounds;
-    const clamped = eventsOf(callIn(edge, b.maxX + 300, b.minZ - 300), 'callin')[0];
-    expect([clamped.x, clamped.z]).toEqual([b.maxX, b.minZ]);
-  });
-
-  it('lands on a kaiju the crosshair is on: anywhere on its body, from 300 to 600 m', () => {
-    const eye = 2.8;
-    const radius = LIZARD.stages[2].bodyRadius;
-    const height = LIZARD.stages[2].height;
-    for (const dist of [300, 450, 600]) {
-      // Knees, chest, head, and the chest again well off the center line.
-      for (const [frac, side] of [[0.1, 0], [0.5, 0], [0.9, 0], [0.5, 0.7 * radius], [0.02, -0.8 * radius]]) {
-        const world = field();
-        const k = placeKaiju(world, 0, dist, 0);
-        lead(world, 1, { wheel: 'holdCharge' });
-        const aimYaw = Math.atan2(side, dist);
-        const aimPitch = Math.atan2(height * frac - eye, dist);
-        const events = [...lead(world, 1, { buttons: Btn.callIn, aimYaw, aimPitch }), ...lead(world, 1, { aimYaw, aimPitch })];
-        const marked = eventsOf(events, 'callin')[0];
-        expect(marked, `marker at ${dist} m, height ${frac}, side ${side}`).toBeDefined();
-        // The marker is on the ground under the body, not a kilometre behind it.
-        expect(Math.hypot(marked.x - k.x, marked.z - k.z)).toBeLessThanOrEqual(radius + 1e-6);
-        events.push(...lead(world, Math.round((ARTY.delay + ARTY.duration + 2) * TICK_RATE), { aimYaw, aimPitch }));
-        const hits = eventsOf(events, 'kaijuHit').filter((h) => h.cause === 'arty');
-        expect(hits.length, `shells on target at ${dist} m, height ${frac}, side ${side}`).toBe(ARTY.shells);
-      }
-    }
-  });
-
-  it('snaps to a kaiju on the map when the crosshair is on the sky just beside it, and ignores a press at the empty sky', () => {
-    const radius = LIZARD.stages[2].bodyRadius;
-    const world = field();
-    const k = placeKaiju(world, 0, 400, 0);
-    lead(world, 1, { wheel: 'holdCharge' });
-    expect(k.known).toBe(true);
-    // Over its head, and in the sky one and a half body widths to the side.
-    for (const [aimYaw, aimPitch] of [[0, 0.6], [Math.atan2(1.5 * radius, 400), 0.2]]) {
-      const w = field();
-      const kk = placeKaiju(w, 0, 400, 0);
-      lead(w, 1, { wheel: 'holdCharge' });
-      const e = eventsOf(lead(w, 1, { buttons: Btn.callIn, aimYaw, aimPitch }), 'callin')[0];
-      expect(e).toMatchObject({ phase: 'marked', x: kk.x, z: kk.z });
-    }
-    // The empty sky, nowhere near it: nothing is marked and the battery is still ready.
-    const events = lead(world, 1, { buttons: Btn.callIn, aimYaw: 2, aimPitch: 0.3 });
-    expect(eventsOf(events, 'callin')).toEqual([]);
-    expect(world.callIns).toEqual([]);
-    expect(world.squads[0].callInCooldowns).toEqual([0]);
-    // Level, the ray would only meet the ground beyond its reach: the same.
-    lead(world, 1, { aimYaw: 2, aimPitch: 0 });
-    expect(eventsOf(lead(world, 1, { buttons: Btn.callIn, aimYaw: 2, aimPitch: 0 }), 'callin')).toEqual([]);
-  });
-
   it('hurts the kaiju: 14 damage and 10 nerve a shell, and never counts as crossfire', () => {
     const world = field();
     const k = placeKaiju(world, 100, 300, 0);
     // The tanks hold their fire, so the guns are the only thing shooting.
-    lead(world, 1, { wheel: 'holdCharge' });
+    holdFire(world);
     const events = callIn(world, 100, 300);
     events.push(...lead(world, Math.round((ARTY.delay + ARTY.duration + 2) * TICK_RATE)));
     const hits = eventsOf(events, 'kaijuHit');
@@ -248,7 +151,8 @@ describe('the artillery call-in', () => {
     // The leader has the titan in plain view within the spotting range, and its nerve is half gone.
     const k = placeKaiju(world, 0, 120 + LIZARD.stages[2].bodyRadius, 0);
     k.nerve = 50;
-    lead(world, 1, { wheel: 'holdCharge' });
+    holdFire(world);
+    lead(world, 1);
     expect(k.spotted).toBe(true);
     const events = callIn(world, k.x, k.z);
     const tight = ARTY.scatterRadius * 0.6 * COMBAT_RULES.scatterSpottedMult * COMBAT_RULES.scatterSlowedMult;
@@ -280,13 +184,58 @@ describe('the artillery call-in', () => {
     const events = lead(world, Math.round((ARTY.delay + ARTY.duration + 2) * TICK_RATE));
     expect(world.squads[0].eliminated).toBe(true);
     expect(eventsOf(events, 'projectileHit').length).toBe(ARTY.shells);
-    // Out until the next stage: the button does nothing now.
-    expect(eventsOf(callIn(world, 100, 300), 'callin')).toEqual([]);
 
     const again = field();
     callIn(again, 100, 300);
     beginStage(again, 3);
     expect(again.callIns).toEqual([]);
-    expect(again.squads[0].callInCooldowns).toEqual([0]);
+  });
+
+  it('pulls a marker outside the playable bounds back to the line', () => {
+    const world = field();
+    world.match.bounds = world.match.stageBounds[0];
+    const b = world.match.bounds;
+    const marked = eventsOf(callIn(world, b.maxX + 300, b.minZ - 300), 'callin')[0];
+    expect([marked.x, marked.z]).toEqual([b.maxX, b.minZ]);
+  });
+});
+
+/**
+ * Where a crosshair marks the ground (`resolveMarkerPoint`, sim/aim.ts): no button uses it in
+ * phase 1; the artillery radio of phase 2 is meant to.
+ */
+describe('a ground marker placed with the crosshair', () => {
+  const eye = 2.8;
+  const out = { x: 0, z: 0 };
+
+  it('is where the aim ray meets the ground, or the ground under a kaiju the crosshair is on, anywhere on its body', () => {
+    const world = field();
+    expect(resolveMarkerPoint(world.cityQuery, world.kaijus, 0, eye, 0, 0.5, -Math.atan2(eye, 200), SQUAD_RULES.markerRange, 0, out)).toBe(true);
+    expect(out.x).toBeCloseTo(Math.sin(0.5) * 200, 3);
+    expect(out.z).toBeCloseTo(Math.cos(0.5) * 200, 3);
+
+    const radius = LIZARD.stages[2].bodyRadius;
+    const height = LIZARD.stages[2].height;
+    for (const dist of [300, 600]) {
+      // Knees, chest, head, and the chest again well off the center line.
+      for (const [frac, side] of [[0.1, 0], [0.5, 0], [0.9, 0], [0.5, 0.7 * radius]]) {
+        const k = placeKaiju(world, 0, dist, 0);
+        const hit = resolveMarkerPoint(world.cityQuery, world.kaijus, 0, eye, 0, Math.atan2(side, dist), Math.atan2(height * frac - eye, dist), SQUAD_RULES.markerRange, 0, out);
+        expect(hit, `at ${dist} m, height ${frac}, side ${side}`).toBe(true);
+        expect(Math.hypot(out.x - k.x, out.z - k.z)).toBeLessThanOrEqual(radius + 1e-6);
+      }
+    }
+  });
+
+  it('snaps to a kaiju on the map with the crosshair on the sky just beside it, and is nowhere at the empty sky', () => {
+    const world = field();
+    const k = placeKaiju(world, 0, 400, 0);
+    k.known = true;
+    const radius = LIZARD.stages[2].bodyRadius;
+    for (const [aimYaw, aimPitch] of [[0, 0.6], [Math.atan2(1.5 * radius, 400), 0.2]]) {
+      expect(resolveMarkerPoint(world.cityQuery, world.kaijus, 0, eye, 0, aimYaw, aimPitch, SQUAD_RULES.markerRange, 0, out)).toBe(true);
+      expect([out.x, out.z]).toEqual([k.x, k.z]);
+    }
+    expect(resolveMarkerPoint(world.cityQuery, world.kaijus, 0, eye, 0, 2, 0.3, SQUAD_RULES.markerRange, 0, out)).toBe(false);
   });
 });

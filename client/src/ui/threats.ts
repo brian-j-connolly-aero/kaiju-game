@@ -11,21 +11,9 @@
  * - it grows with the squad's charge, and from the charge at which a volley counts (60%) it is
  *   lit and pulses fast: that one is about to hurt;
  * - when a squad fires a volley its diamond flashes for a moment.
- *
- * Guns standing in smoke are not shown: the kaiju cannot see them (sim/abilities.ts).
  */
 
-import {
-  COMBAT_RULES,
-  inSmoke,
-  kaijuStageDef,
-  unitTypeDef,
-  weaponDef,
-  wrapAngle,
-  type SmokeShape,
-  type SnapKaiju,
-  type SnapUnit,
-} from '@mb/shared';
+import { COMBAT_RULES, kaijuStageDef, unitTypeDef, weaponDef, wrapAngle, type SnapKaiju, type SnapUnit } from '@mb/shared';
 import { el, icon } from './icons';
 
 /** One squad's guns charging at the kaiju. */
@@ -48,10 +36,10 @@ const POOL = 8;
 
 /**
  * The squads with guns charging at the kaiju, read from a frame: each unit with its laser lit,
- * not in smoke, with the kaiju inside its weapon's range and its aim on the kaiju's body (or
- * within a few degrees of it).
+ * with the kaiju inside its weapon's range and its aim on the kaiju's body (or within a few
+ * degrees of it).
  */
-export function squadThreats(k: SnapKaiju, units: readonly SnapUnit[], smokes: readonly SmokeShape[], out: SquadThreat[] = []): SquadThreat[] {
+export function squadThreats(k: SnapKaiju, units: readonly SnapUnit[], out: SquadThreat[] = []): SquadThreat[] {
   out.length = 0;
   const radius = kaijuStageDef(k.kind, k.stage).bodyRadius;
   const sums = new Map<number, { x: number; y: number; z: number; n: number; charge: number }>();
@@ -64,7 +52,6 @@ export function squadThreats(k: SnapKaiju, units: readonly SnapUnit[], smokes: r
     if (d - radius > weaponDef(def.weapon).range) continue;
     const off = Math.abs(wrapAngle(Math.atan2(dx, dz) - u.aimYaw));
     if (off > Math.atan2(radius, Math.max(d, 1)) + AIM_SLACK) continue;
-    if (smokes.length > 0 && inSmoke(smokes, u.x, u.z)) continue;
     let s = sums.get(u.squad);
     if (!s) sums.set(u.squad, (s = { x: 0, y: 0, z: 0, n: 0, charge: 0 }));
     s.x += u.x;
@@ -166,9 +153,9 @@ export class ThreatRing {
    * `firstPerson`: the camera is in the head (on-screen guns get a diamond too; in third person
    * their lasers are in plain view).
    */
-  update(k: SnapKaiju, units: readonly SnapUnit[], smokes: readonly SmokeShape[], camera: ThreatCamera, firstPerson: boolean, now: number): void {
+  update(k: SnapKaiju, units: readonly SnapUnit[], camera: ThreatCamera, firstPerson: boolean, now: number): void {
     this.root.classList.remove('hidden');
-    squadThreats(k, units, smokes, this.threats);
+    squadThreats(k, units, this.threats);
     const m = camera.matrixWorldInverse.elements;
     const fovY = (camera.fov * Math.PI) / 180;
     let used = 0;

@@ -5,19 +5,18 @@
  * below give the payload type for every message type. Everything is JSON-safe except `snap`
  * (binary, see snapshot.ts) and the `cityState` bytes inside `welcome` (see cityState.ts).
  *
- * The server must validate everything it receives: `sanitizeInput` and `sanitizeCommand` do it
- * for the two hot messages; lobby actions carry only short strings and booleans.
+ * The server must validate everything it receives: `sanitizeInput` does it for the hot message
+ * (`input`); lobby actions carry only short strings and booleans.
  */
 
 import type { FactionId, KaijuKindId } from '../defs/ids';
-import type { SquadCommand } from '../sim/commands';
 import type { MatchConfig, PlayerId } from '../sim/config';
 import type { SimEvent } from '../sim/events';
 import type { PlayerInput } from './input';
 import type { LobbyState } from './lobby';
 
 /** Bump when a message or the snapshot layout changes incompatibly. Sent in `welcome`. */
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 /** Default port for the one process that serves both the page and the WebSocket. */
 export const DEFAULT_PORT = 2567;
@@ -95,8 +94,6 @@ export interface ClientMessages {
   toLobby: Record<string, never>;
   /** Match: one input sample, 30 per second. */
   input: PlayerInput;
-  /** Match: a squad command placed outside the input stream (for example on the map view). */
-  command: SquadCommand;
   /** Tier 2: pick one of the three offered upgrade cards (0..2). */
   draftPick: { card: number };
   /** Latency probe; `t` is the client's clock in milliseconds and comes back unchanged. */
@@ -165,7 +162,6 @@ export const CLIENT_MESSAGE_TYPES: readonly ClientMessageType[] = [
   'start',
   'toLobby',
   'input',
-  'command',
   'draftPick',
   'ping',
 ];

@@ -5,7 +5,9 @@ import {
   corridorClear,
   createRng,
   createSteer,
-  rngRange,
+  rngInt,
+  setTankMove,
+  setWorldMove,
   shallowWay,
   solidInCircle,
   steerToward,
@@ -14,6 +16,7 @@ import {
   TICK_RATE,
   UNIT_TYPES,
   type PlayerInput,
+  type Steer,
   type Unit,
   type World,
 } from '../src/index';
@@ -23,10 +26,21 @@ function lead(world: World, ticks: number, partial: Partial<PlayerInput> = {}): 
   run(world, ticks, [null, input(partial)]);
 }
 
-/** Sends the first squad's sub-units to a marker and returns the first of them. */
-function send(world: World, x: number, z: number): Unit {
-  lead(world, 1, { wheel: 'moveTo', marker: { x, z } });
-  return world.units[1];
+/**
+ * One tick of the first squad's leader finding its way to (x, z) with `steerToward`, driven the
+ * way the squad bot drives it (a tank by throttle and hull turn). Returns the steering answer.
+ */
+function navigate(world: World, x: number, z: number, tolerance: number, steer: Steer): Steer {
+  const leader = world.units[world.squads[0].driven];
+  steerToward(world, leader, x, z, tolerance, steer);
+  const inp = input({ aimYaw: leader.control.aimYaw });
+  if (steer.throttle > 0) {
+    inp.aimYaw = Math.atan2(steer.dirX, steer.dirZ);
+    if (UNIT_TYPES[leader.type].drive) setTankMove(inp, leader.yaw, steer.dirX, steer.dirZ, steer.throttle);
+    else setWorldMove(inp, steer.dirX, steer.dirZ, steer.throttle);
+  }
+  run(world, 1, [null, inp]);
+  return steer;
 }
 
 function sunkIntoWall(world: World, u: Unit): boolean {
@@ -141,19 +155,15 @@ describe('finding the way', () => {
   it('walks round a wall with no roads to help, and takes the short way round', () => {
     // A wall 100 m wide; the unit and its goal are near its east end.
     const world = field([{ x: 0, z: 50, w: 100, d: 10, height: 10 }]);
-    placeUnit(world, 0, 20, -10);
-    placeUnit(world, 1, 30, 0);
-    placeUnit(world, 2, 400, 400);
-    placeUnit(world, 3, 420, 400);
-    const u = send(world, 30, 100);
+    const u = placeUnit(world, 0, 30, 0);
+    const steer = createSteer();
     let west = 0;
     for (let t = 0; t < TICK_RATE * 40; t++) {
-      lead(world, 1);
+      if (navigate(world, 30, 100, 1.5, steer).arrived) break;
       expect(sunkIntoWall(world, u)).toBe(false);
       west = Math.min(west, u.x);
-      if (Math.hypot(u.x - u.nav.holdX, u.z - u.nav.holdZ) < 2) break;
     }
-    expect(Math.hypot(u.x - u.nav.holdX, u.z - u.nav.holdZ)).toBeLessThan(2);
+    expect(Math.hypot(u.x - 30, u.z - 100)).toBeLessThan(2);
     expect(u.z).toBeGreaterThan(60);
     // It went round the east end (20 m away), not the west end (80 m away).
     expect(west).toBeGreaterThan(-10);
@@ -167,15 +177,11 @@ describe('finding the way', () => {
       { x: -27, z: 100, w: 6, d: 54, height: 10 },
       { x: 27, z: 100, w: 6, d: 54, height: 10 },
     ]);
-    const u = placeUnit(world, 1, 0, 0);
-    u.nav.hasHold = true;
-    u.nav.holdX = 0;
-    u.nav.holdZ = 100;
-    u.nav.settled = false;
-    world.squads[0].moveOrder = 'moveTo';
+    const u = placeUnit(world, 0, 0, 0);
+    const steer = createSteer();
     let waited = 0;
     for (let t = 0; t < TICK_RATE * 90; t++) {
-      lead(world, 1);
+      navigate(world, 0, 100, 1.5, steer);
       expect(sunkIntoWall(world, u)).toBe(false);
       expect(Number.isFinite(u.x) && Number.isFinite(u.z)).toBe(true);
       if (u.nav.wait > 0) waited++;
@@ -189,31 +195,28 @@ describe('finding the way', () => {
     // Stage 1 squads deploy in the corners of a small square whose nearest crossroads may lie outside it.
     const world = makeTestWorld({ realCity: true, seed: 5 });
     const b = world.match.bounds;
-    lead(world, 1, { wheel: 'holdCharge' });
+    holdFire(world);
     const leader = world.units[0];
     const tx = leader.x < (b.minX + b.maxX) / 2 ? b.maxX - 60 : b.minX + 60;
     const tz = leader.z < (b.minZ + b.maxZ) / 2 ? b.maxZ - 100 : b.minZ + 100;
-    const u = send(world, tx, tz);
-    const speed = UNIT_TYPES[u.type].speed;
-    const way = Math.abs(u.nav.holdX - u.x) + Math.abs(u.nav.holdZ - u.z);
+    const speed = UNIT_TYPES[leader.type].speed;
+    const way = Math.abs(tx - leader.x) + Math.abs(tz - leader.z);
+    const steer = createSteer();
     let usedRoads = false;
-    let ticks = 0;
-    while (!u.rooted && ticks < ((way * 1.6) / speed + 20) * TICK_RATE) {
-      lead(world, 1);
-      ticks++;
-      if (u.nav.path.length > 0) {
+    let arrived = false;
+    for (let ticks = 0; !arrived && ticks < ((way * 1.6) / speed + 20) * TICK_RATE; ticks++) {
+      arrived = navigate(world, tx, tz, 1.5, steer).arrived;
+      if (leader.nav.path.length > 0) {
         usedRoads = true;
-        for (const p of u.nav.path) expect(boundsContains(b, p.x, p.z, u.radius - 0.5)).toBe(true);
+        for (const p of leader.nav.path) expect(boundsContains(b, p.x, p.z, leader.radius - 0.5)).toBe(true);
       }
-      expect(sunkIntoWall(world, u)).toBe(false);
+      expect(sunkIntoWall(world, leader)).toBe(false);
     }
     expect(usedRoads).toBe(true);
-    expect(u.rooted).toBe(true);
-    expect(Math.hypot(u.x - u.nav.holdX, u.z - u.nav.holdZ)).toBeLessThan(2);
+    expect(arrived).toBe(true);
   });
 
-  it('gets every sub-unit to markers dropped anywhere in the real city, at every level', () => {
-    const rng = createRng(2024);
+  it('gets a unit to crossroads anywhere in the real city at every level, its squad-mates in tow, clear of walls and inside the line', () => {
     for (const stage of [1, 2, 3] as const) {
       const world = makeTestWorld({ realCity: true, seed: 3 + stage, config: { anchor: 2 * stage } });
       if (stage > 1) beginStage(world, stage);
@@ -221,33 +224,26 @@ describe('finding the way', () => {
       // Everybody holds fire, so nothing but the driving is going on.
       holdFire(world);
       lead(world, 1);
-      const units = [1, 2, 3].map((id) => world.units[id]);
-      const speed = UNIT_TYPES[units[0].type].speed;
+      const leader = world.units[0];
+      const speed = UNIT_TYPES[leader.type].speed;
+      const tolerance = stage === 1 ? 1.5 : 4;
+      const nodes = world.city.roads.nodes.filter((n) => boundsContains(b, n.x, n.z, 20) && Math.hypot(n.x - leader.x, n.z - leader.z) < (stage === 1 ? 300 : 420));
+      const rng = createRng(2024 + stage);
+      const steer = createSteer();
       for (let trial = 0; trial < 4; trial++) {
-        // Anywhere: on a roof, in a back yard, in the river. Not too far, to keep the test short.
-        const from = units[0];
-        const reach = stage === 1 ? 300 : 420;
-        const x = Math.min(b.maxX - 5, Math.max(b.minX + 5, from.x + rngRange(rng, -reach, reach)));
-        const z = Math.min(b.maxZ - 5, Math.max(b.minZ + 5, from.z + rngRange(rng, -reach, reach)));
-        lead(world, 1, { wheel: 'moveTo', marker: { x, z } });
-        const way = Math.max(...units.map((u) => Math.abs(u.nav.holdX - u.x) + Math.abs(u.nav.holdZ - u.z)));
+        const goal = nodes[rngInt(rng, nodes.length)];
+        const way = Math.abs(goal.x - leader.x) + Math.abs(goal.z - leader.z);
         const limit = Math.ceil(((way * 2.5) / speed + 30) * TICK_RATE);
-        let ticks = 0;
-        while (ticks < limit && units.some((u) => !u.rooted)) {
-          lead(world, 10);
-          ticks += 10;
-          for (const u of units) {
+        let arrived = false;
+        for (let ticks = 0; !arrived && ticks < limit; ticks++) {
+          arrived = navigate(world, goal.x, goal.z, tolerance, steer).arrived;
+          if (ticks % 10 !== 0) continue;
+          for (const u of world.units.slice(0, 4)) {
             expect(sunkIntoWall(world, u)).toBe(false);
             expect(boundsContains(b, u.x, u.z, u.radius - 1e-6)).toBe(true);
           }
         }
-        for (const u of units) {
-          expect(u.rooted).toBe(true);
-          expect(Math.hypot(u.x - u.nav.holdX, u.z - u.nav.holdZ)).toBeLessThan(2);
-          // Hold points keep off each other and off the walls.
-          expect(solidInCircle(world.cityQuery, u.nav.holdX, u.nav.holdZ, u.radius)).toBe(false);
-        }
-        expect(Math.hypot(units[0].x - units[1].x, units[0].z - units[1].z)).toBeGreaterThan(2 * units[0].radius);
+        expect(arrived, `stage ${stage}, trial ${trial}`).toBe(true);
       }
     }
   });

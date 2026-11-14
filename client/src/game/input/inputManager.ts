@@ -80,6 +80,13 @@ export class InputManager {
   private everLocked = false;
   private lockGivenUp = false;
   private settleUntil = 0;
+  /**
+   * The first mouse movement after the pointer is captured is the browser's jump (the cursor
+   * put back where it was), however late it comes: on a busy page it arrives well after the
+   * settle time, and the view would leap (headless Chromium reported the whole way back to the
+   * page's corner, half a second after the capture).
+   */
+  private skipMove = false;
 
   constructor(element: HTMLElement) {
     this.element = element;
@@ -227,6 +234,10 @@ export class InputManager {
     this.mouseX = e.clientX;
     this.mouseY = e.clientY;
     if (this.pointerLocked) {
+      if (this.skipMove) {
+        this.skipMove = false;
+        return;
+      }
       if (performance.now() < this.settleUntil) return;
     } else if (!this.capture) {
       return;
@@ -275,6 +286,7 @@ export class InputManager {
       this.mouseDX = 0;
       this.mouseDY = 0;
       this.settleUntil = performance.now() + LOCK_SETTLE_MS;
+      this.skipMove = true;
     } else {
       // Buttons held when the pointer went away would otherwise stay down for good: their
       // release goes to whatever the pointer is over now.
@@ -366,7 +378,6 @@ export class InputManager {
     s.moveZ = moveZ;
     s.lookX = lookX;
     s.lookY = this.invertY ? -lookY : lookY;
-    s.pointerY = lookY;
     s.aimOverride = null;
 
     this.autopilot?.(s, dt);

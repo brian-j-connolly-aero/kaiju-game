@@ -21,7 +21,7 @@ import { describe, expect, it } from 'vitest';
 import { MAX_CATCH_UP_STEPS, STARVED_BUTTON_TICKS, STARVED_TICKS } from '../src/room/match';
 import { INPUT_QUEUE_MAX } from '../src/room/inputQueue';
 import { JoinRefused } from '../src/room/peer';
-import { FakePeer, input, makeRoom, seatPlayers, startMatch, TICK_MS, tokenOf } from './helpers';
+import { ackOf, FakePeer, input, makeRoom, seatPlayers, startMatch, TICK_MS, tokenOf } from './helpers';
 
 function refusal(fn: () => unknown): JoinRefused {
   try {
@@ -384,7 +384,7 @@ describe('match loop', () => {
     expect(waiting).toEqual([]);
   });
 
-  it('applies one input per player per tick and acknowledges the last one applied', () => {
+  it('applies one input per player per tick, from the tick after the first one, and acknowledges them', () => {
     const { room, run } = makeRoom();
     const peers = seatPlayers(room, 2);
     room.message('p0', 'setRole', { wantsKaiju: true });
@@ -397,27 +397,33 @@ describe('match loop', () => {
     const slot = peers[1].welcome.playerId;
     const before = world.tick;
     run(TICK_MS / 1000);
+    // The first tick after a player's first input is the cushion: it is played on a guess while
+    // the input waits, so that the match plays every input a tick after it was due.
     expect(world.tick).toBe(before + 1);
-    expect(world.players[slot].input.seq).toBe(1);
-    // A snapshot goes out every second tick and carries the last input applied by then.
+    expect(world.players[slot].input.seq).toBe(0);
     expect(peers[1].lastSnapshot.tick).toBe(world.tick);
-    expect(peers[1].lastSnapshot.ackSeq).toBe(1);
+    expect(ackOf(peers[1].lastSnapshot)).toEqual({ played: 0, drops: 0 });
+    run(TICK_MS / 1000);
+    expect(world.players[slot].input.seq).toBe(1);
     run(TICK_MS / 1000);
     expect(world.players[slot].input.seq).toBe(2);
-    expect(peers[1].lastSnapshot.ackSeq).toBe(1);
+    // A snapshot goes out every second tick and acknowledges the inputs played by then.
+    expect(peers[1].lastSnapshot.tick).toBe(world.tick);
+    expect(ackOf(peers[1].lastSnapshot)).toEqual({ played: 2, drops: 0 });
     run(TICK_MS / 1000);
     expect(world.players[slot].input.seq).toBe(3);
-    expect(peers[1].lastSnapshot.tick).toBe(world.tick);
-    expect(peers[1].lastSnapshot.ackSeq).toBe(3);
     // The other player sent nothing and is acknowledged nothing.
     expect(peers[0].lastSnapshot.ackSeq).toBe(0);
-    // With the queue empty the last input repeats: the unit keeps moving.
+    // With the queue empty the last input repeats: the unit keeps moving. Each of those ticks
+    // stands in for an input still on its way, and the snapshot says how many will be dropped.
     const unit = world.units[world.squads[world.players[slot].squadId].driven];
     const x0 = unit.x;
     const z0 = unit.z;
+    const lastPlayedAt = world.tick;
     run(0.3);
     expect(Math.hypot(unit.x - x0, unit.z - z0)).toBeGreaterThan(0.5);
-    expect(peers[1].lastSnapshot.ackSeq).toBe(3);
+    const snap = peers[1].lastSnapshot;
+    expect(ackOf(snap)).toEqual({ played: 3, drops: snap.tick - lastPlayedAt });
   });
 
   it('cleans what clients send before it reaches the simulation', () => {
@@ -426,14 +432,16 @@ describe('match loop', () => {
     startMatch(room, peers);
     run(1.5);
     room.message('p0', 'input', { seq: 1, moveX: 50, moveZ: -50, aimYaw: 100, aimPitch: 9, buttons: 0xffff });
-    run(TICK_MS / 1000);
+    run((2 * TICK_MS) / 1000);
     const state = room.match!.world.players[peers[0].welcome.playerId].input;
     expect(Math.hypot(state.moveX, state.moveZ)).toBeLessThanOrEqual(1.0001);
     expect(Math.abs(state.aimYaw)).toBeLessThanOrEqual(Math.PI + 1e-9);
     expect(Math.abs(state.aimPitch)).toBeLessThan(Math.PI / 2);
-    // Every bit the game has (ten buttons since smoke and mark), and nothing above them.
+    // Every bit a button has, and nothing else: since phase 1 the buttons are strike, grab, molt,
+    // fire, stomp, the two move buttons and the volley; the bits of the old brace, roar and beam
+    // (2 to 4) and of the old artillery, smoke and mark (7 to 9) are free and dropped.
     expect(state.buttons).toBe(BUTTON_MASK);
-    expect(BUTTON_MASK).toBe(0x3ff);
+    expect(BUTTON_MASK).toBe(0x3c63);
   });
 
   it('brings a connected but silent player to a stop instead of leaving them walking', () => {
@@ -442,7 +450,7 @@ describe('match loop', () => {
     startMatch(room, peers);
     run(1.5);
     room.message('p0', 'input', input(1, { moveZ: 1, aimYaw: 0.7, buttons: Btn.fire }));
-    run(TICK_MS / 1000);
+    run((2 * TICK_MS) / 1000);
     const state = room.match!.world.players[peers[0].welcome.playerId].input;
     expect(state.moveZ).toBe(1);
     run((STARVED_TICKS + 1) * (TICK_MS / 1000));
@@ -453,7 +461,9 @@ describe('match loop', () => {
     expect(state.moveZ).toBe(0);
     expect(state.buttons).toBe(0);
     expect(state.aimYaw).toBeCloseTo(0.7);
-    expect(peers[0].lastSnapshot.ackSeq).toBe(1);
+    // The guesses before the stop stood in for inputs on their way; the ticks after it stand for
+    // nothing (the player is away, not late).
+    expect(ackOf(peers[0].lastSnapshot)).toEqual({ played: 1, drops: STARVED_TICKS - 1 });
   });
 
   describe('on a link that stalls and then delivers everything at once', () => {
@@ -490,42 +500,18 @@ describe('match loop', () => {
       }
     });
 
-    it('keeps a hold a hold when its first inputs arrive late', () => {
-      const { tick, actions } = kaijuRoom();
-      for (let i = 0; i < 9; i++) tick();
-      // The player pressed Strike during the stall and is still holding it: twelve inputs in
-      // all (0.4 s, a deliberate Stomp), eight of them late.
-      tick(0, 0, ...new Array<number>(8).fill(Btn.strike));
-      for (let i = 0; i < 4; i++) tick(Btn.strike);
-      for (let i = 0; i < 60; i++) tick(0);
-      expect(actions()).toEqual(['swipe/windup', 'stomp/windup', 'stomp/active']);
-    });
-
-    it('keeps a hold a hold when the stall falls in the middle of it', () => {
-      const { tick, actions, room } = kaijuRoom();
-      tick(Btn.strike);
-      tick(Btn.strike);
-      // Nine ticks on a guess ("still down"), then the nine late inputs say the same.
-      for (let i = 0; i < 9; i++) tick();
-      tick(...new Array<number>(10).fill(Btn.strike));
-      tick(Btn.strike);
-      tick(Btn.strike);
-      for (let i = 0; i < 60; i++) tick(0);
-      expect(actions()).toEqual(['swipe/windup', 'stomp/windup', 'stomp/active']);
-      // The guessed ticks were paid back: the player is not left a third of a second behind.
-      expect(room.match!.queues[0].items.length).toBeLessThanOrEqual(2);
-    });
-
     it('keeps a brace a brace through a stall longer than half a second', () => {
       const { tick, actions, world, room } = kaijuRoom();
-      tick(Btn.block);
-      tick(Btn.block);
+      // The brace is a move picked at a molt, held on its move button (net/input.ts).
+      world.kaijus[0].moves = ['brace', 'none'];
+      tick(Btn.move1);
+      tick(Btn.move1);
       // 0.8 s with nothing arriving (more than the half second after which the kaiju stops
-      // walking), then the late inputs: the player held Space all along.
+      // walking), then the late inputs: the player held the button all along.
       for (let i = 0; i < 24; i++) tick();
       expect(world.kaijus[0].phase).toBe('brace');
-      tick(...new Array<number>(25).fill(Btn.block));
-      for (let i = 0; i < 5; i++) tick(Btn.block);
+      tick(...new Array<number>(25).fill(Btn.move1));
+      for (let i = 0; i < 5; i++) tick(Btn.move1);
       expect(world.kaijus[0].phase).toBe('brace');
       for (let i = 0; i < 10; i++) tick(0);
       // One brace, not one cut short by the stall and a second one started by the late inputs.
@@ -552,12 +538,84 @@ describe('match loop', () => {
 
     it('lets go of a held button as soon as the late inputs show it was released', () => {
       const { tick, world } = kaijuRoom();
-      tick(Btn.block);
+      tick(Btn.stomp);
       for (let i = 0; i < 6; i++) tick();
-      expect(world.players[0].input.buttons & Btn.block).toBe(Btn.block);
+      expect(world.players[0].input.buttons & Btn.stomp).toBe(Btn.stomp);
       // The release had happened two inputs into the stall.
-      tick(Btn.block, Btn.block, 0, 0, 0, 0, 0);
-      expect(world.players[0].input.buttons & Btn.block).toBe(0);
+      tick(Btn.stomp, Btn.stomp, 0, 0, 0, 0, 0);
+      expect(world.players[0].input.buttons & Btn.stomp).toBe(0);
+    });
+  });
+
+  describe('on a link that delivers inputs a little late', () => {
+    /**
+     * A squad leader walking and turning, tapping Fire now and then, whose inputs reach the
+     * server a random 0 to `maxLate` ticks late (in order, as over one connection). Records,
+     * for every snapshot from the first one that has played an input, how many ticks the body
+     * has had beyond the inputs the client counts in its prediction (the snapshot's tick less
+     * the inputs played and the inputs the server will drop), and the buttons the simulation saw.
+     */
+    function lateLink(maxLate: number, seed: number) {
+      const { room, run } = makeRoom();
+      const peers = seatPlayers(room, 1);
+      startMatch(room, peers);
+      const world = room.match!.world;
+      world.config.bots = { kaijuHandicap: 1, humanHandicap: 1 };
+      const slot = peers[0].welcome.playerId;
+      let rand = seed;
+      const roll = (n: number): number => {
+        rand = (rand * 1103515245 + 12345) % 2147483648;
+        return rand % n;
+      };
+      const inFlight: Array<{ at: number; seq: number; buttons: number }> = [];
+      const sent: number[] = [];
+      const seen: number[] = [];
+      const extra = new Set<number>();
+      let lastSnap = 0;
+      let arriveLast = 0;
+      for (let t = 1; t <= 600; t++) {
+        // The client: one input per tick. After 15 s the link is quick again.
+        const buttons = t < 580 && roll(9) === 0 ? Btn.fire : 0;
+        sent.push(buttons);
+        const late = t < 450 ? roll(maxLate + 1) : 0;
+        arriveLast = Math.max(arriveLast, t + late);
+        inFlight.push({ at: arriveLast, seq: t, buttons });
+        while (inFlight.length > 0 && inFlight[0].at <= t) {
+          const next = inFlight.shift()!;
+          room.message('p0', 'input', input(next.seq, { moveZ: 1, aimYaw: next.seq * 0.02, buttons: next.buttons }));
+        }
+        run(TICK_MS / 1000);
+        seen.push(world.players[slot].input.buttons);
+        const bytes = peers[0].last('snap');
+        if (!bytes) continue;
+        const snap = decodeSnapshot(bytes);
+        if (snap.tick !== lastSnap) {
+          lastSnap = snap.tick;
+          const ack = ackOf(snap);
+          if (ack.played > 0) extra.add(snap.tick - ack.played - ack.drops);
+        }
+      }
+      return { room, world, sent, seen, extra: [...extra] };
+    }
+
+    it('never gives the body a step the client does not count, and builds up no delay', () => {
+      for (const maxLate of [1, 2, 4, 8]) {
+        const { room, extra } = lateLink(maxLate, 7 + maxLate);
+        // One value all match long: whatever arrives late, the body has had exactly one tick for
+        // every input the client counts. (Before, every late input added a step that the client
+        // pulled back when the queue later skipped inputs: the stutter.)
+        expect(extra, `inputs up to ${maxLate} ticks late`).toHaveLength(1);
+        // Once the link is quick again the inputs wait no more than a tick or two.
+        expect(room.match!.queues[0].items.length, `inputs up to ${maxLate} ticks late`).toBeLessThanOrEqual(2);
+      }
+    });
+
+    it('still plays every tap of Fire, late or not', () => {
+      const presses = (buttons: number[]): number => buttons.filter((b, i) => b & Btn.fire && !(i > 0 && buttons[i - 1] & Btn.fire)).length;
+      for (const maxLate of [2, 8]) {
+        const { sent, seen } = lateLink(maxLate, 3 + maxLate);
+        expect(presses(seen), `inputs up to ${maxLate} ticks late`).toBe(presses(sent));
+      }
     });
   });
 
@@ -576,21 +634,6 @@ describe('match loop', () => {
     // And it is back to one tick per tick of time straight away.
     run(1);
     expect(world.tick).toBe(tick + MAX_CATCH_UP_STEPS + TICK_RATE);
-  });
-
-  it('routes squad commands to the right squad and ignores them from the kaiju', () => {
-    const { room, run } = makeRoom();
-    const peers = seatPlayers(room, 2);
-    room.message('p0', 'setRole', { wantsKaiju: true });
-    startMatch(room, peers);
-    run(1.5);
-    const world = room.match!.world;
-    room.message('p1', 'command', { type: 'moveTo', x: 99999, z: 12 });
-    room.message('p0', 'command', { type: 'holdCharge' });
-    room.message('p1', 'command', { type: 'selfDestruct' });
-    const human = world.players[peers[1].welcome.playerId];
-    expect(human.queuedCommands).toEqual([{ type: 'moveTo', x: world.city.half, z: 12 }]);
-    expect(world.players[0].queuedCommands).toEqual([]);
   });
 
   it('takes everyone back to the lobby instead of crashing when the simulation throws', () => {
@@ -643,7 +686,7 @@ describe('dropped players', () => {
     const slot = peers[2].welcome.playerId;
     room.message('p2', 'input', input(40, { moveZ: 1 }));
     run(0.2);
-    expect(peers[2].lastSnapshot.ackSeq).toBe(40);
+    expect(ackOf(peers[2].lastSnapshot).played).toBe(40);
 
     expect(room.drop('p2')).toBe(true);
     expect(room.drop('p2')).toBe(false);
@@ -677,7 +720,7 @@ describe('dropped players', () => {
     expect(back.lastSnapshot.squads.find((s) => s.player === slot)?.bot).toBe(false);
     room.message('p2-reloaded', 'input', input(1, { moveX: 1 }));
     run(0.1);
-    expect(back.lastSnapshot.ackSeq).toBe(1);
+    expect(ackOf(back.lastSnapshot).played).toBe(1);
     expect(back.snapshots.every((s) => s.tick > welcome.tick)).toBe(true);
     expect(back.events.every((e) => e.tick > welcome.tick)).toBe(true);
   });
@@ -703,7 +746,7 @@ describe('dropped players', () => {
     room.message('p1', 'input', input(70));
     room.message('p1', 'input', input(78));
     run(0.1);
-    expect(again.lastSnapshot.ackSeq).toBe(78);
+    expect(ackOf(again.lastSnapshot).played).toBe(78);
     // Coming back for a seat that is gone is refused.
     expect(room.resume(new FakePeer('stranger'))).toBe(false);
   });
@@ -856,7 +899,7 @@ describe('dropped players', () => {
     expect(back.lobby.lobby.lastKaijuSeat).toBe(back.lobby.you);
     room.message('p0-back', 'input', input(1, { moveZ: 1 }));
     run(0.2);
-    expect(back.lastSnapshot.ackSeq).toBe(1);
+    expect(ackOf(back.lastSnapshot).played).toBe(1);
   });
 
   it('never hands the kaiju to anybody but the player who had it', () => {
@@ -942,7 +985,7 @@ describe('late joiners', () => {
     expect(peers[0].lobby.lobby.players[2].slot).toBe(slot);
     room.message('late', 'input', input(1, { moveZ: 1 }));
     run(0.2);
-    expect(late.lastSnapshot.ackSeq).toBe(1);
+    expect(ackOf(late.lastSnapshot).played).toBe(1);
     expect(late.lastSnapshot.squads.find((s) => s.player === slot)?.bot).toBe(false);
 
     // Two more fill the last squads; nobody is left a bot and nobody shares a slot.

@@ -29,6 +29,19 @@ export const LIZARD: KaijuKindDef = {
       mouthHeight: 2.9,
       mouthForward: 2.5,
       handHeight: 2.2,
+      // Measured on the model (kaiju_lizard_s1.glb): head and jaw reach 2.6 m ahead and 2.6 to
+      // 4.5 m up; the tail sweeps down from 1.6 m at its root to 0.6 m, 3.5 m behind the axis.
+      hit: {
+        neck: [0.2, 3.3],
+        snout: [1.65, 3.55],
+        headRadius: 0.95,
+        tail: [
+          [-0.9, 1.6],
+          [-2.1, 1.0],
+          [-3.2, 0.6],
+        ],
+        tailRadii: [0.6, 0.35],
+      },
     },
     {
       height: 32,
@@ -46,6 +59,18 @@ export const LIZARD: KaijuKindDef = {
       mouthHeight: 22,
       mouthForward: 15,
       handHeight: 16,
+      // kaiju_lizard_s2.glb: head and jaw 15.6 m ahead, 20.5 to 29.7 m up; tail to 23.9 m behind.
+      hit: {
+        neck: [2, 24.2],
+        snout: [11.2, 25],
+        headRadius: 4.4,
+        tail: [
+          [-5.3, 12.3],
+          [-13.4, 7.9],
+          [-21.6, 4.4],
+        ],
+        tailRadii: [3.9, 2.3],
+      },
     },
     {
       height: 115,
@@ -63,6 +88,18 @@ export const LIZARD: KaijuKindDef = {
       mouthHeight: 72,
       mouthForward: 51.4,
       handHeight: 58,
+      // kaiju_lizard_s3.glb: head and jaw 55 m ahead, 64 to 103 m up; tail to 90.7 m behind.
+      hit: {
+        neck: [8, 80],
+        snout: [37, 84],
+        headRadius: 18,
+        tail: [
+          [-18.9, 43],
+          [-49.1, 27.7],
+          [-81.5, 15.5],
+        ],
+        tailRadii: [15.5, 9.5],
+      },
     },
   ],
 
@@ -110,8 +147,7 @@ export const LIZARD: KaijuKindDef = {
     swipe: {
       id: 'swipe',
       button: 'strike',
-      gesture: 'tap',
-      holdTime: 0,
+      whileHeld: false,
       timing: { windup: 0.45, active: 0.15, recover: 0.5 },
       activePhase: 'active',
       cooldown: 0,
@@ -126,9 +162,8 @@ export const LIZARD: KaijuKindDef = {
     },
     stomp: {
       id: 'stomp',
-      button: 'strike',
-      gesture: 'hold',
-      holdTime: 0.35,
+      button: 'stomp',
+      whileHeld: false,
       timing: { windup: 0.9, active: 0.1, recover: 0.9 },
       activePhase: 'active',
       cooldown: 0,
@@ -147,8 +182,7 @@ export const LIZARD: KaijuKindDef = {
     grab: {
       id: 'grab',
       button: 'grab',
-      gesture: 'tap',
-      holdTime: 0,
+      whileHeld: false,
       timing: { windup: 0.4, active: 0, recover: 0 },
       activePhase: 'active',
       cooldown: 0,
@@ -163,9 +197,9 @@ export const LIZARD: KaijuKindDef = {
     },
     throw: {
       id: 'throw',
-      button: 'grab',
-      gesture: 'tap',
-      holdTime: 0,
+      // Strike with something in the hand.
+      button: 'strike',
+      whileHeld: false,
       // 0.5 s in total: the object leaves the hand at the end of the wind-up.
       timing: { windup: 0.3, active: 0, recover: 0.2 },
       activePhase: 'active',
@@ -181,9 +215,9 @@ export const LIZARD: KaijuKindDef = {
     },
     eat: {
       id: 'eat',
+      // Grab with something in the hand, or with nothing to pick up but something to eat in reach.
       button: 'grab',
-      gesture: 'hold',
-      holdTime: 0.5,
+      whileHeld: false,
       timing: { windup: 0, active: 2.0, recover: 0 },
       activePhase: 'eat',
       cooldown: 10,
@@ -195,9 +229,9 @@ export const LIZARD: KaijuKindDef = {
     },
     brace: {
       id: 'brace',
-      button: 'block',
-      gesture: 'level',
-      holdTime: 0,
+      // A move picked at the second molt (owner's decision: "no longer free").
+      button: 'slot',
+      whileHeld: true,
       timing: { windup: 0, active: 0, recover: 0 },
       activePhase: 'brace',
       cooldown: 0,
@@ -207,9 +241,8 @@ export const LIZARD: KaijuKindDef = {
     },
     roar: {
       id: 'roar',
-      button: 'roar',
-      gesture: 'press',
-      holdTime: 0,
+      button: 'slot',
+      whileHeld: false,
       timing: { windup: 0, active: 1.2, recover: 0 },
       activePhase: 'roar',
       cooldown: 18,
@@ -221,13 +254,15 @@ export const LIZARD: KaijuKindDef = {
       // stops firing for a few seconds and backs off). At 60 nothing visibly happened.
       unitNerve: 100,
       resetsCharge: true,
+      // Phase 1 after the first multiplayer playtest: the roar stuns, then shakes.
+      stunTime: 2.5,
     },
     special: {
       id: 'special',
       special: 'beam',
-      button: 'special',
-      gesture: 'press',
-      holdTime: 0,
+      // The beam is a move picked at a molt (owner's decision: "a big early reward"), no longer in the starting kit.
+      button: 'slot',
+      whileHeld: false,
       timing: { windup: 0.8, active: 3.0, recover: 0.4 },
       activePhase: 'special',
       cooldown: 0,
@@ -248,9 +283,9 @@ export const LIZARD: KaijuKindDef = {
     },
     molt: {
       id: 'molt',
+      // One press while a molt is offered.
       button: 'molt',
-      gesture: 'hold',
-      holdTime: 1.0,
+      whileHeld: false,
       // The cocoon duration is MATCH_RULES.cocoon; the action only starts it.
       timing: { windup: 0, active: 0, recover: 0 },
       activePhase: 'cocoon',
@@ -259,5 +294,56 @@ export const LIZARD: KaijuKindDef = {
       moveMult: 0,
       turnMult: 0,
     },
+    charge: {
+      id: 'charge',
+      button: 'slot',
+      whileHeld: false,
+      // Wind-up (rooted, still turning), up to 3 s of running, and always a stumble at the end.
+      timing: { windup: 0.8, active: 3.0, recover: 1.2 },
+      activePhase: 'charge',
+      recoverPhase: 'stumble',
+      // Counted from the end of the stumble.
+      cooldown: 12,
+      rageCost: 0,
+      // In the stumble it can do nothing.
+      moveMult: 0,
+      turnMult: 0,
+      windupTurnMult: 1,
+      // 17 / 28 / 44 m/s, reached in half a second; it turns at a quarter of its rate.
+      speedMult: 2,
+      rampTime: 0.5,
+      runTurnMult: 0.25,
+      // Houses at stage 1, most of a district at stage 2; at stage 3 what it already walks through.
+      smashHeight: [9, 30, 70],
+      unitDamage: 90,
+      unitNerve: 40,
+      throwAside: 1.5,
+    },
+    tailSweep: {
+      id: 'tailSweep',
+      button: 'slot',
+      whileHeld: false,
+      timing: { windup: 0.35, active: 0.15, recover: 0.45 },
+      activePhase: 'active',
+      cooldown: 6,
+      rageCost: 0,
+      moveMult: 0.3,
+      turnMult: 0.5,
+      // The rear half, as far as the tail reaches.
+      arc: 180 * DEG,
+      reach: 3,
+      unitDamage: 60,
+      unitNerve: 30,
+      knockback: 1.5,
+      // What a swipe does to a building.
+      structureDamage: [40, 300, 2000],
+    },
+  },
+
+  // Molt cards (docs/ROADMAP.md, phase 1): the beam, the roar or the charge at the first molt;
+  // at the second, the two not taken and one of the brace and the tail sweep.
+  cards: {
+    first: ['beam', 'roar', 'charge'],
+    second: ['brace', 'tailSweep'],
   },
 };

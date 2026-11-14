@@ -75,15 +75,34 @@ function probeInPage(since) {
     squad: null,
     squadUnits: [],
     units: [],
-    smokes: [],
     threatsShown: document.querySelectorAll('.threats:not(.hidden) .threat:not(.hidden)').length,
     threatsAtEdge: document.querySelectorAll('.threats:not(.hidden) .threat.edge:not(.hidden)').length,
-    mapToolsShown: document.querySelectorAll('.map-tools:not(.hidden) .map-tool:not(.hidden)').length,
     view: null,
     aim: null,
+    gun: null,
+    tank: false,
+    volleyHeld: false,
+    // The squad's volley meter and the tank's gun reticle as the page shows them (client-side).
+    meter: (() => {
+      const m = document.querySelector('.volley-meter');
+      if (!m) return null;
+      const c = m.classList;
+      return {
+        shown: !c.contains('hidden'),
+        charged: c.contains('charged'),
+        full: c.contains('full'),
+        countdown: c.contains('countdown'),
+        fired: c.contains('fired'),
+        fizzle: c.contains('fizzle'),
+        charging: m.querySelectorAll('.vm-mate.charging').length,
+      };
+    })(),
+    gunReticle: (() => {
+      const g = document.querySelector('.gun-reticle');
+      if (!g || g.classList.contains('hidden')) return null;
+      return { left: parseFloat(g.style.left), top: parseFloat(g.style.top), edge: g.classList.contains('edge') };
+    })(),
     mapOpen: rt ? rt.mapOpen : false,
-    wheelOpen: false,
-    wheelHighlight: null,
     controller: rt ? rt.controller.kind : 'none',
     thirdPerson: rt ? rt.controller.thirdPerson : false,
     bounds: frame ? frame.bounds : null,
@@ -98,12 +117,11 @@ function probeInPage(since) {
   if (latest) {
     const k = latest.kaijus[0];
     if (k) out.kaiju = { ...k, cooldowns: { ...k.cooldowns }, held: k.held ? { ...k.held } : null };
-    out.units = latest.units.map((u) => ({ id: u.id, squad: u.squad, x: u.x, z: u.z, alive: u.alive, hp: u.hp, laser: u.laser, rooted: u.rooted, charge: u.charge, shaken: u.shaken, members: u.members, type: u.type, cooldown: u.cooldown, veteran: u.veteran, aimYaw: u.aimYaw }));
-    out.smokes = (latest.smokes ?? []).map((c) => ({ ...c }));
+    out.units = latest.units.map((u) => ({ id: u.id, squad: u.squad, x: u.x, z: u.z, alive: u.alive, hp: u.hp, laser: u.laser, rooted: u.rooted, charge: u.charge, shaken: u.shaken, stun: u.stun, members: u.members, type: u.type, cooldown: u.cooldown, veteran: u.veteran, yaw: u.yaw, aimYaw: u.aimYaw, vx: u.vx, vz: u.vz, driven: u.driven }));
     if (session.role.squadId >= 0) {
       const sq = latest.squads[session.role.squadId];
       if (sq) {
-        out.squad = { ...sq, callInCooldowns: sq.callInCooldowns ? [...sq.callInCooldowns] : [] };
+        out.squad = { ...sq };
         out.squadUnits = out.units.filter((u) => u.squad === sq.id);
         out.me = sq.driven >= 0 ? out.units[sq.driven] : null;
       }
@@ -111,7 +129,7 @@ function probeInPage(since) {
   }
   if (frame) {
     const body = frame.localKaiju ?? frame.localUnit;
-    if (body) out.predicted = { x: body.x, z: body.z, yaw: body.yaw };
+    if (body) out.predicted = { x: body.x, z: body.z, yaw: body.yaw, aimYaw: body.aimYaw };
   }
   if (rt) {
     const c = rt.controller;
@@ -119,8 +137,9 @@ function probeInPage(since) {
     else if (c.kind === 'human') {
       out.view = { yaw: c.viewYaw, pitch: c.viewPitch };
       out.aim = { on: c.aimPoint.on, x: c.aimPoint.x, y: c.aimPoint.y, z: c.aimPoint.z, dist: c.aimPoint.dist };
-      out.wheelOpen = c.wheel.open;
-      out.wheelHighlight = c.wheel.highlight;
+      out.gun = { on: c.gunPoint.on, x: c.gunPoint.x, y: c.gunPoint.y, z: c.gunPoint.z, dist: c.gunPoint.dist };
+      out.tank = c.tank;
+      out.volleyHeld = c.volleyHeld;
     } else out.view = { yaw: c.yaw ?? 0, pitch: c.pitch ?? 0 };
   }
   return out;

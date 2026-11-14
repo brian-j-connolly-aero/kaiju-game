@@ -47,6 +47,7 @@ export type KaijuKindId = (typeof KAIJU_KIND_IDS)[number];
 /**
  * The kaiju verbs. 'none' means no action is running. These match the icon names in ASSETS.md
  * (`k_swipe`, `k_stomp`, ...). 'special' is the kind's signature attack (the Lizard's beam).
+ * 'charge' and 'tailSweep' are moves a kaiju can pick at a molt (KAIJU_MOVE_IDS).
  */
 export const KAIJU_ACTION_IDS = [
   'none',
@@ -59,6 +60,8 @@ export const KAIJU_ACTION_IDS = [
   'roar',
   'special',
   'molt',
+  'charge',
+  'tailSweep',
 ] as const;
 export type KaijuActionId = (typeof KAIJU_ACTION_IDS)[number];
 /** An action that can actually be performed (everything except 'none'). */
@@ -77,8 +80,22 @@ export const KAIJU_PHASES = [
   'stagger',
   'cocoon',
   'dead',
+  // The charge's run, and the stumble it always ends in.
+  'charge',
+  'stumble',
 ] as const;
 export type KaijuPhase = (typeof KAIJU_PHASES)[number];
+
+/**
+ * The moves a kaiju picks at a molt, one card of three (DESIGN.md section 4, "Molt cards"): the
+ * first pick goes on its first move button, the second on its second. 'none' is an empty slot.
+ * Each is one of its verbs: 'beam' is the Lizard's special (`kaijuMoveVerb` in defs/kaiju).
+ * Icons: `k_special` for the beam, otherwise `k_<verb>` like every verb.
+ */
+export const KAIJU_MOVE_IDS = ['none', 'beam', 'roar', 'charge', 'tailSweep', 'brace'] as const;
+export type KaijuMoveId = (typeof KAIJU_MOVE_IDS)[number];
+/** A move that can be held in a slot (everything except 'none'). */
+export type KaijuMove = Exclude<KaijuMoveId, 'none'>;
 
 /** What a kaiju can hold in its hand. */
 export const HELD_KINDS = ['none', 'prop', 'wreck', 'vehicle', 'chunk'] as const;
@@ -112,21 +129,6 @@ export type FlightModel = (typeof FLIGHT_MODELS)[number];
 export const CALLIN_IDS = ['artillery'] as const;
 export type CallInId = (typeof CALLIN_IDS)[number];
 
-/** Squad movement order (command wheel: follow me, move to). */
-export const MOVE_ORDERS = ['follow', 'moveTo'] as const;
-export type MoveOrder = (typeof MOVE_ORDERS)[number];
-
-/** Squad fire mode (command wheel: fire at will, hold fire and charge). */
-export const FIRE_MODES = ['atWill', 'charge'] as const;
-export type FireMode = (typeof FIRE_MODES)[number];
-
-/**
- * The four command wheel entries, in wheel order. Icons: `cmd_follow`, `cmd_moveto`,
- * `cmd_fireatwill`, `cmd_holdcharge`.
- */
-export const COMMAND_IDS = ['follow', 'moveTo', 'fireAtWill', 'holdCharge'] as const;
-export type CommandId = (typeof COMMAND_IDS)[number];
-
 /** Animation and behavior state of one unit. */
 export const UNIT_STATES = ['idle', 'moving', 'charging', 'shaken', 'dead'] as const;
 export type UnitState = (typeof UNIT_STATES)[number];
@@ -146,6 +148,11 @@ export const DAMAGE_KINDS = [
   'rocket',
   'shell',
   'arty',
+  // The kaiju's charge (units it runs into, buildings it smashes), its tail sweep, and the city
+  // giving way when every squad is gone ("never alone", DESIGN.md section 2).
+  'charge',
+  'tailSweep',
+  'collapse',
 ] as const;
 export type DamageKind = (typeof DAMAGE_KINDS)[number];
 

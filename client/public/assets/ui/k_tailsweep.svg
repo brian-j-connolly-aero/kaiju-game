@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Kaiju verb: tail sweep. The spiked tail lashing round in a wide arc; two motion lines follow it. -->
+  <path fill="currentColor" stroke="none" d="M3.5 59Q3 24 38 12.5Q52 8.5 60.5 11Q47 15 36 23.5Q22 35 20 59Z"/>
+  <path fill="currentColor" stroke="none" d="M12.5 33L4.5 28.5 15 27ZM20.5 22L16.5 13 26.5 16.5ZM33 14.5L32 5 40 11.5Z"/>
+  <path d="M29 47Q35 33 51 27M40 53Q46 42 59 38"/>
+</svg>

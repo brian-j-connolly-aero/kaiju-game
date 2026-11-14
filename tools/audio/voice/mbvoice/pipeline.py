@@ -13,7 +13,9 @@ import soundfile as sf
 
 from . import OUT_DIR, SCRATCH, SR, asr, dsp
 from .chains import apply_chain, chain_config
+from .models import FILES, files_for
 from .script import spoken_text
+from .scriptdoc import WINDOW_SECONDS
 from .synth import synthesize
 
 TARGET_LUFS = -16.0
@@ -36,19 +38,33 @@ def code_fingerprint() -> str:
     return h.hexdigest()[:16]
 
 
+def is_order(line: dict) -> bool:
+    """The humans' lines for a short window (a nerve break, the signature attack): orders that
+    must be over before the window closes (scriptdoc.WINDOW_SECONDS)."""
+    return line.get("cue") in WINDOW_SECONDS and line.get("audience") == "humans"
+
+
 def line_plan(line: dict, cast: dict, pron: dict) -> dict:
     """Everything that decides how a line sounds. Its hash is the rebuild key."""
     if line["speaker"] not in cast["speakers"]:
         raise SystemExit(f"cast.json has no speaker {line['speaker']!r} (line {line['id']})")
     sp = cast["speakers"][line["speaker"]]
     voice = dict(sp["voice"])
+    max_pause = sp.get("max_pause_ms", 320)
+    # A speaker may deliver orders faster than everything else (cast.json "orders": "rate" and
+    # "max_pause_ms"): unhurried in the briefing, crisp when a window is closing.
+    if is_order(line) and sp.get("orders"):
+        voice["rate"] = sp["orders"].get("rate", voice.get("rate", 1.0))
+        max_pause = sp["orders"].get("max_pause_ms", max_pause)
     chain = sp["chain"]
     plan = {
         "text": spoken_text(line, voice, pron),
         "voice": voice,
+        # the exact model files a neural voice speaks with (their SHA-256 hashes, from models.py)
+        "models": [FILES[n][3] for n in files_for(voice)],
         "chain": chain,
         "chain_cfg": chain_config(chain, sp.get("chain_settings")),
-        "max_pause_ms": sp.get("max_pause_ms", 320),
+        "max_pause_ms": max_pause,
         "min_pause_ms": sp.get("min_pause_ms", 0),
         "target_lufs": TARGET_LUFS,
         "ceiling_dbtp": CEILING_DBTP,
@@ -121,10 +137,12 @@ def decode(path: Path) -> np.ndarray:
 def build_line(job: tuple[dict, dict]) -> dict:
     """Worker: render, encode and transcribe one line. Returns its state record."""
     line, plan = job
+    from . import asr2
     raw, y, span = render(line, plan)
     encode(y, line["id"])
     hyp_raw = asr.transcribe(raw, SR)
     hyp_proc = asr.transcribe(y, SR)
+    hyp_raw2 = asr2.transcribe(raw, SR)
     e_raw, n = asr.word_errors(line["text"], hyp_raw)
     e_proc, _ = asr.word_errors(line["text"], hyp_proc)
     f0 = dsp.f0_track(raw, SR)
@@ -138,4 +156,5 @@ def build_line(job: tuple[dict, dict]) -> dict:
         "f0_median_hz": round(float(np.median(f0)), 1) if len(f0) else 0.0,
         "raw": {"hyp": hyp_raw, "errors": e_raw},
         "processed": {"hyp": hyp_proc, "errors": e_proc},
+        "raw2": {"hyp": hyp_raw2, "errors": asr.word_errors(line["text"], hyp_raw2)[0]},
     }

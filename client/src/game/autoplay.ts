@@ -3,39 +3,49 @@
  * same ActionState, so an automated playtest exercises the real input, prediction and network
  * path on either side. It plays sensibly, not well:
  *
- *   kaiju   walks to the nearest standing building, swipes and stomps it down, roars when
- *           soldiers are near, breathes its beam at them when rage is full, grabs and throws a
- *           car now and then, eats when hurt, braces against a charged volley, molts when it can.
- *   human   drives along the streets to a firing position at its own bearing around the kaiju,
- *           parks the sub-units on hold-and-charge and, with range and a clear line, fires the
- *           volley when the charge is full, waiting a moment for another squad that is nearly
- *           charged so the volleys land together (as the squad bots do: `volleyVerdict`); it
- *           holds its fire on the move, shoots freely at a helpless kaiju or when alone; backs off
- *           when the kaiju closes, calls artillery when it has some, and now and then opens the
- *           map and toggles the camera.
+ *   kaiju   walks to the nearest standing building and swipes and stomps it down (one button
+ *           each), grabs a car now and then and throws it at a unit, or eats it when hurt, molts
+ *           with one press and picks one of the three cards at random. With the moves the cards
+ *           gave it: roars when soldiers are near, beams them when the rage is full, charges a
+ *           unit straight ahead, sweeps its tail at one behind, braces against charged volleys.
+ *   human   drives along the streets to a firing position at its own bearing around the kaiju
+ *           (a tank by throttle and hull turn, as a person drives it at stages 2 and 3), stops
+ *           there and, with range and a clear line, holds Volley: the squad-mates plant and
+ *           charge, and it lets go at full charge, waiting a moment for another squad that is
+ *           nearly charged so the volleys land together (as the squad bots do: `volleyPlan`).
+ *           Whenever it is not charging it fires its own gun; it shoots freely at a helpless
+ *           kaiju or when it has nobody to charge with, lets go and backs off when the kaiju
+ *           closes, and now and then opens the map and toggles the camera.
  *   drone   circles the kaiju.
  */
 
 import {
+  angleDiff,
   BOT_RULES,
   boundsContains,
   clamp,
   distToStructure,
   findRoadPath,
   kaijuKindDef,
+  kaijuMoveSlot,
   kaijuStageDef,
+  LAST_STAGE,
   lineOfSight,
   PROP_KINDS,
   propsInCircle,
   roadAdjacency,
+  setTankMove,
   unitTypeDef,
+  volleyMeter,
   weaponDef,
   type Bounds,
+  type MoveInput,
+  type KaijuVerb,
   type SnapKaiju,
   type SnapUnit,
 } from '@mb/shared';
 import type { FrameState, MatchSession } from '../net/matchSession';
-import type { ActionState } from './input/actions';
+import type { ActionState, ButtonAction } from './input/actions';
 
 interface Target {
   x: number;
@@ -43,48 +53,42 @@ interface Target {
 }
 
 /**
- * The charge of a squad's planted sub-units (their mean, as `squadCharge` in the simulation
- * computes it), read from the snapshot. 0 when none is planted.
+ * What the autopilot's squad does with its two buttons while it has range and a clear line, by
+ * the squad bot's rules (shared/src/sim/bots/squadBot.ts):
+ *
+ *   fire      no volley to charge (the kaiju is helpless, nobody is left to charge with, or the
+ *             squad is on the move): the leader shoots as its gun loads
+ *   charge    hold Volley: the squad-mates plant and charge
+ *   wait      hold Volley at full charge while another planted squad is nearly charged, for at
+ *             most `syncWait` seconds (counted by the caller in `waited`), so the volleys land
+ *             together
+ *   release   let go of Volley: the charged volley fires
  */
-export function snapSquadCharge(units: readonly SnapUnit[], squad: number): number {
-  let sum = 0;
-  let n = 0;
-  for (const u of units) {
-    if (u.squad !== squad || !u.alive || u.driven || !u.rooted) continue;
-    sum += u.charge;
-    n++;
-  }
-  return n > 0 ? sum / n : 0;
-}
-
-/**
- * Whether the autopilot's squad pulls the trigger now (it has range and a clear line): the squad
- * bot's rule (shared/src/sim/bots/squadBot.ts). `fire` with the kaiju helpless or nobody to
- * charge with; `hold` while moving or charging; at full charge `wait` while another planted
- * squad is nearly charged (for at most `syncWait` seconds, counted by the caller in `waited`),
- * then `fire`, so the volleys land together.
- */
-export function volleyVerdict(units: readonly SnapUnit[], squad: number, parked: boolean, helpless: boolean, waited: number): 'fire' | 'wait' | 'hold' {
+export function volleyPlan(units: readonly SnapUnit[], squad: number, parked: boolean, helpless: boolean, waited: number): 'fire' | 'charge' | 'wait' | 'release' {
   const S = BOT_RULES.squad;
-  let subs = 0;
-  for (const u of units) if (u.squad === squad && u.alive && !u.driven) subs++;
-  if (subs === 0 || helpless) return 'fire';
-  if (!parked) return 'hold';
+  let mates = 0;
+  for (const u of units) if (u.squad === squad && u.alive && !u.driven) mates++;
+  if (mates === 0 || helpless || !parked) return 'fire';
   // Charges travel in 1/255 steps.
-  if (snapSquadCharge(units, squad) < S.volleyCharge - 0.5 / 255) return 'hold';
-  if (waited >= S.syncWait) return 'fire';
+  if (volleyMeter(units, squad) < S.volleyCharge - 0.5 / 255) return 'charge';
+  if (waited >= S.syncWait) return 'release';
   const others = new Set<number>();
   for (const u of units) if (u.squad !== squad && u.alive && u.rooted && !u.driven) others.add(u.squad);
   for (const other of others) {
-    const c = snapSquadCharge(units, other);
+    const c = volleyMeter(units, other);
     if (c >= S.syncCharge && c < S.volleyCharge - 0.5 / 255) return 'wait';
   }
-  return 'fire';
+  return 'release';
 }
+
+/** How long the autopilot keeps Volley up after letting go (long enough for an input to carry it). */
+const VOLLEY_LET_GO = 0.4;
 
 const from = { x: 0, y: 0, z: 0 };
 const to = { x: 0, y: 0, z: 0 };
 const propIds: number[] = [];
+/** The buttons of the first, second and third molt card. */
+const CARD_KEYS = ['card1', 'card2', 'card3'] as const;
 
 export class Autopilot {
   private session: MatchSession | null = null;
@@ -95,14 +99,17 @@ export class Autopilot {
   // kaiju
   private targetId = -1;
   private retarget = 0;
-  private strikeHold = 0;
+  /** Buttons held down by the autopilot, and for how much longer (seconds). */
+  private readonly taps = new Map<ButtonAction, number>();
   private strikeRest = 0;
   private stompNext = false;
-  private roarHold = 0;
-  private specialHold = 0;
-  private grabHold = 0;
   private grabRest = 6;
   private braceHold = 0;
+  /** The unit a charge was aimed at (the head stays on it through the run). */
+  private chargeTarget = -1;
+  /** When the molt cards now on offer were first seen (-1: none), and whether one was picked. */
+  private offerSeen = -1;
+  private cardPicked = false;
   private stuck = 0;
   private lastX = 0;
   private lastZ = 0;
@@ -114,12 +121,13 @@ export class Autopilot {
   private path: number[] = [];
   private pathGoal: Target | null = null;
   private pathAge = 0;
-  private commandRest = 2;
   private parked = false;
+  /** Seconds Volley stays up after the autopilot let go of it. */
+  private volleyRest = 0;
+  private readonly tankStick: MoveInput = { moveX: 0, moveZ: 0, aimYaw: 0 };
   private mapRest = 14;
   private mapHold = 0;
   private cameraRest = 9;
-  private callInRest = 3;
   /** Seconds the parked squad has had no line of fire. */
   private noLine = 0;
   /** Seconds the charged squad has waited for a neighbor's volley. */
@@ -152,10 +160,10 @@ export class Autopilot {
     // The autopilot owns the controls: whatever the idle devices said is replaced.
     state.moveX = 0;
     state.moveZ = 0;
-    if (frame.match.phase !== 'playing') {
-      this.strikeHold = 0;
-      return;
-    }
+    this.pressTaps(state, dt);
+    // The molt cards stand through the cocoon and the intermission.
+    if (frame.localKaiju) this.pickCard(frame.localKaiju);
+    if (frame.match.phase !== 'playing') return;
     if (frame.localKaiju) this.driveKaiju(state, dt, session, frame, frame.localKaiju);
     else if (frame.localUnit && frame.localUnit.alive) this.driveHuman(state, dt, session, frame, frame.localUnit);
     else this.driveDrone(state, frame);
@@ -196,73 +204,132 @@ export class Autopilot {
     return best ? { unit: best, dist: bestD } : null;
   }
 
+  /** Holds a button down for `seconds` (a tap by default): the server sees one press. */
+  private tap(action: ButtonAction, seconds = 0.12): void {
+    this.taps.set(action, Math.max(this.taps.get(action) ?? 0, seconds));
+  }
+
+  /** Holds down what the taps hold this frame. */
+  private pressTaps(state: ActionState, dt: number): void {
+    for (const [action, left] of this.taps) {
+      if (left <= 0) {
+        this.taps.delete(action);
+        continue;
+      }
+      state.down[action] = true;
+      this.taps.set(action, left - dt);
+    }
+  }
+
+  /** At a molt: looks at the cards for a moment, then presses the button of one, at random. */
+  private pickCard(k: SnapKaiju): void {
+    if (k.offer.length === 0) {
+      this.offerSeen = -1;
+      return;
+    }
+    if (this.offerSeen < 0) {
+      this.offerSeen = this.time;
+      this.cardPicked = false;
+    }
+    if (this.cardPicked || this.time - this.offerSeen < 0.8) return;
+    this.cardPicked = true;
+    const n = Math.min(k.offer.length, 1 + Math.floor(this.rand() * k.offer.length));
+    this.tap(CARD_KEYS[n - 1]);
+  }
+
   private driveKaiju(state: ActionState, dt: number, session: MatchSession, frame: FrameState, k: SnapKaiju): void {
     const def = kaijuKindDef(k.kind);
     const st = kaijuStageDef(k.kind, k.stage);
-    const d = state.down;
     if (!k.alive || k.phase === 'cocoon' || k.phase === 'stagger' || k.phase === 'dead') return;
+    const idle = k.phase === 'idle';
+    // The move button a verb picked at a molt is on, or null when it was not picked.
+    const moveButton = (verb: KaijuVerb): ButtonAction | null => {
+      const slot = kaijuMoveSlot(k.moves, verb);
+      return slot === 0 ? 'move1' : slot === 1 ? 'move2' : null;
+    };
 
-    // Molt as soon as it is offered: hold the button until the cocoon closes.
-    if (k.moltAvailable) {
-      d.molt = true;
+    // Molt as soon as it is offered: one press.
+    if (k.moltAvailable && k.stage < LAST_STAGE) {
+      if (idle && !this.taps.has('molt')) this.tap('molt');
       state.aimOverride = { yaw: k.yaw, pitch: 0 };
       return;
     }
 
     const threat = this.nearestUnit(frame, k.x, k.z);
+    const bearing = threat ? Math.atan2(threat.unit.x - k.x, threat.unit.z - k.z) : k.yaw;
+
+    // A charge's run: the head stays on the unit it was aimed at (the body turns slowly after it).
+    if (k.action === 'charge' && !idle) {
+      const u = frame.units[this.chargeTarget];
+      state.aimOverride = { yaw: u && u.alive ? Math.atan2(u.x - k.x, u.z - k.z) : k.yaw, pitch: 0 };
+      return;
+    }
+
     let aimX = k.x + Math.sin(k.yaw) * 50;
     let aimZ = k.z + Math.cos(k.yaw) * 50;
     let aimPitch = 0;
     let move = 0;
 
-    // Brace when several lasers are nearly charged and pointed this way.
-    let charged = 0;
-    for (const u of frame.units) if (u.alive && u.laser && u.charge > 0.75) charged++;
-    if (this.braceHold > 0) this.braceHold -= dt;
-    else if (charged >= 3 && this.rand() < dt * 0.6) this.braceHold = 1.6;
-    if (this.braceHold > 0 && threat) {
-      d.block = true;
-      state.aimOverride = { yaw: Math.atan2(threat.unit.x - k.x, threat.unit.z - k.z), pitch: 0 };
-      return;
+    // Brace (once it has it) while several lasers are nearly charged and pointed this way.
+    const brace = moveButton('brace');
+    if (brace) {
+      let charged = 0;
+      for (const u of frame.units) if (u.alive && u.laser && u.charge > 0.75) charged++;
+      if (this.braceHold > 0) this.braceHold -= dt;
+      else if (charged >= 3 && this.rand() < dt * 0.6) this.braceHold = 1.6;
+      if (this.braceHold > 0 && threat) {
+        state.down[brace] = true;
+        state.aimOverride = { yaw: bearing, pitch: 0 };
+        return;
+      }
     }
 
-    // Roar when soldiers are in reach of it.
-    const roarRadius = def.actions.roar.radius[k.stage - 1];
-    if (this.roarHold > 0) {
-      this.roarHold -= dt;
-      d.roar = true;
-    } else if (k.cooldowns.roar <= 0 && threat && threat.dist < roarRadius * 0.75 && k.phase === 'idle') {
-      this.roarHold = 0.15;
+    // Roar when soldiers are in its reach.
+    const roar = moveButton('roar');
+    if (roar && idle && k.cooldowns.roar <= 0 && threat && threat.dist < def.actions.roar.radius[k.stage - 1] * 0.75) this.tap(roar);
+
+    // The beam: rage is full and something is in range.
+    const beam = moveButton('special');
+    if (beam) {
+      const special = def.actions.special;
+      const ready = k.rage >= special.rageCost;
+      const beaming = k.action === 'special';
+      if ((ready || beaming) && threat && threat.dist < special.range[k.stage - 1] * 0.9) {
+        aimPitch = Math.atan2(1.5 - st.mouthHeight, Math.max(1, threat.dist));
+        if (ready && !beaming && idle) this.tap(beam);
+        state.aimOverride = { yaw: bearing, pitch: aimPitch };
+        return;
+      }
     }
 
-    // Beam: rage is full and something is in range.
-    const special = def.actions.special;
-    const beamRange = special.range[k.stage - 1];
-    const beamReady = k.rage >= special.rageCost;
-    const beaming = k.action === 'special';
-    if (this.specialHold > 0) {
-      this.specialHold -= dt;
-      d.special = true;
+    // Charge at a unit straight ahead, out of a swipe's reach and inside a run's.
+    const charge = moveButton('charge');
+    if (charge && idle && k.cooldowns.charge <= 0 && threat) {
+      const c = def.actions.charge;
+      const run = st.topSpeed * c.speedMult * c.timing.active * 0.6;
+      if (threat.dist > st.bodyRadius * 3 && threat.dist < run && Math.abs(angleDiff(bearing, k.yaw)) < 0.5) {
+        this.chargeTarget = threat.unit.id;
+        this.tap(charge);
+        state.aimOverride = { yaw: bearing, pitch: 0 };
+        return;
+      }
     }
-    if ((beamReady || beaming) && threat && threat.dist < beamRange * 0.9) {
-      aimX = threat.unit.x;
-      aimZ = threat.unit.z;
-      aimPitch = Math.atan2(1.5 - st.mouthHeight, Math.max(1, threat.dist));
-      if (beamReady && !beaming && k.phase === 'idle' && this.specialHold <= 0) this.specialHold = 0.15;
-      state.aimOverride = { yaw: Math.atan2(aimX - k.x, aimZ - k.z), pitch: aimPitch };
-      return;
+
+    // Sweep the tail at a unit behind, within its reach.
+    const sweep = moveButton('tailSweep');
+    if (sweep && idle && k.cooldowns.tailSweep <= 0 && threat && threat.dist < def.actions.tailSweep.reach * st.bodyRadius) {
+      if (Math.abs(angleDiff(bearing, k.yaw + Math.PI)) < Math.PI / 2) this.tap(sweep);
     }
 
     // Grab a car now and then; throw it at the nearest unit, or eat it when hurt.
     this.grabRest -= dt;
-    if (this.grabHold > 0) {
-      this.grabHold -= dt;
-      d.grab = true;
-    } else if (k.held && k.phase === 'idle') {
+    const busyHands = this.taps.has('grab') || this.taps.has('strike');
+    if (k.held && idle && !busyHands && this.grabRest <= 0) {
       const hurt = k.hp < k.maxHp * 0.75 && k.cooldowns.eat <= 0;
-      this.grabHold = hurt ? 0.7 : 0.12;
-      this.grabRest = 8 + this.rand() * 6;
-    } else if (!k.held && this.grabRest <= 0 && k.phase === 'idle') {
+      if (hurt) this.tap('grab');
+      else if (threat) this.tap('strike');
+      this.grabRest = hurt || threat ? 8 + this.rand() * 6 : 1;
+    } else if (!k.held && this.grabRest <= 0 && idle && !busyHands) {
       const reach = def.actions.grab.reach * st.bodyRadius;
       propsInCircle(session.mirror.query, k.x, k.z, reach, propIds);
       const car = propIds.find((id) => PROP_KINDS[session.mirror.city.props[id].kind].grabbable);
@@ -270,7 +337,7 @@ export class Autopilot {
         const p = session.mirror.city.props[car];
         aimX = p.x;
         aimZ = p.z;
-        this.grabHold = k.hp < k.maxHp * 0.75 && k.cooldowns.eat <= 0 ? 0.7 : 0.12;
+        this.tap('grab');
         this.grabRest = 1.5;
       } else {
         this.grabRest = 1;
@@ -281,7 +348,7 @@ export class Autopilot {
       aimZ = threat.unit.z;
     }
 
-    // Wreck the nearest building.
+    // Wreck the nearest building: swipe, then stomp, each on its own button.
     this.retarget -= dt;
     const hp = session.mirror.query.structureHp;
     if (this.targetId < 0 || hp[this.targetId] <= 0 || this.retarget <= 0) {
@@ -289,7 +356,7 @@ export class Autopilot {
       this.retarget = 4;
     }
     const target = this.targetId >= 0 ? session.mirror.city.structures[this.targetId] : null;
-    if (target && this.grabHold <= 0 && !k.held) {
+    if (target && !this.taps.has('grab') && !k.held) {
       aimX = target.x;
       aimZ = target.z;
     }
@@ -299,13 +366,10 @@ export class Autopilot {
       const tramples = target.height <= st.trampleHeight || st.wadesTall;
       if (gap > reach * 0.7 || tramples) move = 1;
       const inReach = gap < reach * 0.85;
-      if (this.strikeHold > 0) {
-        this.strikeHold -= dt;
-        d.strike = true;
-      } else if (this.strikeRest > 0) {
+      if (this.strikeRest > 0) {
         this.strikeRest -= dt;
-      } else if (inReach && k.phase === 'idle' && !k.held && (!tramples || k.stage === 3)) {
-        this.strikeHold = this.stompNext ? 0.5 : 0.1;
+      } else if (inReach && idle && !k.held && (!tramples || k.stage === 3)) {
+        this.tap(this.stompNext ? 'stomp' : 'strike');
         this.strikeRest = 0.25;
         this.stompNext = !this.stompNext;
       }
@@ -318,7 +382,7 @@ export class Autopilot {
 
     // Walking into something that is not the target (a wall, the quarantine line): try another.
     const progress = Math.hypot(k.x - this.lastX, k.z - this.lastZ);
-    if (move > 0.5 && k.phase === 'idle') {
+    if (move > 0.5 && idle) {
       this.stuck = progress < 0.02 ? this.stuck + dt : Math.max(0, this.stuck - dt);
       if (this.stuck > 1.5) {
         this.targetId = this.pickStructure(session, k, frame.bounds, this.targetId);
@@ -480,49 +544,42 @@ export class Autopilot {
     }
     this.lastX = u.x;
     this.lastZ = u.z;
-    // World direction to stick deflection relative to the view.
-    const s = Math.sin(aimYaw);
-    const c = Math.cos(aimYaw);
-    state.moveZ = wantX * s + wantZ * c;
-    state.moveX = -wantX * c + wantZ * s;
+    if (u.driven && def.drive) {
+      // A tank: throttle and hull turn toward where it wants to go (stages 2 and 3).
+      setTankMove(this.tankStick, u.yaw, wantX, wantZ, Math.hypot(wantX, wantZ) > 0.1 ? 1 : 0);
+      state.moveX = this.tankStick.moveX;
+      state.moveZ = this.tankStick.moveZ;
+    } else {
+      // World direction to stick deflection relative to the view.
+      const s = Math.sin(aimYaw);
+      const c = Math.cos(aimYaw);
+      state.moveZ = wantX * s + wantZ * c;
+      state.moveX = -wantX * c + wantZ * s;
+    }
     state.aimOverride = { yaw: aimYaw, pitch: aimPitch };
 
-    // With range and a clear line: the shot fires the charged volley, so wait for a full charge
-    // (and a moment for a neighbor that is nearly there) instead of holding the trigger down.
-    if (known && clear && dist < range * 0.97) {
+    // Parked: the squad stops to charge. On the move it fires at will.
+    this.parked = inPosition;
+    // With range and a clear line: hold Volley until the charge is full (and a moment for a
+    // neighbor that is nearly there), let go, and hold it again. Not charging: fire the gun.
+    this.volleyRest = Math.max(0, this.volleyRest - dt);
+    if (known && clear && dist < range * 0.97 && !tooClose) {
       const helpless = k.phase === 'stagger' || k.phase === 'cocoon';
-      const verdict = volleyVerdict(frame.units, squad.id, this.parked && squad.fireMode === 'charge', helpless, this.volleyWait);
-      if (verdict === 'wait') this.volleyWait += dt;
-      else if (verdict === 'fire') d.fire = true;
-      else this.volleyWait = 0;
-    } else {
-      this.volleyWait = 0;
-    }
-
-    // Orders: follow on the move, hold and charge once in position.
-    this.commandRest -= dt;
-    if (this.commandRest <= 0) {
-      if (inPosition && !this.parked) {
-        d.cmdHoldCharge = true;
-        this.parked = true;
-        this.commandRest = 4;
-      } else if (!inPosition && this.parked) {
-        d.cmdFollow = true;
-        this.parked = false;
-        this.commandRest = 4;
-      } else if (squad.fireMode !== 'charge' && this.parked) {
-        d.cmdHoldCharge = true;
-        this.commandRest = 5;
-      } else {
-        this.commandRest = 1;
+      const plan = volleyPlan(frame.units, squad.id, this.parked, helpless, this.volleyWait);
+      if (plan === 'fire') {
+        d.fire = true;
+        this.volleyWait = 0;
+      } else if (plan === 'release') {
+        this.volleyRest = VOLLEY_LET_GO;
+        this.volleyWait = 0;
+      } else if (this.volleyRest <= 0) {
+        d.volley = true;
+        if (plan === 'wait') this.volleyWait += dt;
+        else this.volleyWait = 0;
       }
-    }
-
-    // Artillery, when the squad has it and it is ready.
-    this.callInRest -= dt;
-    if (known && squad.level >= 3 && squad.callInCooldowns[0] <= 0 && this.callInRest <= 0) {
-      session.sendCommand({ type: 'callIn', callIn: 'artillery', x: k.x, z: k.z });
-      this.callInRest = 6;
+    } else {
+      // Too close, out of range or no line: whatever is charging goes now (and off it drives).
+      this.volleyWait = 0;
     }
 
     // Glance at the map and flip the camera now and then, as a player would.

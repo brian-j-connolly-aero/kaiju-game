@@ -1,10 +1,9 @@
-/** Small helpers every system uses: emitting events, looking entities up, queueing commands. */
+/** Small helpers every system uses: emitting events, looking entities up, handing slots to bots. */
 
 import { TALLY_CLASSES, type TallyClass } from '../defs/ids';
 import { VOICE_RULES, VOICE_SIDE_RULES } from '../defs/voice';
 import { BUTTON_COUNT, neutralInput } from '../net/input';
 import { createBotState } from './bots/types';
-import type { SquadCommand } from './commands';
 import type { PlayerId, PlayerSlot } from './config';
 import type { PlayerTally, SimEvent, SimEventInput } from './events';
 import type { InputState, Kaiju, PlayerState, Squad, Unit, VoiceState, World } from './types';
@@ -31,6 +30,7 @@ export function createInputState(): InputState {
     heldTicks: new Array<number>(BUTTON_COUNT).fill(0),
     lastHeldTicks: new Array<number>(BUTTON_COUNT).fill(0),
     sincePressTicks: new Array<number>(BUTTON_COUNT).fill(NEVER_PRESSED_TICKS),
+    card: 0,
   };
 }
 
@@ -50,8 +50,6 @@ export function createPlayerState(slot: PlayerSlot): PlayerState {
     kaijuId: -1,
     squadId: -1,
     input: createInputState(),
-    commands: [],
-    queuedCommands: [],
     botInput: neutralInput(),
     botState: createBotState(),
     handBack: false,
@@ -91,18 +89,6 @@ export function drivenUnit(world: World, squad: Squad): Unit | null {
 /** True for the unit its squad's player drives directly (not a sub-unit). */
 export function isDriven(world: World, unit: Unit): boolean {
   return world.squads[unit.squad].driven === unit.id;
-}
-
-/**
- * Hands a command to the simulation between ticks (the server calls this for `command`
- * messages). It takes effect on the next step, exactly like a wheel pick sent in an input.
- */
-export function queueCommand(world: World, player: PlayerId, command: SquadCommand): void {
-  const p = world.players[player];
-  if (!p || p.role !== 'human') return;
-  // A flood of commands is a broken or hostile client; the newest few are all that matter.
-  if (p.queuedCommands.length >= 8) p.queuedCommands.shift();
-  p.queuedCommands.push(command);
 }
 
 /**

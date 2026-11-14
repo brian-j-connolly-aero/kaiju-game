@@ -48,9 +48,10 @@ export interface BotTuning {
   kaijuHandicap: number;
   humanHandicap: number;
   /**
-   * Squad bots play the lazy way: parked, they pull the trigger every time the gun has loaded
-   * instead of waiting for a full charge. A profile for the balance harness, so that it can
-   * measure what undisciplined fire is worth (docs/BALANCE.md). Absent or false: they volley.
+   * Squad bots play the lazy way: they never charge a volley, they only shoot every time the
+   * gun has loaded (their squad-mates firing at will). A profile for the balance harness, so
+   * that it can measure what undisciplined fire is worth (docs/BALANCE.md). Absent or false:
+   * they volley.
    */
   triggerHappy?: boolean;
 }

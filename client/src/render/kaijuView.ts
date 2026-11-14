@@ -110,6 +110,8 @@ export class KaijuView {
   /** Swimming, as drawn: eased toward the snapshot's `submerge` so it glides down and up. */
   private swim = 0;
   private wakeTimer = 0;
+  /** Seconds to the next puff of the charge's dust. */
+  private dustTimer = 0;
   private walkPhase = 0;
   private lastStepHalf = 0;
   private deadTime = 0;
@@ -289,6 +291,7 @@ export class KaijuView {
 
     // --- swimming ------------------------------------------------------------------------------------
     this.updateSwim(k, dt, speed, effects);
+    this.chargeDust(k, action, phase, dt, effects);
 
     // Dead: topple over and sink a little.
     if (phase === 'dead') {
@@ -422,6 +425,33 @@ export class KaijuView {
       this.wakeTimer = 0.8;
       effects.ring(k.x, k.z, r * 0.9, 0xdff1ff, 1.4, 0.3, 0.13);
     }
+  }
+
+  /**
+   * The charge's dust: the right foot scraping the ground in the wind-up, then in the run a wake
+   * of it behind the feet and a low wave of it pushed ahead of the chest.
+   */
+  private chargeDust(k: SnapKaiju, action: KaijuActionId, phase: KaijuPhase, dt: number, effects: Effects): void {
+    if (action !== 'charge' || (phase !== 'windup' && phase !== 'charge') || this.swim > 0.3) {
+      this.dustTimer = 0;
+      return;
+    }
+    this.dustTimer -= dt;
+    if (this.dustTimer > 0) return;
+    const r = kaijuStageDef(k.kind, k.stage).bodyRadius;
+    const fx = Math.sin(k.yaw);
+    const fz = Math.cos(k.yaw);
+    // The model's right, in the world.
+    const rx = -Math.cos(k.yaw);
+    const rz = Math.sin(k.yaw);
+    if (phase === 'windup') {
+      this.dustTimer = 0.2;
+      effects.dust(k.x + rx * r * 0.45 + fx * r * 0.15, 0.1, k.z + rz * r * 0.45 + fz * r * 0.15, r * 0.4, 2, 0xcbbfa8);
+      return;
+    }
+    this.dustTimer = 0.07;
+    effects.dust(k.x - fx * r * 0.7, 0.1, k.z - fz * r * 0.7, r * 0.6, 2, 0xcfc4ae);
+    effects.dust(k.x + fx * r * 1.1, 0.1, k.z + fz * r * 1.1, r * 0.45, 1, 0xd8cfbb);
   }
 
   hide(): void {

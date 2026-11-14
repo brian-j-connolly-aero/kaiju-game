@@ -21,6 +21,7 @@
  *                        'placeholder' (the old grid city, a development option)
  *   --bar P1,P2,P3       try other destruction bar fractions (MATCH_RULES.bar.p1/p2/p3) in this run
  *                        only; the rules file is not changed
+ *   --clock S            try another match clock (MATCH_RULES.clock, seconds) in this run only
  *   --nav                also print how the squads got about: stuck time, wading, bridge crowding
  *   --events             also print each match's event counts
  *   --json               print the reports as JSON instead of the table
@@ -53,6 +54,7 @@ interface Options {
   city: CityKind;
   nav: boolean;
   bar: [number, number, number] | null;
+  clock: number | null;
 }
 
 function parseArgs(argv: string[]): Options {
@@ -72,6 +74,7 @@ function parseArgs(argv: string[]): Options {
     city: 'meridian',
     nav: false,
     bar: null,
+    clock: null,
   };
   for (let i = 0; i < argv.length; i++) {
     const next = (): number => {
@@ -132,6 +135,12 @@ function parseArgs(argv: string[]): Options {
         o.bar = [v[0], v[1], v[2]];
         break;
       }
+      case '--clock': {
+        const v = next();
+        if (v <= 0) throw new Error('--clock needs a number of seconds, like 576');
+        o.clock = v;
+        break;
+      }
       default:
         throw new Error(`unknown option ${argv[i]} (see the header of shared/scripts/sim.ts)`);
     }
@@ -169,7 +178,7 @@ function printTable(reports: BotMatchReport[], o: Options): void {
     per(r, (s) => s.kaijuHpLost.toFixed(0)),
   ]);
   const widths = head.map((h, i) => Math.max(h.length, ...rows.map((c) => c[i].length)));
-  const tags = [o.city !== 'meridian' ? `city: ${o.city}` : '', o.bar ? `bar ${o.bar.join(' / ')}` : '', o.fast ? 'fast tuning' : '', o.kaijuHandicap > 0 ? `kaiju handicap ${o.kaijuHandicap}` : '', o.humanHandicap > 0 ? `human handicap ${o.humanHandicap}` : '', o.triggerHappy ? 'trigger-happy squads' : '', o.squads === 0 ? 'unopposed' : '', o.everyAnchor ? 'every start in turn' : ''].filter(Boolean);
+  const tags = [o.city !== 'meridian' ? `city: ${o.city}` : '', o.bar ? `bar ${o.bar.join(' / ')}` : '', o.clock !== null ? `clock ${clock(o.clock)}` : '', o.fast ? 'fast tuning' : '', o.kaijuHandicap > 0 ? `kaiju handicap ${o.kaijuHandicap}` : '', o.humanHandicap > 0 ? `human handicap ${o.humanHandicap}` : '', o.triggerHappy ? 'trigger-happy squads' : '', o.squads === 0 ? 'unopposed' : '', o.everyAnchor ? 'every start in turn' : ''].filter(Boolean);
   console.log(`${reports.length} bot matches${tags.length > 0 ? ` [${tags.join(', ')}]` : ''}`);
   console.log(row(head, widths));
   console.log(widths.map((w) => '-'.repeat(w)).join('  '));
@@ -222,6 +231,10 @@ if (options.bar) {
   // A trial for this run only (the rules object is plain data, read when each match starts).
   const bar = MATCH_RULES.bar as { p1: number; p2: number; p3: number };
   [bar.p1, bar.p2, bar.p3] = options.bar;
+}
+if (options.clock !== null) {
+  // The same for the clock (read by createMatchConfig when each match starts).
+  (MATCH_RULES as { clock: number }).clock = options.clock;
 }
 // Built once and handed to every match.
 const city: BuiltCity = getCity(undefined, options.city);

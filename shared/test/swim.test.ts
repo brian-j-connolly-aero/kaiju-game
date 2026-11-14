@@ -13,20 +13,18 @@ import {
   deepWaterAt,
   DT,
   encodeSnapshot,
+  castKaijuBody,
   getCity,
-  kaijuCapsule,
   kaijuKindDef,
   kaijuShownHeight,
   kaijuStageDef,
   perStage,
-  segmentVsCapsule,
   snapshotOfWorld,
   stageBounds,
   structuresInCircle,
   type Bounds,
   type CityQuery,
   type StageId,
-  type VerticalCapsule,
   type World,
 } from '../src/index';
 import { holdFire, input, KAIJU_PLAYER, makeTestWorld, placeKaiju, placeUnit, parkUnits, run } from './helpers';
@@ -112,8 +110,9 @@ describe('coming up', () => {
     steps(world, ticksFor(SWIM.diveTime) + 2);
     expect(k.submerge).toBe(1);
 
-    // A tap of Roar while under: nothing happens at once, it comes up, then it roars.
-    steps(world, 2, Btn.roar);
+    // A tap of the roar's button while under: nothing happens at once, it comes up, then it roars.
+    k.moves = ['roar', 'none'];
+    steps(world, 2, Btn.move1);
     expect(k.action).toBe('none');
     let roared = -1;
     for (let i = 0; i < ticksFor(SWIM.surfaceTime) + 2; i++) {
@@ -135,8 +134,9 @@ describe('coming up', () => {
     const world = channelWorld();
     const k = placeKaiju(world, 70, 0);
     k.rage = 100;
+    k.moves = ['beam', 'none'];
     steps(world, ticksFor(SWIM.diveTime) + 2);
-    for (const b of [Btn.strike, Btn.grab, Btn.special]) {
+    for (const b of [Btn.strike, Btn.grab, Btn.stomp, Btn.move1]) {
       steps(world, 1, b);
       expect(k.action).toBe('none');
       expect(k.submerge).toBeGreaterThan(0);
@@ -148,8 +148,7 @@ describe('what shows', () => {
   it('shrinks the hit volume to the spines: a shot over them misses, a shot at them hits', () => {
     const world = channelWorld();
     const k = placeKaiju(world, 70, 0);
-    const cap: VerticalCapsule = { x: 0, z: 0, r: 0, y0: 0, y1: 0 };
-    const shot = (y: number): boolean => segmentVsCapsule({ x: 70, y, z: -30 }, { x: 70, y, z: 30 }, kaijuCapsule(k, cap));
+    const shot = (y: number): boolean => castKaijuBody(k, 70, y, -30, 0, 0, 60, 1);
     expect(shot(3)).toBe(true);
     steps(world, ticksFor(SWIM.diveTime) + 2);
     const st = kaijuStageDef('lizard', 1);

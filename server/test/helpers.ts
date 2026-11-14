@@ -6,6 +6,7 @@
 
 import {
   decodeSnapshot,
+  PROTOCOL_VERSION,
   TICK_RATE,
   type LobbyMessage,
   type PlayerInput,
@@ -143,7 +144,7 @@ export function seatPlayers(room: GameRoom, count: number): FakePeer[] {
   const peers: FakePeer[] = [];
   for (let i = 0; i < count; i++) {
     const peer = new FakePeer(`p${i}`);
-    room.join(peer, { name: `Player ${String.fromCharCode(65 + i)}`, token: tokenOf(i), protocol: 1 });
+    room.join(peer, { name: `Player ${String.fromCharCode(65 + i)}`, token: tokenOf(i), protocol: PROTOCOL_VERSION });
     peers.push(peer);
   }
   return peers;
@@ -166,4 +167,13 @@ export function startMatch(room: GameRoom, peers: FakePeer[]): void {
 
 export function input(seq: number, fields: Partial<PlayerInput> = {}): PlayerInput {
   return { seq, moveX: 0, moveZ: 0, aimYaw: 0, aimPitch: 0, buttons: 0, ...fields };
+}
+
+/**
+ * The two parts of a snapshot's acknowledgement (`packedAck` in src/room/inputQueue.ts): the
+ * newest input up to which every input was played or dropped, and how many after it the server
+ * will drop (or has dropped already).
+ */
+export function ackOf(snap: Snapshot): { played: number; drops: number } {
+  return { played: snap.ackSeq & 0xffffff, drops: snap.ackSeq >>> 24 };
 }

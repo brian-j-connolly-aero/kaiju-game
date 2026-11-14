@@ -4,6 +4,7 @@
  * test, so requests carry the Host header the tunnel passes on ("<words>.trycloudflare.com").
  */
 
+import { PROTOCOL_VERSION } from '@mb/shared';
 import { request } from 'node:http';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { configFromEnv } from '../src/config';
@@ -167,7 +168,7 @@ describe('the lobby state', () => {
     expect('publicUrl' in a.lobby.lobby).toBe(false);
     address = 'https://kaiju.example.com';
     const b = new FakePeer('p1');
-    room.join(b, { name: 'Player B', token: tokenOf(1), protocol: 1 });
+    room.join(b, { name: 'Player B', token: tokenOf(1), protocol: PROTOCOL_VERSION });
     expect(a.lobby.lobby.publicUrl).toBe('https://kaiju.example.com');
     expect(b.lobby.lobby.publicUrl).toBe('https://kaiju.example.com');
     address = null;

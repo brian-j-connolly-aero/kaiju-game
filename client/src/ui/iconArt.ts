@@ -24,11 +24,23 @@ function cogPath(cx: number, cy: number, outer: number, inner: number, hole: num
 }
 
 const ART: Record<string, string> = {
-  // --- commands ---
-  cmd_follow: `<circle cx="46" cy="32" r="7" ${F}/><path d="M10 18 L24 32 L10 46 M24 18 L38 32 L24 46" ${S}/>`,
-  cmd_moveto: `<path d="M22 54 L22 12 L50 22 L22 32" ${S}/><ellipse cx="22" cy="54" rx="12" ry="4" ${S}/>`,
-  cmd_fireatwill: `<path d="M12 50 L30 32 M12 32 L40 32 M12 14 L30 32" ${S}/><path d="M44 20 L54 14 M46 32 L58 32 M44 44 L54 50" ${S}/>`,
-  cmd_holdcharge: `<path d="M32 6 L56 32 L32 58 L8 32 Z" ${S}/><path d="M24 38 L32 22 L32 34 L40 28 L32 44" ${S}/>`,
+  // --- the squad's controls (docs/ROADMAP.md phase 1: Fire and Volley, tank driving) ---
+  // A soldier with a launcher on the shoulder: the squad on foot (stage 1).
+  sq_foot: `<circle cx="28" cy="12" r="7" ${F}/><path d="M28 21 L28 40 M28 40 L20 58 M28 40 L36 58 M28 27 L18 38" ${S}/><path d="M14 30 L54 20" ${S} stroke-width="7"/>`,
+  // The three squad-mates planted, their lasers on one point ahead: the volley charging.
+  sq_charge: `<path d="M12 44 L32 14 M32 46 L32 14 M52 44 L32 14" ${S} stroke-width="3" stroke-dasharray="4 4"/><path d="M12 44 L18 51 L12 58 L6 51 Z M32 47 L38 54 L32 61 L26 54 Z M52 44 L58 51 L52 58 L46 51 Z" ${F}/><circle cx="32" cy="10" r="5" ${F}/>`,
+  // The volley meter filled past its notch (60%: from there the volley counts).
+  sq_meter: `<path d="M32 4 L60 32 L32 60 L4 32 Z" ${S} stroke-width="4"/><path d="M8 28 L56 28 L60 32 L32 60 L4 32 Z M18 18 L46 18 L53 25 L11 25 Z" ${F}/><path d="M0 26.5 L7 26.5 M57 26.5 L64 26.5" ${S} stroke-width="3"/>`,
+  // ...and short of it: let go now and the shot is weak.
+  sq_meter_low: `<path d="M32 4 L60 32 L32 60 L4 32 Z" ${S} stroke-width="4"/><path d="M12 40 L52 40 L32 60 Z" ${F}/><path d="M0 26.5 L7 26.5 M57 26.5 L64 26.5" ${S} stroke-width="3"/>`,
+  // The volley fired: three shots meeting in one burst.
+  sq_burst: `<path d="M10 60 L30 30 M32 62 L32 32 M54 60 L34 30" ${S} stroke-width="4"/><circle cx="32" cy="20" r="7" ${F}/><path d="M32 2 L32 8 M32 32 L32 36 M14 20 L19 20 M45 20 L50 20 M19 7 L23 11 M41 29 L45 33 M45 7 L41 11 M23 29 L19 33" ${S} stroke-width="4"/>`,
+  // A tank from above, driven forward and back (W and S).
+  sq_drive: `<rect x="23" y="18" width="18" height="28" rx="3" ${F}/><path d="M17 17 L17 47 M47 17 L47 47" ${S}/><path d="M32 2 L42 13 L22 13 Z M32 62 L42 51 L22 51 Z" ${F}/>`,
+  // ...its hull turned (A and D), on the spot when it stands still.
+  sq_turn: `<g transform="rotate(30 32 32)"><rect x="24" y="19" width="16" height="26" rx="3" ${F}/><path d="M18 18 L18 46 M46 18 L46 46" ${S} stroke-width="4"/></g><path d="M38 5 A28 28 0 0 1 59 22" ${S} stroke-width="4"/><path d="M63 29 L52 23 L62 16 Z" ${F}/><path d="M26 59 A28 28 0 0 1 5 42" ${S} stroke-width="4"/><path d="M1 35 L12 41 L2 48 Z" ${F}/>`,
+  // ...and its turret swinging round toward where the mouse looks, at its own pace.
+  sq_turret: `<rect x="12" y="26" width="24" height="34" rx="3" ${S} stroke-width="4"/><circle cx="24" cy="43" r="8" ${F}/><path d="M24 43 L42 20" ${S} stroke-width="6"/><circle cx="54" cy="10" r="6" ${S} stroke-width="3"/><path d="M46 30 A22 22 0 0 0 54 18" ${S} stroke-width="3" stroke-dasharray="3 4"/>`,
   // --- kaiju verbs ---
   k_swipe: `<path d="M14 12 Q34 26 30 54 M28 10 Q48 24 44 52 M42 10 Q60 22 56 46" ${S}/>`,
   k_stomp: `<path d="M22 8 L22 34 L14 44 L50 44 L42 34 L42 8" ${S}/><path d="M6 54 L20 54 M26 54 L38 54 M44 54 L58 54" ${S}/>`,
@@ -39,6 +51,10 @@ const ART: Record<string, string> = {
   k_roar: `<path d="M8 22 L26 32 L8 42 Z" ${F}/><path d="M34 20 Q40 32 34 44 M44 14 Q54 32 44 50 M54 8 Q66 32 54 56" ${S}/>`,
   k_special: `<path d="M6 32 L40 32" stroke="currentColor" stroke-width="10" stroke-linecap="round" fill="none"/><path d="M48 14 L56 22 M52 32 L60 32 M48 50 L56 42" ${S}/>`,
   k_molt: `<path d="M32 6 Q52 22 50 40 Q48 58 32 58 Q16 58 14 40 Q12 22 32 6 Z" ${S}/><path d="M26 22 L34 30 L28 38 L36 46" ${S}/>`,
+  // The moves a molt card gives (the art files are in public/assets/ui): a head rushing down
+  // like a ram with speed lines behind; a spiked tail lashing round with two motion lines.
+  k_charge: `<path d="M20 20 Q26 10 38 11 L52 16 L60 37 L42 41 Q35 47 27 46 Q19 44 18 34 Z" ${F}/><path d="M3 16 L12 16 M3 28 L8 28 M3 40 L12 40 M8 53 L21 53" ${S}/>`,
+  k_tailsweep: `<path d="M4 59 Q3 24 38 12 Q52 8 60 11 Q47 15 36 23 Q22 35 20 59 Z" ${F}/><path d="M29 47 Q35 33 51 27 M40 53 Q46 42 59 38" ${S}/>`,
   k_swim: `<path d="M12 36 L19 21 L25 36 Z M24 36 L32 14 L40 36 Z M39 36 L46 22 L52 36 Z" ${F}/><path d="M5 41 Q11.5 35.5 18 41 T31 41 T44 41 T57 41 M10 53 Q16.5 47.5 23 53 T36 53 T49 53" ${S}/>`,
   // --- status ---
   st_health: `<path d="M32 54 L10 32 Q4 18 18 14 Q28 12 32 24 Q36 12 46 14 Q60 18 54 32 Z" ${F}/>`,
@@ -48,8 +64,6 @@ const ART: Record<string, string> = {
   st_charge: `<path d="M32 8 L52 32 L32 56 L12 32 Z" ${F}/>`,
   st_veteran: `<path d="M12 26 L32 10 L52 26 M12 44 L32 28 L52 44" ${S}/>`,
   st_spotted: `<path d="M4 32 Q32 6 60 32 Q32 58 4 32 Z" ${S}/><circle cx="32" cy="32" r="8" ${F}/>`,
-  st_smoke: `<path d="M15 43 Q6 43 7 35 Q8 27 17 28 Q18 18 28 18 Q36 11 44 19 Q55 18 56 29 Q61 37 53 43 Z" ${S}/><rect x="26" y="48" width="12" height="11" rx="2" ${F}/>`,
-  st_mark: `<path d="M20 5 L44 5 L32 20 Z" ${F}/><path d="M32 30 L52 59 L12 59 Z" ${S}/><path d="M8 12 L4 8 M56 12 L60 8 M10 22 L4 22 M54 22 L60 22" ${S}/>`,
   st_crossfire: `<path d="M8 8 L56 56 M56 8 L8 56" ${S}/><path d="M56 56 L42 54 M56 56 L54 42 M8 56 L22 54 M8 56 L10 42" ${S}/>`,
   st_callin: `<circle cx="32" cy="38" r="16" ${S}/><path d="M32 4 L32 30 M24 22 L32 30 L40 22" ${S}/>`,
   st_shaken: `<path d="M8 20 Q16 10 24 20 T40 20 T56 20 M8 34 Q16 24 24 34 T40 34 T56 34 M8 48 Q16 38 24 48 T40 48 T56 48" ${S}/>`,

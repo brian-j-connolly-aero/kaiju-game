@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  beginStage,
   bitGet,
   Btn,
   CALLINS,
@@ -115,6 +116,46 @@ describe('projectile impacts', () => {
     expect(k.maxHp - k.hp).toBeCloseTo(GUN.damage * LIZARD.damage.normalMult * LIZARD.damage.rearMult, 9);
     expect(k.recentHits).toMatchObject([{ unit: 4 }]);
     expect(world.projectiles).toEqual([]);
+  });
+
+  it('hits the head and the tail too: the hit volume follows the body, not just a column round its middle', () => {
+    const world = arena();
+    beginStage(world, 2);
+    const k = placeKaiju(world, 0, 0, 0);
+    parkUnits(world);
+    const st = LIZARD.stages[1];
+    // A shot from the side, level with the tail between its middle and its tip, well clear of the body.
+    const tailZ = -19;
+    const [mid, tip] = [st.hit.tail[1], st.hit.tail[2]];
+    const tailY = mid[1] + ((tailZ - mid[0]) / (tip[0] - mid[0])) * (tip[1] - mid[1]);
+    expect(-tailZ).toBeGreaterThan(st.bodyRadius * 2);
+    /** What a shell flying across at (z, y) meets, the kaiju looking along `look`: 'kaiju', or 'none' when it flies on past. */
+    const across = (z: number, y: number, look = 0): string => {
+      const p = fireShell(world, 80, z, -1, 0, { y });
+      const hit = eventsOf(run(world, TICK_RATE, [input({ aimYaw: look })]), 'projectileHit')[0];
+      if (hit) return hit.target;
+      expect(p.x).toBeLessThan(-25);
+      world.projectiles.length = 0;
+      return 'none';
+    };
+    expect(across(tailZ, tailY)).toBe('kaiju');
+    // Above it, the shot flies on; the hit counted from the side it came from.
+    expect(across(tailZ, tailY + 8)).toBe('none');
+    // The head, ahead of the body where the eye and mouth are, likewise.
+    expect(across(st.mouthForward - 1, st.mouthHeight + 2)).toBe('kaiju');
+    // Turned round, the tail and the head are not there any more.
+    k.yaw = Math.PI;
+    k.aimYaw = Math.PI;
+    expect(across(tailZ, tailY, Math.PI)).toBe('none');
+    expect(across(st.mouthForward - 1, st.mouthHeight + 2, Math.PI)).toBe('none');
+    // An aim ray lands on the tail just as a shell does.
+    k.yaw = 0;
+    k.aimYaw = 0;
+    const aim = createAimPoint();
+    resolveAimPoint(world.cityQuery, 80, tailY, tailZ, -Math.PI / 2, 0, 200, aim, world.kaijus);
+    expect(aim).toMatchObject({ on: 'kaiju', id: 0 });
+    expect(aim.x).toBeGreaterThan(0);
+    expect(aim.x).toBeLessThan(st.hit.tailRadii[1] + 0.5);
   });
 
   it('carries on past a miss into whatever is behind: the backstop', () => {

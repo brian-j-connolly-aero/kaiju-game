@@ -16,7 +16,7 @@ import { CinematicCamera, type OrbitShot } from '../game/controllers/cinematicCa
 import { DroneController } from '../game/controllers/droneController';
 import { HumanController } from '../game/controllers/humanController';
 import { KaijuController } from '../game/controllers/kaijuController';
-import { CameraShake, squadIsOut, type ControlContext, type Controller } from '../game/controllers/types';
+import { CameraShake, squadIsOut, type ControlContext, type Controller, type InputSample } from '../game/controllers/types';
 import type { InputManager } from '../game/input/inputManager';
 import { InputTicker } from '../game/input/inputTicker';
 import type { FrameState, MatchSession } from '../net/matchSession';
@@ -26,6 +26,16 @@ import type { HudView } from '../ui/hud';
 /** The front page photo is this wide at most, and is not retaken more often than this (seconds). */
 const PHOTO_WIDTH = 640;
 const PHOTO_EVERY = 5;
+
+/**
+ * What goes to the server while the body cannot act (outside play): no movement and no buttons,
+ * but a molt card picked meanwhile still goes (a pick counts until the intermission is over).
+ */
+export function idleSample(sample: InputSample | null, aimYaw: number, aimPitch: number): InputSample {
+  const out: InputSample = { moveX: 0, moveZ: 0, aimYaw, aimPitch, buttons: 0 };
+  if (sample?.card) out.card = sample.card;
+  return out;
+}
 
 export interface RuntimeDeps {
   session: MatchSession;
@@ -58,6 +68,12 @@ export class MatchRuntime {
   photo = '';
   /** Called for every simulation event after the renderer and the audio have had it. */
   onEvent: ((e: SimEvent) => void) | null = null;
+  /**
+   * Called every frame once the camera is in place for the picture about to be drawn (shake
+   * included), before it is drawn: the HUD pins its pictures of points in the world (the gun's
+   * reticle) here, so they move with the picture and not a frame behind it.
+   */
+  onCamera: (() => void) | null = null;
   eventCounts: Record<string, number> = {};
   /** Where a frame's time goes, milliseconds, smoothed: input and network, scene update, drawing. */
   readonly timing = { logic: 0, scene: 0, draw: 0 };
@@ -101,6 +117,16 @@ export class MatchRuntime {
     return this.player instanceof HumanController ? this.player : null;
   }
 
+  /** The kaiju player's controller, or null for the other roles. */
+  get kaiju(): KaijuController | null {
+    return this.player instanceof KaijuController ? this.player : null;
+  }
+
+  /** The kaiju player picked molt card `n` (1 to 3): it goes to the server with the next input. */
+  pickCard(n: number): void {
+    this.kaiju?.pickCard(n);
+  }
+
   /** The human controller when the player is driving a unit right now, else null. */
   get activeHuman(): HumanController | null {
     return this.controller === this.player ? this.human : null;
@@ -118,6 +144,8 @@ export class MatchRuntime {
     const st = kaijuStageDef(k.kind, k.stage);
     const d = this.distanceToCamera(k.x, k.z);
     if (k.id !== this.session.role.kaijuId && d < st.height * 5) this.shake.add(0.12 * (1 - d / (st.height * 5)));
+    // The monster's own footfalls jolt its view only while it charges: the run should pound.
+    else if (k.id === this.session.role.kaijuId && k.action === 'charge' && k.phase === 'charge') this.shake.add(0.1);
   }
 
   handleEvent(e: SimEvent): void {
@@ -142,11 +170,21 @@ export class MatchRuntime {
     switch (e.type) {
       case 'kaijuAction': {
         const k = frame?.kaijus[e.kaiju];
-        if (k && e.action === 'stomp' && e.phase === 'active') {
-          const reach = kaijuStageDef(k.kind, k.stage).height * 8;
-          const d = this.distanceToCamera(e.x, e.z);
-          if (d < reach) this.shake.add(0.7 * (1 - d / reach));
-        }
+        if (!k) break;
+        const h = kaijuStageDef(k.kind, k.stage).height;
+        const d = this.distanceToCamera(e.x, e.z);
+        // A stomp lands, a charge ends in its stumble, a tail sweep hits: the ground shakes nearby.
+        const kick =
+          e.action === 'stomp' && e.phase === 'active' ? { reach: h * 8, amount: 0.7 } : e.action === 'charge' && e.phase === 'stumble' ? { reach: h * 7, amount: 0.6 } : e.action === 'tailSweep' && e.phase === 'active' ? { reach: h * 5, amount: 0.35 } : null;
+        if (kick && d < kick.reach) this.shake.add(kick.amount * (1 - d / kick.reach));
+        break;
+      }
+      case 'cityCollapse': {
+        // Never alone: the city gives way around the kaiju.
+        const k = frame?.kaijus[e.kaiju];
+        const reach = (k ? kaijuStageDef(k.kind, k.stage).height : 10) * 12 + 120;
+        const d = this.distanceToCamera(e.x, e.z);
+        if (d < reach) this.shake.add(0.9 * (1 - d / reach));
         break;
       }
       case 'kaijuHit':
@@ -218,7 +256,6 @@ export class MatchRuntime {
       inRange,
       thirdPerson: this.controller.thirdPerson,
       recoil: human ? human.recoil : 0,
-      wheelOpen: human ? human.wheel.open : false,
       mapOpen: this.mapOpen,
       mode: this.controller.kind,
       device: input.state.device,
@@ -265,13 +302,15 @@ export class MatchRuntime {
     // 30 Hz input ticks. Outside play the body cannot act: send a neutral sample so the server
     // still hears from this client. Buttons are read from the latch (`input.held`), which is
     // started again after every sample, so a click between two ticks is in exactly one of them.
+    // A molt card picked during the intermission still goes out (it counts until the
+    // intermission ends: sim/moltCards.ts).
     const ticks = this.ticker.advance(dt);
     for (let i = 0; i < ticks; i++) {
       const sample = controller.sample(ctx);
       input.sampleTaken();
       if (!sample && this.session.role.kind === 'spectator') continue;
       if (!sample || !playing) {
-        session.tickInput({ moveX: 0, moveZ: 0, aimYaw: session.aimYaw, aimPitch: session.aimPitch, buttons: 0 }, now);
+        session.tickInput(idleSample(sample, session.aimYaw, session.aimPitch), now);
       } else {
         session.tickInput(sample, now);
       }
@@ -309,6 +348,7 @@ export class MatchRuntime {
     const cam = renderer.camera;
     const e = cam.matrixWorld.elements;
     cam.updateMatrixWorld();
+    this.onCamera?.();
     audio.setListener(cam.position.x, cam.position.y, cam.position.z, -e[8], -e[9], -e[10]);
     this.matchAudio.update(frame, dt);
     audio.update(dt);

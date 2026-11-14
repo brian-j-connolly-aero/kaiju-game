@@ -1,79 +1,51 @@
 /**
- * System 3 of 11: unit orders and sub-unit behavior (DESIGN.md section 5).
+ * System 3 of 11: squad-mates (DESIGN.md section 5, "The humans").
  *
- * The player drives one unit of the squad (the input system has already copied their stick,
- * aim and trigger onto it). This system runs everything else about a squad:
+ * The player drives one unit of the squad; the input system has already copied their stick, aim
+ * and trigger onto it. The other living units are its squad-mates. Nobody gives them orders:
+ * they ride with the leader as a loose swarm and shoot on their own, and the volley button is
+ * the one thing the player asks of them. This system runs all of it:
  *
- * - Perception first: smoke clouds and marks wear off (`updateAbilities`), then
- *   `updateSpotting` refreshes `kaiju.spotted` and `kaiju.known`.
+ * - Perception first: `updateSpotting` refreshes `kaiju.spotted` and `kaiju.known`.
  * - Lives: when the driven unit is dead and others live, the player takes over the nearest
- *   survivor (`takeover`). (The damage system marks the squad eliminated when the last one dies.)
- * - Commands from `player.commands`. The movement order ('follow' / 'moveTo') and the fire mode
- *   ('atWill' / 'charge') are independent; a call-in request starts a mission if it is ready,
- *   and smoke and a mark are thrown or set if they are (sim/abilities.ts).
- *   Wheel orders cost planning (hold points, routes), so a squad carries them out from a small
- *   budget (`takeOrders`): a few at once, then a few a second, the newest of each kind first
- *   in line. However many commands a client sends, the work per squad is bounded.
- * - Every living sub-unit then gets its `control` for this tick:
- *     shaken            it cannot fire, lets go of a hold, and backs away from a kaiju that is near;
- *     on hold (rooted)  it stands, keeps its laser on the target inside its firing arc, and
- *                       builds charge from 0 to 1 over COMBAT_RULES.chargeTime;
- *     otherwise         it goes to its hold point when it has one (by the move-to marker, or
- *                       where a hold command parked it) and else to its place in the column
- *                       behind the leader, finding its way with sim/nav.ts. In fire mode
- *                       'atWill' it shoots on its own at a kaiju it has range and a clear line
- *                       of fire to; in fire mode 'charge' it holds fire, and plants itself when
- *                       it is at its hold point.
- * - It keeps `unit.state` current for animation and says `volley.ready` when every charging
- *   sub-unit of a squad is full.
- *
- * Hold-and-charge, as built:
- * - "hold fire and charge" means "hold here and charge". With the order 'follow' the command
- *   parks every sub-unit where it stands (that spot becomes its hold point); with the order
- *   'moveTo' they keep the hold points by the marker. A sub-unit that is at its hold point
- *   plants itself: it is rooted, its firing arc (COMBAT_RULES.chargeHalfArc either side) is
- *   fixed at that moment, its laser is on (`state` 'charging') and its charge starts from 0.
- *   The arc points at the kaiju when the humans know where it is (or the unit sees it),
- *   otherwise at what the leader is aiming at;
- * - a planted unit stays planted while the leader goes wherever it likes. Firing a volley
- *   spends the charge and ends that hold, and the unit plants itself again on the spot the
- *   next tick: a fresh arc, aimed anew, and the charge builds again;
- * - a new movement order lets it go and clears its charge. 'follow' gives up the parking spot:
- *   the sub-units come along holding their fire, and do not plant again until the hold command
- *   is given again. 'moveTo' sends them to the marker, where they plant when they arrive;
- * - 'fire at will' ends the hold too (parked units fall back in behind the leader);
- * - a shaken unit lets go and backs off; when it steadies it returns to its hold point and
- *   plants again. Giving the hold command again plants everybody afresh: new arcs, charge from 0.
+ *   survivor (`takeOver`). (The damage system marks the squad eliminated when the last one dies.)
+ * - Every living squad-mate then gets its `control` for this tick:
+ *     stunned         (a roar) it stands frozen: no moving, no firing, no charge;
+ *     shaken          it cannot fire or charge, and backs away from a kaiju that is near;
+ *     volley held     (Btn.volley is down, or was let go on this very tick: the weapon system
+ *                     fires the volley later in the tick and un-plants the squad) it stops
+ *                     where it is and plants: rooted, laser on (`state` 'charging'), its weapon
+ *                     swinging toward the point the leader's aim ray lands on (`volleyAim`), its
+ *                     charge growing from 0 to 1 over COMBAT_RULES.chargeTime. The leader
+ *                     itself is never planted and drives on;
+ *     otherwise       it rides in its place in the swarm (`swarmSlot`: one spacing behind the
+ *                     leader out to either side, the third two spacings straight behind, single
+ *                     file where a street is too narrow), finding its way with sim/nav.ts,
+ *                     keeping pace with a leader on the move and hurrying when it has dropped
+ *                     behind; and it shoots at will at a kaiju it has range and a clear line of
+ *                     fire to (half nerve, the at-will aim error).
+ * - It keeps `unit.state` current for animation and says `volley.ready` when every planted
+ *   squad-mate of a squad is fully charged.
  *
  * The weapon system fires; this one only sets `control.fire`. Nothing here changes hp.
  */
 
 import { castSegment } from '../../city/spatialIndex';
-import { callInDef } from '../../defs/callins';
-import { factionLevelDef } from '../../defs/factions';
 import { COMBAT_RULES, DT, SQUAD_RULES } from '../../defs/rules';
 import { unitTypeDef } from '../../defs/units';
 import { modMult } from '../../defs/upgrades';
 import { projectileTypeDef, weaponDef } from '../../defs/weapons';
-import { angleDist, clampAngleAround, turnToward, yawFromTo, yawOf } from '../../math/angle';
+import { angleDist, DEG, turnToward, yawFromTo, yawOf } from '../../math/angle';
 import { approach, clamp } from '../../math/scalar';
 import type { Vec2, Vec3 } from '../../math/vec';
-import { markKaiju, throwSmoke, updateAbilities } from '../abilities';
-import { createAimPoint, resolveAimPoint } from '../aim';
-import type { SquadCommand } from '../commands';
+import { Btn } from '../../net/input';
+import { createAimPoint } from '../aim';
 import { setWorldMove } from '../movement';
 import { createSteer, resetRoute, steerToward } from '../nav';
 import { updateSpotting } from '../spotting';
-import {
-  assignHoldPoints,
-  chargeTarget,
-  formationSlot,
-  nearestKaiju,
-  scatterMult,
-  updateTrail,
-} from '../squads';
-import type { Squad, Unit, World } from '../types';
+import { clearTrail, formationSpacing, nearestKaiju, swarmSlot, swarmWidth, trailFollow, updateTrail, volleyAim, type TrailTarget } from '../squads';
 import { kaijuShownHeight } from '../swim';
+import type { Squad, Unit, World } from '../types';
 import { emit } from '../worldOps';
 import { say } from './voice';
 
@@ -86,62 +58,58 @@ const SEPARATION_GAP = 0.5;
 const SEPARATION_WEIGHT = 0.8;
 /** A sub-unit firing at will checks its lines of fire every this many ticks (five times a second). */
 const SHOT_LOOK_TICKS = 6;
+/** A leader faster than this is on the move: its squad-mates keep pace with it instead of settling. */
+const LEADER_MOVING = 1;
+/** On the move, a squad-mate closes the gap to its place in about this many seconds on top of the leader's pace. */
+const CLOSE_TIME = 1;
+/** A tank squad-mate settled in its place turns to face the way its leader faces, creeping at this throttle... */
+const FACE_THROTTLE = 0.06;
+/** ...whenever it is more than this far off. */
+const FACE_SLACK = 15 * DEG;
+/** A squad-mate this many spacings from its place has fallen behind: it drives the leader's way after it... */
+const BEHIND_SPACINGS = 3;
+/** ...passing every point of it it comes within this many meters (beyond its radius) of, and aiming about a second's drive on. */
+const TRAIL_NEAR = 3;
+/**
+ * A vehicle takes the corners of that way at no more than this share of its top speed: going
+ * flat out it would sail past the corner and into the houses (a troop of tanks catching up at
+ * 33 m/s slides some 40 m before it has turned).
+ */
+const TRAIL_CORNER_SPEED = 0.4;
 
 const steer = createSteer();
 const slot: Vec2 = { x: 0, z: 0 };
+const lead: TrailTarget = { x: 0, z: 0, corner: Infinity };
 const push: Vec2 = { x: 0, z: 0 };
 const aim = createAimPoint();
+const target: Vec3 = { x: 0, y: 0, z: 0 };
 const muzzle: Vec3 = { x: 0, y: 0, z: 0 };
 const mark: Vec3 = { x: 0, y: 0, z: 0 };
 /** Where a sub-unit wants its weapon pointed this tick. */
 const want = { yaw: 0, pitch: 0 };
 
 // ---------------------------------------------------------------------------------------------
-// Hold-and-charge
+// The volley button
 // ---------------------------------------------------------------------------------------------
 
-/** Lets a unit go from a hold: it may move again and whatever charge it had is gone. */
-function release(u: Unit): void {
-  u.rooted = false;
-  u.charge = 0;
-  u.nav.settled = false;
-  u.nav.hurry = 1;
-  resetRoute(u.nav);
+/** True while the squad's player holds the volley button, and on the tick it is let go (the weapon system fires then). */
+export function volleyHeld(world: World, squad: Squad): boolean {
+  const input = world.players[squad.player].input;
+  return ((input.buttons | input.released) & Btn.volley) !== 0;
 }
 
-/** The heading a unit's firing arc is centered on when it plants itself now. */
-function arcCenter(world: World, leader: Unit, u: Unit): number {
-  const k = chargeTarget(world, u);
-  if (k) return yawFromTo(u.x, u.z, k.x, k.z);
-  // Nothing to point at: cover what the leader is looking at.
-  const eye = unitTypeDef(leader.type).eyeHeight;
-  const c = leader.control;
-  resolveAimPoint(world.cityQuery, leader.x, leader.y + eye, leader.z, c.aimYaw, c.aimPitch, SQUAD_RULES.aimRayRange, aim);
-  const dx = aim.x - u.x;
-  const dz = aim.z - u.z;
-  if (aim.on === 'none' || dx * dx + dz * dz < 1) return c.aimYaw;
-  return yawOf(dx, dz);
-}
-
-/** Plants a unit for a charge: rooted where it stands, arc fixed, laser on, charge from 0. */
-function plant(world: World, leader: Unit, u: Unit): void {
+/** Plants a squad-mate for the volley: rooted where it stands, laser on, charge from 0. */
+function plant(u: Unit): void {
   u.rooted = true;
   u.charge = 0;
   u.state = 'charging';
-  u.arcYaw = arcCenter(world, leader, u);
   u.nav.settled = true;
   u.nav.hurry = 1;
   resetRoute(u.nav);
-  const c = u.control;
-  c.moveX = 0;
-  c.moveZ = 0;
-  c.fire = false;
-  c.aimYaw = u.arcYaw;
-  c.aimPitch = 0;
 }
 
-/** One tick of holding: charge builds and the laser follows the target as far as the arc allows. */
-function holdAndCharge(world: World, squad: Squad, u: Unit): void {
+/** One tick of a planted squad-mate: it stands, swings its weapon toward the volley's aim point and charges. */
+function holdAndCharge(squad: Squad, u: Unit, aimAt: Vec3 | null): void {
   const c = u.control;
   c.moveX = 0;
   c.moveZ = 0;
@@ -149,162 +117,14 @@ function holdAndCharge(world: World, squad: Squad, u: Unit): void {
   u.state = 'charging';
   const time = COMBAT_RULES.chargeTime * modMult(squad.mods, 'chargeTime');
   u.charge = time > 0 ? Math.min(1, u.charge + DT / time) : 1;
-
-  let yaw = u.arcYaw;
-  let pitch = 0;
-  const k = chargeTarget(world, u);
-  if (k) {
-    const type = unitTypeDef(u.type);
-    const d = Math.hypot(k.x - u.x, k.z - u.z);
-    yaw = clampAngleAround(yawFromTo(u.x, u.z, k.x, k.z), u.arcYaw, COMBAT_RULES.chargeHalfArc);
-    pitch = Math.atan2(kaijuShownHeight(k) * SQUAD_RULES.aimHeights[0] - (u.y + type.muzzleHeight), Math.max(d, 1e-6));
-  }
+  if (!aimAt) return;
+  const dx = aimAt.x - u.x;
+  const dz = aimAt.z - u.z;
+  const d = Math.hypot(dx, dz);
+  if (d < 1) return;
   const step = SQUAD_RULES.aimTurnRate * DT;
-  c.aimYaw = clampAngleAround(turnToward(c.aimYaw, yaw, step), u.arcYaw, COMBAT_RULES.chargeHalfArc);
-  c.aimPitch = approach(c.aimPitch, pitch, step);
-}
-
-// ---------------------------------------------------------------------------------------------
-// Commands
-// ---------------------------------------------------------------------------------------------
-
-function startCallIn(world: World, squad: Squad, leader: Unit, c: Extract<SquadCommand, { type: 'callIn' }>): void {
-  const index = factionLevelDef(squad.faction, world.match.stage).callIns.indexOf(c.callIn);
-  if (index < 0 || (squad.callInCooldowns[index] ?? 0) > 0) return;
-  const def = callInDef(c.callIn);
-  const b = world.match.bounds;
-  const x = clamp(c.x, b.minX, b.maxX);
-  const z = clamp(c.z, b.minZ, b.maxZ);
-  // The shells come over the caller's shoulder: from behind the squad toward the marker.
-  let dirX = x - leader.x;
-  let dirZ = z - leader.z;
-  const d = Math.hypot(dirX, dirZ);
-  if (d > 1) {
-    dirX /= d;
-    dirZ /= d;
-  } else {
-    dirX = Math.sin(leader.control.aimYaw);
-    dirZ = Math.cos(leader.control.aimYaw);
-  }
-  const id = world.nextCallInId++;
-  world.callIns.push({
-    id,
-    callIn: c.callIn,
-    squad: squad.id,
-    player: squad.player,
-    x,
-    z,
-    timer: def.delay,
-    shellsLeft: def.shells,
-    nextShell: 0,
-    dirX,
-    dirZ,
-  });
-  squad.callInCooldowns[index] = def.cooldown * modMult(squad.mods, 'callInCooldown');
-  emit(world, {
-    type: 'callin',
-    id,
-    callIn: c.callIn,
-    squad: squad.id,
-    player: squad.player,
-    x,
-    z,
-    phase: 'marked',
-    delay: def.delay,
-    radius: def.scatterRadius * scatterMult(world.match.stage, nearestKaiju(world, x, z)),
-  });
-}
-
-function applyCommand(world: World, squad: Squad, leader: Unit, c: SquadCommand): void {
-  switch (c.type) {
-    case 'follow':
-      squad.moveOrder = 'follow';
-      squad.formed = true;
-      break;
-    case 'moveTo': {
-      const b = world.match.bounds;
-      squad.moveOrder = 'moveTo';
-      squad.moveTarget.x = clamp(c.x, b.minX, b.maxX);
-      squad.moveTarget.z = clamp(c.z, b.minZ, b.maxZ);
-      assignHoldPoints(world, squad);
-      break;
-    }
-    case 'fireAtWill':
-      squad.fireMode = 'atWill';
-      break;
-    case 'holdCharge':
-      squad.fireMode = 'charge';
-      break;
-    case 'callIn':
-      startCallIn(world, squad, leader, c);
-      return;
-    case 'smoke':
-      throwSmoke(world, squad, leader, c.x, c.z);
-      return;
-    case 'mark':
-      markKaiju(world, squad, leader, leader.control.aimYaw, leader.control.aimPitch);
-      return;
-  }
-  const parked = squad.moveOrder === 'follow';
-  for (const id of squad.units) {
-    const u = world.units[id];
-    if (!u.alive || id === squad.driven) continue;
-    // Every wheel command ends the hold a unit is in; one that is at its hold point on
-    // hold-and-charge plants itself afresh this same tick.
-    release(u);
-    // By the move-to marker a unit keeps its hold point. Following the leader there are none,
-    // except the spot a hold command parks a unit on.
-    if (!parked && u.nav.hasHold) continue;
-    u.nav.hasHold = c.type === 'holdCharge';
-    u.nav.holdX = u.x;
-    u.nav.holdZ = u.z;
-  }
-}
-
-function isMoveOrder(c: SquadCommand): boolean {
-  return c.type === 'follow' || c.type === 'moveTo';
-}
-
-/** What the orders of one tick share across the squads. */
-interface OrderTick {
-  /** A move-to has been planned this tick. */
-  moveToPlanned: boolean;
-}
-
-/**
- * Takes this tick's commands for a squad. Call-ins, smoke and marks go straight through (their
- * cooldown is the limit). Wheel orders join the squad's short queue, where a newer movement order replaces an
- * older one that has not been carried out yet and a newer fire mode an older fire mode, and
- * are carried out in the order they came as far as the squad's order budget reaches
- * (SQUAD_RULES.orderBurst at once, refilled at ordersPerSecond). Every order plans afresh for
- * the whole squad, so this is what keeps a flood of commands from costing more than a few
- * honest ones. A move-to is the dear one (it searches for hold points), so only one is planned
- * per tick in the whole match: a second squad's waits for the next tick.
- */
-function takeOrders(world: World, squad: Squad, leader: Unit, commands: readonly SquadCommand[], tick: OrderTick): void {
-  squad.orderBudget = Math.min(SQUAD_RULES.orderBurst, squad.orderBudget + SQUAD_RULES.ordersPerSecond * DT);
-  const pending = squad.pendingOrders;
-  for (const c of commands) {
-    if (c.type === 'callIn' || c.type === 'smoke' || c.type === 'mark') {
-      applyCommand(world, squad, leader, c);
-      continue;
-    }
-    const move = isMoveOrder(c);
-    for (let i = pending.length - 1; i >= 0; i--) {
-      if (isMoveOrder(pending[i]) === move) pending.splice(i, 1);
-    }
-    pending.push(c);
-  }
-  while (pending.length > 0 && squad.orderBudget >= 1 - 1e-9) {
-    const next = pending[0];
-    if (next.type === 'moveTo') {
-      if (tick.moveToPlanned) break;
-      tick.moveToPlanned = true;
-    }
-    pending.shift();
-    squad.orderBudget = Math.max(0, squad.orderBudget - 1);
-    applyCommand(world, squad, leader, next);
-  }
+  c.aimYaw = turnToward(c.aimYaw, yawOf(dx, dz), step);
+  c.aimPitch = approach(c.aimPitch, Math.atan2(aimAt.y - (u.y + unitTypeDef(u.type).muzzleHeight), d), step);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -329,68 +149,114 @@ function takeOver(world: World, squad: Squad): void {
   // With nobody left the damage system has already marked the squad eliminated.
   if (!next) return;
   squad.driven = next.id;
-  release(next);
-  next.nav.hasHold = false;
+  next.rooted = false;
+  next.charge = 0;
+  next.nav.settled = true;
+  next.nav.hurry = 1;
+  resetRoute(next.nav);
   if (next.state !== 'shaken') next.state = 'idle';
   // The stick and trigger were held for the unit that died; the new one starts from rest.
   next.control.moveX = 0;
   next.control.moveZ = 0;
   next.control.fire = false;
-  squad.trail.length = 0;
+  clearTrail(squad);
   emit(world, { type: 'takeover', player: squad.player, squad: squad.id, fromUnit: lost.id, toUnit: next.id });
 }
 
 // ---------------------------------------------------------------------------------------------
-// Sub-unit behavior
+// The swarm
 // ---------------------------------------------------------------------------------------------
 
 /**
- * Steers a sub-unit toward where it belongs (into `steer`): its hold point when it has one,
- * otherwise its place in the column behind the leader. Returns true when it is at its hold point.
+ * Steers a squad-mate toward its place in the swarm (into `steer`). Behind the leader as it
+ * goes, a squad-mate keeps the leader's pace and a little more until it is in its place, then
+ * rides along; one that has dropped well behind hurries (`nav.hurry`). Around a leader that has
+ * stopped it settles in its place and does not shuffle after every small move.
  */
-function followOrder(world: World, squad: Squad, leader: Unit, u: Unit, rank: number): boolean {
+function followSwarm(world: World, squad: Squad, leader: Unit, u: Unit, rank: number, width: number): void {
   steer.dirX = 0;
   steer.dirZ = 0;
   steer.throttle = 0;
   const nav = u.nav;
   nav.hurry = 1;
-
-  let gx: number;
-  let gz: number;
-  let tolerance: number;
-  let resume: number;
-  if (nav.hasHold) {
-    gx = nav.holdX;
-    gz = nav.holdZ;
-    tolerance = SQUAD_RULES.arriveRadius;
-    resume = tolerance + 0.5;
-  } else {
-    // Not formed up yet (a fresh deployment): the unit's place is where it stands.
-    if (!formationSlot(world, squad, leader, u, rank, slot)) {
-      nav.settled = true;
-      return false;
+  // Not formed up yet (a fresh deployment): the unit's place is where it stands.
+  if (!swarmSlot(world, squad, leader, u, rank, width, slot)) {
+    nav.settled = true;
+    return;
+  }
+  const def = unitTypeDef(u.type);
+  const tolerance = SQUAD_RULES.slotTolerance * u.radius + 1;
+  const resume = 1.5 * tolerance + 0.5;
+  const dist = Math.hypot(slot.x - u.x, slot.z - u.z);
+  const lvx = leader.vx;
+  const lvz = leader.vz;
+  const pace = Math.hypot(lvx, lvz);
+  const onTheMove = pace > LEADER_MOVING;
+  if (!onTheMove && nav.settled && dist <= resume) {
+    // Settled: a tank turns to face where its leader faces, so that the swarm sets off together.
+    // (Infantry turns at once whichever way it goes.)
+    if (def.steer === 'heading' && angleDist(u.yaw, leader.yaw) > FACE_SLACK) {
+      steer.dirX = Math.sin(leader.yaw);
+      steer.dirZ = Math.cos(leader.yaw);
+      steer.throttle = FACE_THROTTLE;
     }
-    gx = slot.x;
-    gz = slot.z;
-    tolerance = SQUAD_RULES.slotTolerance * u.radius + 1;
-    // A unit that has stopped in its slot does not shuffle after every small move of the leader.
-    resume = 1.5 * tolerance + 0.5;
+    return;
   }
 
-  const dist = Math.hypot(gx - u.x, gz - u.z);
-  if (!nav.settled || dist > resume) {
-    nav.settled = false;
-    steerToward(world, u, gx, gz, tolerance, steer);
-    if (steer.arrived) nav.settled = true;
-    // The leader is as fast as its sub-units: one that has dropped out of the column hurries to close up.
-    else if (!nav.hasHold && dist > resume) nav.hurry = SQUAD_RULES.catchUpSpeed;
+  nav.settled = false;
+  const top = def.speed * modMult(squad.mods, 'speed');
+  if (dist > BEHIND_SPACINGS * formationSpacing(u)) {
+    // Fallen behind: flat out along the way the leader came (it is open to a unit of this size),
+    // which beats finding a way of its own to a place that keeps moving off. Off that way, it
+    // first goes to where the way passes nearest (a point that stays put), unless its place is nearer.
+    const fast = top * SQUAD_RULES.catchUpSpeed;
+    const corner = TRAIL_CORNER_SPEED * top;
+    // A vehicle looks out for a corner as far ahead as it needs to brake for it.
+    const reach = def.steer === 'heading' ? (fast * fast - corner * corner) / (2 * def.accel) + u.radius : 0;
+    if (trailFollow(squad, u, u.radius + TRAIL_NEAR, Math.max(3 * u.radius, def.speed), reach, lead) < dist) {
+      steerToward(world, u, lead.x, lead.z, 1, steer);
+      nav.hurry = SQUAD_RULES.catchUpSpeed;
+      if (steer.throttle > 0) {
+        // Flat out, braking in time to take the leader's next corner at corner speed.
+        const v = def.steer === 'heading' ? Math.sqrt(corner * corner + 2 * def.accel * Math.max(0, lead.corner - u.radius)) : fast;
+        steer.throttle = Math.min(1, v / fast);
+      }
+      return;
+    }
   }
-  return nav.settled && nav.hasHold;
+  nav.trailMark = -1;
+  steerToward(world, u, slot.x, slot.z, tolerance, steer);
+  if (steer.arrived) {
+    if (onTheMove) {
+      // In its place: ride along with the leader.
+      steer.dirX = lvx / pace;
+      steer.dirZ = lvz / pace;
+      steer.throttle = Math.min(1, pace / top);
+    } else {
+      nav.settled = true;
+    }
+    return;
+  }
+  if (onTheMove && (slot.x - u.x) * lvx + (slot.z - u.z) * lvz <= 0) {
+    // Ahead of its place: ride along a little slower while the place catches up (a tank does
+    // not turn round for a place that is coming to it anyway).
+    steer.dirX = lvx / pace;
+    steer.dirZ = lvz / pace;
+    steer.throttle = clamp((pace - dist / CLOSE_TIME) / top, 0, 1);
+    return;
+  }
+  // On its way to its place: the leader's pace (its place moves with the leader), and on top of
+  // it no more than it can still brake from in the distance left, so that it does not overshoot
+  // (a troop of tanks at full speed needs some 25 m to stop). Faster than the leader if it must.
+  const want = (onTheMove ? pace : 0) + Math.sqrt(2 * def.accel * dist);
+  if (want > top) nav.hurry = SQUAD_RULES.catchUpSpeed;
+  // Along the streets the navigation's own easing for the corners stands.
+  if (steer.throttle > 0 && nav.path.length === 0) steer.throttle = Math.min(1, want / (top * nav.hurry));
 }
 
 /**
- * Adds a push away from any moving unit this one overlaps, so a column on the move does not
- * bunch up. Units that stand still are walked past: a parked squad is not an obstacle course.
+ * Adds a push away from any moving unit this one overlaps, so a swarm on the move does not
+ * bunch up. Units that stand still are walked past: a planted squad is not an obstacle course.
  */
 function separate(world: World, u: Unit): void {
   push.x = 0;
@@ -422,6 +288,10 @@ function separate(world: World, u: Unit): void {
   steer.dirZ = mz / len;
   steer.throttle = Math.min(1, len);
 }
+
+// ---------------------------------------------------------------------------------------------
+// Fire at will, and backing off
+// ---------------------------------------------------------------------------------------------
 
 /**
  * Looks for something to shoot at will: the nearest living kaiju within the weapon's range that
@@ -476,11 +346,12 @@ function findShot(world: World, squad: Squad, u: Unit): boolean {
   return true;
 }
 
-/** A shaken unit lets go of everything and backs away from a kaiju that is near. */
+/** A shaken unit lets go of everything (its charge too) and backs away from a kaiju that is near. */
 function backOff(world: World, u: Unit): void {
   const c = u.control;
   c.fire = false;
   u.rooted = false;
+  u.charge = 0;
   u.nav.settled = false;
   u.nav.hurry = 1;
   steer.dirX = 0;
@@ -507,37 +378,47 @@ function backOff(world: World, u: Unit): void {
   setWorldMove(c, steer.dirX, steer.dirZ, steer.throttle);
 }
 
-function orderSubUnit(world: World, squad: Squad, leader: Unit, u: Unit, rank: number): void {
+// ---------------------------------------------------------------------------------------------
+// One squad-mate, one tick
+// ---------------------------------------------------------------------------------------------
+
+function orderSubUnit(world: World, squad: Squad, leader: Unit, u: Unit, rank: number, width: number, held: boolean, aimAt: Vec3 | null): void {
   const c = u.control;
   c.fire = false;
+  // roar stun: frozen where it stands; it neither moves, nor fires, nor charges.
+  if (u.stun > 0) {
+    c.moveX = 0;
+    c.moveZ = 0;
+    u.rooted = false;
+    u.charge = 0;
+    return;
+  }
   if (u.shaken > 0) {
     backOff(world, u);
     return;
   }
-
-  const charging = squad.fireMode === 'charge';
-  if (!charging) u.rooted = false;
-  if (!u.rooted) {
-    // Free to move: go where it belongs. On hold-and-charge, plant once at its hold point.
-    const holding = followOrder(world, squad, leader, u, rank);
-    if (charging && holding) plant(world, leader, u);
-  }
-  if (u.rooted) {
-    holdAndCharge(world, squad, u);
+  if (held) {
+    // The volley: stop where it stands, plant once, and charge for as long as the button is held.
+    if (!u.rooted) plant(u);
+    holdAndCharge(squad, u, aimAt);
     return;
   }
+  if (u.rooted) {
+    // Let go without a shot (the weapon system un-plants those that fired): the charge is gone.
+    u.rooted = false;
+    u.charge = 0;
+  }
+  followSwarm(world, squad, leader, u, rank, width);
   // On the move it keeps clear of the others; on the last few meters it does not, or a unit
   // standing where it is going would hold it off for good.
   const nav = u.nav;
   if (!nav.settled && Math.hypot(nav.goalX - u.x, nav.goalZ - u.z) > 2 * u.radius + SEPARATION_GAP) separate(world, u);
 
-  // Where the weapon points: at a target when firing at will, otherwise along the way it is
-  // going, and where the leader looks when it is standing by.
+  // Where the weapon points: at a target it can shoot, otherwise along the way it is going, and
+  // where the leader looks when it is standing by.
   const step = SQUAD_RULES.aimTurnRate * DT;
-  let shot = false;
-  if (!charging && findShot(world, squad, u)) {
-    shot = true;
-  } else {
+  const shot = findShot(world, squad, u);
+  if (!shot) {
     want.yaw = steer.throttle > 0 ? yawOf(steer.dirX, steer.dirZ) : leader.control.aimYaw;
     want.pitch = 0;
   }
@@ -553,13 +434,10 @@ function orderSubUnit(world: World, squad: Squad, leader: Unit, u: Unit, rank: n
 
 export function unitOrderSystem(world: World): void {
   if (world.match.phase !== 'playing') return;
-  // Clouds thin out and marks wear off before anybody looks.
-  updateAbilities(world);
   updateSpotting(world);
-  const orderTick: OrderTick = { moveToPlanned: false };
 
   for (const squad of world.squads) {
-    // An eliminated player is out until the next stage: nothing to order, nothing to call in.
+    // An eliminated player is out until the next stage.
     if (squad.eliminated || squad.driven < 0) {
       squad.volleyReady = false;
       continue;
@@ -567,15 +445,33 @@ export function unitOrderSystem(world: World): void {
     takeOver(world, squad);
     const leader = world.units[squad.driven];
     if (!leader.alive) continue;
-
-    takeOrders(world, squad, leader, world.players[squad.player].commands, orderTick);
     updateTrail(squad, leader);
 
-    // The driven unit is never on hold; the player moves and aims it.
+    // The driven unit is never planted; the player moves and aims it.
     leader.rooted = false;
     if (leader.shaken <= 0) {
       leader.state = leader.vx * leader.vx + leader.vz * leader.vz > MOVING_SPEED * MOVING_SPEED ? 'moving' : 'idle';
     }
+
+    let mates = 0;
+    let sample: Unit | null = null;
+    for (const id of squad.units) {
+      const u = world.units[id];
+      if (!u.alive || id === squad.driven) continue;
+      mates++;
+      sample ??= u;
+    }
+    if (!sample) {
+      squad.volleyReady = false;
+      continue;
+    }
+    const held = volleyHeld(world, squad);
+    let aimAt: Vec3 | null = null;
+    if (held) {
+      volleyAim(world, leader, aim, target);
+      aimAt = target;
+    }
+    const width = held ? 1 : swarmWidth(world, squad, leader, sample, mates);
 
     let rank = 0;
     let holding = 0;
@@ -583,7 +479,7 @@ export function unitOrderSystem(world: World): void {
     for (const id of squad.units) {
       const u = world.units[id];
       if (!u.alive || id === squad.driven) continue;
-      orderSubUnit(world, squad, leader, u, rank++);
+      orderSubUnit(world, squad, leader, u, rank++, width, held, aimAt);
       if (u.rooted) {
         holding++;
         if (u.charge >= 1) full++;

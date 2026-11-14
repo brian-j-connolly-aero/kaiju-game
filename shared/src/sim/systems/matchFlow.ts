@@ -19,24 +19,37 @@
  *    the blast threw are still sliding. `match.stage` and `match.bounds` are still the old ones.
  * 5. `beginStage`: survivors are marked as veterans, the bounds widen, every squad returns
  *    fresh at the new level on the new perimeter (eliminated players are back), and play
- *    resumes. City damage, rage, upgrades and the clock carry over.
+ *    resumes. City damage, rage, upgrades, the moves picked at the molts and the clock carry
+ *    over. A molt card nobody picked by the end of the intermission is drawn at random first
+ *    (sim/moltCards.ts).
+ *
+ * Never alone (docs/ROADMAP.md, phase 1): when every squad has been wiped out during play, the
+ * city gives way. Over MATCH_RULES.neverAloneTime the standing structures nearest the kaiju
+ * inside the bounds collapse one after another (queued as structure hits with cause
+ * 'collapse', so they fall and fill the bar by the usual rules) until the bar reaches the
+ * current stage's mark; if the bounds cannot supply that much, the bar is set to the mark.
+ * Then the cocoon starts by itself (`kaiju.forceMolt`, the kaiju action system). At stage 3 the
+ * bar reaches the last mark and the kaiju wins.
  */
 
+import { distToStructure } from '../../city/spatialIndex';
 import { kaijuKindDef, kaijuStageDef } from '../../defs/kaiju/index';
 import type { EndReason, StageId, Winner } from '../../defs/ids';
 import { callInDef } from '../../defs/callins';
-import { COMBAT_RULES, DT, MATCH_RULES } from '../../defs/rules';
+import { COMBAT_RULES, DT, MATCH_RULES, TICK_RATE } from '../../defs/rules';
 import { LAST_STAGE } from '../../defs/stages';
 import { unitTypeDef } from '../../defs/units';
 import { modMult } from '../../defs/upgrades';
+import { boundsContains } from '../../math/geom';
 import { clamp } from '../../math/scalar';
-import { clearAbilities } from '../abilities';
 import { shoveUnit } from '../kaijuEffects';
+import { pickCardAtRandom } from '../moltCards';
 import { createMoveResult, stepMovement, unitMoveParams, type MoveInput, type MoveParams } from '../movement';
 import { deploySquads, findStandingRoom, setKaijuStage } from '../spawn';
 import { markVeterans, nearestKaiju, scatterMult } from '../squads';
 import type { Kaiju, World } from '../types';
 import { emit } from '../worldOps';
+import { checkBarMarks } from './cityDamage';
 import { applyHit } from './damage';
 
 /** How far past the edge of the shove radius the blast wave throws a unit. */
@@ -87,6 +100,11 @@ function growKaiju(world: World, k: Kaiju, stage: StageId): void {
   k.phaseDuration = 0;
   k.actionTime = 0;
   k.moltAvailable = false;
+  k.forceMolt = false;
+  k.collapse = null;
+  k.act.actionButton = 0;
+  k.act.chargeBlocked = false;
+  k.act.chargeHits.length = 0;
   k.vx = 0;
   k.vz = 0;
   k.recentHits.length = 0;
@@ -117,7 +135,6 @@ export function beginStage(world: World, stage: StageId): void {
   }
   world.projectiles.length = 0;
   world.callIns.length = 0;
-  clearAbilities(world);
   deploySquads(world);
   m.phase = 'playing';
   m.phaseTime = 0;
@@ -220,6 +237,79 @@ function finishCocoons(world: World): boolean {
   return true;
 }
 
+// ---------------------------------------------------------------------------------------------
+// Never alone
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Every squad is gone: the structures nearest the kaiju are lined up to fall, enough of them to
+ * bring the bar to the stage's mark, spread evenly over MATCH_RULES.neverAloneTime.
+ */
+function startCollapse(world: World, k: Kaiju): void {
+  const m = world.match;
+  const mark = m.marks[m.stage - 1];
+  const index = world.cityIndex;
+  const order: Array<{ id: number; d: number }> = [];
+  const need = mark - m.barPoints;
+  if (need > 0) {
+    for (const s of world.city.structures) {
+      if (s.passable || !(s.value > 0) || !(world.structureHp[s.id] > 0) || !boundsContains(m.bounds, s.x, s.z)) continue;
+      order.push({ id: s.id, d: distToStructure(index, s.id, k.x, k.z) });
+    }
+    order.sort((a, b) => a.d - b.d || a.id - b.id);
+  }
+  const ids: number[] = [];
+  let worth = 0;
+  for (const o of order) {
+    if (worth >= need) break;
+    const s = world.city.structures[o.id];
+    ids.push(o.id);
+    worth += (s.value * world.structureHp[o.id]) / s.hp;
+  }
+  const span = ids.length > 0 ? Math.round(MATCH_RULES.neverAloneTime * TICK_RATE) : 0;
+  const ticks = ids.map((_, i) => world.tick + 1 + Math.floor((i * span) / ids.length));
+  k.collapse = { ids, ticks, done: 0, mark };
+  emit(world, { type: 'cityCollapse', kaiju: k.id, x: k.x, z: k.z, count: ids.length, duration: span / TICK_RATE });
+}
+
+/**
+ * One tick of the city giving way: the structures whose turn has come fall (the city damage
+ * system brings them down on the next tick). Once the last has fallen the bar is made up to the
+ * mark if the city could not fill it, and the cocoon is due (at stage 3: the kaiju has won).
+ */
+function stepCollapse(world: World, k: Kaiju): void {
+  const c = k.collapse;
+  if (!c) return;
+  while (c.done < c.ids.length && c.ticks[c.done] <= world.tick) {
+    const id = c.ids[c.done++];
+    if (world.structureHp[id] > 0) world.structureHits.push({ id, damage: Infinity, by: k.player, cause: 'collapse' });
+  }
+  // The last one fell on an earlier tick's queue and the city damage system has applied it.
+  const last = c.ticks.length > 0 ? c.ticks[c.ticks.length - 1] : world.tick - 1;
+  if (c.done < c.ids.length || world.tick <= last) return;
+  const m = world.match;
+  if (m.barPoints < c.mark) m.barPoints = c.mark;
+  checkBarMarks(world);
+  k.collapse = null;
+  if (m.stage < LAST_STAGE) k.forceMolt = true;
+}
+
+/** Never alone: with every squad wiped out during play, the city gives way around the kaiju (see the header). */
+function neverAlone(world: World): void {
+  // A match that never had a squad (the balance harness alone) is not one whose squads are gone.
+  if (world.squads.length === 0 || !world.squads.every((s) => s.eliminated)) return;
+  for (const k of world.kaijus) {
+    if (!k.alive || k.forceMolt) continue;
+    // Already sealed in: the molt is coming anyway, and the squads with it.
+    if (k.phase === 'cocoon') {
+      k.collapse = null;
+      continue;
+    }
+    if (!k.collapse) startCollapse(world, k);
+    stepCollapse(world, k);
+  }
+}
+
 /** During the intermission nobody drives, but whatever the blast threw keeps sliding until it stops. */
 function coastUnits(world: World): void {
   for (const u of world.units) {
@@ -258,6 +348,8 @@ export function matchFlowSystem(world: World): void {
     coastUnits(world);
     m.phaseTime -= DT;
     if (m.phaseTime <= 1e-9) {
+      // A molt card nobody picked is drawn now: every molt ends with a new move.
+      for (const k of world.kaijus) if (k.alive) pickCardAtRandom(world, k);
       // Who lived through the stage (and the blast) comes back as a veteran.
       markVeterans(world);
       beginStage(world, Math.min(LAST_STAGE, m.stage + 1) as StageId);
@@ -287,5 +379,11 @@ export function matchFlowSystem(world: World): void {
     return;
   }
 
+  neverAlone(world);
+  // The city filled the bar to the end: the kaiju has won.
+  if (m.marksReached >= 3) {
+    endMatch(world, 'kaiju', 'bar');
+    return;
+  }
   finishCocoons(world);
 }

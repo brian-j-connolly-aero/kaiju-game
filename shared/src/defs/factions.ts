@@ -12,9 +12,9 @@ export const ARMY: FactionDef = {
   id: 'army',
   name: 'Army',
   levels: [
-    { level: 1, unitType: 'army_rocket_infantry', callIns: [] },
-    { level: 2, unitType: 'army_tank', callIns: [] },
-    { level: 3, unitType: 'army_tank_troop', callIns: ['artillery'] },
+    { level: 1, unitType: 'army_rocket_infantry' },
+    { level: 2, unitType: 'army_tank' },
+    { level: 3, unitType: 'army_tank_troop' },
   ],
 };
 

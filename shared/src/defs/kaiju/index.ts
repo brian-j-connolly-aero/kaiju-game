@@ -3,7 +3,7 @@
  * its id to KAIJU_KIND_IDS if it is new, and add at most one behavior module for its special.
  */
 
-import type { KaijuKindId, KaijuVerb, StageId } from '../ids';
+import type { KaijuKindId, KaijuMoveId, KaijuVerb, StageId } from '../ids';
 import { perStage } from '../ids';
 import type { KaijuActionDef, KaijuKindDef, KaijuStageDef } from '../schema';
 import { LIZARD } from './lizard';
@@ -29,6 +29,24 @@ export function kaijuStageDef(kind: KaijuKindId, stage: StageId): KaijuStageDef 
 
 export function kaijuActionDef(kind: KaijuKindId, verb: KaijuVerb): KaijuActionDef {
   return kaijuKindDef(kind).actions[verb];
+}
+
+/** The verb a move picked at a molt performs ('none' for an empty slot): the beam is the special. */
+export function kaijuMoveVerb(move: KaijuMoveId): KaijuVerb | 'none' {
+  switch (move) {
+    case 'beam':
+      return 'special';
+    case 'none':
+      return 'none';
+    default:
+      return move;
+  }
+}
+
+/** The slot (0 or 1) a kaiju holding these moves has put a verb in, or -1 when it has not picked it. */
+export function kaijuMoveSlot(moves: readonly KaijuMoveId[], verb: KaijuVerb): number {
+  for (let i = 0; i < moves.length; i++) if (kaijuMoveVerb(moves[i]) === verb) return i;
+  return -1;
 }
 
 export { LIZARD };

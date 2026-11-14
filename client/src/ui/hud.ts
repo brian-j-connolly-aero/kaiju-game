@@ -5,25 +5,23 @@
  *
  *   top       destruction bar (a skyline with three towers as the marks), sun-and-moon clock
  *             arc, the stage, and for humans the kaiju's health and nerve
- *   corners   own health / nerve / rage (kaiju) or unit health / charge (human), the squads,
- *             and the verbs with the glyph of the button that does each on the device in use,
- *             always ending with the controls card and its button (it glows for a while at
- *             the start of a match, so a new player finds it)
- *   center    crosshair
+ *   corners   own health / nerve / rage (kaiju) or unit health / nerve / reload (human), the
+ *             squads, and the verbs with the glyph of the button that does each on the device
+ *             in use, always ending with the controls card and its button (it glows for a
+ *             while at the start of a match, so a new player finds it)
+ *   center    crosshair (the squad's volley meter and the tank's gun reticle sit around it:
+ *             ui/volleyMeter.ts, ui/gunReticle.ts)
  */
 
 import {
   barDisplayFraction,
-  callInDef,
   clamp01,
   COMBAT_RULES,
-  factionLevelDef,
   kaijuKindDef,
   MATCH_RULES,
-  SQUAD_ABILITIES,
   unitTypeDef,
+  volleyMeter,
   weaponDef,
-  type CommandId,
   type SnapKaiju,
   type SnapSquad,
   type SnapUnit,
@@ -32,6 +30,7 @@ import { glyphFor, keyLayoutVersion, type Bindings, type ButtonAction, type Inpu
 import type { FrameState, MatchSession } from '../net/matchSession';
 import { skylinePath } from './iconArt';
 import { el, glyph, icon, setGlyph, uiMarkup } from './icons';
+import { KaijuKit } from './kaijuKit';
 
 export interface HudView {
   /** What the crosshair is on. */
@@ -41,8 +40,6 @@ export interface HudView {
   thirdPerson: boolean;
   /** Recoil pulse, 0..1. */
   recoil: number;
-  /** The command the wheel is highlighting, when open. */
-  wheelOpen: boolean;
   mapOpen: boolean;
   /** 'kaiju', 'human' or 'drone': which set of verbs to show. */
   mode: 'kaiju' | 'human' | 'drone';
@@ -115,12 +112,12 @@ export class Hud {
   private readonly health: Meter;
   private readonly nerve: Meter;
   private readonly rage: Meter;
-  private readonly charge: Meter;
   private readonly reload: Meter;
   private readonly squads: HTMLElement;
   private readonly squadRows: Array<{ root: HTMLElement; name: HTMLElement; pips: HTMLElement[] }> = [];
   private readonly crosshair: HTMLElement;
-  private readonly kaijuHints: Record<string, Hint>;
+  /** The monster's buttons: the starting kit, the two move slots, molt (ui/kaijuKit.ts). */
+  readonly kit = new KaijuKit();
   private readonly humanHints: Record<string, Hint>;
   private readonly droneHints: Record<string, Hint>;
   private readonly hintsKaiju: HTMLElement;
@@ -129,14 +126,12 @@ export class Hud {
   private readonly status: HTMLElement;
   private readonly statusIcons: Record<string, HTMLElement>;
   private readonly statusUntil: Record<string, number> = {};
-  private readonly orders: HTMLElement;
   private readonly capture: HTMLElement;
   private readonly menuHint: Hint;
   private readonly controlsHint: Hint;
   private lastBar = -1;
-  /** The longest reload and call-in wait seen since each was last ready (a modifier can lengthen them). */
+  /** The longest reload seen since the weapon was last ready (a modifier can lengthen it). */
   private reloadPeak = 0;
-  private callInPeak = 0;
   private lastClock = -1;
   private lastDevice = '';
   /** When this HUD was first shown (the controls card's hint glows for a while after it). */
@@ -199,35 +194,21 @@ export class Hud {
     this.health = meter('st_health', 'own-health');
     this.nerve = meter('st_nerve', 'own-nerve');
     this.rage = meter('st_rage', 'own-rage');
-    this.charge = meter('st_charge', 'own-charge');
     this.reload = meter('st_reload', 'own-reload');
-    const meters = el('div', 'meters', [this.health.root, this.nerve.root, this.rage.root, this.charge.root, this.reload.root]);
+    const meters = el('div', 'meters', [this.health.root, this.nerve.root, this.rage.root, this.reload.root]);
 
     // --- squads ---
     this.squads = el('div', 'squads');
-    this.orders = el('div', 'orders', [icon('cmd_follow'), icon('cmd_fireatwill')]);
 
     // --- verbs ---
-    this.kaijuHints = {
-      strike: hint('k_swipe', 'strike'),
-      grab: hint('k_grab', 'grab'),
-      block: hint('k_brace', 'block'),
-      roar: hint('k_roar', 'roar'),
-      special: hint('k_special', 'special'),
-      molt: hint('k_molt', 'molt'),
-      camera: hint('st_camera', 'camera'),
-    };
     this.humanHints = {
       fire: hint('st_reload', 'fire'),
-      wheel: hint('cmd_holdcharge', 'wheel'),
-      callIn: hint('st_callin', 'callIn'),
-      smoke: hint('st_smoke', 'smoke'),
-      mark: hint('st_mark', 'mark'),
+      volley: hint('st_charge', 'volley'),
       map: hint('st_map', 'map'),
       camera: hint('st_camera', 'camera'),
     };
     this.droneHints = { rise: hint('ui_rise', 'rise'), sink: hint('ui_sink', 'sink'), map: hint('st_map', 'map') };
-    this.hintsKaiju = el('div', 'hints', Object.values(this.kaijuHints).map((h) => h.root));
+    this.hintsKaiju = this.kit.root;
     this.hintsHuman = el('div', 'hints', Object.values(this.humanHints).map((h) => h.root));
     this.hintsDrone = el('div', 'hints', Object.values(this.droneHints).map((h) => h.root));
 
@@ -236,7 +217,6 @@ export class Hud {
     this.statusIcons = {
       crossfire: icon('st_crossfire', 'status-icon status-crossfire'),
       spotted: icon('st_spotted', 'status-icon status-spotted'),
-      marked: icon('st_mark', 'status-icon status-marked'),
       shaken: icon('st_shaken', 'status-icon status-shaken'),
       swim: icon('k_swim', 'status-icon status-swim'),
       nerveBreak: icon('st_nerve', 'status-icon status-break'),
@@ -258,7 +238,7 @@ export class Hud {
     this.root.append(
       el('div', 'hud-top', [this.clock, el('div', 'hud-top-mid', [bar, this.boss]), el('div', 'hud-top-right', [stage, el('div', 'hud-menus', [this.menuHint.root])])]),
       this.squads,
-      el('div', 'hud-bottom-left', [meters, this.orders]),
+      el('div', 'hud-bottom-left', [meters]),
       el('div', 'hud-bottom-right', [this.hintsKaiju, this.hintsHuman, this.hintsDrone, this.controlsHint.root]),
       this.crosshair,
       this.status,
@@ -382,8 +362,8 @@ export class Hud {
     const lu = frame.localUnit;
     setClass(this.health.root, 'hidden', !lk && !lu);
     setClass(this.nerve.root, 'hidden', !lk && !lu);
-    setClass(this.rage.root, 'hidden', !lk);
-    setClass(this.charge.root, 'hidden', !lu);
+    // Rage is only shown once the beam it powers has been picked at a molt.
+    setClass(this.rage.root, 'hidden', !lk || !lk.moves.includes('beam'));
     setClass(this.reload.root, 'hidden', !lu);
     if (lk) {
       const def = kaijuKindDef(lk.kind);
@@ -395,42 +375,14 @@ export class Hud {
     } else if (lu) {
       setMeter(this.health, lu.hp / Math.max(1, lu.maxHp));
       setMeter(this.nerve, lu.nerve / COMBAT_RULES.unitNerveCapacity);
-      setClass(this.nerve.root, 'danger', lu.shaken > 0);
-      // Charge: the average of the squad's sub-units that are charging.
-      let sum = 0;
-      let n = 0;
-      for (const u of frame.units) {
-        if (u.squad === session.role.squadId && u.alive && !u.driven) {
-          sum += u.charge;
-          n++;
-        }
-      }
-      setMeter(this.charge, n > 0 ? sum / n : 0);
-      setClass(this.charge.root, 'full', n > 0 && sum / n > 0.98);
+      setClass(this.nerve.root, 'danger', lu.shaken > 0 || lu.stun > 0);
       setMeter(this.reload, 1 - clamp01(lu.cooldown / this.reloadFull(lu)));
     }
 
-    // Squads and the standing orders of the local squad.
+    // Squads.
     setClass(this.squads, 'hidden', frame.squads.length === 0);
     this.updateSquads(session, frame.squads, frame.units);
     const own = frame.squads[session.role.squadId];
-    setClass(this.orders, 'hidden', !own || view.mode !== 'human');
-    if (own) {
-      const want: CommandId[] = [own.moveOrder === 'moveTo' ? 'moveTo' : 'follow', own.fireMode === 'charge' ? 'holdCharge' : 'fireAtWill'];
-      const ids = { follow: 'cmd_follow', moveTo: 'cmd_moveto', fireAtWill: 'cmd_fireatwill', holdCharge: 'cmd_holdcharge' };
-      const key = want.join(',');
-      if (this.orders.dataset.orders !== key) {
-        // (A change, not the first picture: pop once so the player sees the order was taken.)
-        const changed = this.orders.dataset.orders !== undefined;
-        this.orders.dataset.orders = key;
-        this.orders.replaceChildren(icon(ids[want[0]]), icon(ids[want[1]]));
-        if (changed) {
-          this.orders.classList.remove('changed');
-          void this.orders.offsetWidth;
-          this.orders.classList.add('changed');
-        }
-      }
-    }
 
     // Verbs with their glyphs for the device in use.
     setClass(this.hintsKaiju, 'hidden', view.mode !== 'kaiju');
@@ -440,33 +392,20 @@ export class Hud {
     const deviceKey = `${view.device}:${view.mode}:${keyLayoutVersion()}`;
     if (deviceKey !== this.lastDevice) {
       this.lastDevice = deviceKey;
-      this.updateHints(this.kaijuHints, view);
+      this.kit.setGlyphs(view.bindings, view.device);
       this.updateHints(this.humanHints, view);
       this.updateHints(this.droneHints, view);
       setGlyph(this.menuHint.glyph, glyphFor(view.bindings, 'menu', view.device));
       setGlyph(this.controlsHint.glyph, glyphFor(view.bindings, 'controls', view.device));
     }
-    if (lk) {
-      const def = kaijuKindDef(lk.kind);
-      this.cooldown(this.kaijuHints.roar, lk.cooldowns.roar / def.actions.roar.cooldown);
-      this.cooldown(this.kaijuHints.grab, lk.cooldowns.eat > 0 && lk.held ? lk.cooldowns.eat / def.actions.eat.cooldown : 0);
-      this.cooldown(this.kaijuHints.special, 1 - lk.rage / def.actions.special.rageCost, lk.rage >= def.actions.special.rageCost);
-      setClass(this.kaijuHints.special.root, 'glow', lk.rage >= def.actions.special.rageCost);
-      setClass(this.kaijuHints.molt.root, 'hidden', !lk.moltAvailable);
-      setClass(this.kaijuHints.molt.root, 'glow', lk.moltAvailable);
-      setClass(this.kaijuHints.block.root, 'active', lk.phase === 'brace');
-    }
+    if (lk) this.kit.update(lk, now);
     if (lu && own) {
-      const hasCallIn = own.level >= 3;
-      setClass(this.humanHints.callIn.root, 'hidden', !hasCallIn);
-      const callIn = factionLevelDef(own.faction, own.level).callIns[0];
-      const wait = own.callInCooldowns[0];
-      this.callInPeak = wait > 0 ? Math.max(this.callInPeak, wait) : 0;
-      const callInFull = Math.max(callIn ? callInDef(callIn).cooldown : 1, this.callInPeak);
-      this.cooldown(this.humanHints.callIn, wait / callInFull);
       this.cooldown(this.humanHints.fire, lu.cooldown / this.reloadFull(lu));
-      this.cooldown(this.humanHints.smoke, own.smokeCooldown / SQUAD_ABILITIES.smoke.cooldown);
-      this.cooldown(this.humanHints.mark, own.markCooldown / SQUAD_ABILITIES.mark.cooldown);
+      // The volley's picture: lit while the squad-mates charge, glowing once the volley counts
+      // (the big meter round the crosshair says how far: ui/volleyMeter.ts).
+      const charge = volleyMeter(frame.units, own.id);
+      setClass(this.humanHints.volley.root, 'active', charge > 0);
+      setClass(this.humanHints.volley.root, 'glow', charge >= COMBAT_RULES.volleyMinCharge);
     }
 
     // The mouse is free and the game wants it: say "click" (mouse players only).
@@ -484,9 +423,8 @@ export class Hud {
     setClass(s.nerveBreak, 'on', (this.statusUntil.nerveBreak ?? 0) > now);
     setClass(s.volley, 'on', (this.statusUntil.volley ?? 0) > now);
     setClass(s.callin, 'on', (this.statusUntil.callin ?? 0) > now);
-    setClass(s.spotted, 'on', !!boss && boss.spotted && !boss.marked && view.mode !== 'drone');
-    setClass(s.marked, 'on', !!boss && boss.marked && view.mode !== 'kaiju');
-    setClass(s.shaken, 'on', !!lu && lu.shaken > 0);
+    setClass(s.spotted, 'on', !!boss && boss.spotted && view.mode !== 'drone');
+    setClass(s.shaken, 'on', !!lu && (lu.shaken > 0 || lu.stun > 0));
     // The kaiju player under water (sim/swim.ts): faint while going down or coming up.
     setClass(s.swim, 'on', !!lk && lk.submerge > 0);
     setClass(s.swim, 'partial', !!lk && lk.submerge > 0 && lk.submerge < 1);

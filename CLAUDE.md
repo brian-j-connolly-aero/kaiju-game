@@ -6,6 +6,8 @@ Server-authoritative multiplayer, self-hosted on one PC behind a Cloudflare Tunn
 ## Read first
 
 - `docs/requirements.md`: the owner's design doc. Source of truth for intent and tone.
+- `docs/ROADMAP.md`: the owner's latest decisions and the current work plan. Newer than
+  `docs/DESIGN.md` where the two disagree.
 - `docs/DESIGN.md`: concrete rules and numbers.
 - `docs/ARCHITECTURE.md`: stack, layout, contracts, quality gates.
 - `docs/ASSETS.md`: art and audio contract (names, formats, manifests).

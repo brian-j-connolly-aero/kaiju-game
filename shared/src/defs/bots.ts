@@ -33,44 +33,30 @@ export const BOT_RULES = {
     safeAt: 0.45,
     /** Squads keep at least this bearing apart around the kaiju, so their fire crosses. */
     bearingSpread: 70 * DEG,
-    /** A parked squad has a line of fire when its leader and this share of its planted sub-units have one. */
+    /** A parked squad has a line of fire when its leader and this share of its planted squad-mates have one. */
     clearLines: 0.6,
     /** A parked squad waits this long with no line of fire before it moves on. */
     losPatience: 4,
     /** A parked squad stays put until the kaiju is beyond this, of range. */
     leaveAt: 0.97,
-    /** It fires the volley at this charge; with the kaiju helpless it fires as soon as it can. */
+    /** It lets go of the volley button at this charge; with the kaiju helpless it does not charge at all. */
     volleyCharge: 1,
-    /** A ready squad waits up to this long for another squad that is nearly charged, so volleys land together. */
+    /** A charged squad holds on up to this long for another squad that is at least this charged, so volleys land together. */
     syncWait: 2.5,
     syncCharge: 0.55,
-    /** It plants the squad afresh when this share of its planted sub-units no longer cover the kaiju. */
-    replantUncovered: 0.5,
-    /** Seconds between two wheel commands (a person's fingers are not faster). */
-    commandGap: 0.35,
+    /**
+     * Parked, it waits for its squad-mates to come up (every one within this many spacings of
+     * the leader) before it holds the volley button, for at most this many seconds: they plant
+     * where they stand.
+     */
+    gatherSpacings: 4,
+    gatherWait: 6,
     /** The kaiju counts as standing still (aim straight at it) below this fraction of its top speed. */
     stillSpeed: 0.25,
     /** Stage 1, kaiju not on the map: the squad searches; it has reached a search point within this many meters. */
     searchReach: 25,
-    /** Artillery: called when ready and the kaiju is within this, of range (it reaches the whole city); the marker leads it by this many seconds. */
-    callInRange: 4,
-    callInLead: 3.5,
     /** Candidate firing positions examined for a line of fire per look. */
     spotCandidates: 8,
-    /**
-     * Marking (sim/abilities.ts): the leader marks the kaiju when it has it in sight and nobody
-     * has marked it, and its squad is charged at least this much or the kaiju is off the map
-     * (the mark keeps it there).
-     */
-    markCharge: 0.5,
-    /**
-     * Smoke: thrown between the squad and the kaiju when the kaiju comes within this, of range
-     * (it covers the retreat), or when the squad is planted and the kaiju is dashing at it
-     * within this, of range, with at least this share of the squad's guns charging.
-     */
-    smokeRetreatAt: 0.35,
-    smokeRushAt: 0.55,
-    smokeCharging: 0.5,
   },
 
   kaiju: {
@@ -103,11 +89,9 @@ export const BOT_RULES = {
     rushRange: [110, 280, 450] as PerStage<number>,
     rushMax: 7,
     rushRest: 7,
-    /** A unit in smoke is hidden from it; it still finds one it bumps into, within this many radii. */
-    smokeFeelRadii: 1.5,
-    /** It roars when at least this many units stand inside the roar radius and are charging or it is hurt. */
+    /** It roars (when it has picked the roar) when at least this many units stand inside the roar radius and are charging or it is hurt. */
     roarUnits: 2,
-    /** It braces when at least this many lasers are on it with this much charge, for at most this long. */
+    /** It braces (when it has picked the brace) when at least this many lasers are on it with this much charge, for at most this long. */
     braceLasers: 4,
     braceCharge: 0.8,
     braceMax: 2.5,
@@ -138,6 +122,25 @@ export const BOT_RULES = {
     swimMax: 8,
     swimRest: 30,
     swimLegRadii: [20, 10, 0] as PerStage<number>,
+
+    /**
+     * The charge (when it has picked it): at a unit standing between the melee range and this
+     * share of the run's reach with nothing it cannot smash in between; or along the way to
+     * what it is wrecking when the run would smash buildings worth at least this many bar points
+     * (per stage; the titan's run smashes nothing its walk would not, so it charges only at units).
+     * During the run it ends it early once the unit it ran at is behind it.
+     */
+    chargeReach: 0.8,
+    chargeWorth: [20, 150, 1e9] as PerStage<number>,
+    /** The tail sweep (when it has picked it): at least this many units behind it within this share of the sweep's reach. */
+    sweepUnits: 1,
+    sweepReach: 0.9,
+    /**
+     * Molt cards: it looks at the offer for a moment (seconds, drawn between the two), then picks
+     * one by these weights (a simple preference, with some randomness).
+     */
+    cardThink: [1, 3] as readonly [number, number],
+    cardWeights: { beam: 4, roar: 3, charge: 3, tailSweep: 2, brace: 1.5 },
 
     /** The molt: it looks for a place out of sight for at most this long, then cocoons where it stands. */
     hideTime: 16,

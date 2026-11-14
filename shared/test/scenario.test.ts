@@ -81,12 +81,7 @@ function createScript(world: World) {
     untilIdle();
   }
 
-  function hold(button: number, seconds: number): void {
-    for (let i = 0; i < Math.ceil(seconds * TICK_RATE) + 1; i++) step({ buttons: button });
-    step();
-  }
-
-  return { events, k, step, wait, untilIdle, face, walkTo, tap, swipe, hold };
+  return { events, k, step, wait, untilIdle, face, walkTo, tap, swipe };
 }
 
 /**
@@ -181,7 +176,7 @@ describe('scripted scenario: a hatchling wrecks a block', () => {
 
     // 3. A stomp shakes the house across the street (the rubble takes nothing), then claws finish it.
     s.face(-90 * DEG);
-    s.hold(Btn.strike, A.stomp.holdTime);
+    s.tap(Btn.stomp);
     s.untilIdle();
     const afterStomp = world.structureHp[0];
     expect(afterStomp).toBeLessThan(HOUSE.hp);
@@ -203,7 +198,7 @@ describe('scripted scenario: a hatchling wrecks a block', () => {
     expected += PROP_KINDS.car_taxi.value;
     expect(bar()).toBeCloseTo(expected, 4);
     s.face(yawFromTo(k.x, k.z, 9, 30));
-    s.tap(Btn.grab);
+    s.tap(Btn.strike);
     s.wait(60);
     expect(k.held).toBeNull();
     expect(world.structureHp[3]).toBe(HOUSE.hp - A.throw.structureDamage[0]);
@@ -242,8 +237,10 @@ describe('scripted scenario: a hatchling wrecks a block', () => {
 
     // 7. All that wrecking filled the rage meter: breathe on the apartment block.
     expect(k.rage).toBe(COMBAT_RULES.rageMax);
+    // (The beam is a move picked at a molt: as if it had been.)
+    k.moves = ['beam', 'none'];
     s.face(0);
-    s.tap(Btn.special);
+    s.tap(Btn.move1);
     s.untilIdle();
     // The special spent the whole meter, and what it burnt does not refill it.
     expect(k.rage).toBe(COMBAT_RULES.rageMax - A.special.rageCost);
@@ -264,7 +261,8 @@ describe('scripted scenario: a hatchling wrecks a block', () => {
     expect(fallen.map((e) => e.cause)).toEqual(['swipe', 'swipe', 'swipe', 'swipe', 'trample']);
     // The humans could have read every attack coming.
     const tells = eventsOf(s.events, 'kaijuAction').filter((e) => e.phase === 'windup');
-    expect(tells.filter((e) => e.action === 'swipe').length).toBe(8);
+    // (Seven swipes: the stomp has a button of its own and its own tell from the start.)
+    expect(tells.filter((e) => e.action === 'swipe').length).toBe(7);
     expect(tells.filter((e) => e.action === 'stomp').length).toBe(1);
     expect(tells.filter((e) => e.action === 'grab').length).toBe(1);
     expect(tells.filter((e) => e.action === 'throw').length).toBe(1);
@@ -273,8 +271,8 @@ describe('scripted scenario: a hatchling wrecks a block', () => {
     // A client that only listened to the events has the same city.
     expectMirrorMatches(world, s.events);
 
-    // 8. Time to grow: hold Molt.
-    s.hold(Btn.molt, A.molt.holdTime);
+    // 8. Time to grow: press Molt.
+    s.tap(Btn.molt);
     expect(k.phase).toBe('cocoon');
     expect(eventsOf(s.events, 'cocoon').length).toBe(1);
     expect(world.match.phase).toBe('playing');
@@ -295,14 +293,16 @@ describe('scripted scenario: a hatchling wrecks a block', () => {
     k.hp = 400;
     // The van underfoot is crushed to a wreck; pick the wreck up and eat it.
     s.wait(2);
-    s.hold(Btn.grab, LIZARD.actions.eat.holdTime);
+    s.tap(Btn.grab);
+    s.untilIdle();
+    s.tap(Btn.grab);
     s.untilIdle();
     expect(k.hp).toBe(400 + LIZARD.actions.eat.heal);
     // Wait out the cooldown, walk up to the kiosk and eat it where it stands.
     s.wait(Math.ceil(LIZARD.actions.eat.cooldown * TICK_RATE));
     s.walkTo(0, 9.5);
     s.face(0);
-    s.hold(Btn.grab, LIZARD.actions.eat.holdTime);
+    s.tap(Btn.grab);
     s.untilIdle();
     expect(k.hp).toBe(400 + 2 * LIZARD.actions.eat.heal);
     // Then carry the bus off.
@@ -331,7 +331,7 @@ describe('scripted scenario: a hatchling wrecks a block', () => {
       s.walkTo(0, 14);
       s.face(90 * DEG);
       s.swipe();
-      s.hold(Btn.strike, LIZARD.actions.stomp.holdTime);
+      s.tap(Btn.stomp);
       s.untilIdle();
       s.walkTo(0, 50);
       return { bar: world.match.barPoints, events: s.events.length, x: world.kaijus[0].x, z: world.kaijus[0].z };
@@ -370,9 +370,10 @@ describe('scripted rampage in the real city', () => {
         aimYaw = yawFromTo(k.x, k.z, s.x, s.z);
         if (best < k.radius * 2) {
           moveZ = 0;
-          // Alternate swipes and stomps: tap, or keep the button down.
+          // Alternate swipes and stomps, a press each.
           const cycle = tick % 90;
-          if (cycle < 2 || (cycle >= 45 && cycle < 45 + 14)) buttons = Btn.strike;
+          if (cycle < 2) buttons = Btn.strike;
+          else if (cycle >= 45 && cycle < 47) buttons = Btn.stomp;
         }
       }
       const events = world.step([input({ aimYaw, moveZ, buttons })]);

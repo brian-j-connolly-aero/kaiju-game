@@ -72,7 +72,8 @@ function checkWorld(world: World, events: SimEvent[], peak: { events: number }, 
   if (world.projectiles.length >= 400) bad(`${world.projectiles.length} projectiles`);
   if (world.callIns.length > world.squads.length) bad(`${world.callIns.length} call-ins`);
   if (world.hits.length + world.structureHits.length + world.propHits.length > 0) bad('a damage queue was not drained');
-  for (const squad of world.squads) if (squad.trail.length >= 200) bad(`squad ${squad.id} trail ${squad.trail.length}`);
+  // A squad's trail keeps the last 400 m of its leader's way (sim/squads.ts), sampled every 2 m.
+  for (const squad of world.squads) if (squad.trail.length > 210) bad(`squad ${squad.id} trail ${squad.trail.length}`);
 }
 
 function play(seed: number, fast: boolean): { report: BotMatchReport; peakEvents: number } {
@@ -138,7 +139,9 @@ describe('full bot matches (soak)', () => {
     expect(reports.filter((r) => r.stages[2].reached).length).toBeGreaterThanOrEqual(3);
     const seen = new Set<string>();
     for (const r of reports) for (const type of Object.keys(r.eventCounts)) seen.add(type);
-    const wanted = ['projectileSpawn', 'projectileHit', 'structureStage', 'propsDestroyed', 'kaijuAction', 'kaijuHit', 'volley', 'moltAvailable', 'cocoon', 'moltBlast', 'stageChange', 'barMark', 'matchPhase', 'voice', 'matchEnd', 'callin', 'unitHit'];
+    const wanted = ['projectileSpawn', 'projectileHit', 'structureStage', 'propsDestroyed', 'kaijuAction', 'kaijuHit', 'volley', 'moltAvailable', 'cocoon', 'moltOffer', 'moltPick', 'moltBlast', 'stageChange', 'barMark', 'matchPhase', 'voice', 'matchEnd', 'unitHit'];
+    // Nothing calls artillery in phase 1 (the button is gone; phase 2's radio will start missions).
+    expect(seen.has('callin')).toBe(false);
     expect(wanted.filter((type) => !seen.has(type))).toEqual([]);
   });
 });

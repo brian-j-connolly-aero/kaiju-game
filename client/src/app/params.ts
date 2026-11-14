@@ -13,7 +13,7 @@
  *   ?assets=none    ignore the asset manifest: everything is drawn from procedural fallbacks
  *   ?mute=1         no sound
  *   ?res=0.5        render resolution scale (1 = one canvas pixel per CSS pixel)
- *   ?cam=tp         start in third person
+ *   ?cam=fp         start in first person (third person is the default; V switches in a match)
  *   ?fps=20         cap the frame rate (automated playtests on software rendering)
  *   ?sandbox=2      no server: run the simulation in the page, this player against the bots,
  *                   starting at stage 1, 2 or 3 (with ?role=kaiju or ?role=human)
@@ -31,6 +31,7 @@ export interface PageParams {
   noAssets: boolean;
   mute: boolean;
   resolution: number;
+  /** The view a match starts in: third person unless the address says ?cam=fp. */
   thirdPerson: boolean;
   fpsCap: number;
   /** 0 for normal play; 1..3 starts a local sandbox match at that stage. */
@@ -64,7 +65,7 @@ export function readPageParams(search: string): PageParams {
     noAssets: q.get('assets') === 'none',
     mute: flag(q, 'mute'),
     resolution: num(q, 'res', 1, 0.1, 2),
-    thirdPerson: q.get('cam') === 'tp',
+    thirdPerson: q.get('cam') !== 'fp',
     fpsCap: num(q, 'fps', 0, 0, 240),
     sandbox: Math.round(num(q, 'sandbox', 0, 0, 3)) as 0 | 1 | 2 | 3,
   };

@@ -16,7 +16,8 @@
  *
  * Each tick the step segment is swept against, nearest first:
  * - standing structures (box prisms up to their height), bridge decks excepted;
- * - living kaiju (upright capsules), except the kaiju that threw it;
+ * - living kaiju (their hit volume: body, head and neck, tail; sim/kaijuBody.ts), except the
+ *   kaiju that threw it;
  * - units, only for projectiles thrown by a kaiju: there is no friendly fire between human
  *   units, so their own shells pass over each other;
  * - the ground (y = 0).
@@ -24,7 +25,8 @@
  * in flight collides with the box (a unit on a bridge can shoot, and a kaiju on one can be
  * hit). A projectile that comes down on a standing deck has hit the deck.
  * On impact: the structure that was hit and every standing structure within the splash radius
- * take `structureDamage`; kaiju within the splash (and units, for kaiju projectiles) take
+ * take `structureDamage`; kaiju whose hit volume is within the splash (and units, for kaiju
+ * projectiles) take
  * `damage` and `nerve` through the hit queue; props within the splash are destroyed;
  * `projectileHit` ends it for the clients. A projectile whose time runs out, or that leaves the
  * city, ends with target 'none'.
@@ -46,9 +48,9 @@ import { unitTypeDef } from '../../defs/units';
 import { projectileTypeDef } from '../../defs/weapons';
 import { createCastHit, segmentVsCapsule, type VerticalCapsule } from '../../math/geom';
 import type { Vec2, Vec3 } from '../../math/vec';
-import { kaijuCapsule, unitCapsule } from '../aim';
+import { unitCapsule } from '../aim';
 import type { ProjectileTarget } from '../events';
-import { kaijuShownHeight, kaijuShownRadius } from '../swim';
+import { castKaijuBody, kaijuBodyDistance } from '../kaijuBody';
 import type { Projectile, World } from '../types';
 import { emit } from '../worldOps';
 
@@ -147,12 +149,9 @@ function impact(world: World, p: Projectile, x: number, y: number, z: number, ta
     for (const k of world.kaijus) {
       if (!k.alive || (p.owner === 'kaiju' && p.ownerId === k.id)) continue;
       let reached = target === 'kaiju' && targetId === k.id;
-      if (!reached && splash > 0) {
-        // Swimming, only what shows above the water can be caught by a blast (sim/swim.ts).
-        const side = Math.max(0, Math.hypot(x - k.x, z - k.z) - kaijuShownRadius(k));
-        const above = Math.max(0, y - kaijuShownHeight(k));
-        reached = side * side + above * above <= splash * splash;
-      }
+      // A blast catches the head or the tail as well as the body; swimming, only what shows
+      // above the water (sim/swim.ts).
+      if (!reached && splash > 0) reached = kaijuBodyDistance(k, x, y, z) <= splash;
       if (!reached) continue;
       world.hits.push({
         target: { entity: 'kaiju', id: k.id },
@@ -227,8 +226,8 @@ function fly(world: World, p: Projectile): boolean {
   }
   for (const k of world.kaijus) {
     if (!k.alive || (p.owner === 'kaiju' && p.ownerId === k.id)) continue;
-    kaijuCapsule(k, capsule).r += radius;
-    if (segmentVsCapsule(segA, segB, capsule, capHit) && capHit.t < best) {
+    // The step is the segment's own length, so `t` is a fraction of it (as for the city cast).
+    if (castKaijuBody(k, segA.x, segA.y, segA.z, segB.x - segA.x, segB.y - segA.y, segB.z - segA.z, 1, radius, capHit) && capHit.t < best) {
       best = capHit.t;
       target = 'kaiju';
       targetId = k.id;

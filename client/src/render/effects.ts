@@ -47,26 +47,6 @@ const NEAR_SIZE = 0.6;
 /** The same for smoke and dust: they may come closer to filling the view, but never blank it. */
 const NEAR_SMOKE = 1;
 const scratch = new THREE.Color();
-/** Puffs drawn for one smoke screen (sim/abilities.ts). */
-const CLOUD_PUFFS = 14;
-
-/** A smoke screen as the effects draw it. A snapshot's SnapSmoke satisfies it. */
-export interface CloudDraw {
-  id: number;
-  x: number;
-  z: number;
-  radius: number;
-  height: number;
-  /** Seconds it still stands (it thins out over the last two). */
-  timer: number;
-}
-
-/** A repeatable number in 0..1 for (a, b). */
-function hash01(a: number, b: number): number {
-  const v = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
-  return v - Math.floor(v);
-}
-
 function rgb(color: number): [number, number, number] {
   scratch.set(color);
   return [scratch.r, scratch.g, scratch.b];
@@ -83,9 +63,6 @@ export class Effects {
   /** Animations of the sprites drawn added; the rest are alpha blended. */
   private readonly addedAnims = new Set<SpriteAnimInfo>();
   private seed = 987654321;
-  /** Smoke screens standing now; drawn every frame as long as they stand. */
-  private clouds: readonly CloudDraw[] = [];
-  private clock = 0;
 
   constructor(assets: AssetStore) {
     const atlas = assets.atlas;
@@ -255,22 +232,12 @@ export class Effects {
     p.vy = size * 0.5;
   }
 
-  /**
-   * The smoke screens to draw from now on (a snapshot's list). They are not particles: each is a
-   * heap of slow-turning grey puffs at fixed places in its cylinder, as thick at the bottom as at
-   * the top, for as long as the simulation says it stands.
-   */
-  setClouds(clouds: readonly CloudDraw[]): void {
-    this.clouds = clouds;
-  }
-
   get count(): number {
     return this.particles.length;
   }
 
   clear(): void {
     this.particles.length = 0;
-    this.clouds = [];
   }
 
   /**
@@ -324,26 +291,6 @@ export class Effects {
       let size = p.size;
       if (cam && p.layer !== 'ground') size = Math.min(size, Math.hypot(p.x - cam.x, p.y - cam.y, p.z - cam.z) * (p.layer === 'smoke' ? NEAR_SMOKE : NEAR_SIZE));
       batch.push(p.x, p.y, p.z, size, size, uv, 0, p.r, p.g, p.b, fade, p.rot);
-    }
-    this.clock += dt;
-    if (this.clouds.length > 0) {
-      const anim = this.anims.smoke;
-      frameRect(anim, 0, 0, uv, 0);
-      for (const c of this.clouds) {
-        const fade = Math.min(1, c.timer / 2);
-        for (let i = 0; i < CLOUD_PUFFS; i++) {
-          const turn = (i % 2 === 0 ? 1 : -1) * this.clock * 0.06;
-          const a = hash01(c.id, i) * 6.283 + turn;
-          const d = Math.sqrt(hash01(i, c.id + 0.5)) * c.radius * 0.75;
-          const x = c.x + Math.sin(a) * d;
-          const z = c.z + Math.cos(a) * d;
-          const y = c.height * (0.2 + hash01(c.id + 1.5, i) * 0.6);
-          let size = Math.min(c.radius * (0.85 + hash01(i + 2.5, c.id) * 0.5), c.height * 1.5);
-          if (cam) size = Math.min(size, Math.hypot(x - cam.x, y - cam.y, z - cam.z) * NEAR_SMOKE);
-          const shade = 0.72 + hash01(c.id, i + 7.5) * 0.12;
-          this.smoke.push(x, y, z, size, size, uv, 0, shade, shade, shade * 0.97, 0.92 * fade, a + this.clock * 0.05);
-        }
-      }
     }
     this.glow.end();
     this.burst.end();

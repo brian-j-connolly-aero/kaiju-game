@@ -9,6 +9,7 @@ describe('server configuration', () => {
     expect(c.host).toBeUndefined();
     expect(c.fast).toBe(false);
     expect(c.latencyMs).toBe(0);
+    expect(c.jitterMs).toBe(0);
     expect(c.speed).toBe(1);
     expect(c.graceSeconds).toBeGreaterThanOrEqual(30);
     expect(c.endScreenSeconds).toBeGreaterThan(FAST_END_SCREEN_SECONDS);
@@ -26,6 +27,7 @@ describe('server configuration', () => {
       HOST: '127.0.0.1',
       MB_FAST: '1',
       MB_LATENCY: '120',
+      MB_JITTER: '30',
       MB_SPEED: '8',
       MB_GRACE: '12',
       MB_END_SCREEN: '0',
@@ -39,6 +41,7 @@ describe('server configuration', () => {
       host: '127.0.0.1',
       fast: true,
       latencyMs: 120,
+      jitterMs: 30,
       speed: 8,
       graceSeconds: 12,
       endScreenSeconds: 0,

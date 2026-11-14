@@ -20,15 +20,14 @@ import type {
   DamageKind,
   EndReason,
   FactionId,
-  FireMode,
   FlightModel,
   KaijuActionId,
   KaijuKindId,
+  KaijuMoveId,
   KaijuPhase,
   KaijuVerb,
   Level,
   MatchPhase,
-  MoveOrder,
   PerStage,
   ProjectileTypeId,
   Role,
@@ -44,7 +43,6 @@ import type { Rng } from '../math/rng';
 import type { Vec2 } from '../math/vec';
 import type { PlayerInput } from '../net/input';
 import type { BotState } from './bots/types';
-import type { SquadCommand } from './commands';
 import type { MatchConfig, PlayerId } from './config';
 import type { HeldObject, PlayerTally, ProjectileOwner, SimEvent } from './events';
 import type { UnitNav } from './nav';
@@ -77,6 +75,8 @@ export interface InputState {
   lastHeldTicks: number[];
   /** Per button: ticks since it last went down (0 on the press tick); large if never pressed. */
   sincePressTicks: number[];
+  /** Kaiju: the molt card picked in this tick's input (1 to 3), 0 for none. One-shot: it does not repeat. */
+  card: number;
 }
 
 export interface PlayerState {
@@ -92,10 +92,6 @@ export interface PlayerState {
   /** Squad this player leads, or -1. */
   squadId: number;
   input: InputState;
-  /** Commands that take effect this tick (from the wheel, the call-in button, or `command` messages). */
-  commands: SquadCommand[];
-  /** Commands received between ticks, waiting for the next input intake. */
-  queuedCommands: SquadCommand[];
   /** The input a bot wants applied on the next tick; the bots system writes it. */
   botInput: PlayerInput;
   /** Scratch memory of the bot driving this slot. */
@@ -134,12 +130,6 @@ export interface VolleyHit {
 export interface KaijuActionMemory {
   /** Btn bits whose latest press has already started an action (cleared by the next press). */
   usedPress: number;
-  /** Btn bits whose current hold has already been judged as a hold (eat). Cleared by the next press. */
-  usedHold: number;
-  /** The button that started the running action has been down ever since, so a tap can still become a hold. */
-  holdLive: boolean;
-  /** Ticks left in which a grab tap made with something in hand still turns into a throw. */
-  throwBuffer: number;
   /** The running Eat took a meal (from the hand or off the ground) and will heal when it finishes. */
   meal: boolean;
   /** Beam special: how far the beam reaches this tick, and the structure it is burning through (-1: none). */
@@ -157,6 +147,27 @@ export interface KaijuActionMemory {
   crossfireTick: number;
   /** Btn bits pressed while it was under water: acted on as soon as it is up (sim/swim.ts). */
   swimPress: number;
+  /** The Btn bit whose press started the running action (a brace lasts while it is down; a second press ends a charge's run). */
+  actionButton: number;
+  /** Charge: the units it has run into in this charge (each is hit once). */
+  chargeHits: number[];
+  /** Charge: a wall it cannot smash (or the bounds) stopped the run; the stumble starts on the next tick. */
+  chargeBlocked: boolean;
+}
+
+/**
+ * Never alone (DESIGN.md section 2): every squad is gone, so the city gives way around the kaiju.
+ * The structures nearest it collapse one after another until the bar reaches the stage's mark;
+ * then the cocoon starts by itself. Server-side only (clients see the buildings fall).
+ */
+export interface CityCollapse {
+  /** Structures still to bring down, nearest first, and the tick each falls on. */
+  ids: number[];
+  ticks: number[];
+  /** How many have fallen. */
+  done: number;
+  /** The bar mark it fills to (the current stage's). */
+  mark: number;
 }
 
 export interface Kaiju {
@@ -212,6 +223,17 @@ export interface Kaiju {
   cooldowns: Record<KaijuVerb, number>;
   /** True from the moment the bar passes a mark until the kaiju cocoons. */
   moltAvailable: boolean;
+  /**
+   * The moves it picked at its molts (DESIGN.md section 4, "Molt cards"), on its first and
+   * second move buttons; 'none' while a slot is empty. They carry over for the whole match.
+   */
+  moves: [KaijuMoveId, KaijuMoveId];
+  /** The cards on offer, from the start of its cocoon until it picks one (at the latest the end of the intermission); empty otherwise. */
+  offer: KaijuMoveId[];
+  /** Never alone: the city gave way and the cocoon starts by itself as soon as it can. */
+  forceMolt: boolean;
+  /** Never alone: the collapse that is running, or null. */
+  collapse: CityCollapse | null;
   mods: Mods;
   /** Ids of drafted upgrades (Tier 2). */
   upgrades: string[];
@@ -231,11 +253,6 @@ export interface Kaiju {
   knownTimer: number;
   /** Whether a player-driven unit currently has it in sight within the spotting range. */
   spotted: boolean;
-  /**
-   * Seconds left of a squad's mark (sim/abilities.ts): while marked the whole army knows where
-   * it is and it counts as spotted. 0 when it is not marked.
-   */
-  marked: number;
   recentHits: RecentHit[];
   /** The latest charged volley hit of each squad that has landed one lately (for the two-squad rule on breaking nerve). */
   volleyHits: VolleyHit[];
@@ -256,15 +273,6 @@ export interface Squad {
   units: number[];
   /** Unit id the player drives right now; -1 once the whole squad is gone. */
   driven: number;
-  moveOrder: MoveOrder;
-  /** Destination of a 'moveTo' order. */
-  moveTarget: Vec2;
-  fireMode: FireMode;
-  /** Seconds until each call-in of the faction level is ready again (same order as its `callIns`). */
-  callInCooldowns: number[];
-  /** Seconds until the squad's smoke and its mark are ready again (SQUAD_ABILITIES). */
-  smokeCooldown: number;
-  markCooldown: number;
   upgrades: string[];
   mods: Mods;
   /** All four units are gone; the player is out until the next stage. */
@@ -273,23 +281,18 @@ export interface Squad {
   veteranSlots: boolean[];
   /**
    * Where the driven unit has been lately, oldest first (sampled every SQUAD_RULES.trailStep
-   * meters): sub-units on 'follow' string out along it. Server-side only.
+   * meters): the squad-mates' places in the swarm are measured back along it. Server-side only.
    */
   trail: Vec2[];
+  /** How many trail points have ever been dropped from its front: a point's number (`trailBase` plus its index) stays its own. */
+  trailBase: number;
   /**
-   * The sub-units have been called into formation: set by a 'follow' command or once the leader
-   * moves. Until then (a fresh deployment) they stay where they were placed.
+   * The squad-mates have formed up around the leader: set once the leader moves. Until then (a
+   * fresh deployment) they stay where they were placed.
    */
   formed: boolean;
-  /** Every sub-unit that is charging has a full charge (the edge of this is the `volley.ready` cue). */
+  /** Every planted squad-mate has a full charge (the edge of this is the `volley.ready` cue). */
   volleyReady: boolean;
-  /**
-   * Wheel orders the squad may still carry out right now (SQUAD_RULES.orderBurst at most,
-   * refilled over time), and the orders waiting for it: at most one movement order and one fire
-   * mode, in the order they were given. Server-side only.
-   */
-  orderBudget: number;
-  pendingOrders: SquadCommand[];
 }
 
 /** What a unit is trying to do this tick; same meaning as the matching PlayerInput fields. */
@@ -321,7 +324,7 @@ export interface Unit {
   vx: number;
   vz: number;
   radius: number;
-  /** Weapon aim. */
+  /** Weapon aim: for a driven tank the turret, which swings toward the player's aim at its own rate (sim/movement.ts). */
   aimYaw: number;
   aimPitch: number;
 
@@ -331,18 +334,21 @@ export interface Unit {
   members: number;
   /** Accumulated nerve damage, 0..COMBAT_RULES.unitNerveCapacity. */
   nerve: number;
-  /** Seconds left of being shaken; 0 when steady. */
+  /** Seconds left of being shaken; 0 when steady. The time does not run while it is stunned. */
   shaken: number;
+  /**
+   * Seconds left of a roar's stun (DESIGN.md section 4): it cannot move or fire, and does not
+   * answer its controls or its orders. 0 when it is not stunned.
+   */
+  stun: number;
   /** Volley charge, 0..1. */
   charge: number;
   /** Seconds until the weapon can fire again. */
   cooldown: number;
   veteran: boolean;
   state: UnitState;
-  /** Held in place by a hold-and-charge order. */
+  /** Planted for the squad's volley (its player holds the volley button): it stands, laser on, charging. Never the driven unit. */
   rooted: boolean;
-  /** Center of the firing arc a rooted unit is locked to (its aim stays within COMBAT_RULES.chargeHalfArc of it). */
-  arcYaw: number;
   /** Navigation memory of a sub-unit (where it is going and how). Server-side only; never in snapshots. */
   nav: UnitNav;
   inWater: boolean;
@@ -375,29 +381,14 @@ export interface Projectile {
   splash: number;
   structureDamage: number;
   cause: DamageKind;
-  /** Fired as part of a charged volley (the trigger shot, or a sub-unit with at least COMBAT_RULES.volleyMinCharge). */
+  /** Fired as part of a charged volley (the leader's own shot with it, or a squad-mate with at least COMBAT_RULES.volleyMinCharge). */
   volley: boolean;
   /** Fired at will by a sub-unit or bot (halves nerve damage). */
   atWill: boolean;
   payload: HeldObject | null;
 }
 
-/**
- * A smoke cloud a squad threw (sim/abilities.ts): a cylinder standing on the ground that sight
- * lines cannot pass through, and that hides the units inside it from the kaiju's targeting.
- */
-export interface SmokeCloud {
-  id: number;
-  squad: number;
-  x: number;
-  z: number;
-  radius: number;
-  height: number;
-  /** Seconds it still stands. */
-  timer: number;
-}
-
-/** An artillery mission on its way. */
+/** An artillery mission on its way (started with `startCallIn`, sim/systems/weapons.ts). */
 export interface CallInMission {
   id: number;
   callIn: CallInId;
@@ -449,6 +440,8 @@ export interface Hit {
   volleySquad?: number;
   /** The hit clears the volley charge of a unit it reaches, whatever its nerve (the roar). */
   resetsCharge?: boolean;
+  /** Seconds it stuns a unit it reaches (the roar). */
+  stun?: number;
 }
 
 export interface PendingHit {
@@ -572,9 +565,6 @@ export interface World {
   units: Unit[];
   projectiles: Projectile[];
   callIns: CallInMission[];
-  /** Smoke clouds standing now (sim/abilities.ts). */
-  smokes: SmokeCloud[];
-  nextSmokeId: number;
   nextProjectileId: number;
   nextCallInId: number;
 
