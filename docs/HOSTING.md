@@ -228,6 +228,7 @@ version, also inside WSL (`lsb_release -ds` shows which one you have):
   Then close the terminal and open a new one. If the start script says Docker is not running,
   start it with `sudo service docker start`. Podman can stay installed; the script picks
   Docker by itself. (This route was checked against Ubuntu's package lists, not run.)
+  When Docker does not answer, the start script shows Docker's own message and what to try.
 - Docker Desktop on Windows also works from WSL once its WSL integration is turned on.
 
 Play in a browser on Windows, at http://localhost:2567: WSL passes that address through. Keep

@@ -44,6 +44,15 @@ podman_is_old() {
   [ "$major" -lt 4 ] || { [ "$major" -eq 4 ] && [ "$minor" -lt 7 ]; }
 }
 
+first_error() {
+  # The first line a command writes to its error output ("" when it wrote none).
+  "$@" 2>&1 >/dev/null | grep -v '^[[:space:]]*$' | head -n 1
+}
+DOCKER_FIXES="  - If it mentions 'permission denied':   sudo usermod -aG docker \$USER
+    then close this terminal and open a new one (the change only counts in a new terminal).
+  - If it says it cannot connect, or asks whether Docker is running:   sudo service docker start
+  - If it mentions a 'context':   docker context use default"
+
 find_engine() {
   local have_podman=0 have_docker=0 podman_ok=0 docker_ok=0
   command -v podman >/dev/null 2>&1 && have_podman=1
@@ -70,11 +79,17 @@ Install one of them, then run this again (docs/HOSTING.md, section 9, has the de
   elif [ $docker_ok = 1 ] && docker compose version >/dev/null 2>&1; then
     ENGINE=docker; COMPOSE=(docker compose)
   elif [ $podman_ok = 1 ] && podman_is_old && [ $have_docker = 1 ] && [ $docker_ok = 0 ]; then
-    fail "Docker is installed but not answering (and this computer's Podman is too old to use).
-Try these, then run this again:
-  - Start it:   sudo service docker start
-  - If it says 'permission denied':   sudo usermod -aG docker \$USER
-    then close this terminal and open a new one."
+    fail "This computer's Podman ($(podman_version)) is too old to start the game, so the game uses Docker
+here. Docker is installed, but it does not answer. Docker's own message:
+    $(first_error docker info)
+Try the line that fits, then run this again:
+$DOCKER_FIXES"
+  elif [ $podman_ok = 1 ] && podman_is_old && [ $docker_ok = 1 ]; then
+    fail "This computer's Podman ($(podman_version)) is too old to start the game, so the game uses Docker
+here. Docker works, but its compose part does not. Docker's own message:
+    $(first_error docker compose version)
+Install it with   sudo apt install docker-compose-v2   and run this again. If it is installed
+already,   type -a docker   shows whether 'docker' here is really Docker or a stand-in for Podman."
   elif [ $podman_ok = 1 ] && podman_is_old; then
     fail "Podman works, but this computer has Podman $(podman_version), which is too old to start
 the game by itself (Ubuntu 22.04 comes with it, and has no podman-compose to add).
@@ -91,17 +106,20 @@ docs/HOSTING.md, section 9, has the details."
 Install it with   sudo apt update && sudo apt install podman-compose
 (or in Podman Desktop: Settings, Resources, Compose, Setup)."
   elif [ $docker_ok = 1 ]; then
-    fail "Docker works, but its compose part is missing. Install the Docker Compose plugin
-(it comes with Docker Desktop; on Ubuntu:   sudo apt install docker-compose-v2)."
+    fail "Docker works, but its compose part does not. Docker's own message:
+    $(first_error docker compose version)
+Install the Docker Compose plugin (it comes with Docker Desktop; on Ubuntu:
+sudo apt install docker-compose-v2)."
   elif [ $have_podman = 1 ]; then
     fail "Podman is installed but not answering.
 If you use Podman Desktop on Windows, open it and press Start on the Podman machine.
 On Linux, check that   podman info   works for your user."
   else
-    fail "Docker is installed but not running.
-Open Docker Desktop and wait until it says it is running, then try again.
-(On Linux without Docker Desktop:   sudo service docker start
- If it says 'permission denied':   sudo usermod -aG docker \$USER   and open a new terminal.)"
+    fail "Docker is installed but does not answer. Docker's own message:
+    $(first_error docker info)
+With Docker Desktop: open it and wait until it says it is running, then try again.
+On Linux or in WSL, try the line that fits:
+$DOCKER_FIXES"
   fi
 }
 compose() { "${COMPOSE[@]}" "$@"; }
