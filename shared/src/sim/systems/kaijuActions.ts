@@ -23,6 +23,8 @@
  * - Molt: held for `molt.holdTime` while `moltAvailable`.
  * - A press made while another action runs is remembered for INPUT_BUFFER_TICKS, and for as
  *   long as the button stays down.
+ * - Swimming (sim/swim.ts): nothing starts while the kaiju is in the water going down, under or
+ *   coming up. A press made then brings it up and is acted on as soon as it is up.
  * When several are wanted on the same tick the order is: molt, brace, special, roar, strike,
  * throw, grab, eat.
  *
@@ -55,6 +57,7 @@ import {
   swipeEffect,
   throwEffect,
 } from '../kaijuEffects';
+import { updateSwim } from '../swim';
 import type { InputState, Kaiju, World } from '../types';
 import { emit } from '../worldOps';
 
@@ -79,6 +82,7 @@ function isDown(input: InputState, button: KaijuButton): boolean {
  */
 function freshPress(k: Kaiju, input: InputState, button: KaijuButton): boolean {
   if ((k.act.usedPress & Btn[button]) !== 0) return false;
+  if ((k.act.swimPress & Btn[button]) !== 0) return true;
   return input.sincePressTicks[BtnIndex[button]] <= INPUT_BUFFER_TICKS || isDown(input, button);
 }
 
@@ -175,6 +179,7 @@ function startAction(world: World, k: Kaiju, def: KaijuKindDef, input: InputStat
   k.cooldowns[verb] = action.cooldown * modMult(k.mods, 'actionCooldown');
   if (action.rageCost > 0) k.rage = Math.max(0, k.rage - action.rageCost);
   k.act.usedPress |= Btn[button];
+  k.act.swimPress = 0;
   k.act.holdLive = isDown(input, button);
   k.act.throwBuffer = 0;
   if (action.timing.windup > 0) {
@@ -314,6 +319,9 @@ function updateKaiju(world: World, k: Kaiju): void {
   k.phaseTime += DT;
   if (k.phase !== 'idle') k.actionTime += DT;
 
+  // Going under or coming up (it comes up for anything but standing idle in deep water).
+  updateSwim(world.cityQuery, k, input);
+
   if (k.phase === 'stagger' || k.phase === 'cocoon' || k.phase === 'dead') return;
 
   // A Grab tap with something in the hand (a press that did not start a grab, let go before the
@@ -328,7 +336,11 @@ function updateKaiju(world: World, k: Kaiju): void {
   }
 
   if (k.phase !== 'idle') advance(world, k, def, input);
-  if (k.phase === 'idle') startFromInput(world, k, def, input);
+  // In the water nothing starts until it is all the way up; then the presses it kept get one go.
+  if (k.phase === 'idle' && k.submerge <= 0) {
+    startFromInput(world, k, def, input);
+    k.act.swimPress = 0;
+  }
 }
 
 export function kaijuActionSystem(world: World): void {

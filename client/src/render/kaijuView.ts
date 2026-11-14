@@ -38,6 +38,8 @@ export interface KaijuOverride {
 export interface KaijuViewCallbacks {
   /** A foot came down. */
   onStep?: (k: SnapKaiju) => void;
+  /** It went into the water to swim, or came up out of it (sim/swim.ts). */
+  onSplash?: (k: SnapKaiju) => void;
 }
 
 const tmp = new THREE.Vector3();
@@ -61,6 +63,13 @@ export interface KaijuViewFrame {
 const NOT_LOCAL: KaijuViewFrame = { firstPerson: false, insideHead: false };
 /** The weak point's violet (art notes for the kaiju, section 5). */
 const WEAK_GLOW = 0xc9a6ff;
+/**
+ * Swimming: how far the body tips forward (radians), and how far it sinks and slides back
+ * (body heights), all the way under. Tuned by eye so the spines' ridge shows (sim/swim.ts).
+ */
+const SWIM_TILT = 0.35;
+const SWIM_SINK = 0.72;
+const SWIM_BACK = 0.1;
 
 function heldModelId(held: HeldObject): string {
   switch (held.kind) {
@@ -98,6 +107,9 @@ export class KaijuView {
   private readonly pose = createKaijuPose();
   private readonly current = new Map<string, NodePose>();
   private hipsLift = 0;
+  /** Swimming, as drawn: eased toward the snapshot's `submerge` so it glides down and up. */
+  private swim = 0;
+  private wakeTimer = 0;
   private walkPhase = 0;
   private lastStepHalf = 0;
   private deadTime = 0;
@@ -229,7 +241,7 @@ export class KaijuView {
     const half = Math.floor(this.walkPhase / Math.PI);
     if (half !== this.lastStepHalf) {
       this.lastStepHalf = half;
-      if (speed > stage.topSpeed * 0.15 && !cocooned) {
+      if (speed > stage.topSpeed * 0.15 && !cocooned && this.swim < 0.3) {
         this.callbacks.onStep?.(k);
         // The foot that just landed kicks up dust beside the body.
         const side = half % 2 === 0 ? 1 : -1;
@@ -275,12 +287,22 @@ export class KaijuView {
     this.hipsLift += (this.pose.hipsLift - this.hipsLift) * blend;
     rig.setOffset('hips', 0, this.hipsLift, 0);
 
+    // --- swimming ------------------------------------------------------------------------------------
+    this.updateSwim(k, dt, speed, effects);
+
     // Dead: topple over and sink a little.
     if (phase === 'dead') {
       this.deadTime = Math.min(1, this.deadTime + dt / 1.6);
       const fall = this.deadTime * this.deadTime;
       rig.root.rotation.set(fall * 1.45, 0, fall * 0.2);
       rig.root.position.set(0, -fall * stage.height * 0.04, fall * stage.height * 0.25);
+    } else if (this.swim > 0) {
+      // Swimming: it lies forward along the surface like a crocodile and sinks until only the
+      // ridge of spines along its back shows. The water (drawn opaque) hides the rest.
+      this.deadTime = 0;
+      const s = this.swim * this.swim * (3 - 2 * this.swim);
+      rig.root.rotation.set(s * SWIM_TILT, 0, 0);
+      rig.root.position.set(0, -s * stage.height * SWIM_SINK, -s * stage.height * SWIM_BACK);
     } else {
       this.deadTime = 0;
       rig.root.rotation.set(0, 0, 0);
@@ -361,6 +383,44 @@ export class KaijuView {
       lines.push(tmp.x, tmp.y, tmp.z, tmp2.x, tmp2.y, tmp2.z, width * 1.3, 1.0, 0.95, 0.75, 1.0);
       effects.glowAt(tmp2.x, tmp2.y, tmp2.z, width * (4 + Math.sin(time * 50)) * 1.6, 0xffb060, 0.06);
       if (Math.floor(time * 30) % 2 === 0) effects.dust(tmp2.x, tmp2.y, tmp2.z, width * 1.5, 1, 0x554a44);
+    }
+  }
+
+  /**
+   * Eases the drawn swim toward the snapshot's, splashes on the way in and out, and leaves a
+   * wake behind it while it swims (a V of foam rings) or bubbles while it lies still.
+   */
+  private updateSwim(k: SnapKaiju, dt: number, speed: number, effects: Effects): void {
+    const target = k.alive && k.phase !== 'cocoon' ? k.submerge : 0;
+    const before = this.swim;
+    // Fast enough to follow the 1 s dive, smooth enough to hide the 15 Hz snapshot steps.
+    this.swim += (target - this.swim) * (1 - Math.exp(-dt * 8));
+    if (Math.abs(target - this.swim) < 0.002) this.swim = target;
+    const st = kaijuStageDef(k.kind, k.stage);
+    const r = st.bodyRadius;
+    const going = before <= 0.02 && this.swim > 0.02;
+    const coming = before >= 0.3 && this.swim < 0.3 && target < before;
+    if (going || coming) {
+      effects.splash(k.x, k.z, r * 0.7);
+      this.callbacks.onSplash?.(k);
+    }
+    if (this.swim < 0.3) {
+      this.wakeTimer = 0;
+      return;
+    }
+    this.wakeTimer -= dt;
+    if (this.wakeTimer > 0) return;
+    const fx = Math.sin(k.yaw);
+    const fz = Math.cos(k.yaw);
+    if (speed > st.topSpeed * 0.1) {
+      this.wakeTimer = 0.14;
+      // Foam at the bow and a spreading ring at the tail: together they draw the V.
+      effects.ring(k.x + fx * r * 0.9, k.z + fz * r * 0.9, r * 0.8, 0xe8f6ff, 0.9, 0.55, 0.14);
+      effects.ring(k.x - fx * r * 1.6, k.z - fz * r * 1.6, r * 1.3, 0xdff1ff, 1.6, 0.4, 0.13);
+      effects.dust(k.x + fx * r, 0.2, k.z + fz * r, r * 0.35, 1, 0xeaf6ff);
+    } else {
+      this.wakeTimer = 0.8;
+      effects.ring(k.x, k.z, r * 0.9, 0xdff1ff, 1.4, 0.3, 0.13);
     }
   }
 

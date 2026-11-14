@@ -9,6 +9,8 @@ export * from './aim';
 export * from './bar';
 export * from './spawn';
 export * from './spotting';
+export * from './swim';
+export * from './abilities';
 export * from './nav';
 export * from './squads';
 export * from './pipeline';

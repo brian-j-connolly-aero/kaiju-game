@@ -1,5 +1,5 @@
 /**
- * Squad commands: the four command wheel orders plus call-ins. They reach the simulation either
+ * Squad commands: the four command wheel orders plus call-ins, smoke and marking. They reach the simulation either
  * inside an input (`wheel` / `marker`, or the call-in button) or as a `command` message that the
  * server passes to `queueCommand`. Either way the orders system sees them in
  * `player.commands` on the next tick.
@@ -18,7 +18,11 @@ export type SquadCommand =
   /** Sub-units stop, lock to their firing arc, show lasers and build charge. */
   | { type: 'holdCharge' }
   /** Request an off-map strike on a ground point. */
-  | { type: 'callIn'; callIn: CallInId; x: number; z: number };
+  | { type: 'callIn'; callIn: CallInId; x: number; z: number }
+  /** Throw the squad's smoke toward a ground point (sim/abilities.ts). */
+  | { type: 'smoke'; x: number; z: number }
+  /** Mark the kaiju the leader is aiming at, for the whole army (sim/abilities.ts). */
+  | { type: 'mark' };
 
 export type SquadCommandType = SquadCommand['type'];
 
@@ -37,6 +41,12 @@ export function sanitizeCommand(raw: unknown, cityHalf = 1100): SquadCommand | n
       const m = sanitizeMarker(r, cityHalf);
       return m ? { type: 'moveTo', x: m.x, z: m.z } : null;
     }
+    case 'smoke': {
+      const m = sanitizeMarker(r, cityHalf);
+      return m ? { type: 'smoke', x: m.x, z: m.z } : null;
+    }
+    case 'mark':
+      return { type: 'mark' };
     case 'callIn': {
       const m = sanitizeMarker(r, cityHalf);
       if (!m || typeof r.callIn !== 'string' || !(CALLIN_IDS as readonly string[]).includes(r.callIn)) return null;

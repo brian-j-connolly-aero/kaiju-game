@@ -52,6 +52,17 @@ describe('the controls card', () => {
     }
   });
 
+  it('pictures swimming (no button: walk into deep water) at the stages the kaiju can swim', () => {
+    const tiles = kaijuTiles('lizard');
+    const swim = tiles.find((t) => t.id === 'swim') as CardTile;
+    expect(swim).toBeDefined();
+    expect(buttonParts([swim])).toEqual([]);
+    expect(swim.parts.some((p) => p.kind === 'move')).toBe(true);
+    expect(swim.parts.some((p) => p.kind === 'picture' && p.icon === 'k_swim')).toBe(true);
+    // The hatchling and the juvenile; the titan is too big.
+    expect(swim.stages).toEqual([1, 2]);
+  });
+
   it('shows the squad commands, the volley with the player own shot as its trigger, and the call-in', () => {
     const tiles = squadTiles();
     for (const id of ['follow', 'moveTo', 'fireAtWill', 'holdCharge', 'wheel', 'volley', 'callIn', 'map', 'camera', 'settings', 'controls', 'drone']) {

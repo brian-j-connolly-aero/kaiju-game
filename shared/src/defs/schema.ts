@@ -342,6 +342,36 @@ export interface KaijuKindDef {
   /** Damage per second to units inside the body radius while the kaiju is moving. */
   trampleDps: number;
   actions: KaijuActionSet;
+  /** Swimming, the hide-and-travel mode in deep water; absent for a kind that cannot swim. */
+  swim?: KaijuSwimDef;
+}
+
+/**
+ * Swimming (DESIGN.md section 4, "Swimming"). It is automatic: a kaiju that stands idle in water
+ * deep enough goes under; any action button brings it up. Under, only its spines show: it is
+ * harder to see and to hit, it travels fast, and it cannot act.
+ */
+export interface KaijuSwimDef {
+  /** Per stage: whether the body can go under at all (the titan is too big for any water). */
+  stages: PerStage<boolean>;
+  /**
+   * Per stage: water is deep enough where it reaches this many body radii out from the center,
+   * all round. Less than 1: the sides of the body may brush the banks of a narrow channel.
+   */
+  fitRadii: PerStage<number>;
+  /** Seconds to go all the way under, and to come all the way up. */
+  diveTime: number;
+  surfaceTime: number;
+  /** Seconds after its last action (or button) before it goes under again. */
+  settleTime: number;
+  /** Top speed while under, as a multiple of the stage's top speed on land (no water slowdown). */
+  speedMult: number;
+  turnMult: number;
+  /** What shows above the water while under: the spines' height (body heights) and their spread (body radii). This is the hit volume. */
+  exposedHeight: number;
+  exposedRadius: number;
+  /** While under, squads see it only within this share of their usual sight and spotting distances. */
+  sightMult: number;
 }
 
 // ---------------------------------------------------------------------------------------------

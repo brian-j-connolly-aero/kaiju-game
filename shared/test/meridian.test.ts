@@ -83,7 +83,7 @@ function inBounds(b: Bounds, x: number, z: number): boolean {
 
 describe('the game plays in Port Meridian; the placeholder is untouched', () => {
   it('is what getCity returns, and the placeholder is still what generateCity returns, to the last bit', () => {
-    expect(cityChecksum(getCity().city)).toBe(1739170986);
+    expect(cityChecksum(getCity().city)).toBe(3570529651);
     expect(cityChecksum(getCity().city)).toBe(cityChecksum(city));
     // The checksum the placeholder had before Port Meridian's archetypes were appended.
     expect(cityChecksum(generateCity())).toBe(1340881825);
@@ -468,8 +468,8 @@ describe('Port Meridian: identical on every machine', () => {
     const again = generatePortMeridian(CITY_SEED);
     // The city as delivered (docs/CITY.md). Chromium computes the same two numbers. When the city
     // is changed on purpose, these change: update them here and in docs/CITY.md.
-    expect(cityChecksum(city)).toBe(1739170986);
-    expect(meridianChecksum(city)).toBe(1876286051);
+    expect(cityChecksum(city)).toBe(3570529651);
+    expect(meridianChecksum(city)).toBe(3898350366);
     expect(cityChecksum(again)).toBe(cityChecksum(city));
     expect(meridianChecksum(again)).toBe(meridianChecksum(city));
     expect(JSON.stringify(again)).toBe(JSON.stringify(city));

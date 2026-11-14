@@ -1610,3 +1610,129 @@ controls back up??", and, as a squad, "Commo rose opened but I only ever could u
   over-the-shoulders view; levers `CHASE_PIVOT`, `CHASE_FLOOR` and the distance in
   `placeChase`). Movement in first person is still relative to the wanted heading, not the
   clamped head, as before. If the owner still wants weapon choice, that is a design change.
+
+## Polish pass 2: wheel and map clicks, smoke and marking, the monster's warnings (14 November, the squad-controls task)
+
+The owner's second set of notes, the squad side and the monster's first-person view. (The
+monster's swim and travel mode is another engineer's, in its own section.)
+
+- **Command wheel: the left button picks.** *Cause:* the wheel only took an order when its
+  button was let go; a left click while it was open fired the weapon. The "hold and charge"
+  picture is always drawn yellow (the volley colour) and the real highlight was a faint cyan
+  ring, so it looked as if entry 4 were stuck highlighted. The mouse path under pointer lock was
+  checked and works (a unit test feeds `movementX` / `movementY` through the real input manager
+  and controller: the highlight moves right, left, up and down). *Change*
+  (`client/src/game/controllers/humanController.ts`, `ui/commandWheel.ts`, `styles.css`): while
+  the wheel is open the fire button picks the entry pointed at and closes the wheel, and fires
+  nothing until it is let go; a quick tap of the wheel button leaves the wheel open to point and
+  click; the number keys close it. The entry pointed at grows with a white ring and glow, the
+  others fade, and the fire button's glyph sits under the hub. The pointer is a little faster.
+- **Map: left click places the order.** A picker at the map's left side (move-to, and the
+  artillery from stage 3, with its cooldown) chooses what a left click places; the call-in
+  button picks the artillery too, and it goes back to move-to after one call. Right click still
+  calls the guns at once; the confirm button places the picked order at the map cursor (on a
+  controller: X then A, where X alone used to call the guns).
+- **Smoke and marking for every squad** (`shared/src/sim/abilities.ts`, `SQUAD_ABILITIES` in
+  `defs/rules.ts`; DESIGN.md section 5, "Smoke and marking"). Not in the owner's design doc
+  before this (it gives spotting to the Air faction, Tier 2); nothing of it existed in the code.
+  Smoke (G / Y): a cloud at the crosshair that blocks every sight line and hides the guns in it
+  from the monster (the bot ignores them; the monster player's picture and map drop their
+  markers and lasers), 14 s, every 30 s. Mark (R / RB): with the monster in sight and in the
+  crosshair, every squad knows where it is and shoots straighter for 10 s, every 30 s. The
+  orange triangle over the monster now shows only while it is marked or a leader has it in
+  plain sight. Bots use both. Contract changes: two input buttons, snapshot version 2 (marked
+  flag, two cooldowns, the clouds), `smoke` and `mark` events (ARCHITECTURE.md).
+- **Monster in first person: warnings of charging guns** (`client/src/ui/threats.ts`): one
+  yellow diamond per squad charging at it, over the guns or on the screen's edge with an arrow
+  toward them; it grows with the charge, pulses from 60% and flashes when the volley is fired.
+- **Checked.** `npm run check`; `npm run build`; new tests `shared/test/abilities.test.ts` and
+  `client/test/squadControls.test.ts`; `tools/playtest/scripted.mjs` now also picks wheel
+  entries with a left click (held and tapped wheel) and checks that no shot leaves, throws
+  smoke, marks the monster, checks the map picker and the left-click marker, and looks for the
+  monster's warnings in first person. Balance: see below.
+- **Balance** (`npm run sim -- --seeds 60 --every-anchor`; before: monster 47% of 60, about
+  10:30). With smoke and marking alone: 29 of 60 (48%), 9:42. With the other engineer's swim
+  work also in the tree: 26 of 60 (43%), 9:51; seeds 61 to 120: 31 of 60 (52%), 9:44. After
+  the kaiju bot fix below: 23 of 60 (38%), 10:05, and seeds 61 to 120: 30 of 60 (50%), 9:53;
+  53 of 120 together (44%). Bots mark about 30 times and smoke about 10 to 18 times a match.
+  Within the 8-point band over 120 matches, so no retune; single batches of 60 swing by about
+  ten points.
+- **Kaiju bot fix** (`shared/src/sim/bots/kaijuBot.ts`): a hurt kaiju bot walking to food with
+  a house in the way leaned on the house for the rest of the match (found by the bot-match soak
+  test, seed 103, once smoke and marks changed how matches go). It now smashes what stands in
+  the way of a meal, as it already did on the way to anything else.
+- **Test changes made on purpose.** Ten buttons instead of eight (`net.test.ts`,
+  `gameRoom.test.ts`); the wheel test holds the button a moment before letting go in the
+  middle (a quick tap now leaves it open); the random-input soak draws the same random numbers
+  as before and presses smoke and mark alongside some of them (and now expects smoke); the
+  voice test's seed-1 bot match now ends at stage 2, so instead of "more than 5 news lines" it
+  checks that the news said every one of its cues that match reached.
+- **Still open / not tried in a browser.** Pointer-lock mouse movement (headless browsers garble
+  it; covered by the unit test). The map's artillery picker and left-click call at stage 3 (the
+  scripted session stays at stage 1; the click rule is unit-tested). A gamepad. The new
+  controls card has four more tiles and is crowded at 640 x 360. One run of the human session
+  saw the Enter key fail to open the controls card once; the next full run passed it on both
+  sides, so it is noted as a possible flaky check, not fixed.
+
+## Polish pass 2: the monster swims (14 November, the swim task)
+
+Owner's note: "all monsters should have some hide/travel mode, Grognar should be able to swim in
+the river, still hittable but only a few spines/a bit of hitbox exposed. We may have to update
+the map to have water at all stages. Maybe big size doesn't have travel mode."
+
+- **Swimming** (`shared/src/sim/swim.ts`, numbers in `shared/src/defs/kaiju/lizard.ts`, rules in
+  docs/DESIGN.md section 4, "Swimming"). Stages 1 and 2; the titan cannot. Automatic, so there is
+  no new button to learn: in water deep enough for its body, a monster that is not acting goes
+  under in 1 s; any monster button (or an action, a stagger, leaving the deep water) brings it
+  up in 0.6 s and the press is then carried out. Under: only the spines show and only they can
+  be hit (the hit volume is 0.14 of its height, 0.55 of its radius), it swims at 1.1 times its
+  walking speed with no water slowdown, it cannot attack, grab, beam, eat, brace, roar or molt,
+  and it tramples and wrecks nothing (no bar, no rage: no stalling). Squads see and spot it only
+  within 0.4 of the usual distances, and at stage 2 it drops off the humans' map while it is
+  under and unseen.
+- **The orange marker over the monster** belongs to the smoke-and-marking engineer and was not
+  touched. It already follows the server's `spotted` and `marked`, which now take swimming into
+  account; the snapshot also carries `submerge` (0 to 1, the last byte of each kaiju record,
+  under the snapshot version that engineer already raised to 2) for anything else that wants it.
+- **The city**: the Old Moat, 20 m of water outside the beltway along the west, north and east
+  edges (docs/CITY.md section 11). No street or building moved; 179 trees of the beltway's tree
+  belt went, and the two city checksums changed (tests and docs updated). Checked: from every
+  start, at stage 1 and stage 2, the monster can walk to swimmable water without breaking
+  anything (148 to 165 m away at stage 1). The river and the bay were already wide enough.
+- **Bots.** The monster bot swims away when its nerve is 70% full, or when it is seen below 40%
+  health, if deep water is within 10 body radii (stage 1) or 8 (stage 2): 8 s in the water, away
+  from the squads, then back to work, and not again for 30 s. Squad bots aim at what shows (the
+  spines), and when they have lost a swimming monster they wait on the near bank instead of
+  wading in after it.
+- **Picture and sound.** The monster leans forward and sinks until only the top of its head and
+  shoulders with their spines show; a splash (picture and sound) as it goes under and comes up,
+  rings of foam at its bow and tail as it swims, bubbles when it lies still. In first person the
+  eyes stay just above the water, with the snout and claws at the waterline. The HUD shows a
+  new picture (spines over two waves, `k_swim`, water blue) while it is under, faint while it
+  goes down or comes up; the controls card has a swim tile (the movement keys, an arrow, that
+  picture, the stage triangles for 1 and 2) and no button. The client does not show a wind-up
+  ahead of the server for a press made under water.
+- **Checked.** `npm run check` and `npm run build` pass. New: `shared/test/swim.test.ts` (going
+  under and coming up, speed, a press under water carried out once up, no attacks under water,
+  the smaller hit volume, nothing wrecked or trampled under a low bridge, lost from the stage 2
+  map, the snapshot, the water at every start, the bot swimming away) and a swim tile check in
+  `client/test/controlsCard.test.ts`. `tools/playtest/shots.mjs` has three new extras
+  (`--only x-kaiju-swim,x-human-swim`): the monster put in the moat at stage 1 and stage 2 goes
+  under by itself, swims along it without coming up, comes up for Roar and roars; and a squad's
+  view of the spines from the bank. All passed with no console errors; `smoke.mjs` (two players,
+  a whole fast match) passed too.
+- **Balance** (`npm run sim -- --every-anchor`, 120 matches each, the smoke-and-marking work in
+  the tree both times; before both changes: monster 47% of 60, 10:33). With swimming: 53 of 120
+  (44%), 9:59 (seeds 1 to 60: 22, seeds 61 to 120: 31). The same tree with swimming switched off:
+  60 of 120 (50%), 10:05. An earlier pair: 57 of 120 (48%) with, 61 of 120 (51%) without. Stages
+  1 and 2 come out the same; the bot monster swims about 4 s a match, at stage 2 only (at stage
+  1 the moat is too far from where it wrecks). Within the noise of the harness, perhaps a few
+  points against the bot monster; no retune. A first version of the bot that went for water up
+  to 45 radii away won only 20%: running to the water with its back to the guns cost more than
+  the swim gave back, which is why the bot now only uses water that is close.
+- **Still open / not tried.** Not played by a person: whether the automatic dive feels right, or
+  whether a toggle would be wanted after all. The swimming look is the existing model leaned
+  forward and sunk (no new art): from close behind a hatchling shows little more than the top
+  of its head. The wake is subtle. The other pictures in `docs/city/` (district close-ups,
+  heat map, model) do not show the moat. `tools/playtest/scripted.mjs` (being reworked by the
+  other engineer) does not swim; the swim checks with real key presses are in `shots.mjs`.

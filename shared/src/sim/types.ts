@@ -155,6 +155,8 @@ export interface KaijuActionMemory {
   beamSeed: number;
   /** Tick of the last `crossfire` event for this kaiju (they are rate limited). */
   crossfireTick: number;
+  /** Btn bits pressed while it was under water: acted on as soon as it is up (sim/swim.ts). */
+  swimPress: number;
 }
 
 export interface Kaiju {
@@ -217,11 +219,23 @@ export interface Kaiju {
   /** Set by the movement system each tick. */
   wading: boolean;
   inWater: boolean;
+  /**
+   * Swimming (sim/swim.ts): 0 standing up, 1 all the way under with only the spines showing,
+   * in between while going down or coming up. Set by the kaiju action system.
+   */
+  submerge: number;
+  /** Seconds left before it may go under again after acting. */
+  swimSettle: number;
   /** Whether the humans' map shows the kaiju, and for how long noise keeps it shown (stage 1). */
   known: boolean;
   knownTimer: number;
   /** Whether a player-driven unit currently has it in sight within the spotting range. */
   spotted: boolean;
+  /**
+   * Seconds left of a squad's mark (sim/abilities.ts): while marked the whole army knows where
+   * it is and it counts as spotted. 0 when it is not marked.
+   */
+  marked: number;
   recentHits: RecentHit[];
   /** The latest charged volley hit of each squad that has landed one lately (for the two-squad rule on breaking nerve). */
   volleyHits: VolleyHit[];
@@ -248,6 +262,9 @@ export interface Squad {
   fireMode: FireMode;
   /** Seconds until each call-in of the faction level is ready again (same order as its `callIns`). */
   callInCooldowns: number[];
+  /** Seconds until the squad's smoke and its mark are ready again (SQUAD_ABILITIES). */
+  smokeCooldown: number;
+  markCooldown: number;
   upgrades: string[];
   mods: Mods;
   /** All four units are gone; the player is out until the next stage. */
@@ -363,6 +380,21 @@ export interface Projectile {
   /** Fired at will by a sub-unit or bot (halves nerve damage). */
   atWill: boolean;
   payload: HeldObject | null;
+}
+
+/**
+ * A smoke cloud a squad threw (sim/abilities.ts): a cylinder standing on the ground that sight
+ * lines cannot pass through, and that hides the units inside it from the kaiju's targeting.
+ */
+export interface SmokeCloud {
+  id: number;
+  squad: number;
+  x: number;
+  z: number;
+  radius: number;
+  height: number;
+  /** Seconds it still stands. */
+  timer: number;
 }
 
 /** An artillery mission on its way. */
@@ -540,6 +572,9 @@ export interface World {
   units: Unit[];
   projectiles: Projectile[];
   callIns: CallInMission[];
+  /** Smoke clouds standing now (sim/abilities.ts). */
+  smokes: SmokeCloud[];
+  nextSmokeId: number;
   nextProjectileId: number;
   nextCallInId: number;
 

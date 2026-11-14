@@ -48,6 +48,7 @@ import { createCastHit, segmentVsCapsule, type VerticalCapsule } from '../../mat
 import type { Vec2, Vec3 } from '../../math/vec';
 import { kaijuCapsule, unitCapsule } from '../aim';
 import type { ProjectileTarget } from '../events';
+import { kaijuShownHeight, kaijuShownRadius } from '../swim';
 import type { Projectile, World } from '../types';
 import { emit } from '../worldOps';
 
@@ -147,8 +148,9 @@ function impact(world: World, p: Projectile, x: number, y: number, z: number, ta
       if (!k.alive || (p.owner === 'kaiju' && p.ownerId === k.id)) continue;
       let reached = target === 'kaiju' && targetId === k.id;
       if (!reached && splash > 0) {
-        const side = Math.max(0, Math.hypot(x - k.x, z - k.z) - k.radius);
-        const above = Math.max(0, y - k.height);
+        // Swimming, only what shows above the water can be caught by a blast (sim/swim.ts).
+        const side = Math.max(0, Math.hypot(x - k.x, z - k.z) - kaijuShownRadius(k));
+        const above = Math.max(0, y - kaijuShownHeight(k));
         reached = side * side + above * above <= splash * splash;
       }
       if (!reached) continue;

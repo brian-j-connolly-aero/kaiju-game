@@ -1,14 +1,15 @@
 /**
  * Turns the hand-made water, park and plaza data (layout.ts, map coordinates) into the city's
  * area polygons in world coordinates: the sea with its bay, quays and mole, the River Wend as
- * two channels that part around Chapter Island, and every park and plaza.
+ * two channels that part around Chapter Island, every park and plaza, and the Old Moat along the
+ * city limit.
  */
 
 import type { Vec2 } from '../../math/vec';
 import type { Area, AreaKind } from '../types';
 import { DIR_COS, DIR_COUNT, DIR_SIN } from './dirs';
 import { chaikinOpen, quant } from './geo';
-import { OPEN, RIVER, SEA, type Pt } from './layout';
+import { MOATS, OPEN, RIVER, SEA, type Pt } from './layout';
 
 /** Map point [east, north] to world: +X is west on the map. */
 export function toWorld(p: Pt): Vec2 {
@@ -144,5 +145,7 @@ export function buildAreas(): Area[] {
     const polygon = o.rect ? rectPolygon(o.rect) : o.disc ? discPolygon(o.disc[0], o.disc[1], o.disc[2]) : (o.poly ?? []).map(toWorld);
     add(o.kind, o.name, polygon);
   }
+  // Last, so the ids of everything above (which seed their furnishing) stay what they were.
+  for (const m of MOATS) add('water', m.name, rectPolygon(m.rect));
   return areas;
 }

@@ -435,6 +435,14 @@ export class MatchAudio {
       case 'callin':
         if (e.phase === 'inbound') a.play('arty_distant', { gain: 0.8 });
         break;
+      case 'smoke':
+        // The canister bursts where it lands (a rush of air, heard by both sides).
+        a.play('gust', { x: e.x, y: 2, z: e.z, refDistance: e.radius * 2, gain: 0.8 });
+        break;
+      case 'mark':
+        // The squads hear the army's radio click; the kaiju hears nothing (it sees no marker).
+        if (this.side() === 'humans') a.play('radio_open', { gain: 0.7 });
+        break;
       case 'matchPhase':
         if (e.phase === 'briefing') {
           a.playMusic(['briefing']);
@@ -470,6 +478,11 @@ export class MatchAudio {
   /** A kaiju's foot came down. */
   step(k: SnapKaiju): void {
     this.audio.play(`kaiju_step_s${k.stage}`, { x: k.x, y: 0, z: k.z, refDistance: REACH[k.stage] * 0.8, gain: 0.8 });
+  }
+
+  /** The kaiju went under the water or came up (sim/swim.ts): a big splash where it is. */
+  splash(k: SnapKaiju): void {
+    this.audio.play('splash', { x: k.x, y: 0, z: k.z, refDistance: REACH[k.stage] * 0.8, gain: 1 });
   }
 
   /** Once per frame: music for the phase and stage, ambience for the time of day, combat heat, loops. */

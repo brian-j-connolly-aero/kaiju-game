@@ -10,14 +10,17 @@
  * buttons. Nothing is sent to the server by the script itself and the autopilot is off.
  *
  *   kaiju   creates a room, volunteers, starts. Then: look, walk, swipe, stomp, grab, throw,
- *           eat, roar, brace, molt (when the bar offers it), the special (when rage allows),
- *           the view toggle (V) and the controls card (H, then Enter).
+ *           eat, roar, brace, molt (when the bar offers it), the warnings of guns charging at it
+ *           in first person, the special (when rage allows), the view toggle (V) and the
+ *           controls card (H, then Enter).
  *   human   creates a room, switches the practice option on (a bot plays the kaiju) and off
  *           again; a second page joins by the invite address, volunteers for the kaiju, gets
  *           ready and then never touches the controls. The host starts. Then: drive, fire, the
  *           four commands by their keys, every entry of the command wheel (right button held,
- *           pointer moved toward the entry, let go; and once more with Q), a charged volley,
- *           the map and a marker on it, the view toggle and the controls card. After that the player
+ *           pointer moved toward the entry, let go; and once more with Q), the wheel picked
+ *           with a LEFT click (right button held, and after a quick tap of Q) without firing,
+ *           a charged volley, smoke (G), marking the kaiju (R), the map and a left-click marker
+ *           on it, the view toggle and the controls card. After that the player
  *           lets go and the match runs to its end. (On Port Meridian the practice bot kaiju
  *           molts within a minute of a fast match, and every molt redeploys the squads, which
  *           undid the human checks half way through: an idle kaiju keeps the match at stage 1.)
@@ -446,6 +449,45 @@ async function playKaiju(origin, opts, errors) {
       }
     }
 
+    // --- warnings of charging guns in first person (polish pass 2) ------------------------------
+    {
+      // A squad with guns charging at the kaiju, by the snapshot: lasers lit, in range, aimed at it.
+      const threatened = (q) => {
+        if (!q.kaiju) return 0;
+        const squads = new Set();
+        for (const u of q.units) {
+          if (!u.alive || !u.laser) continue;
+          const d = Math.hypot(q.kaiju.x - u.x, q.kaiju.z - u.z);
+          const off = Math.abs(wrapAngle(Math.atan2(q.kaiju.x - u.x, q.kaiju.z - u.z) - u.aimYaw));
+          const range = u.type === 'army_rocket_infantry' ? 160 : u.type === 'army_tank' ? 420 : 600;
+          if (d < range * 0.9 && off < 0.1 && !q.smokes.some((c) => Math.hypot(c.x - u.x, c.z - u.z) <= c.radius)) squads.add(u.squad);
+        }
+        return squads.size;
+      };
+      const p0 = await driver.probe();
+      if (p0.thirdPerson) await driver.tapKey('KeyV', 110);
+      let expected = 0;
+      let streak = 0;
+      const seen = await driver.until((q) => {
+        if (q.thirdPerson || !q.match || q.match.phase !== 'playing') return null;
+        const n = threatened(q);
+        if (n > 0) expected++;
+        streak = n > 0 && q.threatsShown === 0 ? streak + 1 : 0;
+        if (streak >= 8) return { missing: true, q };
+        return n > 0 && q.threatsShown > 0 ? { q, n } : null;
+      }, 45000, 250);
+      if (seen && !seen.missing) {
+        await shot('11a-first-person-warnings');
+        report.pass('first person: warnings of charging guns', `in first person, with ${seen.n} squad(s) charging at the kaiju by the snapshot, the page shows ${seen.q.threatsShown} warning diamond(s), ${seen.q.threatsAtEdge} of them on the screen's edge`);
+      } else if (seen && seen.missing) {
+        report.fail('first person: warnings of charging guns', `for 2 s the snapshot had squads charging at the kaiju and the page showed no warning`);
+      } else if (expected === 0) {
+        report.skip('first person: warnings of charging guns', 'no squad charged at the kaiju with its lasers on it in 45 s');
+      } else {
+        report.fail('first person: warnings of charging guns', `the snapshot had squads charging at the kaiju (${expected} probes) and no warning was ever shown`);
+      }
+    }
+
     // --- the special ---------------------------------------------------------------------------
     {
       p = await driver.probe();
@@ -590,6 +632,38 @@ function openHeadingInPage({ x, z, yaw }) {
     }
   }
   return best;
+}
+
+/**
+ * Runs in the page: whether the straight line from (x, eye height, z) to the kaiju's upper body
+ * is clear of standing, solid structures (sampled every metre against each footprint and its
+ * height), the way the server's sight test sees it. Smoke is ignored (the check is made with
+ * none near).
+ */
+function sightOfKaijuInPage({ x, z, eye, kx, kz, ky }) {
+  const mirror = window.__mb.internals.ctx.runtime?.session?.mirror;
+  if (!mirror) return false;
+  const d = Math.hypot(kx - x, kz - z);
+  const near = mirror.city.structures.filter((st) => !st.passable && mirror.structureStage[st.id] < 3 && st.cls !== 'bridge' && distToSegment(st.x, st.z) < Math.hypot(st.hx, st.hz) + 1);
+  function distToSegment(px, pz) {
+    const t = Math.max(0, Math.min(1, ((px - x) * (kx - x) + (pz - z) * (kz - z)) / Math.max(d * d, 1e-6)));
+    return Math.hypot(px - (x + (kx - x) * t), pz - (z + (kz - z) * t));
+  }
+  for (let s = 1; s < d - 2; s += 1) {
+    const t = s / d;
+    const px = x + (kx - x) * t;
+    const pz = z + (kz - z) * t;
+    const py = eye + (ky - eye) * t;
+    for (const st of near) {
+      if (py > st.height) continue;
+      const c = Math.cos(st.yaw);
+      const sn = Math.sin(st.yaw);
+      const lx = (px - st.x) * c - (pz - st.z) * sn;
+      const lz = (px - st.x) * sn + (pz - st.z) * c;
+      if (Math.abs(lx) < st.hx && Math.abs(lz) < st.hz) return false;
+    }
+  }
+  return true;
 }
 
 async function playHuman(origin, opts, errors) {
@@ -750,6 +824,40 @@ async function playHumanChecks(page, driver, report, opts, shot) {
       await wheelPick('follow me', 'right button', 0, -reach, (q) => q.squad.moveOrder === 'follow', 'follow');
       await wheelPick('fire at will', 'Q', 0, reach, (q) => q.squad.fireMode === 'atWill', 'fireAtWill');
       await wheelPick('hold and charge', 'Q', -reach, 0, (q) => q.squad.fireMode === 'charge', 'holdCharge');
+
+      // Polish pass 2: with the wheel open the LEFT button picks, and fires nothing. Once with
+      // the right button held, and once after a quick tap of Q (the wheel stays open for it).
+      const clickPick = async (how, dx, dy, test, entry) => {
+        const unit = (await driver.probe()).me?.id;
+        const from = driver.events.length;
+        if (how === 'right button held') {
+          await page.mouse.move(cx, cy);
+          await page.mouse.down({ button: 'right' });
+        } else {
+          await driver.tapKey('KeyQ', 80);
+          // Without pointer lock the wheel's pointer follows the mouse while a button is held on the view.
+          await page.mouse.move(cx, cy);
+          await page.mouse.down({ button: 'middle' });
+        }
+        const opened = await driver.until((q) => (q.wheelOpen ? q : null), 2500);
+        await page.mouse.move(cx + dx, cy + dy, { steps: 6 });
+        const picked = await driver.until((q) => (q.wheelHighlight === entry ? q : null), 2500);
+        if (picked) await shot(`04-wheel-click-${entry}`);
+        await page.mouse.down({ button: 'left' });
+        const closed = await driver.until((q) => (!q.wheelOpen ? q : null), 2000);
+        await sleep(250);
+        await page.mouse.up({ button: 'left' });
+        await page.mouse.up({ button: how === 'right button held' ? 'right' : 'middle' });
+        const applied = picked ? await driver.until((q) => (q.squad && test(q) ? q : null), 5000) : null;
+        await sleep(400);
+        const shots = driver.eventsSince(from, 'projectileSpawn', (e) => e.owner === 'unit' && e.ownerId === unit);
+        const label = `command wheel (${how}, left click picks): ${entry}`;
+        if (opened && picked && closed && applied && shots.length === 0) report.pass(label, `the wheel opened, the pointer chose "${entry}", the left click closed it and the squad in the snapshot has moveOrder=${applied.squad.moveOrder} fireMode=${applied.squad.fireMode}; the server spawned no shot from unit ${unit}`);
+        else report.fail(label, `wheel opened: ${!!opened}; entry highlighted: ${picked ? picked.wheelHighlight : `not ${entry}`}; closed by the click: ${!!closed}; order applied: ${!!applied}; shots the server spawned from unit ${unit} during the click: ${shots.length}`);
+        await sleep(300);
+      };
+      await clickPick('right button held', 0, reach, (q) => q.squad.fireMode === 'atWill', 'fireAtWill');
+      await clickPick('tap Q', -reach, 0, (q) => q.squad.fireMode === 'charge', 'holdCharge');
     }
 
     // --- a charged volley ----------------------------------------------------------------------
@@ -787,6 +895,51 @@ async function playHumanChecks(page, driver, report, opts, shot) {
       }
     }
 
+    // --- smoke (G) and marking the kaiju (R) --------------------------------------------------
+    {
+      p = await driver.probe();
+      await driver.lookTo(p.view.yaw, -0.2, 0.06, 4000);
+      const own = (await driver.probe()).squad?.id;
+      let from = driver.events.length;
+      await driver.tapKey('KeyG', 110);
+      const smoke = await driver.until(() => driver.eventsSince(from, 'smoke', (e) => e.squad === own)[0], 4000);
+      const after = await driver.until((q) => (q.squad && q.squad.smokeCooldown > 0 && q.smokes.some((c) => c.squad === own) ? q : null), 3000);
+      if (smoke && after) report.pass('smoke (G)', `pressed G; the server sent a smoke event (radius ${fmt(smoke.radius, 0)} m at (${fmt(smoke.x, 0)}, ${fmt(smoke.z, 0)})), the snapshot carries the cloud and the squad's smoke cools down (${fmt(after.squad.smokeCooldown, 1)} s)`);
+      else report.fail('smoke (G)', `smoke event ${smoke ? 'seen' : 'NOT seen'}; cloud and cooldown in the snapshot: ${!!after}`);
+      await sleep(600);
+      await shot('06b-smoke');
+
+      // Marking needs the kaiju in the leader's own sight within range (a house in between and
+      // the press does nothing, by the rules). Walk toward it until the leader can see it.
+      const markRange = 250;
+      const sees = async (q) =>
+        q.kaiju && q.me && Math.hypot(q.kaiju.x - q.me.x, q.kaiju.z - q.me.z) < markRange && (await page.evaluate(sightOfKaijuInPage, { x: q.me.x, z: q.me.z, eye: 1.7, kx: q.kaiju.x, kz: q.kaiju.z, ky: 4.5 * 0.7 }));
+      let near = await driver.until(async (q) => ((await sees(q)) ? q : null), 1500, 250);
+      if (!near) {
+        const k0 = (await driver.probe()).kaiju;
+        if (k0) await driver.walkTo(k0.x, k0.z, 40, { timeoutMs: 30000, done: () => false, doneAsync: sees });
+        near = await driver.until(async (q) => ((await sees(q)) ? q : null), 3000, 250);
+      }
+      if (!near) {
+        p = await driver.probe();
+        report.skip('mark the kaiju (R)', `the squad leader never had the kaiju in sight within ${markRange} m (walked toward it for 30 s; ${p.kaiju && p.me ? fmt(Math.hypot(p.kaiju.x - p.me.x, p.kaiju.z - p.me.z), 0) : '?'} m away at the end)`);
+      } else {
+        let marked = null;
+        for (let attempt = 0; attempt < 3 && !marked; attempt++) {
+          const q = await driver.probe();
+          await driver.lookAt(q.kaiju.x, q.kaiju.z, 2.25, 1.7, 0.03);
+          from = driver.events.length;
+          await driver.tapKey('KeyR', 110);
+          marked = await driver.until(() => driver.eventsSince(from, 'mark', (e) => e.squad === own)[0], 2500);
+          // Pressed with a building in the way: nothing is spent, and the next try is a fair one.
+        }
+        const shown = marked ? await driver.until((q) => (q.kaiju?.marked && q.squad?.markCooldown > 0 ? q : null), 3000) : null;
+        if (marked && shown) report.pass('mark the kaiju (R)', `looked at the kaiju and pressed R; the server sent a mark event and the snapshot shows it marked (and the squad's mark cooling down, ${fmt(shown.squad.markCooldown, 1)} s)`);
+        else report.fail('mark the kaiju (R)', `mark event ${marked ? 'seen' : 'NOT seen'} in three tries (a house between the squad and the kaiju blocks it); marked in the snapshot: ${!!shown}`);
+        if (marked) await shot('06c-marked');
+      }
+    }
+
     // --- the map -------------------------------------------------------------------------------
     {
       await driver.tapKey('KeyM', 110);
@@ -804,11 +957,15 @@ async function playHumanChecks(page, driver, report, opts, shot) {
         const drift = before && after ? Math.hypot(after.x - before.x, after.z - before.z) : -1;
         if (drift >= 0 && drift < 0.6) report.pass('map (M): the unit idles', `the map opened; W held for 1.5 s moved the server's unit ${fmt(drift, 2)} m`);
         else report.fail('map (M): the unit idles', `with the map open, holding W moved the server's unit ${fmt(drift, 2)} m`);
-        // A click on the map places the move-to marker.
+        // A left click on the map places the move-to marker (the picked order; at this stage the
+        // squad has no guns, so the picker at the map's side offers nothing else and is hidden).
+        const tools = (await driver.probe()).mapToolsShown;
+        if (tools === 0) report.pass('map: no artillery to pick before stage 3', 'the order picker at the map\'s side is hidden at stage 1');
+        else report.fail('map: no artillery to pick before stage 3', `${tools} order picture(s) shown at stage 1`);
         const was = (await driver.probe()).squad;
         await page.mouse.click(driver.width * 0.5, driver.height * 0.42);
         const marked = await driver.until((q) => (q.squad && q.squad.moveOrder === 'moveTo' && (q.squad.moveTargetX !== was.moveTargetX || q.squad.moveTargetZ !== was.moveTargetZ || was.moveOrder !== 'moveTo') ? q : null), 5000);
-        if (marked) report.pass('map: place a move-to marker', `clicked on the map; the squad in the snapshot has moveOrder moveTo at (${fmt(marked.squad.moveTargetX, 0)}, ${fmt(marked.squad.moveTargetZ, 0)})`);
+        if (marked) report.pass('map: place a move-to marker', `left-clicked on the map; the squad in the snapshot has moveOrder moveTo at (${fmt(marked.squad.moveTargetX, 0)}, ${fmt(marked.squad.moveTargetZ, 0)})`);
         else report.fail('map: place a move-to marker', `clicked on the map; the squad in the snapshot is still moveOrder=${(await driver.probe()).squad?.moveOrder}`);
         await shot('08-map-marker');
         await driver.tapKey('KeyM', 110);

@@ -58,6 +58,7 @@ import { clamp } from '../../math/scalar';
 import { MAX_AIM_PITCH } from '../../net/input';
 import { createAimPoint, resolveAimPoint } from '../aim';
 import { arcCovers, isChargedVolley, nearestKaiju, scatterMult, unitAimErrorMult, volleyStrength } from '../squads';
+import { kaijuShownHeight } from '../swim';
 import type { CallInMission, Squad, Unit, World } from '../types';
 import { emit } from '../worldOps';
 import { spawnProjectile } from './projectiles';
@@ -190,7 +191,7 @@ function fireLeader(world: World, squad: Squad, leader: Unit): void {
   let sz = az;
   if (aim.on === 'kaiju' && target) {
     sx = target.x;
-    sy = clamp(ay, 0, target.height);
+    sy = clamp(ay, 0, kaijuShownHeight(target));
     sz = target.z;
   }
 

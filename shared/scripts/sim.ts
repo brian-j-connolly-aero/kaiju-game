@@ -196,7 +196,8 @@ function printTable(reports: BotMatchReport[], o: Options): void {
         `, segment filled after ${filled.length > 0 ? clock(mean(filled)) : '-'}` +
         `, stage time when completed ${complete.length > 0 ? clock(mean(complete.map((r) => r.stages[i].time))) : '-'}` +
         `; per match: staggers ${perMatch((s) => s.staggers)}, volleys ${perMatch((s) => s.volleys)}, units lost ${perMatch((s) => s.unitsLost)}` +
-        `, kaiju hp lost ${perMatch((s) => s.kaijuHpLost, 0)} (healed ${perMatch((s) => s.kaijuHpHealed, 0)}), collateral ${perMatch((s) => s.collateral, 0)} points`,
+        `, kaiju hp lost ${perMatch((s) => s.kaijuHpLost, 0)} (healed ${perMatch((s) => s.kaijuHpHealed, 0)}), collateral ${perMatch((s) => s.collateral, 0)} points` +
+        `, swum ${perMatch((s) => s.swimTime, 0)} s (${perMatch((s) => s.dives)} dives)`,
     );
   }
   const ticks = reports.reduce((a, r) => a + r.ticks, 0);

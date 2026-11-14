@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Kaiju: swimming. Only the row of spines shows above the waves; the body is under water. -->
+  <path fill="currentColor" stroke="none" d="M12 36L19 21 25 36ZM24 36L32 14 40 36ZM39 36L46 22 52 36Z"/>
+  <path d="M5 41Q11.5 35.5 18 41T31 41T44 41T57 41"/>
+  <path d="M10 53Q16.5 47.5 23 53T36 53T49 53"/>
+</svg>

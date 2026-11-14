@@ -198,3 +198,35 @@ export const SQUAD_RULES = {
   /** Call-in shells fall at this angle above the horizon, toward the marker from behind the caller. */
   callInElevation: 75 * DEG,
 } as const;
+
+/**
+ * The two things every squad leader can do besides firing (DESIGN.md section 5, "Smoke and
+ * marking"; polish pass 2, after the owner asked for them): throw smoke, and mark the kaiju for
+ * the whole army. Per stage where the size of things changes. All starting values, kept modest
+ * and checked with the balance harness (docs/BALANCE.md section 8).
+ */
+export const SQUAD_ABILITIES = {
+  smoke: {
+    /** Seconds between two smokes of one squad. */
+    cooldown: 30,
+    /** Seconds a cloud stands. */
+    duration: 14,
+    /** Radius of the cloud on the ground, and how high it stands, meters. */
+    radius: [12, 30, 60] as PerStage<number>,
+    height: [10, 28, 55] as PerStage<number>,
+    /** The furthest the leader can throw (or call) it from where the leader stands, meters. */
+    range: [45, 130, 260] as PerStage<number>,
+    /** Clouds standing in the whole match at most (the oldest gives way). */
+    maxClouds: 12,
+  },
+  mark: {
+    /** Seconds between two marks of one squad. */
+    cooldown: 30,
+    /** Seconds the kaiju stays marked. */
+    duration: 10,
+    /** The leader must see the kaiju within this range to mark it, meters. */
+    range: [260, 650, 1300] as PerStage<number>,
+    /** The crosshair counts as on the kaiju within this many body radii of its body's axis. */
+    aimSlackRadii: 1.5,
+  },
+} as const;

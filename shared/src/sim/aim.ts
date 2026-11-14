@@ -11,6 +11,7 @@ import { kaijuStageDef } from '../defs/kaiju/index';
 import { SQUAD_RULES } from '../defs/rules';
 import { unitTypeDef } from '../defs/units';
 import type { Vec2, Vec3 } from '../math/vec';
+import { kaijuShownHeight, kaijuShownRadius } from './swim';
 import type { Kaiju, Unit } from './types';
 
 export interface AimPoint {
@@ -66,10 +67,20 @@ export function kaijuMouthPoint(k: KaijuHeadSource, out: Vec3): Vec3 {
   return out;
 }
 
-/** Hit volume of a kaiju: an upright capsule of its body radius and height. */
+/**
+ * Hit volume of a kaiju: an upright capsule of its body radius and height. Swimming, it is only
+ * what shows above the water (sim/swim.ts): the spines, a capsule whose rounded top is their
+ * height and which reaches on down into the water.
+ */
 export function kaijuCapsule(k: Kaiju, out: VerticalCapsule): VerticalCapsule {
   out.x = k.x;
   out.z = k.z;
+  if (k.submerge > 0) {
+    out.r = kaijuShownRadius(k);
+    out.y1 = kaijuShownHeight(k);
+    out.y0 = Math.min(0, out.y1 - 2 * out.r);
+    return out;
+  }
   out.r = k.radius;
   out.y0 = 0;
   out.y1 = k.height;

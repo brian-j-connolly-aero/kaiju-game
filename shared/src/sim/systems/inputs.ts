@@ -3,8 +3,8 @@
  *
  * Takes one input per player for this tick (bots supply their own), and turns raw button state
  * into what the action systems need: press and release edges and how long each button has been
- * down. It also collects this tick's squad commands (wheel picks, the call-in button, and
- * commands queued from `command` messages) into `player.commands`, and copies the player's
+ * down. It also collects this tick's squad commands (wheel picks, the call-in, smoke and mark
+ * buttons, and commands queued from `command` messages) into `player.commands`, and copies the player's
  * movement, aim and trigger onto the unit they drive.
  *
  * The meaning of every button is specified in net/input.ts.
@@ -14,6 +14,7 @@ import { factionLevelDef } from '../../defs/factions';
 import { unitTypeDef } from '../../defs/units';
 import { Btn, BUTTON_COUNT, neutralInput, type PlayerInput } from '../../net/input';
 import { SQUAD_RULES } from '../../defs/rules';
+import { smokeReach } from '../abilities';
 import { resolveMarkerPoint } from '../aim';
 import type { SquadCommand } from '../commands';
 import type { InputsByPlayer, InputState, PlayerState, Squad, World } from '../types';
@@ -103,6 +104,12 @@ function collectCommands(world: World, p: PlayerState, input: PlayerInput | null
       if (at) p.commands.push({ type: 'callIn', callIn: callIns[0], x: at.x, z: at.z });
     }
   }
+  // Smoke goes where the crosshair is, no further than the throw (straight ahead with it on the sky).
+  if (p.input.pressed & Btn.smoke) {
+    const at = input?.marker ?? aimGround(world, squad, p.input, smokeReach(world));
+    if (at) p.commands.push({ type: 'smoke', x: at.x, z: at.z });
+  }
+  if (p.input.pressed & Btn.mark) p.commands.push({ type: 'mark' });
 }
 
 export function inputSystem(world: World, inputs: InputsByPlayer | undefined): void {

@@ -463,13 +463,17 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
     means the server abandoned the match after an internal failure: show the lobby.
 - **Input semantics** are specified in the header of `shared/src/net/input.ts` and nowhere else:
   the client sends raw button state (`Btn` bits: strike, grab, block, roar, special, molt, fire,
-  callIn); the simulation derives presses, releases, taps and holds. `moveX` / `moveZ` are
+  callIn, smoke, mark); the simulation derives presses, releases, taps and holds. `moveX` / `moveZ` are
   relative to the view (`moveZ` forward along `aimYaw`, `moveX` to the right). `wheel` is a
   one-shot command wheel pick and `marker` its ground point. The server cleans every input with
   `sanitizeInput` and every command with `sanitizeCommand`.
 - Server helpers: `snapshotOfWorld` + `encodeSnapshot` (encode once, then `setSnapshotAck` per
   client), `welcomeFor(world, player)`. Client helpers: `decodeSnapshot`, `decodeCityState` +
   `cityStateFromWire` (the live city state for local queries and prediction).
+- Snapshot version 2 (polish pass 2) added the kaiju's `marked` flag, each squad's smoke and
+  mark cooldowns, and the smoke clouds standing (a short list after the units); the layout is
+  in the header of `shared/src/net/snapshot.ts`. The `smoke` and `mark` events say when a cloud
+  is thrown and the kaiju is marked.
 - Projectiles are **not** in snapshots. Clients spawn them from `projectileSpawn` events and fly
   them locally with the same kinematics; `projectileHit` ends them.
 - Structure changes are events (`structureStage { id, stage }` with stage 0 intact, 1 damaged,

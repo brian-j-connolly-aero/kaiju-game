@@ -12,14 +12,17 @@
  *   counts   u8 kaijus, u8 squads, u8 units
  *   kaiju    u8 id, u8 player, u8 kind, u8 stage, u8 flags, u8 action, u8 phase, u8 heldKind,
  *            u16 heldRef, f32 x, z, vx, vz, yaw, aimYaw, aimPitch, hp, maxHp, nerve, rage,
- *            phaseTime, phaseDuration, u16 nerveImmune (0.01 s), u16 x 9 cooldowns (0.01 s)
+ *            phaseTime, phaseDuration, u16 nerveImmune (0.01 s), u16 x 9 cooldowns (0.01 s),
+ *            u8 submerge (1 / 255)
  *   squad    u8 id, u8 player, u8 faction, u8 level, u8 flags, u8 moveOrder, u8 fireMode,
  *            u8 driven (255 = none), i16 moveTargetX, i16 moveTargetZ (0.1 m),
- *            u16 x 2 call-in cooldowns (0.01 s)
+ *            u16 x 2 call-in cooldowns (0.01 s), u16 smoke cooldown, u16 mark cooldown (0.01 s)
  *   unit     u8 id, u8 squad, u8 type, u8 state, u8 flags, f32 x, z, vx, vz, u16 y (0.1 m),
  *            i16 yaw, i16 aimYaw, i16 aimPitch (pi / 32768), u16 hp, u16 maxHp (0.1),
  *            u8 members, u8 nerve (0.5), u8 shaken (0.05 s), u8 charge (1 / 255),
  *            u8 cooldown (0.05 s)
+ *   smokes   u8 count, then per cloud: u16 id, u8 squad, i16 x, i16 z (0.1 m), u16 radius,
+ *            u16 height (0.1 m), u16 seconds left (0.01 s)
  *
  * Positions and velocities are full 32-bit floats so a client can replay its own inputs from a
  * snapshot without drift. `ackSeq` is the only per-client field; the server encodes once and
@@ -85,7 +88,7 @@ import {
 } from './bytes';
 
 export const SNAPSHOT_MAGIC = 0x4d;
-export const SNAPSHOT_VERSION = 1;
+export const SNAPSHOT_VERSION = 2;
 /** Byte offset of the u32 ackSeq in an encoded snapshot. */
 const ACK_OFFSET = 6;
 
@@ -120,8 +123,10 @@ export interface SnapKaiju {
   inWater: boolean;
   /** The humans' map may show it. */
   known: boolean;
-  /** A player-driven unit has it in sight (scatter bonus). */
+  /** A player-driven unit has it in sight, or a squad has marked it (scatter bonus). */
   spotted: boolean;
+  /** A squad has marked it for the whole army (sim/abilities.ts). */
+  marked: boolean;
   x: number;
   z: number;
   vx: number;
@@ -144,6 +149,8 @@ export interface SnapKaiju {
   held: HeldObject | null;
   /** Seconds until each verb is ready again (0.01 s steps). */
   cooldowns: Record<KaijuVerb, number>;
+  /** Swimming (sim/swim.ts): 0 standing up, 1 all the way under (1 / 255 steps). */
+  submerge: number;
 }
 
 export interface SnapSquad {
@@ -163,6 +170,22 @@ export interface SnapSquad {
   moveTargetZ: number;
   /** Seconds until the faction level's first and second call-in are ready (0.01 s steps). */
   callInCooldowns: [number, number];
+  /** Seconds until the squad's smoke and its mark are ready (0.01 s steps). */
+  smokeCooldown: number;
+  markCooldown: number;
+}
+
+/** A smoke cloud standing now (sim/abilities.ts). */
+export interface SnapSmoke {
+  id: number;
+  squad: number;
+  /** 0.1 m steps. */
+  x: number;
+  z: number;
+  radius: number;
+  height: number;
+  /** Seconds it still stands (0.01 s steps). */
+  timer: number;
 }
 
 export interface SnapUnit {
@@ -211,6 +234,7 @@ export interface Snapshot {
   kaijus: SnapKaiju[];
   squads: SnapSquad[];
   units: SnapUnit[];
+  smokes: SnapSmoke[];
 }
 
 const K_ALIVE = 1;
@@ -219,6 +243,7 @@ const K_WADING = 4;
 const K_WATER = 8;
 const K_KNOWN = 16;
 const K_SPOTTED = 32;
+const K_MARKED = 128;
 
 const S_ELIMINATED = 1;
 const S_BOT = 2;
@@ -275,7 +300,8 @@ function writeKaiju(w: ByteWriter, k: SnapKaiju): void {
       (k.wading ? K_WADING : 0) |
       (k.inWater ? K_WATER : 0) |
       (k.known ? K_KNOWN : 0) |
-      (k.spotted ? K_SPOTTED : 0),
+      (k.spotted ? K_SPOTTED : 0) |
+      (k.marked ? K_MARKED : 0),
   );
   writeU8(w, KAIJU_ACTION_IDS.indexOf(k.action));
   writeU8(w, KAIJU_PHASES.indexOf(k.phase));
@@ -296,6 +322,7 @@ function writeKaiju(w: ByteWriter, k: SnapKaiju): void {
   writeF32(w, k.phaseDuration);
   writeU16(w, quantize(k.nerveImmune, 100, 65535));
   for (const verb of VERBS) writeU16(w, quantize(k.cooldowns[verb], 100, 65535));
+  writeU8(w, quantize(k.submerge, 255, 255));
 }
 
 function readKaiju(r: ByteReader): SnapKaiju {
@@ -324,6 +351,7 @@ function readKaiju(r: ByteReader): SnapKaiju {
   const nerveImmune = readU16(r) / 100;
   const cooldowns = {} as Record<KaijuVerb, number>;
   for (const verb of VERBS) cooldowns[verb] = readU16(r) / 100;
+  const submerge = readU8(r) / 255;
   return {
     id,
     player,
@@ -335,6 +363,7 @@ function readKaiju(r: ByteReader): SnapKaiju {
     inWater: (flags & K_WATER) !== 0,
     known: (flags & K_KNOWN) !== 0,
     spotted: (flags & K_SPOTTED) !== 0,
+    marked: (flags & K_MARKED) !== 0,
     x,
     z,
     vx,
@@ -353,6 +382,7 @@ function readKaiju(r: ByteReader): SnapKaiju {
     phaseDuration,
     held: heldFrom(heldKind, ref),
     cooldowns,
+    submerge,
   };
 }
 
@@ -373,6 +403,8 @@ function writeSquad(w: ByteWriter, s: SnapSquad): void {
   writeI16(w, quantizeI16(s.moveTargetZ, 10));
   writeU16(w, quantize(s.callInCooldowns[0], 100, 65535));
   writeU16(w, quantize(s.callInCooldowns[1], 100, 65535));
+  writeU16(w, quantize(s.smokeCooldown, 100, 65535));
+  writeU16(w, quantize(s.markCooldown, 100, 65535));
 }
 
 function readSquad(r: ByteReader): SnapSquad {
@@ -388,6 +420,8 @@ function readSquad(r: ByteReader): SnapSquad {
   const moveTargetZ = readI16(r) / 10;
   const c0 = readU16(r) / 100;
   const c1 = readU16(r) / 100;
+  const smokeCooldown = readU16(r) / 100;
+  const markCooldown = readU16(r) / 100;
   return {
     id,
     player,
@@ -401,7 +435,30 @@ function readSquad(r: ByteReader): SnapSquad {
     moveTargetX,
     moveTargetZ,
     callInCooldowns: [c0, c1],
+    smokeCooldown,
+    markCooldown,
   };
+}
+
+function writeSmoke(w: ByteWriter, c: SnapSmoke): void {
+  writeU16(w, c.id & 0xffff);
+  writeU8(w, c.squad);
+  writeI16(w, quantizeI16(c.x, 10));
+  writeI16(w, quantizeI16(c.z, 10));
+  writeU16(w, quantize(c.radius, 10, 65535));
+  writeU16(w, quantize(c.height, 10, 65535));
+  writeU16(w, quantize(c.timer, 100, 65535));
+}
+
+function readSmoke(r: ByteReader): SnapSmoke {
+  const id = readU16(r);
+  const squad = readU8(r);
+  const x = readI16(r) / 10;
+  const z = readI16(r) / 10;
+  const radius = readU16(r) / 10;
+  const height = readU16(r) / 10;
+  const timer = readU16(r) / 100;
+  return { id, squad, x, z, radius, height, timer };
 }
 
 function writeUnit(w: ByteWriter, u: SnapUnit): void {
@@ -488,10 +545,10 @@ function readUnit(r: ByteReader): SnapUnit {
 }
 
 export function encodeSnapshot(s: Snapshot): Uint8Array {
-  if (s.kaijus.length > 255 || s.squads.length > 255 || s.units.length > 255) {
+  if (s.kaijus.length > 255 || s.squads.length > 255 || s.units.length > 255 || s.smokes.length > 255) {
     throw new Error('snapshot has too many entities for the wire format');
   }
-  const w = createWriter(64 + s.kaijus.length * 90 + s.squads.length * 16 + s.units.length * 40);
+  const w = createWriter(64 + s.kaijus.length * 90 + s.squads.length * 20 + s.units.length * 40 + s.smokes.length * 16);
   writeU8(w, SNAPSHOT_MAGIC);
   writeU8(w, SNAPSHOT_VERSION);
   writeU32(w, s.tick >>> 0);
@@ -516,6 +573,8 @@ export function encodeSnapshot(s: Snapshot): Uint8Array {
   for (const k of s.kaijus) writeKaiju(w, k);
   for (const q of s.squads) writeSquad(w, q);
   for (const u of s.units) writeUnit(w, u);
+  writeU8(w, s.smokes.length);
+  for (const c of s.smokes) writeSmoke(w, c);
   return finishWriter(w);
 }
 
@@ -547,6 +606,9 @@ export function decodeSnapshot(bytes: Uint8Array): Snapshot {
   for (let i = 0; i < kaijuCount; i++) kaijus.push(readKaiju(r));
   for (let i = 0; i < squadCount; i++) squads.push(readSquad(r));
   for (let i = 0; i < unitCount; i++) units.push(readUnit(r));
+  const smokeCount = readU8(r);
+  const smokes: SnapSmoke[] = [];
+  for (let i = 0; i < smokeCount; i++) smokes.push(readSmoke(r));
 
   return {
     tick,
@@ -555,6 +617,7 @@ export function decodeSnapshot(bytes: Uint8Array): Snapshot {
     kaijus,
     squads,
     units,
+    smokes,
   };
 }
 

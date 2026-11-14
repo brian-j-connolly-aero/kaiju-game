@@ -42,6 +42,7 @@ import { angleDist, yawOf } from '../../math/angle';
 import type { Vec2 } from '../../math/vec';
 import type { PlayerId } from '../config';
 import type { HitFacing } from '../events';
+import { kaijuSwimming } from '../swim';
 import type { CombatantRef, Hit, Kaiju, Unit, World } from '../types';
 import { emit } from '../worldOps';
 
@@ -402,6 +403,8 @@ function queueTrample(world: World): void {
   const minSpeed2 = COMBAT_RULES.trampleMinSpeed * COMBAT_RULES.trampleMinSpeed;
   for (const k of world.kaijus) {
     if (!k.alive || k.phase === 'stagger' || k.phase === 'cocoon') continue;
+    // Swimming, it tramples nobody (sim/swim.ts).
+    if (kaijuSwimming(k)) continue;
     if (k.vx * k.vx + k.vz * k.vz < minSpeed2) continue;
     const dps = kaijuKindDef(k.kind).trampleDps * modMult(k.mods, 'unitDamage');
     if (!(dps > 0)) continue;

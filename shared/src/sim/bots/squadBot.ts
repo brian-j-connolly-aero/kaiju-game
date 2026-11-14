@@ -12,9 +12,14 @@
  *   staggered or in its cocoon it fires as fast as the guns load. (With the harness profile
  *   `MatchConfig.bots.triggerHappy` it always does: the lazy way to lead a squad.)
  * - retreat: when the kaiju comes close it un-parks and drives away, then starts over.
- * - search (stage 1, kaiju not on the map): go to where it was last known, then look around.
+ * - search (kaiju not on the map: stage 1, or swimming): go to where it was last known (to the
+ *   near bank when that was out in the water), then look around.
  * - a cocoon on the map is a target like any other, only better: the squad closes in on it.
  * - artillery: marked a little ahead of the kaiju whenever it is ready and the kaiju is near.
+ * - marking: with the kaiju in sight and nobody's mark on it, the leader marks it when a volley
+ *   is coming (or, at stage 1, to keep it on the map).
+ * - smoke: thrown on the squad when the kaiju comes too close (to cover the retreat), or when it
+ *   is coming for the planted guns.
  *
  * It only knows what the humans' map shows (`kaiju.known`) and what it reads off its own
  * squad. It is deliberately beatable: it parks in plain sight, it is slow to notice that the
@@ -23,12 +28,12 @@
  * Everything it does goes into `player.botInput`.
  */
 
-import { castSegment } from '../../city/spatialIndex';
+import { castSegment, inWater } from '../../city/spatialIndex';
 import type { CityData } from '../../city/types';
 import { BOT_RULES } from '../../defs/bots';
 import { factionLevelDef } from '../../defs/factions';
 import { kaijuStageDef } from '../../defs/kaiju/index';
-import { DT, SQUAD_RULES } from '../../defs/rules';
+import { DT, SQUAD_ABILITIES, SQUAD_RULES } from '../../defs/rules';
 import { unitTypeDef } from '../../defs/units';
 import { modMult } from '../../defs/upgrades';
 import { projectileTypeDef, weaponDef } from '../../defs/weapons';
@@ -38,11 +43,13 @@ import { rngInt } from '../../math/rng';
 import { clamp } from '../../math/scalar';
 import type { Vec3 } from '../../math/vec';
 import { MAX_AIM_PITCH } from '../../net/input';
+import { markableKaiju } from '../abilities';
 import { setWorldMove } from '../movement';
 import { createSteer, steerToward } from '../nav';
 import { arcCovers, nearestKaiju, squadCharge } from '../squads';
+import { kaijuShownHeight } from '../swim';
 import type { Kaiju, PlayerState, Squad, Unit, World } from '../types';
-import { beginBotInput, botHandicap, heldButtons, hesitates, press, releaseAll } from './common';
+import { beginBotInput, botHandicap, busyWith, heldButtons, hesitates, press, releaseAll } from './common';
 import type { BotState, SquadBotMode } from './types';
 
 const S = BOT_RULES.squad;
@@ -97,9 +104,26 @@ function lineOfFireAt(world: World, x: number, z: number, height: number, k: Kai
   muzzle.y = height;
   muzzle.z = z;
   mark.x = k.x;
-  mark.y = k.height * h;
+  mark.y = kaijuShownHeight(k) * h;
   mark.z = k.z;
   return !castSegment(world.cityQuery, muzzle, mark, undefined, -1, true);
+}
+
+const bank = { x: 0, z: 0 };
+
+/**
+ * The first dry ground on the way from (x, z) back toward (fromX, fromZ), in 4 m steps: the
+ * point itself when it is dry, the near bank when it is out in the water.
+ */
+function bankToward(world: World, x: number, z: number, fromX: number, fromZ: number, out: { x: number; z: number }): void {
+  const d = Math.hypot(fromX - x, fromZ - z);
+  const steps = Math.floor(d / 4);
+  out.x = x;
+  out.z = z;
+  for (let i = 0; i < steps && inWater(world.cityQuery, out.x, out.z); i++) {
+    out.x = x + ((fromX - x) * (i + 1) * 4) / d;
+    out.z = z + ((fromZ - z) * (i + 1) * 4) / d;
+  }
 }
 
 function botOf(world: World, squad: Squad): BotState | null {
@@ -328,9 +352,12 @@ export function squadBot(world: World, p: PlayerState, squad: Squad): void {
     } else if (bs.mode === 'search') {
       const reached = Math.hypot(bs.goalX - leader.x, bs.goalZ - leader.z) < S.searchReach;
       if (!bs.lastChecked) {
-        bs.goalX = tx;
-        bs.goalZ = tz;
-        if (dist < S.searchReach) bs.lastChecked = true;
+        // Lost in the water (it swims, sim/swim.ts): wait on the bank nearest the leader rather
+        // than wade out after it.
+        bankToward(world, tx, tz, leader.x, leader.z, bank);
+        bs.goalX = bank.x;
+        bs.goalZ = bank.z;
+        if (Math.hypot(bank.x - leader.x, bank.z - leader.z) < S.searchReach) bs.lastChecked = true;
       } else if (reached) {
         // Nothing here: look somewhere else inside the line.
         const spots = parkingSpots(world.city);
@@ -360,7 +387,7 @@ export function squadBot(world: World, p: PlayerState, squad: Squad): void {
     const top = kaijuStageDef(k.kind, k.stage).topSpeed;
     const speed = Math.hypot(k.vx, k.vz);
     // Where on the body: the height the leader has a line to (the middle when it has none).
-    const aimY = k.height * (bs.aimHeight >= 0 ? bs.aimHeight : 0.5);
+    const aimY = kaijuShownHeight(k) * (bs.aimHeight >= 0 ? bs.aimHeight : 0.5);
     if (speed < S.stillSpeed * top || helpless) {
       aimYaw = yawFromTo(leader.x, leader.z, k.x, k.z);
       aimPitch = Math.atan2(aimY - eyeY, Math.max(dist, 1));
@@ -434,9 +461,43 @@ export function squadBot(world: World, p: PlayerState, squad: Squad): void {
     }
   }
 
+  // --- Mark the kaiju for everybody, with a volley coming or to keep it on the map -------------
+  if (known && k.marked <= 0 && squad.markCooldown <= 0 && bs.los && !busyWith(bs, 'mark')) {
+    const worth = world.match.stage === 1 || squadCharge(world, squad) >= S.markCharge || helpless;
+    if (worth && markableKaiju(world, leader, input.aimYaw, input.aimPitch) === k) press(bs, 'mark', TAP_TICKS, 15);
+  }
+
+  // --- Smoke: cover a retreat, or hide the planted guns from a kaiju that is coming for them ----
+  let smoked = false;
+  if (known && !helpless && squad.smokeCooldown <= 0 && !busyWith(bs, 'smoke')) {
+    let at: Unit | null = null;
+    if (dist < S.smokeRetreatAt * range) {
+      at = leader;
+    } else if (bs.mode === 'hold' && dist < S.smokeRushAt * range) {
+      // Coming this way, and most of the squad charging where it stands.
+      const closing = (k.vx * (leader.x - k.x) + k.vz * (leader.z - k.z)) / Math.max(dist, 1);
+      let subs = 0;
+      let charging = 0;
+      for (const id of squad.units) {
+        const u = world.units[id];
+        if (!u.alive || id === squad.driven) continue;
+        subs++;
+        if (u.rooted) charging++;
+      }
+      if (closing > kaijuStageDef(k.kind, k.stage).topSpeed * 0.4 && subs > 0 && charging >= subs * S.smokeCharging) at = leader;
+    }
+    if (at && press(bs, 'smoke', TAP_TICKS, 15)) {
+      // On the squad, a little toward the kaiju: the guns stand inside it and the kaiju looks into it.
+      const cloud = SQUAD_ABILITIES.smoke.radius[world.match.stage - 1];
+      const toward = Math.min(cloud * 0.4, dist * 0.3);
+      input.marker = { x: at.x + ((tx - at.x) / Math.max(dist, 1)) * toward, z: at.z + ((tz - at.z) / Math.max(dist, 1)) * toward };
+      smoked = true;
+    }
+  }
+
   // --- Artillery, when the squad has it ---------------------------------------------------------
   if (bs.callInTimer > 0) bs.callInTimer -= DT;
-  else if (known && dist < S.callInRange * range && factionLevelDef(squad.faction, world.match.stage).callIns.length > 0 && (squad.callInCooldowns[0] ?? 1) <= 0) {
+  else if (!smoked && known && dist < S.callInRange * range && factionLevelDef(squad.faction, world.match.stage).callIns.length > 0 && (squad.callInCooldowns[0] ?? 1) <= 0) {
     if (press(bs, 'callIn', TAP_TICKS, 15)) {
       input.marker = {
         x: clamp(k.x + k.vx * S.callInLead, b.minX, b.maxX),

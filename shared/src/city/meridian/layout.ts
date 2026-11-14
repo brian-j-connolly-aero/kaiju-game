@@ -18,7 +18,8 @@
  *   920 m out, so its stage 2 square (which slides 280 m toward downtown and reaches 460 m
  *   further) stops exactly at the ring boulevard: no juvenile ever gets the towers, the titan does.
  * - FRAME: the avenues at 740 m separate the starting neighborhoods from the mid-rise ring.
- * - EDGE: the beltway at 1070 m is where squads deploy at stage 3.
+ * - EDGE: the beltway at 1070 m is where squads deploy at stage 3. Outside it, along the west,
+ *   north and east edges, runs the Old Moat (see MOATS).
  */
 
 import type { InfillId, PaletteId } from './palettes';
@@ -124,6 +125,21 @@ export const SEA: ReadonlyArray<{ smooth: boolean; pts: readonly Pt[] }> = [
       [208, -1100],
     ],
   },
+];
+
+/**
+ * The Old Moat: swimmable water at every stage (owner's note after the second playtest: "We may
+ * have to update the map to have water at all stages"). Every starting neighborhood touches the
+ * city limit, so a moat along the limit puts water in every stage 1 square and every stage 2
+ * square. It is 20 m wide and runs outside the beltway (in the strip that held only its tree
+ * belt), along the west edge from the beach, across the north edge past the mouth of the River
+ * Wend, and down the east edge to the south edge: no street and no building moves for it.
+ * Rectangles [east0, north0, east1, north1] in map coordinates; they overlap at the corners.
+ */
+export const MOATS: ReadonlyArray<{ name: string; rect: readonly [number, number, number, number] }> = [
+  { name: 'The Old Moat', rect: [-1100, -810, -1080, 1100] },
+  { name: 'The Old Moat', rect: [-1100, 1080, 1100, 1100] },
+  { name: 'The Old Moat', rect: [1080, -1100, 1100, 1100] },
 ];
 
 // ---------------------------------------------------------------------------------------------

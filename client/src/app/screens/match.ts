@@ -16,6 +16,7 @@ import { CommandWheel } from '../../ui/commandWheel';
 import { Hud } from '../../ui/hud';
 import { el } from '../../ui/icons';
 import { MapView } from '../../ui/mapView';
+import { ThreatRing } from '../../ui/threats';
 import type { AppContext, Screen } from '../context';
 import { cardForMatch } from './briefing';
 
@@ -25,6 +26,8 @@ export class MatchScreen implements Screen {
   private hud: Hud | null = null;
   private wheel: CommandWheel | null = null;
   private map: MapView | null = null;
+  /** The kaiju's warnings of guns charging at it (in first person above all). */
+  private threats: ThreatRing | null = null;
   private wheelWasOpen = false;
   /** The pointer was captured when the map or the panel opened: give it back when they close. */
   private mapTookPointer = false;
@@ -39,6 +42,7 @@ export class MatchScreen implements Screen {
     this.hud = new Hud();
     this.wheel = new CommandWheel();
     this.map = new MapView();
+    this.threats = new ThreatRing();
     this.map.setCity(runtime.session.mirror.city);
     const renderer = ctx.renderer;
     if (renderer) this.map.setLandmarkPictures(() => renderer.landmarkPictures());
@@ -46,7 +50,7 @@ export class MatchScreen implements Screen {
       runtime.session.sendCommand(command);
       ctx.audio.play('ui_wheel_select');
     };
-    this.root = el('div', 'screen match', [this.hud.root, this.wheel.root, this.map.root]);
+    this.root = el('div', 'screen match', [this.threats.root, this.hud.root, this.wheel.root, this.map.root]);
     ctx.ui.append(this.root);
     // The controls card opens and closes with its own key and takes no mouse input here: the
     // pointer stays captured and the game runs on behind it.
@@ -93,7 +97,10 @@ export class MatchScreen implements Screen {
     const now = ctx.now();
     if (e.type === 'crossfire') hud.flash('crossfire', now);
     else if (e.type === 'nerveBreak') hud.flash('nerveBreak', now, 2.5);
-    else if (e.type === 'volley') hud.flash('volley', now, 1);
+    else if (e.type === 'volley') {
+      hud.flash('volley', now, 1);
+      this.threats?.volley(e.squad, now);
+    }
     else if (e.type === 'callin' && e.phase !== 'done') hud.flash('callin', now, 2);
   }
 
@@ -156,6 +163,17 @@ export class MatchScreen implements Screen {
     const view = runtime.hudView();
     hud.root.classList.toggle('cinematic', runtime.shot !== null);
     hud.update(frame, runtime.session, view, ctx.now());
+    // The kaiju's own warnings, while it plays (not under the intermission's cinematic camera).
+    const threats = this.threats;
+    const lk = frame.localKaiju;
+    const renderer = ctx.renderer;
+    if (threats && lk && lk.alive && renderer && runtime.shot === null && frame.match.phase === 'playing' && !runtime.mapOpen) {
+      renderer.camera.updateMatrixWorld();
+      threats.update(lk, frame.units, frame.smokes, renderer.camera, !runtime.controller.thirdPerson, now);
+    } else {
+      threats?.hide();
+    }
+
     const human = runtime.activeHuman;
     if (human) {
       wheel.update(human.wheel, ctx.input.bindings, input.device, frame.squads[runtime.session.role.squadId] ?? null);
@@ -187,5 +205,6 @@ export class MatchScreen implements Screen {
     this.hud = null;
     this.wheel = null;
     this.map = null;
+    this.threats = null;
   }
 }

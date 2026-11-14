@@ -28,8 +28,10 @@ function kaiju(over: Partial<SnapKaiju> = {}): SnapKaiju {
     moltAvailable: false,
     wading: false,
     inWater: false,
+    submerge: 0,
     known: true,
     spotted: false,
+    marked: false,
     x: FAR,
     z: FAR,
     vx: 0,
@@ -252,7 +254,8 @@ describe('the command wheel', () => {
   function pick(c: HumanController, u: SnapUnit, dx: number, dy: number): CommandId | undefined {
     const input = createActionState();
     c.update(context(frameInput(input, {}, ['wheel']), { u }));
-    for (let i = 0; i < 4; i++) c.update(context(frameInput(input, { x: dx / 4, y: dy / 4 }, [], ['wheel']), { u }));
+    // Held for a moment (a quick tap with nothing pointed at leaves the wheel open: squadControls.test.ts).
+    for (let i = 0; i < 24; i++) c.update(context(frameInput(input, { x: dx / 24, y: dy / 24 }, [], ['wheel']), { u }));
     expect(c.wheel.open).toBe(true);
     const highlighted = c.wheel.highlight;
     c.update(context(frameInput(input), { u }));

@@ -46,7 +46,8 @@ the bay between the Old Town on the west bank and the downtown towers on the eas
   **Bellhaven**, **Temple Hill** (terraces on a round hill around a temple), **Hollowmere**,
   **Northgate** and **Easter Green**.
 - A **beltway** runs all the way round the city edge. It is where army squads arrive in the
-  last stage.
+  last stage. Outside it, along the west, north and east edges, runs the **Old Moat**, where a
+  young Gragnor can swim (section 11).
 
 ### Why the city is laid out in three bands
 
@@ -341,12 +342,14 @@ Ids are append-only: never rename or reorder. Art files are named after them.
   water.
 - **The sea**: the bay, a working harbor along the east side with two piers, the Long Mole out to
   the Farewell Light, the Boardwalk pier and beach on the west side.
+- **The Old Moat** (section 11): 20 m of water outside the beltway along the west, north and
+  east edges of the city, from the beach round to the south-east corner.
 - **Parks and plazas** (27 in all, named on the map): a green or plaza at every starting
   neighborhood, the Temple Gardens, Scholars Quad, Halcyon Hill, Signal Hill, Wend Gardens along
   the river, Founders Plaza, Exchange Square, Station Square, Market Square, the Stadium
   Concourse, Wheel Plaza, the Embankment Promenade along the downtown waterfront and Juniper
   Strand (the beach).
-- **Props** (5541): parked and moving cars, taxis, vans, trucks, buses at stops, kiosks on plazas
+- **Props** (5362): parked and moving cars, taxis, vans, trucks, buses at stops, kiosks on plazas
   and high streets, trees in parks and along avenues, lamps, traffic lights at junctions,
   benches, hydrants and billboards.
 
@@ -384,14 +387,16 @@ All numbers below were measured on the shared 4-core machine while other work wa
 (load average 2.3 to 4.7; another program's headless browser used up to 3.6 cores at times). The
 machine was never idle.
 
-**Size**: 2695 structures, 5541 props, 40 archetypes, 13 landmarks plus the landmark bridge,
-6 bridge decks, 12 districts, 10 anchors, 27 parks and plazas.
+**Size**: 2695 structures, 5362 props, 40 archetypes, 13 landmarks plus the landmark bridge,
+6 bridge decks, 12 districts, 10 anchors, 27 parks and plazas, and the Old Moat (section 11).
 
-**Same everywhere**: city checksum (seed 9001, the game's seed) 1739170986, full checksum
-(`meridianChecksum`, which also covers streets, areas, districts and their tints) 1876286051.
+**Same everywhere**: city checksum (seed 9001, the game's seed) 3570529651, full checksum
+(`meridianChecksum`, which also covers streets, areas, districts and their tints) 3898350366.
 Node 22 and headless Chromium 153 compute exactly the same numbers (an esbuild bundle of the
-generator, run in both). For seed 9002 the city checksum is 2320056143 and the full checksum
-424900319. The placeholder city is unchanged: 1340881825 from both `generateCity()` and
+generator, run in both). For seed 9002 the city checksum is 485795498 and the full checksum
+3758613154. (Before the Old Moat, 14 November: 5541 props, checksums 1739170986 and 1876286051;
+for seed 9002, 2320056143 and 424900319. The moat changed nothing but the tree belt outside the
+beltway, which it replaced.) The placeholder city is unchanged: 1340881825 from both `generateCity()` and
 `getCity()`.
 
 **Build time** (generation plus spatial index):
@@ -565,3 +570,44 @@ needed). The steps as they were planned:
   Renaming is the owner's call; if Bellhaven goes, "Bellmere" is a ready replacement (the anchor,
   district, common and high street names are in `layout.ts`; the placeholder city has its own
   Bellhaven anchor in `generateCity.ts`).
+
+---
+
+## 11. The Old Moat (14 November, the swim task)
+
+The owner's note after the second playtest: "Grognar should be able to swim in the river...
+We may have to update the map to have water at all stages." The monster can now swim, at
+stages 1 and 2 (docs/DESIGN.md section 4, "Swimming"), in water that is deep enough for its body:
+0.75 of its body radius from its middle all round at stage 1 (3.6 m of water across), 0.35 at
+stage 2 (6.3 m).
+
+**What was missing.** Every starting neighborhood lies 920 m from the center, against the
+city's edge, and no stage 1 square held any water at all. Of the stage 2 squares, the six on the
+west and north reach the river or the bay; Easter Green and Harrow Lane on the east reach no
+water, and Cinder Flats and Gull Point only a 28 m sliver of the bay's quay.
+
+**What changed.** One thing: the Old Moat, three water rectangles in `layout.ts` (`MOATS`), 20 m
+wide, between the beltway and the city limit (from 1080 to 1100 m out) along the west edge from
+the beach, the whole north edge past the mouth of the River Wend, and the whole east edge. Every
+stage 1 and stage 2 square touches the city limit, so every one now holds some of it. That strip
+held nothing but the beltway's tree belt, so no street and no building moved: the structures,
+their values, the streets and the bar marks are exactly what they were. The moat areas are added
+after all the others, so no other area's id (which seeds its furnishing) changed either. Only
+the 179 trees of the belt are gone (5541 props became 5362) and the checksums changed (section
+7). The juvenile fits in the moat with its flanks against the banks (6.3 m of the 20); the river
+(68 to 96 m wide) and the bay are far roomier.
+
+A first try widened the east side into a 36 m canal by pulling the beltway in by 22 m. That
+reshuffled the whole city (the street ids seed the buildings, so 1778 of 2695 buildings moved)
+and broke the fairness and deployment checks; it was dropped for the moat as it is.
+
+**Checked** (`shared/test/swim.test.ts`, "Port Meridian has water to swim in at every start"):
+for every start, at stage 1 and at stage 2, a walk from where the match starts (through nothing
+taller than the kaiju tramples, so without breaking anything) reaches deep enough water inside
+the bounds. Measured: at stage 1, between 5 700 and 11 100 square meters of swimmable water
+inside every square, first reached 148 to 165 m from the start; at stage 2, between 7 200 (Easter
+Green) and 138 000 (Juniper Bay) square meters, all of it reachable. The city tests (fairness,
+deployment on every perimeter point, no squad landing in water) pass unchanged; only the two
+checksum values were updated. `map.png` and `anchors.png` are redrawn with the moat; the other
+pictures in `docs/city/` do not show it.
+

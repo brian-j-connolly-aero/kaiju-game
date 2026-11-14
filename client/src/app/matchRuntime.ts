@@ -84,7 +84,7 @@ export class MatchRuntime {
     this.player = role === 'kaiju' ? new KaijuController(deps.thirdPerson) : role === 'human' ? new HumanController(deps.thirdPerson) : null;
     this.controller = this.player ?? this.drone;
     deps.renderer.beginMatch(deps.session.mirror, 1, deps.session.boundsFor(1));
-    deps.renderer.cues = { onStep: (k) => this.onStep(k) };
+    deps.renderer.cues = { onStep: (k) => this.onStep(k), onSplash: (k) => this.matchAudio.splash(k) };
     // Whatever was pressed in the menus is not the first input of the match.
     deps.input.sampleTaken();
   }

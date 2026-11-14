@@ -8,6 +8,7 @@ import {
   barDisplayFraction,
   createMatchConfig,
   createWorld,
+  DT,
   TICK_RATE,
   type BuiltCity,
   type EndReason,
@@ -60,6 +61,9 @@ export interface StageReport {
   barDisplay: number;
   /** Bar points added during the stage by the squads' own fire. */
   collateral: number;
+  /** Swimming (sim/swim.ts): seconds the kaiju spent in the water going down, under or coming up, and how often it went in. */
+  swimTime: number;
+  dives: number;
 }
 
 export interface BotMatchReport {
@@ -100,6 +104,8 @@ function emptyStage(): StageReport {
     barPoints: 0,
     barDisplay: 0,
     collateral: 0,
+    swimTime: 0,
+    dives: 0,
   };
 }
 
@@ -126,6 +132,7 @@ export function runBotMatch(o: BotMatchOptions): { report: BotMatchReport; world
 
   let stage = 0;
   let prevHp = world.kaijus[0]?.hp ?? 0;
+  let wasSwimming = false;
   let collateralBase = 0;
   let peakProjectiles = 0;
   let peakCallIns = 0;
@@ -184,6 +191,11 @@ export function runBotMatch(o: BotMatchOptions): { report: BotMatchReport; world
       }
     }
     const k = world.kaijus[0];
+    if (k && m.phase === 'playing' && k.submerge > 0) {
+      if (!wasSwimming) stages[stage].dives++;
+      stages[stage].swimTime += DT;
+    }
+    wasSwimming = !!k && k.submerge > 0;
     if (k && m.phase === 'playing') {
       if (k.hp < prevHp) stages[stage].kaijuHpLost += prevHp - k.hp;
       else if (k.hp > prevHp) stages[stage].kaijuHpHealed += k.hp - prevHp;
@@ -246,7 +258,7 @@ export function worldHash(world: World): number {
   mix(m.breaks);
   mix(m.kills);
   for (const k of world.kaijus) {
-    for (const v of [k.x, k.z, k.yaw, k.vx, k.vz, k.aimYaw, k.aimPitch, k.hp, k.nerve, k.rage, k.phaseTime, k.stage, k.nerveImmune]) mix(v);
+    for (const v of [k.x, k.z, k.yaw, k.vx, k.vz, k.aimYaw, k.aimPitch, k.hp, k.nerve, k.rage, k.phaseTime, k.stage, k.nerveImmune, k.submerge]) mix(v);
     mix(k.alive ? 1 : 0);
     mix(k.held ? 1 : 0);
   }

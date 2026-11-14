@@ -122,6 +122,12 @@ export function kaijuTiles(kind: KaijuKindId): CardTile[] {
       tiles.push({ id: verb, group: 'verbs', verb, parts: [press, icon] });
     }
   }
+  // Swimming (sim/swim.ts) has no button: walk into deep water and stand, and it goes under.
+  if (def.swim) {
+    const swim = def.swim;
+    const stages = ALL_STAGES.filter((s) => s <= stageCount && swim.stages[s - 1]);
+    if (stages.length > 0) tiles.push({ id: 'swim', group: 'verbs', parts: [{ kind: 'move' }, then, picture('k_swim', 'kaiju')], stages });
+  }
   tiles.push({ id: 'map', group: 'view', parts: [button('map'), picture('st_map')] }, ...viewTiles());
   return tiles;
 }
@@ -135,9 +141,14 @@ export function squadTiles(): CardTile[] {
     { id: 'look', group: 'move', parts: [{ kind: 'look' }, picture('st_spotted')] },
     { id: 'fire', group: 'verbs', parts: [button('fire'), picture('st_reload', 'human')] },
     { id: 'callIn', group: 'verbs', parts: [button('callIn'), picture('st_callin', 'human')], stages: [3] },
+    // Smoke where the crosshair is; mark the kaiju in the crosshair for the whole army.
+    { id: 'smoke', group: 'verbs', parts: [button('smoke'), picture('st_smoke', 'human')] },
+    { id: 'mark', group: 'verbs', parts: [button('mark'), picture('st_mark', 'kaiju')] },
     camera,
     // Hold the wheel, point at a command, let go.
     { id: 'wheel', group: 'squad', wide: true, parts: [button('wheel', true), { kind: 'look' }, { kind: 'then' }, { kind: 'wheel' }] },
+    // Or tap it, point, and click (the click picks; it does not fire).
+    { id: 'wheelClick', group: 'squad', wide: true, parts: [button('wheel'), { kind: 'look' }, then, { kind: 'button', action: 'fire', mouse: 'Mouse0' }, { kind: 'wheel' }] },
     { id: 'follow', group: 'squad', parts: [button('cmdFollow'), picture('cmd_follow', 'human')] },
     { id: 'moveTo', group: 'squad', parts: [button('cmdMoveTo'), picture('cmd_moveto', 'human')] },
     { id: 'fireAtWill', group: 'squad', parts: [button('cmdFireAtWill'), picture('cmd_fireatwill', 'human')] },
@@ -149,21 +160,20 @@ export function squadTiles(): CardTile[] {
       wide: true,
       parts: [picture('cmd_holdcharge', 'volley'), then, picture('st_charge', 'volley'), then, button('fire'), picture('st_reload', 'volley'), picture('st_reload', 'volley'), picture('st_reload', 'volley')],
     },
-    // The map; on it a click (or the confirm button) sends the squad there, a right click calls the guns.
+    // The map; on it a left click (or the confirm button) sends the squad there.
     {
       id: 'map',
       group: 'view',
       wide: true,
-      parts: [
-        button('map'),
-        picture('st_map'),
-        then,
-        { kind: 'button', action: 'confirm', mouse: 'Mouse0' },
-        picture('cmd_moveto', 'human'),
-        { kind: 'button', action: 'callIn', mouse: 'Mouse2' },
-        picture('st_callin', 'human'),
-        { kind: 'stages', stages: [3] },
-      ],
+      parts: [button('map'), picture('st_map'), then, { kind: 'button', action: 'confirm', mouse: 'Mouse0' }, picture('cmd_moveto', 'human')],
+    },
+    // At stage 3: pick the guns on the map's side (or press the call-in button), then a left click calls them there.
+    {
+      id: 'mapCallIn',
+      group: 'view',
+      wide: true,
+      parts: [picture('st_map', 'dim'), button('callIn'), then, { kind: 'button', action: 'confirm', mouse: 'Mouse0' }, picture('st_callin', 'human')],
+      stages: [3],
     },
     // Squad gone: the news drone flies until the next molt.
     { id: 'drone', group: 'view', wide: true, parts: [picture('ui_skull', 'dim'), then, button('rise'), picture('ui_rise'), button('sink'), picture('ui_sink')] },

@@ -344,6 +344,34 @@ export interface CallInEvent extends EventBase {
   radius: number;
 }
 
+/**
+ * A squad threw smoke (sim/abilities.ts): a cloud of `radius` standing `height` high at (x, z)
+ * for `duration` seconds. The clouds standing now are also in every snapshot.
+ */
+export interface SmokeEvent extends EventBase {
+  type: 'smoke';
+  /** Cloud id, unique per match. */
+  id: number;
+  squad: number;
+  player: PlayerId;
+  x: number;
+  z: number;
+  radius: number;
+  height: number;
+  duration: number;
+}
+
+/** A squad marked a kaiju for the whole army for `duration` seconds (it was at (x, z)). */
+export interface MarkEvent extends EventBase {
+  type: 'mark';
+  kaiju: number;
+  squad: number;
+  player: PlayerId;
+  x: number;
+  z: number;
+  duration: number;
+}
+
 /** The bar passed a mark and the kaiju may now cocoon. */
 export interface MoltAvailableEvent extends EventBase {
   type: 'moltAvailable';
@@ -448,6 +476,8 @@ export type SimEvent =
   | VolleyEvent
   | RoarEvent
   | CallInEvent
+  | SmokeEvent
+  | MarkEvent
   | MoltAvailableEvent
   | CocoonEvent
   | MoltBlastEvent
@@ -485,6 +515,8 @@ export const SIM_EVENT_TYPES: readonly SimEventType[] = [
   'volley',
   'roar',
   'callin',
+  'smoke',
+  'mark',
   'moltAvailable',
   'cocoon',
   'moltBlast',

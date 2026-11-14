@@ -75,6 +75,10 @@ function probeInPage(since) {
     squad: null,
     squadUnits: [],
     units: [],
+    smokes: [],
+    threatsShown: document.querySelectorAll('.threats:not(.hidden) .threat:not(.hidden)').length,
+    threatsAtEdge: document.querySelectorAll('.threats:not(.hidden) .threat.edge:not(.hidden)').length,
+    mapToolsShown: document.querySelectorAll('.map-tools:not(.hidden) .map-tool:not(.hidden)').length,
     view: null,
     aim: null,
     mapOpen: rt ? rt.mapOpen : false,
@@ -94,7 +98,8 @@ function probeInPage(since) {
   if (latest) {
     const k = latest.kaijus[0];
     if (k) out.kaiju = { ...k, cooldowns: { ...k.cooldowns }, held: k.held ? { ...k.held } : null };
-    out.units = latest.units.map((u) => ({ id: u.id, squad: u.squad, x: u.x, z: u.z, alive: u.alive, hp: u.hp, laser: u.laser, rooted: u.rooted, charge: u.charge, shaken: u.shaken, members: u.members, type: u.type, cooldown: u.cooldown, veteran: u.veteran }));
+    out.units = latest.units.map((u) => ({ id: u.id, squad: u.squad, x: u.x, z: u.z, alive: u.alive, hp: u.hp, laser: u.laser, rooted: u.rooted, charge: u.charge, shaken: u.shaken, members: u.members, type: u.type, cooldown: u.cooldown, veteran: u.veteran, aimYaw: u.aimYaw }));
+    out.smokes = (latest.smokes ?? []).map((c) => ({ ...c }));
     if (session.role.squadId >= 0) {
       const sq = latest.squads[session.role.squadId];
       if (sq) {
@@ -294,9 +299,10 @@ export class Driver {
 
   /**
    * Walks toward a point with the forward key held, steering with the mouse, until within
-   * `stopDist` of it, `done(probe)` says so, or the time is up. Returns true when it arrived.
+   * `stopDist` of it, `done(probe)` (or the awaited `doneAsync(probe)`) says so, or the time is
+   * up. Returns true when it arrived.
    */
-  async walkTo(x, z, stopDist, { timeoutMs = 15000, done = null, key = 'KeyW' } = {}) {
+  async walkTo(x, z, stopDist, { timeoutMs = 15000, done = null, doneAsync = null, key = 'KeyW' } = {}) {
     const deadline = Date.now() + timeoutMs;
     let walking = false;
     let arrived = false;
@@ -305,7 +311,7 @@ export class Driver {
         const p = await this.probe();
         if (!p || !p.predicted) break;
         const d = Math.hypot(x - p.predicted.x, z - p.predicted.z);
-        if (d <= stopDist || (done && done(p))) {
+        if (d <= stopDist || (done && done(p)) || (doneAsync && (await doneAsync(p)))) {
           arrived = true;
           break;
         }

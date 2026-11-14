@@ -92,6 +92,11 @@ export interface BotState {
   beamX: number;
   beamY: number;
   beamZ: number;
+  /** Swimming away (sim/swim.ts): seconds left of it, seconds until it may again, and where in the water it is heading. */
+  swimFor: number;
+  swimRest: number;
+  swimX: number;
+  swimZ: number;
 }
 
 export function createBotState(): BotState {
@@ -146,5 +151,9 @@ export function createBotState(): BotState {
     beamX: 0,
     beamY: 0,
     beamZ: 0,
+    swimFor: 0,
+    swimRest: 0,
+    swimX: 0,
+    swimZ: 0,
   };
 }
