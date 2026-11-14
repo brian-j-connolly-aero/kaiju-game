@@ -17,7 +17,10 @@
  *   --seconds N      how long each visit plays before the last picture (default 14)
  *   --width W --height H   page size (default 960 x 540)
  *   --no-assets      procedural fallbacks only
- *   --no-extras      skip the scripted extras (command wheel, charging lasers, molts, roar, beam, stagger)
+ *   --no-extras      skip the scripted extras (command wheel, charging lasers, molts, roar, beam,
+ *                    stagger, swimming)
+ *   --only TAGS      only the extras whose names start with one of these (comma separated, for
+ *                    example `x-kaiju-swim,x-human-swim`), and none of the stage visits
  *
  * The Chromium flags are the ones documented in smoke.mjs.
  */
@@ -47,7 +50,7 @@ const TYPES = {
 };
 
 function parseArgs(argv) {
-  const opts = { out: '/tmp/mb-scratch/playtest/shots', stages: [1, 2, 3], roles: ['kaiju', 'human'], seconds: 14, width: 960, height: 540, noAssets: false, extras: true };
+  const opts = { out: '/tmp/mb-scratch/playtest/shots', stages: [1, 2, 3], roles: ['kaiju', 'human'], seconds: 14, width: 960, height: 540, noAssets: false, extras: true, only: [] };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const next = () => argv[++i];
@@ -59,6 +62,10 @@ function parseArgs(argv) {
     else if (a === '--height') opts.height = Number(next()) || 540;
     else if (a === '--no-assets') opts.noAssets = true;
     else if (a === '--no-extras') opts.extras = false;
+    else if (a === '--only') {
+      opts.only = next().split(',').filter(Boolean);
+      opts.stages = [];
+    }
     else {
       console.error(`unknown option ${a}`);
       process.exit(2);
@@ -147,6 +154,7 @@ async function main() {
   // --- extras: things the autopilot does not show by itself ------------------------------------
   if (opts.extras) {
     const visit = async (tag, query, steps) => {
+      if (opts.only.length > 0 && !opts.only.some((o) => tag.startsWith(o))) return;
       const browser = await chromium.launch({ headless: true, args: CHROMIUM_ARGS });
       const page = await browser.newPage({ viewport: { width: opts.width, height: opts.height }, deviceScaleFactor: 1 });
       const errors = [];
@@ -263,6 +271,113 @@ async function main() {
       });
       await sleep(1500);
       await shot('3-stagger');
+    });
+
+    // Swimming (sim/swim.ts): the kaiju is put in the Old Moat inside its bounds and left idle;
+    // it must go under by itself (the server's world says so), show its spines and a wake as
+    // it swims, and come up for Roar. Stage 1 and stage 2; the squads' view of it last.
+    const intoMoat = (stage) => {
+      const w = window.__mb.internals.ctx.client.local.world;
+      const b = w.match.bounds;
+      const k = w.kaijus[0];
+      // The Old Moat runs 20 m wide along the west (world +X), north (+Z) and east (-X) limits.
+      const lane = stage === 1 ? 1090 : 1088;
+      if (b.maxX >= 1095) {
+        k.x = lane;
+        k.z = (b.minZ + b.maxZ) / 2;
+        k.yaw = 0;
+      } else if (b.minX <= -1095) {
+        k.x = -lane;
+        k.z = (b.minZ + b.maxZ) / 2;
+        k.yaw = 0;
+      } else {
+        k.x = (b.minX + b.maxX) / 2;
+        k.z = lane;
+        k.yaw = Math.PI / 2;
+      }
+      k.vx = 0;
+      k.vz = 0;
+      k.aimYaw = k.yaw;
+      // Keep the squads out of it: this is about the look of the water.
+      for (const u of w.units) {
+        u.x = (b.minX + b.maxX) / 2;
+        u.z = (b.minZ + b.maxZ) / 2;
+      }
+      return { x: k.x, z: k.z, yaw: k.yaw };
+    };
+    const submerge = (page) => page.evaluate(() => window.__mb.internals.ctx.client.local.world.kaijus[0].submerge);
+    for (const stage of [1, 2]) {
+      await visit(`x-kaiju-swim-s${stage}`, { sandbox: String(stage), role: 'kaiju' }, async (page, shot) => {
+        await sleep(2000);
+        const at = await page.evaluate(intoMoat, stage);
+        // The view along the moat.
+        await page.evaluate((yaw) => {
+          const c = window.__mb.internals.ctx.runtime.controller;
+          c.aimYaw = yaw;
+          c.aimPitch = -0.15;
+        }, at.yaw);
+        await sleep(3000);
+        const under = await submerge(page);
+        console.log(`shots: x-kaiju-swim-s${stage}: submerge ${under.toFixed(2)} after 3 s idle in the moat`);
+        if (under < 1) throw new Error(`x-kaiju-swim-s${stage}: the kaiju did not go under in the moat`);
+        await shot('1-under-first-person');
+        await page.evaluate(() => {
+          window.__mb.internals.ctx.runtime.controller.thirdPerson = true;
+        });
+        await sleep(900);
+        await shot('2-under-third-person');
+        await page.keyboard.down('KeyW');
+        await sleep(2500);
+        await shot('3-swimming-wake');
+        await page.keyboard.up('KeyW');
+        const moving = await submerge(page);
+        if (moving < 1) throw new Error(`x-kaiju-swim-s${stage}: it came up while swimming along the moat`);
+        // Roar brings it up, and it roars once it is up.
+        await page.evaluate(() => {
+          window.__mb.internals.ctx.client.local.world.kaijus[0].cooldowns.roar = 0;
+        });
+        await page.keyboard.down('KeyQ');
+        await sleep(150);
+        await page.keyboard.up('KeyQ');
+        let roared = false;
+        for (let i = 0; i < 20 && !roared; i++) {
+          await sleep(100);
+          roared = await page.evaluate(() => window.__mb.internals.ctx.client.local.world.kaijus[0].action === 'roar');
+        }
+        const up = await submerge(page);
+        console.log(`shots: x-kaiju-swim-s${stage}: after Roar, submerge ${up.toFixed(2)}, roared ${roared}`);
+        if (!roared || up > 0) throw new Error(`x-kaiju-swim-s${stage}: Roar did not bring it up and roar`);
+        await shot('4-up-and-roaring');
+      });
+    }
+    await visit('x-human-swim', { sandbox: '2', role: 'human' }, async (page, shot) => {
+      await sleep(2000);
+      // The bot kaiju lies still (it would go back to wrecking), and so do the bot squads.
+      await page.evaluate(() => {
+        window.__mb.internals.ctx.client.local.world.config.bots = { kaijuHandicap: 1, humanHandicap: 1 };
+      });
+      await page.evaluate(intoMoat, 2);
+      await sleep(2500);
+      if ((await submerge(page)) < 1) throw new Error('x-human-swim: the kaiju did not go under in the moat');
+      // The player's unit on the bank, 70 m along the moat, looking at the spines.
+      await page.evaluate(() => {
+        const w = window.__mb.internals.ctx.client.local.world;
+        const k = w.kaijus[0];
+        const squad = w.squads[w.players.find((p) => !p.bot && p.role === 'human').squadId];
+        const u = w.units[squad.driven];
+        const inward = Math.abs(k.x) > Math.abs(k.z) ? { x: -Math.sign(k.x), z: 0 } : { x: 0, z: -Math.sign(k.z) };
+        const along = { x: -inward.z, z: inward.x };
+        // (On the beltway, between the moat and the houses.)
+        u.x = k.x + inward.x * 16 + along.x * 70;
+        u.z = k.z + inward.z * 16 + along.z * 70;
+        u.vx = 0;
+        u.vz = 0;
+        const c = window.__mb.internals.ctx.runtime.controller;
+        c.viewYaw = Math.atan2(k.x - u.x, k.z - u.z);
+        c.viewPitch = -0.05;
+      });
+      await sleep(2000);
+      await shot('1-spines-from-the-bank');
     });
   }
 

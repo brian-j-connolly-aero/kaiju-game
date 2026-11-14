@@ -827,6 +827,9 @@ export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
           throttle = d > stop ? 1 : 0;
           if (!facing) aimYaw = yawFromTo(k.x, k.z, fx, fz);
           facing = true;
+          // A wall between it and the meal is smashed, as on the way to anything else (it
+          // could otherwise lean on a house for the rest of the match, the meal beyond it).
+          if (throttle > 0 && !k.held && !st.wadesTall && canAct(k) && wallAhead(world, k, st, moveYaw) >= 0) strike(world, k, bs, def, st, k.aimYaw);
         }
       }
     }

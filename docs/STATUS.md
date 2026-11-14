@@ -1650,3 +1650,20 @@ monster's swim and travel mode is another engineer's, in its own section.)
   entries with a left click (held and tapped wheel) and checks that no shot leaves, throws
   smoke, marks the monster, checks the map picker and the left-click marker, and looks for the
   monster's warnings in first person. Balance: see below.
+- **Balance** (`npm run sim -- --seeds 60 --every-anchor`; before: monster 47% of 60, about
+  10:30). With smoke and marking alone: 29 of 60 (48%), 9:42. With the other engineer's swim
+  work also in the tree: 26 of 60 (43%), 9:51; seeds 61 to 120: 31 of 60 (52%), 9:44. Bots
+  mark about 30 times and smoke about 10 to 18 times a match. Within the 8-point band, so no
+  retune. Matches are about half a minute shorter.
+- **Test changes made on purpose.** Ten buttons instead of eight (`net.test.ts`,
+  `gameRoom.test.ts`); the wheel test holds the button a moment before letting go in the
+  middle (a quick tap now leaves it open); the random-input soak draws the same random numbers
+  as before and presses smoke and mark alongside some of them (and now expects smoke); the
+  voice test's seed-1 bot match now ends at stage 2, so instead of "more than 5 news lines" it
+  checks that the news said every one of its cues that match reached.
+- **Still open / not tried in a browser.** Pointer-lock mouse movement (headless browsers garble
+  it; covered by the unit test). The map's artillery picker and left-click call at stage 3 (the
+  scripted session stays at stage 1; the click rule is unit-tested). A gamepad. The new
+  controls card has four more tiles and is crowded at 640 x 360. One run of the human session
+  saw the Enter key fail to open the controls card once; the next full run passed it on both
+  sides, so it is noted as a possible flaky check, not fixed.
