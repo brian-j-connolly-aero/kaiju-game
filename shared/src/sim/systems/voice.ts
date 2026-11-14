@@ -16,9 +16,20 @@
  * `say` also chooses the concrete lines, one list per listening side, from whatever
  * `voiceLines.json` holds today (`chooseVoiceLines`): deterministic from the world's generator,
  * the squad's own voice when the cue is about a squad, and not the line that cue played last.
+ * Each side then has its own say (VOICE_SIDE_RULES, `sideHears`): the news speaks only for the
+ * big moments, and the radio is rationed harder still. A side that is not to hear a cue gets
+ * an empty list. The cue is emitted all the same, so what the radio and the news say never
+ * changes how the match plays out (the generator is drawn exactly as before).
  */
 
-import { VOICE_CUE_RULES, VOICE_RULES, chooseVoiceLines, type VoiceCueId } from '../../defs/voice';
+import {
+  VOICE_CUE_RULES,
+  VOICE_RULES,
+  VOICE_SIDE_RULES,
+  chooseVoiceLines,
+  type VoiceCueId,
+  type VoiceCueRule,
+} from '../../defs/voice';
 import { DT } from '../../defs/rules';
 import { rngU32 } from '../../math/rng';
 import { NO_PLAYER } from '../config';
@@ -28,6 +39,23 @@ import { emit } from '../worldOps';
 
 const SIDES = ['humans', 'kaiju'] as const;
 const callsigns: string[] = [];
+
+/**
+ * Whether a side gets a line for a cue that has passed the cue rules, spending that side's
+ * budget when it does. The news has a fixed list of cues; the radio has its own waits and budget.
+ */
+function sideHears(world: World, side: 'humans' | 'kaiju', cue: VoiceCueId, rule: VoiceCueRule): boolean {
+  if (side === 'kaiju') return VOICE_SIDE_RULES.news.cues.includes(cue);
+  const R = VOICE_SIDE_RULES.radio;
+  const radio = world.voice.radio;
+  const fixed = R.gaps[cue];
+  if (rule.priority === 2 && fixed === undefined) return true;
+  if ((radio.cooldowns[cue] ?? 0) > 0) return false;
+  if (rule.priority === 0 && radio.tokens < 1) return false;
+  if (rule.priority < 2) radio.tokens = Math.max(0, radio.tokens - 1);
+  radio.cooldowns[cue] = fixed ?? Math.max(R.minGap, rule.gap * R.gapScale);
+  return true;
+}
 
 /**
  * Emits a voice cue unless radio discipline says no: the same cue was heard too recently, or it
@@ -47,6 +75,7 @@ export function say(world: World, cue: VoiceCueId, squad = -1, player: number = 
   const callsign = world.squads[squad]?.callsign;
   const lines = { humans: [] as string[], kaiju: [] as string[] };
   for (const side of SIDES) {
+    if (!sideHears(world, side, cue, rule)) continue;
     const key = `${cue}|${side}`;
     const chosen = chooseVoiceLines(cue, side, variant, { callsign, callsigns, avoid: v.lastLine[key] });
     for (const line of chosen) lines[side].push(line.id);
@@ -164,6 +193,14 @@ export function voiceSystem(world: World): void {
   if (v.tokens < VOICE_RULES.chatterTokens) {
     v.tokens = Math.min(VOICE_RULES.chatterTokens, v.tokens + DT / VOICE_RULES.chatterRefill);
   }
+  const radio = v.radio;
+  for (const cue of Object.keys(radio.cooldowns) as VoiceCueId[]) {
+    const left = (radio.cooldowns[cue] ?? 0) - DT;
+    if (left > 0) radio.cooldowns[cue] = left;
+    else delete radio.cooldowns[cue];
+  }
+  const R = VOICE_SIDE_RULES.radio;
+  if (radio.tokens < R.chatterTokens) radio.tokens = Math.min(R.chatterTokens, radio.tokens + DT / R.chatterRefill);
 
   // Only the events that existed before this system ran: the cues it adds are not re-read.
   const count = world.events.length;

@@ -17,6 +17,7 @@ import {
   TICK_RATE,
   unitTypeDef,
   VOICE_LINES,
+  VOICE_SIDE_RULES,
   type CityData,
   type KaijuKindId,
   type MatchEndEvent,
@@ -77,9 +78,15 @@ export function isRadioLine(line: Pick<VoiceLine, 'audience'>): boolean {
   return line.audience === 'humans';
 }
 
-/** The ids of the lines a side should have decoded before the match starts. */
+/**
+ * The ids of the lines a side should have decoded before the match starts. The news only ever
+ * speaks for its own short list of cues (VOICE_SIDE_RULES), so nothing else is loaded for it.
+ */
 export function voiceAheadIds(side: 'humans' | 'kaiju'): string[] {
-  return VOICE_LINES.filter((l) => l.audience === side && VOICE_AHEAD.includes(l.cue)).map((l) => l.id);
+  const news: readonly VoiceCueId[] = VOICE_SIDE_RULES.news.cues;
+  return VOICE_LINES.filter(
+    (l) => l.audience === side && VOICE_AHEAD.includes(l.cue) && (side === 'humans' || news.includes(l.cue)),
+  ).map((l) => l.id);
 }
 
 /**

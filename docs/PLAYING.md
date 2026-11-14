@@ -98,8 +98,10 @@ press it again to close it. The game keeps running behind it.
 - **Colours and shapes:** cyan circles are the army, orange triangles are the monster, yellow
   diamonds are volleys being charged. The orange eye over the monster means the army can see it.
 - **Pictures with a button, bottom right:** what you can do right now and which button does it.
-- **Subtitles:** the radio (army) and the television news (monster) say everything out loud,
-  with the speaker's name.
+- **Subtitles:** what the radio (army) and the television news (monster) say out loud, with
+  the speaker's name. The radio calls out what is happening in the fight; the news only breaks
+  in for the big moments (the start, a landmark falling, the monster growing, the last minute,
+  the end).
 
 ## Five tips for the monster
 

@@ -576,5 +576,18 @@ rules per cue in `shared/src/defs/voice.ts`):
   lines that refills at one line per 5 s: a burst when something starts, then a trickle.
 - `kaiju.lowhp` is called once per stage, when the kaiju first drops below 25% health;
   `bar.near` once on the way to each mark, at 85% of the way from the last one.
-- In bot matches this comes to about 14 cues a minute, each side hearing one line per cue:
-  two or three in a typical ten seconds, seven or eight in the very busiest.
+- On top of that, each side has its own say (`VOICE_SIDE_RULES`; polish pass of 14 November,
+  after the owner's first game: "the anchor was speaking the whole time"). A cue that passes
+  the rules above is always emitted, so the match itself is unchanged; a side that is not to
+  hear it gets no line, and no subtitle.
+  - The news (the kaiju player) speaks only for: the briefing, the start, a landmark down, the
+    molt being ready, stage 2 and 3, one minute and ten seconds left, the ending, and the
+    hearing. All the colour commentary (volleys, crossfire, roars, buildings, units, artillery,
+    staggers and so on) is off. The lines are still in the script, just not played.
+  - The radio (the squads) keeps every cue but repeats a cue only after twice its gap (at least
+    8 s; nerve break 24 s, landmark 10 s, artillery 45 s), and routine chatter has its own
+    budget of two lines refilling at one per 15 s. Other cues the match turns on are not held.
+- Measured over ten whole bot matches (seeds 1 to 10, 115 minutes, briefing not counted): about
+  13 cues a minute. Before this pass both sides heard all of them (1,473 news lines, 1,484 radio
+  lines). Now the news says 124 (about 1 a minute, 12 times fewer) and the radio 772 (about 6.7
+  a minute, 52%). `test/voice.test.ts` holds a whole bot match to these limits.

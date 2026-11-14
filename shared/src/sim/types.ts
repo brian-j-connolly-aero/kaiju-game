@@ -145,6 +145,14 @@ export interface KaijuActionMemory {
   /** Beam special: how far the beam reaches this tick, and the structure it is burning through (-1: none). */
   beamLength: number;
   beamBlocker: number;
+  /**
+   * Beam special: where the player has steered the head (the beam itself shakes about this,
+   * see `beamShake`), the tick the steering started (it seeds the shake), and whether it has.
+   */
+  beamSteering: boolean;
+  beamYaw: number;
+  beamPitch: number;
+  beamSeed: number;
   /** Tick of the last `crossfire` event for this kaiju (they are rate limited). */
   crossfireTick: number;
 }
@@ -493,6 +501,8 @@ export interface VoiceState {
   lowHpStage: number;
   /** How many marks `bar.near` has been called for (it is called once on the way to each mark). */
   barNearCalled: number;
+  /** The radio's own, stricter discipline (VOICE_SIDE_RULES.radio): its per-cue waits and budget. */
+  radio: { cooldowns: Partial<Record<VoiceCueId, number>>; tokens: number };
 }
 
 /** Inputs for one tick, indexed by PlayerId. A missing entry repeats that player's last input. */

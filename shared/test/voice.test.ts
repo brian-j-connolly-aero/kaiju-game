@@ -3,17 +3,20 @@ import {
   chooseVoiceLines,
   say,
   SQUAD_CALLSIGNS,
+  TICK_RATE,
   VOICE_CUE_IDS,
   VOICE_CUE_RULES,
   VOICE_LINES,
   VOICE_RULES,
   VOICE_SEQUENCE_CUES,
+  VOICE_SIDE_RULES,
   voiceLinesFor,
   type VoiceCueId,
   type VoiceEvent,
   type VoiceLine,
   type World,
 } from '../src/index';
+import { runBotMatch } from '../scripts/botMatch';
 import { eventsOf, KAIJU_PLAYER, makeTestWorld, parkUnits, run } from './helpers';
 
 const BY_ID = new Map(VOICE_LINES.map((l) => [l.id, l]));
@@ -44,13 +47,16 @@ describe('voice lines: chosen by the simulation, from whatever the script holds'
     for (const cue of VOICE_CUE_IDS) {
       world.voice.cooldowns = {};
       world.voice.tokens = VOICE_RULES.chatterTokens;
+      world.voice.radio.cooldowns = {};
+      world.voice.radio.tokens = VOICE_SIDE_RULES.radio.chatterTokens;
       expect(say(world, cue)).toBe(true);
       const e = lastVoice(world);
       expect(e.cue).toBe(cue);
       for (const side of ['humans', 'kaiju'] as const) {
         const ids = e.lines[side];
         // Exactly what the script offers that side: one line, or the whole sequence, or nothing.
-        const offered = voiceLinesFor(cue, side);
+        // The news only speaks for its own short list of cues.
+        const offered = side === 'kaiju' && !VOICE_SIDE_RULES.news.cues.includes(cue) ? [] : voiceLinesFor(cue, side);
         if (offered.length === 0) expect(ids).toEqual([]);
         else if (VOICE_SEQUENCE_CUES.includes(cue)) expect(ids).toEqual(offered.map((l) => l.id));
         else expect(ids.length).toBe(1);
@@ -93,11 +99,13 @@ describe('voice lines: chosen by the simulation, from whatever the script holds'
 
   it('does not play the same line twice running when the script has a choice', () => {
     const world = quietWorld();
-    const cue: VoiceCueId = CRITICAL;
+    const cue: VoiceCueId = 'landmark.down';
+    expect(VOICE_SIDE_RULES.news.cues).toContain(cue);
     expect(voiceLinesFor(cue, 'kaiju').length).toBeGreaterThan(1);
     let previous = '';
     const heard = new Set<string>();
     for (let i = 0; i < 30; i++) {
+      world.voice.cooldowns = {};
       say(world, cue);
       const id = lastVoice(world).lines.kaiju[0];
       expect(id).not.toBe(previous);
@@ -245,5 +253,94 @@ describe('the cues that watch a number', () => {
     wait();
     expect(near(add(620))).toBe(1);
     expect(near(run(world, 30 * 30))).toBe(0);
+  });
+});
+
+describe('what each side hears (VOICE_SIDE_RULES)', () => {
+  it('keeps the news to the big moments, while the cue still goes out to the radio', () => {
+    const world = quietWorld();
+    for (const cue of ['building.down', 'volley.ready', 'crossfire', 'nerve.break', 'kaiju.roar'] as const) {
+      expect(VOICE_SIDE_RULES.news.cues).not.toContain(cue);
+      world.voice.cooldowns = {};
+      world.voice.tokens = VOICE_RULES.chatterTokens;
+      world.voice.radio.cooldowns = {};
+      world.voice.radio.tokens = VOICE_SIDE_RULES.radio.chatterTokens;
+      expect(say(world, cue)).toBe(true);
+      const e = lastVoice(world);
+      expect(e.lines.kaiju).toEqual([]);
+      expect(e.lines.humans.length).toBe(1);
+    }
+    for (const cue of ['stage.2', 'landmark.down', 'end.kaiju', 'match.start'] as const) {
+      world.voice.cooldowns = {};
+      say(world, cue);
+      expect(lastVoice(world).lines.kaiju.length).toBe(1);
+    }
+  });
+
+  it('makes the radio wait longer than the cue itself before repeating it', () => {
+    const world = quietWorld();
+    const cue = IMPORTANT;
+    const gap = VOICE_CUE_RULES[cue].gap;
+    const radioGap = Math.max(VOICE_SIDE_RULES.radio.minGap, gap * VOICE_SIDE_RULES.radio.gapScale);
+    expect(radioGap).toBeGreaterThan(gap);
+    say(world, cue);
+    expect(lastVoice(world).lines.humans.length).toBe(1);
+    // The cue may go out again after its own gap, but the radio stays quiet for it...
+    run(world, 30 * gap + 1);
+    expect(say(world, cue)).toBe(true);
+    expect(lastVoice(world).lines.humans).toEqual([]);
+    // ...until its own, longer wait is over.
+    run(world, 30 * (radioGap - gap) + 1);
+    world.voice.cooldowns = {};
+    say(world, cue);
+    expect(lastVoice(world).lines.humans.length).toBe(1);
+  });
+
+  it('rations radio chatter on its own, slower budget', () => {
+    const world = quietWorld();
+    run(world, 30 * VOICE_SIDE_RULES.radio.chatterRefill * VOICE_SIDE_RULES.radio.chatterTokens);
+    const routine = VOICE_CUE_IDS.filter((c) => VOICE_CUE_RULES[c].priority === 0);
+    const heard = routine.filter((cue) => {
+      world.voice.tokens = VOICE_RULES.chatterTokens;
+      say(world, cue);
+      return lastVoice(world).lines.humans.length > 0;
+    });
+    expect(heard.length).toBe(VOICE_SIDE_RULES.radio.chatterTokens);
+    expect(VOICE_SIDE_RULES.radio.chatterRefill).toBeGreaterThan(VOICE_RULES.chatterRefill);
+  });
+
+  it('never changes the match: a cue nobody hears is still emitted and still draws its number', () => {
+    const world = quietWorld();
+    say(world, 'crossfire');
+    world.voice.cooldowns = {};
+    const before = world.rng.s;
+    expect(say(world, 'crossfire')).toBe(true);
+    const e = lastVoice(world);
+    expect(e.lines).toEqual({ humans: [], kaiju: [] });
+    expect(world.rng.s).not.toBe(before);
+  });
+
+  it('over a whole bot match: the news speaks about ten times less, the radio about half as often', () => {
+    let cues = 0;
+    let anchor = 0;
+    let radio = 0;
+    const { world } = runBotMatch({
+      seed: 1,
+      onTick: (_w, events) => {
+        for (const e of events) {
+          if (e.type !== 'voice' || e.cue === 'match.briefing') continue;
+          cues++;
+          if (e.lines.kaiju.length > 0) anchor++;
+          if (e.lines.humans.length > 0) radio++;
+        }
+      },
+    });
+    const minutes = world.tick / TICK_RATE / 60;
+    // Before this pass both sides spoke for every cue: about 13 lines a minute each.
+    expect(cues / minutes).toBeGreaterThan(10);
+    expect(anchor / minutes).toBeLessThan(1.6);
+    expect(anchor).toBeGreaterThan(5);
+    expect(radio / cues).toBeLessThan(0.6);
+    expect(radio / cues).toBeGreaterThan(0.4);
   });
 });

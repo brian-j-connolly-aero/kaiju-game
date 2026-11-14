@@ -1468,3 +1468,33 @@ a bad connection would have felt, and it was found while looking.
 - Someone who empties their name keeps being asked for one when they open an invite link.
 - From earlier rounds and unchanged: district roof colors, the real tunnel and Windows scripts,
   a real controller and graphics card.
+
+## Polish pass: fewer voice lines (14 November, the voices task)
+
+The owner's note after the first game: "The anchor was speaking the whole time ... cut all the
+fluff anchor lines. Army lines were ok but maybe reduce frequency by 2x".
+
+- **Cause.** Every cue the simulation emitted (about 13 a minute in a bot match) gave both sides a
+  line: the news anchor narrated every volley, roar, crossfire, building and unit. The rules in
+  `VOICE_CUE_RULES` / `VOICE_RULES` throttle the cue, not what each side hears.
+- **Change.** `VOICE_SIDE_RULES` (`shared/src/defs/voice.ts`, applied in `say`,
+  `shared/src/sim/systems/voice.ts`): the news only speaks for the briefing, start, landmark
+  down, molt ready, stages 2 and 3, one minute and ten seconds left, the ending and the hearing;
+  the radio keeps every cue with its own longer waits and a slower chatter budget (numbers in
+  DESIGN.md section 8). A cue is still emitted with the same random draw, and a side that is not
+  to hear it gets an empty list, so the match plays out exactly as before (same winners and
+  lengths across seeds 1 to 5 before and after). Subtitles come only from spoken lines, so they
+  follow. The client no longer preloads anchor lines it will never play. No audio was added or
+  removed; the unused anchor lines stay in the script and the manifest.
+- **Measured** (ten bot matches, seeds 1 to 10, briefing not counted, with the tree as it stood):
+  news 1,473 lines before, 124 after (12 times fewer, about 1 a minute); radio 1,484 before, 772
+  after (52%). A second run later, with other teams' in-progress gameplay changes in the tree:
+  1,341 to 111 and 1,353 to 710, the same ratios. In a two-page browser smoke run (short clock,
+  150 s of play) the monster's page showed 10 subtitles, all big moments; the army's page 29.
+- **Tests.** `shared/test/voice.test.ts`: the news stays quiet for colour cues; the radio waits
+  longer than the cue; the radio budget; a silent cue still draws its number; a whole bot match
+  held to under 1.6 news lines a minute and 40 to 60% radio. `client/test/matchAudio.test.ts`:
+  only news lines it speaks are preloaded.
+- **Still open.** The monster player no longer hears warnings such as "the army is preparing a
+  volley" or "a strike is inbound"; the pictures on screen carry those. Soldier lines for the
+  monster's side are for the later voice-and-art loop.

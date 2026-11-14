@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyHit,
   beamPath,
+  beamShake,
   beginStage,
   bitGet,
   Btn,
@@ -689,7 +690,10 @@ describe('roar', () => {
     expect(actions(events)).toEqual([['roar', 'roar']]);
     expect(eventsOf(events, 'roar')).toMatchObject([{ kaiju: 0, x: 0, z: 0, radius: reach }]);
     expect(eventsOf(events, 'voice').map((e) => e.cue)).toContain('kaiju.roar');
-    expect(inside.nerve).toBeGreaterThan(A.roar.unitNerve - COMBAT_RULES.unitNerveLeak);
+    // Shaken on the spot (polish pass: the roar used to leave a fresh unit merely unsettled).
+    expect(inside.shaken).toBeCloseTo(COMBAT_RULES.shakenDuration - DT, 6);
+    expect(inside.state).toBe('shaken');
+    expect(eventsOf(events, 'unitShaken')).toMatchObject([{ unit: 0 }]);
     expect(inside.charge).toBe(0);
     expect(outside.nerve).toBe(0);
     expect(outside.charge).toBe(0.9);
@@ -714,18 +718,23 @@ describe('roar', () => {
     expect(again).toBeLessThanOrEqual(2 + ticksFor(A.roar.cooldown));
   });
 
-  it('unsettles a fresh unit without breaking it, and breaks one that was already rattled', () => {
-    // The relationship the design relies on: one roar alone does not shake a fresh unit.
-    expect(A.roar.unitNerve).toBeLessThan(COMBAT_RULES.unitNerveCapacity);
+  it('shakes every unit it reaches, a fresh one as much as a rattled one, but not one that is already shaken', () => {
+    // The relationship the polish pass relies on: one roar alone shakes a fresh unit.
+    expect(A.roar.unitNerve).toBeGreaterThanOrEqual(COMBAT_RULES.unitNerveCapacity);
     const world = arena();
     const fresh = placeUnit(world, 0, 0, 10);
     const rattled = placeUnit(world, 1, 10, 0);
-    rattled.nerve = COMBAT_RULES.unitNerveCapacity - A.roar.unitNerve + 1;
+    const shaken = placeUnit(world, 2, -10, 0);
+    rattled.nerve = 50;
+    shaken.shaken = 1;
+    shaken.state = 'shaken';
     const events = play(world, 1, { buttons: Btn.roar });
-    expect(fresh.shaken).toBe(0);
+    expect(fresh.shaken).toBeGreaterThan(0);
     expect(rattled.shaken).toBeGreaterThan(0);
-    expect(eventsOf(events, 'unitShaken')).toMatchObject([{ unit: 1 }]);
-    expect(world.players[KAIJU_PLAYER].tally.breaks).toBe(1);
+    // Already shaken: it cannot get worse, and its time is not extended.
+    expect(shaken.shaken).toBeCloseTo(1 - DT, 6);
+    expect(eventsOf(events, 'unitShaken').map((e) => e.unit).sort()).toEqual([0, 1]);
+    expect(world.players[KAIJU_PLAYER].tally.breaks).toBe(2);
   });
 
   it('reaches farther at each stage', () => {
@@ -734,7 +743,7 @@ describe('roar', () => {
     const world = arena({}, 2);
     const u = placeUnit(world, 4, 0, A.roar.radius[1] - 5);
     play(world, 1, { buttons: Btn.roar });
-    expect(u.nerve).toBeGreaterThan(0);
+    expect(u.shaken).toBeGreaterThan(0);
   });
 });
 
@@ -742,6 +751,20 @@ describe('the beam special', () => {
   const beam = A.special;
   const windup = ticksFor(beam.timing.windup);
   const burn = ticksFor(beam.timing.active);
+
+  /**
+   * Runs `fn` with the beam's shake, pull and kick turned off: for the tests of where the beam
+   * reaches and what it burns, which aim it exactly. The shake has its own test below.
+   */
+  function steady(fn: () => void): void {
+    const saved = { wobbleYaw: beam.wobbleYaw, wobblePitch: beam.wobblePitch, driftYaw: beam.driftYaw, kickPitch: beam.kickPitch };
+    Object.assign(beam, { wobbleYaw: 0, wobblePitch: 0, driftYaw: 0, kickPitch: 0 });
+    try {
+      fn();
+    } finally {
+      Object.assign(beam, saved);
+    }
+  }
 
   /** Fires the beam straight ahead and runs it to the end; returns the events. */
   function fire(world: World, partial: Partial<PlayerInput> = {}): SimEvent[] {
@@ -794,7 +817,7 @@ describe('the beam special', () => {
     expect(world.match.barPoints).toBeCloseTo((50 * beam.structureDps[0] * beam.timing.active) / 5000, 6);
   });
 
-  it('stops at a building until it burns through, then reaches what was behind', () => {
+  it('stops at a building until it burns through, then reaches what was behind', () => steady(() => {
     const firstHp = beam.structureDps[0] * 1;
     const world = arena({
       structures: [
@@ -825,9 +848,9 @@ describe('the beam special', () => {
     expect(5000 - world.structureHp[1]).toBeLessThanOrEqual(beam.structureDps[0] * remaining + 1e-6);
     expect(sheltered.maxHp - sheltered.hp).toBeGreaterThan(beam.unitDps * (remaining - 0.2));
     expect(sheltered.maxHp - sheltered.hp).toBeLessThanOrEqual(beam.unitDps * remaining + 1e-6);
-  });
+  }));
 
-  it('hurts units it passes over at the beam rate, within its width and range', () => {
+  it('hurts units it passes over at the beam rate, within its width and range', () => steady(() => {
     const world = arena();
     const range = beam.range[0];
     const reachSide = beam.width[0] / 2 + world.units[0].radius;
@@ -849,7 +872,7 @@ describe('the beam special', () => {
     expect(reports.length).toBeGreaterThan(5);
     expect(reports.length).toBeLessThan(burn / 2);
     expect(reports.every((e) => e.cause === 'beam')).toBe(true);
-  });
+  }));
 
   it('leaves the mouth where the model has it: ahead of the body along the aim, at mouth height', () => {
     // The art's anchors (docs/art/client-notes-kaiju-lizard.md, section 7): eye and mouth, height / forward.
@@ -893,7 +916,7 @@ describe('the beam special', () => {
     expect(world.structureHp[0]).toBeLessThan(5000);
   });
 
-  it('sweeps slowly: the head only turns at the reduced rate while the beam is on', () => {
+  it('sweeps slowly: the head only turns at the reduced rate while the beam is on', () => steady(() => {
     const world = arena();
     const k = world.kaijus[0];
     // Normally the head snaps to the aim.
@@ -913,6 +936,60 @@ describe('the beam special', () => {
     expect(k.aimYaw).toBeLessThan(45 * DEG);
     expect(k.aimPitch).toBeCloseTo(-Math.min(0.5, rate * 0.5), 2);
     expect(beam.turnMult).toBeLessThan(1);
+  }));
+
+  it('fights the head: it shakes, pulls to one side and kicks up about where it is steered, and stays aimable', () => {
+    // Nothing defined, nothing happens.
+    expect(beamShake({ ...beam, wobbleYaw: undefined, wobblePitch: undefined, driftYaw: undefined, kickPitch: undefined }, 1, 3, 5)).toEqual({ yaw: 0, pitch: 0 });
+    const active = beam.timing.active;
+    const pull = beam.driftYaw ?? 0;
+    const most = pull + (beam.wobbleYaw ?? 0);
+
+    /** Fires the beam with the crosshair held dead ahead and level; the beam's yaw and pitch on every tick it burns. */
+    function burnAhead(extraTicks: number): Array<{ yaw: number; pitch: number; steered: number }> {
+      const world = arena();
+      const k = world.kaijus[0];
+      play(world, extraTicks);
+      k.rage = COMBAT_RULES.rageMax;
+      const out: Array<{ yaw: number; pitch: number; steered: number }> = [];
+      play(world, 2, { buttons: Btn.special });
+      for (let i = 0; i < 400 && k.phase !== 'idle'; i++) {
+        play(world, 1);
+        if (k.phase === 'special') out.push({ yaw: k.aimYaw, pitch: k.aimPitch, steered: k.act.beamYaw });
+      }
+      // Free again: the head snaps back to the crosshair.
+      play(world, 1);
+      expect(k.aimYaw).toBe(0);
+      expect(k.aimPitch).toBe(0);
+      return out;
+    }
+
+    const a = burnAhead(0);
+    expect(a.length).toBeGreaterThanOrEqual(burn - 1);
+    // The head stays steered at the crosshair; the beam is what strays.
+    expect(a.every((t) => Math.abs(t.steered) < 1e-9)).toBe(true);
+    const yaws = a.map((t) => t.yaw);
+    const spread = Math.max(...yaws) - Math.min(...yaws);
+    expect(spread).toBeGreaterThan(5 * DEG);
+    // ...but never further than its pull and shake together: it goes where it is pointed, roughly.
+    expect(Math.max(...yaws.map(Math.abs))).toBeLessThanOrEqual(most + 1e-9);
+    // It kicks up as it goes: by the end it is aimed above where the head is steered.
+    expect(a[a.length - 1].pitch).toBeGreaterThan((beam.kickPitch ?? 0) - (beam.wobblePitch ?? 0) - 1e-9);
+    expect(a[0].pitch).toBeLessThan(a[a.length - 1].pitch);
+
+    // The same beam started on the next tick pulls the other way at the end; a replay is the same.
+    const b = burnAhead(1);
+    expect(Math.sign(a[a.length - 1].yaw)).toBe(-Math.sign(b[b.length - 1].yaw));
+    expect(Math.abs(a[a.length - 1].yaw)).toBeGreaterThan(pull - (beam.wobbleYaw ?? 0) - 1e-9);
+    expect(burnAhead(0)).toEqual(a);
+
+    // The pure function the clients can use says the same: the full pull to one side by the end.
+    expect(beamShake(beam, active, active, 2).yaw).toBeGreaterThan(0);
+    expect(beamShake(beam, active, active, 3).yaw).toBeLessThan(0);
+    // At the start it is only a tremor: a third of the shake, no pull, no kick.
+    const start = beamShake(beam, 0, active, 2);
+    expect(Math.abs(start.yaw)).toBeLessThanOrEqual((beam.wobbleYaw ?? 0) * 0.35 + 1e-12);
+    expect(Math.abs(start.pitch)).toBeLessThanOrEqual((beam.wobblePitch ?? 0) * 0.35 + 1e-12);
   });
 
   it('is cut short when the kaiju is staggered, and the rage is gone', () => {

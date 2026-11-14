@@ -184,9 +184,9 @@ export class Effects {
     }
   }
 
-  /** A ring that spreads on the ground to `radius` over `life` seconds. */
-  ring(x: number, z: number, radius: number, color = 0xffffff, life = 0.6, alpha = 0.9): void {
-    const p = this.spawn('ground', this.anims.ring, x, 0.2, z, radius * 0.2, life, color, alpha);
+  /** A ring that spreads on the ground (or, flat, at height `y`) to `radius` over `life` seconds. */
+  ring(x: number, z: number, radius: number, color = 0xffffff, life = 0.6, alpha = 0.9, y = 0.2): void {
+    const p = this.spawn('ground', this.anims.ring, x, y, z, radius * 0.2, life, color, alpha);
     p.grow = (radius * 2 - radius * 0.2) / life;
     p.rot = 0;
   }

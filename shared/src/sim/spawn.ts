@@ -159,6 +159,10 @@ export function createActionMemory(): KaijuActionMemory {
     meal: false,
     beamLength: 0,
     beamBlocker: -1,
+    beamSteering: false,
+    beamYaw: 0,
+    beamPitch: 0,
+    beamSeed: 0,
     crossfireTick: -1e9,
   };
 }

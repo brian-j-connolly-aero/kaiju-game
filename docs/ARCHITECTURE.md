@@ -233,7 +233,10 @@ section 5, "Bots"):
 How the radio works (`systems/voice.ts`, rules per cue in `defs/voice.ts`): every cue goes
 through `say(world, cue, squad?, player?)`, which applies the cue's minimum gap and the chatter
 budget (`VOICE_CUE_RULES`, `VOICE_RULES`), then chooses the lines for both sides from
-`voiceLines.json` as it stands (`chooseVoiceLines`) and emits the `voice` event. Clients play
+`voiceLines.json` as it stands (`chooseVoiceLines`) and emits the `voice` event. Each side's
+list can be empty: `VOICE_SIDE_RULES` limits the news to a short list of cues and gives the
+radio its own longer waits and budget, without changing which cues are emitted or the random
+numbers they draw. Clients play
 `event.lines.humans` or `event.lines.kaiju` in order (ids are also the audio file names); they
 do not choose lines themselves. (`pickVoiceLine` remains for tools that only have a cue.)
 

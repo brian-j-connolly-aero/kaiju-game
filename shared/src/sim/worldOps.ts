@@ -1,7 +1,7 @@
 /** Small helpers every system uses: emitting events, looking entities up, queueing commands. */
 
 import { TALLY_CLASSES, type TallyClass } from '../defs/ids';
-import { VOICE_RULES } from '../defs/voice';
+import { VOICE_RULES, VOICE_SIDE_RULES } from '../defs/voice';
 import { BUTTON_COUNT, neutralInput } from '../net/input';
 import { createBotState } from './bots/types';
 import type { SquadCommand } from './commands';
@@ -67,6 +67,7 @@ export function createVoiceState(): VoiceState {
     lastLine: {},
     lowHpStage: 0,
     barNearCalled: 0,
+    radio: { cooldowns: {}, tokens: VOICE_SIDE_RULES.radio.chatterTokens },
   };
 }
 

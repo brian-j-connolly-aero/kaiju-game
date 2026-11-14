@@ -128,6 +128,48 @@ export const VOICE_RULES = {
 } as const;
 
 /**
+ * What each side actually hears, on top of the cue rules above. A cue that passes those is
+ * always emitted (so the match itself never changes); these rules only decide whether a side
+ * gets a line for it, and a side that gets none hears and reads nothing.
+ *
+ * The news (the kaiju player's side) speaks only for the moments listed here: the match
+ * starting and ending, the creature growing, a landmark falling, the last minute. Everything
+ * else the anchor used to say was colour commentary, and it talked the whole match.
+ *
+ * The radio (the squads' side) keeps every cue but is half as chatty as the cue rules alone:
+ * each cue waits `gapScale` times its own gap (at least `minGap`) before the radio repeats
+ * it, and routine and important cues share a budget that refills at `chatterRefill`.
+ * Cues the match turns on (priority 2) skip both, except the ones listed in `gaps`, which
+ * happen over and over in a match and get a fixed gap of their own.
+ */
+export const VOICE_SIDE_RULES = {
+  news: {
+    cues: [
+      'match.briefing',
+      'match.start',
+      'landmark.down',
+      'molt.available',
+      'stage.2',
+      'stage.3',
+      'clock.1min',
+      'clock.10s',
+      'end.humans.kill',
+      'end.humans.clock',
+      'end.kaiju',
+      'hearing.humans.win',
+      'hearing.kaiju.win',
+    ] as readonly VoiceCueId[],
+  },
+  radio: {
+    gapScale: 3,
+    minGap: 8,
+    chatterTokens: 2,
+    chatterRefill: 15,
+    gaps: { 'nerve.break': 24, 'landmark.down': 10, 'callin.inbound': 45 } as Readonly<Partial<Record<VoiceCueId, number>>>,
+  },
+} as const;
+
+/**
  * Default squad callsigns, by squad index. The first three have voiced radio lines in the
  * script; lines for a cue fall back to Overlord when a squad has none of its own.
  */

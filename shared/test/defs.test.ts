@@ -203,17 +203,21 @@ describe('the Lizard (DESIGN.md sections 2 and 4)', () => {
     expect(a.eat).toMatchObject({ button: 'grab', gesture: 'hold', holdTime: 0.5, heal: 80, cooldown: 10, moveMult: 0 });
     expect(a.eat.timing.active).toBe(2);
     expect(a.brace).toMatchObject({ button: 'block', gesture: 'level', moveMult: 0, turnMult: 0.3, activePhase: 'brace' });
-    expect(a.roar).toMatchObject({ gesture: 'press', cooldown: 18, radius: [40, 110, 280], unitNerve: 60, resetsCharge: true });
+    expect(a.roar).toMatchObject({ gesture: 'press', cooldown: 18, radius: [40, 110, 280], unitNerve: 100, resetsCharge: true });
     expect(a.roar.timing.active).toBe(1.2);
     expect(a.special).toMatchObject({
       special: 'beam',
       rageCost: 100,
       range: [60, 220, 600],
-      width: [1.5, 5, 14],
+      width: [2.2, 7.5, 21],
       unitDps: 150,
       structureDps: [60, 600, 4000],
-      turnMult: 0.35,
+      turnMult: 0.25,
     });
+    // The breath fights the head (polish pass), but stays aimable: all it can stray, shake and
+    // pull together, is well inside the head's lead over the body.
+    expect([a.special.wobbleYaw, a.special.wobblePitch, a.special.driftYaw, a.special.kickPitch].map((x) => +((x ?? 0) / DEG).toFixed(6))).toEqual([4, 1.5, 6, 4]);
+    expect((a.special.wobbleYaw ?? 0) + (a.special.driftYaw ?? 0)).toBeLessThan(LIZARD.headLeadMax / 3);
     expect(a.special.timing).toMatchObject({ windup: 0.8, active: 3 });
     expect(a.molt).toMatchObject({ button: 'molt', gesture: 'hold', holdTime: 1, activePhase: 'cocoon' });
   });
@@ -245,7 +249,7 @@ describe('the Army (DESIGN.md section 5)', () => {
     const w = [l1, l2, l3].map((u) => WEAPONS[u.weapon]);
     expect(w.map((x) => x.maxShots)).toEqual([3, 1, 3]);
     expect(w.map((x) => x.damage)).toEqual([3.2, 9.5, 3.2]);
-    expect(w.map((x) => x.nerve)).toEqual([1.8, 5.4, 1.6]);
+    expect(w.map((x) => x.nerve)).toEqual([1.8, 5.4, 4.5]);
     expect(w.map((x) => x.range)).toEqual([160, 420, 600]);
     expect(w.map((x) => x.cooldown)).toEqual([2.6, 3.2, 3.2]);
     expect(w.map((x) => x.splashRadius)).toEqual([3, 5, 5]);
@@ -256,7 +260,7 @@ describe('the Army (DESIGN.md section 5)', () => {
     expect(w.map((x) => PROJECTILE_TYPES[x.projectile].flight)).toEqual(['flat', 'flat', 'flat']);
   });
 
-  it('normalizes a squad salvo to about 38 damage and about 20 nerve at every level', () => {
+  it('normalizes a squad salvo to about 38 damage at every level, and about 20 nerve at levels 1 and 2', () => {
     for (const level of ARMY.levels) {
       const unit = UNIT_TYPES[level.unitType];
       const weapon = WEAPONS[unit.weapon];
@@ -266,15 +270,30 @@ describe('the Army (DESIGN.md section 5)', () => {
       const nerve = MATCH_RULES.unitsPerSquad * shots * weapon.nerve;
       expect(damage).toBeGreaterThanOrEqual(38);
       expect(damage).toBeLessThan(38.5);
-      // Tuned per level with the balance harness (docs/BALANCE.md).
+      // Tuned per level with the balance harness (docs/BALANCE.md). Level 3 is counted per tank
+      // since the polish pass (docs/STATUS.md section 15): see the next test.
+      if (level.level === 3) continue;
       expect(nerve).toBeGreaterThanOrEqual(19);
       expect(nerve).toBeLessThanOrEqual(22);
     }
   });
 
-  it('keeps one squad from breaking the kaiju alone: a full-charge volley stays under its nerve capacity', () => {
+  it('counts level 3 per tank: a charged volley of ten tanks (three of them leaders shooting uncharged) breaks the titan from the front, six do not', () => {
+    const P = LIZARD.damage;
+    const shell = WEAPONS[UNIT_TYPES.army_tank_troop.weapon].nerve;
+    const full = 1 + COMBAT_RULES.volleyNervePerCharge;
+    expect((3 * shell + 7 * shell * full) * P.frontMult).toBeGreaterThan(LIZARD.nerveCapacity * 1.05);
+    expect((2 * shell + 4 * shell * full) * P.frontMult).toBeLessThan(LIZARD.nerveCapacity * 0.75);
+    // A level 3 tank is worth nearly what a level 2 tank is.
+    expect(shell / WEAPONS[UNIT_TYPES.army_tank.weapon].nerve).toBeGreaterThan(0.8);
+  });
+
+  it('at levels 1 and 2, keeps one squad most of the way: a full-charge volley stays under the nerve capacity', () => {
+    // (At level 3 a full squad's volley passes it; the two-squad rule in the damage system is
+    // what keeps one squad from breaking the kaiju alone there: volleyRules.test.ts.)
     const P = LIZARD.damage;
     for (const level of ARMY.levels) {
+      if (level.level === 3) continue;
       const unit = UNIT_TYPES[level.unitType];
       const weapon = WEAPONS[unit.weapon];
       const salvo = shotsForMembers(weapon, unit.members) * weapon.nerve;

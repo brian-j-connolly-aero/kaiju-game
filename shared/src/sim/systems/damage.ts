@@ -135,11 +135,13 @@ function noteVolleyHit(world: World, k: Kaiju, squad: number): void {
 
 /**
  * Whether the kaiju's nerve may break now: charged volleys from enough different squads have
- * hit it within the window (DESIGN.md section 3). A match with fewer squads than that needs
- * all it has; with none (no humans at all) nothing is asked.
+ * hit it within the window (DESIGN.md section 3). A match with fewer squads still in the fight
+ * than that (the rest wiped out) needs all it has left; with none nothing is asked.
  */
 function volleysCanBreak(world: World, k: Kaiju): boolean {
-  const needed = Math.min(COMBAT_RULES.breakSquads, world.squads.length);
+  let standing = 0;
+  for (const s of world.squads) if (!s.eliminated) standing++;
+  const needed = Math.min(COMBAT_RULES.breakSquads, standing);
   if (needed <= 0) return true;
   const windowTicks = COMBAT_RULES.volleyBreakWindow * TICK_RATE;
   let squads = 0;

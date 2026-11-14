@@ -197,7 +197,9 @@ export const LIZARD: KaijuKindDef = {
       moveMult: 0,
       turnMult: 0.5,
       radius: [40, 110, 280],
-      unitNerve: 60,
+      // Polish pass: a full unit nerve capacity, so every unit the roar reaches is shaken (it
+      // stops firing for a few seconds and backs off). At 60 nothing visibly happened.
+      unitNerve: 100,
       resetsCharge: true,
     },
     special: {
@@ -211,12 +213,17 @@ export const LIZARD: KaijuKindDef = {
       cooldown: 0,
       rageCost: 100,
       moveMult: 0,
-      turnMult: 0.35,
+      // Polish pass (docs/STATUS.md section 15): wider, slower to steer, and it fights back.
+      turnMult: 0.25,
       range: [60, 220, 600],
-      width: [1.5, 5, 14],
+      width: [2.2, 7.5, 21],
       unitDps: 150,
       unitNervePerSecond: 60,
       structureDps: [60, 600, 4000],
+      wobbleYaw: 4 * DEG,
+      wobblePitch: 1.5 * DEG,
+      driftYaw: 6 * DEG,
+      kickPitch: 4 * DEG,
     },
     molt: {
       id: 'molt',

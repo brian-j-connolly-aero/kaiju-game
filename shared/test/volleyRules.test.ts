@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyHit,
   beginStage,
   Btn,
   COMBAT_RULES,
@@ -149,7 +150,10 @@ describe('holding the trigger against charging a volley', () => {
       }
       expect(first, `stage ${stage}`).toBeGreaterThan(0);
       expect(first).toBeLessThan(COMBAT_RULES.chargeTime + 4);
-      expect(eventsOf(f.events, 'nerveBreak').length, `stage ${stage}`).toBeGreaterThanOrEqual(4);
+      // Again and again: at least four breaks in the minute, or three and the kaiju is dead (at
+      // stage 3 the first shells of a volley now break it, so the rest land on the weak point).
+      const breaks = eventsOf(f.events, 'nerveBreak').length;
+      expect(breaks, `stage ${stage}`).toBeGreaterThanOrEqual(k.alive ? 4 : 3);
     }
   });
 
@@ -229,5 +233,71 @@ describe('it takes two squads to break the kaiju', () => {
       expect(broke, `stage ${stage}`).toBeGreaterThanOrEqual(0);
       expect(k.phase).toBe('stagger');
     }
+  });
+});
+
+describe('a volley of about ten tanks (the polish pass, docs/STATUS.md section 15)', () => {
+  /** Wears a unit down to `members` (0: destroyed) the way fire would. */
+  function wear(world: World, id: number, members: number): void {
+    const u = world.units[id];
+    const def = UNIT_TYPES[u.type];
+    const hp = (members / def.members) * def.hp;
+    applyHit(world, { entity: 'unit', id }, { damage: u.hp - hp + (members === 0 ? 1 : 0), nerve: 0, fromDir: { x: 0, z: 0 }, sourceId: -1, player: 0, kind: 'swipe', atWill: false });
+    expect(u.members).toBe(members);
+  }
+
+  /**
+   * Stage 3, the kaiju standing still facing the squads. `members[s][i]`: tanks left in unit i of
+   * squad s (the squad's leader is unit 0); a squad listed as null has been wiped out. Only the
+   * first `firing` squads charge and fire one volley together; the others stand by, parked.
+   */
+  function lateVolley(members: Array<number[] | null>, firing: number, bearingsDeg: number[]) {
+    const f = field(3, bearingsDeg.slice(0, firing).map((d) => (d * Math.PI) / 180));
+    const { world } = f;
+    const k = world.kaijus[0];
+    members.forEach((m, s) => world.squads[s].units.forEach((id, i) => wear(world, id, m ? m[i] : 0)));
+    for (let s = 0; s < 4; s++) expect(world.squads[s].eliminated).toBe(members[s] === null);
+    let tanks = 0;
+    for (let s = 0; s < firing; s++) for (const id of world.squads[s].units) tanks += world.units[id].alive ? world.units[id].members : 0;
+    f.step([], 'holdCharge');
+    for (let t = 0; t < CHARGE_TICKS + 5; t++) f.step([]);
+    const fire = Array.from({ length: firing }, () => Btn.fire);
+    f.step(fire);
+    f.step([]);
+    let nerve = 0;
+    for (let t = 0; t < 8 * TICK_RATE; t++) {
+      for (const h of eventsOf(f.step([]), 'kaijuHit')) nerve += h.nerve;
+    }
+    return { world, k, tanks, nerve, events: f.events, breaks: eventsOf(f.events, 'nerveBreak').length };
+  }
+
+  it('from two squads, staggers a titan that stands still in front of them, even with the leaders shooting uncharged', () => {
+    // A leader with 2 tanks and a full troop; a leader with 1 tank and two troops of 2: ten tanks, three of them leaders.
+    const v = lateVolley([[2, 3, 0, 0], [1, 2, 2, 0], [3, 3, 3, 3], [3, 3, 3, 3]], 2, [-15, 15]);
+    expect(v.tanks).toBe(10);
+    expect(eventsOf(v.events, 'crossfire')).toEqual([]);
+    expect(v.breaks).toBe(1);
+    expect(eventsOf(v.events, 'kaijuStagger')[0]).toMatchObject({ on: true });
+  });
+
+  it('from the last squad standing, staggers it too: the two-squad rule asks only for the squads still in the fight', () => {
+    const v = lateVolley([[1, 3, 3, 3], null, null, null], 1, [0]);
+    expect(v.tanks).toBe(10);
+    expect(v.breaks).toBe(1);
+  });
+
+  it('one full squad of a match with four standing still brings it only to the brink', () => {
+    const v = lateVolley([[3, 3, 3, 3], [3, 3, 3, 3], [3, 3, 3, 3], [3, 3, 3, 3]], 1, [0]);
+    expect(v.tanks).toBe(12);
+    expect(v.nerve).toBeGreaterThan(CAP);
+    expect(v.breaks).toBe(0);
+    expect(v.k.nerve).toBeGreaterThan(CAP * 0.5);
+  });
+
+  it('a few charged tanks do not: three tanks from each of two squads stay well short', () => {
+    const v = lateVolley([[1, 2, 0, 0], [1, 2, 0, 0], [3, 3, 3, 3], [3, 3, 3, 3]], 2, [-15, 15]);
+    expect(v.tanks).toBe(6);
+    expect(v.breaks).toBe(0);
+    expect(v.nerve).toBeLessThan(CAP * 0.75);
   });
 });

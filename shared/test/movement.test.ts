@@ -120,7 +120,7 @@ describe('stepMovement in the open', () => {
     expect(brace.turnRate).toBeCloseTo(200 * DEG * 0.3, 9);
     const beam = kaijuMoveParams(hatchling({ phase: 'special', action: 'special' }), BIG);
     expect(beam.topSpeed).toBe(0);
-    expect(beam.turnRate).toBeCloseTo(200 * DEG * 0.35, 9);
+    expect(beam.turnRate).toBeCloseTo(200 * DEG * 0.25, 9);
     for (const phase of ['stagger', 'cocoon', 'dead'] as const) {
       const p = kaijuMoveParams(hatchling({ phase }), BIG);
       expect(p.topSpeed).toBe(0);
