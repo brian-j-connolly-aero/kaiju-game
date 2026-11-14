@@ -1673,3 +1673,66 @@ monster's swim and travel mode is another engineer's, in its own section.)
   controls card has four more tiles and is crowded at 640 x 360. One run of the human session
   saw the Enter key fail to open the controls card once; the next full run passed it on both
   sides, so it is noted as a possible flaky check, not fixed.
+
+## Polish pass 2: the monster swims (14 November, the swim task)
+
+Owner's note: "all monsters should have some hide/travel mode, Grognar should be able to swim in
+the river, still hittable but only a few spines/a bit of hitbox exposed. We may have to update
+the map to have water at all stages. Maybe big size doesn't have travel mode."
+
+- **Swimming** (`shared/src/sim/swim.ts`, numbers in `shared/src/defs/kaiju/lizard.ts`, rules in
+  docs/DESIGN.md section 4, "Swimming"). Stages 1 and 2; the titan cannot. Automatic, so there is
+  no new button to learn: in water deep enough for its body, a monster that is not acting goes
+  under in 1 s; any monster button (or an action, a stagger, leaving the deep water) brings it
+  up in 0.6 s and the press is then carried out. Under: only the spines show and only they can
+  be hit (the hit volume is 0.14 of its height, 0.55 of its radius), it swims at 1.1 times its
+  walking speed with no water slowdown, it cannot attack, grab, beam, eat, brace, roar or molt,
+  and it tramples and wrecks nothing (no bar, no rage: no stalling). Squads see and spot it only
+  within 0.4 of the usual distances, and at stage 2 it drops off the humans' map while it is
+  under and unseen.
+- **The orange marker over the monster** belongs to the smoke-and-marking engineer and was not
+  touched. It already follows the server's `spotted` and `marked`, which now take swimming into
+  account; the snapshot also carries `submerge` (0 to 1, the last byte of each kaiju record,
+  under the snapshot version that engineer already raised to 2) for anything else that wants it.
+- **The city**: the Old Moat, 20 m of water outside the beltway along the west, north and east
+  edges (docs/CITY.md section 11). No street or building moved; 179 trees of the beltway's tree
+  belt went, and the two city checksums changed (tests and docs updated). Checked: from every
+  start, at stage 1 and stage 2, the monster can walk to swimmable water without breaking
+  anything (148 to 165 m away at stage 1). The river and the bay were already wide enough.
+- **Bots.** The monster bot swims away when its nerve is 70% full, or when it is seen below 40%
+  health, if deep water is within 10 body radii (stage 1) or 8 (stage 2): 8 s in the water, away
+  from the squads, then back to work, and not again for 30 s. Squad bots aim at what shows (the
+  spines), and when they have lost a swimming monster they wait on the near bank instead of
+  wading in after it.
+- **Picture and sound.** The monster leans forward and sinks until only the top of its head and
+  shoulders with their spines show; a splash (picture and sound) as it goes under and comes up,
+  rings of foam at its bow and tail as it swims, bubbles when it lies still. In first person the
+  eyes stay just above the water, with the snout and claws at the waterline. The HUD shows a
+  new picture (spines over two waves, `k_swim`, water blue) while it is under, faint while it
+  goes down or comes up; the controls card has a swim tile (the movement keys, an arrow, that
+  picture, the stage triangles for 1 and 2) and no button. The client does not show a wind-up
+  ahead of the server for a press made under water.
+- **Checked.** `npm run check` and `npm run build` pass. New: `shared/test/swim.test.ts` (going
+  under and coming up, speed, a press under water carried out once up, no attacks under water,
+  the smaller hit volume, nothing wrecked or trampled under a low bridge, lost from the stage 2
+  map, the snapshot, the water at every start, the bot swimming away) and a swim tile check in
+  `client/test/controlsCard.test.ts`. `tools/playtest/shots.mjs` has three new extras
+  (`--only x-kaiju-swim,x-human-swim`): the monster put in the moat at stage 1 and stage 2 goes
+  under by itself, swims along it without coming up, comes up for Roar and roars; and a squad's
+  view of the spines from the bank. All passed with no console errors; `smoke.mjs` (two players,
+  a whole fast match) passed too.
+- **Balance** (`npm run sim -- --every-anchor`, 120 matches each, the smoke-and-marking work in
+  the tree both times; before both changes: monster 47% of 60, 10:33). With swimming: 53 of 120
+  (44%), 9:59 (seeds 1 to 60: 22, seeds 61 to 120: 31). The same tree with swimming switched off:
+  60 of 120 (50%), 10:05. An earlier pair: 57 of 120 (48%) with, 61 of 120 (51%) without. Stages
+  1 and 2 come out the same; the bot monster swims about 4 s a match, at stage 2 only (at stage
+  1 the moat is too far from where it wrecks). Within the noise of the harness, perhaps a few
+  points against the bot monster; no retune. A first version of the bot that went for water up
+  to 45 radii away won only 20%: running to the water with its back to the guns cost more than
+  the swim gave back, which is why the bot now only uses water that is close.
+- **Still open / not tried.** Not played by a person: whether the automatic dive feels right, or
+  whether a toggle would be wanted after all. The swimming look is the existing model leaned
+  forward and sunk (no new art): from close behind a hatchling shows little more than the top
+  of its head. The wake is subtle. The other pictures in `docs/city/` (district close-ups,
+  heat map, model) do not show the moat. `tools/playtest/scripted.mjs` (being reworked by the
+  other engineer) does not swim; the swim checks with real key presses are in `shots.mjs`.
