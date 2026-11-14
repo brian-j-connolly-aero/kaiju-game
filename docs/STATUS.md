@@ -535,7 +535,7 @@ Server
 - The balance was tuned for bot against bot in Port Meridian before phase 1 (`docs/BALANCE.md`
   section 8). Phase 1 changed both sides' controls and only the pace was cut since (section 9):
   with the 9:36 clock and `p3` 0.29 the kaiju bot wins 20 of 40, stages of about 2:02 / 2:27 /
-  3:00, matches of about 7:30, 16 kills in 40. Balance waits for the owner's next playtest; real
+  3:01, matches of about 7:30, 16 kills in 40. Balance waits for the owner's next playtest; real
   players will move it. Numbers nobody has tuned yet: action move multipliers, wade damage, rage
   per bar segment, prop values, archetype hp and value, and everything new in phase 1.
 - Nerve breaks only when charged volleys (60% charge or more) from two different squads land
@@ -2452,3 +2452,137 @@ cores, so the headless pages drew 2 to 17 frames a second)
 - A real browser may report its jump after the pointer is captured differently from headless
   Chromium; the first movement after a capture is thrown away either way (a few pixels at worst).
 
+
+## Phase 1 integration: both sides together, the leftovers gone, matches a fifth shorter (14 November, the integration task)
+
+The four phase 1 builders (the monster's and the army's work, each in the simulation and on
+screen) finished in two pairs, beside the stutter fix and the natural voices. This task ran it
+all together, removed what the new controls left behind, cut the pace and played the game end
+to end in the browser.
+
+**Is the tree green? Yes.** `npm run check` passes: type checks, lint (252 files, one
+`STUB(server)`: the Tier 2 draft pick), 815 tests in 62 files. It already passed when this task
+started (818 tests): the builders had reconciled the contract files they shared. The three tests
+fewer are the old squad commands' (below).
+
+**What changed**
+
+- **Versions.** `PROTOCOL_VERSION` is 2 and `SNAPSHOT_VERSION` 3, each bumped once this phase
+  (from 1 and 2). The snapshot's header (`shared/src/net/snapshot.ts`) matches the layout byte
+  for byte and now also explains the two numbers packed in the acknowledgement;
+  `ARCHITECTURE.md` section 4.2 says what version 3 changed.
+- **The old squad orders, gone end to end.** No client sent the `command` message any more, so
+  it went: the message type (`shared/src/net/protocol.ts`), the server's handler and
+  `queueSlotCommand` (`server/src/room`), `shared/src/sim/commands.ts` (`SquadCommand`,
+  `sanitizeCommand`), the no-op `queueCommand`, `GroundMarker` and `sanitizeMarker`, and the
+  unused city-size argument of `sanitizeInput`. A page from before that sends one is ignored
+  like any unknown message. Their three tests went with them.
+- **Other leftovers removed.** `ActionState.pointerY` (the command wheel's pointer); the command
+  wheel's four order icons and the smoke and mark icons (the SVG files, their stand-in drawings
+  in `client/src/ui/iconArt.ts`, the manifest entries, `docs/ASSETS.md` and
+  `docs/art/UI_ICONS.md`, the icon preview tool's list and mock-ups, the orphaned preview sheet
+  `docs/art/previews/ui_icons_commands.png`); a controls-card check that the old actions were
+  absent; the wheel pick and marker in the input queue's notes. The input bits of the old
+  buttons (2 to 4, 7 to 9) and the `wheel`, `marker` and `COMMAND_IDS` were already gone. The
+  server's input queue still carries a dropped input's molt card to the next input it keeps (it
+  carries any one-shot field without naming it).
+- **Kept on purpose** for phase 2's artillery radio: the artillery mission (`startCallIn`,
+  `CallInDef`), `resolveMarkerPoint` with `SQUAD_RULES.markerRange` and `markerSnapRadii`, the
+  client's call-in picture and effects, and the `callin.inbound` voice lines (never cued now).
+- **The roar's stun guards** (the five lines commented "roar stun": `systems/inputs.ts`,
+  `movement.ts` `unitMoveParams`, `systems/weapons.ts` `ready`, `systems/unitOrders.ts`
+  `orderSubUnit`, `systems/damage.ts`) are all in place, and the tests that hold them pass
+  (`kaijuActions.test.ts`: a stunned unit neither moves nor fires; `squads.test.ts`,
+  `weapons.test.ts`: a stunned squad-mate neither charges nor fires).
+- **Pace: matches a fifth shorter** (`docs/BALANCE.md` section 9). The clock went from 12:00 to
+  9:36 (`MATCH_RULES.clock` 720 to 576) and the third bar fraction from 0.31 to 0.29. The
+  balance harness gained `--clock S`. Phase 1 had already made stages 1 and 2 shorter by itself
+  (the squad-mates' stray fire fills the bar) and stage 3 longer (more volleys and staggers).
+- **Docs.** `DESIGN.md` section 2 (the clock, the bar, the pace targets and what was measured),
+  `ARCHITECTURE.md` (the command message, the harness options, the playtests in the quality
+  gates), `PLAYING.md` and `README.md` (a match is about eight minutes, ten at most; a current
+  picture for "What the pictures mean", `docs/progress/art-wired-squad-view.png` retaken),
+  `BALANCE.md` section 9, and in this file the stub table, the module map, the known risks and
+  the commands table.
+
+**Measured** (on a machine shared with the voice builder's last job; load average up to 35 on 4
+cores while five browsers ran)
+
+- `npm run sim -- --seeds 20 --every-anchor`, seeds 1 to 20 and 21 to 40, and `--unopposed`:
+
+  | | Stage 1 | Stage 2 | Stage 3 | Match | Kaiju wins |
+  | --- | --- | --- | --- | --- | --- |
+  | Before phase 1 (`BALANCE.md` section 8) | 3:15 | 3:05 | 3:50 | 10:20 | 47% of 60 |
+  | Phase 1, old clock and bar (40 matches) | 2:02 | 2:27 | 4:41 | 8:30 | 17 of 40 |
+  | Phase 1, 9:36 clock and `p3` 0.29 (40 matches) | 2:02 | 2:27 | 3:01 | 7:31 | 20 of 40 |
+  | Aim (a fifth off section 8) | 2:35 | 2:30 | 3:05 | 8:15 | |
+  | Alone, old bar (segment filled after) | 2:03 | 1:57 | 3:05 | 7:27 | |
+  | Alone, `p3` 0.29 | 2:03 | 1:57 | 2:44 | 7:06 | |
+
+  (Contested stage times are for stages the kaiju completed.)
+
+  Every match finished without an error. The kaiju's win rate (50%) is not degenerate, so
+  balance was left alone, as the owner asked. Stage 1 stays half a minute under its aim:
+  raising `p1` would lengthen it (and stage 2, and the hatchling's time alone) and cost the
+  kaiju a third to a half of its wins (tried: `BALANCE.md` section 9).
+- `npm run build`: passes.
+- `node tools/playtest/smoke.mjs` (five headless pages on the autopilot against the real
+  server with `MB_FAST=1`): PASSED. The match reached stage 3 and the humans won on the clock
+  after 150 s of play; no console errors on any page; snapshots of 801 to 810 bytes, about
+  48.5 kbit/s down per page; the server kept 19.7 ticks a second on the overloaded machine.
+- `node tools/playtest/scripted.mjs` (both sessions, real key presses and clicks, every check
+  judged by what the server sent back): PASSED, 65 of 65 confirmed, nothing failed or left
+  unattempted, no console errors. The monster (32): look, walk, swipe, stomp, the empty move
+  buttons, grab and throw, the first mark with 111 s left on the fast clock, the molt on one F,
+  the cards in the server's order, the charge picked by key and run (and ended early with Q),
+  grab and eat, the second mark with 68 s left, the roar picked by a click and stunning 10 units
+  with 54 s left, then the sandbox part (view, controls card, first-person warnings, beam, tail
+  sweep, brace, roar). The squad (24): fire, the volley planted, charged to full (1.00) and let
+  go (12 volley shells), an early let go (9 ragged shots, no charged volley), the old keys doing
+  nothing, the map, the view, the card, the countdown ring, the match end. The tank (9): A and D
+  on the spot, W along the hull, the turret trailing the view, the gun's reticle, a shell along
+  the turret.
+- `node tools/playtest/shots.mjs` (the sandbox, every stage from both sides and every extra):
+  PASSED, no console errors anywhere. The volley meter below and past its notch, full, flashing
+  and fizzling; the tank's gun reticle at the screen's edge while the view swung and back on the
+  crosshair; the monster's cards (the controls card fits, 355 of 355 pixels; the view did not
+  turn as the pointer was captured or given back; both picks landed, not at random); 4 charges
+  and 4 stumbles; the tail sweep hitting 10 of 10 units behind it; the roar stunning 8 of 8;
+  never alone (one `cityCollapse`, 26 buildings falling, the cocoon by itself); swimming at
+  stages 1 and 2. Looked at one by one: third person is the first view on both sides, the kit
+  and the slots show what the monster owns, the meter and the two reticles read as intended.
+- The same extras at 1920 by 1080 pixels (for the slides): PASSED again, no console errors.
+
+**Pictures for the slides** (`docs/progress/`, JPEG, 1920 by 1080, 280 to 390 KB each; the
+owner wants a picture-dense development log after phase 3):
+
+| File | One sentence |
+| --- | --- |
+| `phase1-molt-cards.jpg` | At each molt the monster picks its next move from three picture cards, here the roar, the charge or the brace. |
+| `phase1-charge.jpg` | The new charge, seen from the default view behind the monster: head down, a wider lens and a wake of dust down the street. |
+| `phase1-roar-stun.jpg` | The roar now freezes every tank and soldier in reach: yellow stars spin over each one. |
+| `phase1-tail-sweep.jpg` | The tail sweep throws back a squad that sneaks up behind the monster. |
+| `phase1-volley-meter.jpg` | A squad holds the right button: its three tanks plant, aim their lasers at the crosshair and fill the big yellow volley meter. |
+| `phase1-tank-reticles.jpg` | Tanks drive like tanks now: the cyan sight shows where the turret points while it swings round to the crosshair on the monster. |
+
+(Taken with `tools/playtest/shots.mjs` at 1920 by 1080, and for the volley and the tank with a
+scratch script built from its helpers that puts the squad at the end of a straight street with
+the monster at the other end; `/tmp/mb-scratch/integrate/slides/`.)
+
+**Still open**
+
+- Nobody has played phase 1 yet; balance waits for the owner's next playtest. Stage 1 runs half
+  a minute under the pace aim (above).
+- `docs/requirements.md` (the owner's own document) still says a match runs about 12 minutes and
+  first person by default; `docs/ROADMAP.md` supersedes it and it was left as the owner wrote it.
+- The icon preview sheets in `docs/art/previews/ui_icons*.png` are from before phase 1: they
+  still show the command wheel and lack the charge and tail sweep icons. The preview tool itself
+  is up to date and passes its checks (`node tools/art/ui/preview.cjs --check`: 90 of 90);
+  running it without `--check` redraws them (not done here).
+- The squad's new pictures (`sq_*`) and the charge's and tail sweep's sounds are still
+  placeholders (the army-client and monster-client sections above).
+- In third person a squad on foot fills the bottom of the screen with its own soldiers when it
+  stands close together (seen in the volley pictures at stage 1).
+- Everything the four phase 1 sections above list as not yet felt by a person (the charge's
+  turn and stumble, the 2.5 s stun, the 4.5 s volley charge, tank turn rates, the chase cameras)
+  is still untried by people.

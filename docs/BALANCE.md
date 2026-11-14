@@ -769,8 +769,8 @@ longer, and slower for a hatchling on its own, is the opposite of what the playt
 | Alone (`--unopposed`, 10 starts) | 2:03 | 1:57 | 2:44 | 7:06 | |
 
 - Stages 2 and 3 are on the aim. Stage 1 is half a minute under it, so the average match is
-  about 7:30, 45 s under the aim of 8:15: a third shorter than section 8's 10:20 rather than a
-  fifth. If the owner's next playtest finds stage 1 rushed, `p1` is the lever (about 0.21 for
+  about 7:30, 45 s under the aim of 8:15: about a quarter shorter than section 8's 10:20
+  rather than a fifth. If the owner's next playtest finds stage 1 rushed, `p1` is the lever (about 0.21 for
   2:35; it lengthens stage 2 too, see above).
 - The kaiju won 20 of 40 (50%), with the old clock and bar 17 of 40 (43%). Not degenerate, so
   nothing else was touched. With 20 matches a win rate carries about 11 points of noise either

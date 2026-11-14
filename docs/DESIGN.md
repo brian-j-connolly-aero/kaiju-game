@@ -85,7 +85,7 @@ squares clamped to the city, drawn as a thin glowing quarantine line; nobody can
   after the first multiplayer playtest): contested stages of about 2:35 / 2:30 / 3:05 and a
   match of about 8:15; a kaiju left alone fills a stage's segment in about two minutes. Measured
   with `npm run sim` (bot against bot, Port Meridian, every start in turn, 40 matches):
-  contested stages of about 2:02 / 2:27 / 3:00 and 7:31 on average (stage 1 is shorter than the
+  contested stages of about 2:02 / 2:27 / 3:01 and 7:31 on average (stage 1 is shorter than the
   aim because the squad-mates' stray fire fills the bar too); alone 123 / 117 / 164 s for the
   three segments; the kaiju winning 20 of 40. `docs/BALANCE.md` section 9 has the tables.
 

@@ -845,17 +845,20 @@ layout, requires bumping `SNAPSHOT_VERSION` / `PROTOCOL_VERSION`.
   per stage. These are the balance instrument; `docs/BALANCE.md` says how to read them and
   records every tuning pass. Options: `--seeds N`, `--seed N`, `--unopposed`,
   `--kaiju-handicap H`, `--human-handicap H`, `--trigger-happy` (squads that hold the trigger
-  instead of charging volleys), `--fast`, `--anchor N`, `--events`, `--json`; the header of
-  `shared/scripts/sim.ts` lists them all.
+  instead of charging volleys), `--fast`, `--anchor N`, `--every-anchor`, `--bar P1,P2,P3` and
+  `--clock S` (other bar fractions or another clock for one run), `--nav`, `--events`, `--json`;
+  the header of `shared/scripts/sim.ts` lists them all.
 - The simulation is deterministic and the tests hold it to that: `test/determinism.test.ts`
   plays two matches side by side from one seed and compares a hash of the whole state on every
   tick, and replays recorded inputs; `test/matchSoak.test.ts` plays whole bot matches (three
   full-length, six fast) with every number, bound and entity count checked ten times a second.
 - Browser playtest (`tools/playtest`): server + 5 headless clients complete a `MB_FAST` match
   with zero console errors, and screenshots are captured for visual review (`smoke.mjs`).
-  `scripted.mjs` plays the kaiju and a squad with real key and mouse events and passes only
-  when every action was attempted and the server confirmed each one; an action it could not
-  get to is reported as not attempted, never as passed.
+  `scripted.mjs` plays the kaiju and a squad with real key and mouse events (and a tank in the
+  sandbox) and passes only when every action was attempted and the server confirmed each one;
+  an action it could not get to is reported as not attempted, never as passed. `shots.mjs`
+  takes pictures of every stage from both sides and of the scripted extras in the sandbox, and
+  fails on any console error.
 - Never commit secrets. Never add a dependency that needs a network service at runtime: the
   game must run fully offline on one PC plus a tunnel.
 

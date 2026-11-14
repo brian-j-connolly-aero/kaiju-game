@@ -144,7 +144,7 @@ fills as the gun reloads.
 
 ## What the pictures mean
 
-![What a squad leader sees](progress/art-wired-squad-view.png)
+![What a squad leader sees: a tank from behind at sunset, the volley diamond round the crosshair with another squad's five-second ring, the squads on the right, your bars bottom left, your buttons bottom right](progress/art-wired-squad-view.png)
 
 - **Skyline, top centre:** the monster's progress. It fills from the left; the three towers are
   the three stages, and the last one is the monster's win.

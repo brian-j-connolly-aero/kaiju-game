@@ -22,7 +22,9 @@ controls and tips for both sides. In the game, H opens the controls card.
 
 ## For developers
 
-- `docs/requirements.md`: the owner's design brief. `docs/DESIGN.md`: rules and numbers.
+- `docs/requirements.md`: the owner's design brief. `docs/ROADMAP.md`: the owner's decisions
+  after the first multiplayer playtest, and the work planned from them (newer than the brief).
+  `docs/DESIGN.md`: rules and numbers.
 - `docs/ARCHITECTURE.md`: how the code is laid out. `docs/ASSETS.md`: the art and sound contract.
 - `docs/STATUS.md`: what is built, what was tested, what is still open.
 
