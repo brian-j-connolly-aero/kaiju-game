@@ -6,7 +6,9 @@
  *   top       destruction bar (a skyline with three towers as the marks), sun-and-moon clock
  *             arc, the stage, and for humans the kaiju's health and nerve
  *   corners   own health / nerve / rage (kaiju) or unit health / charge (human), the squads,
- *             and the verbs with the glyph of the button that does each on the device in use
+ *             and the verbs with the glyph of the button that does each on the device in use,
+ *             always ending with the controls card and its button (it glows for a while at
+ *             the start of a match, so a new player finds it)
  *   center    crosshair
  */
 
@@ -88,6 +90,9 @@ function setClass(node: HTMLElement, name: string, on: boolean): void {
   if (node.classList.contains(name) !== on) node.classList.toggle(name, on);
 }
 
+/** Seconds the controls card's hint glows after the HUD first appears in a match. */
+const CONTROLS_GLOW = 20;
+
 const SKY_W = 400;
 const SKY_H = 44;
 
@@ -133,6 +138,8 @@ export class Hud {
   private callInPeak = 0;
   private lastClock = -1;
   private lastDevice = '';
+  /** When this HUD was first shown (the controls card's hint glows for a while after it). */
+  private shownAt = -1;
 
   constructor() {
     // --- destruction bar ---
@@ -239,15 +246,15 @@ export class Hud {
     // The settings panel and the button that opens it.
     this.menuHint = hint('ui_settings', 'menu');
     this.menuHint.root.classList.add('hint-menu');
-    // The controls card and its key, beside the gear.
+    // The controls card and its button: always the last of the verbs, whoever is playing.
     this.controlsHint = hint('ui_controls', 'controls');
-    this.controlsHint.root.classList.add('hint-menu');
+    this.controlsHint.root.classList.add('hint-controls');
 
     this.root.append(
-      el('div', 'hud-top', [this.clock, el('div', 'hud-top-mid', [bar, this.boss]), el('div', 'hud-top-right', [stage, el('div', 'hud-menus', [this.controlsHint.root, this.menuHint.root])])]),
+      el('div', 'hud-top', [this.clock, el('div', 'hud-top-mid', [bar, this.boss]), el('div', 'hud-top-right', [stage, el('div', 'hud-menus', [this.menuHint.root])])]),
       this.squads,
       el('div', 'hud-bottom-left', [meters, this.orders]),
-      el('div', 'hud-bottom-right', [this.hintsKaiju, this.hintsHuman, this.hintsDrone]),
+      el('div', 'hud-bottom-right', [this.hintsKaiju, this.hintsHuman, this.hintsDrone, this.controlsHint.root]),
       this.crosshair,
       this.status,
       this.capture,
@@ -318,6 +325,8 @@ export class Hud {
   update(frame: FrameState, session: MatchSession, view: HudView, now: number): void {
     const match = frame.match;
     setClass(this.root, 'hidden', false);
+    if (this.shownAt < 0) this.shownAt = now;
+    setClass(this.controlsHint.root, 'glow', now - this.shownAt < CONTROLS_GLOW);
 
     // Destruction bar: the city left of the fill line lies in ruins.
     const f = Math.round(barDisplayFraction(match.barPoints, match.marks) * 1000) / 1000;
@@ -406,8 +415,15 @@ export class Hud {
       const ids = { follow: 'cmd_follow', moveTo: 'cmd_moveto', fireAtWill: 'cmd_fireatwill', holdCharge: 'cmd_holdcharge' };
       const key = want.join(',');
       if (this.orders.dataset.orders !== key) {
+        // (A change, not the first picture: pop once so the player sees the order was taken.)
+        const changed = this.orders.dataset.orders !== undefined;
         this.orders.dataset.orders = key;
         this.orders.replaceChildren(icon(ids[want[0]]), icon(ids[want[1]]));
+        if (changed) {
+          this.orders.classList.remove('changed');
+          void this.orders.offsetWidth;
+          this.orders.classList.add('changed');
+        }
       }
     }
 

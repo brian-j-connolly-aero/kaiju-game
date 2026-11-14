@@ -157,7 +157,8 @@ Every combatant (kaiju, human unit) has `hp` and `nerve`. All damage goes throug
 - After any freeze or trip ends (Tier 2), 6 s immunity to both.
 
 **Human units:** hp per the tables below, nerve capacity 100, nerve leaks at 8 per second.
-Roar: 60 nerve to every unit in radius and it always resets volley charge. Stomp shockwave: 40
+Roar: 100 nerve to every unit in radius (a full unit's worth: every unit it reaches is shaken)
+and it always resets volley charge. Stomp shockwave: 40
 at the center falling to 10 at the edge. A friendly unit destroyed within 40 m: 15. At 100 a unit
 is **shaken** for 4 s: it cannot fire, loses its charge, and bot or sub-unit AI backs off.
 
@@ -179,7 +180,9 @@ special itself wrecks earns no rage, so one special can never pay for the next.
 - The two-squad rule counts squads, not hits: each squad's latest charged volley hit is
   remembered for 5 s, volleys that land during a stagger or the immunity included. The hit
   that takes the nerve to 100 need not be a volley's own, as long as two squads' volleys have
-  landed in the last 5 s. A match with a single squad asks for that squad's volley only.
+  landed in the last 5 s. A match with a single squad asks for that squad's volley only, and so
+  does a match in which every other squad has been wiped out: the rule counts the squads still
+  in the fight.
 - A shaken unit cannot be shaken further; when it steadies its nerve starts again from 0.
 - Trample needs the kaiju to be moving (at least 1 m/s) and the unit's circle to overlap its
   body circle. It deals no nerve damage.
@@ -192,6 +195,10 @@ special itself wrecks earns no rage, so one special can never pay for the next.
 View: first-person from a camera anchor in the head (own snout and claws visible), third-person
 toggle. The mouse or right stick sets a desired heading; the body turns toward it at the stage
 turn rate; the head (camera) can lead the body by up to 50°. Movement is relative to the view.
+Both views look exactly where the head looks, with the same limits (up and down 62°, sideways
+the head's 50° lead, all the way round as the body turns): the toggle moves the camera from
+inside the head to behind and above the shoulders and never changes the look direction. While
+the beam drags the head, or the kaiju is staggered, both views ride the head.
 
 Action timings are the tells. `r` = body radius for the stage.
 
@@ -202,8 +209,8 @@ Action timings are the tells. `r` = body radius for the stage.
 | Grab tap | Grab, then throw | 0.4 s grab, 0.5 s throw | Grabs the nearest car, wreck, live vehicle (stage 2+) or building chunk (stage 2+) in a 100° arc within 2.5 r. Tap again (or strike) to throw at the aim point: 25 / 45 / 70 m/s ballistic. Impact: units 120 in radius 4 / 10 / 22 m; structures 60 / 350 / 1500. |
 | Grab hold (0.5 s+) | Eat | 2.0 s, rooted | Needs a held object or an edible in reach. Heals 80 hp. 10 s cooldown. The meal is consumed. |
 | Block hold | Brace | while held | Rooted, turn rate ×0.3. Front-arc reductions above. |
-| Roar | Roar | 1.2 s, 18 s cooldown | Radius 40 / 110 / 280 m. Unit nerve and charge reset as above. |
-| Special | Lizard: beam | 0.8 s windup, 3.0 s beam | Costs 100 rage. Range 60 / 220 / 600 m, width 1.5 / 5 / 14 m, turn rate ×0.35. Units 150 per second. Structures 60 / 600 / 4000 per second; the beam stops at the first standing structure until it burns through. |
+| Roar | Roar | 1.2 s, 18 s cooldown | Radius 40 / 110 / 280 m. Every unit inside is shaken (100 nerve) and loses its charge. |
+| Special | Lizard: beam | 0.8 s windup, 3.0 s beam | Costs 100 rage. Range 60 / 220 / 600 m, width 2.2 / 7.5 / 21 m, turn rate ×0.25. It fights the head: a shake of up to 4° sideways and 1.5° up and down, a pull of 6° to one side and a kick of 4° upward, all growing over the 3 s. Units 150 per second. Structures 60 / 600 / 4000 per second; the beam stops at the first standing structure until it burns through. |
 | Molt (hold 1 s) | Cocoon | 10 s | Only when a molt is available. |
 
 Walking over units deals trample damage (40 per second inside the body radius while moving).
@@ -240,7 +247,11 @@ definition.
   weapon: level it burns what stands at mouth height, pointed down it ends on the ground.
   The mouth is where the model has it: 2.5 / 15 / 51.4 m ahead of the body's axis along the
   aim and 2.9 / 22 / 72 m up, so what stands under a titan's chin is not in the beam.
-  While it is on, the head only turns at the beam's reduced rate. It stops at the first
+  While it is on, the head only turns at the beam's reduced rate, and the beam strays about
+  where the head is steered: it shakes (a third of the shake at first, all of it by the end),
+  pulls to one side (left or right, by the tick it started) and kicks upward, the pull and the
+  kick growing evenly to their full size over the 3 s (`beamShake` in `sim/beam.ts`; a pure
+  function of time, the same on every machine). The player steers against it. It stops at the first
   standing structure its center or either edge touches and burns only that one; units behind
   a standing building are safe. Units within the beam's width (plus 1 m of slack above and
   below) take the unit damage and 60 nerve per second.
@@ -260,24 +271,30 @@ definition.
 
 Each human controls a **squad of 4 units**: one driven directly, three sub-units that take
 orders. A unit is one simulated body with a member count (soldiers or vehicles drawn around it);
-members are lost as hp drops. View: first-person from the lead member, third-person toggle.
+members are lost as hp drops. View: first-person from the lead member, third-person toggle
+(the same look direction and limits in both: up and down 80°, all the way round).
 Arcade handling: cooldowns, no ammo.
 
 ### Army (Tier 1)
 
-Damage is normalized so a squad's full salvo is about 38 raw damage at every level, and about
-20 raw nerve (19 to 22, tuned per level). A single squad's full-charge volley is 54 nerve from
-the front and 92 from behind or as a one-player crossfire (infantry and tanks): most of the
-way, never all of it. It takes two squads to break the kaiju, and the rule in section 3 holds
-that line whatever one squad does (a volley from behind that also crosses, or volley after
-volley, only brings it to the brink).
+Damage is normalized so a squad's full salvo is about 38 raw damage at every level. Nerve is
+about 20 raw per salvo at levels 1 and 2 (19 to 22, tuned per level): a single squad's
+full-charge volley is 54 nerve from the front and 92 from behind or as a one-player crossfire,
+most of the way, never all of it. Level 3 is counted per tank, the way a player sees it (the
+polish pass after the first playtest): a troop's shell carries 4.5 nerve, so each tank of a
+troop is worth nearly what a level 2 tank is (5.4), and a charged volley of about ten tanks
+breaks the titan from the front (108 with three of the ten firing as leaders, uncharged).
+A full level 3 squad's volley passes 100 by itself. Either way it takes two squads to break the
+kaiju while two are in the fight, and the rule in section 3 holds that line whatever one squad
+does (a volley from behind that also crosses, or volley after volley, only brings it to the
+brink).
 
 | | Level 1: rocket infantry | Level 2: tank platoon | Level 3: tank company |
 | --- | --- | --- | --- |
 | Unit | section of 10 soldiers (3 launchers) | 1 tank | troop of 3 tanks |
 | Unit hp / speed / radius | 100 / 6.5 m/s / 3 m | 100 / 15 m/s / 4 m | 300 / 15 m/s / 9 m |
 | Shot | up to 3 rockets (one per 3.4 members) | 1 shell | up to 3 shells (one per tank) |
-| Per projectile: damage / nerve | 3.2 / 1.8 | 9.5 / 5.4 | 3.2 / 1.6 |
+| Per projectile: damage / nerve | 3.2 / 1.8 | 9.5 / 5.4 | 3.2 / 4.5 |
 | Projectile speed, flight | 55 m/s, flat | 110 m/s, flat | 110 m/s, flat |
 | Range / cooldown (a projectile gives out after 1.1 × range) | 160 m / 2.6 s | 420 m / 3.2 s | 600 m / 3.2 s |
 | Splash radius / structure damage | 3 m / 3 | 5 m / 25 | 5 m / 25 |
@@ -523,15 +540,21 @@ shortcut that a page cannot cancel).
 | Kaiju: beam (needs full rage) | E | RB |
 | Kaiju: molt (hold 1 s, when a molt is there) | F | B |
 | Squad: fire (also the volley's trigger) | Left button | RT |
-| Squad: command wheel (hold, point, let go) | Right button or Q | LB |
+| Squad: command wheel (hold, point, let go): orders to the three other units | Right button or Q | LB |
 | Squad: follow me, move to, fire at will, hold and charge | 1, 2, 3, 4 | D-pad up, right, down, left |
 | Squad: artillery call-in (stage 3) | E | X |
-| On the map: move-to here, call-in here | Left click, right click | A, X |
+| On the map: move-to here, call-in here | Left click (or Space at the map cursor), right click | A, X |
 | Drone: up, down | Space, C | A, B |
 | Map | M or Tab | Back |
 | Camera (first or third person) | V | Right stick click |
 | Settings | Escape | Start |
-| Controls card | H | Left stick click |
+| Controls card | H or Enter | Left stick click |
+
+**What a squad player can do.** A squad has no weapon choice: the driven unit has the one weapon
+of its level (rockets, a tank gun, a troop's guns) on Fire, plus the artillery call-in at stage 3.
+The command wheel's four entries are orders to the squad's three other units, not weapons; its
+hub shows those three as cyan circles, and the two orders in force (one movement, one fire mode)
+carry a cyan dot. A new order makes the standing-orders pictures at the bottom left pop once.
 
 **The controls card** (`client/src/ui/controlsCard.ts`) teaches all of this without words:
 every control of the player's role, each as the button's glyph on the device in use (it
@@ -541,8 +564,9 @@ mark a control that only exists at some stages (grabbing tanks and pieces of bui
 stage 2, the molt before stages 2 and 3, artillery at stage 3). The squad's card includes the
 volley (hold and charge, wait for the full charge, then the leader's own shot) and the drone.
 It has a button in the lobby (for the role picked there) and on the briefing screen, is open
-by itself for the whole briefing, and in a match opens and closes with its key (shown beside
-the settings gear) while the game runs on; it takes no mouse input there, so the captured
+by itself for the whole briefing, and in a match opens and closes with its key while the game
+runs on. Its picture and button are always the last of the action pictures at the bottom right,
+for every role, and glow for the first 20 seconds of a match so a new player finds them; it takes no mouse input there, so the captured
 pointer stays captured. A test fails if an action a player can press is missing from their
 card (`ACTION_USERS` in `actions.ts` says who presses what).
 
@@ -576,5 +600,18 @@ rules per cue in `shared/src/defs/voice.ts`):
   lines that refills at one line per 5 s: a burst when something starts, then a trickle.
 - `kaiju.lowhp` is called once per stage, when the kaiju first drops below 25% health;
   `bar.near` once on the way to each mark, at 85% of the way from the last one.
-- In bot matches this comes to about 14 cues a minute, each side hearing one line per cue:
-  two or three in a typical ten seconds, seven or eight in the very busiest.
+- On top of that, each side has its own say (`VOICE_SIDE_RULES`; polish pass of 14 November,
+  after the owner's first game: "the anchor was speaking the whole time"). A cue that passes
+  the rules above is always emitted, so the match itself is unchanged; a side that is not to
+  hear it gets no line, and no subtitle.
+  - The news (the kaiju player) speaks only for: the briefing, the start, a landmark down, the
+    molt being ready, stage 2 and 3, one minute and ten seconds left, the ending, and the
+    hearing. All the colour commentary (volleys, crossfire, roars, buildings, units, artillery,
+    staggers and so on) is off. The lines are still in the script, just not played.
+  - The radio (the squads) keeps every cue but repeats a cue only after twice its gap (at least
+    8 s; nerve break 24 s, landmark 10 s, artillery 45 s), and routine chatter has its own
+    budget of two lines refilling at one per 15 s. Other cues the match turns on are not held.
+- Measured over ten whole bot matches (seeds 1 to 10, 115 minutes, briefing not counted): about
+  13 cues a minute. Before this pass both sides heard all of them (1,473 news lines, 1,484 radio
+  lines). Now the news says 124 (about 1 a minute, 12 times fewer) and the radio 772 (about 6.7
+  a minute, 52%). `test/voice.test.ts` holds a whole bot match to these limits.

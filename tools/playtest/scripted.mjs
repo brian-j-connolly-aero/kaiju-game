@@ -10,11 +10,14 @@
  * buttons. Nothing is sent to the server by the script itself and the autopilot is off.
  *
  *   kaiju   creates a room, volunteers, starts. Then: look, walk, swipe, stomp, grab, throw,
- *           eat, roar, brace, molt (when the bar offers it), the special (when rage allows).
+ *           eat, roar, brace, molt (when the bar offers it), the special (when rage allows),
+ *           the view toggle (V) and the controls card (H, then Enter).
  *   human   creates a room, switches the practice option on (a bot plays the kaiju) and off
  *           again; a second page joins by the invite address, volunteers for the kaiju, gets
  *           ready and then never touches the controls. The host starts. Then: drive, fire, the
- *           four commands, a charged volley, the map and a marker on it. After that the player
+ *           four commands by their keys, every entry of the command wheel (right button held,
+ *           pointer moved toward the entry, let go; and once more with Q), a charged volley,
+ *           the map and a marker on it, the view toggle and the controls card. After that the player
  *           lets go and the match runs to its end. (On Port Meridian the practice bot kaiju
  *           molts within a minute of a fast match, and every molt redeploys the squads, which
  *           undid the human checks half way through: an idle kaiju keeps the match at stage 1.)
@@ -467,12 +470,89 @@ async function playKaiju(origin, opts, errors) {
         else report.fail('special (E)', `kaijuAction special ${beam ? 'seen' : 'NOT seen'}; rage spent in snapshot: ${!!spent}; beam phase seen in a snapshot: ${!!on}`);
       }
     }
+    await viewAndCardChecks(page, driver, report, shot);
     p = await driver.probe();
     report.final = { stage: p.match?.stage, clock: p.match?.clock, bar: p.match?.barPoints, kaijuHp: p.kaiju?.hp, fps: p.fps, pageErrors: p.errors };
   } finally {
     await browser.close().catch(() => {});
   }
   return report;
+}
+
+/** Runs in the page: the 3D camera's heading and elevation (yaw 0 faces +Z). */
+function cameraLookInPage() {
+  const cam = window.__mb.internals.ctx.renderer?.camera;
+  if (!cam) return null;
+  const e = cam.matrixWorld.elements;
+  // The camera looks down its own -Z axis.
+  const x = -e[8];
+  const y = -e[9];
+  const z = -e[10];
+  return { yaw: Math.atan2(x, z), pitch: Math.asin(Math.max(-1, Math.min(1, y))) };
+}
+
+/**
+ * Both sides: the view toggle keeps the look direction (V, client only), and the controls card
+ * opens and closes with H and with Enter while the match runs on (client only: the card is a
+ * page overlay, there is nothing for the server to confirm).
+ */
+async function viewAndCardChecks(page, driver, report, shot) {
+  {
+    // Look somewhere that is not level first, so a view that resets its pitch would show.
+    await driver.drag(0, 0.25);
+    // The kaiju's views look where its head looks, and the head is held within 50 degrees of
+    // a body that may still be turning, or is the server's while the kaiju is staggered: so
+    // the camera is compared only once the kaiju is free and its body has stopped turning.
+    let lastYaw = null;
+    const steady = await driver.until((q) => {
+      if (q.role !== 'kaiju' || !q.kaiju) return q;
+      const still = lastYaw !== null && Math.abs(wrapAngle(q.kaiju.yaw - lastYaw)) < 0.002;
+      lastYaw = q.kaiju.yaw;
+      return still && q.kaiju.phase === 'idle' ? q : null;
+    }, 12000, 150);
+    if (!steady) {
+      report.skip('view toggle (V) keeps the look direction', 'the kaiju was never free and still for long enough (staggered or turning) to compare the views');
+      return cardChecks(page, driver, report, shot);
+    }
+    const was = (await driver.probe()).thirdPerson;
+    const before = await page.evaluate(cameraLookInPage);
+    await driver.tapKey('KeyV', 110);
+    const now = (await driver.until((q) => (q.thirdPerson !== was ? q : null), 2000)) !== null;
+    const after = await page.evaluate(cameraLookInPage);
+    const p = await driver.probe();
+    await shot(was ? 'view-first-person' : 'view-third-person');
+    const turned = before && after ? Math.hypot(wrapAngle(after.yaw - before.yaw), after.pitch - before.pitch) : NaN;
+    // (The bot squads' fire shakes the camera a little; a different view is tens of degrees off.)
+    if (now && turned < 0.06) report.pass('view toggle (V) keeps the look direction', `switched to ${was ? 'first' : 'third'} person; the camera looked (${fmt(before.yaw, 2)}, ${fmt(before.pitch, 2)}) rad before and (${fmt(after.yaw, 2)}, ${fmt(after.pitch, 2)}) after, ${fmt(turned, 3)} rad apart (client-side view)`);
+    else report.fail('view toggle (V) keeps the look direction', `switched: ${now}; camera before ${JSON.stringify(before)}, after ${JSON.stringify(after)} (${fmt(turned, 3)} rad apart; kaiju phase ${p.kaiju?.phase ?? 'none'})`);
+    if (now) await driver.tapKey('KeyV', 110);
+    await sleep(300);
+  }
+  return cardChecks(page, driver, report, shot);
+}
+
+/** The controls card opens and closes with H and with Enter in a running match. */
+async function cardChecks(page, driver, report, shot) {
+  const cardOpen = () =>
+    page.evaluate(() => {
+      const card = window.__mb.internals.ctx.controls;
+      return card.open === true && !card.root.classList.contains('hidden');
+    });
+  for (const [key, name] of [
+    ['KeyH', 'H'],
+    ['Enter', 'Enter'],
+  ]) {
+    await driver.tapKey(key, 110);
+    await sleep(400);
+    const opened = await cardOpen();
+    if (opened) await shot(`controls-card-${name}`);
+    const stillPlaying = (await driver.probe()).match?.phase === 'playing';
+    await driver.tapKey(key, 110);
+    await sleep(400);
+    const closed = !(await cardOpen());
+    if (opened && closed) report.pass(`controls card (${name})`, `${name} opened the controls card over the running match (phase still "${stillPlaying ? 'playing' : 'not playing'}") and ${name} again closed it (client-side overlay)`);
+    else report.fail(`controls card (${name})`, `after ${name}: open ${opened}; after a second ${name}: closed ${closed}`);
+  }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -619,25 +699,57 @@ async function playHumanChecks(page, driver, report, opts, shot) {
       }
     }
     await order('command: follow me (1)', 'Digit1', (q) => q.squad.moveOrder === 'follow', () => 'the squad in the snapshot has moveOrder follow');
-    const holding = await order('command: hold and charge (4)', 'Digit4', (q) => q.squad.fireMode === 'charge', () => 'the squad in the snapshot has fireMode charge');
+    await order('command: hold and charge (4)', 'Digit4', (q) => q.squad.fireMode === 'charge', () => 'the squad in the snapshot has fireMode charge');
 
-    // --- the command wheel itself (right button held, drag to an entry, release) ---------------
+    // --- the command wheel itself: every entry, picked by the pointer ------------------------------
+    // The right button (or Q) held, the mouse moved toward an entry, let go. Each pick is made
+    // from a state it changes, so the server's snapshot proves the entry works; the order runs
+    // through all four entries and ends on hold-and-charge for the volley below. (The owner's
+    // first squad game: "the commo rose opened but I only ever could use weapon 1".)
     {
       const cx = driver.width / 2;
       const cy = driver.height / 2;
-      await page.mouse.move(cx, cy);
-      await page.mouse.down({ button: 'right' });
-      const opened = await driver.until((q) => (q.wheelOpen ? q : null), 2500);
-      // Fire at will is the bottom entry: drag down.
-      await page.mouse.move(cx, cy + 140, { steps: 6 });
-      const picked = await driver.until((q) => (q.wheelHighlight ? q : null), 2500);
-      await shot('04-wheel');
-      await page.mouse.up({ button: 'right' });
-      const applied = picked ? await driver.until((q) => (q.squad && q.squad.fireMode === 'atWill' ? q : null), 5000) : null;
-      if (opened && picked && applied) report.pass('command wheel (hold right button, drag, release)', `the wheel opened, the pointer chose "${picked.wheelHighlight}", and on release the squad in the snapshot switched to fireMode atWill`);
-      else report.fail('command wheel (hold right button, drag, release)', `wheel opened: ${!!opened}; entry highlighted: ${picked ? picked.wheelHighlight : 'none'}; snapshot fireMode afterwards: ${(await driver.probe()).squad?.fireMode}`);
-      // Back to hold-and-charge for the volley below.
-      if (holding) await driver.tapKey('Digit4', 110);
+      const reach = 140;
+      const wheelPick = async (name, how, dx, dy, test, entry) => {
+        if (how === 'right button') {
+          await page.mouse.move(cx, cy);
+          await page.mouse.down({ button: 'right' });
+        } else {
+          // Without pointer lock the view (and the wheel's pointer) follows the mouse while a
+          // button is held on the view: the middle button is bound to nothing.
+          await driver.keyDown('KeyQ');
+          await page.mouse.move(cx, cy);
+          await page.mouse.down({ button: 'middle' });
+        }
+        const opened = await driver.until((q) => (q.wheelOpen ? q : null), 2500);
+        await page.mouse.move(cx + dx, cy + dy, { steps: 6 });
+        const picked = await driver.until((q) => (q.wheelHighlight === entry ? q : null), 2500);
+        if (picked) await shot(`04-wheel-${entry}`);
+        if (how === 'right button') await page.mouse.up({ button: 'right' });
+        else {
+          await driver.keyUp('KeyQ');
+          await sleep(150);
+          await page.mouse.up({ button: 'middle' });
+        }
+        const applied = picked ? await driver.until((q) => (q.squad && test(q) ? q : null), 5000) : null;
+        const label = `command wheel (${how}): ${entry}`;
+        if (opened && picked && applied) report.pass(label, `the wheel opened, the pointer chose "${entry}", and on release the squad in the snapshot has moveOrder=${applied.squad.moveOrder} fireMode=${applied.squad.fireMode}`);
+        else report.fail(label, `wheel opened: ${!!opened}; entry highlighted: ${picked ? picked.wheelHighlight : `not ${entry}`}; snapshot afterwards: moveOrder=${(await driver.probe()).squad?.moveOrder} fireMode=${(await driver.probe()).squad?.fireMode}`);
+        await sleep(300);
+      };
+      // Move to marks the ground under the crosshair: look down the street first.
+      p = await driver.probe();
+      await driver.lookTo(p.view.yaw, -0.25, 0.06, 4000);
+      p = await driver.probe();
+      if (p.squad?.fireMode !== 'charge') await driver.tapKey('Digit4', 110);
+      if (p.squad?.moveOrder !== 'follow') await driver.tapKey('Digit1', 110);
+      await driver.until((q) => (q.squad && q.squad.fireMode === 'charge' && q.squad.moveOrder === 'follow' ? q : null), 4000);
+      await wheelPick('fire at will', 'right button', 0, reach, (q) => q.squad.fireMode === 'atWill', 'fireAtWill');
+      await wheelPick('hold and charge', 'right button', -reach, 0, (q) => q.squad.fireMode === 'charge', 'holdCharge');
+      await wheelPick('move to', 'right button', reach, 0, (q) => q.squad.moveOrder === 'moveTo', 'moveTo');
+      await wheelPick('follow me', 'right button', 0, -reach, (q) => q.squad.moveOrder === 'follow', 'follow');
+      await wheelPick('fire at will', 'Q', 0, reach, (q) => q.squad.fireMode === 'atWill', 'fireAtWill');
+      await wheelPick('hold and charge', 'Q', -reach, 0, (q) => q.squad.fireMode === 'charge', 'holdCharge');
     }
 
     // --- a charged volley ----------------------------------------------------------------------
@@ -705,16 +817,8 @@ async function playHumanChecks(page, driver, report, opts, shot) {
       }
     }
 
-    // --- camera toggle (client only; recorded, not a server check) ------------------------------
-    {
-      const was = (await driver.probe()).thirdPerson;
-      await driver.tapKey('KeyV', 110);
-      const now = (await driver.until((q) => (q.thirdPerson !== was ? q : null), 2000)) !== null;
-      await sleep(300);
-      await shot('09-third-person');
-      report.add('camera toggle (V)', now ? 'pass' : 'fail', now ? 'the view switched between first and third person (a client-side view; there is nothing for the server to confirm)' : 'the view did not switch');
-      if (now) await driver.tapKey('KeyV', 110);
-    }
+    // --- view toggle and controls card (client only) ---------------------------------------------
+    await viewAndCardChecks(page, driver, report, shot);
 
     // --- let go and let the match run out ------------------------------------------------------
     {

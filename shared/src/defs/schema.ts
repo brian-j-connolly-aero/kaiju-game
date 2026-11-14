@@ -279,6 +279,16 @@ export interface BeamSpecialDef extends KaijuActionBase {
   unitDps: number;
   unitNervePerSecond: number;
   structureDps: PerStage<number>;
+  /**
+   * How hard the breath is to hold (radians, all optional, 0 when left out). While it burns,
+   * the beam shakes about where the head is steered (`wobbleYaw` / `wobblePitch`: the largest
+   * sideways and up-and-down shake, reached by the end), pulls to one side (`driftYaw` by the
+   * end) and kicks upward (`kickPitch` by the end). The player steers against it.
+   */
+  wobbleYaw?: number;
+  wobblePitch?: number;
+  driftYaw?: number;
+  kickPitch?: number;
 }
 
 export type KaijuSpecialDef = BeamSpecialDef;

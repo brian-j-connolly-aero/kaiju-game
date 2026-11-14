@@ -103,6 +103,22 @@ interface GroundMark {
   b: number;
 }
 
+/** Seconds a roar's shockwave takes to reach the edge of its radius. */
+const ROAR_WAVE = 0.8;
+
+/**
+ * An effect due a moment from now: the dust thrown up along a roar's spreading front, and a
+ * unit jolted when that front reaches it.
+ */
+interface PendingFx {
+  at: number;
+  kind: 'front' | 'jolt';
+  x: number;
+  z: number;
+  /** Front: how far out the front is. Jolt: the unit's radius. */
+  r: number;
+}
+
 export class GameRenderer {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
@@ -138,6 +154,9 @@ export class GameRenderer {
    */
   private stageSeen = false;
   private readonly marks: GroundMark[] = [];
+  private readonly pending: PendingFx[] = [];
+  /** The latest roar, so that the units it shakes jolt when its front reaches them. */
+  private lastRoar = { x: 0, z: 0, radius: 0, time: -1e9 };
   private readonly ringUv = [0, 0, 0, 0];
   private readonly triangleUv = [0, 0, 0, 0];
   private resolution: number;
@@ -250,6 +269,8 @@ export class GameRenderer {
     this.units.clear();
     this.crowd.clear();
     this.marks.length = 0;
+    this.pending.length = 0;
+    this.lastRoar.time = -1e9;
   }
 
   private applyStage(stage: StageId, immediate: boolean): void {
@@ -305,6 +326,7 @@ export class GameRenderer {
   skipMoment(): void {
     this.effects.clear();
     this.projectiles.clear();
+    this.pending.length = 0;
   }
 
   /**
@@ -435,8 +457,32 @@ export class GameRenderer {
         break;
       }
       case 'roar': {
-        fx.ring(e.x, e.z, e.radius, 0xff9a3c, 1.0, 0.8);
-        fx.ring(e.x, e.z, e.radius * 0.6, 0xffd9a0, 0.7, 0.6);
+        // A shockwave anyone can see from anywhere: a ring on the ground, rings in the air up
+        // the kaiju's height (over the rooftops, so the streets do not hide it), dust thrown up
+        // along the spreading front, and every unit it shakes jolts as the front reaches it.
+        const k = this.kaijuAt(e.kaiju);
+        const st = k ? kaijuStageDef(k.kind, k.stage) : null;
+        const h = st ? st.height : 10;
+        fx.ring(e.x, e.z, e.radius, 0xff9a3c, ROAR_WAVE, 1.0);
+        fx.ring(e.x, e.z, e.radius * 0.97, 0xffd9a0, ROAR_WAVE * 1.15, 0.7, h * 0.35);
+        fx.ring(e.x, e.z, e.radius * 0.9, 0xffb060, ROAR_WAVE * 1.3, 0.55, h * 0.8);
+        if (k && st && !this.insideKaiju(e.kaiju)) {
+          const fwd = st.mouthForward;
+          fx.glowAt(e.x + Math.sin(k.aimYaw) * fwd, st.mouthHeight, e.z + Math.cos(k.aimYaw) * fwd, st.bodyRadius * 4, 0xffc070, 0.35, 0.8);
+        }
+        for (let i = 1; i <= 4; i++) this.pending.push({ at: this.time + (ROAR_WAVE * i) / 4, kind: 'front', x: e.x, z: e.z, r: (e.radius * i) / 4 });
+        this.lastRoar = { x: e.x, z: e.z, radius: e.radius, time: this.time };
+        break;
+      }
+      case 'unitShaken': {
+        const u = this.lastFrame?.units[e.unit];
+        if (!u) break;
+        const roar = this.lastRoar;
+        const radius = unitTypeDef(u.type).radius;
+        const d = Math.hypot(u.x - roar.x, u.z - roar.z);
+        // Shaken by the roar that went off just now: when its front gets there. Otherwise at once.
+        const delay = this.time - roar.time < 0.1 && d <= roar.radius + radius ? (Math.min(d, roar.radius) / Math.max(1, roar.radius)) * ROAR_WAVE : 0;
+        this.pending.push({ at: this.time + delay, kind: 'jolt', x: u.x, z: u.z, r: radius });
         break;
       }
       case 'kaijuHit': {
@@ -509,6 +555,33 @@ export class GameRenderer {
   }
 
   // --- per frame -------------------------------------------------------------------------------
+
+  /** Spawns the effects whose moment has come (see `PendingFx`). */
+  private runPending(): void {
+    const fx = this.effects;
+    for (let i = 0; i < this.pending.length; i++) {
+      const p = this.pending[i];
+      if (p.at > this.time) continue;
+      this.pending[i] = this.pending[this.pending.length - 1];
+      this.pending.pop();
+      i--;
+      if (p.kind === 'front') {
+        // A dozen puffs of dust around the circle the front has reached, each a little bigger further out.
+        const n = 12;
+        const size = Math.max(2, p.r * 0.12);
+        const turn = p.r * 0.37;
+        for (let j = 0; j < n; j++) {
+          const a = turn + (j / n) * Math.PI * 2;
+          fx.dust(p.x + Math.sin(a) * p.r, 0.5, p.z + Math.cos(a) * p.r, size, 1, 0xd8c8b0);
+        }
+      } else {
+        // The unit jolts: a puff of dust kicked up, a pale flash and a small ring round it.
+        fx.dust(p.x, 0.5, p.z, p.r * 1.4, 5, 0xe0d4c0);
+        fx.ring(p.x, p.z, p.r * 2.5, 0xffe0a0, 0.8, 0.9);
+        fx.glowAt(p.x, p.r * 0.8 + 1, p.z, p.r * 2.2, 0xfff0c8, 0.5, 0.9);
+      }
+    }
+  }
 
   /** First-person camera anchor of a kaiju (the rig's `cam_fp`), valid after `update`. */
   kaijuCamAnchor(id: number): THREE.Vector3 | null {
@@ -618,6 +691,7 @@ export class GameRenderer {
     // Props are drawn out to a distance that grows with the camera's height.
     const cam = this.camera.position;
     this.stats.props = this.city ? this.city.updateProps(cam.x, cam.z, Math.min(950, 330 + cam.y * 2.6)) : 0;
+    this.runPending();
     this.effects.update(dt, this.camera);
     this.boundary.update(dt, time);
     this.sky.update(dt, this.camera);

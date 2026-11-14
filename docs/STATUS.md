@@ -1468,3 +1468,145 @@ a bad connection would have felt, and it was found while looking.
 - Someone who empties their name keeps being asked for one when they open an invite link.
 - From earlier rounds and unchanged: district roof colors, the real tunnel and Windows scripts,
   a real controller and graphics card.
+
+## Polish pass: fewer voice lines (14 November, the voices task)
+
+The owner's note after the first game: "The anchor was speaking the whole time ... cut all the
+fluff anchor lines. Army lines were ok but maybe reduce frequency by 2x".
+
+- **Cause.** Every cue the simulation emitted (about 13 a minute in a bot match) gave both sides a
+  line: the news anchor narrated every volley, roar, crossfire, building and unit. The rules in
+  `VOICE_CUE_RULES` / `VOICE_RULES` throttle the cue, not what each side hears.
+- **Change.** `VOICE_SIDE_RULES` (`shared/src/defs/voice.ts`, applied in `say`,
+  `shared/src/sim/systems/voice.ts`): the news only speaks for the briefing, start, landmark
+  down, molt ready, stages 2 and 3, one minute and ten seconds left, the ending and the hearing;
+  the radio keeps every cue with its own longer waits and a slower chatter budget (numbers in
+  DESIGN.md section 8). A cue is still emitted with the same random draw, and a side that is not
+  to hear it gets an empty list, so the match plays out exactly as before (same winners and
+  lengths across seeds 1 to 5 before and after). Subtitles come only from spoken lines, so they
+  follow. The client no longer preloads anchor lines it will never play. No audio was added or
+  removed; the unused anchor lines stay in the script and the manifest.
+- **Measured** (ten bot matches, seeds 1 to 10, briefing not counted, with the tree as it stood):
+  news 1,473 lines before, 124 after (12 times fewer, about 1 a minute); radio 1,484 before, 772
+  after (52%). A second run later, with other teams' in-progress gameplay changes in the tree:
+  1,341 to 111 and 1,353 to 710, the same ratios. In a two-page browser smoke run (short clock,
+  150 s of play) the monster's page showed 10 subtitles, all big moments; the army's page 29.
+- **Tests.** `shared/test/voice.test.ts`: the news stays quiet for colour cues; the radio waits
+  longer than the cue; the radio budget; a silent cue still draws its number; a whole bot match
+  held to under 1.6 news lines a minute and 40 to 60% radio. `client/test/matchAudio.test.ts`:
+  only news lines it speaks are preloaded.
+- **Still open.** The monster player no longer hears warnings such as "the army is preparing a
+  volley" or "a strike is inbound"; the pictures on screen carry those. Soldier lines for the
+  monster's side are for the later voice-and-art loop.
+
+## Polish pass: the monster's combat feel (14 November, the monster-feel task)
+
+The owner's notes after the first game, as the monster against four bot squads: "a full volley
+of ~10 tanks could almost stun me but not quite", "Roar didn't seem to do anything?", and "The
+beam breath was AWESOME!!! ... a little wider and even more uncontrollable?".
+
+- **Stagger (note 2). Cause: two things.** (1) At stage 3 a unit is a troop of three tanks, and
+  its nerve was normalized per squad, not per tank: each tank's shell carried 1.6 nerve against
+  a stage 2 tank's 5.4. Ten tanks in a charged volley, three of them leaders firing uncharged,
+  came to 38 nerve from the front (52 from the flank) against the 100 a stagger needs; at
+  stages 1 and 2 ten units come to 113 to 130 and break it. (2) The two-squad rule counted every
+  squad of the match, wiped out or not, so once only one squad was left it could never break the
+  kaiju at all: its volleys stopped at the brink, "almost but not quite".
+  **Change.** `army_troop_guns` nerve 1.6 to 4.5 (`shared/src/defs/weapons.ts`), so each tank of
+  a troop is worth nearly a stage 2 tank; and `volleysCanBreak` (`sim/systems/damage.ts`) asks
+  for two squads only while two are still in the fight. Measured in the simulation (titan
+  standing still, facing the squads; scratch probe, then turned into tests):
+
+  | Stage 3, one volley | Before | After |
+  | --- | --- | --- |
+  | Ten tanks from two squads, front (3 leaders uncharged) | 38 nerve, no stagger | 108, stagger |
+  | The same from the flank | 52, no stagger | stagger |
+  | Ten tanks, last squad standing | 45, and the rule forbade it | stagger |
+  | One full squad (12 tanks) while four are standing | 48 | 135 nerve dealt, held at the brink: no stagger |
+  | Six charged tanks from two squads | (not measured) | 63 at most, no stagger |
+
+  Stages 1 and 2 are unchanged (ten units: stagger). Tests: `volleyRules.test.ts` ("a volley of
+  about ten tanks"), `defs.test.ts` (level 3 counted per tank). The design's old "one squad's
+  volley stays under 100" now holds at levels 1 and 2 only; at level 3 the two-squad rule is what
+  stops one squad (DESIGN.md section 5).
+- **Roar (note 3). Cause: too weak, and nearly invisible.** It dealt 60 nerve to units whose
+  capacity is 100, so a fresh unit was not shaken: it kept moving and firing, and the only real
+  effect, its charge wiped, shows only as a yellow diamond going out. On screen it was two flat
+  rings on the ground, mostly hidden by the houses. **Change.** Roar nerve 60 to 100: every unit
+  inside the radius is shaken (stops firing for 4 s, backs off, flickers). The client now draws a
+  shockwave that reads from anywhere: a ground ring plus two rings in the air at a third and
+  four fifths of the kaiju's height (over the rooftops), dust thrown up along the spreading
+  front, a glow at the mouth, and every shaken unit jolts (dust, flash, ring) as the front
+  reaches it (`client/src/render/gameRenderer.ts`, `effects.ts`). Pictures only, no text; the
+  roar button's cooldown already darkens on the controls strip.
+- **Beam (note 4).** Width 1.5 / 5 / 14 m to 2.2 / 7.5 / 21 m; the head turns at a quarter of the
+  body's turn rate instead of 35%; and it fights the head: a shake of up to 4 degrees sideways and
+  1.5 up and down, a pull of up to 6 degrees to one side and a kick of up to 4 degrees upward,
+  growing over the 3 s burn (`beamShake`, `sim/beam.ts`; the simulation keeps where the player
+  steers in `act.beamYaw` / `beamPitch` and adds the shake on top). It stays aimable: everything
+  together strays at most 10 degrees, well inside the head's 50 degree lead, and the player
+  steers against it. Damage numbers are unchanged. Tests: `kaijuActions.test.ts` (the beam
+  "fights the head"; the reach and damage tests run with the shake off).
+- **Balance** (`npm run sim -- --seeds 60 --every-anchor`): before, kaiju 28 of 60 (47%), mean
+  10:19; after, 28 of 60 (47%), mean 10:33 (seeds 61 to 120: also 28 of 60, 10:34). Stage 3
+  staggers 4.0 to 5.1 a match; units lost per match 4.1 / 3.8 / 2.5 to 3.3 / 3.1 / 1.9 (shaken
+  units back off instead of dying). No retune needed. Trigger-happy squads (20 matches): they
+  now break the titan 0.3 times a match and win 4 of 20 (before: never, 0 of 20); disciplined
+  squads break it 5.1 times and win 32 of 60.
+- **Checked.** `npm run check`; `npm run build`; `tools/playtest/shots.mjs` (stage 3, monster,
+  with a new roar visit: 7 of 8 units round the juvenile shaken, pictures of the shockwave);
+  `tools/playtest/scripted.mjs --only kaiju` (16 of 16 actions confirmed by the server,
+  roar and beam included).
+- **Still open.** Not felt by a person yet: whether the beam's pull is fun or annoying with a
+  mouse, and whether shaking every unit in the roar is too strong against people (bots did not
+  mind). Levers: `wobbleYaw` / `driftYaw` / `kickPitch` in `defs/kaiju/lizard.ts`, roar
+  `unitNerve` (try 80: shakes only units already rattled), troop `nerve`.
+
+## Polish pass: views, the controls card and the command wheel (14 November, the controls-view task)
+
+The owner's notes: "When switching between first and third person the view changed, and some
+angles I could only reach by using first person", "Maybe tab or enter something to pull the
+controls back up??", and, as a squad, "Commo rose opened but I only ever could use weapon 1".
+
+- **Views (note 5). Cause:** the monster's chase camera did not look where the player looked. It
+  looked at a fixed point ahead of the body from a height that only tilted at 60% of the mouse's
+  pitch, so it could only look from about 19 degrees down to 7 up (first person: 62 down to 62
+  up); and it followed the wanted heading (up to 150 degrees off the body) while first person
+  follows the head (at most 50 degrees off). **Change** (`client/src/game/controllers/kaijuController.ts`):
+  one look direction (`viewYaw`, `viewPitch`: the wanted heading held to the head's 50 degree
+  reach, the mouse's pitch within 62 degrees) for both cameras; the chase camera hangs behind a
+  point 1.25 body heights up, back along that direction, and slides along the ground when
+  looking up. While the beam drags the head or the kaiju is staggered, both cameras ride the
+  head and the mouse's wish goes to the server as it is. The squad's cameras already shared one
+  direction and limit (80 degrees); now tested. Tests: `client/test/cameraViews.test.ts`.
+- **Controls card (note 6). Cause:** its key was shown only as a tiny card and keycap beside the
+  settings gear at the top right. **Change:** Enter (and the keypad's Enter) opens it too, besides
+  H; its picture and button are now the last of the action pictures at the bottom right for every
+  role (keyboard or controller glyph, whichever is in use), and glow for the first 20 seconds of a
+  match. The keyboard's "confirm on the map" moved from Enter to Space (the mouse click is the
+  usual way). In the menus Enter and Space on a focused page button only press the button. Tab
+  stays the map.
+- **Command wheel (note 7). Cause: not a broken wheel but a wheel that looks like a weapon
+  picker.** Every entry worked by mouse and by keys, confirmed by the server (below). The design
+  has no weapon choice: the leader has the one weapon of its level on Fire, plus artillery at
+  stage 3. The wheel's entries are orders to the squad's other three units, but they were drawn
+  with keycaps 1 to 4, a rocket picture for fire at will and nothing saying who takes them: a
+  weapon wheel, and nothing seemed to change when an entry was picked. **Change**
+  (`client/src/ui/commandWheel.ts`, `hud.ts`, `styles.css`): the hub shows the three squad-mates
+  as cyan circles; the two orders in force carry a cyan dot; a new order makes the
+  standing-orders pictures at the bottom left pop. In headless Chromium with real pointer lock
+  the mouse's movement reports are garbage (each step reported as a jump and a jump back), so
+  wheel pointing under pointer lock cannot be judged there; the wheel's logic is the same code
+  path with or without the lock, and is unit-tested.
+- **Checked.** `npm run check`; `npm run build`; `tools/playtest/scripted.mjs --only human`
+  (28 of 28 confirmed: all four wheel entries with the right button and two with Q, server-side,
+  plus V keeping the look direction and H and Enter opening and closing the card in a running
+  match); `--only kaiju` (19 of 19, the view toggle and both card keys included; an earlier
+  run of it missed one grab, the kaiju stopping 23 m short of the car, which the rerun did not
+  repeat). The view check waits until the kaiju is free and its body has stopped turning: while
+  it turns, the head's 50 degree hold moves the view in both cameras alike. `scripted.mjs` now checks every wheel entry, the view
+  toggle's direction, and both card keys on both sides.
+- **Still open.** Not felt by a person yet: the new chase camera (closer to the classic
+  over-the-shoulders view; levers `CHASE_PIVOT`, `CHASE_FLOOR` and the distance in
+  `placeChase`). Movement in first person is still relative to the wanted heading, not the
+  clamped head, as before. If the owner still wants weapon choice, that is a design change.

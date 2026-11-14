@@ -155,3 +155,30 @@ export function beamTouches(path: BeamPath, halfWidth: number, x: number, z: num
   const reach = radius + halfWidth;
   return px * px + pz * pz <= reach * reach && gap <= halfWidth + BEAM_HEIGHT_SLACK;
 }
+
+/** How far the beam is off where the head is steered, radians (see `beamShake`). */
+export interface BeamShake {
+  yaw: number;
+  pitch: number;
+}
+
+const TAU = Math.PI * 2;
+
+/**
+ * How far the breath pulls away from where the player steers it, `t` seconds into a beam that
+ * burns for `active` seconds. It is a pure function of time and a seed (the tick the beam
+ * started), so it is the same on every machine: a shake that grows from a third to its full
+ * size, a pull to one side (left or right by the seed) and an upward kick, both growing
+ * evenly to their full size at the end. All zero for a beam that defines none of them.
+ */
+export function beamShake(action: BeamSpecialDef, t: number, active: number, seed: number, out: BeamShake = { yaw: 0, pitch: 0 }): BeamShake {
+  const g = active > 0 ? Math.min(1, Math.max(0, t / active)) : 1;
+  const shake = 0.35 + 0.65 * g;
+  const side = seed % 2 === 0 ? 1 : -1;
+  // A phase per beam, spread over the circle by the golden ratio.
+  const phase = ((seed * 0.618034) % 1) * TAU;
+  const wob = 0.65 * Math.sin(TAU * 0.9 * t + phase) + 0.35 * Math.sin(TAU * 2.3 * t + 2 * phase);
+  out.yaw = side * (action.driftYaw ?? 0) * g + (action.wobbleYaw ?? 0) * shake * wob;
+  out.pitch = (action.kickPitch ?? 0) * g + (action.wobblePitch ?? 0) * shake * Math.sin(TAU * 1.4 * t + 3 * phase);
+  return out;
+}

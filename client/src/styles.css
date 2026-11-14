@@ -863,6 +863,19 @@ body {
   filter: drop-shadow(0 1px 2px #000);
 }
 
+/* A new order: the standing-orders pictures pop once. */
+.orders.changed {
+  transform-origin: left center;
+  animation: orders-pop 0.6s ease-out;
+}
+
+@keyframes orders-pop {
+  0% {
+    transform: scale(1.6);
+    color: #fff;
+  }
+}
+
 .squads {
   position: absolute;
   top: 84px;
@@ -934,6 +947,14 @@ body {
   position: absolute;
   right: 14px;
   bottom: 14px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+/* The controls card's picture and button: always last, set a little apart from the verbs. */
+.hint.hint-controls {
+  margin-left: 8px;
 }
 
 .hints {
@@ -1168,14 +1189,57 @@ body {
   color: #fff;
 }
 
+/* The hub: the squad's three other units (cyan circles, the army's mark), who take the orders. */
 .wheel-hub {
   position: absolute;
-  left: -8px;
-  top: -8px;
+  left: -27px;
+  top: -27px;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 3px solid var(--panel-edge);
+}
+
+.wheel-mate {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--human);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
+}
+
+.wheel-mate:nth-child(1) {
+  left: 17px;
+  top: 7px;
+}
+
+.wheel-mate:nth-child(2) {
+  left: 7px;
+  top: 25px;
+}
+
+.wheel-mate:nth-child(3) {
+  left: 27px;
+  top: 25px;
+}
+
+/* The orders the squad follows right now: a cyan dot on the rim. */
+.wheel-now {
+  position: absolute;
+  right: 2px;
+  top: 2px;
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--human);
+  border: 2px solid #fff;
+  display: none;
+}
+
+.wheel-slice.now .wheel-now {
+  display: block;
 }
 
 .wheel-pointer {

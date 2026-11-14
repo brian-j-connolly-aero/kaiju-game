@@ -7,7 +7,8 @@
  * - a wading kaiju (the titan) deals contact damage to the taller structures it pushes through;
  * - vehicles crush props; infantry walks around them.
  * It also points the kaiju's head: at the player's aim, within the head lead of the body, and
- * only at the special's reduced turn rate while a special (the beam) is running.
+ * only at the special's reduced turn rate while a special (the beam) is running, with the
+ * beam's own shake, pull and kick on top (`beamShake`).
  *
  * Nothing moves outside the 'playing' phase.
  */
@@ -17,14 +18,16 @@ import { kaijuKindDef, kaijuStageDef } from '../../defs/kaiju/index';
 import { DT } from '../../defs/rules';
 import { unitTypeDef } from '../../defs/units';
 import { modMult } from '../../defs/upgrades';
-import { clampAngleAround, turnToward } from '../../math/angle';
+import { clampAngleAround, turnToward, wrapAngle } from '../../math/angle';
 import { approach } from '../../math/scalar';
+import { beamShake, type BeamShake } from '../beam';
 import { createMoveResult, kaijuMoveParams, stepMovement, unitMoveParams, type MoveParams } from '../movement';
 import type { World } from '../types';
 
 const params = {} as MoveParams;
 const result = createMoveResult();
 const propIds: number[] = [];
+const shake: BeamShake = { yaw: 0, pitch: 0 };
 
 export function movementSystem(world: World): void {
   if (world.match.phase !== 'playing') return;
@@ -47,14 +50,28 @@ export function movementSystem(world: World): void {
       const special = def.actions.special;
       if (k.action === 'special' && k.phase === special.activePhase) {
         // While the special runs (the beam) the head is as slow as the body, so the breath
-        // sweeps instead of snapping to wherever the player looks.
+        // sweeps instead of snapping to wherever the player looks; and the breath fights the
+        // head: it shakes, pulls to one side and kicks up about where the head is steered.
+        const act = k.act;
+        if (!act.beamSteering) {
+          act.beamSteering = true;
+          act.beamYaw = k.aimYaw;
+          act.beamPitch = k.aimPitch;
+          act.beamSeed = world.tick;
+        }
         const step = kaijuStageDef(k.kind, k.stage).turnRate * special.turnMult * modMult(k.mods, 'turnRate') * DT;
-        k.aimYaw = clampAngleAround(turnToward(k.aimYaw, wantYaw, step), k.yaw, def.headLeadMax);
-        k.aimPitch = approach(k.aimPitch, input.aimPitch, step);
+        act.beamYaw = clampAngleAround(turnToward(act.beamYaw, wantYaw, step), k.yaw, def.headLeadMax);
+        act.beamPitch = approach(act.beamPitch, input.aimPitch, step);
+        beamShake(special, k.phaseTime, special.timing.active, act.beamSeed, shake);
+        k.aimYaw = clampAngleAround(wrapAngle(act.beamYaw + shake.yaw), k.yaw, def.headLeadMax);
+        k.aimPitch = act.beamPitch + shake.pitch;
       } else {
+        k.act.beamSteering = false;
         k.aimYaw = wantYaw;
         k.aimPitch = input.aimPitch;
       }
+    } else {
+      k.act.beamSteering = false;
     }
 
     for (const id of result.trampled) {

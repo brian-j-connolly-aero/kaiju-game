@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   TICK_RATE,
   VOICE_LINES,
+  VOICE_SIDE_RULES,
   voiceLinesFor,
   type Bounds,
   type KaijuKindId,
@@ -278,6 +279,9 @@ describe('voice lines', () => {
     expect(aheadK.length).toBeGreaterThan(0);
     expect(k.fetcher.requests.filter((u) => u.includes('/voice/')).sort()).toEqual(aheadK.map((id) => `audio/voice/${id}.ogg`).sort());
     expect(ahead.some((id) => aheadK.includes(id))).toBe(false);
+    // The news is not loaded for cues it no longer speaks for.
+    const byId = new Map(VOICE_LINES.map((l) => [l.id, l]));
+    for (const id of aheadK) expect(VOICE_SIDE_RULES.news.cues).toContain(byId.get(id)?.cue);
   });
 });
 

@@ -176,10 +176,12 @@ describe('the driven unit', () => {
     expect(eventsOf(lead(troop, 1, { buttons: Btn.fire }), 'projectileSpawn').length).toBe(2);
   });
 
-  it('a squad salvo is about 38 damage and about 20 nerve at every level', () => {
+  it('a squad salvo is about 38 damage at every level, and about 20 nerve at levels 1 and 2', () => {
     for (const weapon of Object.values(WEAPONS)) {
       expect(4 * weapon.maxShots * weapon.damage).toBeCloseTo(38.4, 0);
       // Nerve is tuned per level (docs/BALANCE.md); defs.test.ts checks what it must never exceed.
+      // The level 3 troop is counted per tank since the polish pass (defs.test.ts).
+      if (weapon.id === 'army_troop_guns') continue;
       expect(4 * weapon.maxShots * weapon.nerve).toBeGreaterThanOrEqual(19);
       expect(4 * weapon.maxShots * weapon.nerve).toBeLessThanOrEqual(22);
     }

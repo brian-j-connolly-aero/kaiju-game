@@ -146,10 +146,11 @@ export function defaultBindings(): Bindings {
       camera: ['KeyV'],
       rise: ['Space'],
       sink: ['KeyC'],
-      confirm: ['Enter'],
+      // (On the keyboard the map is clicked; Space is the keys-only way, Enter opens the card.)
+      confirm: ['Space'],
       back: ['Escape'],
       menu: ['Escape'],
-      controls: ['KeyH'],
+      controls: ['KeyH', 'Enter', 'NumpadEnter'],
     },
     gamepad: {
       moveForward: [],

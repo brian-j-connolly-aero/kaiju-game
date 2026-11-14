@@ -17,7 +17,7 @@
  *   --seconds N      how long each visit plays before the last picture (default 14)
  *   --width W --height H   page size (default 960 x 540)
  *   --no-assets      procedural fallbacks only
- *   --no-extras      skip the scripted extras (command wheel, charging lasers, molts, beam, stagger)
+ *   --no-extras      skip the scripted extras (command wheel, charging lasers, molts, roar, beam, stagger)
  *
  * The Chromium flags are the ones documented in smoke.mjs.
  */
@@ -194,6 +194,38 @@ async function main() {
       await page.evaluate(() => window.__mb.internals.ctx.client.local.toStage(3));
       await sleep(6000);
       await shot('4-after-molt-stage-3');
+    });
+
+    // The roar: a squad stands round the juvenile, inside its roar; the player presses Roar.
+    // The shockwave spreads and each unit jolts as it reaches it, then backs off shaken.
+    await visit('x-kaiju-roar', { sandbox: '2', role: 'kaiju' }, async (page, shot) => {
+      await sleep(2500);
+      await page.evaluate(() => {
+        window.__mb.internals.ctx.runtime.controller.thirdPerson = true;
+        const w = window.__mb.internals.ctx.client.local.world;
+        const k = w.kaijus[0];
+        k.cooldowns.roar = 0;
+        for (const u of w.units.slice(0, 8)) {
+          const a = k.yaw + (u.id - 3.5) * 0.35;
+          u.x = k.x + Math.sin(a) * (50 + (u.id % 4) * 12);
+          u.z = k.z + Math.cos(a) * (50 + (u.id % 4) * 12);
+        }
+      });
+      await sleep(1200);
+      await shot('0-before');
+      await page.keyboard.down('KeyQ');
+      await sleep(150);
+      await page.keyboard.up('KeyQ');
+      await sleep(250);
+      // Counted before the pictures: a screenshot can take longer than a unit stays shaken.
+      const shaken = await page.evaluate(() => window.__mb.internals.ctx.client.local.world.units.slice(0, 8).filter((u) => u.shaken > 0).length);
+      console.log(`shots: x-kaiju-roar: ${shaken} of 8 units shaken by the roar`);
+      if (shaken === 0) throw new Error('x-kaiju-roar: the roar shook no unit');
+      await shot('1-shockwave');
+      await sleep(400);
+      await shot('2-units-jolt');
+      await sleep(1500);
+      await shot('3-backing-off');
     });
 
     // The beam: fill the rage meter and let the autopilot breathe it.
