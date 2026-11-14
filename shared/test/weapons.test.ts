@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  angleDist,
   beginStage,
   Btn,
   COMBAT_RULES,
@@ -29,6 +30,7 @@ import { eventsOf, HUMAN_PLAYER, input, makeTestWorld, parkUnits, placeKaiju, pl
 const INFANTRY = UNIT_TYPES.army_rocket_infantry;
 const ROCKETS = WEAPONS.army_rocket_launchers;
 const ROCKET = PROJECTILE_TYPES.rocket;
+const CHARGE_TICKS = Math.round(COMBAT_RULES.chargeTime * TICK_RATE);
 
 /** A wide open field with the first squad (a person's) in the middle and everybody else far away. */
 function field(options: TestWorldOptions = {}, stage: StageId = 1): World {
@@ -40,8 +42,15 @@ function field(options: TestWorldOptions = {}, stage: StageId = 1): World {
   return world;
 }
 
+/** Lines the first squad up along x at a z, leader first, `gap` apart, all facing (and aiming) +Z. */
 function lineUp(world: World, x: number, z: number, gap = 12): Unit[] {
-  return [0, 1, 2, 3].map((id) => placeUnit(world, id, x + id * gap, z));
+  return [0, 1, 2, 3].map((id) => {
+    const u = placeUnit(world, id, x + id * gap, z);
+    u.yaw = 0;
+    u.aimYaw = 0;
+    u.control.aimYaw = 0;
+    return u;
+  });
 }
 
 function lead(world: World, ticks: number, partial: Partial<PlayerInput> = {}): SimEvent[] {
@@ -189,25 +198,29 @@ describe('the driven unit', () => {
 });
 
 describe('the volley', () => {
-  it('fires every charged sub-unit at the player\'s aim point with the charge multipliers, then starts over', () => {
+  /** Holds the volley button for `ticks` ticks with the crosshair at `aim`; returns the events. */
+  function hold(world: World, ticks: number, aim: { aimYaw: number; aimPitch: number }): SimEvent[] {
+    return lead(world, ticks, { ...aim, buttons: Btn.volley });
+  }
+
+  it('fires every charged squad-mate at the crosshair when the button is let go, the leader with them; then they follow again', () => {
     const world = field();
     const [leader, a, b, c] = lineUp(world, 0, 0);
-    lead(world, 1, { wheel: 'holdCharge' });
-    // Five seconds of a six second charge: a real volley, not yet a full one.
-    lead(world, 150);
-    const charge = a.charge;
-    expect(charge).toBeCloseTo(151 / (COMBAT_RULES.chargeTime * TICK_RATE), 9);
-
     const aim = aimAt(leader, 10, 0, 90);
-    const events = lead(world, 1, { ...aim, buttons: Btn.fire });
+    // About three quarters of the charge: a charged volley, not yet a full one.
+    hold(world, 100, aim);
+    const charge = a.charge;
+    expect(charge).toBeCloseTo(100 / CHARGE_TICKS, 9);
+
+    const events = lead(world, 1, aim);
     const spawns = eventsOf(events, 'projectileSpawn');
     expect(spawns.length).toBe(12);
     expect(spawns.every((s) => s.volley)).toBe(true);
     expect(spawns.map((s) => s.ownerId)).toEqual([0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3]);
 
-    // The charge at the moment of firing (one more tick of it) multiplies damage. Nerve only
-    // counts the part of the charge above the minimum: from the fire-at-will half to x3 at full.
-    const fired = charge + 1 / (COMBAT_RULES.chargeTime * TICK_RATE);
+    // The charge at the moment of letting go (the tick it is let go counts) multiplies damage.
+    // Nerve only counts the part of the charge above the minimum: from the fire-at-will half to x3 at full.
+    const fired = charge + 1 / CHARGE_TICKS;
     const strength = (fired - COMBAT_RULES.volleyMinCharge) / (1 - COMBAT_RULES.volleyMinCharge);
     expect(volleyStrength(fired)).toBeCloseTo(strength, 12);
     const fullNerve = 1 + COMBAT_RULES.volleyNervePerCharge;
@@ -238,27 +251,20 @@ describe('the volley', () => {
       expect(Math.abs(pitch)).toBeLessThan(5 * error);
     }
 
-    // The charge is spent; they stay planted (the squad has not moved) and build it again.
+    // The charge is spent and they are let go: no longer planted, free to follow.
     for (const u of [a, b, c]) {
-      expect(u.charge).toBe(0);
+      expect([u.rooted, u.charge, u.state]).toEqual([false, 0, 'idle']);
       expect(u.cooldown).toBeCloseTo(ROCKETS.cooldown, 9);
-    }
-    lead(world, 30, aim);
-    for (const u of [a, b, c]) {
-      expect(u.rooted).toBe(true);
-      expect(u.charge).toBeCloseTo(30 / (COMBAT_RULES.chargeTime * TICK_RATE), 9);
-      expect([u.x, u.z]).toEqual([u.id * 12, 0]);
     }
   });
 
-  it('is ragged below the minimum charge: the sub-units fire with the trigger, but it is fire at will and no volley', () => {
+  it('is ragged below the minimum charge: the squad-mates fire, but it is fire at will and no volley', () => {
     const world = field();
     const [leader, a, b, c] = lineUp(world, 0, 0);
-    lead(world, 1, { wheel: 'holdCharge' });
-    // Half a charge: more than holding Fire ever gets (the launchers reload in 2.6 s of the 6).
-    lead(world, 89);
-    const events = lead(world, 1, { ...aimAt(leader, 10, 0, 90), buttons: Btn.fire });
-    const fired = 91 / (COMBAT_RULES.chargeTime * TICK_RATE);
+    const aim = aimAt(leader, 10, 0, 90);
+    hold(world, 60, aim);
+    const events = lead(world, 1, aim);
+    const fired = 61 / CHARGE_TICKS;
     expect(fired).toBeLessThan(COMBAT_RULES.volleyMinCharge);
     const spawns = eventsOf(events, 'projectileSpawn');
     expect(spawns.map((s) => s.ownerId)).toEqual([0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3]);
@@ -283,9 +289,9 @@ describe('the volley', () => {
   it('is at full strength after the charge time: damage x2, nerve x3', () => {
     const world = field();
     const [leader] = lineUp(world, 0, 0);
-    lead(world, 1, { wheel: 'holdCharge' });
-    lead(world, COMBAT_RULES.chargeTime * TICK_RATE + 5);
-    const events = lead(world, 1, { ...aimAt(leader, 10, 0, 90), buttons: Btn.fire });
+    const aim = aimAt(leader, 10, 0, 90);
+    hold(world, CHARGE_TICKS + 5, aim);
+    const events = lead(world, 1, aim);
     expect(eventsOf(events, 'volley')[0].charge).toBe(1);
     const sub = world.projectiles.filter((p) => p.ownerId !== 0);
     expect(sub.length).toBe(9);
@@ -295,57 +301,68 @@ describe('the volley', () => {
     }
   });
 
-  it('is only the player\'s own shot when nobody has charge', () => {
+  it('goes at where the crosshair is when it is let go, though the leader has driven on meanwhile', () => {
     const world = field();
-    const [leader, a] = lineUp(world, 0, 0);
-    const events = lead(world, 1, { ...aimAt(leader, 10, 0, 90), buttons: Btn.fire });
-    expect(eventsOf(events, 'projectileSpawn').length).toBe(3);
-    expect(eventsOf(events, 'volley')).toEqual([]);
-    expect(world.players[HUMAN_PLAYER].tally.volleys).toBe(0);
-    expect(a.cooldown).toBe(0);
-  });
-
-  it('leaves out a sub-unit whose firing arc does not cover the aim point; it keeps its charge', () => {
-    const world = field();
-    const [leader, a, b, c] = lineUp(world, 0, 0, 60);
-    // Planted facing north (the leader looks at the ground a kilometer to the north).
-    const north = aimAt(leader, 90, 0, 1000);
-    lead(world, 1, { ...north, wheel: 'holdCharge' });
-    lead(world, 120, north);
-    const charge = a.charge;
-    // The player swings round and fires west: only arcs that reach there join in. None do.
-    const west = aimAt(leader, -150, 0, 0);
-    let events = lead(world, 1, { ...west, buttons: Btn.fire });
-    expect(eventsOf(events, 'projectileSpawn').length).toBe(3);
-    expect(eventsOf(events, 'volley')).toEqual([]);
-    for (const u of [a, b, c]) {
-      expect(u.rooted).toBe(true);
-      expect(u.charge).toBeGreaterThan(charge);
+    const [leader, a, b, c] = lineUp(world, 0, 0);
+    hold(world, 1, aimAt(leader, 0, 0, 100));
+    for (let t = 0; t < 90; t++) lead(world, 1, { aimYaw: -90 * DEG, moveZ: 1, buttons: Btn.volley });
+    hold(world, 10, { aimYaw: 0, aimPitch: 0 });
+    expect(leader.x).toBeLessThan(-20);
+    for (const u of [a, b, c]) expect(u.rooted).toBe(true);
+    const aim = aimAt(leader, 30, 0, 120);
+    hold(world, 1, aim);
+    const events = lead(world, 1, aim);
+    const v = eventsOf(events, 'volley')[0];
+    expect([v.x, v.z]).toEqual([expect.closeTo(30, 1), expect.closeTo(120, 1)]);
+    for (const s of eventsOf(events, 'projectileSpawn').filter((e) => e.ownerId !== 0)) {
+      const [yaw] = offAim(s, 30, 0, 120);
+      expect(Math.abs(yaw)).toBeLessThan(5 * ROCKETS.aimErrorAtWill);
     }
-    // A point just inside the far unit's arc edge (and outside the others') takes that one unit along.
-    leader.cooldown = 0;
-    const edge = COMBAT_RULES.chargeHalfArc - 1 * DEG;
-    const px = c.x + Math.sin(c.arcYaw + edge) * 80;
-    const pz = c.z + Math.cos(c.arcYaw + edge) * 80;
-    events = lead(world, 1, { ...aimAt(leader, px, 0, pz), buttons: Btn.fire });
-    expect(eventsOf(events, 'volley')).toMatchObject([{ units: [c.id] }]);
-    expect(a.charge).toBeGreaterThan(charge);
-    expect(c.charge).toBe(0);
   });
 
-  it('aims the sub-units at the middle of the kaiju when the player\'s crosshair is on it', () => {
+  it('with a quick tap, is a ragged shot from everybody, and with no squad-mates left, the leader\'s own', () => {
+    const world = field();
+    const [leader, a, b, c] = lineUp(world, 0, 0);
+    const aim = aimAt(leader, 10, 0, 90);
+    hold(world, 1, aim);
+    let events = lead(world, 1, aim);
+    expect(eventsOf(events, 'projectileSpawn').length).toBe(12);
+    expect(eventsOf(events, 'volley')).toEqual([]);
+
+    for (const u of [a, b, c]) u.alive = false;
+    leader.cooldown = 0;
+    hold(world, 10, aim);
+    events = lead(world, 1, aim);
+    expect(eventsOf(events, 'projectileSpawn').map((s) => s.ownerId)).toEqual([0, 0, 0]);
+    expect(eventsOf(events, 'volley')).toEqual([]);
+  });
+
+  it('does not take along a squad-mate that is shaken, stunned or whose weapon is not ready; all of them are let go', () => {
+    const world = field();
+    const [leader, a, b, c] = lineUp(world, 0, 0);
+    const aim = aimAt(leader, 18, 0, 100);
+    hold(world, 120, aim);
+    a.cooldown = 1;
+    b.shaken = 2;
+    c.stun = 1;
+    const events = lead(world, 1, aim);
+    expect(eventsOf(events, 'projectileSpawn').map((s) => s.ownerId)).toEqual([0, 0, 0]);
+    expect(eventsOf(events, 'volley')).toEqual([]);
+    for (const u of [a, b, c]) expect([u.rooted, u.charge]).toEqual([false, 0]);
+  });
+
+  it('aims the squad-mates at the middle of the kaiju when the crosshair is on it', () => {
     const world = field();
     const [leader, a, b, c] = lineUp(world, 0, 0, 30);
     parkUnits(world, [0, 1, 2, 3]);
-    // Sub-units on three sides of the kaiju, the leader on the fourth.
+    // Squad-mates on three sides of the kaiju, the leader on the fourth.
     placeUnit(world, 1, 60, 60);
     placeUnit(world, 2, 0, 120);
     placeUnit(world, 3, -60, 60);
     const k = placeKaiju(world, 0, 60, 0);
     const aim = aimAt(leader, 0, 3, 60);
-    lead(world, 1, { ...aim, wheel: 'holdCharge' });
-    lead(world, COMBAT_RULES.chargeTime * TICK_RATE, aim);
-    const events = lead(world, 1, { ...aim, buttons: Btn.fire });
+    hold(world, CHARGE_TICKS + 1, aim);
+    const events = lead(world, 1, aim);
     expect(eventsOf(events, 'volley')).toMatchObject([{ units: [1, 2, 3], charge: 1 }]);
     // The aim point of the event is where the ray met the kaiju's skin, on the leader's side.
     const v = eventsOf(events, 'volley')[0];
@@ -362,19 +379,32 @@ describe('the volley', () => {
     expect(eventsOf(events, 'crossfire').length).toBeGreaterThan(0);
     for (const u of [a, b, c]) expect(u.hp).toBe(u.maxHp);
   });
+});
 
-  it('does not take along a sub-unit that is shaken or whose weapon is not ready', () => {
-    const world = field();
-    const [leader, a, b, c] = lineUp(world, 0, 0);
-    const aim = aimAt(leader, 18, 0, 100);
-    lead(world, 1, { ...aim, wheel: 'holdCharge' });
-    lead(world, 150, aim);
-    a.cooldown = 1;
-    b.shaken = 2;
-    const events = lead(world, 1, { ...aim, buttons: Btn.fire });
-    expect(eventsOf(events, 'volley')).toMatchObject([{ units: [c.id] }]);
-    expect(a.charge).toBeGreaterThan(0);
-    expect(a.rooted).toBe(true);
+describe('the driven tank\'s gun', () => {
+  it('fires along its turret, not along the view: the turret swings round at its own rate', () => {
+    for (const stage of [2, 3] as const) {
+      const world = field({}, stage);
+      const [leader] = lineUp(world, 0, 0, 30);
+      const def = UNIT_TYPES[leader.type];
+      leader.yaw = 0;
+      leader.aimYaw = 0;
+      // The player looks a quarter turn to the left and fires at once.
+      const events = lead(world, 1, { aimYaw: 90 * DEG, aimPitch: 0.02, buttons: Btn.fire });
+      const spawns = eventsOf(events, 'projectileSpawn');
+      expect(spawns.length).toBe(WEAPONS[def.weapon].maxShots);
+      const turret = def.drive!.turretRate / TICK_RATE;
+      expect(leader.aimYaw).toBeCloseTo(turret, 9);
+      for (const s of spawns) {
+        expect(angleDist(Math.atan2(s.vx, s.vz), turret)).toBeLessThan(1 * DEG);
+        expect(angleDist(Math.atan2(s.vx, s.vz), 90 * DEG)).toBeGreaterThan(80 * DEG);
+      }
+      // Once the turret is round, the shots go where the player looks.
+      lead(world, 2 * TICK_RATE, { aimYaw: 90 * DEG, aimPitch: 0.02 });
+      leader.cooldown = 0;
+      const later = eventsOf(lead(world, 1, { aimYaw: 90 * DEG, aimPitch: 0.02, buttons: Btn.fire }), 'projectileSpawn');
+      for (const s of later) expect(angleDist(Math.atan2(s.vx, s.vz), 90 * DEG)).toBeLessThan(1 * DEG);
+    }
   });
 });
 
@@ -385,9 +415,12 @@ describe('weapon range', () => {
     const units = lineUp(world, 0, 0, 2 * world.units[0].radius + 3);
     const k = placeKaiju(world, units[1].x, dist, 0);
     const aim = aimAt(units[0], k.x, k.height / 2, k.z);
-    lead(world, 1, { ...aim, wheel: 'holdCharge' });
-    lead(world, COMBAT_RULES.chargeTime * TICK_RATE + 5, aim);
-    const events = lead(world, 1, { ...aim, buttons: Btn.fire });
+    // A tank's turret is already on the aim (it swings round at its own rate).
+    units[0].aimYaw = aim.aimYaw;
+    lead(world, CHARGE_TICKS + 5, { ...aim, buttons: Btn.volley });
+    const events = lead(world, 1, aim);
+    // What follows the volley is not part of it: the squad-mates, free again, would fire at will.
+    for (const u of units.slice(1)) u.cooldown = 1e9;
     events.push(...lead(world, 12 * TICK_RATE, aim));
     return { events, world };
   }
@@ -444,14 +477,13 @@ describe('aim error and scatter', () => {
    */
   function volleyErrors(world: World, aim: { aimYaw: number; aimPitch: number }, at: [number, number, number], rounds: number, prepare?: () => void, charge = 1): number[] {
     const errors: number[] = [];
-    lead(world, 1, { ...aim, wheel: 'holdCharge' });
     for (let i = 0; i < rounds; i++) {
-      // A unit that has just fired plants itself again on the next tick, with its charge at 0.
-      lead(world, 1, aim);
+      // Planted on the press; the charge is set by hand, and the tick the button is let go adds one more tick of it.
+      lead(world, 1, { ...aim, buttons: Btn.volley });
       for (const id of [0, 1, 2, 3]) world.units[id].cooldown = 0;
       for (const id of [1, 2, 3]) world.units[id].charge = charge;
       prepare?.();
-      const events = lead(world, 1, { ...aim, buttons: Btn.fire });
+      const events = lead(world, 1, aim);
       for (const s of eventsOf(events, 'projectileSpawn')) {
         if (s.ownerId === 0) continue;
         errors.push(...offAim(s, at[0], at[1], at[2]));
@@ -480,7 +512,7 @@ describe('aim error and scatter', () => {
 
     const part = field();
     const charge = (1 + COMBAT_RULES.volleyMinCharge) / 2;
-    errors = volleyErrors(part, aimAt(lineUp(part, 0, 0)[0], 18, 0, 150), [18, 0, 150], 60, undefined, charge - 1 / (COMBAT_RULES.chargeTime * TICK_RATE));
+    errors = volleyErrors(part, aimAt(lineUp(part, 0, 0)[0], 18, 0, 150), [18, 0, 150], 60, undefined, charge - 1 / CHARGE_TICKS);
     const between = (ROCKETS.aimErrorAtWill + ROCKETS.aimErrorVolley) / 2;
     expect(sigma(errors)).toBeGreaterThan(between * 0.9);
     expect(sigma(errors)).toBeLessThan(between * 1.1);
@@ -610,10 +642,8 @@ describe('projectile events', () => {
     const [leader] = lineUp(world, 0, 0);
     placeKaiju(world, 30, 80, 0);
     const aim = aimAt(leader, 30, 2, 80);
-    const events = lead(world, 1, { ...aim, wheel: 'holdCharge' });
-    events.push(...lead(world, 100, aim));
+    const events = lead(world, 100, { ...aim, buttons: Btn.volley });
     events.push(...lead(world, 200, { ...aim, buttons: Btn.fire }));
-    events.push(...lead(world, 1, { wheel: 'fireAtWill' }));
     events.push(...lead(world, 300));
     const spawns = eventsOf(events, 'projectileSpawn');
     const hits = eventsOf(events, 'projectileHit');

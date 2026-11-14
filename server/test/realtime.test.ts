@@ -12,6 +12,7 @@ import { gzipSync } from 'node:zlib';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PING_INTERVAL_MS, PING_MAX_MISSED } from '../src/net/server';
+import { ackOf } from './helpers';
 import { options, Player, sleep, startTestServer, token, until, type TestServer } from './netHelpers';
 
 /** The page the test server serves: a production build names its script after a hash of the code. */
@@ -239,8 +240,8 @@ describe('real time', () => {
     expect(snaps).toBeLessThanOrEqual(Math.ceil(seconds * SNAPSHOT_RATE) + 2);
     expect(snaps).toBeGreaterThanOrEqual(seconds * SNAPSHOT_RATE * 0.5);
     // The acknowledgement follows the inputs closely: a few in flight or queued, no more.
-    expect(solo.lastSeq - solo.snapshot.ackSeq).toBeLessThanOrEqual(10);
-    expect(solo.snapshot.ackSeq).toBeGreaterThan(40);
+    expect(solo.lastSeq - ackOf(solo.snapshot).played).toBeLessThanOrEqual(10);
+    expect(ackOf(solo.snapshot).played).toBeGreaterThan(40);
 
     // A latency probe comes straight back.
     solo.client.send('ping', { t: 4242 });
@@ -264,10 +265,10 @@ describe('reconnecting', () => {
     // The host plays the kaiju, so the other player leads a squad.
     const [host, other] = await startedRoom(2, 20, 0);
     for (const p of [host, other]) p.startInputs({ moveZ: 1 });
-    await until(() => other.snapshots.length > 5 && other.snapshot.ackSeq > 0, 'play to be under way');
+    await until(() => other.snapshots.length > 5 && ackOf(other.snapshot).played > 0, 'play to be under way');
     const slot = other.welcome.playerId;
     expect(slot).toBe(1);
-    const ackBefore = other.snapshot.ackSeq;
+    const ackBefore = ackOf(other.snapshot).played;
     const squadIsBot = (p: Player): boolean | undefined => p.snapshot.squads.find((s) => s.player === slot)?.bot;
     expect(squadIsBot(host)).toBe(false);
 
@@ -285,7 +286,7 @@ describe('reconnecting', () => {
     // The same page keeps counting its inputs, so the acknowledgement carries on from before.
     const snapsBefore = other.snapshots.length;
     await until(() => other.snapshots.length > snapsBefore + 3, 'snapshots after reconnecting');
-    expect(other.snapshot.ackSeq).toBeGreaterThanOrEqual(ackBefore);
+    expect(ackOf(other.snapshot).played).toBeGreaterThanOrEqual(ackBefore);
     await until(() => squadIsBot(host) === false && squadIsBot(other) === false, 'the squad to be back in human hands');
     for (const p of [host, other]) await p.leave();
   });

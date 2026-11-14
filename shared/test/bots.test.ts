@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   angleDist,
-  beginStage,
   BOT_RULES,
   Btn,
   BUTTON_MASK,
-  COMMAND_IDS,
   createMatchConfig,
   createWorld,
   LIZARD,
@@ -17,10 +15,11 @@ import {
   WEAPONS,
   yawFromTo,
   type MatchConfig,
+  type PlayerInput,
   type SimEvent,
   type World,
 } from '../src/index';
-import { eventsOf, HUMAN_PLAYER, input, KAIJU_PLAYER, makeTestWorld, placeKaiju, placeUnit, run, type TestWorldOptions } from './helpers';
+import { eventsOf, holdFire, HUMAN_PLAYER, input, KAIJU_PLAYER, makeTestWorld, placeKaiju, placeUnit, run, type TestWorldOptions } from './helpers';
 
 const SEC = TICK_RATE;
 const ROCKET_RANGE = WEAPONS.army_rocket_launchers.range;
@@ -42,11 +41,11 @@ function leaders(world: World) {
 }
 
 describe('bots play through the input interface only', () => {
-  it('writes inputs a client could have sent: in range, the right buttons for the role, one wheel pick at a time', () => {
+  it('writes inputs a client could have sent: in range, the right buttons for the role', () => {
     const world = createWorld({ seed: 11, config: { ...createMatchConfig({ fast: true }) } });
-    const kaijuButtons = Btn.strike | Btn.grab | Btn.block | Btn.roar | Btn.special | Btn.molt;
-    const squadButtons = Btn.fire | Btn.callIn;
-    const seen = { kaiju: 0, squad: 0, wheel: new Set<string>(), marker: 0 };
+    const kaijuButtons = Btn.strike | Btn.grab | Btn.stomp | Btn.move1 | Btn.move2 | Btn.molt;
+    const squadButtons = Btn.fire | Btn.volley;
+    const seen = { kaiju: 0, squad: 0, cards: 0 };
     for (let t = 0; t < 150 * SEC && world.match.phase !== 'ended'; t++) {
       world.step();
       for (const p of world.players) {
@@ -58,6 +57,7 @@ describe('bots play through the input interface only', () => {
         expect(clean?.moveZ).toBeCloseTo(b.moveZ, 9);
         expect(clean?.aimPitch).toBe(b.aimPitch);
         expect(clean?.buttons).toBe(b.buttons);
+        expect(clean?.card).toBe(b.card);
         expect(Math.hypot(b.moveX, b.moveZ)).toBeLessThanOrEqual(1 + 1e-9);
         expect(Math.abs(b.aimPitch)).toBeLessThanOrEqual(MAX_AIM_PITCH);
         expect(Number.isFinite(b.aimYaw)).toBe(true);
@@ -65,15 +65,13 @@ describe('bots play through the input interface only', () => {
         expect(b.seq).toBe(world.tick);
         if (p.role === 'kaiju') {
           expect(b.buttons & squadButtons).toBe(0);
-          expect(b.wheel).toBeUndefined();
+          // Only the monster's own buttons (the old brace, roar and beam buttons are gone).
+          expect(b.buttons & ~kaijuButtons).toBe(0);
           seen.kaiju |= b.buttons;
+          if (b.card !== undefined) seen.cards++;
         } else {
-          expect(b.buttons & kaijuButtons).toBe(0);
-          if (b.wheel) {
-            expect(COMMAND_IDS).toContain(b.wheel);
-            seen.wheel.add(b.wheel);
-          }
-          if (b.marker) seen.marker++;
+          // Fire and the volley, nothing else.
+          expect(b.buttons & ~squadButtons).toBe(0);
           seen.squad |= b.buttons;
         }
       }
@@ -81,8 +79,11 @@ describe('bots play through the input interface only', () => {
     // Over a whole (fast) match the bots used their repertoire.
     expect(seen.kaiju & Btn.strike).toBeTruthy();
     expect(seen.kaiju & Btn.molt).toBeTruthy();
+    // It picked its card at the molt itself (one pick, no more), and the move is in its slot.
+    expect(seen.cards).toBe(world.match.stage - 1);
+    expect(world.kaijus[0].moves[0]).not.toBe('none');
     expect(seen.squad & Btn.fire).toBeTruthy();
-    expect([...seen.wheel].sort()).toEqual(['follow', 'holdCharge']);
+    expect(seen.squad & Btn.volley).toBeTruthy();
     expect(world.match.stage).toBeGreaterThan(1);
   });
 
@@ -93,7 +94,6 @@ describe('bots play through the input interface only', () => {
     const events = run(world, 5 * SEC);
     for (const p of world.players) {
       expect(p.botInput).toMatchObject({ moveX: 0, moveZ: 0, buttons: 0, seq: world.tick });
-      expect(p.botInput.wheel).toBeUndefined();
       expect(p.botInput.aimYaw).toBe(yaws[p.id]);
     }
     expect(eventsOf(events, 'kaijuAction')).toEqual([]);
@@ -110,7 +110,7 @@ describe('bots play through the input interface only', () => {
 });
 
 describe('the squad bot', () => {
-  it('takes a firing position inside its range band, parks on hold-and-charge, and volleys when charged', () => {
+  it('takes a firing position inside its range band, holds the volley button there, and lets go when charged', () => {
     const world = squadWorld();
     const k = world.kaijus[0];
     const events = run(world, 45 * SEC);
@@ -121,14 +121,14 @@ describe('the squad bot', () => {
       // Inside the band the bot parks in, and not on top of the kaiju.
       expect(d).toBeGreaterThanOrEqual(BOT_RULES.squad.retreatAt * ROCKET_RANGE);
       expect(d).toBeLessThanOrEqual(BOT_RULES.squad.standoffMax * ROCKET_RANGE + 2);
-      // Parked: hold fire and charge, the sub-units planted with their arcs on the kaiju.
-      expect(squad.fireMode).toBe('charge');
+      // Parked and charging: the squad-mates planted, their weapons on the kaiju.
+      expect(world.players[squad.player].botState.charging).toBe(true);
       for (const id of squad.units) {
-        if (id === squad.driven) continue;
+        if (id === squad.driven || !world.units[id].rooted) continue;
         const u = world.units[id];
-        expect(u.rooted).toBe(true);
-        expect(angleDist(u.arcYaw, yawFromTo(u.x, u.z, k.x, k.z))).toBeLessThan(0.2);
+        expect(angleDist(u.aimYaw, yawFromTo(u.x, u.z, k.x, k.z))).toBeLessThan(0.2);
       }
+      expect(squad.units.filter((id) => world.units[id].rooted).length).toBeGreaterThanOrEqual(2);
       // The leader keeps its crosshair on the kaiju.
       expect(angleDist(leader.aimYaw, yawFromTo(leader.x, leader.z, k.x, k.z))).toBeLessThan(0.05);
     }
@@ -145,8 +145,6 @@ describe('the squad bot', () => {
     const patient = volleys.filter((v) => !staggered(v.tick) && !staggered(v.tick - 1));
     expect(patient.length).toBeGreaterThanOrEqual(4);
     expect(patient.every((v) => v.charge >= BOT_RULES.squad.volleyCharge - 1e-6)).toBe(true);
-    // They did not plink: every projectile was part of a charged volley (the ragged fire into a stagger aside).
-    expect(eventsOf(events, 'projectileSpawn').every((s) => s.volley || staggered(s.tick) || staggered(s.tick - 1))).toBe(true);
     // Rockets found the target.
     expect(eventsOf(events, 'kaijuHit').length).toBeGreaterThan(20);
   });
@@ -173,25 +171,22 @@ describe('the squad bot', () => {
     run(world, 30 * SEC);
     const squad = world.squads[0];
     const leader = world.units[squad.driven];
-    expect(squad.fireMode).toBe('charge');
-    expect(world.units[squad.units[1]].rooted).toBe(true);
+    expect(world.players[squad.player].botState.charging).toBe(true);
     const retreat = BOT_RULES.squad.retreatAt * ROCKET_RANGE;
 
     // The kaiju turns up 25 m from the leader.
     const away = yawFromTo(k.x, k.z, leader.x, leader.z);
     placeKaiju(world, leader.x - Math.sin(away) * 25, leader.z - Math.cos(away) * 25, away);
     const events = run(world, 12 * SEC);
-    // It un-parked (follow) and drove off: the whole squad is clear of the kaiju again.
-    expect(world.players[squad.player].botState.parked || Math.hypot(leader.x - k.x, leader.z - k.z) > retreat).toBe(true);
+    // It let go of the volley and drove off, its squad-mates with it: the whole squad is clear of the kaiju again.
     expect(Math.hypot(leader.x - k.x, leader.z - k.z)).toBeGreaterThan(retreat);
     for (const id of squad.units) expect(Math.hypot(world.units[id].x - k.x, world.units[id].z - k.z)).toBeGreaterThan(30);
-    expect(squad.moveOrder).toBe('follow');
     // No volley was fired from the saddle.
     expect(eventsOf(events, 'volley').filter((v) => v.squad === 0 && v.tick > world.tick - 11 * SEC && v.tick < world.tick - 4 * SEC)).toEqual([]);
 
     // Left alone, it parks again and goes back to work.
     const later = run(world, 30 * SEC);
-    expect(world.units[squad.units[1]].rooted).toBe(true);
+    expect(world.players[squad.player].botState.charging).toBe(true);
     expect(eventsOf(later, 'volley').some((v) => v.squad === 0)).toBe(true);
   });
 
@@ -239,19 +234,6 @@ describe('the squad bot', () => {
       expect(salvos).toBeGreaterThanOrEqual(Math.floor(10 / cooldown) - 1);
     }
   });
-
-  it('calls artillery on the kaiju at level 3, leading it, and keeps calling when it is ready again', () => {
-    const world = squadWorld({ realCity: true });
-    beginStage(world, 3);
-    const k = world.kaijus[0];
-    const events = run(world, 50 * SEC);
-    const marked = eventsOf(events, 'callin').filter((e) => e.phase === 'marked');
-    // All four squads called it in, and those whose battery was ready again called again.
-    expect(new Set(marked.map((e) => e.squad)).size).toBe(4);
-    expect(marked.length).toBeGreaterThan(4);
-    for (const e of marked) expect(Math.hypot(e.x - k.x, e.z - k.z)).toBeLessThan(40);
-    expect(eventsOf(events, 'projectileSpawn').filter((s) => s.owner === 'callin').length).toBeGreaterThanOrEqual(32);
-  });
 });
 
 describe('the kaiju bot', () => {
@@ -268,8 +250,20 @@ describe('the kaiju bot', () => {
     const world = makeTestWorld({ people: 'none', config: bots(true, false), ...STREET, ...options });
     // The squads keep out of it: parked in a corner, holding their fire.
     for (const u of world.units) placeUnit(world, u.id, 150 + (u.id % 4) * 8, 150 + Math.floor(u.id / 4) * 8);
-    for (const squad of world.squads) squad.fireMode = 'charge';
+    holdFire(world);
     return world;
+  }
+
+  /**
+   * Hands squad `s` to a person who holds the volley button with the crosshair on the kaiju, so
+   * that its squad-mates stand planted and charge with their lasers on it. Returns that input.
+   */
+  function chargingSquad(world: World, s: number, k: World['kaijus'][number]): PlayerInput {
+    const squad = world.squads[s];
+    const leader = world.units[squad.driven];
+    setPlayerBot(world, squad.player, false);
+    const d = Math.hypot(k.x - leader.x, k.z - leader.z);
+    return input({ buttons: Btn.volley, aimYaw: yawFromTo(leader.x, leader.z, k.x, k.z), aimPitch: Math.atan2(k.height * 0.5 - 2, d) });
   }
 
   it('goes for what pays best: walks over cars, swipes houses down, and fills the bar', () => {
@@ -302,6 +296,15 @@ describe('the kaiju bot', () => {
     const offered = eventsOf(events, 'moltAvailable')[0].tick;
     const closed = eventsOf(events, 'cocoon')[0].tick;
     expect(closed - offered).toBeLessThan(4 * SEC);
+    // At each molt it picked a card itself, from what was on offer, and kept both moves.
+    const offers = eventsOf(events, 'moltOffer');
+    const picks = eventsOf(events, 'moltPick');
+    expect(picks.map((e) => [e.slot, e.random])).toEqual([
+      [0, false],
+      [1, false],
+    ]);
+    picks.forEach((e, i) => expect(offers[i].offer).toContain(e.move));
+    expect(world.kaijus[0].moves).toEqual(picks.map((e) => e.move));
   });
 
   it('eats when it is hurt: from the street, a car at a time', () => {
@@ -317,50 +320,44 @@ describe('the kaiju bot', () => {
     expect(eventsOf(run(fresh, 30 * SEC), 'kaijuHeld').filter((e) => e.reason === 'eat')).toEqual([]);
   });
 
-  it('fights what comes close: it roars at guns charging inside its roar, and tramples and swipes units in reach', () => {
+  it('fights what comes close: it roars at guns charging inside its roar (when it has the roar), and tramples and swipes units in reach', () => {
     const world = kaijuWorld({ structures: [], props: [] });
     const k = placeKaiju(world, 0, 0, 0);
-    // A squad parks and charges 25 m away: inside the roar radius, inside its patience.
+    k.moves = ['roar', 'none'];
+    // A squad stands 25 m away charging a volley: inside the roar radius, inside its patience.
     const squad = world.squads[0];
     squad.units.forEach((id, i) => placeUnit(world, id, -12 + i * 8, 25));
-    run(world, 1, [null, input({ wheel: 'holdCharge' })]);
-    // (Squad 0 belongs to a bot standing still; give the order the way the server would.)
-    squad.fireMode = 'charge';
-    for (const id of squad.units) {
-      if (id === squad.driven) continue;
-      const u = world.units[id];
-      u.nav.hasHold = true;
-      u.nav.holdX = u.x;
-      u.nav.holdZ = u.z;
-    }
-    const events = run(world, 20 * SEC);
-    expect(eventsOf(events, 'roar').length).toBeGreaterThanOrEqual(1);
+    const hold = chargingSquad(world, 0, k);
+    const events = run(world, 20 * SEC, [null, hold]);
+    const roars = eventsOf(events, 'roar');
+    expect(roars.length).toBeGreaterThanOrEqual(1);
+    // It goes for the units the roar froze (they stand still for the stun, then flee shaken): it
+    // is on top of one of them as the stun ends, and brings it down.
+    const stun = Math.round(LIZARD.actions.roar.stunTime * SEC);
+    const pounce = eventsOf(events, 'unitHit').find((e) => e.tick > roars[0].tick && e.tick <= roars[0].tick + stun + 2 * SEC && e.cause !== 'roar');
+    expect(pounce).toBeDefined();
     const lost = eventsOf(events, 'unitDestroyed').filter((e) => e.squad === 0);
-    expect(lost.length).toBeGreaterThanOrEqual(2);
+    expect(lost.length).toBeGreaterThanOrEqual(1);
     expect(lost.every((e) => e.by === KAIJU_PLAYER)).toBe(true);
     expect(k.alive).toBe(true);
   });
 
-  it('braces when enough charged lasers are on it, facing them, and not forever', () => {
+  it('braces (when it has the brace) when enough charged lasers are on it, facing them, and not forever', () => {
     const world = kaijuWorld({ structures: [], props: [] });
     const k = placeKaiju(world, 0, 0, 0);
-    // Two squads planted 100 m north, charged and holding: out of its dash range, lasers on it.
+    k.moves = ['brace', 'none'];
+    // Two squads planted 100 m north, charging and holding: out of its dash range, lasers on it.
+    const holds: Array<PlayerInput | null> = [null];
     for (const s of [0, 1]) {
-      const squad = world.squads[s];
-      squad.units.forEach((id, i) => {
-        const u = placeUnit(world, id, -40 + s * 50 + i * 8, 118);
-        if (id === squad.driven) return;
-        u.nav.hasHold = true;
-        u.nav.holdX = u.x;
-        u.nav.holdZ = u.z;
-      });
+      world.squads[s].units.forEach((id, i) => placeUnit(world, id, -40 + s * 50 + i * 8, 118));
+      holds.push(chargingSquad(world, s, k));
     }
     let braced = 0;
     let longest = 0;
     let spell = 0;
     let facing = 0;
     for (let t = 0; t < 40 * SEC; t++) {
-      world.step();
+      world.step(holds);
       if (k.phase === 'brace') {
         braced++;
         spell++;
@@ -378,9 +375,10 @@ describe('the kaiju bot', () => {
     expect(braced).toBeLessThan(25 * SEC);
   });
 
-  it('turns its beam on units in reach when it has the rage for it', () => {
+  it('turns its beam on units in reach when it has the beam and the rage for it', () => {
     const world = kaijuWorld({ structures: [], props: [] });
     const k = placeKaiju(world, 0, 0, 0);
+    k.moves = ['beam', 'none'];
     world.squads[0].units.forEach((id, i) => placeUnit(world, id, -12 + i * 8, 45));
     k.rage = 100;
     const events = run(world, 8 * SEC);
@@ -388,13 +386,36 @@ describe('the kaiju bot', () => {
     expect(eventsOf(events, 'unitDestroyed').some((e) => e.cause === 'beam')).toBe(true);
     expect(k.rage).toBeLessThan(100);
   });
+
+  it('sweeps its tail at a unit behind it, and charges at a unit in the open, when it has those moves', () => {
+    const world = kaijuWorld({ structures: [], props: [] });
+    const k = placeKaiju(world, 0, 0, 0);
+    k.moves = ['charge', 'tailSweep'];
+    // Two leaders standing still: one right behind it, one out in the open ahead, within a run.
+    placeUnit(world, 4, 0, -(k.radius + 3));
+    placeUnit(world, 0, 0, 32);
+    const events = run(world, 8 * SEC);
+    const started = eventsOf(events, 'kaijuAction').filter((e) => e.phase === 'windup').map((e) => e.action);
+    expect(started.indexOf('tailSweep')).toBeGreaterThanOrEqual(0);
+    expect(started).toContain('charge');
+    expect(eventsOf(events, 'unitHit').some((e) => e.cause === 'tailSweep')).toBe(true);
+    expect(eventsOf(events, 'unitHit').some((e) => e.cause === 'charge')).toBe(true);
+    // Without those moves it does neither.
+    const plain = kaijuWorld({ structures: [], props: [] });
+    placeKaiju(plain, 0, 0, 0);
+    placeUnit(plain, 4, 0, -(k.radius + 3));
+    placeUnit(plain, 0, 0, 32);
+    const none = eventsOf(run(plain, 8 * SEC), 'kaijuAction').map((e) => e.action);
+    expect(none).not.toContain('charge');
+    expect(none).not.toContain('tailSweep');
+  });
 });
 
 describe('handicaps and hand-overs', () => {
   it('a handicapped kaiju bot hesitates that share of the time, and gets less done', () => {
     const wreck = (handicap: number): { idle: number; bar: number } => {
       const world = makeTestWorld({ people: 'none', realCity: true, seed: 5, config: { bots: { kaijuHandicap: handicap, humanHandicap: 1 } } });
-      for (const squad of world.squads) squad.fireMode = 'charge';
+      holdFire(world);
       let idle = 0;
       const ticks = 90 * SEC;
       for (let t = 0; t < ticks; t++) {
@@ -426,20 +447,20 @@ describe('handicaps and hand-overs', () => {
     expect(p.bot).toBe(true);
     expect(p.botState.stage).toBe(0);
     const bar = world.match.barPoints;
-    run(world, 40 * SEC, [input({ seq: 21, moveZ: -1, buttons: Btn.roar }), input({ seq: 21 })]);
+    run(world, 40 * SEC, [input({ seq: 21, moveZ: -1, buttons: Btn.stomp }), input({ seq: 21 })]);
     expect(p.input.seq).toBe(world.tick - 1);
     expect(world.match.barPoints).toBeGreaterThan(bar);
     expect(p.botState.stage).toBe(1);
 
     // They come back while the bot has a button down: the controls are let go at once...
-    p.botInput.buttons = Btn.strike | Btn.block;
+    p.botInput.buttons = Btn.strike | Btn.stomp;
     p.botInput.moveZ = 1;
     world.step([null, input({ seq: 22 })]);
-    expect(p.input.buttons).toBe(Btn.strike | Btn.block);
+    expect(p.input.buttons).toBe(Btn.strike | Btn.stomp);
     setPlayerBot(world, KAIJU_PLAYER, false);
     world.step([null, input({ seq: 23 })]);
     expect(p.input).toMatchObject({ buttons: 0, moveX: 0, moveZ: 0 });
-    expect(p.input.released).toBe(Btn.strike | Btn.block);
+    expect(p.input.released).toBe(Btn.strike | Btn.stomp);
     // ...and stay let go until their own first input arrives, which is then obeyed.
     run(world, 10, [null, input({ seq: 24 })]);
     expect(p.input.buttons).toBe(0);

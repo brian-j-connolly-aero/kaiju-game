@@ -116,7 +116,9 @@ describe('applyHit on the kaiju: damage', () => {
   it('takes far less on the braced front arc, and nothing off the flank or rear', () => {
     const world = arena();
     const k = world.kaijus[0];
-    run(world, 3, [input({ buttons: Btn.block })]);
+    // The brace is a move picked at a molt: on its slot's button.
+    k.moves = ['brace', 'none'];
+    run(world, 3, [input({ buttons: Btn.move1 })]);
     expect(k.phase).toBe('brace');
 
     let events = hitKaiju(world, shot(0, { damage: 100, nerve: 10 }));

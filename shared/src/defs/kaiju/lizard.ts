@@ -147,7 +147,7 @@ export const LIZARD: KaijuKindDef = {
     swipe: {
       id: 'swipe',
       button: 'strike',
-      held: false,
+      whileHeld: false,
       timing: { windup: 0.45, active: 0.15, recover: 0.5 },
       activePhase: 'active',
       cooldown: 0,
@@ -163,7 +163,7 @@ export const LIZARD: KaijuKindDef = {
     stomp: {
       id: 'stomp',
       button: 'stomp',
-      held: false,
+      whileHeld: false,
       timing: { windup: 0.9, active: 0.1, recover: 0.9 },
       activePhase: 'active',
       cooldown: 0,
@@ -182,7 +182,7 @@ export const LIZARD: KaijuKindDef = {
     grab: {
       id: 'grab',
       button: 'grab',
-      held: false,
+      whileHeld: false,
       timing: { windup: 0.4, active: 0, recover: 0 },
       activePhase: 'active',
       cooldown: 0,
@@ -199,7 +199,7 @@ export const LIZARD: KaijuKindDef = {
       id: 'throw',
       // Strike with something in the hand.
       button: 'strike',
-      held: false,
+      whileHeld: false,
       // 0.5 s in total: the object leaves the hand at the end of the wind-up.
       timing: { windup: 0.3, active: 0, recover: 0.2 },
       activePhase: 'active',
@@ -217,7 +217,7 @@ export const LIZARD: KaijuKindDef = {
       id: 'eat',
       // Grab with something in the hand, or with nothing to pick up but something to eat in reach.
       button: 'grab',
-      held: false,
+      whileHeld: false,
       timing: { windup: 0, active: 2.0, recover: 0 },
       activePhase: 'eat',
       cooldown: 10,
@@ -231,7 +231,7 @@ export const LIZARD: KaijuKindDef = {
       id: 'brace',
       // A move picked at the second molt (owner's decision: "no longer free").
       button: 'slot',
-      held: true,
+      whileHeld: true,
       timing: { windup: 0, active: 0, recover: 0 },
       activePhase: 'brace',
       cooldown: 0,
@@ -242,7 +242,7 @@ export const LIZARD: KaijuKindDef = {
     roar: {
       id: 'roar',
       button: 'slot',
-      held: false,
+      whileHeld: false,
       timing: { windup: 0, active: 1.2, recover: 0 },
       activePhase: 'roar',
       cooldown: 18,
@@ -262,7 +262,7 @@ export const LIZARD: KaijuKindDef = {
       special: 'beam',
       // The beam is a move picked at a molt (owner's decision: "a big early reward"), no longer in the starting kit.
       button: 'slot',
-      held: false,
+      whileHeld: false,
       timing: { windup: 0.8, active: 3.0, recover: 0.4 },
       activePhase: 'special',
       cooldown: 0,
@@ -285,7 +285,7 @@ export const LIZARD: KaijuKindDef = {
       id: 'molt',
       // One press while a molt is offered.
       button: 'molt',
-      held: false,
+      whileHeld: false,
       // The cocoon duration is MATCH_RULES.cocoon; the action only starts it.
       timing: { windup: 0, active: 0, recover: 0 },
       activePhase: 'cocoon',
@@ -297,7 +297,7 @@ export const LIZARD: KaijuKindDef = {
     charge: {
       id: 'charge',
       button: 'slot',
-      held: false,
+      whileHeld: false,
       // Wind-up (rooted, still turning), up to 3 s of running, and always a stumble at the end.
       timing: { windup: 0.8, active: 3.0, recover: 1.2 },
       activePhase: 'charge',
@@ -322,7 +322,7 @@ export const LIZARD: KaijuKindDef = {
     tailSweep: {
       id: 'tailSweep',
       button: 'slot',
-      held: false,
+      whileHeld: false,
       timing: { windup: 0.35, active: 0.15, recover: 0.45 },
       activePhase: 'active',
       cooldown: 6,

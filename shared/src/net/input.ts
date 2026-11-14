@@ -54,8 +54,8 @@
  *                during the run ends it early), tail sweep (each when off cooldown), and the
  *                brace, which lasts for as long as its button is down.
  *   Btn.molt     Starts the cocoon, on the press, when a molt is offered.
- *   Btn.block, Btn.roar, Btn.special: the old controls. Still defined (and let through by
- *                sanitizeInput) but the simulation reads none of them.
+ *   (Bits 2, 3 and 4 were the old brace, roar and beam buttons. They are free now, and
+ *   sanitizeInput drops them.)
  *
  *   card         One-shot: the molt card picked since the last input, 1 to 3 (the first,
  *                second or third move on offer). It counts from the moment the cocoon starts
@@ -92,37 +92,26 @@
  *                own shot joins if its weapon is ready, and the squad-mates follow again. A
  *                stunned or shaken squad-mate neither charges nor fires.
  *
- *   Btn.callIn, Btn.smoke, Btn.mark, and the `wheel` and `marker` fields: the old squad
- *                controls (artillery, smoke, marking, the command wheel and its markers). Still
- *                defined (and let through by sanitizeInput) for the client of the moment, but
- *                the simulation reads none of them.
+ *   (Bits 7, 8 and 9 were the squad's old artillery, smoke and mark buttons. They are free now,
+ *   and sanitizeInput drops them, as it drops any field it does not know.)
  *
  *   The map view and the camera toggle are client-only. While the map is open the client sends
  *   zero movement and no buttons (the unit idles).
  */
 
-import { COMMAND_IDS, type CommandId } from '../defs/ids';
 import { PI, wrapAngle } from '../math/angle';
 import { clamp } from '../math/scalar';
 
-/** Button bits of PlayerInput.buttons. */
+/**
+ * Button bits of PlayerInput.buttons. A button keeps its bit for good; a bit whose button is
+ * gone stays free (bits 2 to 4: the monster's old brace, roar and beam buttons; bits 7 to 9: the
+ * squad's old artillery, smoke and mark buttons).
+ */
 export const Btn = {
   strike: 1 << 0,
   grab: 1 << 1,
-  /** Unused by the simulation since the monster's new controls (the client still sends it). */
-  block: 1 << 2,
-  /** Unused by the simulation since the monster's new controls (the client still sends it). */
-  roar: 1 << 3,
-  /** Unused by the simulation since the monster's new controls (the client still sends it). */
-  special: 1 << 4,
   molt: 1 << 5,
   fire: 1 << 6,
-  /** Unused by the simulation since the army's new controls (the client still sends it). */
-  callIn: 1 << 7,
-  /** Unused by the simulation since the army's new controls (the client still sends it). */
-  smoke: 1 << 8,
-  /** Unused by the simulation since the army's new controls (the client still sends it). */
-  mark: 1 << 9,
   stomp: 1 << 10,
   move1: 1 << 11,
   move2: 1 << 12,
@@ -132,54 +121,26 @@ export const Btn = {
 
 export type ButtonName = keyof typeof Btn;
 
-/** Button names by bit index (bit i is 1 << i). */
-export const BUTTON_NAMES: readonly ButtonName[] = [
-  'strike',
-  'grab',
-  'block',
-  'roar',
-  'special',
-  'molt',
-  'fire',
-  'callIn',
-  'smoke',
-  'mark',
-  'stomp',
-  'move1',
-  'move2',
-  'volley',
-];
-export const BUTTON_COUNT = BUTTON_NAMES.length;
-export const BUTTON_MASK = (1 << BUTTON_COUNT) - 1;
+/** Every button, in the order of its bit. */
+export const BUTTON_NAMES: readonly ButtonName[] = (Object.keys(Btn) as ButtonName[]).sort((a, b) => Btn[a] - Btn[b]);
+
+/** Every button's bit together: anything else in `buttons` is dropped by sanitizeInput. */
+export const BUTTON_MASK = BUTTON_NAMES.reduce((mask, name) => mask | Btn[name], 0);
+
+/**
+ * How long the simulation's per-button arrays are: one entry per bit up to the highest in use
+ * (bit i is 1 << i; the entry of a free bit is never read).
+ */
+export const BUTTON_COUNT = 32 - Math.clz32(BUTTON_MASK);
 
 /** Bit index of each button, for the per-button arrays in the simulation's input state. */
-export const BtnIndex: Readonly<Record<ButtonName, number>> = {
-  strike: 0,
-  grab: 1,
-  block: 2,
-  roar: 3,
-  special: 4,
-  molt: 5,
-  fire: 6,
-  callIn: 7,
-  smoke: 8,
-  mark: 9,
-  stomp: 10,
-  move1: 11,
-  move2: 12,
-  volley: 13,
-};
+export const BtnIndex: Readonly<Record<ButtonName, number>> = Object.fromEntries(BUTTON_NAMES.map((name) => [name, 31 - Math.clz32(Btn[name])])) as Record<ButtonName, number>;
 
 /** Ticks a kaiju button press is remembered while another action finishes (0.2 s). */
 export const INPUT_BUFFER_TICKS = 6;
 
 /** Steepest aim elevation either way. */
 export const MAX_AIM_PITCH = (89 * PI) / 180;
-
-export interface GroundMarker {
-  x: number;
-  z: number;
-}
 
 /** One input sample. JSON on the wire (`input` message), 30 per second. */
 export interface PlayerInput {
@@ -191,10 +152,6 @@ export interface PlayerInput {
   aimPitch: number;
   /** Bitwise OR of the Btn bits that are down right now. */
   buttons: number;
-  /** The old command wheel pick: let through, read by nothing in the simulation (see the header). */
-  wheel?: CommandId;
-  /** The old ground marker: let through, read by nothing in the simulation (see the header). */
-  marker?: GroundMarker;
   /** Kaiju: the molt card picked since the last input, 1 to 3 (one-shot; see the header). */
   card?: number;
 }
@@ -209,9 +166,10 @@ function finite(v: unknown): v is number {
 
 /**
  * Validates and normalizes an input received from a client. Returns null when it is not a usable
- * input at all; otherwise a clean copy with every field in range. Never trust the wire.
+ * input at all; otherwise a clean copy with every field in range, and nothing else (no unknown
+ * field, no free button bit). Never trust the wire.
  */
-export function sanitizeInput(raw: unknown, cityHalf = 1100): PlayerInput | null {
+export function sanitizeInput(raw: unknown): PlayerInput | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const r = raw as Record<string, unknown>;
   if (!finite(r.seq) || !finite(r.moveX) || !finite(r.moveZ) || !finite(r.aimYaw) || !finite(r.aimPitch)) return null;
@@ -231,19 +189,6 @@ export function sanitizeInput(raw: unknown, cityHalf = 1100): PlayerInput | null
     aimPitch: clamp(r.aimPitch, -MAX_AIM_PITCH, MAX_AIM_PITCH),
     buttons: Math.floor(r.buttons) & BUTTON_MASK,
   };
-  if (typeof r.wheel === 'string' && (COMMAND_IDS as readonly string[]).includes(r.wheel)) {
-    out.wheel = r.wheel as CommandId;
-  }
-  const marker = sanitizeMarker(r.marker, cityHalf);
-  if (marker) out.marker = marker;
   if (r.card === 1 || r.card === 2 || r.card === 3) out.card = r.card;
   return out;
-}
-
-/** Validates a ground marker and clamps it into the city. Returns null when unusable. */
-export function sanitizeMarker(raw: unknown, cityHalf = 1100): GroundMarker | null {
-  if (typeof raw !== 'object' || raw === null) return null;
-  const m = raw as Record<string, unknown>;
-  if (!finite(m.x) || !finite(m.z)) return null;
-  return { x: clamp(m.x, -cityHalf, cityHalf), z: clamp(m.z, -cityHalf, cityHalf) };
 }

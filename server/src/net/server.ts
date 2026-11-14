@@ -4,8 +4,8 @@
  * so it works unchanged behind a tunnel or reverse proxy on a single hostname.
  */
 
-import { matchMaker, Server } from '@colyseus/core';
-import { WebSocketTransport } from '@colyseus/ws-transport';
+import { matchMaker, Room, Server } from '@colyseus/core';
+import { WebSocketClient, WebSocketTransport } from '@colyseus/ws-transport';
 import { buildStamp, CITY_SEED, getCity, JOIN_ERROR, PROTOCOL_VERSION, ROOM_NAME } from '@mb/shared';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -24,6 +24,53 @@ import { configureRooms, MatchRoom, openRoomCodes, roomPerf, roomStats } from '.
  */
 export const PING_INTERVAL_MS = 1000;
 export const PING_MAX_MISSED = 2;
+
+/**
+ * A slow, uneven link for testing clients without one (MB_LATENCY with MB_JITTER): every message
+ * is held back half the round trip plus a random 0 to `jitterMs`, each way, and each connection
+ * still delivers in order, as one TCP connection does (a message held back holds back the ones
+ * after it). The room library's own simulation holds every message back by the same time; this
+ * wraps the same two places it does: the sending of bytes and the room's handling of a message.
+ * For tests only: it changes the library for the whole process.
+ */
+function simulateUnevenLink(latencyMs: number, jitterMs: number): void {
+  const half = latencyMs / 2;
+  /** One connection, one way: when its newest message is due, and the messages still on their way. */
+  interface Line {
+    dueAt: number;
+    waiting: Array<() => void>;
+  }
+  const later = (lines: WeakMap<object, Line>, connection: object, deliver: () => void): void => {
+    let line = lines.get(connection);
+    if (!line) {
+      line = { dueAt: 0, waiting: [] };
+      lines.set(connection, line);
+    }
+    const now = performance.now();
+    line.dueAt = Math.max(line.dueAt, now + half + Math.random() * jitterMs);
+    line.waiting.push(deliver);
+    // One timer per message. Timers can fire a millisecond the wrong way round, so each delivers
+    // the oldest message still waiting rather than its own.
+    const waiting = line.waiting;
+    setTimeout(() => (waiting.shift() as () => void)(), line.dueAt - now);
+  };
+  const sent = new WeakMap<object, Line>();
+  const send = WebSocketClient.prototype.raw;
+  WebSocketClient.prototype.raw = function (this: WebSocketClient, data, options, cb) {
+    // The library may reuse the buffer once this returns: keep a copy.
+    const copy = Buffer.from(data);
+    later(sent, this, () => send.call(this, copy, options, cb));
+  };
+  const received = new WeakMap<object, Line>();
+  // The room's handling of an incoming message is private to the library; its own latency
+  // simulation replaces it the same way.
+  const rooms = Room.prototype as unknown as Record<string, (this: unknown, client: object, buffer: Buffer) => void>;
+  const receive = rooms._onMessage;
+  rooms._onMessage = function (this: unknown, client: object, buffer: Buffer) {
+    const copy = Buffer.from(buffer);
+    later(received, client, () => receive.call(this, client, copy));
+  };
+}
 
 export interface GameServer {
   /** The port actually bound (useful when the configuration asked for port 0). */
@@ -95,7 +142,12 @@ export async function startGameServer(config: ServerConfig): Promise<GameServer>
     express: (app) => configureApp(app, { clientDir: config.clientDir, health, publicAddress, log: config.log }),
   });
   server.define(ROOM_NAME, MatchRoom);
-  if (config.latencyMs > 0) server.simulateLatency(config.latencyMs);
+  if (config.jitterMs > 0) {
+    simulateUnevenLink(config.latencyMs, config.jitterMs);
+    config.log?.(`simulating a slow link: ${config.latencyMs} ms round trip, plus up to ${config.jitterMs} ms each way at random`);
+  } else if (config.latencyMs > 0) {
+    server.simulateLatency(config.latencyMs);
+  }
 
   // Build the city before the first player arrives, not while they wait for a match to start.
   getCity(CITY_SEED);

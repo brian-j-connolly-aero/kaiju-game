@@ -18,13 +18,14 @@ import { eventsOf, HUMAN_PLAYER, input, makeTestWorld, parkUnits, placeKaiju, pl
 /**
  * Scripted squads against a kaiju that stands still at the origin, facing north (+Z). Units are
  * put on their marks by hand before the first step; after that everything goes through
- * `world.step(inputs)`: the command wheel, the stick, the aim and the trigger, the way people
- * at the controls would play it.
+ * `world.step(inputs)`: the stick, the aim and the two buttons, the way people at the controls
+ * would play it. A player who has fired a volley holds the volley button again at once, so the
+ * squad-mates plant again where they stand (they do not wander off to shoot at will).
  */
 const ROCKETS = WEAPONS.army_rocket_launchers;
 const P = LIZARD.damage;
 const INFANTRY = UNIT_TYPES.army_rocket_infantry;
-const CHARGE_TICKS = COMBAT_RULES.chargeTime * TICK_RATE;
+const CHARGE_TICKS = Math.round(COMBAT_RULES.chargeTime * TICK_RATE);
 /** Height the squads aim at: the middle of the hatchling. */
 const MID = LIZARD.stages[0].height / 2;
 
@@ -34,6 +35,10 @@ interface Script {
   /** Steps once with these inputs per squad player (index 0 is the first squad). */
   step(inputs?: Array<Partial<PlayerInput> | null>): void;
   wait(ticks: number): void;
+  /** Squads whose players hold the volley button (from the next step on, until changed). */
+  holding: boolean[];
+  /** Those squads let go for one tick (the volley fires) with these inputs, and hold on again. */
+  fire(inputs?: Array<Partial<PlayerInput> | null>): void;
 }
 
 function createScript(options: TestWorldOptions = {}): Script {
@@ -45,15 +50,18 @@ function createScript(options: TestWorldOptions = {}): Script {
   for (const p of world.players) setPlayerBot(world, p.id, false);
   const events: SimEvent[] = [];
   const last: PlayerInput[] = world.players.map(() => input());
+  let letGo = false;
   const script: Script = {
     world,
     events,
+    holding: world.squads.map(() => false),
     step(inputs = []) {
       const frame: Array<PlayerInput | null> = [null];
       for (let s = 0; s < world.squads.length; s++) {
         const partial = inputs[s];
         // A person's aim stays where they left it between button presses.
         const next = input({ aimYaw: last[s + 1].aimYaw, aimPitch: last[s + 1].aimPitch, ...partial });
+        if (script.holding[s] && !letGo) next.buttons |= Btn.volley;
         last[s + 1] = next;
         frame.push(next);
       }
@@ -63,6 +71,11 @@ function createScript(options: TestWorldOptions = {}): Script {
     },
     wait(ticks) {
       for (let i = 0; i < ticks; i++) script.step();
+    },
+    fire(inputs = []) {
+      letGo = true;
+      script.step(inputs);
+      letGo = false;
     },
   };
   return script;
@@ -107,7 +120,7 @@ function tally(events: SimEvent[]): { hits: number; damage: number; nerve: numbe
   return { hits: hits.length, damage: hits.reduce((a, h) => a + h.damage, 0), nerve: hits.reduce((a, h) => a + h.nerve, 0) };
 }
 
-/** One squad's full-charge volley, in raw numbers: the trigger shot plus three charged sub-units. */
+/** One squad's full-charge volley, in raw numbers: the leader's shot plus three charged squad-mates. */
 const VOLLEY_NERVE = 3 * ROCKETS.nerve + 9 * ROCKETS.nerve * (1 + COMBAT_RULES.volleyNervePerCharge);
 const VOLLEY_DAMAGE = 3 * ROCKETS.damage + 9 * ROCKETS.damage * (1 + COMBAT_RULES.volleyDamagePerCharge);
 
@@ -116,12 +129,12 @@ function volleyFrom(bearing: number): { script: Script; result: ReturnType<typeo
   const script = createScript();
   const { world } = script;
   deploy(world, 0, bearing, 45);
-  script.step([{ wheel: 'holdCharge' }]);
+  script.holding[0] = true;
+  script.step([aimAt(world, 0, 0, MID, 0)]);
   script.wait(CHARGE_TICKS + 5);
   expect(eventsOf(script.events, 'voice').map((e) => e.cue)).toContain('volley.ready');
   expect(eventsOf(script.events, 'projectileSpawn')).toEqual([]);
-  script.step([{ ...aimAt(world, 0, 0, MID, 0), buttons: Btn.fire }]);
-  script.step([{ buttons: 0 }]);
+  script.fire();
   script.wait(60);
   expect(eventsOf(script.events, 'volley')).toMatchObject([{ squad: 0, player: HUMAN_PLAYER, units: [1, 2, 3], charge: 1 }]);
   return { script, result: tally(script.events) };
@@ -159,17 +172,19 @@ describe('a squad charges a volley at a stationary kaiju', () => {
     expect(rear.nerve / front.nerve).toBeCloseTo(P.rearMult / P.frontMult, 6);
   });
 
-  it('as a crossfire: one player parks the sub-units in front, drives to the side, and beats both', () => {
+  it('as a crossfire: one player plants the squad-mates in front, drives to the side, and beats both', () => {
     const front = volleyFrom(0).result;
     const flank = volleyFrom(90 * DEG).result;
 
     const script = createScript();
     const { world } = script;
     deploy(world, 0, 0, 45);
-    // Park them on hold-and-charge, then drive round to the kaiju's east side.
-    script.step([{ wheel: 'holdCharge' }]);
+    // Plant them with the volley button, and drive round to the kaiju's east side holding it.
+    script.holding[0] = true;
+    script.step([aimAt(world, 0, 0, MID, 0)]);
     walkTo(script, 0, 45, 45);
     walkTo(script, 0, 45, 0);
+    script.step([aimAt(world, 0, 0, MID, 0)]);
     script.wait(CHARGE_TICKS);
     const subs = [1, 2, 3].map((id) => world.units[id]);
     for (const u of subs) {
@@ -177,8 +192,7 @@ describe('a squad charges a volley at a stationary kaiju', () => {
       expect(u.charge).toBe(1);
       expect(u.z).toBeCloseTo(45, 6);
     }
-    script.step([{ ...aimAt(world, 0, 0, MID, 0), buttons: Btn.fire }]);
-    script.step([{ buttons: 0 }]);
+    script.fire();
     script.wait(60);
 
     const result = tally(script.events);
@@ -213,14 +227,14 @@ describe('a full coordinated volley', () => {
     // They stand at different distances, so the four volleys arrive one after the other.
     const bearings = [-24, -8, 8, 24].map((d) => d * DEG);
     bearings.forEach((b, s) => deploy(world, s, b, 46 + 8 * s, 7));
-    script.step(world.squads.map(() => ({ wheel: 'holdCharge' as const })));
+    script.holding = world.squads.map(() => true);
+    script.step(world.squads.map((s) => aimAt(world, s.driven, 0, MID, 0)));
     script.wait(CHARGE_TICKS + 5);
     expect(world.squads.every((s) => s.volleyReady)).toBe(true);
     expect(k.hp).toBe(k.maxHp);
 
-    // "Fire!": everybody's trigger on the same tick.
-    script.step(world.squads.map((s) => ({ ...aimAt(world, s.driven, 0, MID, 0), buttons: Btn.fire })));
-    script.step(world.squads.map(() => ({ buttons: 0 })));
+    // "Fire!": everybody lets go on the same tick.
+    script.fire();
     script.wait(60);
 
     expect(eventsOf(script.events, 'volley').length).toBe(4);
@@ -255,12 +269,12 @@ describe('a miss', () => {
     const { world } = script;
     const k = world.kaijus[0];
     deploy(world, 0, 0, 45);
-    script.step([{ wheel: 'holdCharge' }]);
-    script.wait(CHARGE_TICKS + 5);
     // The player's crosshair slips off the kaiju's shoulder: it is on the shop front behind it.
     const aim = aimAt(world, 0, 24, 3, -33);
-    script.step([{ ...aim, buttons: Btn.fire }]);
-    script.step([{ buttons: 0 }]);
+    script.holding[0] = true;
+    script.step([aim]);
+    script.wait(CHARGE_TICKS + 5);
+    script.fire();
     script.wait(90);
 
     // Nothing touched the kaiju; every rocket found the shop.
@@ -284,8 +298,7 @@ describe('a miss', () => {
     expect(eventsOf(script.events, 'voice').map((e) => e.cue)).toContain('collateral.human');
     // Rubble is a safe backstop: the next volley through the same spot costs nothing.
     script.wait(CHARGE_TICKS);
-    script.step([{ ...aim, buttons: Btn.fire }]);
-    script.step([{ buttons: 0 }]);
+    script.fire();
     script.wait(120);
     expect(world.match.barPoints).toBeCloseTo(90, 6);
   });
@@ -295,11 +308,11 @@ describe('a miss', () => {
     const { world } = script;
     const k = world.kaijus[0];
     deploy(world, 0, 0, 45);
-    script.step([{ wheel: 'holdCharge' }]);
-    script.wait(60);
     // On the ground a couple of meters off its flank: inside the splash of a rocket.
-    script.step([{ ...aimAt(world, 0, LIZARD.stages[0].bodyRadius + 2, 0, 0), buttons: Btn.fire }]);
-    script.step([{ buttons: 0 }]);
+    script.holding[0] = true;
+    script.step([aimAt(world, 0, LIZARD.stages[0].bodyRadius + 2, 0, 0)]);
+    script.wait(60);
+    script.fire();
     script.wait(60);
     expect(tally(script.events).hits).toBeGreaterThan(0);
     expect(k.hp).toBeLessThan(k.maxHp);

@@ -4,7 +4,6 @@ import {
   boundsContains,
   Btn,
   BUTTON_MASK,
-  COMMAND_IDS,
   createMatchConfig,
   createRng,
   createWorld,
@@ -27,13 +26,19 @@ import {
  * up inside a wall, whatever the inputs are.
  */
 /**
- * Random buttons from one draw of 0..255: the first eight buttons as drawn, and smoke and mark
- * (added later) pressed together with some of them, so that the draws, and so the rest of the
- * chaos, stay what they were before those two buttons existed.
+ * Random buttons from one draw of 0..255: the first eight bits as drawn (some of them are free
+ * bits now, which the masking drops), and the buttons added later (the monster's stomp and two
+ * move buttons) pressed together with some of them, so that the draws, and so the rest of the
+ * chaos, stay what they were before those buttons existed.
  */
 function chaosButtons(v: number): number {
-  return (v | ((v & 0x81) === 0x81 ? Btn.smoke : 0) | ((v & 0x42) === 0x42 ? Btn.mark : 0)) & BUTTON_MASK;
+  let b = v;
+  b |= ((v & 0x14) === 0x14 ? Btn.stomp : 0) | ((v & 0x0c) === 0x0c ? Btn.move1 : 0) | ((v & 0x18) === 0x18 ? Btn.move2 : 0);
+  return b & BUTTON_MASK;
 }
+
+/** The monster's moves at each stage of the chaos, so that all five are pressed somewhere. */
+const CHAOS_MOVES = { 1: ['charge', 'tailSweep'], 2: ['roar', 'beam'], 3: ['brace', 'charge'] } as const;
 
 describe('simulation soak with random inputs', () => {
   function checkInvariants(world: World, lastBar: number): void {
@@ -63,7 +68,7 @@ describe('simulation soak with random inputs', () => {
       expect(u.charge).toBeGreaterThanOrEqual(0);
       expect(u.charge).toBeLessThanOrEqual(1);
       expect(u.cooldown).toBeGreaterThanOrEqual(0);
-      expect(Number.isFinite(u.cooldown) && Number.isFinite(u.arcYaw) && Number.isFinite(u.nav.holdX) && Number.isFinite(u.nav.holdZ)).toBe(true);
+      expect(Number.isFinite(u.cooldown) && Number.isFinite(u.nav.trailMark) && Number.isFinite(u.nav.hurry)).toBe(true);
       expect(Number.isFinite(u.control.moveX) && Number.isFinite(u.control.moveZ) && Number.isFinite(u.control.aimYaw) && Number.isFinite(u.control.aimPitch)).toBe(true);
       if (!u.alive) expect([u.rooted, u.charge, u.state]).toEqual([false, 0, 'dead']);
       // Only a planted sub-unit shows a laser; the unit a player drives is never planted.
@@ -74,7 +79,6 @@ describe('simulation soak with random inputs', () => {
       expect(squad.eliminated).toBe(living === 0);
       expect(squad.driven < 0).toBe(squad.eliminated);
       if (!squad.eliminated) expect(squad.units).toContain(squad.driven);
-      for (const c of squad.callInCooldowns) expect(c).toBeGreaterThanOrEqual(0);
     }
     // Nothing piles up: every projectile ends (a hit, the edge of the city, or its time running out).
     expect(world.projectiles.length).toBeLessThan(400);
@@ -95,6 +99,10 @@ describe('simulation soak with random inputs', () => {
     config.tuning.briefing = 0;
     const world = createWorld({ seed: 31337, config });
     const rng = createRng(4242);
+    // The volley button is held for seconds at a time, so some volleys are charged: it has its
+    // own generator, so the draws above it stay what they were.
+    const volleyRng = createRng(777);
+    const volleys = config.players.map(() => false);
     const known: readonly string[] = SIM_EVENT_TYPES;
     const held: PlayerInput[] = config.players.map(() => ({ seq: 0, moveX: 0, moveZ: 0, aimYaw: 0, aimPitch: 0, buttons: 0 }));
     let eventCount = 0;
@@ -103,6 +111,7 @@ describe('simulation soak with random inputs', () => {
 
     for (const stage of [1, 2, 3] as const) {
       if (stage > 1) beginStage(world, stage);
+      world.kaijus[0].moves = [...CHAOS_MOVES[stage]];
       let lastBar = world.match.barPoints;
       for (let t = 0; t < 30 * 60; t++) {
         const inputs = held.map((prev, p): PlayerInput | null => {
@@ -115,11 +124,15 @@ describe('simulation soak with random inputs', () => {
             moveZ: change ? rngRange(rng, -0.3, 1) : prev.moveZ,
             aimYaw: prev.aimYaw + rngRange(rng, -0.08, 0.08) + (change ? rngRange(rng, -1.5, 1.5) : 0),
             aimPitch: rngRange(rng, -0.4, 0.3),
-            buttons: change ? chaosButtons(rngInt(rng, 256)) : prev.buttons,
+            buttons: change ? chaosButtons(rngInt(rng, 256)) : prev.buttons & ~Btn.volley,
           };
+          if (rngChance(volleyRng, 0.012)) volleys[p] = !volleys[p];
+          if (volleys[p]) next.buttons |= Btn.volley;
+          // (The draws once spent on the old command wheel's picks and ground markers are still
+          // made, so that the rest of the chaos stays what it was.)
           if (p > 0 && rngChance(rng, 0.01)) {
-            next.wheel = COMMAND_IDS[rngInt(rng, COMMAND_IDS.length)];
-            if (rngChance(rng, 0.5)) next.marker = { x: rngRange(rng, -1100, 1100), z: rngRange(rng, -1100, 1100) };
+            rngInt(rng, 4);
+            if (rngChance(rng, 0.5)) rngRange(rng, -1100, 1100) + rngRange(rng, -1100, 1100);
           }
           held[p] = next;
           return next;
@@ -150,8 +163,8 @@ describe('simulation soak with random inputs', () => {
       }
       expect(world.match.stage).toBe(stage);
     }
-    // The squads did their part of the chaos too: shots, volleys, call-ins, lost units, takeovers.
-    const wanted = ['projectileSpawn', 'projectileHit', 'volley', 'callin', 'smoke', 'kaijuHit', 'unitDestroyed', 'takeover'];
+    // The squads did their part of the chaos too: shots, volleys, lost units, takeovers.
+    const wanted = ['projectileSpawn', 'projectileHit', 'volley', 'kaijuHit', 'unitDestroyed', 'takeover'];
     expect(wanted.filter((type) => !seen.has(type))).toEqual([]);
     // The kaiju walked through things: props at every stage, buildings once it was big enough.
     expect(eventCount).toBeGreaterThan(50);

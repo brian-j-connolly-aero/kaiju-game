@@ -4,7 +4,7 @@ Monster Battle 9001 has a no-reading rule: apart from names and subtitles, nothi
 text. These user interface (UI) pictograms are therefore the game's whole language. Each one has
 to be understood in under a second by someone who has never played.
 
-- **Files:** `client/public/assets/ui/<name>.svg`, 90 icons and `skyline.svg`. The names are the
+- **Files:** `client/public/assets/ui/<name>.svg`, 95 icons and `skyline.svg`. The names are the
   contract in `docs/ASSETS.md` section 5.
 - **Format:** hand-written SVG (Scalable Vector Graphics, a drawing written as text). No drawing
   program is involved: to change an icon, edit its file.
@@ -74,8 +74,8 @@ wherever the idea appears:
 | Diamond | a volley | `cmd_holdcharge` (the aim point), `st_charge` |
 | Shell | a shot | `cmd_fireatwill` (three in flight), `st_callin` (two falling), `st_reload` (one, standing) |
 
-Two more things are shared on purpose: the Lizard's head (`k_eat`, `k_roar`, `k_special`) and its
-clawed hand (`k_grab` closing, `k_throw` open).
+Two more things are shared on purpose: the Lizard's head (`k_eat`, `k_roar`, `k_special`, and
+lowered in `k_charge`) and its clawed hand (`k_grab` closing, `k_throw` open).
 
 ## The icons
 
@@ -104,6 +104,9 @@ against three units holding on one target.
 | `k_roar` | Roar | A roaring maw with sound waves |
 | `k_special` | Special (the Lizard's beam) | A beam from the mouth |
 | `k_molt` | Molt | The kaiju (triangle) in its cocoon: spines on both sides, the shell cracking across the top |
+| `k_swim` | Swimming | Only the row of spines shows above two waves |
+| `k_charge` | Charge (a move picked at a molt) | The Lizard's head lowered like a ram, two spines laid back, rushing forward with four speed lines behind it |
+| `k_tailsweep` | Tail sweep (a move picked at a molt) | The spiked tail lashing round in a wide arc, two motion lines following it |
 
 ### Status
 

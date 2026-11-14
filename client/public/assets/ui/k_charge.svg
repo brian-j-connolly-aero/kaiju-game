@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Kaiju verb: charge. The Lizard's head lowered like a ram, spines laid back, rushing forward; speed lines behind it. -->
+  <g transform="rotate(9 40 28)">
+    <path fill="currentColor" stroke="none" fill-rule="evenodd" d="M20 20Q26 10 38 11L45 13Q52 16 55 24L60 36Q61.5 41 56.5 41.5L42 41Q35 47 27 46Q19 44.5 18.5 34ZM32.5 18.5L41 21 33.5 24.5Z"/>
+    <path fill="currentColor" stroke="none" d="M21.5 17L13 10.5 24.5 12.5ZM19 26L9.5 21.5 19.5 31Z"/>
+  </g>
+  <path d="M5 16H13M5 28H10M5 40H13M10 53H22"/>
+</svg>

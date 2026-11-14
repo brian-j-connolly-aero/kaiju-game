@@ -269,7 +269,6 @@ describe('match flow', () => {
       expect(world.units[1].veteran).toBe(true);
       expect(world.units[2].veteran).toBe(false);
       expect(world.squads[0].level).toBe(stage);
-      expect(world.squads[0].callInCooldowns).toEqual(stage === 3 ? [0] : []);
     }
     const cues = voiceCues(run(world, 1));
     expect(cues).not.toContain('match.start');

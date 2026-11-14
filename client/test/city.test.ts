@@ -14,7 +14,7 @@ import { box, merge, paint } from '../src/assets/procedural/geo';
 import { proceduralModel } from '../src/assets/procedural/models';
 import type { RigModel } from '../src/assets/rigModel';
 import { seatAsleep } from '../src/app/screens/lobby';
-import { snapSquadCharge, volleyVerdict } from '../src/game/autoplay';
+import { volleyPlan } from '../src/game/autoplay';
 import { CityView, insidePolygon, shadeOf, wallPaint } from '../src/render/cityView';
 import { buildGround, setGroundNight } from '../src/render/ground';
 import { pictureTriangles } from '../src/render/landmarkPictures';
@@ -307,24 +307,23 @@ function unit(squad: number, over: Partial<SnapUnit>): SnapUnit {
 
 describe('the autopilot squad charges its volleys', () => {
   const lead = unit(0, { driven: true, rooted: false, laser: false });
-  it('holds its fire while charging and on the move', () => {
+  it('holds Volley while its squad-mates charge, and fires at will on the move', () => {
     const units = [lead, unit(0, { charge: 0.4 }), unit(0, { charge: 0.5 })];
-    expect(snapSquadCharge(units, 0)).toBeCloseTo(0.45, 5);
-    expect(volleyVerdict(units, 0, true, false, 0)).toBe('hold');
-    expect(volleyVerdict(units, 0, false, false, 0)).toBe('hold');
+    expect(volleyPlan(units, 0, true, false, 0)).toBe('charge');
+    expect(volleyPlan(units, 0, false, false, 0)).toBe('fire');
   });
-  it('fires a full charge, but waits a moment for a squad that is nearly charged', () => {
+  it('lets go at full charge, but holds on a moment for a squad that is nearly charged', () => {
     const mine = [lead, unit(0, { charge: 1 }), unit(0, { charge: 1 })];
-    expect(volleyVerdict(mine, 0, true, false, 0)).toBe('fire');
+    expect(volleyPlan(mine, 0, true, false, 0)).toBe('release');
     const withNeighbor = [...mine, unit(1, { charge: 0.8 }), unit(1, { charge: 0.7 })];
-    expect(volleyVerdict(withNeighbor, 0, true, false, 0)).toBe('wait');
-    expect(volleyVerdict(withNeighbor, 0, true, false, 3)).toBe('fire');
+    expect(volleyPlan(withNeighbor, 0, true, false, 0)).toBe('wait');
+    expect(volleyPlan(withNeighbor, 0, true, false, 3)).toBe('release');
     const farBehind = [...mine, unit(1, { charge: 0.2 })];
-    expect(volleyVerdict(farBehind, 0, true, false, 0)).toBe('fire');
+    expect(volleyPlan(farBehind, 0, true, false, 0)).toBe('release');
   });
   it('shoots freely at a helpless kaiju and when it has nobody left to charge with', () => {
-    expect(volleyVerdict([lead, unit(0, { charge: 0.1 })], 0, true, true, 0)).toBe('fire');
-    expect(volleyVerdict([lead], 0, false, false, 0)).toBe('fire');
+    expect(volleyPlan([lead, unit(0, { charge: 0.1 })], 0, true, true, 0)).toBe('fire');
+    expect(volleyPlan([lead], 0, true, false, 0)).toBe('fire');
   });
 });
 

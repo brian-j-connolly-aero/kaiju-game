@@ -7,22 +7,7 @@
  */
 
 import * as THREE from 'three';
-import {
-  createAimPoint,
-  createCastHit,
-  inSmoke,
-  kaijuStageDef,
-  rayVsCapsule,
-  resolveAimPoint,
-  unitTypeDef,
-  weaponDef,
-  type CityQuery,
-  type SnapKaiju,
-  type SmokeShape,
-  type SnapUnit,
-  type UnitTypeDef,
-  type VerticalCapsule,
-} from '@mb/shared';
+import { createAimPoint, resolveAimPoint, unitTypeDef, weaponDef, type CityQuery, type SnapKaiju, type SnapUnit, type UnitTypeDef } from '@mb/shared';
 import type { AssetStore } from '../assets/assetStore';
 import { frameRect, type SpriteAnimInfo, type SpriteInfo } from '../assets/spriteAtlas';
 import type { Effects } from './effects';
@@ -32,6 +17,11 @@ import type { Materials } from './materials';
 import type { QuadBatch } from './quadBatch';
 
 const MAX_VEHICLES = 64;
+/** A unit's marker is hidden this close to the camera (meters) and fades in over the next stretch. */
+const MARKER_HIDE_NEAR = 16;
+const MARKER_FADE = 16;
+/** A soldier this close to the camera (meters) is not drawn. */
+const SPRITE_HIDE_NEAR = 3.5;
 
 export interface UnitsViewContext {
   camera: THREE.Camera;
@@ -45,11 +35,6 @@ export interface UnitsViewContext {
   hideLocalLead: boolean;
   city: CityQuery | null;
   kaijus: SnapKaiju[];
-  /**
-   * The kaiju player's view: the smoke screens standing now. Units inside one show no marker and
-   * no laser (smoke hides them from the kaiju, sim/abilities.ts). Null for everyone else.
-   */
-  veil?: readonly SmokeShape[] | null;
 }
 
 interface Fallen {
@@ -60,10 +45,6 @@ interface Fallen {
 }
 
 const aim = createAimPoint();
-const capHit = createCastHit();
-const capsule: VerticalCapsule = { x: 0, z: 0, r: 0, y0: 0, y1: 0 };
-const origin = { x: 0, y: 0, z: 0 };
-const dir = { x: 0, y: 0, z: 0 };
 const uv = [0, 0, 0, 0];
 
 /** Where member `i` of `count` stands relative to the unit's center, before the unit's heading. */
@@ -228,6 +209,9 @@ export class UnitsView {
           memberOffset(def, u.id, i, def.members, this.offset);
           const x = u.x + this.offset.x * cos + this.offset.z * sin;
           const z = u.z - this.offset.x * sin + this.offset.z * cos;
+          // A soldier right at the camera (a squad-mate riding past a third-person camera) would
+          // be a wall of pixels across the view: not drawn.
+          if (Math.hypot(x - camera.position.x, u.y + 1 - camera.position.y, z - camera.position.z) < SPRITE_HIDE_NEAR) continue;
           const sprite = i < def.visual.primaryCount ? primary : secondary;
           const name = firing ? 'fire' : moving ? 'walk' : 'idle';
           const anim = (sprite.anims.get(name) ?? sprite.anims.get('idle') ?? [...sprite.anims.values()][0]) as SpriteAnimInfo;
@@ -239,49 +223,34 @@ export class UnitsView {
       }
 
       // Marker: a cyan circle over every unit, a yellow diamond while it charges a volley.
-      // (Not over the unit the player drives: they know where they are, and it would sit on the crosshair.)
-      // The kaiju sees neither marker nor laser of a unit in smoke.
-      const veiled = !!ctx.veil && ctx.veil.length > 0 && inSmoke(ctx.veil, u.x, u.z);
-      if (!local && !veiled) {
+      // (Not over the unit the player drives: they know where they are, and it would sit on the
+      // crosshair.) A marker is for finding units far off: close to the camera the unit itself is
+      // in plain view, and a marker of its smallest size there would fill the screen (a squad's
+      // own squad-mates ride right by a third-person camera), so it fades out up close.
+      const near = Math.min(1, Math.max(0, (dist - MARKER_HIDE_NEAR) / MARKER_FADE));
+      if (!local && near > 0.02) {
         const size = Math.min(40, Math.max(1.6, dist * 0.022));
         const top = def.height + 1.2 + size * 0.5;
         const charging = u.laser || u.state === 'charging';
         const bright = own ? 1 : 0.7;
         if (charging) {
           const pulse = 0.75 + 0.25 * Math.sin(time * (4 + u.charge * 10));
-          this.markers.push(u.x, top, u.z, size * (0.8 + u.charge * 0.5), size * (0.8 + u.charge * 0.5), this.diamondUv, 0, 1, 0.85, 0.1, pulse);
+          this.markers.push(u.x, top, u.z, size * (0.8 + u.charge * 0.5), size * (0.8 + u.charge * 0.5), this.diamondUv, 0, 1, 0.85, 0.1, pulse * near);
         } else {
-          this.markers.push(u.x, top, u.z, size * (u.driven ? 1 : 0.75), size * (u.driven ? 1 : 0.75), this.circleUv, 0, 0.12 * bright, 0.78 * bright, 0.88 * bright, shaken ? 0.5 : 0.95);
+          this.markers.push(u.x, top, u.z, size * (u.driven ? 1 : 0.75), size * (u.driven ? 1 : 0.75), this.circleUv, 0, 0.12 * bright, 0.78 * bright, 0.88 * bright, (shaken ? 0.5 : 0.95) * near);
         }
-        if (u.veteran) this.markers.push(u.x, top + size * 0.7, u.z, size * 0.7, size * 0.7, this.chevronUv, 0, 1, 1, 1, 0.9);
+        if (u.veteran) this.markers.push(u.x, top + size * 0.7, u.z, size * 0.7, size * 0.7, this.chevronUv, 0, 1, 1, 1, 0.9 * near);
       }
 
-      // Targeting laser: from the muzzle along the aim to whatever it meets first.
-      if (u.laser && ctx.city && !veiled) {
+      // Targeting laser: from the muzzle along the aim to whatever it meets first (a building,
+      // the ground, or the kaiju's body, head or tail: the hit volume the server uses).
+      if (u.laser && ctx.city) {
         const range = weaponDef(def.weapon).range;
         const oy = u.y + def.muzzleHeight;
-        resolveAimPoint(ctx.city, u.x, oy, u.z, u.aimYaw, u.aimPitch, range, aim);
-        let end = aim.dist;
-        const cp = Math.cos(u.aimPitch);
-        origin.x = u.x;
-        origin.y = oy;
-        origin.z = u.z;
-        dir.x = Math.sin(u.aimYaw) * cp;
-        dir.y = Math.sin(u.aimPitch);
-        dir.z = Math.cos(u.aimYaw) * cp;
-        for (const k of ctx.kaijus) {
-          if (!k.alive) continue;
-          const st = kaijuStageDef(k.kind, k.stage);
-          capsule.x = k.x;
-          capsule.z = k.z;
-          capsule.r = st.bodyRadius;
-          capsule.y0 = 0;
-          capsule.y1 = st.height;
-          if (rayVsCapsule(origin, dir, end, capsule, capHit) && capHit.t < end) end = capHit.t;
-        }
-        const ex = u.x + dir.x * end;
-        const ey = Math.max(0.15, oy + dir.y * end);
-        const ez = u.z + dir.z * end;
+        resolveAimPoint(ctx.city, u.x, oy, u.z, u.aimYaw, u.aimPitch, range, aim, ctx.kaijus);
+        const ex = aim.x;
+        const ey = Math.max(0.15, aim.y);
+        const ez = aim.z;
         const glow = 0.35 + u.charge * 0.65;
         const width = Math.max(0.12, dist * 0.0025) * (1 + u.charge);
         lines.push(u.x, oy, u.z, ex, ey, ez, width, 1, 0.82, 0.1, glow);

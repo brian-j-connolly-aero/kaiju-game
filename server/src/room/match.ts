@@ -3,12 +3,14 @@
  * ARCHITECTURE.md section 4.
  *
  *   - a fixed 30 Hz step driven by the accumulator in fixedStep.ts;
- *   - one input per human-controlled slot per tick, taken from that slot's short queue; a tick
- *     with nothing queued is played on a guess (the previous input again, held buttons
- *     included), and the queue is told, so that it can skip the late inputs the guess already
- *     stood in for (inputQueue.ts). A player who stays silent is brought to a stop rather than
- *     left walking (after 0.5 s), and lets go of held buttons after 1 s;
- *   - the sequence number of the last input applied per slot (the snapshot acknowledgement);
+ *   - one input per human-controlled slot per tick, taken from that slot's short queue, a tick
+ *     after it was due; a tick with nothing queued is played on a guess (the previous input
+ *     again, held buttons included), and the queue is told: the guess stands in for the input
+ *     that is late, and an input with nothing new in it is dropped in its place (inputQueue.ts).
+ *     A player who stays silent is brought to a stop rather than left walking (after 0.5 s), and
+ *     lets go of held buttons after 1 s;
+ *   - per slot, the acknowledgement for the snapshots (`ackFor`): the inputs played or dropped,
+ *     and how many more the server will drop (`packedAck` in inputQueue.ts);
  *   - the events since the last flush, sent together with each snapshot;
  *   - a snapshot every second tick at normal speed, and never more than one per update, so a
  *     catch-up after a hitch does not send a burst of stale snapshots.
@@ -18,9 +20,11 @@
 
 import {
   createWorld,
+  drivenUnit,
   encodeSnapshot,
   neutralInput,
-  queueCommand,
+  playerKaiju,
+  playerSquad,
   setPlayerBot,
   SNAPSHOT_EVERY_TICKS,
   snapshotOfWorld,
@@ -30,11 +34,10 @@ import {
   type PlayerId,
   type PlayerInput,
   type SimEvent,
-  type SquadCommand,
   type World,
 } from '@mb/shared';
 import { createFixedStep, dueSteps, type FixedStep, type FixedStepOptions } from './fixedStep';
-import { clearInputQueue, createInputQueue, noteGuessedTick, pushInput, takeInput, type InputQueue } from './inputQueue';
+import { clearInputQueue, createInputQueue, noteGuessedTick, packedAck, pushInput, takeInput, type InputQueue } from './inputQueue';
 
 export const TICK_MS = 1000 / TICK_RATE;
 /** Ticks one update may run to catch up (at speed 1). */
@@ -43,24 +46,27 @@ export const MAX_CATCH_UP_STEPS = 4;
 export const MAX_FRAME_MS = 250;
 /** How early a tick may run, milliseconds (timers are only accurate to about a millisecond). */
 export const STEP_SLOP_MS = 2;
-/** Ticks without a fresh input after which a connected player's unit stops moving (0.5 s). */
+/**
+ * Ticks without a fresh input after which a connected player's unit stops moving (0.5 s). Up to
+ * then a guessed tick repeats the last input and stands in for the late one (inputQueue.ts).
+ */
 export const STARVED_TICKS = 15;
 /**
  * Ticks without a fresh input after which a connected player's held buttons are let go too
- * (1 s, as long as the queue remembers guessed ticks: INPUT_OWED_MAX). Buttons are kept longer
- * than movement so that a hiccup on the line in the middle of a hold (a brace, an eat, a stomp,
- * the molt) does not cut the hold short and then start it again when the late inputs arrive.
+ * (1 s). Buttons are kept longer than movement so that a hiccup on the line in the middle of a
+ * hold (a brace, a volley's charge) does not cut the hold short and then start it again when the
+ * late inputs arrive.
  */
 export const STARVED_BUTTON_TICKS = 30;
+/** Slower than this a body counts as standing still (meters per second). */
+const STILL_SPEED = 0.05;
 
 export interface MatchSession {
   world: World;
   clock: FixedStep;
   stepOptions: FixedStepOptions;
-  /** Per slot: the queue of inputs waiting to be simulated. */
+  /** Per slot: the queue of inputs waiting to be simulated, and the acknowledgement (inputQueue.ts). */
   queues: InputQueue[];
-  /** Per slot: sequence number of the last input the simulation applied for the current connection. */
-  acks: number[];
   /** Per slot: ticks in a row with no fresh input. */
   starved: number[];
   /** Per slot: true while a connected person (not a bot) drives it. */
@@ -103,7 +109,6 @@ export function createMatchSession(options: MatchSessionOptions): MatchSession {
     clock,
     stepOptions,
     queues: Array.from({ length: n }, createInputQueue),
-    acks: new Array<number>(n).fill(0),
     starved: new Array<number>(n).fill(0),
     live: new Array<boolean>(n).fill(false),
     events: [],
@@ -125,22 +130,28 @@ export function setSlotLive(m: MatchSession, slot: PlayerId, live: boolean, fres
   if (slot < 0 || slot >= m.live.length) return;
   m.live[slot] = live;
   m.starved[slot] = 0;
-  clearInputQueue(m.queues[slot]);
-  if (live && fresh) m.acks[slot] = 0;
+  // The acknowledgement starts over for a new page and carries on for the same page come back.
+  clearInputQueue(m.queues[slot], live && fresh);
   setPlayerBot(m.world, slot, !live);
 }
 
 /** Queues a sanitized input for a slot. Inputs for bot slots and stale inputs are ignored. */
 export function queueInput(m: MatchSession, slot: PlayerId, input: PlayerInput): void {
   if (slot < 0 || slot >= m.live.length || !m.live[slot]) return;
-  if (input.seq <= m.acks[slot]) return;
   pushInput(m.queues[slot], input);
 }
 
-/** Queues a sanitized squad command for a slot. */
-export function queueSlotCommand(m: MatchSession, slot: PlayerId, command: SquadCommand): void {
-  if (slot < 0 || slot >= m.live.length || !m.live[slot]) return;
-  queueCommand(m.world, slot, command);
+/** The acknowledgement to put in this slot's snapshots (inputQueue.ts, `packedAck`). */
+export function ackFor(m: MatchSession, slot: PlayerId): number {
+  return slot >= 0 && slot < m.queues.length ? packedAck(m.queues[slot]) : 0;
+}
+
+/** The body this slot drives stands still, or nothing moves this tick (the briefing, an intermission). */
+function standsStill(world: World, slot: PlayerId): boolean {
+  if (world.match.phase !== 'playing') return true;
+  const squad = playerSquad(world, slot);
+  const body = squad ? drivenUnit(world, squad) : playerKaiju(world, slot);
+  return !body || !body.alive || body.vx * body.vx + body.vz * body.vz < STILL_SPEED * STILL_SPEED;
 }
 
 /** Runs exactly one simulation tick. */
@@ -151,10 +162,9 @@ export function stepMatch(m: MatchSession): void {
   for (let slot = 0; slot < inputs.length; slot++) {
     inputs[slot] = undefined;
     if (!m.live[slot]) continue;
-    const next = takeInput(m.queues[slot]);
+    const next = takeInput(m.queues[slot], standsStill(world, slot));
     if (next) {
       inputs[slot] = next;
-      m.acks[slot] = next.seq;
       m.starved[slot] = 0;
       continue;
     }
@@ -172,7 +182,9 @@ export function stepMatch(m: MatchSession): void {
       inputs[slot] = stop;
       buttons = stop.buttons;
     }
-    noteGuessedTick(m.queues[slot], buttons);
+    // Only a guess that repeats the last input stands in for the one that is late; from the stop
+    // on the player is away, not late.
+    noteGuessedTick(m.queues[slot], buttons, starved < STARVED_TICKS);
   }
   const events = world.step(inputs);
   for (const e of events) {

@@ -35,7 +35,7 @@ import { COMBAT_RULES, DT, SQUAD_RULES } from '../../defs/rules';
 import { unitTypeDef } from '../../defs/units';
 import { modMult } from '../../defs/upgrades';
 import { projectileTypeDef, weaponDef } from '../../defs/weapons';
-import { angleDist, turnToward, yawFromTo, yawOf } from '../../math/angle';
+import { angleDist, DEG, turnToward, yawFromTo, yawOf } from '../../math/angle';
 import { approach, clamp } from '../../math/scalar';
 import type { Vec2, Vec3 } from '../../math/vec';
 import { Btn } from '../../net/input';
@@ -43,7 +43,7 @@ import { createAimPoint } from '../aim';
 import { setWorldMove } from '../movement';
 import { createSteer, resetRoute, steerToward } from '../nav';
 import { updateSpotting } from '../spotting';
-import { formationSpacing, nearestKaiju, swarmSlot, swarmWidth, trailLead, updateTrail, volleyAim } from '../squads';
+import { clearTrail, formationSpacing, nearestKaiju, swarmSlot, swarmWidth, trailFollow, updateTrail, volleyAim, type TrailTarget } from '../squads';
 import { kaijuShownHeight } from '../swim';
 import type { Squad, Unit, World } from '../types';
 import { emit } from '../worldOps';
@@ -62,14 +62,24 @@ const SHOT_LOOK_TICKS = 6;
 const LEADER_MOVING = 1;
 /** On the move, a squad-mate closes the gap to its place in about this many seconds on top of the leader's pace. */
 const CLOSE_TIME = 1;
+/** A tank squad-mate settled in its place turns to face the way its leader faces, creeping at this throttle... */
+const FACE_THROTTLE = 0.06;
+/** ...whenever it is more than this far off. */
+const FACE_SLACK = 15 * DEG;
 /** A squad-mate this many spacings from its place has fallen behind: it drives the leader's way after it... */
 const BEHIND_SPACINGS = 3;
-/** ...when it is within this many of its radii (plus 6 m) of that way, aiming about a second's drive ahead along it. */
-const TRAIL_REACH_RADII = 2;
+/** ...passing every point of it it comes within this many meters (beyond its radius) of, and aiming about a second's drive on. */
+const TRAIL_NEAR = 3;
+/**
+ * A vehicle takes the corners of that way at no more than this share of its top speed: going
+ * flat out it would sail past the corner and into the houses (a troop of tanks catching up at
+ * 33 m/s slides some 40 m before it has turned).
+ */
+const TRAIL_CORNER_SPEED = 0.4;
 
 const steer = createSteer();
 const slot: Vec2 = { x: 0, z: 0 };
-const lead: Vec2 = { x: 0, z: 0 };
+const lead: TrailTarget = { x: 0, z: 0, corner: Infinity };
 const push: Vec2 = { x: 0, z: 0 };
 const aim = createAimPoint();
 const target: Vec3 = { x: 0, y: 0, z: 0 };
@@ -149,7 +159,7 @@ function takeOver(world: World, squad: Squad): void {
   next.control.moveX = 0;
   next.control.moveZ = 0;
   next.control.fire = false;
-  squad.trail.length = 0;
+  clearTrail(squad);
   emit(world, { type: 'takeover', player: squad.player, squad: squad.id, fromUnit: lost.id, toUnit: next.id });
 }
 
@@ -174,6 +184,7 @@ function followSwarm(world: World, squad: Squad, leader: Unit, u: Unit, rank: nu
     nav.settled = true;
     return;
   }
+  const def = unitTypeDef(u.type);
   const tolerance = SQUAD_RULES.slotTolerance * u.radius + 1;
   const resume = 1.5 * tolerance + 0.5;
   const dist = Math.hypot(slot.x - u.x, slot.z - u.z);
@@ -181,38 +192,66 @@ function followSwarm(world: World, squad: Squad, leader: Unit, u: Unit, rank: nu
   const lvz = leader.vz;
   const pace = Math.hypot(lvx, lvz);
   const onTheMove = pace > LEADER_MOVING;
-  if (!onTheMove && nav.settled && dist <= resume) return;
+  if (!onTheMove && nav.settled && dist <= resume) {
+    // Settled: a tank turns to face where its leader faces, so that the swarm sets off together.
+    // (Infantry turns at once whichever way it goes.)
+    if (def.steer === 'heading' && angleDist(u.yaw, leader.yaw) > FACE_SLACK) {
+      steer.dirX = Math.sin(leader.yaw);
+      steer.dirZ = Math.cos(leader.yaw);
+      steer.throttle = FACE_THROTTLE;
+    }
+    return;
+  }
 
   nav.settled = false;
-  const def = unitTypeDef(u.type);
-  if (dist > BEHIND_SPACINGS * formationSpacing(u) && trailLead(squad, u, TRAIL_REACH_RADII * u.radius + 6, Math.max(3 * u.radius, def.speed), lead)) {
-    // Fallen behind: flat out along the way the leader came (it is open to a unit of this size),
-    // which beats finding a way of its own to a place that keeps moving off.
-    steerToward(world, u, lead.x, lead.z, 1, steer);
-    if (steer.throttle > 0) steer.throttle = 1;
-    nav.hurry = SQUAD_RULES.catchUpSpeed;
-    return;
-  }
-  steerToward(world, u, slot.x, slot.z, tolerance, steer);
-  if (!onTheMove) {
-    if (steer.arrived) nav.settled = true;
-    else if (dist > resume) nav.hurry = SQUAD_RULES.catchUpSpeed;
-    return;
-  }
   const top = def.speed * modMult(squad.mods, 'speed');
-  const ahead = (slot.x - u.x) * lvx + (slot.z - u.z) * lvz;
-  if (steer.arrived || ahead <= 0) {
-    // In its place, or ahead of it: ride along with the leader, a little slower while the place
-    // catches up (a tank does not turn round for a place that is coming to it anyway).
+  if (dist > BEHIND_SPACINGS * formationSpacing(u)) {
+    // Fallen behind: flat out along the way the leader came (it is open to a unit of this size),
+    // which beats finding a way of its own to a place that keeps moving off. Off that way, it
+    // first goes to where the way passes nearest (a point that stays put), unless its place is nearer.
+    const fast = top * SQUAD_RULES.catchUpSpeed;
+    const corner = TRAIL_CORNER_SPEED * top;
+    // A vehicle looks out for a corner as far ahead as it needs to brake for it.
+    const reach = def.steer === 'heading' ? (fast * fast - corner * corner) / (2 * def.accel) + u.radius : 0;
+    if (trailFollow(squad, u, u.radius + TRAIL_NEAR, Math.max(3 * u.radius, def.speed), reach, lead) < dist) {
+      steerToward(world, u, lead.x, lead.z, 1, steer);
+      nav.hurry = SQUAD_RULES.catchUpSpeed;
+      if (steer.throttle > 0) {
+        // Flat out, braking in time to take the leader's next corner at corner speed.
+        const v = def.steer === 'heading' ? Math.sqrt(corner * corner + 2 * def.accel * Math.max(0, lead.corner - u.radius)) : fast;
+        steer.throttle = Math.min(1, v / fast);
+      }
+      return;
+    }
+  }
+  nav.trailMark = -1;
+  steerToward(world, u, slot.x, slot.z, tolerance, steer);
+  if (steer.arrived) {
+    if (onTheMove) {
+      // In its place: ride along with the leader.
+      steer.dirX = lvx / pace;
+      steer.dirZ = lvz / pace;
+      steer.throttle = Math.min(1, pace / top);
+    } else {
+      nav.settled = true;
+    }
+    return;
+  }
+  if (onTheMove && (slot.x - u.x) * lvx + (slot.z - u.z) * lvz <= 0) {
+    // Ahead of its place: ride along a little slower while the place catches up (a tank does
+    // not turn round for a place that is coming to it anyway).
     steer.dirX = lvx / pace;
     steer.dirZ = lvz / pace;
-    const lag = steer.arrived ? 0 : dist / CLOSE_TIME;
-    steer.throttle = clamp((pace - lag) / top, 0, 1);
+    steer.throttle = clamp((pace - dist / CLOSE_TIME) / top, 0, 1);
     return;
   }
-  // Behind its place: the leader's pace and a little more, along the way the navigation found.
-  if (steer.throttle > 0) steer.throttle = Math.max(steer.throttle, Math.min(1, (pace + dist / CLOSE_TIME) / top));
-  if (dist > resume) nav.hurry = SQUAD_RULES.catchUpSpeed;
+  // On its way to its place: the leader's pace (its place moves with the leader), and on top of
+  // it no more than it can still brake from in the distance left, so that it does not overshoot
+  // (a troop of tanks at full speed needs some 25 m to stop). Faster than the leader if it must.
+  const want = (onTheMove ? pace : 0) + Math.sqrt(2 * def.accel * dist);
+  if (want > top) nav.hurry = SQUAD_RULES.catchUpSpeed;
+  // Along the streets the navigation's own easing for the corners stands.
+  if (steer.throttle > 0 && nav.path.length === 0) steer.throttle = Math.min(1, want / (top * nav.hurry));
 }
 
 /**
@@ -307,11 +346,12 @@ function findShot(world: World, squad: Squad, u: Unit): boolean {
   return true;
 }
 
-/** A shaken unit lets go of everything and backs away from a kaiju that is near. */
+/** A shaken unit lets go of everything (its charge too) and backs away from a kaiju that is near. */
 function backOff(world: World, u: Unit): void {
   const c = u.control;
   c.fire = false;
   u.rooted = false;
+  u.charge = 0;
   u.nav.settled = false;
   u.nav.hurry = 1;
   steer.dirX = 0;

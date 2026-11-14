@@ -10,6 +10,7 @@ import {
   BUTTON_COUNT,
   BUTTON_MASK,
   BUTTON_NAMES,
+  BtnIndex,
   buildMatchConfig,
   bytesToBase64,
   canStartMatch,
@@ -17,7 +18,6 @@ import {
   cityStateFromWire,
   cleanPlayerName,
   CLIENT_MESSAGE_TYPES,
-  COMMAND_IDS,
   createLobbyState,
   createMatchConfig,
   createRng,
@@ -27,22 +27,20 @@ import {
   encodeCityState,
   encodeSnapshot,
   FACTION_IDS,
-  FIRE_MODES,
   hpForStage,
   KAIJU_ACTION_IDS,
   KAIJU_KIND_IDS,
+  KAIJU_MOVE_IDS,
   KAIJU_PHASES,
   makeRoomCode,
   MATCH_PHASES,
   MAX_AIM_PITCH,
-  MOVE_ORDERS,
   peekSnapshotTick,
   pickKaijuSeat,
   PROP_KIND_IDS,
   PROTOCOL_VERSION,
   removeLobbyPlayer,
   ROOM_CODE_ALPHABET,
-  sanitizeCommand,
   sanitizeInput,
   SERVER_MESSAGE_TYPES,
   setSnapshotAck,
@@ -74,7 +72,6 @@ function sampleKaiju(overrides: Partial<SnapKaiju> = {}): SnapKaiju {
     submerge: 0,
     known: true,
     spotted: false,
-    marked: false,
     x: -812.375,
     z: 44.5,
     vx: 13.25,
@@ -92,7 +89,9 @@ function sampleKaiju(overrides: Partial<SnapKaiju> = {}): SnapKaiju {
     phaseTime: 0.5,
     phaseDuration: 0.875,
     held: { kind: 'prop', prop: 'bus' },
-    cooldowns: { swipe: 0, stomp: 0, grab: 0, throw: 0, eat: 7.25, brace: 0, roar: 17.5, special: 0, molt: 0 },
+    cooldowns: { swipe: 0, stomp: 0, grab: 0, throw: 0, eat: 7.25, brace: 0, roar: 17.5, special: 0, molt: 0, charge: 14.5, tailSweep: 0 },
+    moves: ['roar', 'none'],
+    offer: ['beam', 'charge', 'tailSweep'],
     ...overrides,
   };
 }
@@ -105,14 +104,7 @@ function sampleSquad(overrides: Partial<SnapSquad> = {}): SnapSquad {
     level: 3,
     eliminated: false,
     bot: true,
-    moveOrder: 'moveTo',
-    fireMode: 'charge',
     driven: 5,
-    moveTargetX: -340.5,
-    moveTargetZ: 1022.5,
-    callInCooldowns: [31.25, 0],
-    smokeCooldown: 12.5,
-    markCooldown: 0,
     ...overrides,
   };
 }
@@ -135,7 +127,7 @@ function sampleUnit(overrides: Partial<SnapUnit> = {}): SnapUnit {
     vx: 0,
     vz: 0,
     y: 0,
-    yaw: 0,
+    yaw: -2.125,
     aimYaw: 0,
     aimPitch: 0,
     hp: 212.5,
@@ -145,6 +137,8 @@ function sampleUnit(overrides: Partial<SnapUnit> = {}): SnapUnit {
     shaken: 1.25,
     charge: 1,
     cooldown: 2.75,
+    stunned: true,
+    stun: 1.5,
     ...overrides,
   };
 }
@@ -167,7 +161,6 @@ function sampleSnapshot(): Snapshot {
     kaijus: [sampleKaiju()],
     squads: [sampleSquad()],
     units: [sampleUnit()],
-    smokes: [{ id: 7, squad: 1, x: -120.5, z: 330.2, radius: 30, height: 28, timer: 9.25 }],
   };
 }
 
@@ -189,9 +182,8 @@ describe('snapshot codec', () => {
     for (const kind of KAIJU_KIND_IDS) check({ ...base, kaijus: [sampleKaiju({ kind })] });
     for (const action of KAIJU_ACTION_IDS) check({ ...base, kaijus: [sampleKaiju({ action })] });
     for (const phase of KAIJU_PHASES) check({ ...base, kaijus: [sampleKaiju({ phase })] });
+    for (const move of KAIJU_MOVE_IDS) check({ ...base, kaijus: [sampleKaiju({ moves: ['charge', move], offer: move === 'none' ? [] : [move] })] });
     for (const faction of FACTION_IDS) check({ ...base, squads: [sampleSquad({ faction })] });
-    for (const moveOrder of MOVE_ORDERS) check({ ...base, squads: [sampleSquad({ moveOrder })] });
-    for (const fireMode of FIRE_MODES) check({ ...base, squads: [sampleSquad({ fireMode })] });
     for (const type of UNIT_TYPE_IDS) check({ ...base, units: [sampleUnit({ type })] });
     for (const state of UNIT_STATES) check({ ...base, units: [sampleUnit({ state })] });
   });
@@ -210,13 +202,13 @@ describe('snapshot codec', () => {
       const s = { ...base, kaijus: [sampleKaiju({ held })] };
       expect(decodeSnapshot(encodeSnapshot(s)).kaijus[0].held).toEqual(held);
     }
-    const kaijuFlags = ['alive', 'moltAvailable', 'wading', 'inWater', 'known', 'spotted', 'marked'] as const;
+    const kaijuFlags = ['alive', 'moltAvailable', 'wading', 'inWater', 'known', 'spotted'] as const;
     for (const flag of kaijuFlags) {
       const off = Object.fromEntries(kaijuFlags.map((f) => [f, false]));
       const k = sampleKaiju({ ...off, [flag]: true });
       expect(decodeSnapshot(encodeSnapshot({ ...base, kaijus: [k] })).kaijus[0]).toEqual(k);
     }
-    const unitFlags = ['alive', 'veteran', 'driven', 'rooted', 'inWater', 'laser', 'wreck'] as const;
+    const unitFlags = ['alive', 'veteran', 'driven', 'rooted', 'inWater', 'laser', 'wreck', 'stunned'] as const;
     for (const flag of unitFlags) {
       const off = Object.fromEntries(unitFlags.map((f) => [f, false]));
       const u = sampleUnit({ ...off, [flag]: true });
@@ -270,7 +262,8 @@ describe('snapshot codec', () => {
       expect(u.type).toBe(wu.type);
       expect(u.x).toBeCloseTo(wu.x, 3);
       expect(u.z).toBeCloseTo(wu.z, 3);
-      expect(u.yaw).toBeCloseTo(wu.yaw, 3);
+      // The hull's heading is a 32-bit float too (a tank drives along it; prediction needs it).
+      expect(u.yaw).toBeCloseTo(wu.yaw, 6);
       expect(u.aimYaw).toBeCloseTo(wu.aimYaw, 3);
       expect(u.hp).toBeCloseTo(wu.hp, 1);
       expect(u.members).toBe(wu.members);
@@ -304,13 +297,13 @@ describe('snapshot codec', () => {
     s.units[0].hp = 1e9;
     s.units[0].charge = 3;
     s.units[0].nerve = -5;
-    s.squads[0].moveTargetX = 99999;
+    s.units[0].aimPitch = 9;
     const back = decodeSnapshot(encodeSnapshot(s));
     expect(back.units[0].shaken).toBe(12.75);
     expect(back.units[0].hp).toBe(6553.5);
     expect(back.units[0].charge).toBe(1);
     expect(back.units[0].nerve).toBe(0);
-    expect(back.squads[0].moveTargetX).toBe(3276.7);
+    expect(back.units[0].aimPitch).toBeCloseTo(32767 / (32768 / Math.PI), 9);
   });
 
   it('rejects garbage', () => {
@@ -393,24 +386,26 @@ describe('welcome', () => {
   });
 });
 
-describe('input and command validation', () => {
-  it('defines one bit per button', () => {
-    expect(BUTTON_COUNT).toBe(10);
-    expect(BUTTON_MASK).toBe(1023);
+describe('input validation', () => {
+  it('defines one bit per button, and keeps the bits of buttons that are gone free', () => {
+    expect(BUTTON_COUNT).toBe(14);
     const bits = BUTTON_NAMES.map((n) => Btn[n]);
-    expect(new Set(bits).size).toBe(BUTTON_COUNT);
-    BUTTON_NAMES.forEach((name, i) => expect(Btn[name]).toBe(1 << i));
-    expect(COMMAND_IDS).toEqual(['follow', 'moveTo', 'fireAtWill', 'holdCharge']);
+    expect(new Set(bits).size).toBe(BUTTON_NAMES.length);
+    BUTTON_NAMES.forEach((name) => expect(Btn[name]).toBe(1 << BtnIndex[name]));
+    expect(BUTTON_MASK).toBe(bits.reduce((mask, bit) => mask | bit, 0));
+    // Bits 2 to 4 were the monster's old brace, roar and beam buttons: free, and dropped.
+    expect(BUTTON_MASK & 0b11100).toBe(0);
+    expect(sanitizeInput({ seq: 1, moveX: 0, moveZ: 0, aimYaw: 0, aimPitch: 0, buttons: 0b11100 | Btn.stomp })?.buttons).toBe(Btn.stomp);
+    // Bits 7 to 9 were the squad's old artillery, smoke and mark buttons: free, and dropped too.
+    expect(BUTTON_MASK & 0b1110000000).toBe(0);
+    expect(sanitizeInput({ seq: 1, moveX: 0, moveZ: 0, aimYaw: 0, aimPitch: 0, buttons: 0b1110000000 | Btn.volley })?.buttons).toBe(Btn.volley);
   });
 
   it('accepts a clean input unchanged', () => {
-    const clean = { seq: 12, moveX: 0.5, moveZ: -0.5, aimYaw: 1, aimPitch: 0.25, buttons: Btn.fire | Btn.callIn };
+    const clean = { seq: 12, moveX: 0.5, moveZ: -0.5, aimYaw: 1, aimPitch: 0.25, buttons: Btn.fire | Btn.volley };
     expect(sanitizeInput(clean)).toEqual(clean);
-    expect(sanitizeInput({ ...clean, wheel: 'moveTo', marker: { x: 10, z: -20 } })).toEqual({
-      ...clean,
-      wheel: 'moveTo',
-      marker: { x: 10, z: -20 },
-    });
+    // The molt card goes through: 1, 2 or 3.
+    for (const card of [1, 2, 3]) expect(sanitizeInput({ ...clean, card })).toEqual({ ...clean, card });
   });
 
   it('clamps and normalizes hostile values', () => {
@@ -421,8 +416,7 @@ describe('input and command validation', () => {
       aimYaw: 100,
       aimPitch: 9,
       buttons: 0xfffff,
-      wheel: 'selfDestruct',
-      marker: { x: 1e9, z: -1e9 },
+      card: 4,
       extra: 'ignored',
     });
     expect(out).not.toBeNull();
@@ -433,8 +427,8 @@ describe('input and command validation', () => {
     expect(out.aimYaw).toBeLessThan(Math.PI);
     expect(out.aimPitch).toBe(MAX_AIM_PITCH);
     expect(out.buttons).toBe(BUTTON_MASK);
-    expect(out.wheel).toBeUndefined();
-    expect(out.marker).toEqual({ x: 1100, z: -1100 });
+    expect(out.card).toBeUndefined();
+    for (const card of [0, -1, 2.5, '2', null]) expect(sanitizeInput({ seq: 1, moveX: 0, moveZ: 0, aimYaw: 0, aimPitch: 0, buttons: 0, card })?.card).toBeUndefined();
     expect(Object.keys(out)).not.toContain('extra');
   });
 
@@ -447,26 +441,9 @@ describe('input and command validation', () => {
     expect(sanitizeInput({ seq: 1, moveX: 0, moveZ: 0, aimYaw: 0, aimPitch: 0, buttons: '3' })).toBeNull();
   });
 
-  it('validates squad commands', () => {
-    expect(sanitizeCommand({ type: 'follow', junk: 1 })).toEqual({ type: 'follow' });
-    expect(sanitizeCommand({ type: 'fireAtWill' })).toEqual({ type: 'fireAtWill' });
-    expect(sanitizeCommand({ type: 'holdCharge' })).toEqual({ type: 'holdCharge' });
-    expect(sanitizeCommand({ type: 'moveTo', x: 5, z: 9999 })).toEqual({ type: 'moveTo', x: 5, z: 1100 });
-    expect(sanitizeCommand({ type: 'moveTo', x: 'a', z: 0 })).toBeNull();
-    expect(sanitizeCommand({ type: 'callIn', callIn: 'artillery', x: 1, z: 2 })).toEqual({
-      type: 'callIn',
-      callIn: 'artillery',
-      x: 1,
-      z: 2,
-    });
-    expect(sanitizeCommand({ type: 'callIn', callIn: 'nuke', x: 1, z: 2 })).toBeNull();
-    expect(sanitizeCommand({ type: 'explode' })).toBeNull();
-    expect(sanitizeCommand(undefined)).toBeNull();
-  });
-
   it('lists every message type once', () => {
     expect(new Set(CLIENT_MESSAGE_TYPES).size).toBe(CLIENT_MESSAGE_TYPES.length);
-    expect(CLIENT_MESSAGE_TYPES).toEqual(expect.arrayContaining(['setName', 'setRole', 'setFaction', 'ready', 'start', 'input', 'command', 'draftPick', 'ping']));
+    expect(CLIENT_MESSAGE_TYPES).toEqual(expect.arrayContaining(['setName', 'setRole', 'setFaction', 'ready', 'start', 'input', 'draftPick', 'ping']));
     expect(SERVER_MESSAGE_TYPES).toEqual(['welcome', 'lobby', 'snap', 'events', 'pong']);
   });
 });

@@ -210,7 +210,12 @@ export interface SnapUnit {
 
 export interface Snapshot {
   tick: number;
-  /** Sequence number of the last input the server applied for the receiving client. */
+  /**
+   * The receiving client's acknowledgement, two numbers in one: the low 24 bits are the input
+   * sequence number up to which the server has played or dropped every input, the top 8 bits
+   * how many inputs after it the server will drop (`packedAck` in server/src/room/inputQueue.ts,
+   * `readAck` in client/src/net/prediction.ts; ARCHITECTURE.md section 4.3).
+   */
   ackSeq: number;
   match: SnapMatch;
   kaijus: SnapKaiju[];

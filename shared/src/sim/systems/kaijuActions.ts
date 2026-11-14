@@ -102,14 +102,13 @@ function freshPress(k: Kaiju, input: InputState, button: ButtonName): boolean {
   return input.sincePressTicks[BtnIndex[button]] <= INPUT_BUFFER_TICKS || isDown(input, button);
 }
 
-function announce(world: World, k: Kaiju, action: KaijuVerb, phase: KaijuPhase, duration: number, elapsed = 0): void {
+function announce(world: World, k: Kaiju, action: KaijuVerb, phase: KaijuPhase, duration: number): void {
   emit(world, {
     type: 'kaijuAction',
     kaiju: k.id,
     action,
     phase,
     duration,
-    ...(elapsed > 0 ? { elapsed } : {}),
     x: k.x,
     z: k.z,
     yaw: k.actionYaw,
@@ -261,6 +260,8 @@ function startCocoon(world: World, k: Kaiju): void {
   k.vx = 0;
   k.vz = 0;
   k.act.usedPress |= Btn.molt;
+  // Presses kept from the water (never alone brings it up with one) are spent.
+  k.act.swimPress = 0;
   setPhase(k, 'cocoon', duration);
   announce(world, k, 'molt', 'cocoon', duration);
   emit(world, { type: 'cocoon', kaiju: k.id, x: k.x, z: k.z, duration });

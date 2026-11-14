@@ -1,0 +1,231 @@
+{
+ "about": "The first cast (RHVoice, Flite and Pico), as last built before the neural voices: its voices, the measurements of that build (pocketsphinx), the second recognizer and the voice prints measured on its shipped .ogg files, and the size of its files. Frozen; nothing rebuilds it.",
+ "cast": {
+  "Overlord": {
+   "voice": {
+    "engine": "rhvoice",
+    "voice": "bdl",
+    "rate": 0.85,
+    "pitch": 0.72
+   },
+   "chain": "radio"
+  },
+  "Granite": {
+   "voice": {
+    "engine": "flite",
+    "voice": "rms",
+    "rate": 1.06
+   },
+   "chain": "radio"
+  },
+  "Beacon": {
+   "voice": {
+    "engine": "rhvoice",
+    "voice": "clb",
+    "rate": 1.15
+   },
+   "chain": "radio"
+  },
+  "Tempest": {
+   "voice": {
+    "engine": "rhvoice",
+    "voice": "alan"
+   },
+   "chain": "radio"
+  },
+  "Anchor": {
+   "voice": {
+    "engine": "rhvoice",
+    "voice": "slt",
+    "rate": 0.94
+   },
+   "chain": "broadcast"
+  },
+  "Chair": {
+   "voice": {
+    "engine": "pico",
+    "voice": "en-US",
+    "rate": 0.9,
+    "pitch": 0.9,
+    "shift_st": -3.0
+   },
+   "chain": "hall"
+  }
+ },
+ "summary": {
+  "speaker:Overlord": {
+   "lines": 50,
+   "words": 420,
+   "wer_raw": 5.5,
+   "wer_processed": 5.2,
+   "wer_ogg": 5.0,
+   "wer_mp3": 5.0,
+   "words_per_second": 2.48,
+   "seconds_total": 175.7,
+   "wer2_raw": 1.9,
+   "wer2_ogg": 2.1
+  },
+  "speaker:Granite": {
+   "lines": 26,
+   "words": 168,
+   "wer_raw": 7.7,
+   "wer_processed": 9.5,
+   "wer_ogg": 9.5,
+   "wer_mp3": 8.9,
+   "words_per_second": 2.93,
+   "seconds_total": 61.9,
+   "wer2_raw": 0.6,
+   "wer2_ogg": 4.2
+  },
+  "speaker:Beacon": {
+   "lines": 26,
+   "words": 219,
+   "wer_raw": 7.3,
+   "wer_processed": 5.0,
+   "wer_ogg": 5.0,
+   "wer_mp3": 7.3,
+   "words_per_second": 2.66,
+   "seconds_total": 86.9,
+   "wer2_raw": 0.0,
+   "wer2_ogg": 0.0
+  },
+  "speaker:Tempest": {
+   "lines": 27,
+   "words": 201,
+   "wer_raw": 6.5,
+   "wer_processed": 7.5,
+   "wer_ogg": 9.5,
+   "wer_mp3": 10.9,
+   "words_per_second": 2.85,
+   "seconds_total": 76.3,
+   "wer2_raw": 0.5,
+   "wer2_ogg": 0.0
+  },
+  "speaker:Anchor": {
+   "lines": 86,
+   "words": 874,
+   "wer_raw": 5.4,
+   "wer_processed": 7.2,
+   "wer_ogg": 7.2,
+   "wer_mp3": 7.2,
+   "words_per_second": 2.8,
+   "seconds_total": 320.8,
+   "wer2_raw": 0.6,
+   "wer2_ogg": 0.7
+  },
+  "speaker:Chair": {
+   "lines": 6,
+   "words": 94,
+   "wer_raw": 16.0,
+   "wer_processed": 18.1,
+   "wer_ogg": 19.1,
+   "wer_mp3": 18.1,
+   "words_per_second": 2.58,
+   "seconds_total": 44.5,
+   "wer2_raw": 0.0,
+   "wer2_ogg": 0.0
+  },
+  "chain:radio": {
+   "lines": 129,
+   "words": 1008,
+   "wer_raw": 6.4,
+   "wer_processed": 6.3,
+   "wer_ogg": 6.6,
+   "wer_mp3": 7.3,
+   "words_per_second": 2.67,
+   "seconds_total": 400.8,
+   "wer2_raw": 1.0,
+   "wer2_ogg": 1.6
+  },
+  "chain:broadcast": {
+   "lines": 86,
+   "words": 874,
+   "wer_raw": 5.4,
+   "wer_processed": 7.2,
+   "wer_ogg": 7.2,
+   "wer_mp3": 7.2,
+   "words_per_second": 2.8,
+   "seconds_total": 320.8,
+   "wer2_raw": 0.6,
+   "wer2_ogg": 0.7
+  },
+  "chain:hall": {
+   "lines": 6,
+   "words": 94,
+   "wer_raw": 16.0,
+   "wer_processed": 18.1,
+   "wer_ogg": 19.1,
+   "wer_mp3": 18.1,
+   "words_per_second": 2.58,
+   "seconds_total": 44.5,
+   "wer2_raw": 0.0,
+   "wer2_ogg": 0.0
+  },
+  "all": {
+   "lines": 221,
+   "words": 1976,
+   "wer_raw": 6.4,
+   "wer_processed": 7.3,
+   "wer_ogg": 7.5,
+   "wer_mp3": 7.8,
+   "words_per_second": 2.71,
+   "seconds_total": 766.2,
+   "wer2_raw": 0.8,
+   "wer2_ogg": 1.1
+  }
+ },
+ "ogg_bytes": 6209291,
+ "mp3_bytes": 6600916,
+ "radio_voices": {
+  "names": [
+   "Overlord",
+   "Granite",
+   "Beacon",
+   "Tempest"
+  ],
+  "matrix": [
+   [
+    0.99,
+    0.48,
+    0.32,
+    0.45
+   ],
+   [
+    0.48,
+    0.97,
+    0.38,
+    0.53
+   ],
+   [
+    0.32,
+    0.38,
+    0.99,
+    0.31
+   ],
+   [
+    0.45,
+    0.53,
+    0.31,
+    0.98
+   ]
+  ]
+ },
+ "second_opinion_misses": {
+  "v_kaiju_spotted_2": "target sighted all squads moving from two sides",
+  "v_kaiju_spotted_7": "officials confirmed soldiers can now see the creature",
+  "v_volley_ready_4": "bolly is charged check what is behind the target",
+  "v_volley_fired_1": "bolly away",
+  "v_volley_fired_2": "brown's out watch the fall",
+  "v_volley_fired_5": "all of it is on the way should stink",
+  "v_volley_fired_10": "the army has fired again it isn't clear what was hit",
+  "v_crossfire_6": "arm units have caught the creature in a crossfire sources say",
+  "v_crossfire_10": "cross fire keep it up",
+  "v_stagger_end_2": "it is backup window is shut",
+  "v_landmark_down_4": "a city landmark has been destroyed tours are cancelled until further notice",
+  "v_player_takeover_2": "lost hour leader next in line takes over",
+  "v_stage_2_2": "the district is the new line all squads redeployed",
+  "v_callin_inbound_1": "strike and bound keep it at the marker",
+  "v_kaiju_lowhp_4": "experts suggest the creature ate something it is badly hurt",
+  "v_end_humans_clock_1": "time the city stands ceasefire all squads"
+ }
+}

@@ -76,7 +76,7 @@ client/                   @mb/client
   src/net/                connection, snapshot interpolation, input sending, prediction
   src/render/             three.js scene: city, kaiju, units, crowds, projectiles, effects, sky
   src/game/               local player controllers (kaiju, human, map view, drone), input devices
-  src/ui/                 HUD, command wheel, menus, lobby, draft, end screen, subtitles
+  src/ui/                 HUD (the squad's volley meter, the tank's gun reticle), menus, lobby, draft, end screen, subtitles
   src/audio/              music stems, positional effects, voice queue
   public/assets/          models/ textures/ sprites/ audio/{music,sfx,voice}/ ui/  + manifest.json
 tools/art/                Blender Python sources for every model (source of truth for art)
@@ -128,9 +128,8 @@ squads; bots fill empty slots), the city seed, the starting anchor (or -1 for ra
 timers (`MatchTuning`; `fastTuning()` is the `MB_FAST` set) and, optionally, bot handicaps
 (`bots`: 0 is a bot at its best, 1 leaves it standing still; `idleBots()` for tests; and
 `bots.triggerHappy`, a harness profile in which squad bots hold the trigger instead of
-charging volleys). Squad
-commands that do not travel inside an input are handed over with
-`queueCommand(world, player, command)`.
+charging volleys). `queueCommand(world, player, command)` is kept for old callers and does
+nothing: since phase 1 there are no squad commands (no wheel, no map orders).
 
 People coming and going is one hook: `setPlayerBot(world, player, bot)`. With `true` a bot takes
 the slot over from the next tick, with a blank mind, from whatever state the slot is in (a
@@ -149,15 +148,19 @@ State (plain objects and typed arrays, cheap to snapshot):
 - `match`: phase, stage, clock, bar points and marks, winner, per-player tallies.
 - `kaijus[]`: id, controlling player, kind, stage, pos, yaw, velocity, hp, nerve, rage, action
   state machine (`idle | windup | active | recover | brace | eat | roar | special | stagger |
-  cocoon | dead`, with action id and timer), held object, cooldowns, mods.
+  cocoon | dead | charge | stumble`, with action id and timer), held object, cooldowns, mods,
+  the moves picked at the molts (`moves`, two slots) and the molt cards on offer (`offer`);
+  server-side only: `forceMolt` and `collapse` (never alone, below).
 - `squads[]`: player or bot, faction, level, 4 unit ids, driven unit id (-1 when eliminated),
-  movement order, fire mode, call-in cooldowns, upgrades and mods, eliminated flag; server-side
-  only: the leader's `trail`, `formed`, `volleyReady`, and the order budget (`orderBudget`,
-  `pendingOrders`: wheel orders are carried out a few a second, see below).
-- `units[]`: id, squad, type, pos (and altitude for aircraft), yaw, aim yaw and pitch, hp,
-  members, nerve, shaken timer, charge, weapon cooldown, veteran flag, `rooted` and `arcYaw`
-  (the firing arc of a planted unit); server-side only: `nav` (hold point, route, steering
-  memory of a sub-unit; `sim/nav.ts`).
+  upgrades and mods, eliminated flag; server-side only: the leader's `trail` (with `trailBase`,
+  how many points have dropped off its front, so a point keeps its number), `formed` and
+  `volleyReady`.
+- `units[]`: id, squad, type, pos (and altitude for aircraft), yaw, aim yaw and pitch (for the
+  tank a person drives, the turret: it turns at its own rate, see `stepMovement` below), hp,
+  members, nerve, shaken timer, the roar's stun timer (`stun`), charge, weapon cooldown, veteran
+  flag, `rooted` (a squad-mate planted for the volley); server-side only: `nav` (route,
+  steering memory of a squad-mate, the trail point it is driving for when it has fallen behind;
+  `sim/nav.ts`).
 - `projectiles[]`: id, type, owner, pos, velocity, flight model (`flat | arc | thrown`), ttl.
 - `callIns[]`: artillery missions on their way (marker, timers, shells left, approach direction).
 - City state: `Float32Array` hp per structure id (plus the visual stage per structure), bitset
@@ -181,16 +184,16 @@ operates on `World`, and is covered by tests.
 
 | # | File in `sim/systems/` | Reads | Writes |
 | --- | --- | --- | --- |
-| 1 | `inputs.ts` | this tick's inputs, queued commands | `player.input` (edges, hold timers), `player.commands`, the driven unit's `control` |
-| 2 | `kaijuActions.ts` | `player.input` | the kaiju action state machine, held object, cocoon start; queues hits and city damage, spawns thrown projectiles |
-| 3 | `unitOrders.ts` | `player.commands`, the kaiju, the city | spotting, takeover, squad orders, call-in missions, every sub-unit's `control`, `rooted`, `arcYaw`, charge, `state`, `nav` |
+| 1 | `inputs.ts` | this tick's inputs | `player.input` (edges, hold timers), the driven unit's `control` |
+| 2 | `kaijuActions.ts` | `player.input` (buttons, the one-shot `card`) | the kaiju action state machine, held object, cocoon start and the molt cards (`moves`, `offer`); queues hits and city damage, spawns thrown projectiles |
+| 3 | `unitOrders.ts` | `player.input` (the volley button, the leader's aim), the kaiju, the city | spotting, takeover, the leader's trail, every squad-mate's `control` (swarm, planting and charging, fire at will), `rooted`, charge, `state`, `nav` |
 | 4 | `bots.ts` | the world | `player.botInput` for the NEXT tick (bots use the same input interface as people); `player.botState` |
 | 5 | `movement.ts` | `player.input`, `unit.control` | positions, the kaiju's head aim; queues trample and wade damage to the city |
-| 6 | `weapons.ts` | `unit.control.fire`, aim, charge, `callIns` | weapon and call-in cooldowns, projectiles (salvos, volleys, shells), `volley`, the later `callin` phases |
+| 6 | `weapons.ts` | `unit.control.fire`, the volley button's release, aim, charge, `callIns` | weapon cooldowns, projectiles (salvos, volleys, shells), `rooted` and charge back to nothing after a volley, `volley`, the `callin` phases |
 | 7 | `projectiles.ts` | projectiles | flight, impacts; queues hits, structure and prop damage |
 | 8 | `damage.ts` | `hits` | hp, nerve, stagger, shaken, deaths, squad elimination, rage; tramples units under a moving kaiju |
 | 9 | `cityDamage.ts` | `structureHits`, `propHits` | structure hp and stages, props and wrecks, the bar, tallies, rage, `barMark`, `moltAvailable` |
-| 10 | `matchFlow.ts` | the bar marks, hp, the clock, a cocoon that has run its time | phases, the clock, the end of the molt (blast wave, the kaiju's new body, intermission, `beginStage`), the end of the match |
+| 10 | `matchFlow.ts` | the bar marks, hp, the clock, a cocoon that has run its time, squads all eliminated | phases, the clock, never alone (the city gives way, `forceMolt`), the end of the molt (blast wave, the kaiju's new body, intermission, a molt card drawn if none was picked, `beginStage`), the end of the match |
 | 11 | `voice.ts` | this tick's events, kaiju hp, the bar | `voice` events with the lines to play (rationed) |
 
 All eleven are implemented; `docs/STATUS.md` lists what is still a stub elsewhere.
@@ -219,9 +222,10 @@ How the bots are put together (`sim/bots/`, numbers in `defs/bots.ts`; behavior 
 section 5, "Bots"):
 
 - `systems/bots.ts` calls `kaijuBot` or `squadBot` for every slot with `player.bot` set. Each
-  writes `player.botInput` (a plain `PlayerInput`: stick relative to its aim, aim, button bits,
-  `wheel`, `marker`), which the input system applies on the next tick exactly as it applies a
-  person's. Bots read the World freely but change nothing in it except their own
+  writes `player.botInput` (a plain `PlayerInput`: the stick, aim and button bits; the stick is
+  relative to its aim, except that a squad bot driving a tank works its throttle and hull turn
+  through `setTankMove` in `sim/movement.ts`), which the input system applies on the next tick
+  exactly as it applies a person's. Bots read the World freely but change nothing in it except their own
   `player.botState` and, for a squad leader, the route memory of the unit it drives
   (`unit.nav`, through `steerToward`, the same navigation the sub-units use).
 - A squad bot acts on what the humans' map shows (`kaiju.known`), not on where the kaiju is.
@@ -242,40 +246,48 @@ do not choose lines themselves. (`pickVoiceLine` remains for tools that only hav
 
 How the human side is put together (`DESIGN.md` section 5 has the rules):
 
-- **Orders** (`systems/unitOrders.ts`). Wheel orders are carried out from a per-squad budget
-  (`takeOrders`: `SQUAD_RULES.orderBurst` at once, then `ordersPerSecond`; a newer order of
-  the same kind replaces one still waiting; one move-to is planned per tick in the whole
-  match), so the planning a command costs is bounded whatever a client sends. Call-ins are
-  not held up. The driven unit's `control` comes straight from its
-  player's input. Every other living unit of the squad is a sub-unit and gets its `control`
-  here each tick: where to go (its hold point, or its slot in the column behind the leader),
-  where to point its weapon, and whether to fire at will. Hold-and-charge is a per-unit state:
-  `rooted` (planted), `arcYaw` (the arc it is locked to), `charge`, `state` 'charging' (which
-  is what the snapshot's `laser` flag reports). Squad helpers that bots and clients can use
-  are in `sim/squads.ts`: `formationSlot`, `scatterMult` and `kaijuIsSlowed` (both work on
-  snapshot data), `arcCovers`, `laserOnKaiju` / `lasersOnKaiju`, `squadCharge`, `markVeterans`.
+- **Squad-mates** (`systems/unitOrders.ts`). The driven unit's `control` comes straight from its
+  player's input. Every other living unit of the squad is a squad-mate (a sub-unit) and gets its
+  `control` here each tick, in this order: stunned by the roar (stand still, unplanted, charge
+  gone); shaken (back off, unplanted, charge gone); the player holding the volley button
+  (`volleyHeld`: plant, turn the weapon toward the point the leader's aim ray lands on,
+  `volleyAim` in `sim/squads.ts`, and charge from 0 to 1 over `COMBAT_RULES.chargeTime`); else
+  follow the swarm and fire at will. The swarm is a loose group around and behind the leader:
+  places measured back along the leader's trail (`swarmSlot`, three across or single file where
+  a street is too narrow, `swarmWidth`), a speed that brakes in time to stop at the place and
+  rides along at the leader's pace, and, for a squad-mate that has fallen more than three
+  spacings behind, the leader's own way after it (`trailFollow`, which also says how far the
+  next corner of that way is, so that a tank brakes for it). Planting and charging are
+  per-unit state: `rooted`, `charge`, `state` 'charging' (which is what the snapshot's `laser`
+  flag reports). Squad helpers that bots and clients can use are in `sim/squads.ts`:
+  `volleyMeter` (the squad's charge from snapshot units), `scatterMult` and `kaijuIsSlowed` (both
+  work on snapshot data), `volleyAim`, `laserOnKaiju` / `lasersOnKaiju`, `squadCharge`,
+  `markVeterans`.
 - **Navigation** (`sim/nav.ts`). `steerToward(world, unit, x, z, tolerance, out)` answers with
   a direction and a throttle: the straight line when the unit's whole width fits
   (`corridorClear`), otherwise along the road graph (onto the nearest street it can reach,
   Dijkstra through the crossroads inside the bounds, off at the point nearest the goal), with
   a look-ahead that steers round walls on every leg. It never moves anything: the movement
-  system does, with the same `stepMovement` as everybody. A sub-unit that has dropped out of
-  formation gets `nav.hurry` (a multiplier on its top speed); the driven unit never does, so
+  system does, with the same `stepMovement` as everybody. A squad-mate that has fallen behind its
+  place gets `nav.hurry` (a multiplier on its top speed); the driven unit never does, so
   client prediction of one's own unit is unaffected.
 - **Weapons** (`systems/weapons.ts`). A unit that fires launches one projectile per launcher or
-  tank with `spawnProjectile`. The driven unit's shot goes to its aim point
-  (`resolveAimPoint` from the eye, kaiju included) and is the volley trigger; sub-units fire
-  along their own aim. What a sub-unit's shot in a volley is worth follows its charge
-  (`volleyStrength`, `isChargedVolley` in `sim/squads.ts`): ragged below
+  tank with `spawnProjectile`. The driven unit's shot goes to its aim point along its own aim
+  (`resolveAimPoint` from the eye, kaiju included; for a driven tank that aim is its turret).
+  The volley goes on the tick the volley button is let go: the leader's shot if its weapon is
+  ready, then every planted squad-mate with some charge, at the point the leader's aim ray
+  lands on; then they all unplant and follow again. What a squad-mate's shot is worth follows
+  its charge (`volleyStrength`, `isChargedVolley` in `sim/squads.ts`): ragged below
   `COMBAT_RULES.volleyMinCharge`, a charged volley from there up. A unit's projectile lives
   for `SQUAD_RULES.rangeSlack` times its weapon's range (`ttl`), which is how range limits
-  every shot. Aim error is added per projectile from the world's generator. Call-in
-  missions live in `world.callIns` and release their shells here.
-- **Markers placed with the crosshair** (`resolveMarkerPoint` in `sim/aim.ts`, called by the
-  input system for a move-to or a call-in that carries no map marker): the ground under a
-  kaiju the crosshair is on, else where the aim ray lands, else a kaiju on the map just
-  beside the crosshair, else a short way ahead (move-to) or nothing (call-in). It needs only
-  snapshot data, so a client can show where a marker would go.
+  every shot. Aim error is added per projectile from the world's generator. Call-in missions
+  live in `world.callIns` and release their shells here; no button starts one in phase 1, and
+  `startCallIn(world, squad, callIn, x, z)` is the one way in for the radio that will.
+- **Markers placed with the crosshair** (`resolveMarkerPoint` in `sim/aim.ts`; nothing calls it
+  in phase 1, it is kept for the radio's call-ins): the ground under a kaiju the crosshair is
+  on, else where the aim ray lands, else a kaiju on the map just beside the crosshair, else a
+  short way ahead (move-to) or nothing (call-in). It needs only snapshot data, so a client can
+  show where a marker would go.
 - **Breaking nerve** (`systems/damage.ts`). A hit carries `volleySquad` when it is part of a
   charged volley; the kaiju remembers each squad's latest one (`volleyHits`) and its nerve
   breaks only while `COMBAT_RULES.breakSquads` squads have landed one within
@@ -292,15 +304,35 @@ How the kaiju's action state machine, the damage rules and the molt hand over to
   wind-up → effect (instant, or an active phase) → recovery with the timings from its
   definition, and emits `kaijuAction` at each phase change, first at the START of the wind-up.
   A phase of d seconds ends on the first tick at which d has fully passed. The button rules are
-  in the header of `net/input.ts`.
+  in the header of `net/input.ts`: one move per button. The moves picked at the molts are in
+  `kaiju.moves` (`KAIJU_MOVE_IDS`; `kaijuMoveVerb` says which verb each is) and are on the two
+  move buttons. The charge's run is the active phase 'charge' and its recovery the phase
+  'stumble'; the movement system drives the run straight ahead (`kaijuMoveInput` with
+  `kaijuMoveParams`, both in `sim/movement.ts`, so client prediction follows it) and tells the
+  action system when a wall stopped it (`act.chargeBlocked`).
 - **Stagger** is entered by `applyHit` (phase 'stagger', action 'none'), cutting any action
   short; the action system only counts its timer and the damage system ends it. **Death** sets
   phase 'dead' and `alive = false`; the match flow system ends the match.
 - **Molt.** The city damage system sets `kaiju.moltAvailable` (and emits `moltAvailable`) while
   the bar is past the mark of the current stage. The action system starts the cocoon when Molt
-  is held: phase 'cocoon', action 'molt', `phaseDuration` = the cocoon time, the `cocoon` event.
+  is pressed: phase 'cocoon', action 'molt', `phaseDuration` = the cocoon time, the `cocoon` event,
+  and the molt cards (`sim/moltCards.ts`): `kaiju.offer` and the `moltOffer` event. A card pick
+  (`PlayerInput.card`, 1 to 3) is taken by the action system in any phase while an offer
+  stands and lands in the first empty slot (`moltPick`); the match flow system draws one at
+  random (`moltPick` with `random`) when the intermission ends with the offer still standing.
   The cocoon is over when `phaseTime >= phaseDuration`; from there the match flow system takes
   over (blast wave, intermission, `beginStage`).
+- **Never alone.** When every squad is eliminated during play, the match flow system lines up
+  the structures nearest the kaiju (`kaiju.collapse`) and queues them as structure hits with
+  cause 'collapse' over `MATCH_RULES.neverAloneTime` (the `cityCollapse` event first), tops the
+  bar up to the stage's mark if the city could not, and sets `kaiju.forceMolt`; the action
+  system then starts the cocoon as soon as the kaiju is up out of the water and not staggered.
+  At stage 3 the full bar ends the match (the kaiju wins).
+- **Hit volume** (`sim/kaijuBody.ts`): the body's upright capsule, the head and neck along the
+  aim, and the tail along the body's facing (`KaijuStageDef.hit`); only the spines while it
+  swims, only the body in the cocoon. `castKaijuBody` and `kaijuBodyDistance` work from
+  snapshot fields too (`KaijuBodySource`), so a client can cast against the same volume;
+  `resolveAimPoint` takes snapshot kaiju (`AimKaiju`).
 - **The beam** is one pure function, `beamPath(cityQuery, kaiju, action)` (`sim/beam.ts`), used
   by the simulation and meant for clients too: it works from snapshot fields (`kind`, `stage`,
   `x`, `z`, `aimYaw`, `aimPitch`) and the client's mirrored city, and returns the mouth, the
@@ -322,6 +354,13 @@ turn rate, steering model, trample height, wading, bounds) comes from `kaijuMove
 `unitMoveParams`, which need only what a snapshot carries. `stepMovement` never changes the
 city: it reports what the body trampled or waded through and the movement system queues the
 damage. `test/prediction.test.ts` plays a server and a snapshot-fed client side by side.
+The steering model 'tank' is the tank or troop carrier a person (or a squad bot) drives at
+stages 2 and 3: `unitMoveParams(def, { alive, rooted, stun, driven }, bounds)` picks it when
+`driven` is set and the unit type has a `drive` definition (`defs/units.ts`); the stick is the
+throttle and the hull's turn, and the body's `aimYaw` (`MoveBody.aimYaw`, the snapshot unit's
+`aimYaw`) is the turret, which `stepMovement` turns toward the input's aim at `turretRate`.
+`setTankMove` turns a wanted direction into throttle and turn, for bots and autoplay. The
+header of `shared/src/net/input.ts` has the rules.
 
 The city (`shared/src/city`): `generatePortMeridian(seed)` (`city/meridian/`, `docs/CITY.md`)
 builds Port Meridian as `CityData` (structures, props, road graph, water and park areas,
@@ -435,14 +474,16 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
   kaijuKind? }`, `setFaction { faction }`, `ready { ready }`, `setOptions { botKaiju? }` (host),
   `start {}` (host; everyone else connected must be ready or `waited`, section 4.1), `toLobby {}`
   (host, on the end screen); in a match `input` (30 Hz):
-  `{ seq, moveX, moveZ, aimYaw, aimPitch, buttons, wheel?, marker? }` and `command`
-  (`SquadCommand`); any time `ping { t }`. `draftPick { card }` is accepted and ignored until
+  `{ seq, moveX, moveZ, aimYaw, aimPitch, buttons, card? }` and `command` (`SquadCommand`:
+  the old squad orders; the server still accepts and drops it, but no client sends it since the
+  army's phase 1 client, and it is to be removed with the server's handler); any time
+  `ping { t }`. `draftPick { card }` is accepted and ignored until
   drafts exist. Payload types: `ClientMessages` in `shared/src/net/protocol.ts`. The server
   ignores anything malformed, unknown or out of turn; it never answers with an error.
 - Server → client: `lobby` `{ lobby, you }` (on joining and on every change), `welcome` (seed,
   config, your ids, the tick, the anchor, a city checksum, full structure and prop state as
-  bytes), `snap` (binary, 15 Hz: tick, last processed input seq for you, match scalars, every
-  kaiju, squad and unit; compact fixed layout from `shared/src/net/snapshot.ts`, about 800
+  bytes), `snap` (binary, 15 Hz: tick, the acknowledgement of your inputs (section 4.3), match
+  scalars, every kaiju, squad and unit; compact fixed layout from `shared/src/net/snapshot.ts`, about 800
   bytes for a Tier 1 match), `events` (array of `SimEvent` with their tick), `pong { t, tick }`.
   Payload types: `ServerMessages`. `snap` is the only message sent as raw bytes; everything else
   is plain data in the library's own encoding (MessagePack), in which the `cityState` bytes of
@@ -462,29 +503,52 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
   - A `lobby` message whose phase goes from `match` straight to `lobby`, with no `matchEnd`,
     means the server abandoned the match after an internal failure: show the lobby.
 - **Input semantics** are specified in the header of `shared/src/net/input.ts` and nowhere else:
-  the client sends raw button state (`Btn` bits: strike, grab, block, roar, special, molt, fire,
-  callIn, smoke, mark); the simulation derives presses, releases, taps and holds. `moveX` / `moveZ` are
-  relative to the view (`moveZ` forward along `aimYaw`, `moveX` to the right). `wheel` is a
-  one-shot command wheel pick and `marker` its ground point. The server cleans every input with
-  `sanitizeInput` and every command with `sanitizeCommand`.
+  the client sends raw button state (`Btn` bits; the monster's are strike, grab, stomp, move1,
+  move2 and molt, one move per button; the army's are fire and volley); the simulation derives
+  presses and releases. `moveX` / `moveZ` are relative to the view (`moveZ` forward along
+  `aimYaw`, `moveX` to the right), except for the tank or troop carrier a person drives at
+  stages 2 and 3: there `moveZ` is the throttle and `moveX` turns the hull, and `aimYaw` is
+  where the turret should point (it follows at its own rate). Holding volley plants and charges
+  the squad-mates; letting go fires them. The bits of buttons that are gone (2 to 4, the
+  monster's old brace, roar and beam; 7 to 9, the squad's old artillery, smoke and mark) are
+  free and `sanitizeInput` drops them; the input's old `wheel` and `marker` fields are gone too.
+  `card` (1 to 3) is the monster's one-shot molt card pick. The server cleans every input with
+  `sanitizeInput` and every command with `sanitizeCommand` (and then drops the command).
 - Server helpers: `snapshotOfWorld` + `encodeSnapshot` (encode once, then `setSnapshotAck` per
   client), `welcomeFor(world, player)`. Client helpers: `decodeSnapshot`, `decodeCityState` +
   `cityStateFromWire` (the live city state for local queries and prediction).
 - Snapshot version 2 (polish pass 2) added the kaiju's `marked` flag, each squad's smoke and
-  mark cooldowns, and the smoke clouds standing (a short list after the units); the layout is
-  in the header of `shared/src/net/snapshot.ts`. The `smoke` and `mark` events say when a cloud
-  is thrown and the kaiju is marked.
+  mark cooldowns, and the smoke clouds standing; version 3 took them out again with smoke and
+  mark themselves. The layout is in the header of `shared/src/net/snapshot.ts`.
+- Snapshot version 3 (phase 1 after the first multiplayer playtest; `PROTOCOL_VERSION` 2): the
+  kaiju record carries the moves picked at the molts (`moves`, two `KAIJU_MOVE_IDS` codes) and
+  the molt cards on offer (`offer`, three codes, 'none' for no card), and a cooldown for every
+  verb including 'charge' and 'tailSweep'; the unit record carries the roar's stun (`stunned`
+  flag and `stun`, seconds left). For the army: the unit's `yaw` is a full 32-bit float (the
+  hull of a driven tank is predicted from it), the squad record is only id, player, faction,
+  level, flags and `driven` (the movement order, fire mode, move-to point, call-in cooldowns,
+  smoke and mark cooldowns and the kaiju's `marked` flag are gone), and the smoke clouds list
+  is gone.
 - Projectiles are **not** in snapshots. Clients spawn them from `projectileSpawn` events and fly
   them locally with the same kinematics; `projectileHit` ends them.
 - Structure changes are events (`structureStage { id, stage }` with stage 0 intact, 1 damaged,
   2 heavily damaged, 3 rubble), one message per state change.
-- The client predicts its own body with `stepMovement`, replays unacknowledged inputs on each
-  snapshot, and smooths small corrections. The body is drawn between its last two predicted
-  poses, so it moves on every frame and not only on every tick. Everything else is
+- The client predicts its own body with `stepMovement`. On each snapshot it restarts from the
+  body in it and replays the inputs after the acknowledgement, less the ones the server says it
+  will drop (section 4.3; `readAck` in `client/src/net/prediction.ts`); an input made after the
+  server had already played its tick on a guess (the page stalled) is not predicted at all.
+  What difference remains fades out over a few frames. The body is drawn between its last two
+  predicted poses, so it moves on every frame and not only on every tick. The turret of a tank the
+  player drives is predicted with its hull (`stepMovement` turns the predicted body's `aimYaw`
+  at the turret's rate; `predictedTurret`), so the turret on screen and the gun's reticle move
+  smoothly and agree with the server. Everything else is
   interpolated about 100 ms in the past, on a clock that never runs backwards. Attack
   wind-ups start instantly on the local client (the server remains the judge of hits).
 - The buttons of an input are everything that was down at any moment since the previous
-  input was built, so a click shorter than the gap between two inputs is in exactly one.
+  input was built, so a click shorter than the gap between two inputs is in exactly one. The
+  squad's volley is the exception: it goes as it is when the input is built (and once for a press
+  too short to be seen otherwise), so that letting go, which fires the squad, reaches the server
+  in the very next input and not one later (`HumanController.sample`).
 - Events that could not be shown for more than two seconds (a hidden tab) are handed to the
   client's own listeners with `MatchSession.catchingUp` set: lasting state is taken over and
   nothing is played back.
@@ -495,22 +559,51 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
   accumulator (`fixedStep.ts`) turns elapsed time into ticks and cannot spiral: a gap counts for
   at most 250 ms, one update runs at most 4 ticks, and anything owed beyond that is dropped (the
   match runs slow for a moment instead of catching up forever).
-- Each tick takes **one input per connected player** from that player's short queue and echoes
-  its `seq` as the snapshot acknowledgement. An empty queue means the tick is played on a
-  guess, the previous input again with held buttons still held; after 15 such ticks (0.5 s) a
-  connected but silent player is brought to a stop, and after 30 (1 s) their held buttons are
-  let go too (so a hiccup in the middle of a brace, an eat or the molt does not cut it short). The acknowledgement starts again from 0
-  for a new page (token rejoin) and carries on for an automatic reconnection.
-- **After a stall** the late inputs arrive all at once. When the queue then holds more than 5,
-  it skips inputs back down to 2 to return the player to real time, but only inputs that carry
-  no news (`inputQueue.ts`): one whose buttons are the same as in the input before it, and that
-  either stands for a tick that was guessed or has none of Strike, Grab and Molt down. An
-  input in which a button goes down or comes up, and every input of a hold in progress, is
-  kept and played in order, so a tap inside the stall still happens and a hold is as long as
-  the player made it. A command wheel pick in a skipped input is carried over. Only a queue of
-  more than 32 is cut back regardless (a press is still carried over). What this cannot mend:
-  a tap whose release is itself stuck behind a stall of about 0.4 s or more has by then been
-  guessed into a hold (`docs/STATUS.md`, known risks).
+- **One input per tick, one tick late.** Each tick plays one input per connected player, in
+  order, from that player's short queue (`inputQueue.ts`). The client predicts its body as "the
+  body in the newest snapshot plus one tick for every input since", so the rule is that every
+  input gets exactly one tick, and the snapshot says so whenever the server cannot keep to it.
+  The first tick after a player's first input is played on a guess while that input waits (the
+  cushion): from then on the match plays each input a tick after it was due, so an input made a
+  little late by a busy computer is still in time. It is built in the briefing, when nothing
+  moves, so it costs nothing.
+- **A late input.** A tick whose input has not arrived is played on a guess: the previous input
+  again, held buttons still held. The guess stands in for the late input: the server commits to
+  drop the next input that brings nothing new (the same buttons as the input before it). When
+  the late input comes with the guess's buttons it is that input. A late press or release is
+  played on the next tick instead (a tap is never lost, a hold is not cut short) and a later
+  input with nothing new is dropped in its place, never one with a button down whose holding
+  time matters (`HOLD_BUTTONS`: the squad's volley, and the monster's two move buttons, on
+  which a brace is held). The one-shot fields of a dropped input (the molt `card`) go with the
+  next input that is kept. Neither side takes an extra step and no delay
+  builds up. (Before, the late input was played as well: one step too many each time, a queue
+  that grew, and every few seconds a skip of four inputs that pulled the player's body back by
+  them: the on-foot stutter of the first multiplayer playtest, `docs/STATUS.md`.)
+- **The acknowledgement** is the snapshot's one per-client field (`ackSeq`, patched in with
+  `setSnapshotAck`), and it carries two numbers (`packedAck`): in its low 24 bits the newest
+  input up to which every input has been played or dropped, and in its top 8 bits how many of
+  the inputs after it the server will drop, or has dropped already from behind inputs still
+  waiting. The client predicts the snapshot's body plus one tick for every input after the first
+  number, less the second, and takes a press as played once the first number has reached it.
+  The first number starts again from 0 for a new page (token rejoin) and carries on for an
+  automatic reconnection. (Two numbers in one field so that the snapshot layout, which others
+  were changing at the time, did not have to change; a later layout change can give the second
+  its own byte.)
+- **A silent player.** After 15 guessed ticks (0.5 s) a connected but silent player is brought
+  to a stop, and after 30 (1 s) their held buttons are let go too, so a hiccup in the middle of
+  a brace or a volley does not cut it short. Only the guesses before the stop stand in for late
+  inputs; the ticks after it stand for nothing (the player is away, not late). If that player's
+  inputs then arrive all at once and the queue holds more than 5, it skips up to that many that
+  carry no news, down to 2, to bring the player back to the present; the client is not told in
+  advance and is corrected (after a stall that long it would be anyway).
+- **Backlogs.** Inputs that keep waiting (two or more after every tick for a second, as when
+  the cushion was built while the link was slow) are trimmed one at a time, and only while the
+  player's body stands still or nothing moves (the briefing), when skipping an input cannot be
+  seen. A queue of more than 32 is cut back regardless; a press among what is cut is carried
+  over.
+- What this cannot mend: a release that arrives late was guessed as still held, so the hold
+  lasts longer by the ticks guessed after it; behind a stall of about 0.4 s or more a tap can
+  become a hold (`docs/STATUS.md`, known risks).
 - If the simulation throws, the match is abandoned and the room returns to the lobby; the
   server keeps running.
 - The end screen returns to the lobby when the host sends `toLobby`, or by itself after 120 s
@@ -578,6 +671,9 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
   token in `.env`) are started by the scripts in `host/`. The owner's guide is `docs/HOSTING.md`.
 - Environment (`server/src/config.ts`): `PORT` (2567), `HOST`, `MB_FAST=1` (short match timers
   and a small bar, set as `LobbyOptions.fast`), `MB_LATENCY` (simulated round-trip milliseconds),
+  `MB_JITTER` (with it, every message is held back a random 0 to this many milliseconds more,
+  each way, still in order: an uneven link for testing; `simulateUnevenLink` in
+  `server/src/net/server.ts`),
   `MB_SPEED` (simulation speed multiplier for headless tests; real clients cannot predict at
   any speed but 1), `MB_GRACE` (seconds a dropped seat is kept), `MB_END_SCREEN`,
   `MB_MAX_ROOMS` (50 rooms with somebody in them), `MB_NO_LIMITS=1` (no per-visitor limits),
@@ -603,28 +699,32 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
 `structureStage`, `propsDestroyed`, `kaijuAction`, `kaijuHit`, `kaijuStagger`, `kaijuHeld`,
 `nerveBreak`, `crossfire`, `unitHit`, `memberLost`, `unitDestroyed`, `unitShaken`, `takeover`,
 `volley`, `roar`, `callin`, `moltAvailable`, `cocoon`, `moltBlast`, `stageChange`, `barMark`,
-`matchPhase`, `voice`, `matchEnd`. Every event carries its `tick`; the payloads are defined and
-documented in `shared/src/sim/events.ts`.
+`matchPhase`, `voice`, `matchEnd`, `unitStunned`, `moltOffer`, `moltPick`, `cityCollapse`.
+Every event carries its `tick`; the payloads are defined and documented in
+`shared/src/sim/events.ts`.
 
 What clients can rely on from the squad events and the squad part of a snapshot:
 
 - A unit's salvo is one `projectileSpawn` per projectile, all on the same tick, with
-  `owner: 'unit'` and the unit's id. `volley: true` marks a charged volley's shots (sub-units
-  with at least 60% charge, and the trigger shot); the `volley` event of that tick lists the
-  sub-units that fired (not the driven unit), the aim point and their average charge. A
-  trigger pulled on less charge fires the sub-units too, raggedly: no `volley` flag, no
-  `volley` event. A unit's projectile carries a `ttl` of 1.1 times its weapon's range over
+  `owner: 'unit'` and the unit's id. A volley goes on the tick the player lets go of the
+  volley button: `volley: true` marks a charged volley's shots (squad-mates with at least 60%
+  charge, and the leader's shot when it goes with them); the `volley` event of that tick lists
+  the squad-mates that fired (not the driven unit), the aim point and their average charge. Let
+  go on less charge and the squad-mates fire raggedly: no `volley` flag, no `volley` event. A unit's projectile carries a `ttl` of 1.1 times its weapon's range over
   its speed and ends with a `projectileHit` on target 'none' when that runs out. `test/weapons.test.ts` replays every spawn
   with `stepProjectile` and checks it ends where its `projectileHit` says.
 - A targeting laser is a snapshot unit with `laser` set: draw it from the unit's muzzle height
   along its `aimYaw` / `aimPitch` to wherever `resolveAimPoint` (mirrored city, snapshot kaiju)
-  says that ray lands, with `charge` for brightness. The flag goes off for one tick when the
-  unit fires. `rooted` is true for as long as it is planted.
+  says that ray lands, with `charge` for brightness. The flag goes off when the unit fires (or
+  is let go without firing). `rooted` is true for as long as it is planted. The squad's charge
+  meter is `volleyMeter(snap.units, squadId)` (`sim/squads.ts`): the mean charge of its living
+  planted units.
 - `callin` comes three times per mission: 'marked' (the marker is placed; `delay` is the time
   to the first impact, `radius` the scatter to draw), 'inbound' (the first shell is falling)
   and 'done' (the last shell has landed, or the molt's blast called the mission off). Its
   shells are `projectileSpawn` events with `owner: 'callin'` and `ownerId` the mission id.
-  `callInCooldowns` in the squad snapshot is the time until the button works.
+  Nothing starts a mission in phase 1 (the button is gone; `startCallIn` is the way in for the
+  radio of phase 2).
 - `takeover` comes the tick after the `unitDestroyed` of the driven unit; from that tick the
   squad's `driven` (and the unit flag) point at the new unit. An eliminated squad has
   `driven: -1`.
@@ -638,10 +738,18 @@ What clients can rely on from the kaiju and city events:
   that prop is gone with no wreck; `'propWreck'`: that wreck is gone; `'unitWreck'`: that dead
   vehicle's wreck is gone, which the snapshot's unit flags also show).
   `shared/test/scenario.test.ts` checks this.
-- `kaijuAction` carries an optional `elapsed`: a Swipe wind-up that becomes a Stomp is announced
-  as a Stomp wind-up of the full length with the time already spent. An action whose effect is
-  instant (grab, throw) still sends its active phase, with duration 0, at the moment it lands.
-  A stagger cuts an action short without a closing `kaijuAction`: `kaijuStagger` is the signal.
+- An action whose effect is instant (grab, throw) still sends its `kaijuAction` active phase,
+  with duration 0, at the moment it lands. The charge sends 'windup', 'charge' (its run, with
+  the longest it can last as `duration`), 'stumble' (on the tick the run ends, whatever ended
+  it) and 'idle'. A stagger cuts an action short without a closing `kaijuAction`:
+  `kaijuStagger` is the signal; so does the cocoon that never alone starts by itself (the
+  `kaijuAction` molt 'cocoon' is the signal).
+- The roar's stun: `unitStunned` per unit (with the seconds), the snapshot's `stunned` and
+  `stun`; the `unitShaken` of the same roar comes on the same tick, but the shaking's seconds
+  only run once the stun is over.
+- Molt cards: `moltOffer` (the three cards and the slot they fill) when the cocoon starts,
+  `moltPick` when a pick lands (`random` when it was drawn at the end of the intermission).
+  The snapshot carries `moves` and `offer` for a client that joins in between.
 - Damage that is dealt a little every tick (the beam, being trampled) sends `unitHit` /
   `kaijuHit` only every sixth tick; hp in snapshots is always current.
 - `crossfire` is sent at most once a second per kaiju.
@@ -681,13 +789,21 @@ layout, requires bumping `SNAPSHOT_VERSION` / `PROTOCOL_VERSION`.
   with the district's name, streets, water, bridges, buildings by state, and each landmark as
   a small picture of its own model (`render/landmarkPictures.ts`, painted on the processor so
   the frame never waits on a read-back from the graphics processor).
-- UI is DOM over the canvas. The no-reading rule in `DESIGN.md` §8 is binding.
+- UI is DOM over the canvas. The no-reading rule in `DESIGN.md` §8 is binding. A HUD picture
+  pinned to a point in the world (the tank's gun reticle) is placed from `MatchRuntime.onCamera`,
+  which runs once the frame's camera is in place (shake included) and before the frame is drawn,
+  so that it moves with the picture. (The screens' own `frame` runs before the camera moves: a
+  picture placed there would trail the view by a frame.)
 - Input: keyboard and mouse, and gamepad; button glyphs follow the last device used, and a
   keycap shows the letter the player's own keyboard layout prints on that key. Rules that are
   contracts (how they are kept: `docs/STATUS.md` section 7.4):
   - During a match the mouse is captured (pointer lock). The click that captures it is never
     also a game action, and mouse buttons count only while it is captured. Whatever frees
-    the pointer (the map, the settings panel) takes it back when it closes.
+    the pointer (the map, the settings panel, the monster's molt cards while they wait for a
+    pick) takes it back when it closes; a card is picked with a plain click on it, never by
+    mouse movement under pointer lock. Taking the pointer never turns the view: the browser's
+    jump right after the capture (the first movement it reports, however late it comes) and
+    anything in the next 100 ms are thrown away (`client/src/game/input/inputManager.ts`).
   - The default keyboard map binds no modifier key and no function key: a page cannot cancel
     the browser shortcuts they make with the game's other keys (`browserShortcutRisk` in
     `client/src/game/input/actions.ts`; a test holds the defaults to it).

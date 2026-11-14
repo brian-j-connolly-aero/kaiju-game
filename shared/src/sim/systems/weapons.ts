@@ -69,7 +69,9 @@ import { spawnProjectile } from './projectiles';
 /** Slack for comparing counted-down timers against zero. */
 const TIME_EPS = 1e-6;
 
+/** Where the volley goes (the crosshair), and where a leader's own shot goes (its weapon's aim). */
 const aim = createAimPoint();
+const shot = createAimPoint();
 const mates: Vec3 = { x: 0, y: 0, z: 0 };
 const disc = { x: 0, z: 0 };
 const volleyUnits: Unit[] = [];
@@ -185,14 +187,14 @@ function fireLeader(world: World, squad: Squad, leader: Unit, volley: boolean): 
     leader.aimYaw,
     leader.aimPitch,
     SQUAD_RULES.aimRayRange,
-    aim,
+    shot,
     world.kaijus,
   );
-  const target = aim.on === 'kaiju' ? world.kaijus[aim.id] : nearestKaiju(world, aim.x, aim.z);
+  const target = shot.on === 'kaiju' ? world.kaijus[shot.id] : nearestKaiju(world, shot.x, shot.z);
   salvo.atPoint = true;
-  salvo.x = aim.x;
-  salvo.y = aim.y;
-  salvo.z = aim.z;
+  salvo.x = shot.x;
+  salvo.y = shot.y;
+  salvo.z = shot.z;
   salvo.damageMult = 1;
   salvo.nerveMult = 1;
   salvo.volley = volley;
@@ -220,6 +222,9 @@ function fireVolley(world: World, squad: Squad, leader: Unit): void {
     if (isChargedVolley(u.charge)) volley = true;
   }
 
+  // The leader's own shot goes with them when its weapon is ready.
+  if (ready(leader)) fireLeader(world, squad, leader, volley);
+
   let charge = 0;
   const ids: number[] = [];
   const fullNerve = 1 + COMBAT_RULES.volleyNervePerCharge;
@@ -240,8 +245,6 @@ function fireVolley(world: World, squad: Squad, leader: Unit): void {
     charge += u.charge;
     ids.push(u.id);
   }
-  // The leader's own shot goes with them when its weapon is ready.
-  if (ready(leader)) fireLeader(world, squad, leader, volley);
 
   // Fired or not, every planted squad-mate is let go: the charge is spent and it follows again.
   for (const id of squad.units) {

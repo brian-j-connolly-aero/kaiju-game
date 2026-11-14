@@ -25,8 +25,7 @@ export function beginBotInput(world: World, p: PlayerState): PlayerInput {
   input.moveX = 0;
   input.moveZ = 0;
   input.buttons = 0;
-  input.wheel = undefined;
-  input.marker = undefined;
+  input.card = undefined;
   return input;
 }
 

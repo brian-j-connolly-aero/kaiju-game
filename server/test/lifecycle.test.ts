@@ -17,6 +17,7 @@ import {
   ROOM_CODE_ALPHABET,
 } from '@mb/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { ackOf } from './helpers';
 import { options, Player, startTestServer, token, until, type TestServer } from './netHelpers';
 
 /**
@@ -138,12 +139,12 @@ describe('a room from creation to the last player leaving', () => {
 
     // --- inputs, snapshots, events -------------------------------------------------------
     for (const p of players) p.startInputs({ moveZ: 1, aimYaw: 0.5 });
-    await until(() => players.every((p) => p.snapshots.length >= 10 && p.snapshot.ackSeq > 0), 'snapshots that acknowledge inputs');
+    await until(() => players.every((p) => p.snapshots.length >= 10 && ackOf(p.snapshot).played > 0), 'snapshots that acknowledge inputs');
     for (const p of players) {
       const ticks = p.snapshots.map((s) => s.tick);
       expect(ticks).toEqual([...ticks].sort((a, b) => a - b));
       expect(new Set(ticks).size).toBe(ticks.length);
-      expect(p.snapshot.ackSeq).toBeLessThanOrEqual(p.lastSeq);
+      expect(ackOf(p.snapshot).played).toBeLessThanOrEqual(p.lastSeq);
       expect(p.snapshot.kaijus.length).toBe(1);
       expect(p.snapshot.squads.length).toBe(4);
       expect(p.snapshot.units.length).toBe(16);
@@ -182,7 +183,7 @@ describe('a room from creation to the last player leaving', () => {
     expect(back.lobby.players[4]).toMatchObject({ connected: true, name: 'Tester 4', slot: droppedSlot });
     expect(decodeCityState(new Uint8Array(back.welcome.cityState)).structureStage.length).toBe(built.city.structures.length);
     back.startInputs({ moveX: 1 });
-    await until(() => back.snapshots.length > 0 && back.snapshot.ackSeq > 0, 'the returning player to be acknowledged');
+    await until(() => back.snapshots.length > 0 && ackOf(back.snapshot).played > 0, 'the returning player to be acknowledged');
     await until(() => host.snapshot.squads.every((s) => !s.bot), 'the bot to hand the squad back');
     expect(back.snapshots.every((s) => s.tick > back.welcome.tick)).toBe(true);
     expect(host.lobby.players[4].connected).toBe(true);

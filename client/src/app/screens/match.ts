@@ -1,22 +1,26 @@
 /**
- * Match: the screen the game is played on. It owns the HUD, the command wheel and the map; the
- * controllers, the renderer and the audio run in the MatchRuntime. During an intermission the
- * camera pulls back to show the kaiju grown and the quarantine line widening.
+ * Match: the screen the game is played on. It owns the HUD, the squad's volley meter and the
+ * tank's gun reticle, the kaiju's warnings and the map; the controllers, the renderer and the
+ * audio run in the MatchRuntime. During an intermission the camera pulls back to show the kaiju
+ * grown and the quarantine line widening.
  *
  * It also looks after the captured mouse. While this screen is up and neither the map nor the
  * settings panel is open, the game wants the mouse (`input.wantCapture`): a click on the view
  * captures it, and only that. Opening the map or the panel lets the pointer go; closing them
- * takes it back if it had been captured. Escape belongs to the browser while the pointer is
+ * takes it back if it had been captured. The kaiju's molt cards (ui/moltCards.ts) do the same
+ * while they wait for a pick: a click on a card picks it and takes the pointer back. Escape belongs to the browser while the pointer is
  * captured (it frees the pointer and the page never sees the key), so "the pointer was taken
  * away while this window had the focus" is read as Escape: the settings panel opens.
  */
 
-import { kaijuStageDef, type SimEvent } from '@mb/shared';
-import { CommandWheel } from '../../ui/commandWheel';
+import { kaijuStageDef, unitTypeDef, weaponDef, type SimEvent } from '@mb/shared';
+import { GunReticle } from '../../ui/gunReticle';
 import { Hud } from '../../ui/hud';
 import { el } from '../../ui/icons';
 import { MapView } from '../../ui/mapView';
+import { MoltCardPicker } from '../../ui/moltCards';
 import { ThreatRing } from '../../ui/threats';
+import { VolleyMeter } from '../../ui/volleyMeter';
 import type { AppContext, Screen } from '../context';
 import { cardForMatch } from './briefing';
 
@@ -24,14 +28,19 @@ export class MatchScreen implements Screen {
   readonly id = 'match' as const;
   private root: HTMLElement | null = null;
   private hud: Hud | null = null;
-  private wheel: CommandWheel | null = null;
   private map: MapView | null = null;
   /** The kaiju's warnings of guns charging at it (in first person above all). */
   private threats: ThreatRing | null = null;
-  private wheelWasOpen = false;
-  /** The pointer was captured when the map or the panel opened: give it back when they close. */
+  /** The squad's volley meter round the crosshair, and the tank's gun reticle. */
+  private volley: VolleyMeter | null = null;
+  private gun: GunReticle | null = null;
+  /** The kaiju's molt cards (ui/moltCards.ts): while they wait for a pick the pointer is free. */
+  private cards: MoltCardPicker | null = null;
+  private cardsWaiting = false;
+  /** The pointer was captured when the map, the panel or the molt cards opened: give it back when they close. */
   private mapTookPointer = false;
   private panelTookPointer = false;
+  private cardsTookPointer = false;
   /** Set by the input manager when the browser took the pointer away. */
   private lockLost = false;
   private lockLostAt = -1;
@@ -40,17 +49,32 @@ export class MatchScreen implements Screen {
     const runtime = ctx.runtime;
     if (!runtime) return;
     this.hud = new Hud();
-    this.wheel = new CommandWheel();
     this.map = new MapView();
     this.threats = new ThreatRing();
+    this.volley = new VolleyMeter(runtime.session.role.squadId);
+    this.gun = new GunReticle();
     this.map.setCity(runtime.session.mirror.city);
     const renderer = ctx.renderer;
     if (renderer) this.map.setLandmarkPictures(() => renderer.landmarkPictures());
-    this.map.onCommand = (command) => {
-      runtime.session.sendCommand(command);
+    // The molt cards: a pick goes to the server with the next input; a picked card flies to its
+    // slot on the HUD and lands there. A click on a card is the gesture a browser wants before
+    // it hands the pointer back.
+    const cards = new MoltCardPicker();
+    this.cards = cards;
+    this.cardsWaiting = false;
+    this.cardsTookPointer = false;
+    cards.slotRect = (slot) => this.hud?.kit.slotRect(slot) ?? null;
+    cards.onFlight = (slot) => this.hud?.kit.hold(slot);
+    cards.onLand = (slot, move) => this.hud?.kit.land(slot, move);
+    cards.onPick = (n, byClick) => {
+      runtime.pickCard(n);
       ctx.audio.play('ui_wheel_select');
+      if (this.cardsTookPointer || byClick) ctx.input.lockPointer();
+      this.cardsTookPointer = false;
     };
-    this.root = el('div', 'screen match', [this.threats.root, this.hud.root, this.wheel.root, this.map.root]);
+    this.root = el('div', 'screen match', [this.threats.root, this.volley.root, this.gun.root, this.hud.root, this.map.root, cards.root]);
+    // The gun reticle is placed once the camera is where this frame's picture is drawn from.
+    runtime.onCamera = () => this.placeGun(ctx);
     ctx.ui.append(this.root);
     // The controls card opens and closes with its own key and takes no mouse input here: the
     // pointer stays captured and the game runs on behind it.
@@ -95,6 +119,8 @@ export class MatchScreen implements Screen {
     const hud = this.hud;
     if (!hud) return;
     const now = ctx.now();
+    this.volley?.onEvent(e, now);
+    if (e.type === 'moltPick' && e.kaiju === ctx.runtime?.session.role.kaijuId) this.cards?.picked(e);
     if (e.type === 'crossfire') hud.flash('crossfire', now);
     else if (e.type === 'nerveBreak') hud.flash('nerveBreak', now, 2.5);
     else if (e.type === 'volley') {
@@ -104,12 +130,38 @@ export class MatchScreen implements Screen {
     else if (e.type === 'callin' && e.phase !== 'done') hud.flash('callin', now, 2);
   }
 
+  /**
+   * The tank's gun reticle, on the point its turret's aim lands on as seen through this frame's
+   * camera; hidden unless the player drives a tank with the view their own.
+   */
+  private placeGun(ctx: AppContext): void {
+    const gun = this.gun;
+    const runtime = ctx.runtime;
+    const renderer = ctx.renderer;
+    if (!gun) return;
+    const human = runtime?.activeHuman ?? null;
+    const u = runtime?.frame?.localUnit ?? null;
+    if (!runtime || !renderer || !human || !u || !u.alive || !human.tank || runtime.shot !== null || runtime.mapOpen || runtime.frame?.match.phase !== 'playing') {
+      gun.hide();
+      return;
+    }
+    const weapon = weaponDef(unitTypeDef(u.type).weapon);
+    const p = human.gunPoint;
+    gun.place(renderer.camera, {
+      x: p.x,
+      y: p.y,
+      z: p.z,
+      onKaiju: p.on === 'kaiju',
+      inRange: p.on !== 'none' && p.dist <= weapon.range,
+      ready: 1 - Math.min(1, u.cooldown / Math.max(0.01, weapon.cooldown)),
+    });
+  }
+
   frame(ctx: AppContext, dt: number): void {
     const runtime = ctx.runtime;
     const hud = this.hud;
     const map = this.map;
-    const wheel = this.wheel;
-    if (!runtime || !hud || !map || !wheel) return;
+    if (!runtime || !hud || !map) return;
     const frame = runtime.frame;
     const input = ctx.input.state;
     if (!frame) return;
@@ -146,8 +198,26 @@ export class MatchScreen implements Screen {
       this.mapTookPointer = false;
       if (!runtime.menuOpen) ctx.input.lockPointer();
     }
-    map.update(frame, runtime.session, input, dt);
-    ctx.input.wantCapture = !ctx.params.autoplay && !runtime.mapOpen && !runtime.menuOpen;
+    map.update(frame, runtime.session);
+
+    // The molt cards. While they wait for a pick the pointer is free, so a click on a card picks
+    // it (mouse movement under pointer lock plays no part); a pick by a key, or the server's own
+    // pick at the end of the intermission, takes the pointer back if the cards had taken it.
+    const cards = this.cards;
+    if (cards) {
+      cards.update(frame.localKaiju, frame.match, runtime.session.config.tuning, input, ctx.input.bindings, input.device, now);
+      if (cards.waiting && !this.cardsWaiting) {
+        ctx.audio.play('ui_wheel_open');
+        this.cardsTookPointer = ctx.input.pointerLocked;
+        ctx.input.unlockPointer();
+      } else if (!cards.waiting && this.cardsWaiting && this.cardsTookPointer) {
+        this.cardsTookPointer = false;
+        if (!runtime.mapOpen && !runtime.menuOpen) ctx.input.lockPointer();
+      }
+      this.cardsWaiting = cards.waiting;
+      hud.root.classList.toggle('cards', cards.active);
+    }
+    ctx.input.wantCapture = !ctx.params.autoplay && !runtime.mapOpen && !runtime.menuOpen && !this.cardsWaiting;
 
     // Intermission: pull the camera back and around the kaiju.
     if (frame.match.phase === 'intermission') {
@@ -169,26 +239,31 @@ export class MatchScreen implements Screen {
     const renderer = ctx.renderer;
     if (threats && lk && lk.alive && renderer && runtime.shot === null && frame.match.phase === 'playing' && !runtime.mapOpen) {
       renderer.camera.updateMatrixWorld();
-      threats.update(lk, frame.units, frame.smokes, renderer.camera, !runtime.controller.thirdPerson, now);
+      threats.update(lk, frame.units, renderer.camera, !runtime.controller.thirdPerson, now);
     } else {
       threats?.hide();
     }
 
+    // The squad's volley meter round the crosshair, from the newest snapshot (not the view's,
+    // which runs a tenth of a second behind), while the player drives a unit of their own.
     const human = runtime.activeHuman;
-    if (human) {
-      wheel.update(human.wheel, ctx.input.bindings, input.device, frame.squads[runtime.session.role.squadId] ?? null);
-      if (human.wheel.open !== this.wheelWasOpen) {
-        this.wheelWasOpen = human.wheel.open;
-        ctx.audio.play(human.wheel.open ? 'ui_wheel_open' : 'ui_wheel_select');
-      }
-    } else {
-      wheel.root.classList.add('hidden');
+    const session = runtime.session;
+    const volley = this.volley;
+    if (volley) {
+      volley.update({
+        units: session.latest?.units ?? frame.units,
+        sinceSnapshot: now - session.stats.lastSnapshotAt,
+        held: !!human && human.volleyHeld,
+        visible: !!human && !!frame.localUnit && frame.localUnit.alive && runtime.shot === null && !runtime.mapOpen && frame.match.phase === 'playing',
+        now,
+      });
     }
   }
 
   exit(ctx: AppContext): void {
     if (ctx.runtime) {
       ctx.runtime.onEvent = null;
+      ctx.runtime.onCamera = null;
       ctx.runtime.mapOpen = false;
       ctx.runtime.menuOpen = false;
       ctx.runtime.shot = null;
@@ -203,8 +278,10 @@ export class MatchScreen implements Screen {
     this.root?.remove();
     this.root = null;
     this.hud = null;
-    this.wheel = null;
     this.map = null;
     this.threats = null;
+    this.volley = null;
+    this.gun = null;
+    this.cards = null;
   }
 }

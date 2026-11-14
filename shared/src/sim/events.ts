@@ -98,9 +98,9 @@ export interface ProjectileSpawnEvent extends EventBase {
   /** Seconds until it expires if it hits nothing (a unit's shot gives out a little past its weapon's range). */
   ttl: number;
   /**
-   * True when it was fired as part of a charged volley (drawn brighter): by a sub-unit with at
-   * least COMBAT_RULES.volleyMinCharge, or the player's trigger shot of such a volley. Ragged
-   * shots, which go with the trigger on less charge than that, are not volley shots.
+   * True when it was fired as part of a charged volley (drawn brighter): by a squad-mate with
+   * at least COMBAT_RULES.volleyMinCharge, or the leader's own shot that went with such a volley.
+   * Ragged shots, let go on less charge than that, are not volley shots.
    */
   volley: boolean;
   /** For thrown objects: what is flying. */
@@ -144,7 +144,9 @@ export interface PropsDestroyedEvent extends EventBase {
  * The kaiju's action state machine changed phase. Emitted when an action starts (phase
  * 'windup', or its active phase when it has no wind-up), when its effect begins, when recovery
  * begins, and when the kaiju returns to 'idle' (action 'none' is never sent; idle carries the
- * verb that just ended).
+ * verb that just ended). The charge: 'windup' (0.8 s, rooted, turning), 'charge' (its run, up
+ * to 3 s: `duration` is the longest it can last; it can end early, and the next event says
+ * so), 'stumble' (1.2 s; it comes on the tick the run ends, whatever ended it), 'idle'.
  */
 export interface KaijuActionEvent extends EventBase {
   type: 'kaijuAction';
@@ -153,14 +155,9 @@ export interface KaijuActionEvent extends EventBase {
   phase: KaijuPhase;
   /** Length of this phase in seconds (0 when open-ended, like brace, or instant, like a grab's snatch). */
   duration: number;
-  /**
-   * Seconds of this phase that had already passed when the event was emitted. Only present when
-   * it is not 0: a Swipe wind-up that becomes a Stomp keeps the time already spent.
-   */
-  elapsed?: number;
   x: number;
   z: number;
-  /** Direction the action is aimed along. */
+  /** Direction the action is aimed along (the tail sweep: straight behind the body). */
   yaw: number;
 }
 

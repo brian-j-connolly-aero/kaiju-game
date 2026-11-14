@@ -2,6 +2,7 @@
 
 import { App } from './app/app';
 import './styles.css';
+import './kaiju.css';
 
 const canvas = document.getElementById('view');
 const ui = document.getElementById('ui');

@@ -817,18 +817,9 @@ body {
   background: none;
 }
 
-.own-rage.full .meter-track,
-.own-charge.full .meter-track {
+.own-rage.full .meter-track {
   border-color: var(--volley);
   box-shadow: 0 0 10px var(--volley);
-}
-
-.own-charge .meter-fill {
-  background: var(--volley);
-}
-
-.own-charge .meter-icon {
-  color: var(--volley);
 }
 
 .own-reload .meter-fill {
@@ -853,27 +844,6 @@ body {
   display: flex;
   flex-direction: column;
   gap: 5px;
-}
-
-.orders {
-  display: flex;
-  gap: 8px;
-  font-size: 30px;
-  color: var(--human);
-  filter: drop-shadow(0 1px 2px #000);
-}
-
-/* A new order: the standing-orders pictures pop once. */
-.orders.changed {
-  transform-origin: left center;
-  animation: orders-pop 0.6s ease-out;
-}
-
-@keyframes orders-pop {
-  0% {
-    transform: scale(1.6);
-    color: #fff;
-  }
 }
 
 .squads {
@@ -1060,6 +1030,282 @@ body {
   transform: scale(1.5);
 }
 
+/*
+ * The squad's volley meter (ui/volleyMeter.ts): a big yellow diamond round the crosshair that
+ * fills from the bottom while Volley is held, a white notch at 60%, the squad-mates under it
+ * and, when another squad's volley has landed, a ring counting its five seconds down. The SVG's
+ * point (0, 0) is the middle of the screen.
+ */
+.volley-meter {
+  --vm: clamp(150px, 34vmin, 270px);
+  position: absolute;
+  left: calc(50% - var(--vm) / 2);
+  top: calc(50% - var(--vm) / 2);
+  width: var(--vm);
+  height: calc(var(--vm) * 1.16);
+  pointer-events: none;
+}
+
+.volley-meter svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.vm-diamond {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+}
+
+.vm-band {
+  fill: rgba(10, 12, 20, 0.55);
+}
+
+.vm-edge {
+  fill: none;
+  stroke: rgba(255, 217, 26, 0.75);
+  stroke-width: 3;
+}
+
+.vm-edge-inner {
+  stroke-width: 2;
+  stroke: rgba(255, 217, 26, 0.45);
+}
+
+/* Below the notch: a dull amber (let go now and the shot is weak). */
+.vm-fill {
+  fill: #b98c12;
+}
+
+.vm-notch {
+  stroke: #fff;
+  stroke-width: 6;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 2px #000);
+}
+
+/* From the notch: the volley counts. Bright, glowing and pulsing. */
+.volley-meter.charged .vm-fill {
+  fill: var(--volley);
+}
+
+.volley-meter.charged .vm-diamond {
+  filter: drop-shadow(0 0 7px var(--volley));
+  animation: vm-pulse 0.5s ease-in-out infinite;
+}
+
+.volley-meter.full .vm-edge {
+  stroke: #fff;
+  stroke-width: 5;
+}
+
+.volley-meter.full .vm-diamond {
+  animation-duration: 0.26s;
+}
+
+/* Only the countdown is up (the button is not held): the diamond waits, faint. */
+.volley-meter.idle .vm-diamond {
+  opacity: 0.4;
+}
+
+@keyframes vm-pulse {
+  50% {
+    transform: scale(1.07);
+  }
+}
+
+/* Let go with the volley charged: a white flash blown outward. */
+.volley-meter.fired .vm-diamond {
+  animation: vm-fired 0.6s ease-out forwards;
+}
+
+.volley-meter.fired .vm-fill,
+.volley-meter.fired .vm-edge {
+  fill: #fff;
+  stroke: #fff;
+}
+
+@keyframes vm-fired {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+    filter: drop-shadow(0 0 16px #fff);
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+    filter: drop-shadow(0 0 4px var(--volley));
+  }
+}
+
+/* Let go short of the notch: the charge fizzles out, grey. */
+.volley-meter.fizzle .vm-fill {
+  fill: #8d8d94;
+}
+
+.volley-meter.fizzle .vm-diamond {
+  animation: vm-fizzle 0.45s ease-in forwards;
+}
+
+@keyframes vm-fizzle {
+  100% {
+    transform: scale(0.82);
+    opacity: 0;
+  }
+}
+
+/* The squad-mates: a cyan circle while following, a yellow diamond while charging. */
+.vm-mate-circle {
+  fill: var(--human);
+  stroke: #0b0e16;
+  stroke-width: 2;
+}
+
+.vm-mate-diamond {
+  display: none;
+  fill: var(--volley);
+  stroke: #0b0e16;
+  stroke-width: 2;
+}
+
+.vm-mate.charging .vm-mate-circle,
+.vm-mate.none {
+  display: none;
+}
+
+.vm-mate.charging .vm-mate-diamond {
+  display: inline;
+}
+
+/* Stunned or shaken: it cannot charge. */
+.vm-mate.out .vm-mate-circle {
+  fill: var(--danger);
+  animation: pulse 0.3s infinite;
+}
+
+.vm-mate.dead .vm-mate-circle {
+  fill: none;
+  stroke: rgba(141, 141, 148, 0.8);
+  stroke-width: 2.5;
+}
+
+/* Another squad's volley has landed: five seconds to land this one. */
+.vm-ring {
+  display: none;
+}
+
+.volley-meter.countdown .vm-ring,
+.volley-meter.paired .vm-ring {
+  display: inline;
+}
+
+.vm-ring-track {
+  fill: none;
+  stroke: rgba(10, 12, 20, 0.45);
+  stroke-width: 11;
+}
+
+.vm-ring-time {
+  fill: none;
+  stroke: #fff2a8;
+  stroke-width: 8;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 4px var(--volley));
+}
+
+.vm-ring-mark {
+  fill: var(--volley);
+  stroke: #0b0e16;
+  stroke-width: 2;
+}
+
+.volley-meter.hurry .vm-ring {
+  animation: pulse 0.24s infinite;
+}
+
+/* This squad's volley landed inside the window: the pair is made, the ring bursts. */
+.volley-meter.paired .vm-ring {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: vm-paired 0.8s ease-out forwards;
+}
+
+.volley-meter.paired .vm-ring-time {
+  stroke: #fff;
+  stroke-dashoffset: 0;
+}
+
+@keyframes vm-paired {
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+/*
+ * The tank's gun reticle (ui/gunReticle.ts): where the turret points now. Cyan, the ring fills
+ * as the gun reloads; placed by the frame (left and top), centered on its point.
+ */
+.gun-reticle {
+  position: absolute;
+  width: 54px;
+  height: 54px;
+  margin: -27px 0 0 -27px;
+  pointer-events: none;
+}
+
+.gun-reticle svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 0 2px #000);
+}
+
+.gr-track {
+  fill: none;
+  stroke: rgba(10, 12, 20, 0.5);
+  stroke-width: 6;
+}
+
+.gr-reload {
+  fill: none;
+  stroke: rgba(30, 200, 224, 0.75);
+  stroke-width: 4;
+}
+
+.gun-reticle.ready .gr-reload {
+  stroke: var(--human);
+}
+
+.gr-ticks {
+  fill: none;
+  stroke: var(--human);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.gr-dot {
+  fill: var(--human);
+}
+
+.gun-reticle.on-kaiju .gr-ticks,
+.gun-reticle.on-kaiju .gr-dot {
+  stroke: var(--kaiju);
+  fill: var(--kaiju);
+}
+
+.gun-reticle.out-of-range {
+  opacity: 0.45;
+}
+
+/* Off the screen (the turret faces away from the view): pinned to the edge, smaller. */
+.gun-reticle.edge {
+  transform: scale(0.7);
+  opacity: 0.7;
+}
+
 .status {
   position: absolute;
   left: 50%;
@@ -1106,13 +1352,6 @@ body {
   opacity: 0.45;
 }
 
-/* A squad has marked the kaiju for the whole army. */
-.status-marked {
-  color: var(--kaiju);
-  font-size: 34px;
-  animation: none !important;
-}
-
 .status-shaken,
 .status-offline,
 .status-callin {
@@ -1148,151 +1387,6 @@ body {
   display: none;
 }
 
-/* --- command wheel -------------------------------------------------------------------------- */
-
-.wheel {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 0;
-  height: 0;
-}
-
-.wheel-slice {
-  position: absolute;
-  width: 84px;
-  height: 84px;
-  margin: -42px 0 0 -42px;
-  border-radius: 50%;
-  background: var(--panel);
-  border: 3px solid var(--panel-edge);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: 40px;
-  color: var(--human);
-}
-
-.wheel-slice.on {
-  border-color: #fff;
-  border-width: 4px;
-  background: rgba(30, 200, 224, 0.55);
-  color: #fff;
-  transform: scale(1.25);
-  box-shadow: 0 0 0 4px rgba(30, 200, 224, 0.6), 0 0 24px rgba(30, 200, 224, 0.8);
-}
-
-/* While one entry is pointed at, the others step back, so the pick is never in doubt. */
-.wheel.picking .wheel-slice:not(.on) {
-  opacity: 0.55;
-  transform: scale(0.92);
-}
-
-.wheel-up {
-  top: -110px;
-}
-
-.wheel-down {
-  top: 110px;
-}
-
-.wheel-left {
-  left: -110px;
-}
-
-.wheel-right {
-  left: 110px;
-}
-
-.wheel-left.wheel-slice {
-  color: var(--volley);
-}
-
-.wheel-left.on {
-  color: #fff;
-}
-
-/* "Click to pick": the left mouse button under the hub while the wheel is open. */
-.wheel-click {
-  position: absolute;
-  left: -16px;
-  top: 34px;
-  width: 32px;
-  height: 32px;
-  font-size: 30px;
-  color: #fff;
-  opacity: 0.85;
-}
-
-.wheel-glyph {
-  font-size: 22px;
-  color: #fff;
-}
-
-/* The hub: the squad's three other units (cyan circles, the army's mark), who take the orders. */
-.wheel-hub {
-  position: absolute;
-  left: -27px;
-  top: -27px;
-  width: 54px;
-  height: 54px;
-  border-radius: 50%;
-  background: var(--panel);
-  border: 3px solid var(--panel-edge);
-}
-
-.wheel-mate {
-  position: absolute;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--human);
-  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
-}
-
-.wheel-mate:nth-child(1) {
-  left: 17px;
-  top: 7px;
-}
-
-.wheel-mate:nth-child(2) {
-  left: 7px;
-  top: 25px;
-}
-
-.wheel-mate:nth-child(3) {
-  left: 27px;
-  top: 25px;
-}
-
-/* The orders the squad follows right now: a cyan dot on the rim. */
-.wheel-now {
-  position: absolute;
-  right: 2px;
-  top: 2px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--human);
-  border: 2px solid #fff;
-  display: none;
-}
-
-.wheel-slice.now .wheel-now {
-  display: block;
-}
-
-.wheel-pointer {
-  position: absolute;
-  left: -5px;
-  top: -5px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #fff;
-}
-
 /* --- map ------------------------------------------------------------------------------------ */
 
 .map {
@@ -1309,61 +1403,8 @@ body {
   border: 3px solid var(--panel-edge);
   border-radius: 10px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
-  cursor: crosshair;
   max-width: 96vw;
   max-height: 96vh;
-}
-
-.map canvas.calling {
-  cursor: cell;
-}
-
-/* The order a left click on the map places: the squad's marker, or (stage 3) the guns. */
-.map-tools {
-  position: absolute;
-  left: 16px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.map-tool {
-  position: relative;
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 40px;
-  color: var(--human);
-  background: var(--panel);
-  border: 3px solid var(--panel-edge);
-  cursor: pointer;
-}
-
-.map-tool.on {
-  color: #fff;
-  border-color: #fff;
-  background: rgba(30, 200, 224, 0.5);
-  transform: scale(1.12);
-}
-
-.map-tool-callin.on {
-  background: rgba(255, 217, 26, 0.45);
-}
-
-.map-tool-cover {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 0;
-  background: rgba(0, 0, 0, 0.6);
-  pointer-events: none;
 }
 
 /* --- subtitles ------------------------------------------------------------------------------ */
@@ -1885,6 +1926,15 @@ body:has(.controls:not(.hidden)) .briefing-sides {
     center / 100% 100% no-repeat;
 }
 
+/* A stick tilted one way only: up and down (a tank's throttle), or sideways (its hull's turn). */
+.card-tilt.card-tilt-v {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cg fill='%23f4f6fb' opacity='0.8'%3E%3Cpath d='M20 0 L24 5 L16 5Z'/%3E%3Cpath d='M20 40 L24 35 L16 35Z'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+.card-tilt.card-tilt-h {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cg fill='%23f4f6fb' opacity='0.8'%3E%3Cpath d='M0 20 L5 16 L5 24Z'/%3E%3Cpath d='M40 20 L35 16 L35 24Z'/%3E%3C/g%3E%3C/svg%3E");
+}
+
 /* "Then": a small arrow between two pictures. */
 .card-then {
   width: 0;
@@ -1948,40 +1998,6 @@ body:has(.controls:not(.hidden)) .briefing-sides {
 
 .card-stage-3 {
   font-size: calc(var(--u) * 0.54);
-}
-
-/* The command wheel in miniature. */
-.card-wheel {
-  position: relative;
-  width: calc(var(--u) * 1.9);
-  height: calc(var(--u) * 1.9);
-  font-size: calc(var(--u) * 0.66);
-  color: var(--human);
-}
-
-.card-wheel .icon {
-  position: absolute;
-}
-
-.card-wheel-up {
-  left: 35%;
-  top: 0;
-}
-
-.card-wheel-right {
-  right: 0;
-  top: 35%;
-}
-
-.card-wheel-down {
-  left: 35%;
-  bottom: 0;
-}
-
-.card-wheel-left {
-  left: 0;
-  top: 35%;
-  color: var(--volley);
 }
 
 .hud-menus {

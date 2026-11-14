@@ -153,7 +153,6 @@ function frameOf(over: { tick?: number; phase?: SnapMatch['phase']; stage?: Stag
     kaijus: [kaiju({ stage, ...over.kaiju })],
     squads: [],
     units: over.units ?? [],
-    smokes: [],
     bounds: { minX: -100, maxX: 100, minZ: -100, maxZ: 100 } as Bounds,
     localUnit: null,
     localKaiju: null,

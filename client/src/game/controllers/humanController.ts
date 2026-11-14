@@ -1,31 +1,39 @@
 /**
- * The human player's controller (DESIGN.md section 5): drives one unit directly, first person
- * from the lead member or third person behind it, fires, opens the command wheel and places
- * its markers. In third person the aim sent to the server is the direction from the unit's
- * eye to whatever the camera's center ray lands on, so the crosshair is honest.
+ * The human player's controller (DESIGN.md section 5): drives one unit directly, third person
+ * from behind it (the default) or first person from the lead member. Two buttons: Fire (the
+ * unit's own weapon) and Volley (held: the three squad-mates plant and charge; let go: they all
+ * fire at the crosshair).
+ *
+ * In third person the aim sent to the server is the direction from the unit's eye to whatever
+ * the camera's center ray lands on, so the crosshair is honest. Rocket infantry (stage 1) moves
+ * relative to the view. The tank or troop the player drives at stages 2 and 3 is driven like a
+ * tank (net/input.ts): W and S are the throttle, A and D turn the hull, and they go to the
+ * server as they are, not turned into the view's frame. The turret swings toward the aim at its
+ * own rate and the shells leave along it, so the controller also works out where the gun
+ * points now (`gunPoint`): the HUD draws a second reticle there.
  */
 
 import type * as THREE from 'three';
 import {
   Btn,
   clamp,
-  COMMAND_IDS,
   createAimPoint,
   createCastHit,
   DEG,
   kaijuStageDef,
+  PROP_KINDS,
+  propsInCircle,
   rayVsCapsule,
   resolveAimPoint,
   unitTypeDef,
   wrapAngle,
   type AimPoint,
-  type CommandId,
-  type GroundMarker,
-  type SnapKaiju,
+  type CityData,
+  type CityQuery,
+  type SnapUnit,
   type VerticalCapsule,
 } from '@mb/shared';
-import type { ActionState } from '../input/actions';
-import { clearOfWalls, easeClearance } from './cameraClearance';
+import { clearOfWalls, easeClearance, type Point3 } from './cameraClearance';
 import { aimCamera, setLens, type ControlContext, type Controller, type InputSample } from './types';
 
 /** How far the view may look up or down, in both cameras. */
@@ -33,33 +41,63 @@ export const HUMAN_PITCH_LIMIT = 80 * DEG;
 const PITCH_LIMIT = HUMAN_PITCH_LIMIT;
 const AIM_RANGE = 900;
 
-export interface WheelState {
-  open: boolean;
-  /**
-   * Opened with a quick tap of the wheel button rather than held: it stays open until an entry
-   * is picked (a left click, a number key, or the wheel button again).
-   */
-  sticky: boolean;
-  /** The entry the pointer is on, or null in the dead center. */
-  highlight: CommandId | null;
-  /** Pointer offset from the wheel's center, each -1..1. */
-  x: number;
-  y: number;
+/**
+ * Props the chase camera keeps out of, by the radius of what shows (meters): a tree's crown is
+ * far wider than its trunk, and a billboard's board. From inside one the camera sees nothing but
+ * leaves (props never block a body, so a unit drives right past them).
+ */
+const CAMERA_SCREENS: Readonly<Partial<Record<string, number>>> = { tree_a: 3.2, tree_b: 3.8, billboard: 2.8 };
+const propIds: number[] = [];
+const crown: VerticalCapsule = { x: 0, z: 0, r: 0, y0: 0, y1: 0 };
+const crownHit = createCastHit();
+const crownDir = { x: 0, y: 0, z: 0 };
+
+/**
+ * The fraction (0..1) of the way from `pivot` to `eye` that is clear of tree crowns and
+ * billboards, `margin` meters short of the first; 1 when nothing is in the way. A crown the
+ * pivot itself stands under is no obstacle (the unit is driving past the tree).
+ */
+export function clearOfProps(city: CityData, query: CityQuery, pivot: Point3, eye: Point3, margin: number): number {
+  const dx = eye.x - pivot.x;
+  const dy = eye.y - pivot.y;
+  const dz = eye.z - pivot.z;
+  const len = Math.hypot(dx, dy, dz);
+  if (len < 1e-4) return 1;
+  crownDir.x = dx / len;
+  crownDir.y = dy / len;
+  crownDir.z = dz / len;
+  propsInCircle(query, (pivot.x + eye.x) / 2, (pivot.z + eye.z) / 2, Math.hypot(dx, dz) / 2 + 4 + margin, propIds);
+  let t = Number.POSITIVE_INFINITY;
+  for (const id of propIds) {
+    const p = city.props[id];
+    const r = p ? CAMERA_SCREENS[p.kind] : undefined;
+    if (!p || !r) continue;
+    crown.r = r + margin;
+    if (Math.hypot(pivot.x - p.x, pivot.z - p.z) < crown.r) continue;
+    crown.x = p.x;
+    crown.z = p.z;
+    crown.y0 = 0;
+    crown.y1 = PROP_KINDS[p.kind].height + 1;
+    if (rayVsCapsule(pivot, crownDir, len + margin, crown, crownHit) && crownHit.t < t) t = crownHit.t;
+  }
+  return t === Number.POSITIVE_INFINITY ? 1 : clamp(t / len, 0, 1);
 }
 
-const capsule: VerticalCapsule = { x: 0, z: 0, r: 0, y0: 0, y1: 0 };
-const capHit = createCastHit();
-const origin = { x: 0, y: 0, z: 0 };
-const dir = { x: 0, y: 0, z: 0 };
+/**
+ * Where the chase camera hangs, behind the unit along the view and above it (meters). Infantry
+ * close, a tank or troop farther back and higher: the center ray of the view passes over the
+ * vehicles, so they never stand on the crosshair, and the hull and the turret stay in sight.
+ */
+export function chaseOffset(unitType: SnapUnit['type']): { back: number; up: number } {
+  const def = unitTypeDef(unitType);
+  if (def.body === 'infantry') return { back: 9, up: 4.2 };
+  return { back: 11 + def.radius * 1.4, up: 4.6 + def.radius * 0.5 };
+}
 
-/** The wheel's four entries, by direction: up, right, down, left (COMMAND_IDS order clockwise from the top). */
-export const WHEEL_LAYOUT: readonly CommandId[] = COMMAND_IDS;
-/** How far the wheel's pointer moves per radian of look input (it spans -1..1 each way). */
-export const WHEEL_POINTER_GAIN = 3;
-/** The pointer picks an entry once it is this far from the middle. */
-export const WHEEL_DEAD_ZONE = 0.35;
-/** Let go of the wheel button sooner than this, with nothing picked, and the wheel stays open. */
-export const WHEEL_TAP_TIME = 0.3;
+/** True when the unit a player drives handles like a tank (stages 2 and 3: net/input.ts). */
+export function drivesLikeTank(u: Pick<SnapUnit, 'type' | 'driven'>): boolean {
+  return u.driven && unitTypeDef(u.type).drive !== undefined;
+}
 
 export class HumanController implements Controller {
   readonly kind = 'human' as const;
@@ -70,19 +108,20 @@ export class HumanController implements Controller {
   /** Direction sent to the server (differs from the view in third person). */
   aimYaw = 0;
   aimPitch = 0;
-  readonly wheel: WheelState = { open: false, sticky: false, highlight: null, x: 0, y: 0 };
-  /** Where the crosshair lands. */
+  /** Where the crosshair lands (the view's aim: a volley goes there). */
   readonly aimPoint: AimPoint = createAimPoint();
-  /** Seconds since the local player last fired (for the recoil kick). */
-  private pendingWheel: CommandId | null = null;
-  private pendingMarker: GroundMarker | null = null;
-  /** Seconds the wheel has been open. */
-  private wheelTime = 0;
   /**
-   * The left button picked a wheel entry: it fires nothing until it has been let go (and the
-   * samples have seen it let go).
+   * Where the driven unit's own weapon points now and its shot would land. For a tank that is
+   * along the turret, which catches up with the aim at its own rate; for infantry it is the
+   * crosshair's point. Worked out once the frame's body is in place (`applyCamera`).
    */
-  private fireBlocked = false;
+  readonly gunPoint: AimPoint = createAimPoint();
+  /** The unit driven right now handles like a tank (stages 2 and 3). */
+  tank = false;
+  /** The volley button is down (and the map is closed): the squad-mates are planting or charging. */
+  volleyHeld = false;
+  /** The volley button went down since the last sample (a tap shorter than the gap between two still counts). */
+  private volleyTap = false;
   private started = false;
   private lastX = 0;
   private lastZ = 0;
@@ -99,111 +138,9 @@ export class HumanController implements Controller {
     this.thirdPerson = thirdPerson;
   }
 
-  /** Queues a command to go out with the next input (the map view uses this too). */
-  queueCommand(command: CommandId, marker: GroundMarker | null): void {
-    this.pendingWheel = command;
-    this.pendingMarker = marker;
-  }
-
-  /** Closes the wheel, sending the entry it is pointing at (if any). */
-  private closeWheel(pick: boolean): void {
-    const w = this.wheel;
-    w.open = false;
-    w.sticky = false;
-    if (pick && w.highlight) this.queueCommand(w.highlight, w.highlight === 'moveTo' ? this.groundMarker() : null);
-  }
-
-  /**
-   * The command wheel. Hold its button (right mouse button or Q, LB), point, let go: the entry
-   * pointed at is the order. While it is open the left mouse button (the trigger) picks the
-   * entry instead of firing, and the shot does not come back until that button is let go. A
-   * quick tap of the wheel button with nothing pointed at leaves the wheel open: point, then
-   * click (or press the wheel button again). The number keys give their order at any time and
-   * close the wheel.
-   */
-  private updateWheel(input: ActionState, dt: number): void {
-    const w = this.wheel;
-    if (input.pressed.wheel) {
-      if (w.open) {
-        // Pressed again while it waits open: that is the pick.
-        this.closeWheel(true);
-      } else {
-        w.open = true;
-        w.sticky = false;
-        w.x = 0;
-        w.y = 0;
-        w.highlight = null;
-        this.wheelTime = 0;
-      }
-    } else if (w.open) {
-      this.wheelTime += dt;
-      // While the wheel is open the look input moves its pointer, not the view.
-      w.x = clamp(w.x + input.lookX * WHEEL_POINTER_GAIN, -1, 1);
-      w.y = clamp(w.y + input.pointerY * WHEEL_POINTER_GAIN, -1, 1);
-      if (Math.hypot(w.x, w.y) > WHEEL_DEAD_ZONE) {
-        const a = Math.atan2(w.x, w.y);
-        const quadrant = ((Math.round(a / (Math.PI / 2)) % 4) + 4) % 4;
-        w.highlight = WHEEL_LAYOUT[quadrant];
-      } else {
-        w.highlight = null;
-      }
-      if (input.pressed.fire) {
-        // The left button picks; it does not fire.
-        this.fireBlocked = true;
-        this.closeWheel(true);
-      } else if (!input.down.wheel && !w.sticky) {
-        if (w.highlight || this.wheelTime >= WHEEL_TAP_TIME) this.closeWheel(true);
-        else w.sticky = true;
-      }
-    }
-    const direct: CommandId | null = input.pressed.cmdFollow
-      ? 'follow'
-      : input.pressed.cmdMoveTo
-        ? 'moveTo'
-        : input.pressed.cmdFireAtWill
-          ? 'fireAtWill'
-          : input.pressed.cmdHoldCharge
-            ? 'holdCharge'
-            : null;
-    if (direct) {
-      if (w.open) this.closeWheel(false);
-      this.queueCommand(direct, direct === 'moveTo' ? this.groundMarker() : null);
-    }
-  }
-
-  /** The ground point under the crosshair, or null when it is on the sky. */
-  private groundMarker(): GroundMarker | null {
-    return this.aimPoint.on === 'none' ? null : { x: this.aimPoint.x, z: this.aimPoint.z };
-  }
-
   /** Casts from (ox, oy, oz) along a heading and elevation against the city and the kaijus. */
-  private cast(ctx: ControlContext, ox: number, oy: number, oz: number, yaw: number, pitch: number): void {
-    const out = this.aimPoint;
-    resolveAimPoint(ctx.session.mirror.query, ox, oy, oz, yaw, pitch, AIM_RANGE, out);
-    const cp = Math.cos(pitch);
-    origin.x = ox;
-    origin.y = oy;
-    origin.z = oz;
-    dir.x = Math.sin(yaw) * cp;
-    dir.y = Math.sin(pitch);
-    dir.z = Math.cos(yaw) * cp;
-    for (const k of ctx.frame.kaijus as SnapKaiju[]) {
-      if (!k.alive) continue;
-      const st = kaijuStageDef(k.kind, k.stage);
-      capsule.x = k.x;
-      capsule.z = k.z;
-      capsule.r = st.bodyRadius;
-      capsule.y0 = 0;
-      capsule.y1 = st.height;
-      if (rayVsCapsule(origin, dir, out.dist, capsule, capHit) && capHit.t < out.dist) {
-        out.dist = capHit.t;
-        out.on = 'kaiju';
-        out.id = k.id;
-        out.x = ox + dir.x * capHit.t;
-        out.y = oy + dir.y * capHit.t;
-        out.z = oz + dir.z * capHit.t;
-      }
-    }
+  private cast(ctx: ControlContext, ox: number, oy: number, oz: number, yaw: number, pitch: number, out: AimPoint): void {
+    resolveAimPoint(ctx.session.mirror.query, ox, oy, oz, yaw, pitch, AIM_RANGE, out, ctx.frame.kaijus);
   }
 
   update(ctx: ControlContext): void {
@@ -241,16 +178,13 @@ export class HumanController implements Controller {
     this.lastZ = u.z;
     this.lastUnit = u.id;
     this.lastStage = stage;
+    this.tank = drivesLikeTank(u);
     if (input.pressed.camera) this.thirdPerson = !this.thirdPerson;
-    if (!ctx.mapOpen) this.updateWheel(input, ctx.dt);
-    else this.closeWheel(false);
-    // The left button that picked a wheel entry fires again only once it has been let go.
-    if (this.fireBlocked && !input.down.fire && !input.held.fire) this.fireBlocked = false;
 
     if (input.aimOverride) {
       this.viewYaw = input.aimOverride.yaw;
       this.viewPitch = input.aimOverride.pitch;
-    } else if (!ctx.mapOpen && !this.wheel.open) {
+    } else if (!ctx.mapOpen) {
       this.viewYaw = wrapAngle(this.viewYaw - input.lookX);
       this.viewPitch = clamp(this.viewPitch + input.lookY, -PITCH_LIMIT, PITCH_LIMIT);
     }
@@ -261,7 +195,7 @@ export class HumanController implements Controller {
     if (this.thirdPerson && !input.aimOverride) {
       // Aim from the unit at what the camera's center ray lands on.
       this.cameraPosition(ctx, this.eye);
-      this.cast(ctx, this.eye.x, this.eye.y, this.eye.z, this.viewYaw, this.viewPitch);
+      this.cast(ctx, this.eye.x, this.eye.y, this.eye.z, this.viewYaw, this.viewPitch, this.aimPoint);
       const dx = this.aimPoint.x - u.x;
       const dy = this.aimPoint.y - eyeY;
       const dz = this.aimPoint.z - u.z;
@@ -276,13 +210,15 @@ export class HumanController implements Controller {
     } else {
       this.aimYaw = this.viewYaw;
       this.aimPitch = this.viewPitch;
-      this.cast(ctx, u.x, eyeY, u.z, this.aimYaw, this.aimPitch);
+      this.cast(ctx, u.x, eyeY, u.z, this.aimYaw, this.aimPitch, this.aimPoint);
     }
     ctx.session.aimYaw = this.aimYaw;
     ctx.session.aimPitch = this.aimPitch;
+    this.volleyHeld = input.down.volley && !ctx.mapOpen && u.alive;
+    if (input.pressed.volley) this.volleyTap = true;
 
     // A little recoil when a shot actually leaves (the weapon was ready when Fire went down).
-    const firing = input.down.fire && !this.fireHeldBack && !ctx.mapOpen && u.alive && u.cooldown <= 0.05 && u.shaken <= 0;
+    const firing = input.down.fire && !ctx.mapOpen && u.alive && u.cooldown <= 0.05 && u.shaken <= 0 && u.stun <= 0;
     if (firing && !this.wasFiring) this.kick = 1;
     this.wasFiring = firing;
     this.kick = Math.max(0, this.kick - ctx.dt * 6);
@@ -292,31 +228,27 @@ export class HumanController implements Controller {
     const input = ctx.input;
     const out: InputSample = { moveX: 0, moveZ: 0, aimYaw: this.aimYaw, aimPitch: this.aimPitch, buttons: 0 };
     if (!ctx.mapOpen) {
-      // Movement is relative to the VIEW; in third person the aim can differ from it, so turn
-      // the stick into the aim's frame, which is the one the server reads it in.
-      const turn = this.viewYaw - this.aimYaw;
-      const c = Math.cos(turn);
-      const s = Math.sin(turn);
-      out.moveX = input.moveX * c - input.moveZ * s;
-      out.moveZ = input.moveZ * c + input.moveX * s;
+      if (this.tank) {
+        // A tank's stick goes as it is: W and S the throttle, A and D the hull's turn.
+        out.moveX = input.moveX;
+        out.moveZ = input.moveZ;
+      } else {
+        // Infantry moves relative to the VIEW; in third person the aim can differ from it, so
+        // turn the stick into the aim's frame, which is the one the server reads it in.
+        const turn = this.viewYaw - this.aimYaw;
+        const c = Math.cos(turn);
+        const s = Math.sin(turn);
+        out.moveX = input.moveX * c - input.moveZ * s;
+        out.moveZ = input.moveZ * c + input.moveX * s;
+      }
       // The latch, not the instant: a click that began and ended between two samples still fires.
-      if (input.held.fire && !this.fireHeldBack) out.buttons |= Btn.fire;
-      if (input.held.callIn) out.buttons |= Btn.callIn;
-      if (input.held.smoke) out.buttons |= Btn.smoke;
-      if (input.held.mark && !this.wheel.open) out.buttons |= Btn.mark;
+      if (input.held.fire) out.buttons |= Btn.fire;
+      // Volley is a hold whose end matters (letting go fires the squad): it goes as it is now,
+      // so the release is in the very next sample, and a tap between two samples still counts once.
+      if (input.down.volley || this.volleyTap) out.buttons |= Btn.volley;
     }
-    if (this.pendingWheel) {
-      out.wheel = this.pendingWheel;
-      if (this.pendingMarker) out.marker = this.pendingMarker;
-      this.pendingWheel = null;
-      this.pendingMarker = null;
-    }
+    this.volleyTap = false;
     return out;
-  }
-
-  /** The trigger does nothing now: the wheel is open, or the left button that picked from it is still down. */
-  get fireHeldBack(): boolean {
-    return this.wheel.open || this.fireBlocked;
   }
 
   /** Whether the weapon's shot was just fired locally (for the HUD's crosshair pulse). */
@@ -328,9 +260,7 @@ export class HumanController implements Controller {
   private chasePosition(ctx: ControlContext, out: { x: number; y: number; z: number }): void {
     const u = ctx.frame.localUnit;
     if (!u) return;
-    const def = unitTypeDef(u.type);
-    const back = def.body === 'infantry' ? 9 : 15 + def.radius;
-    const up = def.body === 'infantry' ? 4.2 : 7.5 + def.radius * 0.4;
+    const { back, up } = chaseOffset(u.type);
     const cp = Math.cos(this.viewPitch);
     out.x = u.x - Math.sin(this.viewYaw) * back * cp;
     out.y = Math.max(1, u.y + up - Math.sin(this.viewPitch) * back * 0.6);
@@ -344,20 +274,25 @@ export class HumanController implements Controller {
     if (u) {
       const def = unitTypeDef(u.type);
       p.x = u.x;
-      p.y = u.y + def.eyeHeight + (def.body === 'vehicle' ? 0.6 : 0);
+      // At the chase camera's own height: a camera that a wall pulls in comes in level, over the
+      // unit, instead of down onto its roof (a tank's turret would fill the lower half of the view).
+      p.y = u.y + Math.max(def.eyeHeight + (def.body === 'vehicle' ? 0.6 : 0), chaseOffset(u.type).up);
       p.z = u.z;
     }
     return p;
   }
 
-  /** Once per frame: how far out the chase camera may go before it meets a wall. */
+  /** Once per frame: how far out the chase camera may go before it meets a wall or a tree's crown. */
   private updateClearance(ctx: ControlContext): void {
     if (!this.thirdPerson || !ctx.frame.localUnit) {
       this.clear = 1;
       return;
     }
     this.chasePosition(ctx, this.eye);
-    this.clear = easeClearance(this.clear, clearOfWalls(ctx.session.mirror.query, this.chasePivot(ctx), this.eye, 0.6), ctx.dt);
+    const mirror = ctx.session.mirror;
+    const pivot = this.chasePivot(ctx);
+    const clear = Math.min(clearOfWalls(mirror.query, pivot, this.eye, 0.6), clearOfProps(mirror.city, mirror.query, pivot, this.eye, 0.6));
+    this.clear = easeClearance(this.clear, clear, ctx.dt);
   }
 
   private cameraPosition(ctx: ControlContext, out: { x: number; y: number; z: number }): void {
@@ -380,8 +315,25 @@ export class HumanController implements Controller {
     }
   }
 
+  /**
+   * Where the driven unit's weapon points: from its eye along its own aim, which is the turret
+   * of a tank (the frame's unit carries the predicted turret) and the crosshair's aim for
+   * infantry. Call once the frame's body is where it is drawn.
+   */
+  private updateGun(ctx: ControlContext): void {
+    const u = ctx.frame.localUnit;
+    if (!u) return;
+    if (!this.tank) {
+      Object.assign(this.gunPoint, this.aimPoint);
+      return;
+    }
+    const def = unitTypeDef(u.type);
+    this.cast(ctx, u.x, u.y + def.eyeHeight, u.z, u.aimYaw, this.aimPitch, this.gunPoint);
+  }
+
   applyCamera(ctx: ControlContext, camera: THREE.PerspectiveCamera): void {
     if (!ctx.frame.localUnit) return;
+    this.updateGun(ctx);
     this.cameraPosition(ctx, this.eye);
     camera.position.set(this.eye.x, this.eye.y, this.eye.z);
     setLens(camera, this.thirdPerson ? 58 : 66, 0.25, 9000);

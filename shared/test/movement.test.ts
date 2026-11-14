@@ -134,7 +134,7 @@ describe('stepMovement in the open', () => {
     expect(modded.turnRate).toBeCloseTo(100 * DEG, 9);
   });
 
-  it('steers vehicles by their hull and infantry freely', () => {
+  it('steers vehicles by their hull (squad-mates) and infantry freely', () => {
     const city = queryFor(makeTestCity());
     const tankDef = UNIT_TYPES.army_tank;
     const tank = body(0, 0, tankDef.radius, 0);
@@ -143,11 +143,11 @@ describe('stepMovement in the open', () => {
     stepMovement(tank, { moveX: 0, moveZ: 1, aimYaw: PI / 2 }, DT, city, tankParams);
     expect(tank.yaw).toBeCloseTo(110 * DEG * DT, 9);
     // It creeps along its hull (still pointing almost north) at a small fraction of top speed.
-    expect(Math.hypot(tank.vx, tank.vz)).toBeLessThan(15 * 0.1);
+    expect(Math.hypot(tank.vx, tank.vz)).toBeLessThan(tankDef.speed * 0.1);
     expect(tank.vz).toBeGreaterThan(Math.abs(tank.vx));
     drive(tank, { moveX: 0, moveZ: 1, aimYaw: PI / 2 }, tankParams, city, 3);
     expect(tank.yaw).toBeCloseTo(PI / 2, 6);
-    expect(tank.vx).toBeCloseTo(15, 6);
+    expect(tank.vx).toBeCloseTo(tankDef.speed, 6);
     // The hull heading, not the turret aim, decides where a tank drives.
     expect(Math.abs(tank.vz)).toBeLessThan(1e-6);
 
@@ -155,7 +155,7 @@ describe('stepMovement in the open', () => {
     const inf = body(0, 0, infDef.radius, 0);
     const infParams = unitMoveParams(infDef, { alive: true, rooted: false }, BIG);
     drive(inf, { moveX: 0, moveZ: 1, aimYaw: PI / 2 }, infParams, city, 1);
-    expect(inf.vx).toBeCloseTo(6.5, 9);
+    expect(inf.vx).toBeCloseTo(infDef.speed, 9);
     expect(inf.x).toBeGreaterThan(5);
   });
 
@@ -163,8 +163,31 @@ describe('stepMovement in the open', () => {
     const def = UNIT_TYPES.army_tank;
     expect(unitMoveParams(def, { alive: true, rooted: true }, BIG).topSpeed).toBe(0);
     expect(unitMoveParams(def, { alive: false, rooted: false }, BIG).topSpeed).toBe(0);
-    expect(unitMoveParams(def, { alive: true, rooted: false }, BIG).topSpeed).toBe(15);
+    expect(unitMoveParams(def, { alive: true, rooted: false }, BIG).topSpeed).toBe(def.speed);
     expect(unitMoveParams(def, { alive: true, rooted: false }, BIG).trampleHeight).toBe(0);
+  });
+
+  it('drives the player\'s own tank by throttle and hull turn, with its turret on its own (prediction runs the same)', () => {
+    const def = UNIT_TYPES.army_tank_troop;
+    const drive = def.drive!;
+    const params = unitMoveParams(def, { alive: true, rooted: false, driven: true }, BIG);
+    expect(params).toMatchObject({ steer: 'tank', topSpeed: def.speed, accel: drive.accel, brake: drive.brake, reverseMult: drive.reverseMult });
+    expect(params.turnRate).toBeCloseTo(drive.turnRate, 12);
+    expect(params.turretRate).toBeCloseTo(drive.turretRate, 12);
+    // A squad-mate of the same troop steers itself.
+    expect(unitMoveParams(def, { alive: true, rooted: false }, BIG).steer).toBe('heading');
+    const city = queryFor(makeTestCity());
+    const tank: MoveBody = { ...body(0, 0, def.radius, 0), aimYaw: 0 };
+    // Throttle with the view to the east: it drives north along its hull, the turret swinging east.
+    for (let i = 0; i < 15; i++) stepMovement(tank, { moveX: 0, moveZ: 1, aimYaw: PI / 2 }, DT, city, params);
+    expect(tank.yaw).toBe(0);
+    expect(tank.vz).toBeCloseTo((15 * drive.accel) / 30, 9);
+    expect(tank.aimYaw).toBeCloseTo(drive.turretRate / 2, 9);
+    // Turning on the spot: no throttle, full turn.
+    const still: MoveBody = { ...body(0, 0, def.radius, 0), aimYaw: 0 };
+    for (let i = 0; i < 30; i++) stepMovement(still, { moveX: -1, moveZ: 0, aimYaw: 0 }, DT, city, params);
+    expect(still.yaw).toBeCloseTo(drive.turnRate, 9);
+    expect([still.x, still.z]).toEqual([0, 0]);
   });
 
   it('converts a world direction into view-relative input and back', () => {
@@ -273,7 +296,7 @@ describe('stepMovement against the city', () => {
 
     const wader = body(0, 0, def.radius);
     let inWaterSpeed = 0;
-    // 20 m of land at 6.5 m/s, then 60 m of river at half speed: about 22 s to the far bank.
+    // 20 m of land at full speed, then 60 m of river at half speed: well under 26 s to the far bank.
     for (let i = 0; i < 30 * 26; i++) {
       stepMovement(wader, north, DT, city, params, result);
       if (wader.z > 40 && wader.z < 60) {
@@ -281,7 +304,7 @@ describe('stepMovement against the city', () => {
         inWaterSpeed = Math.hypot(wader.vx, wader.vz);
       }
     }
-    expect(inWaterSpeed).toBeCloseTo(6.5 * 0.5, 6);
+    expect(inWaterSpeed).toBeCloseTo(def.speed * 0.5, 6);
     expect(result.inWater).toBe(false);
 
     const walker = body(100, 0, def.radius);
@@ -289,7 +312,7 @@ describe('stepMovement against the city', () => {
       stepMovement(walker, north, DT, city, params, result);
       if (walker.z > 25 && walker.z < 75) {
         expect(result.inWater).toBe(false);
-        expect(Math.hypot(walker.vx, walker.vz)).toBeCloseTo(6.5, 6);
+        expect(Math.hypot(walker.vx, walker.vz)).toBeCloseTo(def.speed, 6);
       }
     }
     // Infantry is never blocked by the deck and never tramples it.

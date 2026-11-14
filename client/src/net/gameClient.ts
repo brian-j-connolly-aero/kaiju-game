@@ -264,7 +264,6 @@ export class GameClient {
     try {
       session = new MatchSession(welcome, {
         sendInput: (input) => this.send('input', input),
-        sendCommand: (command) => this.send('command', command),
         onEvent: (event) => this.events.emit('event', event),
         onCityResync: () => this.events.emit('cityResync', null),
       });

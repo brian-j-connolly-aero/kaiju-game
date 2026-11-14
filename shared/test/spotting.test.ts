@@ -131,7 +131,8 @@ describe('known: when the humans\' map shows the kaiju', () => {
     run(world, 2);
     expect(k.known).toBe(false);
 
-    let events = run(world, 2, [input({ buttons: Btn.roar })]);
+    k.moves = ['roar', 'none'];
+    let events = run(world, 2, [input({ buttons: Btn.move1 })]);
     expect(k.known).toBe(true);
     expect(cues(events)).toEqual(['kaiju.spotted']);
     events = run(world, Math.round(MATCH_RULES.revealAfterNoise * TICK_RATE) - 3);

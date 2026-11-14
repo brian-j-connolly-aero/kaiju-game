@@ -42,7 +42,6 @@ import {
   PROTOCOL_VERSION,
   removeLobbyPlayer,
   rngU32,
-  sanitizeCommand,
   sanitizeInput,
   SESSION_TOKEN_PATTERN,
   setSnapshotAck,
@@ -56,11 +55,11 @@ import {
   type Rng,
 } from '@mb/shared';
 import {
+  ackFor,
   advanceMatch,
   createMatchSession,
   matchOver,
   queueInput,
-  queueSlotCommand,
   setSlotLive,
   snapshotDue,
   takeEvents,
@@ -317,14 +316,8 @@ export class GameRoom {
     switch (type) {
       case 'input': {
         if (!this.match || lobby.phase !== 'match' || seat.slot < 0) return;
-        const input = sanitizeInput(payload, this.match.world.city.half);
+        const input = sanitizeInput(payload);
         if (input) queueInput(this.match, seat.slot, input);
-        return;
-      }
-      case 'command': {
-        if (!this.match || lobby.phase !== 'match' || seat.slot < 0) return;
-        const command = sanitizeCommand(payload, this.match.world.city.half);
-        if (command) queueSlotCommand(this.match, seat.slot, command);
         return;
       }
       case 'ping': {
@@ -461,7 +454,7 @@ export class GameRoom {
       if (snapshot) {
         // Each connection gets its own copy: the acknowledgement differs per player.
         const bytes = snapshot.slice();
-        setSnapshotAck(bytes, seat.slot >= 0 ? m.acks[seat.slot] : 0);
+        setSnapshotAck(bytes, seat.slot >= 0 ? ackFor(m, seat.slot) : 0);
         seat.peer.send('snap', bytes);
       }
     }

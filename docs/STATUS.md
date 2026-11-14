@@ -35,8 +35,8 @@ from the scaffold task.
 | `npm run assets:manifest` | `tools/build-manifest.mjs`: merges `client/public/assets/manifest.*.json` into `manifest.json`, lists the files in `ui/`, and leaves out (and reports) entries whose files are missing. `-- --check` only says whether the file is stale. The client build runs it first. |
 | `npx vitest run client/test` | Only the client tests: 20 tests, about 1 second (prediction against a real simulation through latency, the mirrored city, interpolation, the clock, the action map, the animator, the manifest tool). |
 | `node tools/playtest/smoke.mjs` | The browser smoke playtest: starts the server with `MB_FAST=1` on a free port against the production build, opens 5 headless Chromium pages on autoplay (one creates a room, four join by code), plays one match to its end, fails on any console error or page crash, saves screenshots to `/tmp/mb-scratch/playtest/` and prints, per page, draw calls and triangles (peak, and peak at stage 3), bytes over the WebSocket, snapshot size, a smoothness probe, and the server's own timing from `/healthz`. About 4 minutes on this machine. Options in the file header (`--url URL` plays against a server that is already running, such as the game container started with `MB_FAST=1`, and starts nothing; `--players N`, `--role human`, `--no-assets`, `--reconnect`, `--debug`, `--idle-humans`, `--expect kaiju\|humans`, `--expect-stage N`). Five software-rendered pages take the whole machine: the server then runs at about 21 ticks a second, so this run's timing and bandwidth figures describe the test rig, not the game (section 8.3). |
-| `node tools/playtest/scripted.mjs` | The scripted playtest with real inputs: no autopilot. One headless page plays the kaiju, then another plays a squad in a practice match, with real key presses, mouse buttons, mouse movement and clicks on the real lobby buttons (`tools/playtest/driver.mjs`). Each action is judged only by what the server sent back (its newest snapshot and its events) and ends as pass, FAIL or not attempted; the run passes only if everything was attempted and confirmed. Screenshots and `report.json` in `/tmp/mb-scratch/playtest/scripted/`. About 5 minutes. `--only kaiju\|human`, `--out DIR`. It switches pointer lock off (headless Chromium reports garbage mouse movement under it), so mouse look under pointer lock is NOT covered by it. |
-| `node tools/playtest/shots.mjs` | Stage screenshots with no server: opens the built client in sandbox mode (`?sandbox=<stage>`, the simulation runs in the page) for stages 1 to 3 on both sides, plus scripted extras (command wheel, charging lasers, two molts, the beam, a stagger). Pictures in `/tmp/mb-scratch/playtest/shots/`; fails on console errors. |
+| `node tools/playtest/scripted.mjs` | The scripted playtest with real inputs: no autopilot. One headless page plays the kaiju, then another plays a squad in a practice match, then a third drives a tank at stage 2 in the sandbox, with real key presses, mouse buttons, mouse movement and clicks on the real lobby buttons (`tools/playtest/driver.mjs`). Each action is judged only by what the server (for the tank, the sandbox's own simulation) sent back (its newest snapshot and its events) and ends as pass, FAIL or not attempted; the run passes only if everything was attempted and confirmed. Screenshots and `report.json` in `/tmp/mb-scratch/playtest/scripted/`. About 5 to 10 minutes. `--only kaiju\|human\|tank` (human runs the squad and the tank; tank the tank alone), `--out DIR`. It switches pointer lock off (headless Chromium reports garbage mouse movement under it), so mouse look under pointer lock is NOT covered by it. |
+| `node tools/playtest/shots.mjs` | Stage screenshots with no server: opens the built client in sandbox mode (`?sandbox=<stage>`, the simulation runs in the page) for stages 1 to 3 on both sides, plus scripted extras (the squad's volley meter from empty to full and its countdown ring, the tank's third-person view with both reticles, the monster's kit, molt cards and moves, the beam, a stagger, swimming). Pictures in `/tmp/mb-scratch/playtest/shots/`; fails on console errors. |
 
 ## 2. What exists
 
@@ -68,7 +68,8 @@ Everything below is in `shared/` (`@mb/shared`) unless it says otherwise, is cov
 - **`sim/`:** the full Tier 1 `World` shape (`types.ts`), the `SimEvent` union (`events.ts`),
   `MatchConfig` (`config.ts`), `createWorld`, `world.step`, the eleven-system pipeline
   (`pipeline.ts`, one file per system in `systems/`), and these real parts:
-  - input intake: edges, hold timers, wheel and call-in commands, bot inputs, driven unit control;
+  - input intake: edges, hold timers, bot inputs, driven unit control (the squad commands, the
+    wheel and the map orders are gone since phase 1);
   - `stepMovement` and the movement system: collision, bounds, trample, wade, water, bridges,
     kaiju and unit movement under player input, props crushed by kaiju and vehicles;
   - the kaiju (`systems/kaijuActions.ts`, effects in `sim/kaijuEffects.ts`, the beam's path in
@@ -86,21 +87,24 @@ Everything below is in `shared/` (`@mb/shared`) unless it says otherwise, is cov
     `spawnProjectile` launches one. Bridge decks do not stop anything in flight; a projectile
     that comes down on one has hit it;
   - the human side (`systems/unitOrders.ts`, `systems/weapons.ts`, `sim/squads.ts`,
-    `sim/nav.ts`; rules in `DESIGN.md` section 5, "How squads work"):
-    - the four wheel commands with independent movement order and fire mode, from an input or
-      a `command` message;
-    - follow: a staggered column along the leader's trail that closes up in narrow streets;
-    - move to: a hold point per sub-unit on reachable open ground, and navigation to it
-      (straight line, else the road graph inside the bounds, with local steering round walls;
-      rubble, river and bridges passable; stuck handling);
-    - hold-and-charge: planted units, firing arcs, lasers (`state` 'charging'), charge 0 to 1,
-      `volley.ready`;
+    `sim/nav.ts`; rules in `DESIGN.md` section 5, "How squads work"; rebuilt in phase 1):
+    - two buttons: Fire, and Volley (hold to plant the squad-mates, lasers on, charging 0 to 1
+      over 4.5 s at the point the leader's crosshair lands on; let go to fire them all, the
+      leader's own shot with them), `volley.ready`;
+    - the swarm: a loose group around and behind the leader along its trail, single file where
+      a street is narrow, keeping up at every stage (hurry, braking to its place, and the
+      leader's own way after it when it has fallen behind); navigation (straight line, else the
+      road graph inside the bounds, with local steering round walls; rubble, river and bridges
+      passable; stuck handling);
+    - tank driving for the unit a person drives at stages 2 and 3 (throttle and hull turn, a
+      turret that follows the aim at its own rate), predicted exactly by the client;
     - fire at will with range and line-of-fire checks, target leading, weapon traverse;
     - weapons: cooldowns, salvo size from members, the driven unit's exact aim, aim error and
-      the scatter multipliers (stage, spotted, slowed, veteran), the volley on the player's
-      shot with charge multipliers, `volley`, tallies;
-    - the artillery call-in: marker, delay, eight real shells, scatter, cooldown, `callin`;
-    - shaken sub-units backing off; takeover of the nearest survivor; elimination until the
+      the scatter multipliers (stage, spotted, slowed, veteran), the volley with charge
+      multipliers, `volley`, tallies;
+    - the artillery call-in machinery (marker, delay, eight real shells, scatter, `callin`),
+      with no button: `startCallIn` is the entry point for phase 2's radio;
+    - shaken squad-mates backing off; takeover of the nearest survivor; elimination until the
       next stage; `markVeterans`;
   - city damage: structure hp, the four visual stages, bar points with partial credit, tallies
     by class, prop destruction and wrecks, props taken by the kaiju, `barMark`, the molt prompt
@@ -174,6 +178,7 @@ remains is marked `STUB(<area>):` where it lives.
 | Where | What is missing | For |
 | --- | --- | --- |
 | `server/src/room/gameRoom.ts` | `STUB(server)`: the `draftPick` message is accepted and ignored. When the simulation has upgrade drafts, pass the pick on (and add a draft step to the intermission). | Tier 2 |
+| `client/src/ui/commandWheel.ts`, `client/src/ui/hud.ts` (two places), `client/src/ui/mapView.ts` | `STUB(client)`: the command wheel, the order pictures, the artillery, smoke and mark pictures and the map's artillery are left in place but have nothing behind them since the army's phase 1 simulation (no squad orders, no smoke or mark, no artillery button). The army client rework removes them and adds the volley meter. | Phase 1, army client |
 
 Placeholders (not `STUB`-tagged; each file says so at the top):
 
@@ -241,42 +246,41 @@ Kaiju combat (simulation part 1; the rules as built are written out in `DESIGN.m
   it holds when the cocoon closes.
 
 Human squads (simulation part 2; the rules as built are written out in `DESIGN.md` section 5,
-"How squads work", and the numbers the design left open are `SQUAD_RULES` in `defs/rules.ts`)
+"How squads work", and the numbers the design left open are `SQUAD_RULES` in `defs/rules.ts`.
+Phase 1 rebuilt the controls: the bullets marked "Phase 1" replace what stood there before;
+the army's phase 1 section at the end of this file has the rest)
 
-- "Hold fire and charge" means "hold here and charge": the command parks sub-units where they
-  stand (or leaves them their move-to spots). The design says charging units are rooted "until
-  they fire or get a new movement order"; as built, firing spends the charge and the unit plants
-  itself again on its spot the next tick with a fresh arc, so a parked squad stays parked
-  through volley after volley (this is what makes the one-player crossfire work). "Follow me"
-  un-parks them and they do not plant again until the hold command is repeated.
-- With the order 'moveTo', hold-and-charge does not stop sub-units on their way: they go on to
-  their spots and plant there.
-- A sub-unit whose firing arc does not cover the aim point sits a volley out and keeps its
-  charge. Volleys check no line of sight; range limits them only in that every projectile gives
-  out at 1.1 times its weapon's range.
+- Phase 1: there are no commands. Squad-mates plant only while the volley button is held
+  (wherever they are at that moment) and are all let go when it is let go, fired or not; then
+  they follow the leader again. A squad can no longer be parked somewhere to make a crossfire
+  on its own.
+- Phase 1: there is no firing arc. A planted squad-mate turns its weapon toward the aim point
+  at its traverse rate and fires with whatever charge it has. Volleys check no line of sight;
+  range limits them only in that every projectile gives out at 1.1 times its weapon's range.
 - With the crosshair on a kaiju, sub-units aim for the middle of its body at the height the
   player picked (the event's aim point is still where the ray met its skin).
 - Aim error is drawn per projectile, on heading and elevation. A person's own shots have none.
-  A bot's driven unit shoots with the at-will error and half nerve, except when its shot
-  triggers a volley (then volley error, full nerve).
+  A bot's driven unit shoots with the at-will error and half nerve, except when its shot goes
+  with a charged volley (then volley error, full nerve).
 - "Slowed", for scatter, is staggered, cocooned, or at least 30% of nerve capacity in
   accumulated nerve damage (`COMBAT_RULES.scatterSlowedNerve`).
 - "Spotted" counts the driven unit of every squad, bot squads included (bots play by the same
   rules). This changed the scaffold's behavior, which left bots out.
 - Sub-units firing at will lead the target, swing their weapon at 270 degrees per second, and
   look for a clear line of fire to the middle of the body, then higher, then lower.
-- Formation is a staggered column along the leader's trail, not a wedge: it follows streets by
-  itself. Stragglers catch up at 1.3 times speed (`unit.nav.hurry`, sub-units only).
-- Hold points are chosen on open ground with 2 m to spare that can be reached straight from a
-  street, so a marker on a roof or in a back yard sends units to the nearest sensible spot.
+- Phase 1: the squad-mates move as a swarm, places measured back along the leader's trail
+  (two side by side one spacing back, one two spacings back; single file where the street is
+  too narrow), so it follows streets by itself. Stragglers catch up at 1.3 times speed
+  (`unit.nav.hurry`, squad-mates only), and one more than three spacings behind drives the
+  leader's own way after it. There are no hold points and no move-to orders any more.
 - Takeover goes to the survivor nearest the unit that died, the tick after it died.
 - Every unit alive at the end of a stage is a veteran at the next (the driven one too).
 - Artillery shells fall at 75 degrees from 400 m, over the caller's shoulder; the first lands
   `delay` seconds after the marker (within a tick or two). A mission outlives its squad.
 - Bridge decks are road surface for projectiles, sight lines, lines of fire and aim rays
   (`skipPassable` on the city casts). The kaiju's aim ray uses it too; the beam does not.
-- Tests written when sub-units did nothing were adjusted, not weakened: the kaiju tests order
-  every squad to hold fire (`holdFire` in `test/helpers.ts`) and use driven units (ids 0, 4,
+- Tests written when sub-units did nothing were adjusted, not weakened: the kaiju tests keep
+  every squad-mate from firing (`holdFire` in `test/helpers.ts`) and use driven units (ids 0, 4,
   8, 12) where a target must not move, and the one assertion that said "sub-units stay put
   (their AI is not built yet)" now checks that they follow.
 
@@ -433,7 +437,8 @@ Server
   Extend `World` by adding fields; if you add something a client must see, add it to the
   snapshot (bump `SNAPSHOT_VERSION`) or to an event, and update `ARCHITECTURE.md`.
 - **Anyone writing simulation tests:** sub-units now act. A test about something else should
-  call `holdFire(world)` (every squad on hold-and-charge) or park the squads out of range, and
+  call `holdFire(world)` (no squad-mate's weapon comes ready until the next stage; since phase 1
+  squad-mates always fire at will) or park the squads out of range, and
   use a squad's driven unit (ids 0, 4, 8, 12) for a target that must stay put: a sub-unit that
   gets shaken backs off. Bots do not get in the way: `makeTestWorld` handicaps them fully
   (`idleBots()`: they stand still, hands off the buttons) unless the test passes `bots: true`
@@ -460,8 +465,10 @@ Server
 - **Anyone changing the server:** game rules never go in `server/src/net`; that folder only
   adapts the room library. Put behavior in `server/src/room` and test it in
   `server/test/gameRoom.test.ts` with `makeRoom()` and `FakePeer` (no network, no real time).
-  The acknowledgement in a snapshot is the server's own count per connection (`match.acks`),
-  not `world.players[i].input.seq`, because a bot may have driven the slot in between. Only one
+  The acknowledgement in a snapshot is the server's own per connection (`packedAck` in
+  `server/src/room/inputQueue.ts`: the inputs played or dropped, and how many more it will
+  drop; `ackOf` in `server/test/helpers.ts` reads it), not `world.players[i].input.seq`,
+  because a bot may have driven the slot in between. Only one
   server can run per process (the library keeps its matchmaker in module state), so each
   integration test file starts exactly one; do not turn off vitest's per-file isolation.
   Anything about raw web requests belongs in `server/src/http/guard.ts`, which runs before the
@@ -503,7 +510,7 @@ Server
   kaijuKindDef(kind).actions.special)` while the kaiju's phase is 'special'. Fly projectiles
   with `stepProjectile` from `projectileSpawn` until `projectileHit`; `beginStage` clears the
   server's projectiles without events, so drop all local ones on `stageChange`. Start a
-  wind-up animation from `kaijuAction` (phase 'windup', `duration`, optional `elapsed`).
+  wind-up animation from `kaijuAction` (phase 'windup', `duration`).
 - **Client workers:** `test/prediction.test.ts` is the recipe for prediction: build the city with
   `getCity(config.citySeed)`, compare `cityChecksum` with the welcome, mirror the live state with
   `cityStateFromWire`, keep it current from `structureStage` / `propsDestroyed` / `kaijuHeld`
@@ -545,19 +552,15 @@ Server
 - The kaiju grows where its cocoon was if its new body fits there; otherwise it stands up at
   the nearest spot with room (`findStandingRoom` in `sim/spawn.ts`), and the kaiju bot picks
   hiding places with room for the next body.
-- Sub-unit navigation, stress-tested in Port Meridian (1800 random move-to trips over every
-  start and stage, markers anywhere): nobody inside a wall or outside the bounds; 13 trips
+- Sub-unit navigation, stress-tested in Port Meridian before phase 1 (1800 random move-to
+  trips over every start and stage, markers anywhere; the move-to order is gone, the same
+  navigation now brings a squad-mate back to its leader): nobody inside a wall or outside the bounds; 13 trips
   (0.7%) took more than three times the straight drive plus a minute, 4 never arrived, all into
   pockets of houses against the stage 1 line or far out in the bay. Every street edge is
   drivable straight for a 9 m troop. A unit that cannot reach its spot waits and retries; it
   never pushes into a wall forever, but it will not arrive either.
 - Units do not collide with each other or with the kaiju; sub-units only keep apart while
   moving. A parked squad can be walked through.
-- Hold-and-charge deviates from the letter of the design in one place (firing does not release
-  a parked unit; see section 4). If the owner wants squads to regroup on their leader after a
-  volley instead, it is one branch in `orderSubUnit`.
-- The snapshot does not carry `arcYaw`: a client can draw each laser but not the 35 degree arc
-  a planted unit is locked to. Adding it means a snapshot layout change.
 - The beam still treats a bridge deck as a wall while projectiles and sight lines pass it: a
   hatchling standing on a bridge and firing its beam level burns the deck it stands on.
 - The beam is aimed with pitch. Looking level, a titan's beam passes over everything shorter
@@ -582,11 +585,12 @@ Server
   console can drive straight to a hidden hatchling or cocoon. Among friends that spoils a
   match and nothing more; it was left as it is. The mend would be to send humans the last
   known position while `known` is false (and a distance for the cocoon's heartbeat).
-- A tap whose release is held up by a network stall of about 0.4 s or more is played as a
-  hold (a Swipe becomes a Stomp, a Grab an Eat): the server has to guess while nothing
-  arrives and guesses "still held". On simulated bad links that was 0 to 3% of taps
-  (section 4, "Server"). Mending it needs the simulation to take a late release back, which
-  it cannot do today.
+- A release held up by the network is played late: the server has to guess while nothing
+  arrives and guesses "still held", so the hold lasts longer by the ticks it guessed (a volley
+  charges a little more, a brace lasts a little longer; behind a stall of about 0.4 s or more
+  a tap can become a hold). On simulated links one hold in 20 to 30 came out a tick or two
+  longer on the worst link, none to two in 100 on the others (the stutter-fix section at the
+  end). Mending it needs the simulation to take a late release back, which it cannot do today.
 - Nothing restarts the server if the process does end (a power cut, an out-of-memory kill):
   the start script or container of the self-hosting package should, and should set
   `HOST=127.0.0.1` when the tunnel is the way in.
@@ -652,7 +656,10 @@ client/src/game/
                     cameraClearance (holds a first-person or chase camera short of a standing wall)
   autoplay.ts       the autopilot for both sides and the drone
 client/src/ui/      hud.ts, commandWheel.ts, mapView.ts, subtitles.ts, settingsPanel.ts, icons.ts,
-                    iconArt.ts (stand-in icons), controlsCard.ts (every control of a role, as pictures)
+                    iconArt.ts (stand-in icons), controlsCard.ts (every control of a role, as pictures),
+                    kaijuKit.ts (the monster's buttons on the HUD: the kit, the two move slots, molt),
+                    moltCards.ts (the molt card picker: three cards, picked by key, d-pad or click)
+client/src/kaiju.css                the monster's HUD kit, card picker and controls-card pieces (next to styles.css)
 client/src/audio/   audioEngine.ts (effects with voice limits, staged music, voice queue with ducking, limiter, master
                     volume, cache of decoded files), matchAudio.ts (events and frame state -> sound); see 7.6
 client/test/        net.test.ts, game.test.ts, manifestTool.test.ts, audioEngine.test.ts, matchAudio.test.ts
@@ -1736,3 +1743,710 @@ the map to have water at all stages. Maybe big size doesn't have travel mode."
   of its head. The wake is subtle. The other pictures in `docs/city/` (district close-ups,
   heat map, model) do not show the moat. `tools/playtest/scripted.mjs` (being reworked by the
   other engineer) does not swim; the swim checks with real key presses are in `shots.mjs`.
+
+## Phase 1: the monster's new controls and moves (14 November, the monster-simulation task)
+
+The owner's decisions after the first multiplayer playtest (`docs/ROADMAP.md`, phase 1, "The
+monster"), built in the simulation and the bots. The screens, keys and animations are the next
+task's (the monster client); nothing a player sees changed yet beyond what the old client
+already draws.
+
+- **One move per button** (`shared/src/net/input.ts`, `sim/systems/kaijuActions.ts`). Strike:
+  swipe, or throw what is in the hand. Grab: grab what is in reach; with something in the hand,
+  eat it; with nothing to pick up but something to eat in reach (a kiosk), eat that. Stomp has
+  its own button (new bit `Btn.stomp`). Two move buttons (`Btn.move1`, `Btn.move2`) do the moves
+  picked at the molts and nothing before. Molt is one press. No button means one thing tapped
+  and another held any more; holding a button never repeats its move. The old brace, roar and
+  beam bits stay defined (the client still sends them) and the simulation ignores them.
+- **Molt cards** (`sim/moltCards.ts`). When the cocoon starts the monster is offered three moves:
+  beam, roar, charge at the first molt; the two not taken plus brace or tail sweep (drawn with the
+  match's random numbers) at the second. A pick (`PlayerInput.card`, 1 to 3) counts until the
+  intermission ends; otherwise one is drawn at random. It lands at once in the first empty slot
+  and stays for the match. Rage keeps building whether the beam is owned or not.
+- **The five moves.** Beam and brace as before, now picked at a molt. Roar: the same roar plus a
+  2.5 s stun on every unit it reaches (it cannot move or fire, loses its charge, a player's own
+  unit ignores its controls, squad-mates do nothing), and the shaking only starts after the
+  stun. Charge (new): 0.8 s wind-up, rooted but turning; a run of up to 3 s straight ahead at
+  twice walking speed, turning at a quarter of the rate, smashing anything up to 9 / 30 / 70 m
+  tall (city damage, cause 'charge') and stopped dead by anything taller; units it runs into
+  take 90 damage and 40 nerve once and are thrown aside; a second press ends the run; always a
+  1.2 s stumble; 12 s cooldown from the end of the stumble. Tail sweep (new): 0.35 s wind-up, the
+  rear half within 3 body radii, units 60 damage and 30 nerve knocked outward, buildings a
+  swipe's damage, 6 s cooldown.
+- **Never alone** (`sim/systems/matchFlow.ts`). With every squad wiped out during play the
+  nearest buildings collapse one after another over 2.5 s until the bar reaches the stage's mark
+  (topped up if the bounds run out), then the cocoon starts by itself (it surfaces first, waits
+  out a stagger, drops what it holds). At stage 3 the bar fills and the monster wins.
+- **A hit volume that follows the body** (`sim/kaijuBody.ts`). The body's upright capsule, a
+  head-and-neck capsule along where the head looks, and two tail capsules sloping down behind,
+  measured on the three lizard models (numbers in `defs/kaiju/lizard.ts`, `hit`). Shells, blasts
+  and aim rays all use it; the facing multiplier is unchanged. Swimming keeps the spine volume;
+  the cocoon is the body only.
+- **The monster bot** presses one button per move, molts with one press, looks at the cards for
+  1 to 3 s and picks by weights (beam 4, roar 3, charge 3, tail sweep 2, brace 1.5), roars at
+  charging guns close by and then goes for the units the roar froze, charges at a unit within a
+  run's reach or through a row of buildings it can smash on the way to its goal, sweeps its tail
+  when what is behind pays better than a swipe or stomp in front, braces and beams as before
+  when it owns those. In six whole bot matches with the charge and the tail sweep given to it
+  from the start (a scratch probe) it charged up to 3 times a stage (never as a titan: squads
+  stand off farther than a run), and swept its tail 2 to 5 times a stage.
+- **Contracts** (ARCHITECTURE.md sections 3 and 4): button bits 10 to 12, `PlayerInput.card`;
+  `PROTOCOL_VERSION` 2 and `SNAPSHOT_VERSION` 3 (bumped once for both phase 1 simulation tasks);
+  kaiju record `moves` and `offer`, cooldowns for 'charge' and 'tailSweep'; unit record
+  `stunned` and `stun`; events `moltOffer`, `moltPick`, `unitStunned`, `cityCollapse`; ids
+  `KAIJU_MOVE_IDS`, verbs 'charge' and 'tailSweep', phases 'charge' and 'stumble', damage kinds
+  'charge', 'tailSweep', 'collapse'. The `kaijuAction` event lost its `elapsed` field (it was
+  only for a swipe turning into a stomp). Action definitions lost `gesture` and `holdTime`;
+  they say `button` ('strike', 'grab', 'stomp', 'molt', or 'slot' for a move) and `whileHeld`.
+- **Where the roar stun is guarded** (each line commented "roar stun"; keep them through any
+  rewrite): `sim/systems/inputs.ts` (a stunned driven unit ignores its player),
+  `sim/movement.ts` `unitMoveParams` (a stunned unit does not move; client prediction gets it
+  from the snapshot's `stun`), `sim/systems/weapons.ts` `ready` (no firing),
+  `sim/systems/unitOrders.ts` `orderSubUnit` (a stunned squad-mate does nothing, no charge),
+  `sim/systems/damage.ts` (the stun counts down before the shaking does).
+- **Tests.** Rewritten for the new controls: `kaijuActions.test.ts` (one press per move, the
+  stomp's own button, grab and eat, brace, roar and its stun, beam, charge, tail sweep, the
+  molt), `molt.test.ts` (one press; the card flow with the random draw; never alone at stages 1
+  and 3), `projectiles.test.ts` (a shot at the tail and at the head hits, and misses once the
+  body has turned), `prediction.test.ts` (a client predicts the charge's run), `bots.test.ts`
+  (legal inputs with cards, picks at both molts, roar then pounce, charge and sweep),
+  `swim.test.ts`, `scenario.test.ts`, `damage.test.ts`, `spotting.test.ts`, `defs.test.ts`,
+  `net.test.ts` (my fields), `soak.test.ts` (presses the new buttons with moves in the slots),
+  `matchSoak.test.ts` (wants the card events). Deleted as obsolete: the tap-versus-hold tests
+  (a held Strike becoming a Stomp, a held Grab becoming Eat, the 1 s molt hold) and, in
+  `server/test/gameRoom.test.ts`, the two stall tests about a held Strike becoming a Stomp; the
+  brace stall test now holds the brace's move button.
+- **Measured** (`npm run sim -- --seeds 10 --every-anchor`, twice, with the army builder's work
+  changing in the tree at the same time): every match finished without an error. First run:
+  monster 4 wins in 10, mean 8:38, stages of about 1:58 / 2:46 / 4:41 when completed. Last
+  run: monster 6 wins in 10 (the humans 3 by a kill, 1 by the clock), mean 8:44, stages of
+  1:57 / 2:36 / 4:07, staggers 2.0 / 3.1 / 6.5 a match; it reached stage 3 in all ten. In a
+  real neighborhood with every squad wiped out at the start of stage 1, 31 buildings fell in
+  2.5 s and the cocoon closed at once after. Balance is the next round's job; nothing looks
+  broken.
+- **Still open.** The client: keys for Stomp and the two move buttons, the card pictures and the
+  pick, the slots with their cooldowns on the heads-up display (HUD), rage shown only when the
+  beam is owned, the charge and tail sweep animations, the stun on units, prediction through a
+  charge (`kaijuMoveInput`), the controls card and `docs/PLAYING.md`. The server's input queue
+  still treats Strike, Grab and Molt as buttons whose holding time matters; with one move per
+  button only the brace (a held move button) does. Not felt by a person yet: whether the
+  charge's slow turn and stumble feel good, and whether a 2.5 s stun is too strong against
+  people. Levers: `charge`, `tailSweep`, `roar.stunTime` in `defs/kaiju/lizard.ts`,
+  `BOT_RULES.kaiju.chargeReach`, `chargeWorth`, `cardWeights`.
+
+## Phase 1: the on-foot stutter, and third person by default (14 November, the stutter-fix task)
+
+**What was wrong.** The server plays the match in 30 steps a second and plays one input (a
+player's keys and mouse) per step. When an input arrived a few milliseconds after its step, the
+server played that step by repeating the previous input, and then played the late input on the
+next step as well: the body took one step too many and the server fell one more input behind.
+After a few of those, more than five inputs were waiting and the server threw four of them away
+at once to catch up. The player's own screen had already moved the body for those four, so it
+pulled the body back by four steps (0.9 m on foot, 2 m in a tank) over a tenth of a second: the
+pause "every few steps". Late inputs need no bad network: the host's browser and the server on
+one busy computer, through the container's port forwarder, are enough.
+
+**What changed.**
+- The server's input queue (`server/src/room/inputQueue.ts`, `match.ts`, `gameRoom.ts`;
+  `ARCHITECTURE.md` section 4.3). Every input gets exactly one step. A step played on a guess
+  stands in for the late input, which is dropped when it comes (or, if it carries a press or a
+  release, played next and a later input with nothing new dropped instead), so no extra step
+  and no growing delay. Each snapshot's acknowledgement now carries two numbers: the inputs
+  played and how many the server will drop. The match plays each input one step after it was
+  due (built during the briefing, free), so a slightly late input is still in time. Waiting
+  inputs that pile up are trimmed only while the body stands still, where nobody can see it.
+  Taps, holds and one-shot picks (the molt `card`, the old `wheel` and `marker`) keep their
+  guarantees. The buttons whose holding time matters are now the volley and the monster's two
+  move buttons (a held brace), as the monster-simulation section above asked.
+- The client's prediction (`client/src/net/prediction.ts`, `matchSession.ts`): it leaves out
+  the inputs the server will drop, does not predict an input whose step the server already
+  played while the page was frozen (and draws that step as an even slide, not a jump and a
+  stop), and judges a press as played by the first number. It also drives a monster in its
+  charge's run the way the server does (`kaijuMoveInput`), one of the open items above.
+- `MB_JITTER` (`server/src/config.ts`, `server/src/net/server.ts`): with `MB_LATENCY`, every
+  message is held back a random extra amount each way, still in order, to test an uneven link.
+- Third person is the default view for both sides (`client/src/app/params.ts`; `?cam=fp`
+  starts in first person, V still switches); `DESIGN.md` sections 4 and 5 and `PLAYING.md` say so.
+- Tests: `server/test/inputQueue.test.ts` rewritten for the new queue; in
+  `server/test/gameRoom.test.ts` two regression tests on a link that delivers inputs late (the
+  first fails on the old queue: the body gains a step the client never counts), and the
+  acknowledgement checks read the played number (`ackOf`); `client/test/net.test.ts` gains four
+  (no correction when the server's guesses stand in, no double step after a frozen page, the
+  even slide, the charge; the first three fail on the old predictor); `client/test/params.test.ts`
+  checks the default view; `server/test/latency.test.ts` now also runs with jitter. The server
+  test helpers send `PROTOCOL_VERSION` instead of a fixed 1 (it was bumped to 2 this round).
+
+**Measured** with a rig that runs the real server room and the real client session together in
+simulated time (`/tmp/mb-scratch/stutter/rig.ts`): pages at 60 frames a second with 3% missed
+frames and a 50 to 120 ms freeze every 4 s, the server's timer 0.1 to 1.5 ms late with a 5 to
+40 ms hiccup on 5% of steps; links: same machine (0.3 ms), container hop (1 ± 1 ms, spikes of 5
+to 30 ms on 3% of messages), tunnel (40 ± 20 ms each way, spikes of 20 to 60 ms on 1%), bad (60
+± 30 ms, spikes of 40 to 150 ms on 3%). Three runs of two minutes per row, walking and turning,
+with taps, holds and picks. "Wrong" corrections are those over 15 cm that are not just a frozen
+page catching up; "stops" are frames where the drawn body moved less than a third of its speed.
+
+| Per minute, before → after | wrong corrections | largest (m) | stops | inputs waiting |
+| --- | --- | --- | --- | --- |
+| On foot, same machine / container / tunnel / bad | 5.8 / 8.3 / 12.3 / 74 → 0 / 0 / 0 / 0 | 0.87 → 0 | 3.2 / 4.0 / 3.5 / 25 → 0 everywhere | 2.1 to 2.6 → 0.9 to 1.6 |
+| Tank, same four | 5.8 / 9.7 / 14.5 / 108 → 0 / 0 / 0 / 2 | 2.0 → 0.28 | 3.3 / 3.5 / 3.8 / 31 → 0 everywhere | 2.0 to 2.6 → 0.9 to 1.6 |
+| Monster walking, same four | 6.3 / 7.5 / 16.5 / 99 → 0 / 0 / 0 / 0.2 | 1.13 → 0.19 | 3.0 / 4.5 / 6.5 / 36 → 0 everywhere | |
+
+No press or pick was lost before or after. Holds that came out longer: 3 to 39 in about 210 per
+row before, 0 to 10 after (late releases, see known risks). In a real headless browser (the
+built game, the real server, 30 s of walking with W held and mouse turns; this machine draws only
+8 to 11 frames a second with freezes of up to 2 s), pull-backs over 15 cm went from 44 / 95 / 78
+to 0 / 9 / 8 with no delay / 60 ± 30 ms / 100 ± 60 ms simulated (`MB_LATENCY`, `MB_JITTER`).
+
+**Still open.**
+- The monster while attacking: the client replays its inputs at the speed of the newest
+  snapshot's action, so when an attack begins or ends between that snapshot and the present it
+  is a few steps off. With an attack about every second (the old controls) that was 5 to 120
+  corrections a minute after, against 48 to 165 before. The mend: replay the action's own
+  timeline step by step (`kaijuState` in `matchSession.ts`). A charge that hits a tower stops
+  dead on the server and not in the prediction.
+- `updateHint` in `client/src/net/matchSession.ts` still knows only the old monster buttons
+  (block, special, roar); the monster client work should give it the new ones.
+- `tools/playtest/shots.mjs` takes its "first-person" pictures with the default view: it needs
+  `cam: 'fp'` in its page address. `docs/requirements.md` (the owner's own document) still says
+  first person by default; `docs/ROADMAP.md` supersedes it.
+- The monster's chase camera is placed from the body as drawn before the frame's input steps
+  (`KaijuController.update`), so it trails the body by one frame: steady, not a stutter.
+- The one-step cushion adds 33 ms between a press and the server playing it (before, about 2.5
+  inputs waited, about 80 ms).
+
+## Phase 1: the army's new controls, the swarm and tank driving (14 November, the army-simulation task)
+
+The owner's decisions after the first multiplayer playtest (`docs/ROADMAP.md`, phase 1, "The
+army"), built in the simulation and the bots. The keys, the volley meter, the tank's turret on
+screen, the controls card and `docs/PLAYING.md` are the next task's (the army client). Until
+then the old client still compiles and plays, but its wheel, map orders, smoke, mark and
+artillery pictures have nothing behind them (section 3), and nothing on it presses Volley yet.
+
+- **Two buttons** (`shared/src/net/input.ts`). Fire (bit 6, unchanged): the leader's own weapon,
+  every time it is ready, for as long as it is held. Volley (new bit 13, `Btn.volley`): held,
+  it plants the squad-mates where they are (rooted, lasers on, weapons turning toward the point
+  the leader's aim ray lands on) and charges them from 0 to 1 over 4.5 s
+  (`COMBAT_RULES.chargeTime`); let go, every planted squad-mate with charge fires at that point,
+  the leader's shot joins if its weapon is ready, and they all follow again. Ragged below 60%,
+  a charged volley from 60% (the rules of what a volley is worth did not change). The leader
+  is never planted and keeps moving. The 35-degree firing arc is gone. Stunned or shaken
+  squad-mates neither charge nor fire. The old callIn, smoke and mark bits and the `wheel` and
+  `marker` fields are still defined and do nothing.
+- **The swarm** (`sim/squads.ts`: `swarmSlot`, `swarmWidth`, `trailFollow`;
+  `systems/unitOrders.ts`: `followSwarm`). Two squad-mates one spacing behind the leader and out
+  to either side of its track, the third two spacings straight behind, single file where the
+  street is narrow, all measured back along the leader's trail. A squad-mate keeps the leader's
+  pace plus what it needs to close up (up to 1.3 times its own top speed), brakes in time to
+  stop at its place, and rides along once there; one more than three spacings behind drives
+  the leader's own way after it (the trail now keeps the last 400 m), cutting short any loop it
+  passes close to. Settled tanks turn to face where the leader faces. Squad-mates always fire at
+  will (half nerve) when they have range and a line of fire, also on the move.
+- **Removed:** the four wheel commands, move-to markers and map orders, hold points and the
+  order budget (`queueCommand` is now a no-op; the server still accepts the `command` message
+  and drops it), smoke and mark (`sim/abilities.ts` and `test/abilities.test.ts` deleted, with
+  their rules, snapshot fields, events and bot use), and the artillery button. The fire
+  mission itself stays: `startCallIn(world, squad, callIn, x, z)` in `systems/weapons.ts` is
+  the one way in for phase 2's radio (`CallInDef.cooldown` and `resolveMarkerPoint` are kept,
+  unused, for it). `voiceLines.json` is untouched.
+- **Speeds** (`defs/units.ts`): 9.8 / 16.1 / 25.3 m/s at levels 1 / 2 / 3, about 1.15 times
+  the kaiju's top speed at each stage; `defs.test.ts` holds every level between 1.1 and 1.2.
+- **Tank driving** for the unit a person (or a bot) drives at stages 2 and 3 (`sim/movement.ts`,
+  steering model 'tank', `drive` in `defs/units.ts`): `moveZ` is the throttle along the hull and
+  `moveX` turns it (right is positive; on the spot when stopped), 75 degrees a second for a tank
+  and 55 for a troop; speeding up at 10 m/s², braking at 16, reverse at half speed; the
+  velocity always lies along the hull. The turret is the unit's `aimYaw`: it turns toward the
+  input's aim at 140 degrees a second (tank) or 110 (troop); the gun's pitch follows the input
+  at once; shots leave along the turret. Rocket infantry still moves relative to the view, and
+  squad-mates steer themselves as before. `setTankMove` turns a wanted direction into throttle
+  and turn (the squad bot uses it; the client's autopilot can). Prediction: `unitMoveParams`
+  with the snapshot unit's `driven` flag picks the same steering, the snapshot's unit `yaw` is
+  now a 32-bit float, and the turret is the snapshot unit's `aimYaw`; `prediction.test.ts`
+  predicts a driven tank exactly.
+- **The squad bot** (`sim/bots/squadBot.ts`): no wheel. It drives to a firing position (through
+  `setTankMove` when it drives a tank), stops, waits for its squad-mates to come up (all within
+  4 spacings, or 6 s at most), holds Volley with the crosshair on the kaiju, and lets go at full
+  charge, holding on up to 2.5 s for a neighbor that is nearly charged. It lets go early and
+  drives off when the kaiju comes close, and presses Fire whenever it is not charging and has a
+  line of fire.
+- **Contracts** (`ARCHITECTURE.md` sections 3 and 4): `Btn.volley` (bit 13, `BUTTON_COUNT` 14);
+  `PROTOCOL_VERSION` 2 and `SNAPSHOT_VERSION` 3 (one bump shared with the monster's task). The
+  snapshot's squad record is now id, player, faction, level, flags and `driven`; the movement
+  order, fire mode, move-to point, call-in cooldowns, smoke and mark cooldowns, the kaiju's
+  `marked` flag and the smoke clouds are gone; the unit's `yaw` is a 32-bit float. The `smoke`
+  and `mark` events are gone. Definitions: `MOVE_ORDERS`, `FIRE_MODES`, `SQUAD_ABILITIES` and
+  `FactionLevelDef.callIns` are gone; `TankDriveDef`, `UnitTypeDef.drive` and the steering model
+  'tank' are new; `SQUAD_RULES` gained `swarmSide` and `laserSlackRadii` and lost
+  `formationStagger`, `arriveRadius`, `markerSkyReach`, `orderBurst` and `ordersPerSecond`. New
+  helpers: `volleyMeter(units, squad)` (the squad's charge from snapshot units, for the HUD's
+  meter), `volleyAim`, `volleyHeld`, `setTankMove`, `startCallIn`.
+- **Tests.** Rewritten or added: `squads.test.ts` (the swarm: places, single file, keeping up at
+  every stage from a formed swarm, braking, the trail after a loop, catching up; the volley
+  button: planting, charging, aim, letting go, stunned and shaken units; the meter),
+  `weapons.test.ts` (volleys through the button, the leader's shot, the driven tank's gun),
+  `movement.test.ts` and `prediction.test.ts` (tank driving, and its prediction), `callins.test.ts`
+  (`startCallIn`, `resolveMarkerPoint`), `defs.test.ts` (the speed rule, the drive numbers),
+  `world.test.ts` (the old buttons, wheel, markers and commands change nothing), `bots.test.ts`
+  (the squad bot's volleys and legal inputs), `volleyRules.test.ts`, `volleyScenario.test.ts`,
+  `nav.test.ts`, `lives.test.ts`, `flow.test.ts`, `net.test.ts`, `soak.test.ts` (holds Volley
+  for seconds at a time), `matchSoak.test.ts` (no `callin` expected, the trail bound) and
+  `server/test/gameRoom.test.ts` (an old command is accepted and dropped). Deleted as obsolete:
+  `abilities.test.ts` and the tests of the wheel commands, move-to markers, the order budget
+  and the firing arc. `shared/scripts/navWatch.ts` (`npm run sim -- --nav`) now also reports
+  how long squad-mates spend out of their swarm.
+- **Measured** (`npm run sim -- --seeds 10 --every-anchor --nav`, then seeds 11 to 30 the same
+  way; the monster's phase 1 work is in the same tree): every match finished without an error.
+  Seeds 1 to 10: the kaiju won 4 of 10 (the humans 6, all by a kill), mean match 8:18, stages of
+  2:01 / 2:30 / 4:20 when completed, staggers 2.3 / 2.9 / 8.0 a match. Seeds 11 to 30: the kaiju
+  won 10 of 20, mean 8:47. Over all 30: units stuck 0.01% of their time (longest 3.1 s), nobody
+  outside the bounds, squad-mates more than 6 spacings from their leader 2.2% of their time
+  (3.4% before tanks braked for the leader's corners, when the same ten seeds gave the kaiju 6
+  wins in 10), the longest such spell 47 s, all the long ones at stage 3: a troop of tanks that
+  has fallen behind (a fresh deployment, a corner) gains on its leader at only 0.3 times the
+  leader's top speed, and a bot leader does not wait for it. In the tests a squad going flat out
+  keeps every squad-mate within 2.5 spacings at every stage.
+- **Still open.** The army client: Volley on the right mouse button, the volley meter
+  (`volleyMeter`, 0.6 marked), the turret drawn and predicted from the body's `aimYaw`, the
+  wheel, map orders, smoke, mark and artillery pictures removed, the controls card and
+  `docs/PLAYING.md`; the `command` message, `SquadCommand`, `COMMAND_IDS`, `queueCommand` and
+  the unused button bits are to be removed end to end once the client no longer sends them.
+  `tools/playtest/scripted.mjs` still checks the old wheel, smoke and mark and will fail until
+  it is reworked. A troop of tanks that has fallen behind at stage 3 can take half a minute to
+  catch up (see Measured); a leader that slows down, or a little more catch-up speed, would
+  close that.
+  Squad-mates now fire at will all the time, so more stray shots land in the city; balance is
+  not tuned for the new controls (`docs/BALANCE.md` is from before them). Not felt by a person
+  yet: whether 4.5 s of charge, the hull and turret rates and the swarm's spacing feel right.
+  Levers: `COMBAT_RULES.chargeTime`, `TANK_DRIVE` and `TROOP_DRIVE` in `defs/units.ts`,
+  `SQUAD_RULES.swarmSide`, `formationGap`, `catchUpSpeed`, `BOT_RULES.squad.gatherWait`.
+
+## Phase 1: the army's controls on screen: two buttons, the volley meter, tank driving (14 November, the army-client task)
+
+The client side of the army's phase 1 (`docs/ROADMAP.md`, "The army"; the rules are the
+army-simulation section above). Two buttons, a big volley meter, real tank driving with two
+reticles, and the old squad interface removed.
+
+**What changed**
+
+- **Two buttons** (`client/src/game/input/actions.ts`, `game/controllers/humanController.ts`).
+  Left mouse button or the gamepad's right trigger (RT): Fire (holding it keeps firing). Right
+  mouse button or the left trigger (LT): Volley, held to charge and let go to fire. Volley goes to the server as it is when each input is built (and once for a
+  press too short to fall between two inputs), so letting go reaches the server in the very next
+  input; Fire keeps the old latch. Gone from the client: the command wheel
+  (`ui/commandWheel.ts` deleted), the number keys, smoke (G), mark (R), the artillery button (E),
+  the map's order picker, its clicks and its cursor (the map is a view only), the `confirm`
+  action, the HUD's standing-orders pictures, the smoke, mark and artillery pictures and their
+  cooldowns, the charge bar (the meter replaces it), the "marked" status picture, the smoke
+  screens in the effects, and the client's side of the `command` message (`MatchSession`'s
+  `sendCommand`, its callback, the sandbox's handling of it).
+- **The input contract** (`shared/src/net/input.ts`). `Btn.callIn`, `Btn.smoke` and `Btn.mark`
+  are gone and their bits (7 to 9) free: `sanitizeInput` drops them, as it drops the monster's
+  old bits 2 to 4 (the mask and the indexes are worked out from `Btn`, the monster-client
+  task's change). `PlayerInput.wheel` and `marker` are gone, and `COMMAND_IDS` with them; the
+  bots no longer clear them. The shared tests that sent them were trimmed (`net`, `world`,
+  `soak`, `determinism`, `molt`, `bots`); the soak test still makes the random draws it made
+  for them, so its chaos is unchanged. One line outside this task's files changed with them:
+  `server/test/gameRoom.test.ts` checked a mask with every button bit in use and now checks the
+  new one (0x3c63).
+- **The volley meter** (`ui/volleyMeter.ts`, `styles.css`): a yellow diamond round the
+  crosshair, a third of the screen's height on a small window, filling from its bottom point
+  while Volley is held, with a white notch at 60%: dull amber below it, bright and pulsing past
+  it, a white edge and a fast pulse at full. Letting go flashes it white and blows it outward,
+  or fizzles it grey before the notch. Under it one picture per squad-mate (charging, following,
+  stunned or shaken, gone). It reads the newest snapshot (not the view, a tenth of a second
+  behind) and carries the charge forward between snapshots at the charge's own rate. When
+  another squad's charged volley hits the kaiju (tracked from `projectileSpawn` with `volley`
+  and the `projectileHit` on the kaiju), a ring round it counts the five-second window down,
+  blinks for the last 1.5 s and bursts when this squad's own lands in time. The HUD's Volley
+  picture lights up while the squad charges and glows past the notch.
+- **Tank driving** (stages 2 and 3). A tank's stick goes to the server as it is (W and S the
+  throttle, A and D the hull's turn); infantry still moves relative to the view. The chase
+  camera hangs behind and above along the view (infantry 9 m back and 4.2 m up as before; a tank
+  or troop 11 m plus 1.4 radii back and 4.6 m plus half a radius up), so the view's center passes
+  over the tank and the hull and turret sit in the lower third, in sight. A second, cyan reticle
+  (`ui/gunReticle.ts`) marks where the gun points now (the turret's aim ray from the eye, cast on
+  the city and the kaiju's body as the server casts it): it slides onto the crosshair as the
+  turret catches up, its ring fills as the gun reloads, its ticks turn orange on the kaiju, and
+  off the screen it waits at the edge. It is placed from a new hook, `MatchRuntime.onCamera`,
+  run once the frame's camera is in place, so it moves with the picture and not a frame behind.
+- **The turret is predicted** (`client/src/net/prediction.ts`: `ServerBody.aimYaw`, the
+  predictor's `stepAim` and `errAim`, `predictedTurret`; `matchSession.ts` draws the local tank's
+  turret from it instead of the view): restarted from the snapshot's turret and replayed with
+  the pending inputs through `stepMovement`, drawn between ticks and with its corrections
+  faded like the hull's.
+- **Third person** (the default now): the chase camera keeps out of tree crowns and billboards
+  as it keeps out of walls (`clearOfProps`; from inside a crown the view was half leaves); a
+  unit's marker fades out within about 30 m of the camera (squad-mates riding by a third-person
+  camera filled the screen with their circles and diamonds); a soldier within 3.5 m of the camera
+  is not drawn. Lasers end on the kaiju's real hit volume (`resolveAimPoint` with the kaijus), as
+  does the crosshair's aim.
+- **The controls card's squad side** (`ui/controlsCard.ts`): moving on foot (stage 1), looking,
+  Fire, Volley (the right button with a hold ring, the squad-mates charging, the meter past its
+  notch, the volley going off), letting go early (the meter short of its notch, a dim volley), W
+  over S driving and A beside D turning a tank and the mouse swinging its turret (stages 2 and 3;
+  a new card part draws one axis of the keys or of the stick), the map, the camera, the drone,
+  settings and the card. New placeholder pictures `sq_*` (`ui/iconArt.ts`, listed in
+  `docs/ASSETS.md` section 5; art wanted).
+- **Autoplay** (`game/autoplay.ts`, `volleyPlan`): parked with a line of fire it holds Volley,
+  lets go at full charge (waiting up to 2.5 s for a neighbor that is nearly charged), holds it
+  again; it fires its own gun whenever it is not charging, and drives a tank by throttle and hull
+  turn (`setTankMove`).
+- **Playtests** (`tools/playtest/`): `scripted.mjs`'s squad session reworked (fire; the volley
+  held, charged to full and let go; an early let go; the old keys doing nothing; the map as a view
+  only; the countdown ring when another squad's volley lands) and a new tank session at stage 2 in
+  the sandbox (A and D turn on the spot, W drives along the hull not the view, the turret trails
+  the view and the gun's reticle shows it, a shot fired mid-swing leaves along the turret);
+  `--only human` runs both, `--only tank` the tank session alone. `shots.mjs` extras
+  `x-human-volley` (the meter below the notch, past
+  it, full, the flash, the fizzle, the countdown) and `x-human-tank` (third person, the turret
+  lagging, the two reticles apart, driving, turning, first person, the troop at stage 3).
+  `driver.mjs`'s probe reports the meter, the gun reticle and the turret. Made to hold on a busy
+  machine: no pictures while the volley is held (a picture can hold the page still for over a
+  second, and the server then lets go of the button for it), the controls card checks wait up
+  to 3 s for the page's next frame (a change to the shared `cardChecks`, which the monster's
+  session uses too), and the tank's shot is clicked straight after the turn (the view is read
+  afterwards).
+- **Tests**: `client/test/squadControls.test.ts` rewritten (the two buttons through the real
+  input path with the pointer captured, a quick right click, the old keys sending nothing, the
+  stick on foot and in a tank, the gun along the turret, the predicted turret against the
+  simulation's, the meter's charge and pictures, the five-second window, the kaiju's warnings);
+  the wheel tests removed from `cameraViews.test.ts`; `controlsCard.test.ts`, `view.test.ts`,
+  `city.test.ts` (the autopilot's `volleyPlan`) and `session.test.ts` updated.
+- **Docs**: `DESIGN.md` section 8 (the squad rows of the controls table, what a squad player
+  can do, the volley meter, tank driving on screen, the card), `PLAYING.md` (the squad's
+  controls, the volley, two squads at once, driving a tank, the pictures, the tips),
+  `ARCHITECTURE.md` sections 2, 4.2 and 5, `ASSETS.md` section 5, and the playtest rows of
+  section 1 above.
+- **Pictures for the owner** (`docs/progress/`): `squad-volley-meter.png` (the volley charging
+  past its notch, the three lasers meeting at the crosshair), `squad-tank-reticles.png` (a tank
+  from behind, the turret still swinging: the white crosshair where the player looks, the cyan
+  sight where the gun points) and `controls-squad.png` (the squad's controls card, redrawn).
+
+**Measured** (on a machine shared with two other builders and a voice job: load average 6 to 15
+on 4 cores, so the headless pages drew 2 to 14 frames a second and the server and the sandbox
+sometimes ran well under real time)
+
+- `scripted.mjs --only human`, final run. The squad session against the real server: 24 of 24
+  checks confirmed. A room created, the practice option on and off, a guest joining by the
+  invite address, the start; W drove 6.9 m; the left button fired a rocket; holding the right
+  button planted all three squad-mates with their lasers on and brought the meter up with three
+  charging pictures; the squad charged to full (1.00 each) and the meter lit past its notch and
+  showed full; letting go fired a charged volley (3 squad-mates, charge 1.00, 12 shells marked
+  as volley, the leader's among them) and the meter flashed; letting go early at 0.09 fired 9
+  ragged shots and no charged volley, and the meter fizzled; the old keys (Q, 1 to 4, G, R, E)
+  sent nothing; behind the map the unit idled and a click on the map did nothing; V kept the
+  look direction; H and Enter opened and closed the controls card; the match ended (humans won
+  by the clock after 150 s); the meter showed its countdown ring while 174 shells of other
+  squads' charged volleys hit the kaiju. The tank session (stage 2 in the sandbox; run again on
+  its own after its last check was fixed): 9 of 9. A tank driven like one; A turned the hull 55
+  degrees on the spot (0.0 m moved) and D 48 degrees back; W drove 8.2 m along the hull, 63
+  degrees off the view; the turret trailed a 126-degree turn of the view by up to 47 degrees and
+  came round onto it; the gun reticle stood up to 15% of the screen's width off the crosshair
+  meanwhile and came back onto it; a shell fired straight after a turn left 65 degrees off the
+  view, along the turret still swinging round; H and Enter.
+- Earlier runs failed on timing, and the playtest now waits those out: the meter was looked at
+  once, 0.4 s after the press; a full charge was waited for while pictures were taken during the
+  hold (a picture can hold the page still for over a second, past the server's limit for a
+  silent player; no pictures are taken during a hold now); the meter's flash was looked for only
+  0.3 s after the volley; the controls card was read 0.4 s after its key; the tank's 8 m drive
+  was given 6 s; the tank's shot went off after the turret had come round. Every one of them
+  passed in the reruns above.
+- `shots.mjs --only x-human-volley,x-human-tank`: no console errors; the meter below its notch,
+  past it, full, flashing and fizzling, the countdown ring (another squad's volley landed within
+  90 s); the gun reticle out at the screen's edge while the view swung at 200 degrees a second
+  and back on the crosshair once it stopped; with the turret held 25 degrees off the view, the
+  two reticles apart (`docs/progress/squad-tank-reticles.png`). Seen while looking at the
+  pictures: a tank driving at a house has the cyan sight on the house (the gun, lower than the
+  camera, would hit it) and the crosshair on the kaiju beyond it, as intended.
+- The squad autopilot in the sandbox, 75 s each: stage 1, 4 charged volleys, 27 shots of its own,
+  78 by its squad-mates at will, charge reaching full, 333 m driven; stage 2 (a tank driven by
+  throttle and turn), 2 charged volleys, 2 shots of its own (a tank's gun reloads slowly, and
+  the autopilot holds it while its squad charges) and 23 by its squad-mates, 625 m. No console
+  errors.
+
+**Still open**
+
+- For the integrator: nothing in the client sends the `command` message any more. The server
+  still accepts and drops it (`server/src/room/gameRoom.ts`, `queueSlotCommand` in
+  `server/src/room/match.ts`); with it can go `SquadCommand` and `sanitizeCommand`
+  (`shared/src/sim/commands.ts`), `queueCommand` (`shared/src/sim/worldOps.ts`), the message in
+  `shared/src/net/protocol.ts`, `GroundMarker` and `sanitizeMarker` (`shared/src/net/input.ts`,
+  used only by the commands now) and their tests. The header of
+  `server/src/room/inputQueue.ts` still names "the old wheel pick and its marker" among the
+  one-shot fields (the code names no field, so nothing breaks).
+- `ActionState.pointerY` (`client/src/game/input/actions.ts`, set in `inputManager.ts`) was
+  there for the command wheel's pointer; nothing reads it now unless the molt card picker takes
+  it up.
+- The squad's new card and HUD pictures (`sq_*`) are placeholders drawn in code; art is wanted
+  (`docs/ASSETS.md` section 5).
+- The sandbox's input queue (`client/src/net/localLink.ts`, the monster-client task's change)
+  folds the buttons of inputs it drops into the one it keeps, so in a backed-up sandbox a
+  volley's release can come one input late. The real server's queue is not affected.
+- Not felt by a person yet: the meter's size and brightness, the chase cameras' distances, the
+  gun reticle, holding the right button for a volley. Levers: `--vm` in
+  `client/src/styles.css`, `chaseOffset` in `humanController.ts`, `MARKER_HIDE_NEAR` and
+  `SPRITE_HIDE_NEAR` in `unitsView.ts`.
+- Mouse look and the mouse buttons under real pointer lock are covered only by the unit tests
+  (the fake browser); the headless playtests run without pointer lock (driver.mjs).
+- A browser that freezes for more than a second while the player holds Volley has the volley
+  let go by the server (`STARVED_BUTTON_TICKS`, `server/src/room/match.ts`): the squad fires
+  what it had, and the meter flashes when the server's volley arrives. That is the server's
+  rule for a silent player, kept as it is; the playtest's pictures caused it on this machine.
+
+## Phase 3, started early: natural-sounding radio and news voices (14 November, the natural-voices task)
+
+The roadmap's "natural-sounding radio and news voices". All 221 voice lines are now spoken by
+neural voices (speech models trained on recordings of real people) instead of the rule-based
+synthesizers of the first cast. The game is unchanged: same line ids, file names, `.ogg` and
+`.mp3`, loudness target (-16 LUFS) and manifest shape; it still runs fully offline and plays
+finished files. Full write-up, with every table: `docs/audio/VOICE.md` (generated by the build).
+
+**What changed**
+
+- **The cast** (`tools/audio/voice/cast.json`). Overlord: Kokoro `am_onyx`, the deepest voice,
+  at 92% speed. Granite: Kokoro `am_echo`. Beacon: Kokoro `af_sky`. Tempest: Piper
+  `en_GB-alba-medium`, a Scottish woman's voice (Tempest was a Scottish man; the only natural
+  voice with a Scottish accent is a woman's, and the script never says which Tempest is). Anchor:
+  Kokoro `af_heart`, the model's best-rated voice, at 85% speed. Chair: Kokoro `bm_lewis`, a low,
+  calm British man. Kokoro-82M is Apache 2.0; the Alba voice is CC BY 4.0 (credit in VOICE.md
+  section 1).
+- **Orders are spoken faster.** At their grave, slowed pace Overlord's and Beacon's orders for
+  the nerve break and the signature attack ran past their 2.5 s window, so a character can now
+  have an order speed (`"orders"` in `cast.json`; Overlord 1.05, Beacon 1.1, with shorter pauses).
+- **Overlord's radio** is a little wider (to 4.5 kHz) with a stronger presence peak: the dark new
+  voice lost fewer words to the recognizer that way.
+- **The engines** (`tools/audio/voice/mbvoice/synth.py`): two new branches of `synthesize`,
+  `kokoro` (Kokoro-82M through the `kokoro-onnx` package, with misaki, Kokoro's own pronouncing
+  front end) and `piper`, both on ONNX Runtime on the processor, at most two threads in all
+  (`MB_TTS_THREADS`). Both give the same samples every run (checked), so a rebuild is identical.
+- **Model files are not committed.** `mbvoice/models.py` pins every file to a Hugging Face
+  revision and a SHA-256 hash; the build downloads what it needs into `/opt/mbtools/models` the
+  first time (about 350 MB of voice models and 690 MB of measuring models) and needs no network
+  afterwards.
+- **Two new measuring instruments**, because the build's recognizer, pocketsphinx, cannot judge
+  natural speech: a second, modern recognizer (NVIDIA Parakeet TDT 0.6B v2, `mbvoice/asr2.py`)
+  and a speaker-recognition model (WeSpeaker, `mbvoice/speakers.py`) that measures how distinct
+  the four radio voices are. Both run in the build's verification and appear in VOICE.md.
+- **Tools**: `audition.py neural` (every English Kokoro voice and seven Piper voices on a sample),
+  neural casting rounds in `experiments.py` (whose summary now merges with the recorded results
+  instead of refusing), `tryline.py --cue` for orders, `build.sh` checks the new packages,
+  `tools/setup-asset-tools.sh` installs them (kokoro-onnx, piper-tts, misaki, spaCy with its
+  small English model from Hugging Face, sherpa-onnx; no PyTorch). `docs/audio/voice/first_cast.json`
+  keeps the first voices' numbers for comparison.
+
+**Measured** (full build of all 221 lines on two worker processes: 10 minutes to speak and encode,
+16 with verification; the machine was shared and loaded the whole time)
+
+- The build's own checks: 0 failed. Loudness -16.15 to -15.87 LUFS, highest true peak -0.79 dBTP;
+  the humans' orders 1.8 to 2.4 s (limit 2.5); briefings 9.06 s (humans) and 7.94 s (kaiju), limit
+  9.2. 743 s of audio (766 before). Files: 6.37 MB of `.ogg` and 6.59 MB of `.mp3` (6.21 and 6.60
+  before), same encoder settings.
+- Word errors on the shipped `.ogg`, before and after. pocketsphinx: 7.5% before, 15.2% now
+  (Overlord 5.0 to 21.2, Granite 9.5 to 14.3, Beacon 5.0 to 15.1, Tempest 9.5 to 38.8, Anchor 7.2 to
+  6.9, Chair 19.1 to 18.1). The second recognizer: 1.1% before, 0.8% now (Overlord 2.1 to 0.2,
+  Granite 4.2 to 3.0, Beacon 0 to 0, Tempest 0 to 2.5, Anchor 0.7 to 0.6, Chair 0 to 0).
+  pocketsphinx was made for careful American read speech; it counts natural rhythm, words run
+  together and any accent as errors, and it cannot follow the Scottish voice at all. The second
+  recognizer, which hears roughly as a person does, misses fewer words than before.
+- How alike the radio voices sound (voice prints of the finished radio files, 1 = the same
+  voice): closest pair now Beacon and Tempest at 0.31, Overlord and Granite 0.28; in the first
+  cast the closest pair was at 0.53. Each voice against itself: 0.97 to 0.99.
+- The neural voices move their pitch within a line one and a half to two times as far as the
+  first cast did (the measurable side of not sounding robotic).
+- The encoder settings were measured again on the new voices (`encode_test.py`, all 221 lines at
+  four settings of each encoder) and stay as they were: every Vorbis setting below the one in use
+  now fails the peak check (quality 2 peaks at -0.27 dBTP, the limit is -0.5; quality 0 clips),
+  and one step down for MP3 would leave 1.6 times as much of the anchor's spectrum empty.
+- `npm run assets:manifest -- --check`: up to date. Voice tests (`shared/test/defs.test.ts`,
+  `client/test/matchAudio.test.ts`, `client/test/audioEngine.test.ts`): 90 passed. `npm run
+  check`: 818 tests passed (a first run had one timing failure in `shared/test/meridian.test.ts`,
+  the city built in 231 ms against a 200 ms limit while the machine was loaded; it passed alone
+  and in the second full run).
+
+**Still open**
+
+- Nobody has listened: the build machine has no speakers. What to listen for is in VOICE.md
+  section 7, first of all Tempest's Scottish voice through the radio static, and the line
+  `v_landmark_down_3` ("That stood for a hundred years."), whose "stood for a" the radio blurs
+  for both recognizers. Granite's voice ends some lines with a strong breath, which the
+  recognizers hear as an extra "s" ("ways", "parts", "works").
+- If the owner wants Tempest to stay a man, a British Kokoro voice is one line in `cast.json`
+  (`bm_george` or `bm_fable` at speed 0.95); he would lose the Scottish accent.
+- `docs/ASSETS.md` section 1 still lists only the old speech tools on the build machine; it was
+  being edited by someone else, so it was left alone. One line would cover it: "Neural speech:
+  Kokoro-82M and Piper on ONNX Runtime (tools venv); models downloaded by the voice build into
+  `/opt/mbtools/models`".
+- pocketsphinx stays the build's recognizer for continuity, but its totals no longer say how clear
+  the voices are; if the voices are ever judged by one number, it should be the second
+  recognizer's.
+- Two small leftovers in files whose every byte is part of the rebuild key (an edit there rebuilds
+  all 221 lines, about a quarter of an hour), so they wait for the next change that rebuilds
+  anyway: the comment above `OGG_QUALITY` in `tools/audio/voice/mbvoice/pipeline.py` still gives
+  the first voices' reasons (VOICE.md section 6 has the current ones), and `synth.py` imports `re`
+  without using it.
+
+## Phase 1: the monster's controls on screen: the kit, the molt cards, the new moves (14 November, the monster-client task)
+
+The client side of the monster's phase 1 (`docs/ROADMAP.md`, "The monster"; the rules are the
+monster-simulation section above): one move per button, the starting kit on screen, two move buttons
+that the molts fill from three cards, and the pictures for the charge, the tail sweep and the roar's
+stun.
+
+**What changed**
+
+- **Buttons** (`client/src/game/input/actions.ts`; DESIGN.md section 8). Left mouse button or the
+  gamepad's right trigger (RT): Strike (swipe; with something in the hand, throw). Right button or
+  the left trigger (LT): Grab (grab; with something in the hand, eat; nothing to grab but a kiosk in
+  reach, eat that). Space or the left bumper (LB): Stomp. Q or Y: the first move. E or the right
+  bumper (RB): the second move. F or B: Molt, one press. 1, 2, 3 or the directional pad's (d-pad's)
+  left, up and right: the molt cards. The old block, roar and special actions are gone, and so are
+  their bits in `shared/src/net/input.ts` (bits 2 to 4 stay free). `BUTTON_NAMES`, `BtnIndex`,
+  `BUTTON_COUNT` and `BUTTON_MASK` are now worked out from `Btn`, so a button that goes is one line
+  (the army-client task then took bits 7 to 9 the same way). Nothing is held any more but the brace.
+- **The controller** (`client/src/game/controllers/kaijuController.ts`): sends the new bits. A
+  picked card rides on exactly one input (`pickCard`, `InputSample.card`), also outside play
+  (`idleSample` in `client/src/app/matchRuntime.ts`: the intermission sends neutral inputs, and a
+  pick made then must still go). The chase camera (now the first view a player sees) is placed from
+  the body as it is drawn that frame, not a frame behind it, and its lens opens 12 degrees while the
+  charge runs (first person too). The wind-up shown ahead of the server follows the new rules
+  (`hintVerb` in `client/src/net/matchSession.ts`: molt, brace, first move, second move, stomp,
+  strike, grab; an empty slot shows nothing; the roar and eating have no wind-up and show their own
+  phase at once).
+- **The heads-up display (HUD)** (`client/src/ui/kaijuKit.ts`, in `hud.ts`): Strike, Grab and Stomp
+  with their glyphs (the throw and eat pictures while something is in the hand, Grab darkened while
+  the last meal is under 10 s old); the two move slots (a faint egg in a dashed frame until a molt
+  fills it; then the move's picture in a ring that fills as it comes ready, the beam's ring being
+  its rage and glowing when full); the rage meter only once the beam is picked; Molt only while
+  offered, pulsing. New icons `k_charge` and `k_tailsweep` (`client/public/assets/ui/`, checked by
+  `tools/art/ui/preview.cjs`, listed in `docs/ASSETS.md` and `docs/art/UI_ICONS.md`). Styles in a
+  new `client/src/kaiju.css`.
+- **The molt cards** (`client/src/ui/moltCards.ts`, wired in `client/src/app/screens/match.ts`):
+  three big cards when the cocoon starts (also after the city gave way), each the move's picture
+  moving the way the move does (animated in `kaiju.css`), over its key or d-pad glyph; above them
+  the move button the pick goes on; under them a bar running down to the end of the intermission.
+  The pointer is let go while they wait; a plain click on a card picks it and takes the pointer back
+  (no mouse movement under pointer lock is involved). The picked card flies into its slot, which
+  flashes; the server's `moltPick` has the last word (a random draw, or a lost pick, is shown
+  landing).
+- **The controls card** (`client/src/ui/controlsCard.ts`): the kit, throwing and eating (and a kiosk
+  eaten), the molt with its three cards, the two move buttons as empty slots with the stages they
+  fill from, then the five moves each beside both move buttons in a slot frame (the brace with its
+  hold ring, the roar then a dizzy spiral), swimming. The `STUB(client)` is gone. The card now
+  shrinks to fit a small window (`fit()`: in a 960 by 540 window the monster's six rows needed 397
+  pixels of the 368 there are, and the last row was cut off; from 1280 by 720 up it fits as it is).
+- **Taking the pointer back** (`client/src/game/input/inputManager.ts`, outside this task's files,
+  one small change): Chromium reports a jump right after the pointer is captured (the cursor put
+  back where it was, 480 by 270 pixels in the headless browser), and on a busy page it came half a
+  second late, past the 100 ms that were thrown away, so the view leapt up at the sky. The first
+  movement after a capture is now thrown away however late it comes. The molt cards let the pointer
+  go and take it back twice a match, so this mattered here. Test in `input.test.ts`.
+- **Animations and effects** (`kaijuAnimator.ts`, `kaijuView.ts`, `gameRenderer.ts`): the charge's
+  wind-up (head down, shoulders low, a foot pawing the ground, dust), its run (low and forward like
+  a ram, arms tucked, a longer stride that pounds, a wake of dust behind and a wave of it ahead, the
+  view shaking with each footfall for the monster's own player), the stumble (pitching forward, a
+  knee buckling, arms thrown out, a burst of dust and a ring ahead, a camera shake nearby); the tail
+  sweep (the hips coil and the tail is drawn round, then lashes across behind, dust along its arc);
+  the roar's stun: three yellow stars circling over every stunned unit and a pulsing yellow ring
+  under it for as long as the stun lasts, sized with distance so a titan reads them across the city;
+  never alone: two rings rolling out from the monster and a heavy camera shake (`cityCollapse`), the
+  buildings falling as ordinary structure collapses. The roar's shockwave and the beam are
+  unchanged. The charge and the tail sweep reuse the stomp and swipe sounds
+  (`client/src/audio/matchAudio.ts`, three lines).
+- **The autopilot** (`client/src/game/autoplay.ts`): one button per move, one press of Molt, a card
+  picked at random about a second after the cards come up, and the moves it owns used (roar near
+  soldiers, beam at full rage, charge at a unit straight ahead, tail sweep at one behind, brace
+  against charged volleys).
+- **Tests**: `client/test/kaijuControls.test.ts` (new: the wind-up rules, the controller's bits and
+  its one-shot card, the card outside play, the charge's and the tail sweep's poses, a picture for
+  every move); `controlsCard.test.ts` (the kit, the slots, the cards, hold only for the brace),
+  `game.test.ts`, `input.test.ts`, `session.test.ts` (the brace on its move button). Shared and
+  server tests that used the old bits as plain buttons now use stomp or move1 (`world.test.ts`,
+  `kaijuActions.test.ts`, `bots.test.ts`, `net.test.ts`, `server/test/inputQueue.test.ts`,
+  `server/test/gameRoom.test.ts`); the "old buttons do nothing" checks went with the bits.
+- **The sandbox** (`client/src/net/localLink.ts`): its input queue threw away the inputs of a page
+  that fell behind, a quick tap or a molt card among them; the buttons and the card of the inputs it
+  drops now ride on the one it keeps (sandbox only; a release can come one input late there).
+- **Playtests** (`tools/playtest/`): `scripted.mjs`'s monster session rewritten for the new buttons
+  (below); `shots.mjs` extras `x-kaiju-cards` (also: the controls card fits the window, the cards
+  let the captured pointer go and a pick by key or by click takes it back, the view does not leap
+  when it does), `x-kaiju-charge`, `x-kaiju-sweep`, `x-kaiju-roar` (these three as in a browser
+  without pointer lock, so their pictures carry no "click to play" picture), `x-kaiju-beam` and
+  `x-kaiju-collapse`; the swim extras now give the monster the roar on Q first.
+- **Docs**: `DESIGN.md` section 8 (the monster rows of the controls table, the monster's card, what
+  the monster player sees of its buttons), `PLAYING.md` (the monster's controls, growing and the new
+  moves, never alone, the tips), `ASSETS.md`, `docs/art/UI_ICONS.md`, `ARCHITECTURE.md` section 5
+  (the pointer rule: the molt cards, and the jump thrown away), the module map above, and two
+  pictures in `docs/progress/` (`monster-molt-cards.png` new, `controls-kaiju.png` retaken).
+
+**Measured** (on a machine shared with two other builders and a voice job: load average 4 to 20 on 4
+cores, so the headless pages drew 2 to 17 frames a second)
+
+- `npm run check`: types, lint (253 files) and 818 tests in 62 files pass.
+- `node tools/playtest/scripted.mjs --only kaiju` (the real server with `MB_FAST=1`, real key
+  presses and clicks, every check judged by what the server sent back). The last two runs, the
+  second on the final build: 32 of 32 confirmed, nothing failed or left unattempted, no console
+  errors. Look, walk, swipe, stomp on Space, Q and E doing nothing before a molt, grab and throw;
+  the first mark (97 s left on the fast match's 150 s clock); the molt by one press of F (cocoon and
+  `moltOffer`: beam, roar, charge); the three cards on screen in the server's order; card 3 (the
+  charge) picked with its key (`moltPick` card 3, not drawn at random, the snapshot's first slot the
+  charge); the charge on Q (wind-up, run, stumble) and Q again ending its run after 0.83 s; grab and
+  eat at stage 2; the second mark, charging through the blocks (46 s left); the second molt (beam,
+  roar, tail sweep; the run before had the brace); card 2 (the roar) picked with a click (`moltPick`
+  card 2, not random); the roar on E stunning 3 units for 2.5 s each (12 s left; 4 units in the run
+  before). Then the sandbox part: the view toggle, the controls card (H and Enter), the warnings of
+  charging guns in first person, the beam (rage spent, the beam burning), the tail sweep (4 hits, 10
+  units knocked away), the brace (held, then let go) and the roar (4 units stunned and drawn dazed).
+- The five runs before those failed only on the script's own timing, and each was fixed in the
+  script, not the game: the fast clock ran out before the last checks (the view toggle, the card and
+  the warnings moved to the sandbox part; the roar now walks at the squads, which keep their
+  distance from a titan, and says "not attempted" if the clock runs out first); the controls card
+  was looked at too soon on a page drawing 2 to 5 frames a second (the shared check now waits up to
+  3 s, the army-client task's change); a grab was given before the server's body had closed in (the
+  reach is now measured on the server's snapshot); a press of F went in while the wrecking's last
+  click was still on its way, so it met a swipe (the server keeps a press waiting a fifth of a
+  second; the molt now waits until nothing is under way); and in the sandbox the volleys the bot
+  squads let go when told to stand still staggered the kaiju in the middle of the beam (the set-up
+  now clears its nerve). The throw's check now waits for the thrown wreck's own impact (it took the
+  first impact of any shell before).
+- `node tools/playtest/shots.mjs --only x-kaiju` (the sandbox; pictures in
+  `/tmp/mb-scratch/monster-client/shots`, looked at one by one), no console errors in any of them:
+  the kit with its two empty slots; the controls card, all six rows in a 960 by 540 window (355 of
+  355 pixels); the pointer captured with a click and the view not turned (0.000 rad); both molts'
+  cards in the simulation's order, the pointer let go while they waited, card 1 picked with the key
+  1 and card 3 with a click (`moltPick` not random both times), the pointer taken back after each
+  with the view not turned; the card flying into its slot and the slot flashing; the charge's
+  wind-up, run, stumble and a run seen from inside the head (4 runs and 4 stumbles reached the
+  page); the tail sweep's coil and lash (10 of 10 units behind it hit or knocked away; the coil is a
+  third of a second and took a second sweep to catch on a page drawing a few frames a second); the
+  roar's shockwave and the stars over the stunned units, from behind and from inside the head (8 of
+  8 stunned); the beam; never alone (one `cityCollapse`, 28 buildings falling, the cocoon by itself,
+  the cards up); swimming at stages 1 and 2, the roar on Q bringing it up. (The beam, never alone
+  and swimming ran on the build before the card's fit and the pointer's jump, which do not touch
+  them; the rest on the final build.)
+- Nobody picks (a scratch check in the sandbox): the server drew card 1 (the beam) at random at the
+  end of the intermission (`moltPick` random), the page flew the beam into the first slot and the
+  slot showed it. With a wreck in the hand the kit showed the throw and the jaws, the jaws darkened
+  while the last meal was under 10 s old.
+- The autopilot in the sandbox (a scratch check): stage 1 swiped and stomped; at the first mark it
+  pressed Molt once and picked a card itself (card 1, the beam; `moltPick` not random); at stage 2
+  with soldiers near and full rage it breathed the beam, then grabbed and threw. No console errors.
+
+**Still open**
+
+- Not felt by a person yet: the chase camera as the first view (it now follows the drawn body
+  exactly; at stages 2 and 3 the monster sits low in the frame), the cards' 18 seconds (cocoon and
+  intermission) and their animations, the charge's wider lens and its shaking, the size of the daze
+  stars from far off, the tail sweep seen from behind (the body hides part of the tail).
+- A gamepad was not tried: the d-pad picks and the controller glyphs are covered by tests only.
+- The click on a card under real pointer lock was seen in headless Chromium (the lock given back),
+  not in a real browser with a person, where the browser might ask for the lock differently.
+- In first person a charge through a house shows the house's walls for a moment.
+- The charge, the stumble and the tail sweep reuse the stomp and swipe sounds; the stun has no sound
+  of its own. New sounds would be the audio team's.
+- `ActionState.pointerY` (`client/src/game/input/actions.ts`) stays unused: the card picker needs no
+  pointer under pointer lock.
+- `scripted.mjs --only kaiju` reaches stage 3 inside the fast match's 150 s clock only just (the
+  roar came with 12 s left in the last run). On a slower machine the clock can run out first: the
+  roar check then says "not attempted" (the sandbox part still checks the roar's stun).
+- A real browser may report its jump after the pointer is captured differently from headless
+  Chromium; the first movement after a capture is thrown away either way (a few pixels at worst).
+

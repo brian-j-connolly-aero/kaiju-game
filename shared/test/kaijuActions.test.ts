@@ -88,23 +88,22 @@ function equip(world: World, first: KaijuMoveId, second: KaijuMoveId = 'none'): 
 }
 
 describe('one move per button', () => {
-  it('a move button does the move in its slot, and nothing while the slot is empty; the old buttons do nothing', () => {
+  it('a move button does the move in its slot, and nothing while the slot is empty', () => {
     const world = arena();
     const k = world.kaijus[0];
     k.rage = COMBAT_RULES.rageMax;
-    // Nothing picked yet: the move buttons, and the old brace, roar and beam buttons, do nothing.
-    for (const button of [Btn.move1, Btn.move2, Btn.block, Btn.roar, Btn.special]) {
+    // Nothing picked yet: the move buttons do nothing.
+    for (const button of [Btn.move1, Btn.move2]) {
       expect(actions(tap(world, button))).toEqual([]);
     }
     expect(k.phase).toBe('idle');
+    // (Past the 0.2 s a press is remembered for.)
+    play(world, 10);
 
     equip(world, 'roar', 'tailSweep');
     expect(actions(tap(world, Btn.move2))).toEqual([['tailSweep', 'windup']]);
     untilIdle(world);
     expect(actions(tap(world, Btn.move1))).toEqual([['roar', 'roar']]);
-    untilIdle(world);
-    // The beam is a move like the others: with rage but not picked, nothing.
-    expect(actions(tap(world, Btn.special))).toEqual([]);
   });
 });
 
@@ -301,10 +300,11 @@ describe('stomp: its own button', () => {
       props: [{ kind: 'kiosk', x: -6, z: -4 }],
     });
     const k = world.kaijus[0];
+    // Three leaders (squad-mates would follow their leader when the stomp throws it).
     const near = placeUnit(world, 0, -3.5, 0);
-    const far = placeUnit(world, 1, -(reach + 3 - 0.5), 0);
-    const outside = placeUnit(world, 2, -(reach + 3 + 1), -1);
-    for (const id of [0, 1, 2]) toughen(world, id);
+    const far = placeUnit(world, 4, -(reach + 3 - 0.5), 0);
+    const outside = placeUnit(world, 8, -(reach + 3 + 1), -1);
+    for (const id of [0, 4, 8]) toughen(world, id);
     const farStart = Math.hypot(far.x, far.z);
 
     const events = [...tap(world, Btn.stomp), ...untilIdle(world)];
@@ -395,12 +395,11 @@ describe('grab and throw', () => {
   });
 
   it('whiffs when nothing is in reach, and takes a wreck off the ground', () => {
-    let world = arena({ props: [{ kind: 'car_sedan', x: 0, z: R * A.grab.reach + 20 }, { kind: 'kiosk', x: 0, z: clearOf('kiosk', 0.6) }] });
+    let world = arena({ props: [{ kind: 'car_sedan', x: 0, z: R * A.grab.reach + 20 }] });
     let events = [...tap(world, Btn.grab), ...untilIdle(world)];
     expect(world.kaijus[0].held).toBeNull();
     expect(eventsOf(events, 'kaijuHeld')).toEqual([]);
-    // A kiosk cannot be picked up.
-    expect(bitGet(world.propAlive, 1)).toBe(true);
+    expect(bitGet(world.propAlive, 0)).toBe(true);
 
     // A car the kaiju stands on is crushed to a wreck, and the wreck can be picked up.
     world = arena({ props: [{ kind: 'car_taxi', x: 0, z: R }] });
@@ -665,16 +664,17 @@ describe('eat: grab with something in the hand, or something to eat in reach', (
   });
 });
 
-describe('brace', () => {
-  it('braces for exactly as long as block is down, rooted, and nothing else starts meanwhile', () => {
+describe('brace: a move, held on the button of its slot', () => {
+  it('braces for exactly as long as its button is down, rooted, and nothing else starts meanwhile', () => {
     const world = arena();
     const k = world.kaijus[0];
-    let events = play(world, 1, { buttons: Btn.block });
+    equip(world, 'roar', 'brace');
+    let events = play(world, 1, { buttons: Btn.move2 });
     expect(actions(events)).toEqual([['brace', 'brace']]);
     expect(eventsOf(events, 'kaijuAction')[0].duration).toBe(0);
     expect(eventsOf(events, 'voice').map((e) => e.cue)).toContain('kaiju.brace');
 
-    events = play(world, 45, { buttons: Btn.block | Btn.strike | Btn.roar, moveZ: 1 });
+    events = play(world, 45, { buttons: Btn.move2 | Btn.strike | Btn.move1, moveZ: 1 });
     expect(k.phase).toBe('brace');
     expect(k.action).toBe('brace');
     expect(actions(events)).toEqual([]);
@@ -689,72 +689,103 @@ describe('brace', () => {
   it('turns slowly while braced', () => {
     const world = arena();
     const k = world.kaijus[0];
-    play(world, TICK_RATE, { buttons: Btn.block, aimYaw: 170 * DEG });
+    equip(world, 'brace');
+    play(world, TICK_RATE, { buttons: Btn.move1, aimYaw: 170 * DEG });
     const expected = LIZARD.stages[0].turnRate * A.brace.turnMult;
     expect(k.yaw).toBeGreaterThan(expected * 0.9);
     expect(k.yaw).toBeLessThan(expected * 1.1);
   });
 });
 
-describe('roar', () => {
-  it('rattles every unit in the radius, wipes their charge, and goes on cooldown', () => {
+describe('roar: a move that stuns', () => {
+  it('stuns every unit in the radius, wipes their charge, shakes them once the stun is over, and goes on cooldown', () => {
     const world = arena();
     const k = world.kaijus[0];
+    equip(world, 'roar');
     const reach = A.roar.radius[0];
-    // Two driven units (0 and 4): the orders system leaves their charge alone, so only the roar can change it.
+    // Two driven units (0 and 4): nothing but the roar changes their charge.
     const inside = placeUnit(world, 0, 0, reach - 2);
     const outside = placeUnit(world, 4, 0, reach + 2);
     inside.charge = 0.9;
     outside.charge = 0.9;
 
-    let events = play(world, 1, { buttons: Btn.roar });
+    let events = play(world, 1, { buttons: Btn.move1 });
     expect(actions(events)).toEqual([['roar', 'roar']]);
     expect(eventsOf(events, 'roar')).toMatchObject([{ kaiju: 0, x: 0, z: 0, radius: reach }]);
     expect(eventsOf(events, 'voice').map((e) => e.cue)).toContain('kaiju.roar');
-    // Shaken on the spot (polish pass: the roar used to leave a fresh unit merely unsettled).
-    expect(inside.shaken).toBeCloseTo(COMBAT_RULES.shakenDuration - DT, 6);
-    expect(inside.state).toBe('shaken');
+    expect(eventsOf(events, 'unitStunned')).toMatchObject([{ unit: 0, duration: A.roar.stunTime }]);
     expect(eventsOf(events, 'unitShaken')).toMatchObject([{ unit: 0 }]);
+    expect(inside.stun).toBeCloseTo(A.roar.stunTime - DT, 6);
     expect(inside.charge).toBe(0);
+    expect(outside.stun).toBe(0);
     expect(outside.nerve).toBe(0);
     expect(outside.charge).toBe(0.9);
     expect(k.knownTimer).toBeGreaterThan(MATCH_RULES.revealAfterNoise - 2 * DT);
 
-    // The roar itself takes its time, rooted.
-    events = play(world, ticksFor(A.roar.timing.active) - 1, { moveZ: 1 });
-    expect(actions(events)).toEqual([]);
-    expect(k.phase).toBe('roar');
-    expect(k.z).toBe(0);
-    events = play(world, 1);
-    expect(actions(events)).toEqual([['roar', 'idle']]);
+    // The shaking waits for the stun: its time runs once the stun is over.
+    play(world, ticksFor(A.roar.stunTime) - 1);
+    expect(inside.stun).toBe(0);
+    expect(inside.shaken).toBeCloseTo(COMBAT_RULES.shakenDuration, 6);
+    expect(inside.state).toBe('shaken');
+    play(world, 10);
+    expect(inside.shaken).toBeCloseTo(COMBAT_RULES.shakenDuration - 10 * DT, 6);
 
-    // On cooldown: hammering the button does nothing until the cooldown, counted from the
-    // start of the first roar (step 1), has run out.
+    // On cooldown: hammering the button does nothing until the cooldown, counted from the start
+    // of the first roar, has run out.
+    untilIdle(world);
+    const start = world.tick - (ticksFor(A.roar.stunTime) - 1 + 10 + 1);
     let again = -1;
-    for (let step = 2 + ticksFor(A.roar.timing.active); step <= ticksFor(A.roar.cooldown) + 10 && again < 0; step++) {
-      const stepEvents = play(world, 1, { buttons: step % 2 === 0 ? Btn.roar : 0 });
-      if (eventsOf(stepEvents, 'roar').length > 0) again = step;
+    for (let i = 0; i < ticksFor(A.roar.cooldown) + 10 && again < 0; i++) {
+      const stepEvents = play(world, 1, { buttons: i % 2 === 0 ? Btn.move1 : 0 });
+      if (eventsOf(stepEvents, 'roar').length > 0) again = world.tick - start;
     }
-    expect(again).toBeGreaterThanOrEqual(1 + ticksFor(A.roar.cooldown));
-    expect(again).toBeLessThanOrEqual(2 + ticksFor(A.roar.cooldown));
+    expect(again).toBeGreaterThanOrEqual(ticksFor(A.roar.cooldown));
+    expect(again).toBeLessThanOrEqual(ticksFor(A.roar.cooldown) + 2);
   });
 
-  it('shakes every unit it reaches, a fresh one as much as a rattled one, but not one that is already shaken', () => {
-    // The relationship the polish pass relies on: one roar alone shakes a fresh unit.
+  it('a stunned unit cannot move or fire: neither its player nor its squad moves it until the stun is over', () => {
+    const world = makeTestWorld({ people: 'both' });
+    placeKaiju(world, 0, 0, 0);
+    parkUnits(world);
+    equip(world, 'roar');
+    const squad = world.squads[0];
+    const leader = placeUnit(world, squad.driven, 0, 20);
+    const mate = placeUnit(world, squad.units[1], 10, 20);
+    // The player pushes forward and holds the trigger the whole time.
+    const push = input({ moveZ: 1, aimYaw: Math.PI, buttons: Btn.fire });
+    run(world, 1, [input({ buttons: Btn.move1 }), push]);
+    expect(leader.stun).toBeGreaterThan(0);
+    const x = leader.x;
+    const z = leader.z;
+    const events = run(world, ticksFor(A.roar.stunTime) - 2, [null, push]);
+    // Frozen: not a step, not a shot (the squad-mate neither).
+    expect(Math.hypot(leader.x - x, leader.z - z)).toBeLessThan(0.05);
+    expect(eventsOf(events, 'projectileSpawn').filter((e) => e.owner === 'unit' && world.units[e.ownerId].squad === 0)).toEqual([]);
+    expect(Math.hypot(mate.vx, mate.vz)).toBeLessThan(0.05);
+    // Then it answers again (shaken: it moves, but does not fire).
+    run(world, 30, [null, push]);
+    expect(leader.stun).toBe(0);
+    expect(Math.hypot(leader.x - x, leader.z - z)).toBeGreaterThan(1);
+    expect(world.players[HUMAN_PLAYER].input.buttons & Btn.fire).toBeTruthy();
+  });
+
+  it('stuns a unit that is already shaken without shaking it again', () => {
     expect(A.roar.unitNerve).toBeGreaterThanOrEqual(COMBAT_RULES.unitNerveCapacity);
     const world = arena();
+    equip(world, 'roar');
     const fresh = placeUnit(world, 0, 0, 10);
     const rattled = placeUnit(world, 1, 10, 0);
     const shaken = placeUnit(world, 2, -10, 0);
     rattled.nerve = 50;
     shaken.shaken = 1;
     shaken.state = 'shaken';
-    const events = play(world, 1, { buttons: Btn.roar });
+    const events = play(world, 1, { buttons: Btn.move1 });
+    expect(eventsOf(events, 'unitStunned').map((e) => e.unit).sort()).toEqual([0, 1, 2]);
+    expect(eventsOf(events, 'unitShaken').map((e) => e.unit).sort()).toEqual([0, 1]);
     expect(fresh.shaken).toBeGreaterThan(0);
     expect(rattled.shaken).toBeGreaterThan(0);
-    // Already shaken: it cannot get worse, and its time is not extended.
-    expect(shaken.shaken).toBeCloseTo(1 - DT, 6);
-    expect(eventsOf(events, 'unitShaken').map((e) => e.unit).sort()).toEqual([0, 1]);
+    // Already shaken: not shaken again, and its shaking waits out the stun.
+    expect(shaken.shaken).toBe(1);
     expect(world.players[KAIJU_PLAYER].tally.breaks).toBe(2);
   });
 
@@ -762,9 +793,10 @@ describe('roar', () => {
     expect(A.roar.radius[0]).toBeLessThan(A.roar.radius[1]);
     expect(A.roar.radius[1]).toBeLessThan(A.roar.radius[2]);
     const world = arena({}, 2);
+    equip(world, 'roar');
     const u = placeUnit(world, 4, 0, A.roar.radius[1] - 5);
-    play(world, 1, { buttons: Btn.roar });
-    expect(u.shaken).toBeGreaterThan(0);
+    play(world, 1, { buttons: Btn.move1 });
+    expect(u.stun).toBeGreaterThan(0);
   });
 });
 
@@ -789,15 +821,17 @@ describe('the beam special', () => {
 
   /** Fires the beam straight ahead and runs it to the end; returns the events. */
   function fire(world: World, partial: Partial<PlayerInput> = {}): SimEvent[] {
+    equip(world, 'beam');
     world.kaijus[0].rage = COMBAT_RULES.rageMax;
-    return [...play(world, 2, { ...partial, buttons: Btn.special }), ...untilIdle(world, partial)];
+    return [...play(world, 2, { ...partial, buttons: Btn.move1 }), ...untilIdle(world, partial)];
   }
 
   it('needs full rage, spends it at the start, and runs wind-up, beam and recovery by the clock', () => {
     const world = arena();
     const k = world.kaijus[0];
+    equip(world, 'beam');
     k.rage = beam.rageCost - 1;
-    expect(actions(play(world, 10, { buttons: Btn.special }))).toEqual([]);
+    expect(actions(play(world, 10, { buttons: Btn.move1 }))).toEqual([]);
     play(world, 10);
 
     k.rage = beam.rageCost;
@@ -806,7 +840,7 @@ describe('the beam special', () => {
     const total = windup + burn + ticksFor(beam.timing.recover);
     for (let step = 1; step <= 1 + total; step++) {
       // The stick is pushed forward all the way through, except on the tick it is free again.
-      const events = play(world, 1, { buttons: step <= 2 ? Btn.special : 0, moveZ: step <= total ? 1 : 0 });
+      const events = play(world, 1, { buttons: step <= 2 ? Btn.move1 : 0, moveZ: step <= total ? 1 : 0 });
       for (const e of eventsOf(events, 'kaijuAction')) timeline.push([step, e.action, e.phase]);
       cues.push(...eventsOf(events, 'voice').map((e) => e.cue));
       if (step === 1) expect(k.rage).toBe(0);
@@ -848,8 +882,9 @@ describe('the beam special', () => {
     });
     const sheltered = placeUnit(world, 0, 0, 30);
     toughen(world, 0);
+    equip(world, 'beam');
     world.kaijus[0].rage = COMBAT_RULES.rageMax;
-    play(world, 2, { buttons: Btn.special });
+    play(world, 2, { buttons: Btn.move1 });
     play(world, windup - 1);
 
     // For the first second the wall takes it all.
@@ -946,8 +981,9 @@ describe('the beam special', () => {
     play(world, 30);
     expect(k.yaw).toBeCloseTo(0, 6);
 
+    equip(world, 'beam');
     k.rage = COMBAT_RULES.rageMax;
-    play(world, 2, { buttons: Btn.special });
+    play(world, 2, { buttons: Btn.move1 });
     play(world, windup + 1);
     expect(k.phase).toBe('special');
     const start = k.aimYaw;
@@ -971,9 +1007,10 @@ describe('the beam special', () => {
       const world = arena();
       const k = world.kaijus[0];
       play(world, extraTicks);
+      equip(world, 'beam');
       k.rage = COMBAT_RULES.rageMax;
       const out: Array<{ yaw: number; pitch: number; steered: number }> = [];
-      play(world, 2, { buttons: Btn.special });
+      play(world, 2, { buttons: Btn.move1 });
       for (let i = 0; i < 400 && k.phase !== 'idle'; i++) {
         play(world, 1);
         if (k.phase === 'special') out.push({ yaw: k.aimYaw, pitch: k.aimPitch, steered: k.act.beamYaw });
@@ -1016,8 +1053,9 @@ describe('the beam special', () => {
   it('is cut short when the kaiju is staggered, and the rage is gone', () => {
     const world = arena({ structures: [{ x: 0, z: 20, w: 8, d: 4, height: 8, hp: 5000 }] });
     const k = world.kaijus[0];
+    equip(world, 'beam');
     k.rage = COMBAT_RULES.rageMax;
-    play(world, 2, { buttons: Btn.special });
+    play(world, 2, { buttons: Btn.move1 });
     play(world, windup + 10);
     const hp = world.structureHp[0];
     expect(hp).toBeLessThan(5000);
@@ -1029,18 +1067,145 @@ describe('the beam special', () => {
   });
 });
 
+describe('the charge: a move', () => {
+  const c = A.charge;
+  const windup = ticksFor(c.timing.windup);
+  const runTicks = ticksFor(c.timing.active);
+  const stumble = ticksFor(c.timing.recover);
+
+  it('winds up rooted, runs straight ahead at twice its walking speed turning slowly, and always ends in a stumble; the cooldown counts from its end', () => {
+    const world = arena();
+    const k = world.kaijus[0];
+    equip(world, 'charge');
+    const st = LIZARD.stages[0];
+    const timeline: Array<[number, string, string, number]> = [];
+    const speeds: number[] = [];
+    for (let step = 1; step <= 300 && (step < 3 || k.phase !== 'idle'); step++) {
+      // The stick is pulled back the whole time, and the crosshair is off to the right halfway
+      // through the run: the run goes where the body faces, turning only slowly.
+      const turn = step > 1 + windup + runTicks / 2;
+      const events = play(world, 1, { buttons: step <= 2 ? Btn.move1 : 0, moveZ: -1, aimYaw: turn ? 90 * DEG : 0 });
+      for (const e of eventsOf(events, 'kaijuAction')) timeline.push([step, e.action, e.phase, e.duration]);
+      speeds.push(Math.hypot(k.vx, k.vz));
+      if (step === windup) expect(Math.hypot(k.x, k.z)).toBe(0);
+      if (step === 1 + windup + runTicks - 1) {
+        // Half a run of turning at a quarter of the rate (a tick of slack for when it began).
+        const turned = st.turnRate * c.runTurnMult * (runTicks / 2) * DT;
+        expect(k.yaw).toBeGreaterThan(turned - st.turnRate * c.runTurnMult * 2 * DT);
+        expect(k.yaw).toBeLessThan(turned + 1e-6);
+        expect(k.cooldowns.charge).toBeGreaterThan(c.cooldown);
+      }
+    }
+    expect(timeline).toEqual([
+      [1, 'charge', 'windup', c.timing.windup],
+      [1 + windup, 'charge', 'charge', c.timing.active],
+      [1 + windup + runTicks, 'charge', 'stumble', c.timing.recover],
+      [1 + windup + runTicks + stumble, 'charge', 'idle', 0],
+    ]);
+    // Twice the walking top speed, reached half a second into the run.
+    const top = st.topSpeed * c.speedMult;
+    expect(Math.max(...speeds)).toBeCloseTo(top, 6);
+    expect(speeds[windup + ticksFor(c.rampTime)]).toBeGreaterThan(top * 0.97);
+    expect(k.z).toBeGreaterThan(top * (c.timing.active - c.rampTime));
+    expect(k.cooldowns.charge).toBe(c.cooldown);
+    // The stumble left it standing still (on the tick it is free it starts walking where the stick says).
+    expect(speeds[speeds.length - 2]).toBeLessThan(0.5);
+  });
+
+  it('smashes the houses it runs through, and a building too tall to smash stops it dead', () => {
+    // Houses (6 m: more than a hatchling walks through, less than its charge smashes) ahead, then a tall block.
+    const houses = [14, 26, 38].map((z) => ({ x: 0, z, w: 8, d: 8, height: 6, hp: 80, value: 8 }));
+    const world = arena({ structures: [...houses, { x: 0, z: 50, w: 12, d: 8, height: 20, hp: 900, value: 50 }] });
+    const k = world.kaijus[0];
+    equip(world, 'charge');
+    expect(houses[0].height).toBeGreaterThan(LIZARD.stages[0].trampleHeight);
+    expect(houses[0].height).toBeLessThanOrEqual(c.smashHeight[0]);
+    const events = [...tap(world, Btn.move1), ...untilIdle(world)];
+    expect([0, 1, 2].map((id) => world.structureHp[id])).toEqual([0, 0, 0]);
+    expect(eventsOf(events, 'structureStage').filter((e) => e.stage === 3)).toMatchObject([0, 1, 2].map((id) => ({ id, cause: 'charge', by: KAIJU_PLAYER })));
+    expect(world.match.barPoints).toBeCloseTo(3 * 8, 6);
+    // The tall block stood: the run stopped against it, before its time was up.
+    expect(world.structureHp[3]).toBe(900);
+    const stumbleAt = eventsOf(events, 'kaijuAction').find((e) => e.phase === 'stumble') as KaijuActionEvent;
+    const runAt = eventsOf(events, 'kaijuAction').find((e) => e.phase === 'charge') as KaijuActionEvent;
+    expect(stumbleAt.tick - runAt.tick).toBeLessThan(runTicks);
+    expect(k.z + LIZARD.stages[0].bodyRadius).toBeLessThanOrEqual(46 + 0.05);
+  });
+
+  it('hits each unit it runs into once and throws it aside; a second press ends the run early', () => {
+    const world = arena();
+    const k = world.kaijus[0];
+    equip(world, 'charge');
+    // Two leaders (they stay where they are put) in the path, just to either side of the middle.
+    const right = placeUnit(world, 0, -1, 14);
+    const left = placeUnit(world, 4, 1.5, 22);
+    toughen(world, 0);
+    toughen(world, 4);
+    let events = [...tap(world, Btn.move1), ...play(world, windup + ticksFor(1.5))];
+    const hits = eventsOf(events, 'unitHit').filter((e) => e.cause === 'charge');
+    expect(hits.map((e) => [e.unit, e.damage]).sort()).toEqual([
+      [0, c.unitDamage],
+      [4, c.unitDamage],
+    ]);
+    expect(right.nerve).toBeGreaterThan(0);
+    // Thrown aside, each to its own side of the path.
+    expect(right.x).toBeLessThan(-1 - LIZARD.stages[0].bodyRadius);
+    expect(left.x).toBeGreaterThan(1.5 + LIZARD.stages[0].bodyRadius);
+    // Pressed again in the run: the stumble starts at once.
+    expect(k.phase).toBe('charge');
+    events = play(world, 1, { buttons: Btn.move1 });
+    expect(actions(events)).toEqual([['charge', 'stumble']]);
+  });
+});
+
+describe('the tail sweep: a move', () => {
+  it('sweeps the rear half after a short wind-up: units behind are hit and knocked outward, buildings behind take a swipe of damage', () => {
+    const r = radius(1);
+    const world = arena({
+      structures: [
+        { x: 3, z: -(r + 3), w: 4, d: 4, height: 6, hp: 1000 },
+        { x: 0, z: r + 3, w: 4, d: 4, height: 6, hp: 1000 },
+      ],
+    });
+    const k = world.kaijus[0];
+    equip(world, 'tailSweep');
+    const behind = placeUnit(world, 0, -2, -(r + 2));
+    const front = placeUnit(world, 4, -3, r + 2);
+    toughen(world, 0);
+    toughen(world, 4);
+    const timeline: Array<[number, string, string]> = [];
+    for (let step = 1; step <= 60; step++) {
+      for (const e of eventsOf(play(world, 1, { buttons: step <= 2 ? Btn.move1 : 0 }), 'kaijuAction')) timeline.push([step, e.action, e.phase]);
+    }
+    const sw = A.tailSweep.timing;
+    expect(timeline).toEqual([
+      [1, 'tailSweep', 'windup'],
+      [1 + ticksFor(sw.windup), 'tailSweep', 'active'],
+      [1 + ticksFor(sw.windup) + ticksFor(sw.active), 'tailSweep', 'recover'],
+      [1 + ticksFor(sw.windup) + ticksFor(sw.active) + ticksFor(sw.recover), 'tailSweep', 'idle'],
+    ]);
+    expect(behind.maxHp - behind.hp).toBe(A.tailSweep.unitDamage);
+    expect(behind.nerve).toBeGreaterThan(0);
+    // Knocked outward, away from the kaiju.
+    expect(Math.hypot(behind.x, behind.z)).toBeGreaterThan(Math.hypot(2, r + 2) + r * 0.5);
+    expect(front.hp).toBe(front.maxHp);
+    expect(1000 - world.structureHp[0]).toBe(A.tailSweep.structureDamage[0]);
+    expect(world.structureHp[1]).toBe(1000);
+    expect(k.cooldowns.tailSweep).toBeGreaterThan(A.tailSweep.cooldown - 2.1);
+  });
+});
+
 describe('the molt', () => {
-  it('starts the cocoon only when a molt is available and Molt is held long enough', () => {
+  it('starts the cocoon with one press of Molt, only when a molt is available', () => {
     const world = arena({
       marks: [10, 1e6, 2e6],
       structures: [{ x: 100, z: 100, w: 10, d: 10, height: 20, hp: 100, value: 40 }],
       props: [{ kind: 'car_sedan', x: 0, z: clearOf('car_sedan') }],
     });
     const k = world.kaijus[0];
-    const hold = ticksFor(A.molt.holdTime);
 
-    // Not available yet: holding does nothing.
-    expect(actions(play(world, hold + 10, { buttons: Btn.molt }))).toEqual([]);
+    // Not available yet: pressing or holding does nothing.
+    expect(actions(play(world, 40, { buttons: Btn.molt }))).toEqual([]);
     play(world, 2);
 
     // The bar passes the first mark: the prompt.
@@ -1053,18 +1218,11 @@ describe('the molt', () => {
     // Told once, not every tick.
     expect(eventsOf(play(world, 30), 'moltAvailable')).toEqual([]);
 
-    // Letting go early cancels.
-    events = [...play(world, hold - 2, { buttons: Btn.molt }), ...play(world, 5)];
-    expect(actions(events)).toEqual([]);
-    expect(k.phase).toBe('idle');
-
-    // It lets go of what it holds when the cocoon closes.
+    // It lets go of what it holds when the cocoon closes, on the press itself.
     tap(world, Btn.grab);
     untilIdle(world);
     expect(k.held).not.toBeNull();
 
-    events = play(world, hold, { buttons: Btn.molt });
-    expect(actions(events)).toEqual([]);
     events = play(world, 1, { buttons: Btn.molt });
     expect(actions(events)).toEqual([['molt', 'cocoon']]);
     expect(eventsOf(events, 'cocoon')).toMatchObject([{ kaiju: 0, x: k.x, z: k.z, duration: world.config.tuning.cocoon }]);
@@ -1077,7 +1235,7 @@ describe('the molt', () => {
     expect(k.held).toBeNull();
 
     // Helpless: no movement, no actions, and no new prompt while it is in there.
-    events = play(world, 60, { buttons: Btn.strike | Btn.roar, moveZ: 1 });
+    events = play(world, 60, { buttons: Btn.strike | Btn.stomp, moveZ: 1 });
     expect(actions(events)).toEqual([]);
     expect(eventsOf(events, 'moltAvailable')).toEqual([]);
     expect(k.z).toBe(0);
@@ -1116,7 +1274,7 @@ describe('the molt', () => {
     expect(eventsOf(events, 'moltAvailable')).toMatchObject([{ mark: 2 }]);
 
     beginStage(world, 3);
-    events = play(world, ticksFor(A.molt.holdTime) + 5, { buttons: Btn.molt });
+    events = play(world, 30, { buttons: Btn.molt });
     expect(eventsOf(events, 'moltAvailable')).toEqual([]);
     expect(world.kaijus[0].phase).toBe('idle');
   });

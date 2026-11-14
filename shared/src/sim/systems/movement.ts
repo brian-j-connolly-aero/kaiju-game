@@ -111,7 +111,7 @@ export function movementSystem(world: World): void {
       }
     }
     propsInCircle(city, k.x, k.z, k.radius, propIds);
-    for (const id of propIds) world.propHits.push({ id, by: k.player, cause: 'trample' });
+    for (const id of propIds) world.propHits.push({ id, by: k.player, cause: charging ? 'charge' : 'trample' });
   }
 
   for (const u of world.units) {

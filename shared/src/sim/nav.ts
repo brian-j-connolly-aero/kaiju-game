@@ -36,6 +36,8 @@ export interface UnitNav {
   settled: boolean;
   /** Multiplier on its top speed this tick: above 1 while it is catching up with its place in the swarm. */
   hurry: number;
+  /** Fallen behind: the number of the point of its leader's trail it is driving for (`squad.trailBase` plus the point's index), -1 when none. */
+  trailMark: number;
   /** The goal of the last `steerToward` call. */
   goalX: number;
   goalZ: number;
@@ -96,6 +98,7 @@ export function createUnitNav(): UnitNav {
   return {
     settled: true,
     hurry: 1,
+    trailMark: -1,
     goalX: 0,
     goalZ: 0,
     direct: true,
@@ -155,6 +158,7 @@ export function resetNav(nav: UnitNav): void {
   nav.feelZ = NaN;
   nav.settled = true;
   nav.hurry = 1;
+  nav.trailMark = -1;
   nav.shotAt = -1;
   nav.shotHeight = 0;
 }

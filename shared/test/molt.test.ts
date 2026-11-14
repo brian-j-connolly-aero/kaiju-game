@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   allStageBounds,
+  applyHit,
   beginStage,
   boundsContains,
   Btn,
@@ -9,13 +10,16 @@ import {
   createMatchConfig,
   createRng,
   createWorld,
+  decodeSnapshot,
   DT,
+  encodeSnapshot,
   getCity,
   idleBots,
   kaijuStageDef,
   LIZARD,
   MATCH_RULES,
   rngRange,
+  snapshotOfWorld,
   spawnProjectile,
   structuresInCircle,
   TICK_RATE,
@@ -28,7 +32,8 @@ import { eventsOf, holdFire, HUMAN_PLAYER, input, KAIJU_PLAYER, makeTestWorld, p
 
 const COCOON_TICKS = MATCH_RULES.cocoon * TICK_RATE;
 const INTERMISSION_TICKS = MATCH_RULES.intermission * TICK_RATE;
-const MOLT_HOLD_TICKS = Math.ceil(LIZARD.actions.molt.holdTime * TICK_RATE) + 2;
+/** One press of Molt (a tap) starts the cocoon. */
+const MOLT_PRESS_TICKS = 2;
 const R2 = LIZARD.stages[1].bodyRadius;
 const R3 = LIZARD.stages[2].bodyRadius;
 
@@ -57,9 +62,9 @@ function play(world: World, ticks: number, kaiju: Partial<PlayerInput> = {}): Si
   return run(world, ticks, [input(kaiju), input()]);
 }
 
-/** Holds Molt until the cocoon closes, and returns the events up to and including that tick. */
+/** Presses Molt, and returns the events of the press (the cocoon closes on its first tick). */
 function cocoon(world: World): SimEvent[] {
-  const events = play(world, MOLT_HOLD_TICKS, { buttons: Btn.molt });
+  const events = play(world, MOLT_PRESS_TICKS, { buttons: Btn.molt });
   expect(world.kaijus[0].phase).toBe('cocoon');
   return events;
 }
@@ -166,7 +171,7 @@ describe('the molt: blast wave', () => {
 
     // Nobody acts in the intermission: sticks and buttons do nothing, but the thrown unit slides.
     const k = world.kaijus[0];
-    const events = run(world, 60, [input({ moveZ: 1, buttons: Btn.strike | Btn.roar }), input({ moveX: 1, buttons: Btn.fire, wheel: 'holdCharge' })]);
+    const events = run(world, 60, [input({ moveZ: 1, buttons: Btn.strike | Btn.stomp }), input({ moveX: 1, buttons: Btn.fire | Btn.volley })]);
     expect(eventsOf(events, 'kaijuAction')).toEqual([]);
     expect(eventsOf(events, 'projectileSpawn')).toEqual([]);
     expect([k.x, k.z]).toEqual([0, 0]);
@@ -228,7 +233,7 @@ describe('the molt: the next stage', () => {
 
     // Every squad is back, fresh, at level 2, on the new perimeter, away from the kaiju.
     for (const squad of world.squads) {
-      expect(squad).toMatchObject({ eliminated: false, level: 2, driven: squad.units[0], moveOrder: 'follow', fireMode: 'atWill' });
+      expect(squad).toMatchObject({ eliminated: false, level: 2, driven: squad.units[0] });
       for (const id of squad.units) {
         const u = world.units[id];
         expect(u).toMatchObject({ alive: true, type: 'army_tank', hp: UNIT_TYPES.army_tank.hp, shaken: 0, charge: 0, nerve: 0 });
@@ -269,10 +274,9 @@ describe('the molt: the next stage', () => {
     expect(eventsOf(events, 'voice').map((e) => e.cue)).toContain('stage.3');
     expect(world.match).toMatchObject({ phase: 'playing', stage: 3 });
     expect(world.units.every((u) => u.alive && u.type === 'army_tank_troop')).toBe(true);
-    expect(world.squads[0].callInCooldowns).toEqual([0]);
 
     // Nothing more to grow into.
-    const more = play(world, MOLT_HOLD_TICKS + 30, { buttons: Btn.molt });
+    const more = play(world, MOLT_PRESS_TICKS + 30, { buttons: Btn.molt });
     expect(eventsOf(more, 'moltAvailable')).toEqual([]);
     expect(k.phase).not.toBe('cocoon');
   });
@@ -286,7 +290,7 @@ describe('the molt: the next stage', () => {
     world.step();
     world.structureHits.push({ id: world.city.structures[0].id, damage: 1e9, by: 0, cause: 'swipe' });
     world.step();
-    run(world, MOLT_HOLD_TICKS, [input({ buttons: Btn.molt })]);
+    run(world, MOLT_PRESS_TICKS, [input({ buttons: Btn.molt })]);
     const events = run(world, COCOON_TICKS + 2, [input()]);
     expect(eventsOf(events, 'matchPhase')).toMatchObject([{ phase: 'intermission', duration: MATCH_RULES.intermissionWithDraft }]);
   });
@@ -457,5 +461,125 @@ describe('the molt: what can still end the match', () => {
     world.structureHits.push({ id: 0, damage: 10, by: HUMAN_PLAYER, cause: 'arty' });
     const events = play(world, 1);
     expect(eventsOf(events, 'matchEnd')).toMatchObject([{ winner: 'kaiju', reason: 'bar' }]);
+  });
+});
+
+describe('molt cards: a new move at each molt', () => {
+  it('offers beam, roar and charge when the first cocoon starts; the pick goes on the first move button and stays', () => {
+    const world = moltWorld();
+    const k = world.kaijus[0];
+    let events = cocoon(world);
+    expect(eventsOf(events, 'moltOffer')).toMatchObject([{ kaiju: 0, offer: ['beam', 'roar', 'charge'], slot: 0 }]);
+    expect(k.offer).toEqual(['beam', 'roar', 'charge']);
+    expect(decodeSnapshot(encodeSnapshot(snapshotOfWorld(world))).kaijus[0]).toMatchObject({ offer: ['beam', 'roar', 'charge'], moves: ['none', 'none'] });
+
+    // A card out of range is ignored; card 2 picks the roar (a one-shot: it does not repeat).
+    play(world, 1, { card: 4 });
+    expect(k.offer.length).toBe(3);
+    events = play(world, 3, { card: 2 });
+    expect(eventsOf(events, 'moltPick')).toMatchObject([{ kaiju: 0, move: 'roar', slot: 0, card: 2, random: false }]);
+    expect(k.moves).toEqual(['roar', 'none']);
+    expect(k.offer).toEqual([]);
+
+    // Through the molt and into stage 2: the roar is on its button.
+    toLastCocoonTick(world);
+    play(world, 1 + INTERMISSION_TICKS);
+    expect(world.match).toMatchObject({ phase: 'playing', stage: 2 });
+    expect(k.moves).toEqual(['roar', 'none']);
+    expect(decodeSnapshot(encodeSnapshot(snapshotOfWorld(world))).kaijus[0]).toMatchObject({ offer: [], moves: ['roar', 'none'] });
+  });
+
+  it('offers the two not taken and a brace or a tail sweep at the second molt, and draws one if none is picked by the end of the intermission', () => {
+    const run2 = (seed: number): { offer: string[]; moves: string[]; events: SimEvent[] } => {
+      const world = moltWorld({ seed });
+      const k = world.kaijus[0];
+      k.moves = ['beam', 'none'];
+      // Into stage 2 without a cocoon (the bar is already past its mark), and molt again.
+      beginStage(world, 2);
+      play(world, 1);
+      expect(k.moltAvailable).toBe(true);
+      const events = cocoon(world);
+      const offer = k.offer.slice();
+      // Nobody picks: the cocoon runs out, the intermission too.
+      events.push(...toLastCocoonTick(world), ...play(world, 1 + INTERMISSION_TICKS));
+      expect(world.match.stage).toBe(3);
+      return { offer, moves: k.moves.slice(), events };
+    };
+    const a = run2(7);
+    expect(a.offer.slice(0, 2)).toEqual(['roar', 'charge']);
+    expect(['brace', 'tailSweep']).toContain(a.offer[2]);
+    // Drawn at random, and only then does the stage begin.
+    const picks = eventsOf(a.events, 'moltPick');
+    expect(picks).toMatchObject([{ slot: 1, random: true }]);
+    expect(a.offer).toContain(picks[0].move);
+    expect(a.moves).toEqual(['beam', picks[0].move]);
+    expect(picks[0].tick).toBeLessThanOrEqual(eventsOf(a.events, 'stageChange')[0].tick);
+    // The match's random numbers decide it: the same seed, the same cards and the same draw.
+    expect(run2(7)).toEqual(a);
+    // Both extras turn up over a few matches.
+    const extras = new Set([1, 2, 3, 4, 5, 6].map((seed) => run2(seed).offer[2]));
+    expect([...extras].sort()).toEqual(['brace', 'tailSweep']);
+  });
+});
+
+describe('never alone: the city gives way when every squad is gone', () => {
+  /** A street of houses round the kaiju, nearest first along +x: 10 points each. */
+  const STREET = [12, 24, 36, 48, 60, 72, 84, 96].map((x) => ({ x, z: 0, w: 8, d: 8, height: 6, hp: 80, value: 10 }));
+
+  function wipeOut(world: World): void {
+    for (const u of world.units) {
+      applyHit(world, { entity: 'unit', id: u.id }, { damage: Infinity, nerve: 0, fromDir: { x: 0, z: 0 }, sourceId: 0, player: KAIJU_PLAYER, kind: 'stomp', atWill: false });
+    }
+    expect(world.squads.every((s) => s.eliminated)).toBe(true);
+  }
+
+  it('at stage 1, the nearest buildings fall one after another until the bar reaches the mark, then the cocoon starts by itself', () => {
+    const world = makeTestWorld({ structures: STREET, marks: [35, 1e6, 2e6] });
+    holdFire(world);
+    const k = placeKaiju(world, 0, 0);
+    k.held = { kind: 'prop', prop: 'car_sedan' };
+    world.match.barPoints = 4;
+    play(world, 5);
+    expect(eventsOf(play(world, 5), 'cityCollapse')).toEqual([]);
+
+    wipeOut(world);
+    const events = play(world, Math.round(MATCH_RULES.neverAloneTime * TICK_RATE) + 5);
+    expect(eventsOf(events, 'cityCollapse')).toMatchObject([{ kaiju: 0, count: 4, duration: MATCH_RULES.neverAloneTime }]);
+    // The four nearest (31 points needed, 10 each), one after another over the time, by the
+    // usual rules: they fall, the bar fills, the tally counts them.
+    const fell = eventsOf(events, 'structureStage').filter((e) => e.stage === 3);
+    expect(fell.map((e) => [e.id, e.cause, e.by])).toEqual([0, 1, 2, 3].map((id) => [id, 'collapse', KAIJU_PLAYER]));
+    expect(fell[3].tick - fell[0].tick).toBeGreaterThan((MATCH_RULES.neverAloneTime - 1) * TICK_RATE);
+    expect(world.structureHp[4]).toBe(80);
+    expect(world.match.barPoints).toBeCloseTo(44, 6);
+    expect(world.players[KAIJU_PLAYER].tally.wrecked.house).toBe(4);
+    // Then the cocoon, by itself, with what it held dropped and the cards on offer.
+    expect(eventsOf(events, 'cocoon')).toMatchObject([{ kaiju: 0 }]);
+    expect(eventsOf(events, 'kaijuHeld')).toMatchObject([{ reason: 'drop' }]);
+    expect(eventsOf(events, 'moltOffer')).toHaveLength(1);
+    expect(k.phase).toBe('cocoon');
+    expect(eventsOf(events, 'cocoon')[0].tick).toBeGreaterThan(fell[3].tick);
+
+    // The squads come back at the next stage, as after any molt.
+    toLastCocoonTick(world);
+    play(world, 1 + INTERMISSION_TICKS);
+    expect(world.match.stage).toBe(2);
+    expect(world.squads.every((s) => !s.eliminated)).toBe(true);
+  });
+
+  it('at stage 3 the bar fills to the end (set there when the city cannot fill it) and the kaiju wins', () => {
+    const world = makeTestWorld({ structures: STREET, marks: [10, 20, 1e6] });
+    beginStage(world, 3);
+    holdFire(world);
+    // Clear of the street: a titan walks through houses.
+    placeKaiju(world, -100, 0);
+    wipeOut(world);
+    const events = play(world, Math.round(MATCH_RULES.neverAloneTime * TICK_RATE) + 5);
+    // Every building there is falls, and still the bar is short: it is set to the mark.
+    expect(eventsOf(events, 'cityCollapse')).toMatchObject([{ count: STREET.length }]);
+    expect(world.structureHp.every((hp) => hp === 0)).toBe(true);
+    expect(world.match.barPoints).toBe(1e6);
+    expect(eventsOf(events, 'matchEnd')).toMatchObject([{ winner: 'kaiju', reason: 'bar' }]);
+    expect(eventsOf(events, 'cocoon')).toEqual([]);
   });
 });

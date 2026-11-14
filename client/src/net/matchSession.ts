@@ -16,6 +16,7 @@ import {
   decodeSnapshot,
   kaijuKindDef,
   kaijuMoveParams,
+  kaijuMoveVerb,
   kaijuStageDef,
   stageBounds,
   unitMoveParams,
@@ -31,16 +32,14 @@ import {
   type SimEvent,
   type SnapKaiju,
   type SnapMatch,
-  type SnapSmoke,
   type SnapSquad,
   type SnapUnit,
   type Snapshot,
-  type SquadCommand,
   type StageId,
   type WelcomeMessage,
 } from '@mb/shared';
 import { applyCityEvent, createCityMirror, resyncCityMirror, type CityMirror } from './cityMirror';
-import { createPredictor, decayPredictionError, predictedPose, predictStep, reconcile, resetPredictor, type Predictor } from './prediction';
+import { createPredictor, decayPredictionError, predictedPose, predictedTurret, predictStep, readAck, reconcile, resetPredictor, type Predictor } from './prediction';
 import { clockSample, createServerClock, renderTick, type ServerClock } from './serverClock';
 import { createSnapshotBuffer, newestSnapshot, pushSnapshot, sampleSnapshots, type SnapshotBuffer } from './snapshotBuffer';
 
@@ -59,8 +58,6 @@ export interface FrameState {
   kaijus: SnapKaiju[];
   squads: SnapSquad[];
   units: SnapUnit[];
-  /** Smoke clouds standing now (sim/abilities.ts). */
-  smokes: SnapSmoke[];
   /** Playable bounds of the stage being shown. */
   bounds: Bounds;
   /** The unit the local player drives (already at its predicted position), or null. */
@@ -86,9 +83,43 @@ interface LocalHint extends ActionHint {
   shown: boolean;
 }
 
-/** The phase a verb's press leads into (what the drawn kaiju shows once the server's state arrives). */
-function hintPhase(verb: KaijuVerb): KaijuPhase {
-  return verb === 'brace' ? 'brace' : verb === 'roar' ? 'roar' : 'windup';
+/**
+ * The phase a verb's press leads into (what the drawn kaiju shows once the server's state
+ * arrives): its wind-up, or for a verb without one (the roar, eating) its active phase at once.
+ */
+function hintPhase(verb: KaijuVerb, kind: SnapKaiju['kind']): KaijuPhase {
+  if (verb === 'brace') return 'brace';
+  const action = kaijuKindDef(kind).actions[verb];
+  return action.timing.windup > 0 ? 'windup' : action.activePhase;
+}
+
+/** The two move buttons' bits, by slot (`SnapKaiju.moves`). */
+const MOVE_BITS = [Btn.move1, Btn.move2] as const;
+
+/**
+ * Which verb a fresh press starts on an idle kaiju, by the simulation's rules for one move per
+ * button (net/input.ts; sim/systems/kaijuActions.ts `startFromInput`), or null when it starts
+ * nothing that can be shown ahead of the server. `buttons` is what is down, `pressed` what just
+ * went down. The order is the simulation's: molt, brace, the first move, the second, stomp,
+ * strike, grab. A Grab with empty hands is shown as a grab: whether the server eats a kiosk
+ * instead depends on what lies in reach, and the server's own phase takes over the picture.
+ */
+export function hintVerb(k: SnapKaiju, buttons: number, pressed: number): KaijuVerb | null {
+  if (pressed & Btn.molt && k.moltAvailable) return null;
+  const def = kaijuKindDef(k.kind);
+  for (let slot = 0; slot < 2; slot++) {
+    if (kaijuMoveVerb(k.moves[slot]) === 'brace' && buttons & MOVE_BITS[slot]) return 'brace';
+  }
+  for (let slot = 0; slot < 2; slot++) {
+    const verb = kaijuMoveVerb(k.moves[slot]);
+    if (verb === 'none' || verb === 'brace' || !(pressed & MOVE_BITS[slot])) continue;
+    const ready = k.cooldowns[verb] <= 0 && k.rage >= def.actions[verb].rageCost;
+    if (ready) return verb;
+  }
+  if (pressed & Btn.stomp) return 'stomp';
+  if (pressed & Btn.strike) return k.held ? 'throw' : 'swipe';
+  if (pressed & Btn.grab) return k.held ? (k.cooldowns.eat <= 0 ? 'eat' : null) : 'grab';
+  return null;
 }
 
 /** The action state to pose a kaiju in, in place of its own. */
@@ -116,13 +147,13 @@ export function hintPose(k: SnapKaiju, hint: ActionHint | null, now: number): Hi
   }
   const def = kaijuKindDef(k.kind).actions[hint.verb];
   if (hint.verb === 'brace') return { action: 'brace', phase: 'brace', phaseTime: elapsed, phaseDuration: 0 };
-  if (hint.verb === 'roar') return { action: 'roar', phase: 'roar', phaseTime: Math.min(elapsed, def.timing.active), phaseDuration: def.timing.active };
+  // No wind-up (the roar, eating): straight into the active phase.
+  if (!(def.timing.windup > 0)) return { action: hint.verb, phase: def.activePhase, phaseTime: Math.min(elapsed, def.timing.active), phaseDuration: def.timing.active };
   return { action: hint.verb, phase: 'windup', phaseTime: Math.min(elapsed, def.timing.windup), phaseDuration: def.timing.windup };
 }
 
 export interface SessionCallbacks {
   sendInput(input: PlayerInput): void;
-  sendCommand(command: SquadCommand): void;
   /** A simulation event whose moment on screen has come. */
   onEvent(event: SimEvent): void;
   /** The mirrored city was replaced wholesale (reconnection): redraw every structure and prop. */
@@ -255,21 +286,29 @@ export class MatchSession {
     return null;
   }
 
-  private kaijuParams(k: SnapKaiju, bounds: Bounds, now: number): MoveParams {
-    let state: KaijuMoveState = k;
+  /** The kaiju's movement state to predict with: the snapshot's, or the wind-up of a press the server has not answered yet. */
+  private kaijuState(k: SnapKaiju, now: number): KaijuMoveState {
     const hint = this.predictedHint(k, now);
-    if (hint) state = { kind: k.kind, stage: k.stage, nerve: k.nerve, action: hint.verb, phase: 'windup', submerge: k.submerge };
-    return kaijuMoveParams(state, bounds, undefined, this.params);
+    return hint ? { kind: k.kind, stage: k.stage, nerve: k.nerve, action: hint.verb, phase: hintPhase(hint.verb, k.kind), submerge: k.submerge } : k;
   }
 
-  private paramsFor(body: { kaiju: SnapKaiju | null; unit: SnapUnit | null }, snap: Snapshot, now: number): { params: MoveParams; radius: number } {
+  /**
+   * How the local body moves: its movement parameters, its radius and, for a kaiju, the
+   * movement state that can override the stick (a charge's run), as the server's movement uses them.
+   */
+  private paramsFor(
+    body: { kaiju: SnapKaiju | null; unit: SnapUnit | null },
+    snap: Snapshot,
+    now: number,
+  ): { params: MoveParams; radius: number; drive: KaijuMoveState | null } {
     const bounds = this.boundsFor(snap.match.stage);
     if (body.kaiju) {
-      return { params: this.kaijuParams(body.kaiju, bounds, now), radius: kaijuStageDef(body.kaiju.kind, body.kaiju.stage).bodyRadius };
+      const drive = this.kaijuState(body.kaiju, now);
+      return { params: kaijuMoveParams(drive, bounds, undefined, this.params), radius: kaijuStageDef(body.kaiju.kind, body.kaiju.stage).bodyRadius, drive };
     }
     const u = body.unit as SnapUnit;
     const def = unitTypeDef(u.type);
-    return { params: unitMoveParams(def, u, bounds, undefined, this.params), radius: def.radius };
+    return { params: unitMoveParams(def, u, bounds, undefined, this.params), radius: def.radius, drive: null };
   }
 
   private reconcileFrom(snap: Snapshot): void {
@@ -288,14 +327,15 @@ export class MatchSession {
     }
     const now = this.stats.lastSnapshotAt;
     const hint = this.hint;
+    const ack = readAck(snap.ackSeq);
     if (hint && !hint.confirmed && body.kaiju) {
       if (body.kaiju.phase !== 'idle') hint.confirmed = true;
-      // The server has had the press and the kaiju is still idle: it was refused. Stop pretending.
-      else if (snap.ackSeq >= hint.seq) this.hint = null;
+      // The server has played the press and the kaiju is still idle: it was refused. Stop pretending.
+      else if (ack.played >= hint.seq) this.hint = null;
     }
-    const { params, radius } = this.paramsFor(body, snap, now);
+    const { params, radius, drive } = this.paramsFor(body, snap, now);
     const server = body.kaiju ?? (body.unit as SnapUnit);
-    reconcile(this.predictor, server, radius, snap.ackSeq, this.mirror.query, params, snap.match.phase === 'playing');
+    reconcile(this.predictor, server, radius, snap.ackSeq, this.mirror.query, params, snap.match.phase === 'playing', drive);
   }
 
   /**
@@ -319,13 +359,7 @@ export class MatchSession {
     // The view is still showing the tail of the last action: a hint now would be cut off by it.
     const drawn = this.frame?.localKaiju;
     if (drawn && drawn.phase !== 'idle') return;
-    const def = kaijuKindDef(k.kind);
-    let verb: KaijuVerb | null = null;
-    if (buttons & Btn.block) verb = 'brace';
-    else if (pressed & Btn.special && k.rage >= def.actions.special.rageCost) verb = 'special';
-    else if (pressed & Btn.roar && k.cooldowns.roar <= 0) verb = 'roar';
-    else if (pressed & Btn.strike) verb = k.held ? 'throw' : 'swipe';
-    else if (pressed & Btn.grab && !k.held) verb = 'grab';
+    const verb = hintVerb(k, buttons, pressed);
     if (verb) this.hint = { verb, startedAt: now, seq, confirmed: false, shown: false };
   }
 
@@ -342,15 +376,11 @@ export class MatchSession {
     if (snap && body && this.mirror.trusted) {
       const playing = snap.match.phase === 'playing';
       if (body.kaiju && playing) this.updateHint(input.buttons, body.kaiju, now, input.seq);
-      const { params } = this.paramsFor(body, snap, now);
-      predictStep(this.predictor, input, this.mirror.query, params, playing);
+      const { params, drive } = this.paramsFor(body, snap, now);
+      predictStep(this.predictor, input, this.mirror.query, params, playing, drive);
     }
     this.lastButtons = input.buttons;
     return input;
-  }
-
-  sendCommand(command: SquadCommand): void {
-    this.callbacks.sendCommand(command);
   }
 
   // --- per frame -------------------------------------------------------------------------------
@@ -373,7 +403,6 @@ export class MatchSession {
       kaijus: sampled.kaijus,
       squads: snap.squads,
       units: sampled.units,
-      smokes: snap.smokes,
       bounds: this.boundsFor(snap.match.stage),
       localUnit: null,
       localKaiju: null,
@@ -427,7 +456,9 @@ export class MatchSession {
           u.yaw = pose.yaw;
           u.vx = this.predictor.body.vx;
           u.vz = this.predictor.body.vz;
-          u.aimYaw = this.aimYaw;
+          // A tank's turret swings toward the aim at its own rate (predicted with the hull); any
+          // other unit's weapon points where the player looks.
+          u.aimYaw = predictedTurret(this.predictor, this.localAlpha) ?? this.aimYaw;
           u.aimPitch = this.aimPitch;
         }
       }
@@ -459,7 +490,7 @@ export class MatchSession {
     if (!hint || this.role.kind !== 'kaiju' || k.id !== this.role.kaijuId) return null;
     if (k.phase === 'idle') {
       if (!hint.shown && now - hint.startedAt <= HINT_DRAW_TIMEOUT) return hint;
-    } else if (k.phase === hintPhase(hint.verb)) {
+    } else if (k.phase === hintPhase(hint.verb, k.kind)) {
       hint.shown = true;
       return hint;
     }

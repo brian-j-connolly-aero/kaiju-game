@@ -1,15 +1,13 @@
 /**
  * The player cameras: first and third person look the same way, with the same limits, so the
- * view toggle (V) changes where the camera sits and never what the player is looking at. And
- * the squad's command wheel: every entry can be picked by pointing and letting go, and every
- * order has its own key.
+ * view toggle (V) changes where the camera sits and never what the player is looking at.
  */
 
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { CITY_SEED, COMMAND_IDS, createCityQuery, createCityState, getCity, kaijuKindDef, wrapAngle, type CommandId, type SnapKaiju, type SnapUnit } from '@mb/shared';
+import { CITY_SEED, createCityQuery, createCityState, getCity, kaijuKindDef, wrapAngle, type SnapKaiju, type SnapUnit } from '@mb/shared';
 import { createActionState, type ActionState, type ButtonAction } from '../src/game/input/actions';
-import { HUMAN_PITCH_LIMIT, HumanController, WHEEL_LAYOUT } from '../src/game/controllers/humanController';
+import { HUMAN_PITCH_LIMIT, HumanController } from '../src/game/controllers/humanController';
 import { KAIJU_PITCH_LIMIT, KaijuController } from '../src/game/controllers/kaijuController';
 import type { ControlContext } from '../src/game/controllers/types';
 
@@ -31,7 +29,6 @@ function kaiju(over: Partial<SnapKaiju> = {}): SnapKaiju {
     submerge: 0,
     known: true,
     spotted: false,
-    marked: false,
     x: FAR,
     z: FAR,
     vx: 0,
@@ -101,7 +98,7 @@ function context(input: ActionState, body: { k?: SnapKaiju; u?: SnapUnit }): Con
     bounds: { minX: FAR - 500, maxX: FAR + 500, minZ: FAR - 500, maxZ: FAR + 500 },
   };
   return {
-    session: { mirror: { query }, aimYaw: 0, aimPitch: 0 },
+    session: { mirror: { query, city }, aimYaw: 0, aimPitch: 0 },
     renderer: { kaijuCamAnchor: () => null },
     input,
     frame,
@@ -249,65 +246,6 @@ describe('squad cameras', () => {
       c.update(context(frameInput(input, { y: -19 }), { u }));
       c.applyCamera(context(input, { u }), camera);
       expect(cameraDirection(camera).pitch).toBeCloseTo(-HUMAN_PITCH_LIMIT, 4);
-    }
-  });
-});
-
-describe('the command wheel', () => {
-  /** Opens the wheel, moves the pointer (x right, y up), lets go: what goes to the server. */
-  function pick(c: HumanController, u: SnapUnit, dx: number, dy: number): CommandId | undefined {
-    const input = createActionState();
-    c.update(context(frameInput(input, {}, ['wheel']), { u }));
-    // Held for a moment (a quick tap with nothing pointed at leaves the wheel open: squadControls.test.ts).
-    for (let i = 0; i < 24; i++) c.update(context(frameInput(input, { x: dx / 24, y: dy / 24 }, [], ['wheel']), { u }));
-    expect(c.wheel.open).toBe(true);
-    const highlighted = c.wheel.highlight;
-    c.update(context(frameInput(input), { u }));
-    expect(c.wheel.open).toBe(false);
-    const sent = c.sample(context(input, { u })).wheel;
-    expect(sent).toBe(highlighted ?? undefined);
-    return sent;
-  }
-
-  it('sends every entry it has, each picked by pointing toward it and letting go', () => {
-    const u = unit();
-    const c = new HumanController(false);
-    const step = 0.25;
-    const toward: Record<string, [number, number]> = { up: [0, step], right: [step, 0], down: [0, -step], left: [-step, 0] };
-    const places = ['up', 'right', 'down', 'left'];
-    const picked = WHEEL_LAYOUT.map((_, i) => pick(c, u, ...toward[places[i]]));
-    expect(picked).toEqual([...COMMAND_IDS]);
-    // Letting go in the middle picks nothing.
-    expect(pick(c, u, 0.01, 0.01)).toBeUndefined();
-  });
-
-  it('does not turn the view while it is open, and turns it again once closed', () => {
-    const u = unit();
-    const c = new HumanController(false);
-    const input = createActionState();
-    c.update(context(frameInput(input), { u }));
-    const yaw = c.viewYaw;
-    c.update(context(frameInput(input, {}, ['wheel']), { u }));
-    c.update(context(frameInput(input, { x: 0.3 }, [], ['wheel']), { u }));
-    expect(c.viewYaw).toBe(yaw);
-    c.update(context(frameInput(input), { u }));
-    c.update(context(frameInput(input, { x: 0.3 }), { u }));
-    expect(c.viewYaw).not.toBe(yaw);
-  });
-
-  it('gives each order its own key as well', () => {
-    const u = unit();
-    const c = new HumanController(false);
-    const keys: Array<[ButtonAction, CommandId]> = [
-      ['cmdFollow', 'follow'],
-      ['cmdMoveTo', 'moveTo'],
-      ['cmdFireAtWill', 'fireAtWill'],
-      ['cmdHoldCharge', 'holdCharge'],
-    ];
-    for (const [key, command] of keys) {
-      const input = createActionState();
-      c.update(context(frameInput(input, {}, [key]), { u }));
-      expect(c.sample(context(input, { u })).wheel).toBe(command);
     }
   });
 });

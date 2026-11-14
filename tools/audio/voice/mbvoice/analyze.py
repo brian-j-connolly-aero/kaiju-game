@@ -11,7 +11,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 from scipy import signal
 
-from . import DOC_DIR, OUT_DIR, SR, asr, dsp
+from . import DOC_DIR, OUT_DIR, SCRATCH, SR, asr, asr2, dsp
 from .pipeline import CEILING_DBTP, TARGET_LUFS, decode, render
 from .scriptdoc import BRIEFING_BUDGET, BRIEFING_SECONDS, WINDOW_SECONDS
 
@@ -65,6 +65,9 @@ def measure_line(job: tuple[dict, dict, dict]) -> dict:
         e, _ = asr.word_errors(line["text"], hyp)
         m["hyp"] = hyp
         m["errors"] = e
+        if ext == "ogg":                     # the second, modern recognizer (asr2.py)
+            m["hyp2"] = asr2.transcribe(x, SR)
+            m["errors2"] = asr.word_errors(line["text"], m["hyp2"])[0]
         out[ext] = m
         if plan["chain"] == "radio" and ext == "ogg":
             # squelch and static against the speech they frame (levels over 10 ms)
@@ -128,13 +131,17 @@ def verify(lines: list[dict], cast: dict, state: dict, plans: dict, jobs: int = 
             results[l["id"]] = {"id": l["id"], "speaker": l["speaker"], "failures": [f"{l['id']} was never built"]}
             continue
         c = cached.get(l["id"])
-        fresh = c and c.get("hash") == rec["hash"] and "ogg" in c and "mp3" in c and not c["failures"]
+        fresh = (c and c.get("hash") == rec["hash"] and "ogg" in c and "mp3" in c and not c["failures"]
+                 and "errors2" in c["ogg"])
         if fresh and (c.get("chain") != "radio" or "squelch" in c):
             results[l["id"]] = c
         else:
             todo.append((l, rec, plans[l["id"]]))
     print(f"voice: measuring {len(todo)} lines ({len(lines) - len(todo)} cached)")
     if todo:
+        from .synth import split_threads
+        asr2.fetch()                          # the second recognizer's model, once, before the workers
+        split_threads(jobs)
         with Pool(max(1, jobs)) as pool:
             for m in pool.imap_unordered(measure_line, todo):
                 results[m["id"]] = m
@@ -153,10 +160,32 @@ def verify(lines: list[dict], cast: dict, state: dict, plans: dict, jobs: int = 
         "target_lufs": TARGET_LUFS, "ceiling_dbtp": CEILING_DBTP,
         "lines": ordered, "failures": failures,
         "summary": summarize(lines, state, ordered),
+        "radio_voices": radio_voice_prints(lines, state, plans),
     }
     MEASUREMENTS.write_text(json.dumps(report, indent=1) + "\n")
     draw_sheets(lines, cast, plans, state)
     return report
+
+
+def radio_voice_prints(lines: list[dict], state: dict, plans: dict) -> dict:
+    """Voice-print similarity of the characters on the shared radio channel (speakers.py), from the
+    decoded .ogg files. Prints are cached per line and build in $MB_SCRATCH/prints."""
+    from . import speakers
+    cache = SCRATCH / "prints"
+    cache.mkdir(parents=True, exist_ok=True)
+    prints: dict[str, list[np.ndarray]] = {}
+    for l in lines:
+        rec = state["lines"].get(l["id"])
+        if rec is None or plans[l["id"]]["chain"] != "radio" or not (OUT_DIR / f"{l['id']}.ogg").exists():
+            continue
+        f = cache / f"{l['id']}-{rec['hash']}.npy"
+        if f.exists():
+            p = np.load(f)
+        else:
+            p = speakers.voice_print(decode(OUT_DIR / f"{l['id']}.ogg"), SR)
+            np.save(f, p)
+        prints.setdefault(l["speaker"], []).append(p)
+    return speakers.similarity_table(prints) if len(prints) > 1 else {}
 
 
 def timing_failures(lines: list[dict], state: dict) -> list[str]:
@@ -190,13 +219,15 @@ def summarize(lines: list[dict], state: dict, measured: list[dict]) -> dict:
         if rec is None or "ogg" not in m or "mp3" not in m:
             return
         g = groups.setdefault(key, {"lines": 0, "words": 0, "raw": 0, "processed": 0, "ogg": 0, "mp3": 0,
-                                    "seconds": [], "lufs": [], "peak": [], "spw": []})
+                                    "raw2": 0, "ogg2": 0, "seconds": [], "lufs": [], "peak": [], "spw": []})
         g["lines"] += 1
         g["words"] += rec["words"]
         g["raw"] += rec["raw"]["errors"]
         g["processed"] += rec["processed"]["errors"]
         g["ogg"] += m["ogg"]["errors"]
         g["mp3"] += m["mp3"]["errors"]
+        g["raw2"] += rec.get("raw2", {}).get("errors", 0)
+        g["ogg2"] += m["ogg"].get("errors2", 0)
         g["seconds"].append(rec["duration"])
         g["lufs"] += [m["ogg"]["lufs"], m["mp3"]["lufs"]]
         g["peak"] += [m["ogg"]["true_peak_db"], m["mp3"]["true_peak_db"]]
@@ -216,6 +247,8 @@ def summarize(lines: list[dict], state: dict, measured: list[dict]) -> dict:
             "wer_processed": _rate(g["processed"], g["words"]),
             "wer_ogg": _rate(g["ogg"], g["words"]),
             "wer_mp3": _rate(g["mp3"], g["words"]),
+            "wer2_raw": _rate(g["raw2"], g["words"]),
+            "wer2_ogg": _rate(g["ogg2"], g["words"]),
             "seconds_min": round(min(g["seconds"]), 2), "seconds_mean": round(float(np.mean(g["seconds"])), 2),
             "seconds_max": round(max(g["seconds"]), 2), "seconds_total": round(sum(g["seconds"]), 1),
             "lufs_min": min(g["lufs"]), "lufs_max": max(g["lufs"]),

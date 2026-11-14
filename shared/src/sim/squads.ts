@@ -227,7 +227,7 @@ export function updateTrail(squad: Squad, leader: Unit): void {
   const last = t[t.length - 1];
   const d = Math.hypot(leader.x - last.x, leader.z - last.z);
   if (d >= TRAIL_JUMP) {
-    t.length = 0;
+    clearTrail(squad);
     t.push({ x: leader.x, z: leader.z });
     return;
   }
@@ -235,48 +235,128 @@ export function updateTrail(squad: Squad, leader: Unit): void {
   t.push({ x: leader.x, z: leader.z });
   squad.formed = true;
   const keep = Math.ceil(Math.max(MATCH_RULES.unitsPerSquad * formationSpacing(leader), TRAIL_KEEP) / SQUAD_RULES.trailStep) + 2;
-  if (t.length > keep) t.splice(0, t.length - keep);
+  if (t.length > keep) {
+    squad.trailBase += t.length - keep;
+    t.splice(0, t.length - keep);
+  }
+}
+
+/** Forgets the trail (the leader was redeployed or taken over); the numbers of its points are not given out again. */
+export function clearTrail(squad: Squad): void {
+  squad.trailBase += squad.trail.length;
+  squad.trail.length = 0;
+}
+
+/** The leader's way turns a corner where it bends more than 45 degrees (this cosine) over a body's width either side. */
+const TRAIL_CORNER_COS = Math.SQRT1_2;
+/** ...measured over at least this many meters either side. */
+const TRAIL_CORNER_SPAN = 8;
+
+/** Where a squad-mate that has fallen behind drives for (`trailFollow`). */
+export interface TrailTarget extends Vec2 {
+  /**
+   * Meters from the unit, along the leader's way, to the next corner of it (Infinity: none
+   * within the distance asked about). A vehicle slows down for it.
+   */
+  corner: number;
+}
+
+/** Whether the trail turns a corner at point `j`: the way in and the way out, `k` points each, are more than 45 degrees apart. */
+function trailBends(t: readonly Vec2[], j: number, k: number): boolean {
+  const a = Math.max(0, j - k);
+  const b = Math.min(t.length - 1, j + k);
+  const ax = t[j].x - t[a].x;
+  const az = t[j].z - t[a].z;
+  const bx = t[b].x - t[j].x;
+  const bz = t[b].z - t[j].z;
+  const la = Math.hypot(ax, az);
+  const lb = Math.hypot(bx, bz);
+  if (la < 1e-6 || lb < 1e-6) return false;
+  return (ax * bx + az * bz) / (la * lb) < TRAIL_CORNER_COS;
 }
 
 /**
- * For a squad-mate that has fallen behind: the point `ahead` meters further along the leader's
- * way than the point of the trail nearest to it, into `out`. The leader drove that way, so it is
- * open to a unit of its size. Returns false when the unit is more than `reach` meters from the
- * trail (it then finds its own way).
+ * For a squad-mate that has fallen behind: where to drive to get back to its leader along the
+ * way the leader came (open to a unit of its size: the leader drove it). The unit keeps the
+ * number of the trail point it is driving for (`nav.trailMark`) and only ever moves it on, past
+ * every point it comes within `near` of (so a loop the leader drove, or a street it drove twice,
+ * is cut short where the unit passes close to the later part), and drives for the point `ahead`
+ * meters on from there, or for the next corner of the way if that comes first (aiming past a
+ * corner would cut it, through the houses). With no point to go on from, it joins where the
+ * trail passes nearest and drives for that point itself. Returns how far the unit is from the
+ * point it is driving for (into `out`, with how far on the next corner is, looked for up to
+ * `reach` meters); Infinity, with no mark, when there is no trail.
  */
-export function trailLead(squad: Squad, u: Unit, reach: number, ahead: number, out: Vec2): boolean {
+export function trailFollow(squad: Squad, u: Unit, near: number, ahead: number, reach: number, out: TrailTarget): number {
   const t = squad.trail;
-  if (t.length < 2) return false;
-  let best = -1;
-  let bestD = reach * reach;
-  for (let i = 0; i < t.length; i++) {
-    const dx = t[i].x - u.x;
-    const dz = t[i].z - u.z;
-    const d2 = dx * dx + dz * dz;
-    if (d2 <= bestD) {
-      bestD = d2;
-      best = i;
+  const nav = u.nav;
+  out.corner = Infinity;
+  if (t.length < 2) {
+    nav.trailMark = -1;
+    return Infinity;
+  }
+  let i = nav.trailMark - squad.trailBase;
+  if (i < 0 || i >= t.length) {
+    let bestD = Infinity;
+    for (let j = 0; j < t.length; j++) {
+      const d2 = (t[j].x - u.x) * (t[j].x - u.x) + (t[j].z - u.z) * (t[j].z - u.z);
+      if (d2 < bestD) {
+        bestD = d2;
+        i = j;
+      }
     }
   }
-  if (best < 0) return false;
-  let ax = t[best].x;
-  let az = t[best].z;
-  let left = ahead;
-  for (let i = best + 1; i < t.length && left > 0; i++) {
-    const len = Math.hypot(t[i].x - ax, t[i].z - az);
-    if (len >= left) {
-      ax += ((t[i].x - ax) * left) / len;
-      az += ((t[i].z - az) * left) / len;
-      left = 0;
+  // Passed: the last point it has come within `near` of. The point of the way it is at: the
+  // nearest of those (where it has not joined the way yet, the point it joins at).
+  let passed = -1;
+  let here = i;
+  let hereD2 = Infinity;
+  for (let j = i; j < t.length; j++) {
+    const d2 = (t[j].x - u.x) * (t[j].x - u.x) + (t[j].z - u.z) * (t[j].z - u.z);
+    if (d2 > near * near) continue;
+    passed = j;
+    if (d2 < hereD2) {
+      hereD2 = d2;
+      here = j;
+    }
+  }
+  if (passed >= 0) i = Math.min(passed + 1, t.length - 1);
+  nav.trailMark = squad.trailBase + i;
+  const k = Math.max(1, Math.ceil(Math.max(2 * u.radius, TRAIL_CORNER_SPAN) / SQUAD_RULES.trailStep));
+
+  // The next corner, from where the unit is on the way (it is not round a corner until it is
+  // past it, however far on the point it drives for already is).
+  let along = Math.hypot(t[here].x - u.x, t[here].z - u.z);
+  for (let j = here; along <= reach; j++) {
+    if (trailBends(t, j, k)) {
+      out.corner = along;
       break;
     }
-    left -= len;
-    ax = t[i].x;
-    az = t[i].z;
+    if (j + 1 >= t.length) break;
+    along += Math.hypot(t[j + 1].x - t[j].x, t[j + 1].z - t[j].z);
+  }
+
+  // Where it drives for: on the way, a little way on along it, but never past a corner (aiming
+  // past one would cut it, through the houses); joining it, the point where it joins.
+  let ax = t[i].x;
+  let az = t[i].z;
+  if (passed >= 0) {
+    let left = ahead;
+    for (let j = i; j + 1 < t.length && left > 0 && !trailBends(t, j, k); j++) {
+      const len = Math.hypot(t[j + 1].x - ax, t[j + 1].z - az);
+      if (len >= left) {
+        ax += ((t[j + 1].x - ax) * left) / len;
+        az += ((t[j + 1].z - az) * left) / len;
+        break;
+      }
+      left -= len;
+      ax = t[j + 1].x;
+      az = t[j + 1].z;
+    }
   }
   out.x = ax;
   out.z = az;
-  return true;
+  return Math.hypot(ax - u.x, az - u.z);
 }
 
 /** Length of the recorded trail, from the leader back to its oldest point. */

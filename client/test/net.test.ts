@@ -7,6 +7,7 @@ import {
   decodeSnapshot,
   DT,
   encodeSnapshot,
+  idleBots,
   kaijuMoveParams,
   kaijuStageDef,
   snapshotOfWorld,
@@ -118,6 +119,47 @@ describe('prediction and reconciliation', () => {
     expect(pose.x).toBeCloseTo(k.x + 200, 4);
   });
 
+  it("predicts the kaiju's charge as the server runs it: straight ahead, whatever the stick says", () => {
+    const config = createMatchConfig({ humans: [{ name: 'Tester', role: 'kaiju' }], fast: true, anchor: 1 });
+    config.bots = idleBots();
+    const world = createWorld({ seed: 37, config });
+    for (let i = 0; i < 400 && world.match.phase !== 'playing'; i++) world.step([]);
+    // Open ground (for the server and, through the welcome, for the client): a run that hits a
+    // tower stops dead, which is not what this is about.
+    world.structureHp.fill(0);
+    world.structureStage.fill(3);
+    const welcome = welcomeFor(world, 0);
+    const mirror = createCityMirror(welcome.config.citySeed, welcome.cityChecksum, welcome.cityState);
+    const k = world.kaijus[0];
+    k.moves = ['charge', 'none'];
+    const radius = kaijuStageDef(k.kind, k.stage).bodyRadius;
+    // Press the charge, then pull the stick to the side and look away.
+    const look = k.yaw + 1.2;
+    let seq = 1;
+    const steer = (): PlayerInput => ({ seq: ++seq, moveX: 1, moveZ: -0.5, aimYaw: look, aimPitch: 0, buttons: 0 });
+    world.step([{ seq, moveX: 0, moveZ: 0, aimYaw: k.yaw, aimPitch: 0, buttons: Btn.move1 }]);
+    for (let i = 0; i < 90 && k.phase !== 'charge'; i++) world.step([steer()]);
+    expect(k.phase).toBe('charge');
+    // The client restarts from a snapshot of the run and predicts what it sends next.
+    const s = snap(world, seq);
+    const sk = s.kaijus[0];
+    const params = kaijuMoveParams(sk, stageBounds(mirror.city, welcome.anchor, s.match.stage));
+    const predictor = createPredictor();
+    reconcile(predictor, sk, radius, s.ackSeq, mirror.query, params, true, sk);
+    for (let i = 0; i < 10; i++) {
+      const input = steer();
+      predictStep(predictor, input, mirror.query, params, true, sk);
+      for (const e of world.step([input])) applyCityEvent(mirror, e);
+    }
+    expect(k.phase).toBe('charge');
+    expect(Math.hypot(predictor.body.x - k.x, predictor.body.z - k.z)).toBeLessThan(0.05);
+    // Without the run's drive the prediction would have followed the stick, far off.
+    const loose = createPredictor();
+    reconcile(loose, sk, radius, s.ackSeq, mirror.query, params, true);
+    for (let i = 0; i < 10; i++) predictStep(loose, { seq: seq + 1 + i, moveX: 1, moveZ: -0.5, aimYaw: look, aimPitch: 0, buttons: 0 }, mirror.query, params, true);
+    expect(Math.hypot(loose.body.x - k.x, loose.body.z - k.z)).toBeGreaterThan(1);
+  });
+
   it('does not move the body outside the playing phase', () => {
     const world = playingWorld(33);
     const welcome = welcomeFor(world, 0);
@@ -129,6 +171,127 @@ describe('prediction and reconciliation', () => {
     for (let i = 1; i <= 20; i++) predictStep(predictor, wander(i), mirror.query, params, false);
     expect(predictor.body.x).toBe(Math.fround(k.x));
     expect(predictor.pending.length).toBe(20);
+  });
+});
+
+describe('prediction when inputs reach the server late', () => {
+  /** The acknowledgement as the server packs it: played inputs, and in the top byte how many it will drop. */
+  const packAck = (played: number, drops: number): number => played + drops * 0x1000000;
+  const walk = (seq: number): PlayerInput => ({ seq, moveX: 0, moveZ: 1, aimYaw: 0.4, aimPitch: 0, buttons: 0 });
+
+  it('makes no correction when the server played late inputs on guesses and says it will drop them', () => {
+    const world = playingWorld(35);
+    const welcome = welcomeFor(world, 0);
+    const mirror = createCityMirror(welcome.config.citySeed, welcome.cityChecksum, welcome.cityState);
+    const predictor = createPredictor();
+    const radius = kaijuStageDef('lizard', 1).bodyRadius;
+    let rand = 7;
+    const roll = (n: number): number => {
+      rand = (rand * 1103515245 + 12345) % 2147483648;
+      return rand % n;
+    };
+    // The server's side, as server/src/room/inputQueue.ts does it: one tick per tick; a tick
+    // whose input has not arrived repeats the last one and stands in for it, and the late input
+    // (nothing new in it) is dropped when it comes.
+    const inFlight: Array<{ at: number; input: PlayerInput }> = [];
+    const waiting: PlayerInput[] = [];
+    const toClient: Array<{ at: number; snap: Snapshot }> = [];
+    let played = 0;
+    let drops = 0;
+    let arrive = 0;
+    let guessed = 0;
+    let latest = snap(world, 0);
+    let worst = 0;
+    for (let t = 1; t <= 400; t++) {
+      const input = walk(t);
+      arrive = Math.max(arrive, t + roll(5));
+      inFlight.push({ at: arrive, input });
+      const bounds = stageBounds(mirror.city, welcome.anchor, latest.match.stage);
+      predictStep(predictor, input, mirror.query, kaijuMoveParams(latest.kaijus[0], bounds), true);
+
+      while (inFlight.length > 0 && inFlight[0].at <= t) {
+        const late = (inFlight.shift() as { input: PlayerInput }).input;
+        if (drops > 0 && waiting.length === 0) {
+          drops--;
+          played = late.seq;
+        } else {
+          waiting.push(late);
+        }
+      }
+      const next = waiting.shift();
+      if (next) played = next.seq;
+      else {
+        drops++;
+        guessed++;
+      }
+      world.step(next ? [next] : []);
+      if (t % 2 === 0) toClient.push({ at: t + 2, snap: snap(world, packAck(waiting.length > 0 ? waiting[0].seq - 1 : played, drops)) });
+
+      while (toClient.length > 0 && toClient[0].at <= t) {
+        latest = (toClient.shift() as { snap: Snapshot }).snap;
+        const b = stageBounds(mirror.city, welcome.anchor, latest.match.stage);
+        reconcile(predictor, latest.kaijus[0], radius, latest.ackSeq, mirror.query, kaijuMoveParams(latest.kaijus[0], b), true);
+        if (t > 30) worst = Math.max(worst, predictor.lastCorrection);
+      }
+    }
+    expect(guessed).toBeGreaterThan(30);
+    // The guesses were right (the player walked straight on): nothing to correct. Read as one
+    // number, or with the guessed ticks replayed a second time, this was a step or more each time.
+    expect(worst).toBeLessThan(0.01);
+  });
+
+  /** A walking kaiju one input into play, and the server's guesses for `guessed` ticks after it. */
+  function aheadOfThePage(guessed: number) {
+    const world = playingWorld(36);
+    const welcome = welcomeFor(world, 0);
+    const mirror = createCityMirror(welcome.config.citySeed, welcome.cityChecksum, welcome.cityState);
+    const predictor = createPredictor();
+    const radius = kaijuStageDef('lizard', 1).bodyRadius;
+    const params = (): ReturnType<typeof kaijuMoveParams> => kaijuMoveParams(world.kaijus[0], stageBounds(mirror.city, welcome.anchor, 1));
+    reconcile(predictor, snap(world, 0).kaijus[0], radius, 0, mirror.query, params(), true);
+    for (let seq = 1; seq <= 5; seq++) {
+      predictStep(predictor, walk(seq), mirror.query, params(), true);
+      world.step([walk(seq)]);
+    }
+    // The server plays ticks on guesses (walking on) before the page has made their inputs, and
+    // its snapshot says it will drop that many: the page is behind the server.
+    for (let i = 0; i < guessed; i++) world.step([]);
+    const s = snap(world, packAck(5, guessed));
+    const pose = { x: 0, z: 0, yaw: 0 };
+    const before = { ...predictedPose(predictor, pose, 1) };
+    reconcile(predictor, s.kaijus[0], radius, s.ackSeq, mirror.query, params(), true);
+    return { world, mirror, predictor, radius, params, s, pose, before };
+  }
+
+  it('does not predict an input whose tick the server already played on a guess', () => {
+    // A stall of the page: three ticks guessed, then the page makes the three inputs at once.
+    const { world, mirror, predictor, radius, params, s } = aheadOfThePage(3);
+    for (let seq = 6; seq <= 8; seq++) predictStep(predictor, walk(seq), mirror.query, params(), true);
+    // Their ticks are already in the body: it does not move for them (it used to, three steps too far).
+    expect(predictor.body.x).toBeCloseTo(s.kaijus[0].x, 5);
+    expect(predictor.body.z).toBeCloseTo(s.kaijus[0].z, 5);
+    // The next input is predicted as usual, and agrees with the server once it has dropped 6 to 8.
+    predictStep(predictor, walk(9), mirror.query, params(), true);
+    world.step([walk(9)]);
+    reconcile(predictor, world.kaijus[0], radius, packAck(9, 0), mirror.query, params(), true);
+    expect(predictor.lastCorrection).toBeLessThan(0.01);
+  });
+
+  it('draws the body moving on evenly through a tick the server played before the page made it', () => {
+    const { mirror, predictor, params, s, pose, before } = aheadOfThePage(1);
+    // The snapshot moved the body a step ahead; drawn, it stays where it was.
+    expect(Math.hypot(predictor.body.x - before.x, predictor.body.z - before.z)).toBeGreaterThan(0.1);
+    expect(predictedPose(predictor, pose, 1).x).toBeCloseTo(before.x, 5);
+    // The page makes input 6, whose tick that was: the body does not move, and the drawn body
+    // slides through the step during the tick instead of leaping when the snapshot came and
+    // standing still now.
+    predictStep(predictor, walk(6), mirror.query, params(), true);
+    expect(predictor.body.x).toBeCloseTo(s.kaijus[0].x, 5);
+    expect(predictedPose(predictor, pose, 0).x).toBeCloseTo(before.x, 5);
+    const half = { ...predictedPose(predictor, pose, 0.5) };
+    expect(half.x).toBeCloseTo((before.x + s.kaijus[0].x) / 2, 5);
+    expect(half.z).toBeCloseTo((before.z + s.kaijus[0].z) / 2, 5);
+    expect(predictedPose(predictor, pose, 1).x).toBeCloseTo(s.kaijus[0].x, 5);
   });
 });
 

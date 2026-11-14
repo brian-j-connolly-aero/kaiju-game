@@ -197,7 +197,7 @@ export interface ActionTiming {
 interface KaijuActionBase {
   button: KaijuButton;
   /** True when it lasts for as long as its button is down (the brace); otherwise one press starts it and it runs its course. */
-  held: boolean;
+  whileHeld: boolean;
   timing: ActionTiming;
   /** Phase the state machine shows while `timing.active` runs. */
   activePhase: KaijuPhase;

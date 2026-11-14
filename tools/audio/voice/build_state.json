@@ -2,175 +2,207 @@
  "lines": {
   "v_match_briefing_1": {
    "id": "v_match_briefing_1",
-   "hash": "3f9d40c4dd404b92a9c1",
+   "hash": "4f54e2f7982816a9f1ca",
    "spoken": "This is Overlord. A creature has hatched.",
-   "duration": 3.298,
+   "duration": 3.181,
    "speech": [
     0.09,
-    3.138
+    3.021
    ],
    "words": 7,
-   "f0_median_hz": 94.1,
+   "f0_median_hz": 98.2,
    "raw": {
     "hyp": "this is overlord a creature has hatched",
     "errors": 0
    },
    "processed": {
+    "hyp": "this is overlord a creature has hatched",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "this is overlord a creature has hatched",
     "errors": 0
    }
   },
   "v_match_briefing_2": {
    "id": "v_match_briefing_2",
-   "hash": "1df760364dd5cda2bc38",
+   "hash": "e6ac1e9bf356f46ae150",
    "spoken": "It is small. It will not stay small.",
-   "duration": 2.924,
+   "duration": 3.006,
    "speech": [
     0.09,
-    2.764
+    2.846
    ],
    "words": 8,
-   "f0_median_hz": 89.9,
+   "f0_median_hz": 100.3,
    "raw": {
     "hyp": "it is small it will not stay small",
     "errors": 0
    },
    "processed": {
+    "hyp": "it is small it will not stay small",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "it is small it will not stay small",
     "errors": 0
    }
   },
   "v_match_briefing_3": {
    "id": "v_match_briefing_3",
-   "hash": "0daf552094869438ba4a",
+   "hash": "476db1bafdf6725aff0a",
    "spoken": "Kill it. Misses count against us.",
-   "duration": 2.814,
+   "duration": 2.871,
    "speech": [
     0.09,
-    2.654
+    2.711
    ],
    "words": 6,
-   "f0_median_hz": 96.4,
+   "f0_median_hz": 99.4,
    "raw": {
     "hyp": "kill it misses count against us",
     "errors": 0
    },
    "processed": {
+    "hyp": "kill it misses count against us",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "kill it misses count against us",
     "errors": 0
    }
   },
   "v_match_briefing_4": {
    "id": "v_match_briefing_4",
-   "hash": "e4d52953806559a02b72",
+   "hash": "53f002c1eb609342e3f4",
    "spoken": "Good afternoon. This is Channel Nine.",
-   "duration": 2.947,
+   "duration": 2.574,
    "speech": [
     0.04,
-    2.857
+    2.484
    ],
    "words": 6,
-   "f0_median_hz": 166.7,
+   "f0_median_hz": 205.1,
    "raw": {
-    "hyp": "good afternoon mrs channel nine",
-    "errors": 2
+    "hyp": "good afternoon this is channel nine",
+    "errors": 0
    },
    "processed": {
+    "hyp": "good afternoon this is channel nine",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "good afternoon this is channel nine",
     "errors": 0
    }
   },
   "v_match_briefing_5": {
    "id": "v_match_briefing_5",
-   "hash": "28122ab16ff1e47a768b",
+   "hash": "dd553517541cf82eaed0",
    "spoken": "A creature the size of a bus has hatched.",
-   "duration": 2.409,
+   "duration": 2.406,
    "speech": [
     0.04,
-    2.319
+    2.316
    ],
    "words": 9,
-   "f0_median_hz": 172.0,
+   "f0_median_hz": 190.5,
    "raw": {
-    "hyp": "a creature of the size of the best has hatched",
-    "errors": 3
+    "hyp": "a creature the size of a boss has hatched",
+    "errors": 1
    },
    "processed": {
-    "hyp": "the creature the size of the best has hatched",
-    "errors": 3
+    "hyp": "the creature the size of a bus has hatched",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "a creature the size of a bus has hatched",
+    "errors": 0
    }
   },
   "v_match_briefing_6": {
    "id": "v_match_briefing_6",
-   "hash": "5281cb80c70acb3fbaae",
+   "hash": "4f5de1c39945055396dd",
    "spoken": "The army is on its way. So are our cameras.",
-   "duration": 3.2,
+   "duration": 2.958,
    "speech": [
     0.04,
-    3.11
+    2.868
    ],
    "words": 10,
-   "f0_median_hz": 181.8,
+   "f0_median_hz": 201.3,
    "raw": {
-    "hyp": "the army is on its way seller are cameras",
-    "errors": 2
+    "hyp": "the army is on its way so our cameras",
+    "errors": 1
    },
    "processed": {
-    "hyp": "the army is on its way seller are cameras",
-    "errors": 2
+    "hyp": "the army is on its way so our cameras",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "the army is on its way so are our cameras",
+    "errors": 0
    }
   },
   "v_match_start_1": {
    "id": "v_match_start_1",
-   "hash": "fcd328725c797e5a4539",
+   "hash": "ea0c09e05cb5cbb0747b",
    "spoken": "All squads, weapons free. Protect the city.",
-   "duration": 3.804,
+   "duration": 3.567,
    "speech": [
     0.09,
-    3.644
+    3.407
    ],
    "words": 7,
-   "f0_median_hz": 91.7,
+   "f0_median_hz": 93.8,
    "raw": {
     "hyp": "all squads weapons free protect the city",
     "errors": 0
    },
    "processed": {
+    "hyp": "all squads weapons free protect the city",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "all squads weapons free protect the city",
     "errors": 0
    }
   },
   "v_match_start_2": {
    "id": "v_match_start_2",
-   "hash": "c0b5b9c734cb8343acbf",
+   "hash": "655a4a95719f0a1fdffe",
    "spoken": "This is it. Stand between that thing and the city.",
-   "duration": 3.363,
+   "duration": 3.499,
    "speech": [
     0.09,
-    3.203
+    3.339
    ],
    "words": 10,
    "f0_median_hz": 95.2,
    "raw": {
-    "hyp": "this is it stand between bad thing and the city",
-    "errors": 1
+    "hyp": "this is it's damage when that thing in the city",
+    "errors": 4
    },
    "processed": {
-    "hyp": "this is it stand between bad thing and the city",
-    "errors": 1
+    "hyp": "this is it's damn between nothing in the city",
+    "errors": 5
+   },
+   "raw2": {
+    "hyp": "this is it stand between that thing and the city",
+    "errors": 0
    }
   },
   "v_match_start_3": {
    "id": "v_match_start_3",
-   "hash": "cd5c0aa467a8e34bc669",
+   "hash": "af628279c5a64e8c0cfc",
    "spoken": "We are on the air. The creature is on the move.",
-   "duration": 2.881,
+   "duration": 2.764,
    "speech": [
     0.04,
-    2.791
+    2.674
    ],
    "words": 11,
-   "f0_median_hz": 179.8,
+   "f0_median_hz": 210.5,
    "raw": {
     "hyp": "we're on the air the creature is on the move",
     "errors": 2
@@ -178,19 +210,23 @@
    "processed": {
     "hyp": "we're on the air the creature is on the move",
     "errors": 2
+   },
+   "raw2": {
+    "hyp": "we are on the air the creature is on the move",
+    "errors": 0
    }
   },
   "v_match_start_4": {
    "id": "v_match_start_4",
-   "hash": "e304414b62c1e28a3457",
+   "hash": "d9a2725ef0242893b23f",
    "spoken": "The creature has left its egg and is now in traffic.",
-   "duration": 3.098,
+   "duration": 3.327,
    "speech": [
     0.04,
-    3.008
+    3.237
    ],
    "words": 11,
-   "f0_median_hz": 172.0,
+   "f0_median_hz": 202.5,
    "raw": {
     "hyp": "the creature has left its and and is now in traffic",
     "errors": 1
@@ -198,139 +234,167 @@
    "processed": {
     "hyp": "the creature has left its and and is now in traffic",
     "errors": 1
+   },
+   "raw2": {
+    "hyp": "the creature has left its egg and is now in traffic",
+    "errors": 0
    }
   },
   "v_kaiju_spotted_1": {
    "id": "v_kaiju_spotted_1",
-   "hash": "e604f1c775da5384916b",
+   "hash": "0154a669b14b8171e9bc",
    "spoken": "Contact. Target is in the open.",
-   "duration": 2.782,
+   "duration": 2.98,
    "speech": [
     0.09,
-    2.622
+    2.82
    ],
    "words": 6,
-   "f0_median_hz": 91.4,
+   "f0_median_hz": 99.4,
    "raw": {
-    "hyp": "contact target is in the open",
-    "errors": 0
+    "hyp": "contacts target is in the open",
+    "errors": 1
    },
    "processed": {
+    "hyp": "context target is in the open",
+    "errors": 1
+   },
+   "raw2": {
     "hyp": "contact target is in the open",
     "errors": 0
    }
   },
   "v_kaiju_spotted_2": {
    "id": "v_kaiju_spotted_2",
-   "hash": "84827f3e059dad25aca0",
+   "hash": "d2f5a0e10884e7e0a556",
    "spoken": "Target sighted. All squads, move in from two sides.",
-   "duration": 4.211,
+   "duration": 3.958,
    "speech": [
     0.09,
-    4.051
+    3.798
    ],
    "words": 9,
    "f0_median_hz": 91.4,
    "raw": {
-    "hyp": "target sighted all squads move in from two sides",
-    "errors": 0
+    "hyp": "target sighted all squads moving from two sides",
+    "errors": 2
    },
    "processed": {
+    "hyp": "target sighted all squads moving from two sides",
+    "errors": 2
+   },
+   "raw2": {
     "hyp": "target sighted all squads move in from two sides",
     "errors": 0
    }
   },
   "v_kaiju_spotted_3": {
    "id": "v_kaiju_spotted_3",
-   "hash": "e6db6e7a36e142596cd3",
+   "hash": "ad3a6cf4bb8e2f65d699",
    "spoken": "Granite has eyes on. It is in no hurry.",
-   "duration": 2.745,
+   "duration": 2.954,
    "speech": [
     0.09,
-    2.585
+    2.794
    ],
    "words": 9,
-   "f0_median_hz": 106.0,
+   "f0_median_hz": 111.1,
    "raw": {
     "hyp": "granted his eyes on it is in no hurry",
     "errors": 2
    },
    "processed": {
-    "hyp": "granted his eyes on it is in no hurry",
-    "errors": 2
+    "hyp": "granted has eyes on it is in no hurry",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "granite has eyes on it is in no hurry",
+    "errors": 0
    }
   },
   "v_kaiju_spotted_4": {
    "id": "v_kaiju_spotted_4",
-   "hash": "34d541b83c78ae7cb23b",
+   "hash": "a8e8e9b7aa1c7b3211bc",
    "spoken": "Beacon confirms visual contact. Reporting position, as required.",
-   "duration": 4.754,
+   "duration": 4.776,
    "speech": [
     0.09,
-    4.594
+    4.616
    ],
    "words": 8,
-   "f0_median_hz": 179.8,
+   "f0_median_hz": 161.6,
    "raw": {
-    "hyp": "he can confirms visual contact reporting position as required",
-    "errors": 2
+    "hyp": "began confirms visual contact reporting position as required",
+    "errors": 1
    },
    "processed": {
+    "hyp": "began confirms visual contact reporting position as required",
+    "errors": 1
+   },
+   "raw2": {
     "hyp": "beacon confirms visual contact reporting position as required",
     "errors": 0
    }
   },
   "v_kaiju_spotted_5": {
    "id": "v_kaiju_spotted_5",
-   "hash": "81de3ccbd7b16f68cd19",
+   "hash": "3d34445c3e2bc3610e26",
    "spoken": "Tempest has the target. It will not slip away again.",
-   "duration": 3.675,
+   "duration": 3.53,
    "speech": [
     0.09,
-    3.515
+    3.37
    ],
    "words": 10,
-   "f0_median_hz": 140.4,
+   "f0_median_hz": 197.5,
    "raw": {
-    "hyp": "tempest has the target it will not slip away again",
-    "errors": 0
+    "hyp": "tempest has to type it into 'em up slip away again",
+    "errors": 5
    },
    "processed": {
-    "hyp": "tempest as the target it will not slip away again",
-    "errors": 1
+    "hyp": "tempest have to target it to look for the week again",
+    "errors": 7
+   },
+   "raw2": {
+    "hyp": "tempest has the target it will not slip away again",
+    "errors": 0
    }
   },
   "v_kaiju_spotted_6": {
    "id": "v_kaiju_spotted_6",
-   "hash": "f638369681609b73d9f7",
+   "hash": "db47f76777d2dbfdb61e",
    "spoken": "The army reports it has located the creature.",
-   "duration": 3.018,
+   "duration": 2.782,
    "speech": [
     0.04,
-    2.928
+    2.692
    ],
    "words": 8,
-   "f0_median_hz": 177.8,
+   "f0_median_hz": 197.5,
    "raw": {
     "hyp": "the army reports it has located the creature",
     "errors": 0
    },
    "processed": {
+    "hyp": "the army reports that has located the creature",
+    "errors": 1
+   },
+   "raw2": {
     "hyp": "the army reports it has located the creature",
     "errors": 0
    }
   },
   "v_kaiju_spotted_7": {
    "id": "v_kaiju_spotted_7",
-   "hash": "dc8b3ccec3dee7873646",
+   "hash": "87a495c8f72f1ab0825c",
    "spoken": "Officials confirm soldiers can now see the creature.",
-   "duration": 3.379,
+   "duration": 3.37,
    "speech": [
     0.04,
-    3.289
+    3.28
    ],
    "words": 8,
-   "f0_median_hz": 173.9,
+   "f0_median_hz": 200.0,
    "raw": {
     "hyp": "officials confirmed soldiers can now see the creature",
     "errors": 1
@@ -338,239 +402,287 @@
    "processed": {
     "hyp": "officials confirmed soldiers can now see the creature",
     "errors": 1
+   },
+   "raw2": {
+    "hyp": "officials confirm soldiers can now see the creature",
+    "errors": 0
    }
   },
   "v_kaiju_spotted_8": {
    "id": "v_kaiju_spotted_8",
-   "hash": "740396f36d7a8774867a",
+   "hash": "017740ad255968529e91",
    "spoken": "Army spotters now have the creature in plain view.",
-   "duration": 3.093,
+   "duration": 2.874,
    "speech": [
     0.04,
-    3.003
+    2.784
    ],
    "words": 9,
-   "f0_median_hz": 173.9,
+   "f0_median_hz": 197.5,
    "raw": {
-    "hyp": "army spiders now have the creature in plain view",
-    "errors": 1
+    "hyp": "army spotters now have the creature in plain view",
+    "errors": 0
    },
    "processed": {
-    "hyp": "army spiders now have the creature in plain view",
-    "errors": 1
+    "hyp": "army spotters now have the creature in plain view",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "army spotters now have the creature in plain view",
+    "errors": 0
    }
   },
   "v_kaiju_spotted_9": {
    "id": "v_kaiju_spotted_9",
-   "hash": "d4eaf77899a79f526929",
+   "hash": "f050c93cb369ee746e46",
    "spoken": "The creature has been seen again, this time by soldiers.",
-   "duration": 3.603,
+   "duration": 3.405,
    "speech": [
     0.04,
-    3.513
+    3.315
    ],
    "words": 10,
-   "f0_median_hz": 172.0,
+   "f0_median_hz": 202.5,
    "raw": {
     "hyp": "the creature has been seen again this time by soldiers",
     "errors": 0
    },
    "processed": {
+    "hyp": "the creature has been seen again this time by soldiers",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "the creature has been seen again this time by soldiers",
     "errors": 0
    }
   },
   "v_kaiju_spotted_10": {
    "id": "v_kaiju_spotted_10",
-   "hash": "d36b5da5b93fada60c71",
+   "hash": "211ee759b6115b896f68",
    "spoken": "There it is. Out in the open.",
-   "duration": 2.089,
+   "duration": 2.19,
    "speech": [
     0.09,
-    1.929
+    2.03
    ],
    "words": 7,
-   "f0_median_hz": 106.0,
+   "f0_median_hz": 115.9,
    "raw": {
     "hyp": "there it is out in the open",
     "errors": 0
    },
    "processed": {
+    "hyp": "there it is out in the open",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "there it is out in the open",
     "errors": 0
    }
   },
   "v_kaiju_spotted_11": {
    "id": "v_kaiju_spotted_11",
-   "hash": "8aa536e64db9e3ba0fa2",
+   "hash": "6d302d5951e1b5d4911e",
    "spoken": "Target located. Position is on your map now.",
-   "duration": 3.104,
+   "duration": 3.087,
    "speech": [
     0.09,
-    2.944
+    2.927
    ],
    "words": 8,
-   "f0_median_hz": 179.8,
+   "f0_median_hz": 164.9,
    "raw": {
     "hyp": "target located position is on your map now",
     "errors": 0
    },
    "processed": {
+    "hyp": "target located position is on your map now",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "target located position is on your map now",
     "errors": 0
    }
   },
   "v_kaiju_spotted_12": {
    "id": "v_kaiju_spotted_12",
-   "hash": "685e082b8d80ce08c9dc",
+   "hash": "5b2122f643aa9eff16bd",
    "spoken": "There you are. I see it.",
-   "duration": 1.99,
+   "duration": 1.983,
    "speech": [
     0.09,
-    1.83
+    1.823
    ],
    "words": 6,
-   "f0_median_hz": 142.9,
+   "f0_median_hz": 190.5,
    "raw": {
     "hyp": "there you are i see it",
     "errors": 0
    },
    "processed": {
+    "hyp": "there you are i see it",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "there you are i see it",
     "errors": 0
    }
   },
   "v_kaiju_lost_1": {
    "id": "v_kaiju_lost_1",
-   "hash": "c2b020245ab5dd05949e",
+   "hash": "9905119cfdb7e327f314",
    "spoken": "We have lost the target. All squads, search your sectors.",
-   "duration": 4.509,
+   "duration": 4.045,
    "speech": [
     0.09,
-    4.349
+    3.885
    ],
    "words": 10,
-   "f0_median_hz": 92.0,
+   "f0_median_hz": 97.0,
    "raw": {
-    "hyp": "we have lost the target all squads search your sectors",
-    "errors": 0
+    "hyp": "we lost the target all squad searcher sectors",
+    "errors": 4
    },
    "processed": {
+    "hyp": "we lost the target all squad searchers searchers",
+    "errors": 5
+   },
+   "raw2": {
     "hyp": "we have lost the target all squads search your sectors",
     "errors": 0
    }
   },
   "v_kaiju_lost_2": {
    "id": "v_kaiju_lost_2",
-   "hash": "0da5454c793abf42fb5a",
+   "hash": "a6b2b3abff4e9ed32bfb",
    "spoken": "Lost sight of it. Somewhere in the streets.",
-   "duration": 2.876,
+   "duration": 2.608,
    "speech": [
     0.09,
-    2.716
+    2.448
    ],
    "words": 8,
-   "f0_median_hz": 109.6,
+   "f0_median_hz": 119.4,
    "raw": {
     "hyp": "lost sight of it somewhere in the streets",
     "errors": 0
    },
    "processed": {
+    "hyp": "while fighting that somewhere in the streets",
+    "errors": 4
+   },
+   "raw2": {
     "hyp": "lost sight of it somewhere in the streets",
     "errors": 0
    }
   },
   "v_kaiju_lost_3": {
    "id": "v_kaiju_lost_3",
-   "hash": "377c29b6355c0aa67886",
+   "hash": "0c89825f50d13f6ca146",
    "spoken": "The army appears to have lost track of the creature.",
-   "duration": 3.096,
+   "duration": 2.783,
    "speech": [
     0.04,
-    3.006
+    2.693
    ],
    "words": 10,
-   "f0_median_hz": 177.8,
+   "f0_median_hz": 190.5,
    "raw": {
     "hyp": "the army appears to have lost track of the creature",
     "errors": 0
    },
    "processed": {
+    "hyp": "the army appears to have lost track of the creature",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "the army appears to have lost track of the creature",
     "errors": 0
    }
   },
   "v_kaiju_lost_4": {
    "id": "v_kaiju_lost_4",
-   "hash": "647415c6219ad963148d",
+   "hash": "e41e3c22b38bae25b66a",
    "spoken": "The creature is unaccounted for. Residents are asked to check their gardens.",
-   "duration": 4.793,
+   "duration": 4.612,
    "speech": [
     0.04,
-    4.703
+    4.522
    ],
    "words": 12,
-   "f0_median_hz": 173.9,
+   "f0_median_hz": 205.1,
    "raw": {
     "hyp": "the creature is unaccounted for residents are asked to check their gardens",
     "errors": 0
    },
    "processed": {
+    "hyp": "the creature is on accounted for residents are asked to check their gardens",
+    "errors": 2
+   },
+   "raw2": {
     "hyp": "the creature is unaccounted for residents are asked to check their gardens",
     "errors": 0
    }
   },
   "v_kaiju_lost_5": {
    "id": "v_kaiju_lost_5",
-   "hash": "fe12cc8a85a213e38891",
+   "hash": "708d7730b1ec6c3a61d1",
    "spoken": "It is hiding. I will find it.",
-   "duration": 2.43,
+   "duration": 2.231,
    "speech": [
     0.09,
-    2.27
+    2.071
    ],
    "words": 7,
-   "f0_median_hz": 139.1,
+   "f0_median_hz": 190.5,
    "raw": {
     "hyp": "it is hiding i will find it",
     "errors": 0
    },
    "processed": {
+    "hyp": "it is hiding i'm referring to it",
+    "errors": 3
+   },
+   "raw2": {
     "hyp": "it is hiding i will find it",
     "errors": 0
    }
   },
   "v_kaiju_lost_6": {
    "id": "v_kaiju_lost_6",
-   "hash": "9973bb20da622c2f326a",
+   "hash": "3f27d0fdb0ca4baeef44",
    "spoken": "We have lost sight of the creature. So has the army.",
-   "duration": 3.622,
+   "duration": 3.13,
    "speech": [
     0.04,
-    3.532
+    3.04
    ],
    "words": 11,
-   "f0_median_hz": 177.8,
+   "f0_median_hz": 216.2,
    "raw": {
     "hyp": "we have lost sight of the creature so has the army",
     "errors": 0
    },
    "processed": {
+    "hyp": "we have lost sight of the creature so has the army",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "we have lost sight of the creature so has the army",
     "errors": 0
    }
   },
   "v_volley_ready_1": {
    "id": "v_volley_ready_1",
-   "hash": "66b3decd5e242e111486",
+   "hash": "4202408e8147fdb119c2",
    "spoken": "Granite. Charged and ready.",
-   "duration": 1.93,
+   "duration": 2.039,
    "speech": [
     0.09,
-    1.77
+    1.879
    ],
    "words": 4,
-   "f0_median_hz": 108.1,
+   "f0_median_hz": 111.1,
    "raw": {
     "hyp": "granted charged and ready",
     "errors": 1
@@ -578,2499 +690,2999 @@
    "processed": {
     "hyp": "granted charged and ready",
     "errors": 1
+   },
+   "raw2": {
+    "hyp": "granite charged and ready",
+    "errors": 0
    }
   },
   "v_volley_ready_2": {
    "id": "v_volley_ready_2",
-   "hash": "0032628b9aa24ff07597",
+   "hash": "f841792b9ecf21de6c66",
    "spoken": "All weapons are charged. Awaiting your order.",
-   "duration": 2.838,
+   "duration": 2.789,
    "speech": [
     0.09,
-    2.678
+    2.629
    ],
    "words": 7,
-   "f0_median_hz": 190.5,
+   "f0_median_hz": 168.4,
    "raw": {
+    "hyp": "all weapons are charged the weeding your order",
+    "errors": 2
+   },
+   "processed": {
     "hyp": "all weapons are charged awaiting your order",
     "errors": 0
    },
-   "processed": {
+   "raw2": {
     "hyp": "all weapons are charged awaiting your order",
     "errors": 0
    }
   },
   "v_volley_ready_3": {
    "id": "v_volley_ready_3",
-   "hash": "4879085c3b7991a9c80f",
+   "hash": "b1c1f2b74e8a5b110a02",
    "spoken": "Tempest is charged. Give me the word.",
-   "duration": 2.88,
+   "duration": 2.799,
    "speech": [
     0.09,
-    2.72
+    2.639
    ],
    "words": 7,
-   "f0_median_hz": 136.8,
+   "f0_median_hz": 202.5,
    "raw": {
-    "hyp": "tempest is charged give me the word",
-    "errors": 0
+    "hyp": "and pissed as charged give me the words",
+    "errors": 4
    },
    "processed": {
+    "hyp": "tempest to charge to get me to wear it",
+    "errors": 7
+   },
+   "raw2": {
     "hyp": "tempest is charged give me the word",
     "errors": 0
    }
   },
   "v_volley_ready_4": {
    "id": "v_volley_ready_4",
-   "hash": "4f0d7a9d3656203e4e5f",
+   "hash": "353f12a465131db991e1",
    "spoken": "Volley is charged. Check what is behind the target.",
-   "duration": 3.834,
+   "duration": 3.646,
    "speech": [
     0.09,
-    3.674
+    3.486
    ],
    "words": 9,
-   "f0_median_hz": 92.0,
+   "f0_median_hz": 93.6,
    "raw": {
-    "hyp": "bali is charged check what is behind the target",
-    "errors": 1
+    "hyp": "bali is charged to check what is behind the target",
+    "errors": 2
    },
    "processed": {
-    "hyp": "molly is charged check what is behind the target",
+    "hyp": "molly is charged to check what is behind the target",
+    "errors": 2
+   },
+   "raw2": {
+    "hyp": "volley is charged to check what is behind the target",
     "errors": 1
    }
   },
   "v_volley_ready_5": {
    "id": "v_volley_ready_5",
-   "hash": "8e53a87d79d054d603f8",
+   "hash": "0fb75284e67965cf1938",
    "spoken": "Charged. Waiting on your shot.",
-   "duration": 1.995,
-   "speech": [
-    0.09,
-    1.835
-   ],
-   "words": 5,
-   "f0_median_hz": 106.0,
-   "raw": {
-    "hyp": "charged waiting on your shot",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "charged waiting on your shot",
-    "errors": 0
-   }
-  },
-  "v_volley_ready_6": {
-   "id": "v_volley_ready_6",
-   "hash": "a5b4fbf192c378dd21d3",
-   "spoken": "All units report full charge. You are cleared to fire.",
-   "duration": 3.523,
-   "speech": [
-    0.09,
-    3.363
-   ],
-   "words": 10,
-   "f0_median_hz": 190.5,
-   "raw": {
-    "hyp": "all units report full charge you are cleared to fire",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "all units report full charge you are cleared to fire",
-    "errors": 0
-   }
-  },
-  "v_volley_ready_7": {
-   "id": "v_volley_ready_7",
-   "hash": "c4acb08443272e144927",
-   "spoken": "Charged and aimed. It will feel this one.",
-   "duration": 2.925,
-   "speech": [
-    0.09,
-    2.765
-   ],
-   "words": 8,
-   "f0_median_hz": 140.4,
-   "raw": {
-    "hyp": "charged and a and it will feel this one",
-    "errors": 2
-   },
-   "processed": {
-    "hyp": "charged and a and it will feel this one",
-    "errors": 2
-   }
-  },
-  "v_volley_ready_8": {
-   "id": "v_volley_ready_8",
-   "hash": "a6432210370eb4c0644d",
-   "spoken": "Army units have stopped and appear to be taking aim.",
-   "duration": 3.296,
-   "speech": [
-    0.04,
-    3.206
-   ],
-   "words": 10,
-   "f0_median_hz": 173.9,
-   "raw": {
-    "hyp": "army units have stopped and appeared to be taking aim",
-    "errors": 1
-   },
-   "processed": {
-    "hyp": "army units have stopped and appeared to be taking aim",
-    "errors": 1
-   }
-  },
-  "v_volley_ready_9": {
-   "id": "v_volley_ready_9",
-   "hash": "1ddb818f0e2fbb221fb0",
-   "spoken": "The yellow lights you see are army targeting lasers.",
-   "duration": 3.098,
-   "speech": [
-    0.04,
-    3.008
-   ],
-   "words": 9,
-   "f0_median_hz": 172.0,
-   "raw": {
-    "hyp": "the yellow lights you see our army targeting lasers",
-    "errors": 1
-   },
-   "processed": {
-    "hyp": "the yellow lights you see our army targeting lasers",
-    "errors": 1
-   }
-  },
-  "v_volley_ready_10": {
-   "id": "v_volley_ready_10",
-   "hash": "06c1c3354fb9462aed4e",
-   "spoken": "Soldiers are holding fire. Experts say that is rarely a good sign.",
-   "duration": 4.77,
-   "speech": [
-    0.04,
-    4.68
-   ],
-   "words": 12,
-   "f0_median_hz": 173.9,
-   "raw": {
-    "hyp": "soldiers are holding fire experts say that is rarely a good sign",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "soldiers are holding fire experts say that is rarely a good sign",
-    "errors": 0
-   }
-  },
-  "v_volley_ready_11": {
-   "id": "v_volley_ready_11",
-   "hash": "81bccc37e94f8c5341c9",
-   "spoken": "The army is preparing a volley. The creature may wish to brace.",
-   "duration": 4.007,
-   "speech": [
-    0.04,
-    3.917
-   ],
-   "words": 12,
-   "f0_median_hz": 179.8,
-   "raw": {
-    "hyp": "the army is preparing a valley the creature may wish to brace",
-    "errors": 1
-   },
-   "processed": {
-    "hyp": "the army is preparing the valley the creature may wish to brace",
-    "errors": 2
-   }
-  },
-  "v_volley_ready_12": {
-   "id": "v_volley_ready_12",
-   "hash": "b0c107069d86b8a1e4b6",
-   "spoken": "Lasers on. Say when.",
-   "duration": 1.901,
-   "speech": [
-    0.09,
-    1.741
-   ],
-   "words": 4,
-   "f0_median_hz": 106.3,
-   "raw": {
-    "hyp": "lasers on say when",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "lasers on say when",
-    "errors": 0
-   }
-  },
-  "v_volley_ready_13": {
-   "id": "v_volley_ready_13",
-   "hash": "cea17d20eece1ffc6a8b",
-   "spoken": "Charge complete. Standing by for your order.",
-   "duration": 2.927,
-   "speech": [
-    0.09,
-    2.767
-   ],
-   "words": 7,
-   "f0_median_hz": 186.0,
-   "raw": {
-    "hyp": "charge complete standing by for your order",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "charge complete standing by for your order",
-    "errors": 0
-   }
-  },
-  "v_volley_ready_14": {
-   "id": "v_volley_ready_14",
-   "hash": "0726b70dbe8aa62b4b7f",
-   "spoken": "We are charged. I want this one.",
-   "duration": 2.61,
-   "speech": [
-    0.09,
-    2.45
-   ],
-   "words": 7,
-   "f0_median_hz": 130.1,
-   "raw": {
-    "hyp": "we are charged i want this one",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "we are charged i want this one",
-    "errors": 0
-   }
-  },
-  "v_volley_ready_15": {
-   "id": "v_volley_ready_15",
-   "hash": "f00c292ebbf7d157be4d",
-   "spoken": "Full charge. Pick your moment.",
-   "duration": 2.515,
-   "speech": [
-    0.09,
-    2.355
-   ],
-   "words": 5,
-   "f0_median_hz": 90.9,
-   "raw": {
-    "hyp": "full charge pick your moment",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "full charge pick your moment",
-    "errors": 0
-   }
-  },
-  "v_volley_ready_16": {
-   "id": "v_volley_ready_16",
-   "hash": "8d1c027cd39db2c9cf02",
-   "spoken": "Charge complete. Fire when you have a clean shot.",
-   "duration": 3.723,
-   "speech": [
-    0.09,
-    3.563
-   ],
-   "words": 9,
-   "f0_median_hz": 88.9,
-   "raw": {
-    "hyp": "charge complete fire when you have a clean shot",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "charge complete fire when you have a clean shot",
-    "errors": 0
-   }
-  },
-  "v_volley_fired_1": {
-   "id": "v_volley_fired_1",
-   "hash": "e2f246afd1194acaf088",
-   "spoken": "Volley away.",
-   "duration": 1.271,
-   "speech": [
-    0.09,
-    1.111
-   ],
-   "words": 2,
-   "f0_median_hz": 91.4,
-   "raw": {
-    "hyp": "bali away",
-    "errors": 1
-   },
-   "processed": {
-    "hyp": "molly away",
-    "errors": 1
-   }
-  },
-  "v_volley_fired_2": {
-   "id": "v_volley_fired_2",
-   "hash": "0ad46c197dc936dbed10",
-   "spoken": "Rounds out. Watch the fall.",
-   "duration": 1.939,
-   "speech": [
-    0.09,
-    1.779
-   ],
-   "words": 5,
-   "f0_median_hz": 108.8,
-   "raw": {
-    "hyp": "runs out watch the fall",
-    "errors": 1
-   },
-   "processed": {
-    "hyp": "pronouns out watch the fall",
-    "errors": 1
-   }
-  },
-  "v_volley_fired_3": {
-   "id": "v_volley_fired_3",
-   "hash": "408f9af62d376e8550ed",
-   "spoken": "Volley fired. All rounds are in flight and accounted for.",
-   "duration": 3.535,
-   "speech": [
-    0.09,
-    3.375
-   ],
-   "words": 10,
-   "f0_median_hz": 183.9,
-   "raw": {
-    "hyp": "we fired all rounds are in flight and accounted for",
-    "errors": 1
-   },
-   "processed": {
-    "hyp": "dolly fired all rounds are in flight and accounted for",
-    "errors": 1
-   }
-  },
-  "v_volley_fired_4": {
-   "id": "v_volley_fired_4",
-   "hash": "87e110781ab7047e088f",
-   "spoken": "Tempest firing. Everything we have.",
-   "duration": 2.89,
-   "speech": [
-    0.09,
-    2.73
-   ],
-   "words": 5,
-   "f0_median_hz": 137.9,
-   "raw": {
-    "hyp": "tempest finding everything we have",
-    "errors": 1
-   },
-   "processed": {
-    "hyp": "tempest firing everything we have",
-    "errors": 0
-   }
-  },
-  "v_volley_fired_5": {
-   "id": "v_volley_fired_5",
-   "hash": "1564626b84ee55b55241",
-   "spoken": "All of it is on the way. Should sting.",
-   "duration": 2.36,
-   "speech": [
-    0.09,
-    2.2
-   ],
-   "words": 9,
-   "f0_median_hz": 107.4,
-   "raw": {
-    "hyp": "all of it is on the way short string",
-    "errors": 2
-   },
-   "processed": {
-    "hyp": "all of it is on the way shrugs doing",
-    "errors": 2
-   }
-  },
-  "v_volley_fired_6": {
-   "id": "v_volley_fired_6",
-   "hash": "7867c6d6d453ea036aa1",
-   "spoken": "Fired on your mark. Observing for effect.",
-   "duration": 2.893,
-   "speech": [
-    0.09,
-    2.733
-   ],
-   "words": 7,
-   "f0_median_hz": 188.2,
-   "raw": {
-    "hyp": "fires on your mark observing for effect",
-    "errors": 1
-   },
-   "processed": {
-    "hyp": "fired on your mark observing for effect",
-    "errors": 0
-   }
-  },
-  "v_volley_fired_7": {
-   "id": "v_volley_fired_7",
-   "hash": "da3ec2e2b662023dcff3",
-   "spoken": "Firing. This one is for the city.",
-   "duration": 2.54,
-   "speech": [
-    0.09,
-    2.38
-   ],
-   "words": 7,
-   "f0_median_hz": 139.1,
-   "raw": {
-    "hyp": "finding this one is for the city",
-    "errors": 1
-   },
-   "processed": {
-    "hyp": "finding this one is for the city",
-    "errors": 1
-   }
-  },
-  "v_volley_fired_8": {
-   "id": "v_volley_fired_8",
-   "hash": "d171db1033a9ee014919",
-   "spoken": "The army has fired a coordinated volley at the creature.",
-   "duration": 3.639,
-   "speech": [
-    0.04,
-    3.549
-   ],
-   "words": 10,
-   "f0_median_hz": 173.9,
-   "raw": {
-    "hyp": "the army has fired a coordinated valley at the creature",
-    "errors": 1
-   },
-   "processed": {
-    "hyp": "the army has fired a coordinated valley and the creature",
-    "errors": 2
-   }
-  },
-  "v_volley_fired_9": {
-   "id": "v_volley_fired_9",
-   "hash": "0ddc6fdd72c0aa5747c4",
-   "spoken": "A full volley has just been fired. We await the results.",
-   "duration": 3.689,
-   "speech": [
-    0.04,
-    3.599
-   ],
-   "words": 11,
-   "f0_median_hz": 175.8,
-   "raw": {
-    "hyp": "f l valley has just been fired we await the results",
-    "errors": 3
-   },
-   "processed": {
-    "hyp": "the film valley has just been fired we await the results",
-    "errors": 3
-   }
-  },
-  "v_volley_fired_10": {
-   "id": "v_volley_fired_10",
-   "hash": "51939e17d7fbc2e507b6",
-   "spoken": "The army has fired again. It is unclear what was hit.",
-   "duration": 3.433,
-   "speech": [
-    0.04,
-    3.343
-   ],
-   "words": 11,
-   "f0_median_hz": 179.8,
-   "raw": {
-    "hyp": "the army has fired again it is unclear what was his",
-    "errors": 1
-   },
-   "processed": {
-    "hyp": "the army has fired again it is unclear what was his",
-    "errors": 1
-   }
-  },
-  "v_volley_fired_11": {
-   "id": "v_volley_fired_11",
-   "hash": "69bcf7c8aba31de7a04f",
-   "spoken": "Another volley has been fired. Officials describe it as necessary.",
-   "duration": 4.608,
-   "speech": [
-    0.04,
-    4.518
-   ],
-   "words": 10,
-   "f0_median_hz": 173.9,
-   "raw": {
-    "hyp": "another valley has been fired officials described it as necessary",
-    "errors": 2
-   },
-   "processed": {
-    "hyp": "another valley has been fired officials described it as necessary",
-    "errors": 2
-   }
-  },
-  "v_volley_fired_12": {
-   "id": "v_volley_fired_12",
-   "hash": "46d387d1a45e348e0f7a",
-   "spoken": "Fired. Watch where they land.",
-   "duration": 2.524,
-   "speech": [
-    0.09,
-    2.364
-   ],
-   "words": 5,
-   "f0_median_hz": 87.2,
-   "raw": {
-    "hyp": "fired watch where they land",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "fired watch where they land",
-    "errors": 0
-   }
-  },
-  "v_volley_fired_13": {
-   "id": "v_volley_fired_13",
-   "hash": "08f85c4f92eb5528c4ea",
-   "spoken": "Shots away. Start the next charge.",
-   "duration": 3.085,
-   "speech": [
-    0.09,
-    2.925
-   ],
-   "words": 6,
-   "f0_median_hz": 89.4,
-   "raw": {
-    "hyp": "shots away start the next charge",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "shots away start the next charge",
-    "errors": 0
-   }
-  },
-  "v_volley_fired_14": {
-   "id": "v_volley_fired_14",
-   "hash": "c468d99f86d0df79d48a",
-   "spoken": "All shots out. Going again.",
-   "duration": 2.366,
-   "speech": [
-    0.09,
-    2.206
-   ],
-   "words": 5,
-   "f0_median_hz": 109.6,
-   "raw": {
-    "hyp": "all shots about going again",
-    "errors": 1
-   },
-   "processed": {
-    "hyp": "all shots out going again",
-    "errors": 0
-   }
-  },
-  "v_volley_fired_15": {
-   "id": "v_volley_fired_15",
-   "hash": "2273376515ac65b2ba03",
-   "spoken": "All weapons fired. Results to follow.",
-   "duration": 2.786,
-   "speech": [
-    0.09,
-    2.626
-   ],
-   "words": 6,
-   "f0_median_hz": 186.0,
-   "raw": {
-    "hyp": "all weapons fired results to follow",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "all weapons fired results to follow",
-    "errors": 0
-   }
-  },
-  "v_volley_fired_16": {
-   "id": "v_volley_fired_16",
-   "hash": "ccf406d87df043e57a76",
-   "spoken": "Everything we had. I hope it felt that.",
-   "duration": 3.155,
-   "speech": [
-    0.09,
-    2.995
-   ],
-   "words": 8,
-   "f0_median_hz": 141.6,
-   "raw": {
-    "hyp": "everything we had i hope it felt that",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "everything we had i hope it felt that",
-    "errors": 0
-   }
-  },
-  "v_crossfire_1": {
-   "id": "v_crossfire_1",
-   "hash": "7f228d791db0e19ed239",
-   "spoken": "Crossfire. It is caught between you. Keep it there.",
-   "duration": 4.032,
-   "speech": [
-    0.09,
-    3.872
-   ],
-   "words": 9,
-   "f0_median_hz": 95.8,
-   "raw": {
-    "hyp": "crossfire it is caught between you keep it there",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "crossfire it is caught between you keep it there",
-    "errors": 0
-   }
-  },
-  "v_crossfire_2": {
-   "id": "v_crossfire_2",
-   "hash": "acc51decc8f416a55902",
-   "spoken": "Two angles on it. It does not like that.",
-   "duration": 2.641,
-   "speech": [
-    0.09,
-    2.481
-   ],
-   "words": 9,
-   "f0_median_hz": 104.2,
-   "raw": {
-    "hyp": "to impose on it it does not like that",
-    "errors": 2
-   },
-   "processed": {
-    "hyp": "two handles on it it does not like that",
-    "errors": 1
-   }
-  },
-  "v_crossfire_3": {
-   "id": "v_crossfire_3",
-   "hash": "b22518f403f84a1fd7a7",
-   "spoken": "Crossfire established. Exactly as the manual describes.",
-   "duration": 4.232,
-   "speech": [
-    0.09,
-    4.072
-   ],
-   "words": 7,
-   "f0_median_hz": 179.8,
-   "raw": {
-    "hyp": "crossfire established exactly as the manual describes",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "crossfire established exactly as the manual describes",
-    "errors": 0
-   }
-  },
-  "v_crossfire_4": {
-   "id": "v_crossfire_4",
-   "hash": "8d54075010d889699c11",
-   "spoken": "It is trapped between us. Do not let up.",
-   "duration": 3.13,
-   "speech": [
-    0.09,
-    2.97
-   ],
-   "words": 9,
-   "f0_median_hz": 146.8,
-   "raw": {
-    "hyp": "it is trapped between us do not let up",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "it is trapped between us do not let up",
-    "errors": 0
-   }
-  },
-  "v_crossfire_5": {
-   "id": "v_crossfire_5",
-   "hash": "d081cbc6663e5727c647",
-   "spoken": "The creature is now taking fire from two directions.",
-   "duration": 3.437,
-   "speech": [
-    0.04,
-    3.347
-   ],
-   "words": 9,
-   "f0_median_hz": 177.8,
-   "raw": {
-    "hyp": "the creature is now taking fire from two directions",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "the creature is now taking fire from two directions",
-    "errors": 0
-   }
-  },
-  "v_crossfire_6": {
-   "id": "v_crossfire_6",
-   "hash": "65c7ba46c84b7e64d585",
-   "spoken": "Army units have caught the creature in a crossfire, sources say.",
-   "duration": 4.42,
-   "speech": [
-    0.04,
-    4.33
-   ],
-   "words": 11,
-   "f0_median_hz": 172.0,
-   "raw": {
-    "hyp": "army units have caught the creature in a crossfire sources say",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "army units have caught the creature in a crossfire sources say",
-    "errors": 0
-   }
-  },
-  "v_crossfire_7": {
-   "id": "v_crossfire_7",
-   "hash": "b348125bc10357b65925",
-   "spoken": "Fire is now coming from both sides. The creature seems unsure.",
-   "duration": 4.32,
-   "speech": [
-    0.04,
-    4.23
-   ],
-   "words": 11,
-   "f0_median_hz": 177.8,
-   "raw": {
-    "hyp": "fire is now coming from both sides the creature seems unsure",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "fire is now coming from both sides the creature seems unsure",
-    "errors": 0
-   }
-  },
-  "v_crossfire_8": {
-   "id": "v_crossfire_8",
-   "hash": "b687cead19e9e7b80b93",
-   "spoken": "The army now has the creature between two firing lines.",
-   "duration": 3.361,
-   "speech": [
-    0.04,
-    3.271
-   ],
-   "words": 10,
-   "f0_median_hz": 175.8,
-   "raw": {
-    "hyp": "the army now has the creature between two firing lines",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "the army now has the creature between two firing lines",
-    "errors": 0
-   }
-  },
-  "v_crossfire_9": {
-   "id": "v_crossfire_9",
-   "hash": "1f44b4f606cdbbd1778b",
-   "spoken": "Two angles on the target. Its nerve will not hold.",
-   "duration": 3.775,
-   "speech": [
-    0.09,
-    3.615
-   ],
-   "words": 10,
-   "f0_median_hz": 92.8,
-   "raw": {
-    "hyp": "two angles on the target it's nerve will not hold",
-    "errors": 1
-   },
-   "processed": {
-    "hyp": "two angles on the target it's nerve will not hold",
-    "errors": 1
-   }
-  },
-  "v_crossfire_10": {
-   "id": "v_crossfire_10",
-   "hash": "26d3324902a08bce96b3",
-   "spoken": "Crossfire. Keep it up.",
-   "duration": 1.899,
-   "speech": [
-    0.09,
-    1.739
-   ],
-   "words": 4,
-   "f0_median_hz": 106.0,
-   "raw": {
-    "hyp": "crossfire keep it up",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "crossfire keep it up",
-    "errors": 0
-   }
-  },
-  "v_crossfire_11": {
-   "id": "v_crossfire_11",
-   "hash": "b0aa9e8577bf32c28b75",
-   "spoken": "Two firing angles confirmed. Maintaining fire.",
-   "duration": 3.39,
-   "speech": [
-    0.09,
-    3.23
-   ],
-   "words": 6,
-   "f0_median_hz": 188.2,
-   "raw": {
-    "hyp": "two firing angles confirmed maintaining fire",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "two firing angles confirmed maintaining fire",
-    "errors": 0
-   }
-  },
-  "v_crossfire_12": {
-   "id": "v_crossfire_12",
-   "hash": "1ad4e9686cd0a49bd626",
-   "spoken": "Both sides now. It has nowhere to turn.",
-   "duration": 2.98,
-   "speech": [
-    0.09,
-    2.82
-   ],
-   "words": 8,
-   "f0_median_hz": 139.1,
-   "raw": {
-    "hyp": "both sides now it has nowhere to turn",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "both sides known it has nowhere to turn",
-    "errors": 1
-   }
-  },
-  "v_nerve_break_1": {
-   "id": "v_nerve_break_1",
-   "hash": "cfde0a5649786e85948f",
-   "spoken": "Weak point is open. Fire.",
-   "duration": 2.349,
-   "speech": [
-    0.09,
-    2.189
-   ],
-   "words": 5,
-   "f0_median_hz": 93.0,
-   "raw": {
-    "hyp": "weak point is open fire",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "weak point is open fire",
-    "errors": 0
-   }
-  },
-  "v_nerve_break_2": {
-   "id": "v_nerve_break_2",
-   "hash": "0a89b19402bd4bcd877b",
-   "spoken": "Shoot the glowing spot. Now.",
-   "duration": 2.131,
-   "speech": [
-    0.09,
-    1.971
-   ],
-   "words": 5,
-   "f0_median_hz": 107.4,
-   "raw": {
-    "hyp": "shoot the glowing spot now",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "shoot the glowing spot now",
-    "errors": 0
-   }
-  },
-  "v_nerve_break_3": {
-   "id": "v_nerve_break_3",
-   "hash": "522eed4b38322abc42c6",
-   "spoken": "Engaging the weak point, as instructed.",
-   "duration": 2.477,
-   "speech": [
-    0.09,
-    2.317
-   ],
-   "words": 6,
-   "f0_median_hz": 181.8,
-   "raw": {
-    "hyp": "engaging the weak point as instructed",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "engaging the weak point as instructed",
-    "errors": 0
-   }
-  },
-  "v_nerve_break_4": {
-   "id": "v_nerve_break_4",
-   "hash": "dbbcf026eb07710a63f9",
-   "spoken": "It staggers. Give it everything.",
-   "duration": 2.465,
-   "speech": [
-    0.09,
-    2.305
-   ],
-   "words": 5,
-   "f0_median_hz": 136.8,
-   "raw": {
-    "hyp": "it staggers give it everything",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "it staggers give it everything",
-    "errors": 0
-   }
-  },
-  "v_nerve_break_5": {
-   "id": "v_nerve_break_5",
-   "hash": "a720eddc508d4ab33815",
-   "spoken": "The creature has stumbled. It appears badly shaken.",
-   "duration": 3.555,
-   "speech": [
-    0.04,
-    3.465
-   ],
-   "words": 8,
-   "f0_median_hz": 175.8,
-   "raw": {
-    "hyp": "the creature has stumbled it appears badly shaken",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "the creature has stumbled it appears badly shaken",
-    "errors": 0
-   }
-  },
-  "v_nerve_break_6": {
-   "id": "v_nerve_break_6",
-   "hash": "f53389e979963433a217",
-   "spoken": "The creature seems to have lost its nerve, for the moment.",
-   "duration": 3.381,
-   "speech": [
-    0.04,
-    3.291
-   ],
-   "words": 11,
-   "f0_median_hz": 172.0,
-   "raw": {
-    "hyp": "the creature seems to have lost it's nerve for the moment",
-    "errors": 1
-   },
-   "processed": {
-    "hyp": "the creature seems to have lost it's nerve for the moment",
-    "errors": 1
-   }
-  },
-  "v_nerve_break_7": {
-   "id": "v_nerve_break_7",
-   "hash": "bfcfa6a8e5f2286be3e3",
-   "spoken": "The army has an opening. The creature is reeling.",
-   "duration": 3.378,
-   "speech": [
-    0.04,
-    3.288
-   ],
-   "words": 9,
-   "f0_median_hz": 177.8,
-   "raw": {
-    "hyp": "the army has an opening the creature is reeling",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "the army has an opening the creature is reeling",
-    "errors": 0
-   }
-  },
-  "v_nerve_break_8": {
-   "id": "v_nerve_break_8",
-   "hash": "a43b67bb275e525dad20",
-   "spoken": "A glowing weak point is now visible on the creature.",
-   "duration": 3.224,
-   "speech": [
-    0.04,
-    3.134
-   ],
-   "words": 10,
-   "f0_median_hz": 173.0,
-   "raw": {
-    "hyp": "a glowing week client is now visible on the creature",
-    "errors": 2
-   },
-   "processed": {
-    "hyp": "and blowing we find is now visible on the creature",
-    "errors": 4
-   }
-  },
-  "v_nerve_break_9": {
-   "id": "v_nerve_break_9",
-   "hash": "7717011cb2948d483f8a",
-   "spoken": "It is reeling. Fire.",
-   "duration": 2.146,
-   "speech": [
-    0.09,
-    1.986
-   ],
-   "words": 4,
-   "f0_median_hz": 93.0,
-   "raw": {
-    "hyp": "it is reeling fire",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "it is reeling fire",
-    "errors": 0
-   }
-  },
-  "v_nerve_break_10": {
-   "id": "v_nerve_break_10",
-   "hash": "d2dfc768c0ec78ee7d78",
-   "spoken": "Fire now. It will not last.",
-   "duration": 2.368,
-   "speech": [
-    0.09,
-    2.208
-   ],
-   "words": 6,
-   "f0_median_hz": 106.0,
-   "raw": {
-    "hyp": "fire now it will not last",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "fire now it will not last",
-    "errors": 0
-   }
-  },
-  "v_nerve_break_11": {
-   "id": "v_nerve_break_11",
-   "hash": "348ae1c0f39398178ff5",
-   "spoken": "Weak point is open. Firing now.",
-   "duration": 2.401,
-   "speech": [
-    0.09,
-    2.241
-   ],
-   "words": 6,
-   "f0_median_hz": 190.5,
-   "raw": {
-    "hyp": "weak point is open firing now",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "weak point is open firing now",
-    "errors": 0
-   }
-  },
-  "v_nerve_break_12": {
-   "id": "v_nerve_break_12",
-   "hash": "e5f4e6748934bceaadd2",
-   "spoken": "No mercy. Everything we have.",
-   "duration": 2.46,
-   "speech": [
-    0.09,
-    2.3
-   ],
-   "words": 5,
-   "f0_median_hz": 139.7,
-   "raw": {
-    "hyp": "no mercy everything we have",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "no mercy everything we have",
-    "errors": 0
-   }
-  },
-  "v_stagger_end_1": {
-   "id": "v_stagger_end_1",
-   "hash": "3ba3609cf72dd3b8c946",
-   "spoken": "It has recovered. Weak point is closed. Reset your angles.",
-   "duration": 4.75,
-   "speech": [
-    0.09,
-    4.59
-   ],
-   "words": 10,
-   "f0_median_hz": 92.5,
-   "raw": {
-    "hyp": "it has recovered weak point is closed reset your ankles",
-    "errors": 1
-   },
-   "processed": {
-    "hyp": "it has recovered weak point is closed reset your ankles",
-    "errors": 1
-   }
-  },
-  "v_stagger_end_2": {
-   "id": "v_stagger_end_2",
-   "hash": "288594b13107eb1d6577",
-   "spoken": "It is back up. Window is shut.",
-   "duration": 2.116,
-   "speech": [
-    0.09,
-    1.956
-   ],
-   "words": 7,
-   "f0_median_hz": 107.7,
-   "raw": {
-    "hyp": "it is back up window is shot",
-    "errors": 1
-   },
-   "processed": {
-    "hyp": "it is back up window is shot",
-    "errors": 1
-   }
-  },
-  "v_stagger_end_3": {
-   "id": "v_stagger_end_3",
-   "hash": "8f67d882dd93d31feb0a",
-   "spoken": "The creature is back on its feet and appears composed.",
-   "duration": 3.323,
-   "speech": [
-    0.04,
-    3.233
-   ],
-   "words": 10,
-   "f0_median_hz": 172.0,
-   "raw": {
-    "hyp": "the creature is back on its feet and appears composed",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "the creature is back on its feet and appears composed",
-    "errors": 0
-   }
-  },
-  "v_stagger_end_4": {
-   "id": "v_stagger_end_4",
-   "hash": "41b30f512ba8026862d3",
-   "spoken": "The rampage continues. The creature has collected itself.",
-   "duration": 3.974,
-   "speech": [
-    0.04,
-    3.884
-   ],
-   "words": 8,
-   "f0_median_hz": 179.8,
-   "raw": {
-    "hyp": "the rampage continues the creature has collected itself",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "the rampage continues the creature has collected itself",
-    "errors": 0
-   }
-  },
-  "v_stagger_end_5": {
-   "id": "v_stagger_end_5",
-   "hash": "5c22287727a2a473a2d0",
-   "spoken": "It is up again. We will break it again.",
-   "duration": 2.74,
-   "speech": [
-    0.09,
-    2.58
-   ],
-   "words": 9,
-   "f0_median_hz": 140.4,
-   "raw": {
-    "hyp": "it is up again we will break it again",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "it is up again we will break it to get",
-    "errors": 2
-   }
-  },
-  "v_stagger_end_6": {
-   "id": "v_stagger_end_6",
-   "hash": "0687184d50e9c48697a8",
-   "spoken": "The creature is standing again. It does not look pleased.",
-   "duration": 3.688,
-   "speech": [
-    0.04,
-    3.598
-   ],
-   "words": 10,
-   "f0_median_hz": 177.8,
-   "raw": {
-    "hyp": "the creature is standing again it does not look pleased",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "the creature is standing again it does not look pleased",
-    "errors": 0
-   }
-  },
-  "v_kaiju_brace_1": {
-   "id": "v_kaiju_brace_1",
-   "hash": "ed2160951a8fce8473ec",
-   "spoken": "It is bracing. Save your volley. Get behind it.",
-   "duration": 3.939,
-   "speech": [
-    0.09,
-    3.779
-   ],
-   "words": 9,
-   "f0_median_hz": 91.7,
-   "raw": {
-    "hyp": "it is bracing save your volley get behind it",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "it is bracing save your bali get behind it",
-    "errors": 1
-   }
-  },
-  "v_kaiju_brace_2": {
-   "id": "v_kaiju_brace_2",
-   "hash": "5dbbd46fd4c156d5fe62",
-   "spoken": "It is bracing. Circle around behind it.",
-   "duration": 3.1,
-   "speech": [
-    0.09,
-    2.94
-   ],
-   "words": 7,
-   "f0_median_hz": 137.9,
-   "raw": {
-    "hyp": "it is bracing circle around behind it",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "it is bracing circle around behind it",
-    "errors": 0
-   }
-  },
-  "v_kaiju_brace_3": {
-   "id": "v_kaiju_brace_3",
-   "hash": "e7afdb0195733c099c4d",
-   "spoken": "The creature has dug in and appears to be bracing itself.",
-   "duration": 3.501,
-   "speech": [
-    0.04,
-    3.411
-   ],
-   "words": 11,
-   "f0_median_hz": 172.0,
-   "raw": {
-    "hyp": "the creature has dug in and appears to be bracing itself",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "the creature has done in and appears to be bracing itself",
-    "errors": 1
-   }
-  },
-  "v_kaiju_brace_4": {
-   "id": "v_kaiju_brace_4",
-   "hash": "233966eb98aa0beb3921",
-   "spoken": "A defensive posture, experts say. The creature is holding its ground.",
-   "duration": 5.055,
-   "speech": [
-    0.04,
-    4.965
-   ],
-   "words": 11,
-   "f0_median_hz": 177.8,
-   "raw": {
-    "hyp": "a defensive posture experts say the creature is holding its grounds",
-    "errors": 1
-   },
-   "processed": {
-    "hyp": "a defensive posture experts say the creature is holding its grounds",
-    "errors": 1
-   }
-  },
-  "v_kaiju_brace_5": {
-   "id": "v_kaiju_brace_5",
-   "hash": "71176ed26154681eb782",
-   "spoken": "The target is bracing. The manual says to go around.",
-   "duration": 3.608,
-   "speech": [
-    0.09,
-    3.448
-   ],
-   "words": 10,
-   "f0_median_hz": 183.9,
-   "raw": {
-    "hyp": "the target is bracing the manual says to go around",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "the target is bracing the manual says to go around",
-    "errors": 0
-   }
-  },
-  "v_kaiju_brace_6": {
-   "id": "v_kaiju_brace_6",
-   "hash": "acfa6cd66b58ae4f0ed8",
-   "spoken": "The creature has lowered its head and is not moving.",
-   "duration": 2.952,
-   "speech": [
-    0.04,
-    2.862
-   ],
-   "words": 10,
-   "f0_median_hz": 172.0,
-   "raw": {
-    "hyp": "the creature has lowered its head and is not moving",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "the creature has lowered its head and is not moving",
-    "errors": 0
-   }
-  },
-  "v_kaiju_roar_1": {
-   "id": "v_kaiju_roar_1",
-   "hash": "615bfb6e3e7d9df97e98",
-   "spoken": "Steady. It is only noise. Hold your positions.",
-   "duration": 3.932,
-   "speech": [
-    0.09,
-    3.772
-   ],
-   "words": 8,
-   "f0_median_hz": 93.0,
-   "raw": {
-    "hyp": "steady it is only noise hold your positions",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "steady it is only noise hold your positions",
-    "errors": 0
-   }
-  },
-  "v_kaiju_roar_2": {
-   "id": "v_kaiju_roar_2",
-   "hash": "a155a24c6b35d7f7e156",
-   "spoken": "Loud one. Charge is gone. Starting over.",
-   "duration": 3.007,
-   "speech": [
-    0.09,
-    2.847
-   ],
-   "words": 7,
-   "f0_median_hz": 110.3,
-   "raw": {
-    "hyp": "loved one charge is gone starting over",
-    "errors": 1
-   },
-   "processed": {
-    "hyp": "loved one charges go on starting over",
-    "errors": 4
-   }
-  },
-  "v_kaiju_roar_3": {
-   "id": "v_kaiju_roar_3",
-   "hash": "603d9fd51a1c31edcee3",
-   "spoken": "The roar has reset our charge. Beginning again, per procedure.",
-   "duration": 3.762,
-   "speech": [
-    0.09,
-    3.602
-   ],
-   "words": 10,
-   "f0_median_hz": 183.9,
-   "raw": {
-    "hyp": "the power has reset our charge beginning again for procedure",
-    "errors": 2
-   },
-   "processed": {
-    "hyp": "the roar has reset our charge beginning again per procedure",
-    "errors": 0
-   }
-  },
-  "v_kaiju_roar_4": {
-   "id": "v_kaiju_roar_4",
-   "hash": "780046a67f1daa777e04",
-   "spoken": "Let it scream. We are still here.",
-   "duration": 2.545,
-   "speech": [
-    0.09,
-    2.385
-   ],
-   "words": 7,
-   "f0_median_hz": 139.1,
-   "raw": {
-    "hyp": "legit screen we are still here",
-    "errors": 3
-   },
-   "processed": {
-    "hyp": "poetic scream we are still here",
-    "errors": 2
-   }
-  },
-  "v_kaiju_roar_5": {
-   "id": "v_kaiju_roar_5",
-   "hash": "4e7f4bde20798539f69e",
-   "spoken": "The creature has issued a statement. No translation is available.",
-   "duration": 4.307,
-   "speech": [
-    0.04,
-    4.217
-   ],
-   "words": 10,
-   "f0_median_hz": 177.8,
-   "raw": {
-    "hyp": "the creature has issued a statement now translation is available",
-    "errors": 1
-   },
-   "processed": {
-    "hyp": "the creature has issued a statement no translation is available",
-    "errors": 0
-   }
-  },
-  "v_kaiju_roar_6": {
-   "id": "v_kaiju_roar_6",
-   "hash": "20ccfec085d0947b6155",
-   "spoken": "That sound was the creature. We apologize for the volume.",
-   "duration": 4.029,
-   "speech": [
-    0.04,
-    3.939
-   ],
-   "words": 10,
-   "f0_median_hz": 173.9,
-   "raw": {
-    "hyp": "that sounds was the creature we apologize for the value",
-    "errors": 2
-   },
-   "processed": {
-    "hyp": "that sounds was the creature we apologize for the value",
-    "errors": 2
-   }
-  },
-  "v_kaiju_roar_7": {
-   "id": "v_kaiju_roar_7",
-   "hash": "8e4e916d8c81f45c8bfa",
-   "spoken": "The creature has roared again. Windows are broken for several blocks.",
-   "duration": 4.225,
-   "speech": [
-    0.04,
-    4.135
-   ],
-   "words": 11,
-   "f0_median_hz": 177.8,
-   "raw": {
-    "hyp": "the creature has tried again windows are broken for several blocks",
-    "errors": 1
-   },
-   "processed": {
-    "hyp": "the creature has tried again windows are broken for several blocks",
-    "errors": 1
-   }
-  },
-  "v_kaiju_roar_8": {
-   "id": "v_kaiju_roar_8",
-   "hash": "9aab0da7a1307790d618",
-   "spoken": "Soldiers near the creature appear to be reconsidering their positions.",
-   "duration": 4.274,
-   "speech": [
-    0.04,
-    4.184
-   ],
-   "words": 10,
-   "f0_median_hz": 173.9,
-   "raw": {
-    "hyp": "soldiers near the creature appeared to be reconsidering their positions",
-    "errors": 1
-   },
-   "processed": {
-    "hyp": "soldiers near the creature appeared to be reconsidering their positions",
-    "errors": 1
-   }
-  },
-  "v_kaiju_special_1": {
-   "id": "v_kaiju_special_1",
-   "hash": "91576bec2dfffbcb2a55",
-   "spoken": "Get clear. It is charging.",
-   "duration": 2.268,
-   "speech": [
-    0.09,
-    2.108
-   ],
-   "words": 5,
-   "f0_median_hz": 89.9,
-   "raw": {
-    "hyp": "get clear it is charging",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "get clear it is charging",
-    "errors": 0
-   }
-  },
-  "v_kaiju_special_2": {
-   "id": "v_kaiju_special_2",
-   "hash": "20b655d92c728f30cdb7",
-   "spoken": "Incoming. Get out of the way.",
-   "duration": 2.019,
-   "speech": [
-    0.09,
-    1.859
-   ],
-   "words": 6,
-   "f0_median_hz": 103.2,
-   "raw": {
-    "hyp": "incoming get out of the way",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "incoming get out of the way",
-    "errors": 0
-   }
-  },
-  "v_kaiju_special_3": {
-   "id": "v_kaiju_special_3",
-   "hash": "d37ff172d092582b1434",
-   "spoken": "The creature is preparing something. Officials advise distance.",
-   "duration": 4.2,
-   "speech": [
-    0.04,
-    4.11
-   ],
-   "words": 8,
-   "f0_median_hz": 179.8,
-   "raw": {
-    "hyp": "the creature is preparing something officials advise distance",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "the creature is preparing something officials advise distance",
-    "errors": 0
-   }
-  },
-  "v_kaiju_special_4": {
-   "id": "v_kaiju_special_4",
-   "hash": "0d78837de04ebd1d9f0c",
-   "spoken": "We are told this is not normal behavior for any animal.",
-   "duration": 3.523,
-   "speech": [
-    0.04,
-    3.433
-   ],
-   "words": 11,
-   "f0_median_hz": 172.0,
-   "raw": {
-    "hyp": "we are told this is not normal behavior for any animal",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "we are told this is not normal behavior for any animal",
-    "errors": 0
-   }
-  },
-  "v_kaiju_special_5": {
-   "id": "v_kaiju_special_5",
-   "hash": "f25b9d9b1c263c3dde96",
-   "spoken": "Take cover. That is procedure.",
-   "duration": 2.213,
-   "speech": [
-    0.09,
-    2.053
-   ],
-   "words": 5,
-   "f0_median_hz": 183.9,
-   "raw": {
-    "hyp": "take cover that is procedure",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "take cover that is procedure",
-    "errors": 0
-   }
-  },
-  "v_kaiju_special_6": {
-   "id": "v_kaiju_special_6",
-   "hash": "30b377fb4ead6cb3825a",
-   "spoken": "Away from it. All of you.",
-   "duration": 2.085,
-   "speech": [
-    0.09,
-    1.925
-   ],
-   "words": 6,
-   "f0_median_hz": 144.1,
-   "raw": {
-    "hyp": "away from it all of you",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "away from it all of you",
-    "errors": 0
-   }
-  },
-  "v_kaiju_special_7": {
-   "id": "v_kaiju_special_7",
-   "hash": "5c8a8432af0caf041afd",
-   "spoken": "Viewers near the creature should consider being somewhere else.",
-   "duration": 3.454,
-   "speech": [
-    0.04,
-    3.364
-   ],
-   "words": 9,
-   "f0_median_hz": 173.0,
-   "raw": {
-    "hyp": "viewers near the creature should consider being somewhere else",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "viewers near the creature should consider being somewhere else",
-    "errors": 0
-   }
-  },
-  "v_building_down_1": {
-   "id": "v_building_down_1",
-   "hash": "6bea0514431d135f89f7",
-   "spoken": "Building down. That one counts against us.",
-   "duration": 3.458,
-   "speech": [
-    0.09,
-    3.298
-   ],
-   "words": 7,
-   "f0_median_hz": 96.4,
-   "raw": {
-    "hyp": "building down that one counts against us",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "building down that one counts against us",
-    "errors": 0
-   }
-  },
-  "v_building_down_2": {
-   "id": "v_building_down_2",
-   "hash": "d5464cd41a391c068e52",
-   "spoken": "Another one down. The skyline is getting shorter.",
-   "duration": 3.118,
-   "speech": [
-    0.09,
-    2.958
-   ],
-   "words": 8,
-   "f0_median_hz": 107.0,
-   "raw": {
-    "hyp": "number one down the skyline is getting shorter",
-    "errors": 1
-   },
-   "processed": {
-    "hyp": "the number one down the skyline is getting shorter",
-    "errors": 2
-   }
-  },
-  "v_building_down_3": {
-   "id": "v_building_down_3",
-   "hash": "2c43a633fd3f85b85124",
-   "spoken": "Structure lost. Logging the address for the report.",
-   "duration": 3.348,
-   "speech": [
-    0.09,
-    3.188
-   ],
-   "words": 8,
-   "f0_median_hz": 186.0,
-   "raw": {
-    "hyp": "structure lost blocking the address for the report",
-    "errors": 1
-   },
-   "processed": {
-    "hyp": "structure lost lobbying the address for the report",
-    "errors": 1
-   }
-  },
-  "v_building_down_4": {
-   "id": "v_building_down_4",
-   "hash": "e8eca0f9cf4fee7d8d2a",
-   "spoken": "Another building gone. I will remember it.",
-   "duration": 2.925,
-   "speech": [
-    0.09,
-    2.765
-   ],
-   "words": 7,
-   "f0_median_hz": 136.8,
-   "raw": {
-    "hyp": "another building gone i will remember it",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "another building gone i will remember it",
-    "errors": 0
-   }
-  },
-  "v_building_down_5": {
-   "id": "v_building_down_5",
-   "hash": "2dd8cdca1acb6f75eec4",
-   "spoken": "Another structure is down. Residents should make other arrangements.",
-   "duration": 4.138,
-   "speech": [
-    0.04,
-    4.048
-   ],
-   "words": 9,
-   "f0_median_hz": 173.9,
-   "raw": {
-    "hyp": "another structure is down residents should make other arrangements",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "another structure is down residents should make other arrangements",
-    "errors": 0
-   }
-  },
-  "v_building_down_6": {
-   "id": "v_building_down_6",
-   "hash": "5de1932338b73b558245",
-   "spoken": "That building has collapsed. It was recently renovated.",
-   "duration": 3.638,
-   "speech": [
-    0.04,
-    3.548
-   ],
-   "words": 8,
-   "f0_median_hz": 175.8,
-   "raw": {
-    "hyp": "that building has collapsed it was recently renovated",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "that building has collapsed it was recently renovated",
-    "errors": 0
-   }
-  },
-  "v_building_down_7": {
-   "id": "v_building_down_7",
-   "hash": "787fd2946a5bf3d63389",
-   "spoken": "One more building has left the skyline.",
-   "duration": 2.61,
-   "speech": [
-    0.04,
-    2.52
-   ],
-   "words": 7,
-   "f0_median_hz": 176.8,
-   "raw": {
-    "hyp": "one more building has left the skyline",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "one more building has left the skyline",
-    "errors": 0
-   }
-  },
-  "v_building_down_8": {
-   "id": "v_building_down_8",
-   "hash": "e9c833d478cd0bdc5dc6",
-   "spoken": "Another building is down. Insurance offices report heavy call volume.",
-   "duration": 4.819,
-   "speech": [
-    0.04,
-    4.729
-   ],
-   "words": 10,
-   "f0_median_hz": 173.9,
-   "raw": {
-    "hyp": "another building is down insurance offices report heavy call volume",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "another building is down insurance offices report heavy call volume",
-    "errors": 0
-   }
-  },
-  "v_landmark_down_1": {
-   "id": "v_landmark_down_1",
-   "hash": "b9f1800f61d98f76baea",
-   "spoken": "We just lost a landmark. The mayor will want names.",
-   "duration": 4.051,
-   "speech": [
-    0.09,
-    3.891
-   ],
-   "words": 10,
-   "f0_median_hz": 88.4,
-   "raw": {
-    "hyp": "we just lost the landmark the mayor will want names",
-    "errors": 1
-   },
-   "processed": {
-    "hyp": "we just lost the landmark the mayor will want names",
-    "errors": 1
-   }
-  },
-  "v_landmark_down_2": {
-   "id": "v_landmark_down_2",
-   "hash": "5b510cc8b80a459803d9",
-   "spoken": "Landmark destroyed. That one was on the postcards.",
-   "duration": 3.618,
-   "speech": [
-    0.09,
-    3.458
-   ],
-   "words": 8,
-   "f0_median_hz": 179.8,
-   "raw": {
-    "hyp": "landmark destroyed that one was on the postcards",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "landmark destroyed that one was on the postcards",
-    "errors": 0
-   }
-  },
-  "v_landmark_down_3": {
-   "id": "v_landmark_down_3",
-   "hash": "0b200b0456a7041d628c",
-   "spoken": "That stood for a hundred years. Remember it.",
-   "duration": 3.065,
-   "speech": [
-    0.09,
-    2.905
-   ],
-   "words": 8,
-   "f0_median_hz": 140.4,
-   "raw": {
-    "hyp": "that's good for a hundred years remember it",
-    "errors": 2
-   },
-   "processed": {
-    "hyp": "that's good for a hundred years remember it",
-    "errors": 2
-   }
-  },
-  "v_landmark_down_4": {
-   "id": "v_landmark_down_4",
-   "hash": "83b11b868836f605faaa",
-   "spoken": "A city landmark has been destroyed. Tours are canceled until further notice.",
-   "duration": 4.795,
-   "speech": [
-    0.04,
-    4.705
-   ],
-   "words": 12,
-   "f0_median_hz": 175.8,
-   "raw": {
-    "hyp": "a city landmark has been destroyed chairs are cancelled until further notice",
-    "errors": 2
-   },
-   "processed": {
-    "hyp": "the city landmark has been destroyed tours are cancelled until further notice",
-    "errors": 2
-   }
-  },
-  "v_landmark_down_5": {
-   "id": "v_landmark_down_5",
-   "hash": "cfd39d2ff14cf2e680b4",
-   "spoken": "We have lost a landmark. It appears on our station logo.",
-   "duration": 4.032,
-   "speech": [
-    0.04,
-    3.942
-   ],
-   "words": 11,
-   "f0_median_hz": 172.0,
-   "raw": {
-    "hyp": "we have lost a landmark it appears on our station logo",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "we have lost a landmark it appears on our station",
-    "errors": 1
-   }
-  },
-  "v_landmark_down_6": {
-   "id": "v_landmark_down_6",
-   "hash": "a61cf741d9428eabea78",
-   "spoken": "A beloved landmark is gone. The gift shop did not survive.",
-   "duration": 4.015,
-   "speech": [
-    0.04,
-    3.925
-   ],
-   "words": 11,
-   "f0_median_hz": 173.9,
-   "raw": {
-    "hyp": "a beloved landmark is don the gift shop did not survive",
-    "errors": 1
-   },
-   "processed": {
-    "hyp": "the beloved landmark is don the gift shop did not survive",
-    "errors": 2
-   }
-  },
-  "v_collateral_human_1": {
-   "id": "v_collateral_human_1",
-   "hash": "e55ff4217bbce27e7c91",
-   "spoken": "That shot was ours. That is three forms and a hearing.",
-   "duration": 3.741,
-   "speech": [
-    0.09,
-    3.581
-   ],
-   "words": 11,
-   "f0_median_hz": 92.5,
-   "raw": {
-    "hyp": "that shot was ours that is three forms and a hearing",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "that shot was ours that is three forms and a hearing",
-    "errors": 0
-   }
-  },
-  "v_collateral_human_2": {
-   "id": "v_collateral_human_2",
-   "hash": "0500675c212873813a4e",
-   "spoken": "We are doing its work for it. Check your backstop.",
-   "duration": 3.867,
-   "speech": [
-    0.09,
-    3.707
-   ],
-   "words": 10,
-   "f0_median_hz": 90.1,
-   "raw": {
-    "hyp": "we are doing it's work for it check your bag stop",
-    "errors": 3
-   },
-   "processed": {
-    "hyp": "we are doing it's work for it to check your bag stop",
-    "errors": 4
-   }
-  },
-  "v_collateral_human_3": {
-   "id": "v_collateral_human_3",
-   "hash": "9d65f0f38aedd0b721fc",
-   "spoken": "That one was ours. I will sign for it.",
-   "duration": 2.699,
-   "speech": [
-    0.09,
-    2.539
-   ],
-   "words": 9,
-   "f0_median_hz": 105.3,
-   "raw": {
-    "hyp": "that one was ours i will sign for it",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "that one was ours i will sign for it",
-    "errors": 0
-   }
-  },
-  "v_collateral_human_4": {
-   "id": "v_collateral_human_4",
-   "hash": "c4a5eb980cec5b534059",
-   "spoken": "We struck a building. I am required to report it. Reporting.",
-   "duration": 4.263,
-   "speech": [
-    0.09,
-    4.103
-   ],
-   "words": 11,
-   "f0_median_hz": 179.8,
-   "raw": {
-    "hyp": "we struck a building i am required to report it reporting",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "we struck a building i am required to report it to reporting",
-    "errors": 1
-   }
-  },
-  "v_collateral_human_5": {
-   "id": "v_collateral_human_5",
-   "hash": "c389c0913325ac0af642",
-   "spoken": "My shot. My building. It will not happen again.",
-   "duration": 3.685,
-   "speech": [
-    0.09,
-    3.525
-   ],
-   "words": 9,
-   "f0_median_hz": 140.4,
-   "raw": {
-    "hyp": "my shawl to my building it will not happen again",
-    "errors": 2
-   },
-   "processed": {
-    "hyp": "my short my building it will not happen again",
-    "errors": 1
-   }
-  },
-  "v_collateral_human_6": {
-   "id": "v_collateral_human_6",
-   "hash": "90fcdb49d009326bd296",
-   "spoken": "That damage was caused by the army. Officials declined to comment.",
-   "duration": 4.47,
-   "speech": [
-    0.04,
-    4.38
-   ],
-   "words": 11,
-   "f0_median_hz": 173.9,
-   "raw": {
-    "hyp": "that damage was caused by the army officials declined to comment",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "that damage was caused by the army officials declined to comment",
-    "errors": 0
-   }
-  },
-  "v_collateral_human_7": {
-   "id": "v_collateral_human_7",
-   "hash": "d9d48801c225be0f4e9d",
-   "spoken": "A stray army shot has struck a building. An inquiry is expected.",
-   "duration": 4.564,
-   "speech": [
-    0.04,
-    4.474
-   ],
-   "words": 12,
-   "f0_median_hz": 179.8,
-   "raw": {
-    "hyp": "a stray army shot has struck a building an inquiry is expected",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "the stray army shot has struck a building an inquiry is expected",
-    "errors": 1
-   }
-  },
-  "v_collateral_human_8": {
-   "id": "v_collateral_human_8",
-   "hash": "e2cdc9c30862b050d6bb",
-   "spoken": "The army has now hit the city it is defending.",
-   "duration": 2.871,
-   "speech": [
-    0.04,
-    2.781
-   ],
-   "words": 10,
-   "f0_median_hz": 173.9,
-   "raw": {
-    "hyp": "the army has now hit the city it is defending",
-    "errors": 0
-   },
-   "processed": {
-    "hyp": "the army has now hit the city it is defending",
-    "errors": 0
-   }
-  },
-  "v_collateral_human_9": {
-   "id": "v_collateral_human_9",
-   "hash": "f26d444d9ef7e8def4db",
-   "spoken": "Viewers should note the creature did not do that one.",
-   "duration": 3.049,
-   "speech": [
-    0.04,
-    2.959
-   ],
-   "words": 10,
-   "f0_median_hz": 173.9,
-   "raw": {
-    "hyp": "viewers should know the creature did not do that one",
-    "errors": 1
-   },
-   "processed": {
-    "hyp": "viewers should know the creature did not do that one",
-    "errors": 1
-   }
-  },
-  "v_collateral_human_10": {
-   "id": "v_collateral_human_10",
-   "hash": "a00600657c3290fdb3ef",
-   "spoken": "My mistake. Building is gone.",
    "duration": 2.097,
    "speech": [
     0.09,
     1.937
    ],
    "words": 5,
-   "f0_median_hz": 104.9,
+   "f0_median_hz": 115.1,
+   "raw": {
+    "hyp": "charged waiting on your shot",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "charged waiting on your shot",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "charged waiting on your shot",
+    "errors": 0
+   }
+  },
+  "v_volley_ready_6": {
+   "id": "v_volley_ready_6",
+   "hash": "f66285b574b3bf580a16",
+   "spoken": "All units report full charge. You are cleared to fire.",
+   "duration": 3.5,
+   "speech": [
+    0.09,
+    3.34
+   ],
+   "words": 10,
+   "f0_median_hz": 164.9,
+   "raw": {
+    "hyp": "all units report full charge you are cleared to fire",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "all units report full charge you are cleared to fire",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "all units report full charge you are cleared to fire",
+    "errors": 0
+   }
+  },
+  "v_volley_ready_7": {
+   "id": "v_volley_ready_7",
+   "hash": "a6de25a6729ced57932c",
+   "spoken": "Charged and aimed. It will feel this one.",
+   "duration": 2.952,
+   "speech": [
+    0.09,
+    2.793
+   ],
+   "words": 8,
+   "f0_median_hz": 216.2,
+   "raw": {
+    "hyp": "charged and aimed it to feel this one",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "charged and eighteen to get to feel this one",
+    "errors": 4
+   },
+   "raw2": {
+    "hyp": "charged and aimed it will feel this one",
+    "errors": 0
+   }
+  },
+  "v_volley_ready_8": {
+   "id": "v_volley_ready_8",
+   "hash": "46e46abb3c0a68da6ac7",
+   "spoken": "Army units have stopped and appear to be taking aim.",
+   "duration": 2.884,
+   "speech": [
+    0.04,
+    2.794
+   ],
+   "words": 10,
+   "f0_median_hz": 197.5,
+   "raw": {
+    "hyp": "army units have stopped and appear to be taking aim",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "army units have stopped and appear to be taking aim",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "army units have stopped and appear to be taking aim",
+    "errors": 0
+   }
+  },
+  "v_volley_ready_9": {
+   "id": "v_volley_ready_9",
+   "hash": "a0fa012c8761fc5d6580",
+   "spoken": "The yellow lights you see are army targeting lasers.",
+   "duration": 3.227,
+   "speech": [
+    0.04,
+    3.137
+   ],
+   "words": 9,
+   "f0_median_hz": 197.5,
+   "raw": {
+    "hyp": "yellow lights you see our army targeting razors",
+    "errors": 3
+   },
+   "processed": {
+    "hyp": "the yellow lights you see our army targeting razors",
+    "errors": 2
+   },
+   "raw2": {
+    "hyp": "the yellow lights you see are army targeting lasers",
+    "errors": 0
+   }
+  },
+  "v_volley_ready_10": {
+   "id": "v_volley_ready_10",
+   "hash": "028e11604d8ed5579ccc",
+   "spoken": "Soldiers are holding fire. Experts say that is rarely a good sign.",
+   "duration": 4.225,
+   "speech": [
+    0.04,
+    4.135
+   ],
+   "words": 12,
+   "f0_median_hz": 195.1,
+   "raw": {
+    "hyp": "soldiers are holding fire experts say that is rarely a good sign",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "soldiers are holding fire experts say that is rarely a good sign",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "soldiers are holding fire experts say that is rarely a good sign",
+    "errors": 0
+   }
+  },
+  "v_volley_ready_11": {
+   "id": "v_volley_ready_11",
+   "hash": "2fa8a57931d379ae299a",
+   "spoken": "The army is preparing a volley. The creature may wish to brace.",
+   "duration": 3.884,
+   "speech": [
+    0.04,
+    3.794
+   ],
+   "words": 12,
+   "f0_median_hz": 200.0,
+   "raw": {
+    "hyp": "the army is preparing a volley the creature may wish to brace",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "the army is preparing a volley the creature may wish to brace",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "the army is preparing a volley the creature may wish to brace",
+    "errors": 0
+   }
+  },
+  "v_volley_ready_12": {
+   "id": "v_volley_ready_12",
+   "hash": "7347f8480a0cc3c1ff24",
+   "spoken": "Lasers on. Say when.",
+   "duration": 2.023,
+   "speech": [
+    0.09,
+    1.863
+   ],
+   "words": 4,
+   "f0_median_hz": 115.1,
+   "raw": {
+    "hyp": "lasers on say when",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "lasers on say when",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "lasers on say when",
+    "errors": 0
+   }
+  },
+  "v_volley_ready_13": {
+   "id": "v_volley_ready_13",
+   "hash": "a035fdc0c8847ffcb936",
+   "spoken": "Charge complete. Standing by for your order.",
+   "duration": 2.729,
+   "speech": [
+    0.09,
+    2.569
+   ],
+   "words": 7,
+   "f0_median_hz": 163.3,
+   "raw": {
+    "hyp": "charge complete standing by for your order",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "charge complete standing by for your order",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "charge complete standing by for your order",
+    "errors": 0
+   }
+  },
+  "v_volley_ready_14": {
+   "id": "v_volley_ready_14",
+   "hash": "b2e28f0b49cfbe3cf427",
+   "spoken": "We are charged. I want this one.",
+   "duration": 2.686,
+   "speech": [
+    0.09,
+    2.526
+   ],
+   "words": 7,
+   "f0_median_hz": 205.1,
+   "raw": {
+    "hyp": "we are charged i want this one",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "we are charged i want this one",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "we are charged i want this one",
+    "errors": 0
+   }
+  },
+  "v_volley_ready_15": {
+   "id": "v_volley_ready_15",
+   "hash": "16b615e1211550e6c741",
+   "spoken": "Full charge. Pick your moment.",
+   "duration": 2.663,
+   "speech": [
+    0.09,
+    2.503
+   ],
+   "words": 5,
+   "f0_median_hz": 100.0,
+   "raw": {
+    "hyp": "full charge pick your moment",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "full charge pick your moment",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "full charge pick your moment",
+    "errors": 0
+   }
+  },
+  "v_volley_ready_16": {
+   "id": "v_volley_ready_16",
+   "hash": "eb2c28e9ebfb13950ce9",
+   "spoken": "Charge complete. Fire when you have a clean shot.",
+   "duration": 3.601,
+   "speech": [
+    0.09,
+    3.441
+   ],
+   "words": 9,
+   "f0_median_hz": 90.4,
+   "raw": {
+    "hyp": "sarge complete fire when you have a clean shot",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "george complete fire when you have a clean shot",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "charge complete fire when you have a clean shot",
+    "errors": 0
+   }
+  },
+  "v_volley_fired_1": {
+   "id": "v_volley_fired_1",
+   "hash": "63afb4f38135623cfd59",
+   "spoken": "Volley away.",
+   "duration": 1.381,
+   "speech": [
+    0.09,
+    1.221
+   ],
+   "words": 2,
+   "f0_median_hz": 98.5,
+   "raw": {
+    "hyp": "vallejo where",
+    "errors": 2
+   },
+   "processed": {
+    "hyp": "lol you wear",
+    "errors": 3
+   },
+   "raw2": {
+    "hyp": "volley away",
+    "errors": 0
+   }
+  },
+  "v_volley_fired_2": {
+   "id": "v_volley_fired_2",
+   "hash": "2be762e5a245cdfec147",
+   "spoken": "Rounds out. Watch the fall.",
+   "duration": 2.11,
+   "speech": [
+    0.09,
+    1.95
+   ],
+   "words": 5,
+   "f0_median_hz": 130.6,
+   "raw": {
+    "hyp": "rounds out watch the fall",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "rounds out to watch the fall",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "rounds out watch the fall",
+    "errors": 0
+   }
+  },
+  "v_volley_fired_3": {
+   "id": "v_volley_fired_3",
+   "hash": "40f60c6b507f5a798227",
+   "spoken": "Volley fired. All rounds are in flight and accounted for.",
+   "duration": 3.512,
+   "speech": [
+    0.09,
+    3.352
+   ],
+   "words": 10,
+   "f0_median_hz": 164.9,
+   "raw": {
+    "hyp": "bali fired all rounds or inflate and accounted for",
+    "errors": 4
+   },
+   "processed": {
+    "hyp": "the dalai fired all rounds or inflate and accounted for",
+    "errors": 5
+   },
+   "raw2": {
+    "hyp": "volley fired all rounds are in flight and accounted for",
+    "errors": 0
+   }
+  },
+  "v_volley_fired_4": {
+   "id": "v_volley_fired_4",
+   "hash": "449c86bb8b6a4ae8aad0",
+   "spoken": "Tempest firing. Everything we have.",
+   "duration": 2.599,
+   "speech": [
+    0.09,
+    2.439
+   ],
+   "words": 5,
+   "f0_median_hz": 195.1,
+   "raw": {
+    "hyp": "tempest firing everything we have",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "tempest firing everything we have",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "tempest firing everything we have",
+    "errors": 0
+   }
+  },
+  "v_volley_fired_5": {
+   "id": "v_volley_fired_5",
+   "hash": "59af96d8d42057549e58",
+   "spoken": "All of it is on the way. Should sting.",
+   "duration": 2.548,
+   "speech": [
+    0.09,
+    2.388
+   ],
+   "words": 9,
+   "f0_median_hz": 111.9,
+   "raw": {
+    "hyp": "all of it is on the way should staying",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "all of it is on the way should sting",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "all of it is on the way should sting",
+    "errors": 0
+   }
+  },
+  "v_volley_fired_6": {
+   "id": "v_volley_fired_6",
+   "hash": "0e3347bb4460de21cce2",
+   "spoken": "Fired on your mark. Observing for effect.",
+   "duration": 2.777,
+   "speech": [
+    0.09,
+    2.617
+   ],
+   "words": 7,
+   "f0_median_hz": 170.2,
+   "raw": {
+    "hyp": "fired on your mark observing for effect",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "fired on your market observing for a fact",
+    "errors": 3
+   },
+   "raw2": {
+    "hyp": "fired on your mark observing for effect",
+    "errors": 0
+   }
+  },
+  "v_volley_fired_7": {
+   "id": "v_volley_fired_7",
+   "hash": "9c496095d30f2dafd6be",
+   "spoken": "Firing. This one is for the city.",
+   "duration": 2.627,
+   "speech": [
+    0.09,
+    2.467
+   ],
+   "words": 7,
+   "f0_median_hz": 191.6,
+   "raw": {
+    "hyp": "firing this one is the city",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "firing this one it if it t",
+    "errors": 4
+   },
+   "raw2": {
+    "hyp": "firing this one is for the city",
+    "errors": 0
+   }
+  },
+  "v_volley_fired_8": {
+   "id": "v_volley_fired_8",
+   "hash": "5067b408a3d534bee4b8",
+   "spoken": "The army has fired a coordinated volley at the creature.",
+   "duration": 3.416,
+   "speech": [
+    0.04,
+    3.326
+   ],
+   "words": 10,
+   "f0_median_hz": 192.8,
+   "raw": {
+    "hyp": "the army has fired a coordinated volley at the creature",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "the army has fired a coordinated volley at the creature",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "the army has fired a coordinated volley at the creature",
+    "errors": 0
+   }
+  },
+  "v_volley_fired_9": {
+   "id": "v_volley_fired_9",
+   "hash": "e59bbf53a09291532e36",
+   "spoken": "A full volley has just been fired. We await the results.",
+   "duration": 3.735,
+   "speech": [
+    0.04,
+    3.645
+   ],
+   "words": 11,
+   "f0_median_hz": 197.5,
+   "raw": {
+    "hyp": "a full valley has just been fired we await the results",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "a full valley has just been fired we await the results",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "a full volley has just been fired we await the results",
+    "errors": 0
+   }
+  },
+  "v_volley_fired_10": {
+   "id": "v_volley_fired_10",
+   "hash": "bcff4bf8f8fc073c592d",
+   "spoken": "The army has fired again. It is unclear what was hit.",
+   "duration": 3.613,
+   "speech": [
+    0.04,
+    3.523
+   ],
+   "words": 11,
+   "f0_median_hz": 207.8,
+   "raw": {
+    "hyp": "the army has fired again it is unclear what was heads",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "the army has fired again it is unclear what was heads",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "the army has fired again it is unclear what was hit",
+    "errors": 0
+   }
+  },
+  "v_volley_fired_11": {
+   "id": "v_volley_fired_11",
+   "hash": "123cb593c9554d46fabe",
+   "spoken": "Another volley has been fired. Officials describe it as necessary.",
+   "duration": 4.575,
+   "speech": [
+    0.04,
+    4.485
+   ],
+   "words": 10,
+   "f0_median_hz": 195.1,
+   "raw": {
+    "hyp": "another volley has been fired officials described it as necessary",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "another volley has been fired officials described it as necessary",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "another volley has been fired officials describe it as necessary",
+    "errors": 0
+   }
+  },
+  "v_volley_fired_12": {
+   "id": "v_volley_fired_12",
+   "hash": "722578bb2973b7e888a1",
+   "spoken": "Fired. Watch where they land.",
+   "duration": 2.521,
+   "speech": [
+    0.09,
+    2.361
+   ],
+   "words": 5,
+   "f0_median_hz": 96.7,
+   "raw": {
+    "hyp": "fired watch where they land",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "fired watch where they landed",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "fired watch where they land",
+    "errors": 0
+   }
+  },
+  "v_volley_fired_13": {
+   "id": "v_volley_fired_13",
+   "hash": "ce5e352f064ec8184d45",
+   "spoken": "Shots away. Start the next charge.",
+   "duration": 2.823,
+   "speech": [
+    0.09,
+    2.663
+   ],
+   "words": 6,
+   "f0_median_hz": 98.2,
+   "raw": {
+    "hyp": "shot away star the next target",
+    "errors": 3
+   },
+   "processed": {
+    "hyp": "shot the way store the next target",
+    "errors": 5
+   },
+   "raw2": {
+    "hyp": "shots away start the next charge",
+    "errors": 0
+   }
+  },
+  "v_volley_fired_14": {
+   "id": "v_volley_fired_14",
+   "hash": "1f2cca3ba7817893a02d",
+   "spoken": "All shots out. Going again.",
+   "duration": 2.243,
+   "speech": [
+    0.09,
+    2.083
+   ],
+   "words": 5,
+   "f0_median_hz": 108.1,
+   "raw": {
+    "hyp": "all shots out going again",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "all shots out going again",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "all shots out going again",
+    "errors": 0
+   }
+  },
+  "v_volley_fired_15": {
+   "id": "v_volley_fired_15",
+   "hash": "feea35a21fa9b25130c6",
+   "spoken": "All weapons fired. Results to follow.",
+   "duration": 2.725,
+   "speech": [
+    0.09,
+    2.565
+   ],
+   "words": 6,
+   "f0_median_hz": 171.1,
+   "raw": {
+    "hyp": "all what inspired results to follow",
+    "errors": 2
+   },
+   "processed": {
+    "hyp": "oh what inspired results to follow him",
+    "errors": 4
+   },
+   "raw2": {
+    "hyp": "all weapons fired results to follow",
+    "errors": 0
+   }
+  },
+  "v_volley_fired_16": {
+   "id": "v_volley_fired_16",
+   "hash": "9114eb26cc4c84d7e947",
+   "spoken": "Everything we had. I hope it felt that.",
+   "duration": 2.668,
+   "speech": [
+    0.09,
+    2.508
+   ],
+   "words": 8,
+   "f0_median_hz": 202.5,
+   "raw": {
+    "hyp": "everything we had to i hope it felt that",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "at the we had i hope they tell that",
+    "errors": 4
+   },
+   "raw2": {
+    "hyp": "everything we had i hope it felt that",
+    "errors": 0
+   }
+  },
+  "v_crossfire_1": {
+   "id": "v_crossfire_1",
+   "hash": "20c3dfde02807e610db9",
+   "spoken": "Crossfire. It is caught between you. Keep it there.",
+   "duration": 3.692,
+   "speech": [
+    0.09,
+    3.532
+   ],
+   "words": 9,
+   "f0_median_hz": 94.7,
+   "raw": {
+    "hyp": "crossfire is caught between you keep it there",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "crossfire it is caught between you keep it there",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "crossfire it is caught between you keep it there",
+    "errors": 0
+   }
+  },
+  "v_crossfire_2": {
+   "id": "v_crossfire_2",
+   "hash": "12e09acc5eb3c3cc3efc",
+   "spoken": "Two angles on it. It does not like that.",
+   "duration": 2.673,
+   "speech": [
+    0.09,
+    2.513
+   ],
+   "words": 9,
+   "f0_median_hz": 111.1,
+   "raw": {
+    "hyp": "two angles on it it does not like that",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "two angles on it he does not like that",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "two angles on it it does not like that",
+    "errors": 0
+   }
+  },
+  "v_crossfire_3": {
+   "id": "v_crossfire_3",
+   "hash": "675d27ec3ed485f18d17",
+   "spoken": "Crossfire established. Exactly as the manual describes.",
+   "duration": 3.962,
+   "speech": [
+    0.09,
+    3.802
+   ],
+   "words": 7,
+   "f0_median_hz": 160.0,
+   "raw": {
+    "hyp": "crossfire established exactly as the manual describes",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "cross fire established exactly at the manual describes",
+    "errors": 3
+   },
+   "raw2": {
+    "hyp": "crossfire established exactly as the manual describes",
+    "errors": 0
+   }
+  },
+  "v_crossfire_4": {
+   "id": "v_crossfire_4",
+   "hash": "88ebd2b11a2161570e77",
+   "spoken": "It is trapped between us. Do not let up.",
+   "duration": 2.624,
+   "speech": [
+    0.09,
+    2.464
+   ],
+   "words": 9,
+   "f0_median_hz": 200.0,
+   "raw": {
+    "hyp": "it is trapped between us to not let up",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "it is trapped between us do not let up",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "it is trapped between us do not let up",
+    "errors": 0
+   }
+  },
+  "v_crossfire_5": {
+   "id": "v_crossfire_5",
+   "hash": "4d52d0c4ea642d1f231c",
+   "spoken": "The creature is now taking fire from two directions.",
+   "duration": 3.372,
+   "speech": [
+    0.04,
+    3.282
+   ],
+   "words": 9,
+   "f0_median_hz": 195.1,
+   "raw": {
+    "hyp": "the creature is now taking fire from two directions",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "the creature is now taking fire from two directions",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "the creature is now taking fire from two directions",
+    "errors": 0
+   }
+  },
+  "v_crossfire_6": {
+   "id": "v_crossfire_6",
+   "hash": "86b6727a8e4a84138f66",
+   "spoken": "Army units have caught the creature in a crossfire, sources say.",
+   "duration": 3.786,
+   "speech": [
+    0.04,
+    3.696
+   ],
+   "words": 11,
+   "f0_median_hz": 207.8,
+   "raw": {
+    "hyp": "army units have caught the creature in a crossfire sources say",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "army units have caught the creature in a crossfire sources say",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "army units have caught the creature in a crossfire sources say",
+    "errors": 0
+   }
+  },
+  "v_crossfire_7": {
+   "id": "v_crossfire_7",
+   "hash": "73171619c4df8016d78b",
+   "spoken": "Fire is now coming from both sides. The creature seems unsure.",
+   "duration": 4.065,
+   "speech": [
+    0.04,
+    3.975
+   ],
+   "words": 11,
+   "f0_median_hz": 197.5,
+   "raw": {
+    "hyp": "fire is now coming from both sides the creature seems on shore",
+    "errors": 2
+   },
+   "processed": {
+    "hyp": "fire is now coming from both sides the creature seems on shore",
+    "errors": 2
+   },
+   "raw2": {
+    "hyp": "fire is now coming from both sides the creature seems unsure",
+    "errors": 0
+   }
+  },
+  "v_crossfire_8": {
+   "id": "v_crossfire_8",
+   "hash": "008df57c6072d37ce5ca",
+   "spoken": "The army now has the creature between two firing lines.",
+   "duration": 3.639,
+   "speech": [
+    0.04,
+    3.549
+   ],
+   "words": 10,
+   "f0_median_hz": 195.1,
+   "raw": {
+    "hyp": "the army now has the creature between two firing lines",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "the army now has the creature between two firing lines",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "the army now has the creature between two firing lines",
+    "errors": 0
+   }
+  },
+  "v_crossfire_9": {
+   "id": "v_crossfire_9",
+   "hash": "6b650edbe753637c8440",
+   "spoken": "Two angles on the target. Its nerve will not hold.",
+   "duration": 3.758,
+   "speech": [
+    0.09,
+    3.598
+   ],
+   "words": 10,
+   "f0_median_hz": 95.0,
+   "raw": {
+    "hyp": "two angles on the target it's nerve will not hold",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "two angles on the target it's nerve will not hold",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "two angles on the target its nerve will not hold",
+    "errors": 0
+   }
+  },
+  "v_crossfire_10": {
+   "id": "v_crossfire_10",
+   "hash": "dce8a3572fb0ed2c9a93",
+   "spoken": "Crossfire. Keep it up.",
+   "duration": 1.959,
+   "speech": [
+    0.09,
+    1.799
+   ],
+   "words": 4,
+   "f0_median_hz": 114.7,
+   "raw": {
+    "hyp": "cross fire keep it up",
+    "errors": 2
+   },
+   "processed": {
+    "hyp": "cross fire keep it up",
+    "errors": 2
+   },
+   "raw2": {
+    "hyp": "crossfire keep it up",
+    "errors": 0
+   }
+  },
+  "v_crossfire_11": {
+   "id": "v_crossfire_11",
+   "hash": "6f6546cd0f90dcd36dc7",
+   "spoken": "Two firing angles confirmed. Maintaining fire.",
+   "duration": 3.518,
+   "speech": [
+    0.09,
+    3.358
+   ],
+   "words": 6,
+   "f0_median_hz": 164.9,
+   "raw": {
+    "hyp": "two firing angles confirmed maintaining fire",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "two firing angles confirmed maintaining fire",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "two firing angles confirmed maintaining fire",
+    "errors": 0
+   }
+  },
+  "v_crossfire_12": {
+   "id": "v_crossfire_12",
+   "hash": "91b72a96b12a62204da7",
+   "spoken": "Both sides now. It has nowhere to turn.",
+   "duration": 2.721,
+   "speech": [
+    0.09,
+    2.561
+   ],
+   "words": 8,
+   "f0_median_hz": 195.1,
+   "raw": {
+    "hyp": "both sides then it is nowhere to turn",
+    "errors": 2
+   },
+   "processed": {
+    "hyp": "hopefully tonight it is nowhere to turn",
+    "errors": 4
+   },
+   "raw2": {
+    "hyp": "both sides now it has nowhere to turn",
+    "errors": 0
+   }
+  },
+  "v_nerve_break_1": {
+   "id": "v_nerve_break_1",
+   "hash": "0bd985da56a049930ea1",
+   "spoken": "Weak point is open. Fire.",
+   "duration": 2.403,
+   "speech": [
+    0.09,
+    2.243
+   ],
+   "words": 5,
+   "f0_median_hz": 105.3,
+   "raw": {
+    "hyp": "we point is open fire",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "weak point is opened fire",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "weak point is open fire",
+    "errors": 0
+   }
+  },
+  "v_nerve_break_2": {
+   "id": "v_nerve_break_2",
+   "hash": "099f60e00f3af99e6935",
+   "spoken": "Shoot the glowing spot. Now.",
+   "duration": 2.347,
+   "speech": [
+    0.09,
+    2.187
+   ],
+   "words": 5,
+   "f0_median_hz": 111.5,
+   "raw": {
+    "hyp": "shoot the glowing spot now",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "sheep and glowing spot now",
+    "errors": 2
+   },
+   "raw2": {
+    "hyp": "shoot the glowing spot now",
+    "errors": 0
+   }
+  },
+  "v_nerve_break_3": {
+   "id": "v_nerve_break_3",
+   "hash": "ea28889fd1803ff0bd77",
+   "spoken": "Engaging the weak point, as instructed.",
+   "duration": 2.4,
+   "speech": [
+    0.09,
+    2.24
+   ],
+   "words": 6,
+   "f0_median_hz": 171.1,
+   "raw": {
+    "hyp": "engaging the weak point as instructed",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "engaging the weak point as instructed",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "engaging the weak point as instructed",
+    "errors": 0
+   }
+  },
+  "v_nerve_break_4": {
+   "id": "v_nerve_break_4",
+   "hash": "2866300554f6669c25ea",
+   "spoken": "It staggers. Give it everything.",
+   "duration": 2.297,
+   "speech": [
+    0.09,
+    2.137
+   ],
+   "words": 5,
+   "f0_median_hz": 197.5,
+   "raw": {
+    "hyp": "its backers give it everything",
+    "errors": 2
+   },
+   "processed": {
+    "hyp": "it appears to give it a good thing",
+    "errors": 5
+   },
+   "raw2": {
+    "hyp": "it staggers give it everything",
+    "errors": 0
+   }
+  },
+  "v_nerve_break_5": {
+   "id": "v_nerve_break_5",
+   "hash": "fd9cbf91d3ce3c95003e",
+   "spoken": "The creature has stumbled. It appears badly shaken.",
+   "duration": 3.257,
+   "speech": [
+    0.04,
+    3.167
+   ],
+   "words": 8,
+   "f0_median_hz": 205.1,
+   "raw": {
+    "hyp": "the creature has stumbled it appears badly shaken",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "the creature has stumbled it appears badly shaken",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "the creature has stumbled it appears badly shaken",
+    "errors": 0
+   }
+  },
+  "v_nerve_break_6": {
+   "id": "v_nerve_break_6",
+   "hash": "27eed6b19ab2b45fa7c7",
+   "spoken": "The creature seems to have lost its nerve, for the moment.",
+   "duration": 3.186,
+   "speech": [
+    0.04,
+    3.096
+   ],
+   "words": 11,
+   "f0_median_hz": 200.0,
+   "raw": {
+    "hyp": "the creature seems to have lost it's nerve for the moment",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "the creature seems to have lost it's nerve for the moment",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "the creature seems to have lost its nerve for the moment",
+    "errors": 0
+   }
+  },
+  "v_nerve_break_7": {
+   "id": "v_nerve_break_7",
+   "hash": "6ce419da0ca29c3b302f",
+   "spoken": "The army has an opening. The creature is reeling.",
+   "duration": 3.159,
+   "speech": [
+    0.04,
+    3.069
+   ],
+   "words": 9,
+   "f0_median_hz": 210.5,
+   "raw": {
+    "hyp": "the army has an opening the creature is reeling",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "the army has an opening the creature is reeling",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "the army has an opening the creature is reeling",
+    "errors": 0
+   }
+  },
+  "v_nerve_break_8": {
+   "id": "v_nerve_break_8",
+   "hash": "68d2d94682917ea2a221",
+   "spoken": "A glowing weak point is now visible on the creature.",
+   "duration": 3.211,
+   "speech": [
+    0.04,
+    3.121
+   ],
+   "words": 10,
+   "f0_median_hz": 207.8,
+   "raw": {
+    "hyp": "a glowing weak point is now visible on the creature",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "a glowing weak point is now visible on the creature",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "a glowing weak point is now visible on the creature",
+    "errors": 0
+   }
+  },
+  "v_nerve_break_9": {
+   "id": "v_nerve_break_9",
+   "hash": "5807ef9029d551d39b21",
+   "spoken": "It is reeling. Fire.",
+   "duration": 1.924,
+   "speech": [
+    0.09,
+    1.764
+   ],
+   "words": 4,
+   "f0_median_hz": 103.2,
+   "raw": {
+    "hyp": "it is reeling fire",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "it is reeling fire",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "it is reeling fire",
+    "errors": 0
+   }
+  },
+  "v_nerve_break_10": {
+   "id": "v_nerve_break_10",
+   "hash": "3642acb7661e19bac13b",
+   "spoken": "Fire now. It will not last.",
+   "duration": 2.11,
+   "speech": [
+    0.09,
+    1.951
+   ],
+   "words": 6,
+   "f0_median_hz": 103.9,
+   "raw": {
+    "hyp": "fire now we will not last",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "fire now we will not last",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "fire now it will not last",
+    "errors": 0
+   }
+  },
+  "v_nerve_break_11": {
+   "id": "v_nerve_break_11",
+   "hash": "08d831ae4fe72ff4b066",
+   "spoken": "Weak point is open. Firing now.",
+   "duration": 2.124,
+   "speech": [
+    0.09,
+    1.964
+   ],
+   "words": 6,
+   "f0_median_hz": 152.4,
+   "raw": {
+    "hyp": "weak point is open firing now",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "weak point is open firing now",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "weak point is open firing now",
+    "errors": 0
+   }
+  },
+  "v_nerve_break_12": {
+   "id": "v_nerve_break_12",
+   "hash": "e29838bf248e8ba8c62f",
+   "spoken": "No mercy. Everything we have.",
+   "duration": 2.258,
+   "speech": [
+    0.09,
+    2.098
+   ],
+   "words": 5,
+   "f0_median_hz": 201.3,
+   "raw": {
+    "hyp": "no mercy everything we have",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "no mercy everything we have",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "no mercy everything we have",
+    "errors": 0
+   }
+  },
+  "v_stagger_end_1": {
+   "id": "v_stagger_end_1",
+   "hash": "f28eefb9603207900714",
+   "spoken": "It has recovered. Weak point is closed. Reset your angles.",
+   "duration": 4.054,
+   "speech": [
+    0.09,
+    3.894
+   ],
+   "words": 10,
+   "f0_median_hz": 93.0,
+   "raw": {
+    "hyp": "it has recovered weak point is close to reset your ankles",
+    "errors": 3
+   },
+   "processed": {
+    "hyp": "it has recovered weak point is close to reset your ankles",
+    "errors": 3
+   },
+   "raw2": {
+    "hyp": "it has recovered weak point is closed reset your angles",
+    "errors": 0
+   }
+  },
+  "v_stagger_end_2": {
+   "id": "v_stagger_end_2",
+   "hash": "a3e698eb00fb31dde0b6",
+   "spoken": "It is back up. Window is shut.",
+   "duration": 2.417,
+   "speech": [
+    0.09,
+    2.257
+   ],
+   "words": 7,
+   "f0_median_hz": 127.0,
+   "raw": {
+    "hyp": "it is back up window is shot",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "it is back up window is shot",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "it is backup window is shut",
+    "errors": 2
+   }
+  },
+  "v_stagger_end_3": {
+   "id": "v_stagger_end_3",
+   "hash": "2423e857e72b37dca835",
+   "spoken": "The creature is back on its feet and appears composed.",
+   "duration": 3.306,
+   "speech": [
+    0.04,
+    3.216
+   ],
+   "words": 10,
+   "f0_median_hz": 197.5,
+   "raw": {
+    "hyp": "the creature is back on its feet and up here is composed",
+    "errors": 3
+   },
+   "processed": {
+    "hyp": "the creature is back on its feet and up here is composed",
+    "errors": 3
+   },
+   "raw2": {
+    "hyp": "the creature is back on its feet and appears composed",
+    "errors": 0
+   }
+  },
+  "v_stagger_end_4": {
+   "id": "v_stagger_end_4",
+   "hash": "bb3c0cfd289f3d698fe0",
+   "spoken": "The rampage continues. The creature has collected itself.",
+   "duration": 3.8,
+   "speech": [
+    0.04,
+    3.71
+   ],
+   "words": 8,
+   "f0_median_hz": 207.8,
+   "raw": {
+    "hyp": "the rampage continues the creature has collected itself",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "the rampage continues the creature has collected itself",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "the rampage continues the creature has collected itself",
+    "errors": 0
+   }
+  },
+  "v_stagger_end_5": {
+   "id": "v_stagger_end_5",
+   "hash": "10808f381d09a1853f31",
+   "spoken": "It is up again. We will break it again.",
+   "duration": 2.698,
+   "speech": [
+    0.09,
+    2.538
+   ],
+   "words": 9,
+   "f0_median_hz": 202.5,
+   "raw": {
+    "hyp": "it is all began we will break to take and",
+    "errors": 5
+   },
+   "processed": {
+    "hyp": "it is the topic again we will break it again",
+    "errors": 2
+   },
+   "raw2": {
+    "hyp": "it is up again we will break it again",
+    "errors": 0
+   }
+  },
+  "v_stagger_end_6": {
+   "id": "v_stagger_end_6",
+   "hash": "be2074b314714499f783",
+   "spoken": "The creature is standing again. It does not look pleased.",
+   "duration": 3.33,
+   "speech": [
+    0.04,
+    3.24
+   ],
+   "words": 10,
+   "f0_median_hz": 202.5,
+   "raw": {
+    "hyp": "the creature is standing again it does not look pleased",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "the creature is standing again it does not look pleased",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "the creature is standing again it does not look pleased",
+    "errors": 0
+   }
+  },
+  "v_kaiju_brace_1": {
+   "id": "v_kaiju_brace_1",
+   "hash": "8fc48b973cc4954c3c25",
+   "spoken": "It is bracing. Save your volley. Get behind it.",
+   "duration": 3.528,
+   "speech": [
+    0.09,
+    3.368
+   ],
+   "words": 9,
+   "f0_median_hz": 92.2,
+   "raw": {
+    "hyp": "it is bracing save your falling get behind it",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "it is bracing save your balling get the hind it",
+    "errors": 3
+   },
+   "raw2": {
+    "hyp": "it is bracing save your volley get behind it",
+    "errors": 0
+   }
+  },
+  "v_kaiju_brace_2": {
+   "id": "v_kaiju_brace_2",
+   "hash": "e33d8e699fb4c25f6ac1",
+   "spoken": "It is bracing. Circle around behind it.",
+   "duration": 2.903,
+   "speech": [
+    0.09,
+    2.743
+   ],
+   "words": 7,
+   "f0_median_hz": 190.5,
+   "raw": {
+    "hyp": "it is bracing cycle or rent behind it",
+    "errors": 3
+   },
+   "processed": {
+    "hyp": "it took a briefing from cooler and behind it",
+    "errors": 6
+   },
+   "raw2": {
+    "hyp": "it is bracing circle around behind it",
+    "errors": 0
+   }
+  },
+  "v_kaiju_brace_3": {
+   "id": "v_kaiju_brace_3",
+   "hash": "b9f952f55addd8b903b1",
+   "spoken": "The creature has dug in and appears to be bracing itself.",
+   "duration": 3.64,
+   "speech": [
+    0.04,
+    3.55
+   ],
+   "words": 11,
+   "f0_median_hz": 189.4,
+   "raw": {
+    "hyp": "the creature has died and and appears to be bracing itself",
+    "errors": 2
+   },
+   "processed": {
+    "hyp": "the creature has dog and and appears to be bracing itself",
+    "errors": 2
+   },
+   "raw2": {
+    "hyp": "the creature has dug in and appears to be bracing itself",
+    "errors": 0
+   }
+  },
+  "v_kaiju_brace_4": {
+   "id": "v_kaiju_brace_4",
+   "hash": "8bb0478433378d87e23c",
+   "spoken": "A defensive posture, experts say. The creature is holding its ground.",
+   "duration": 4.523,
+   "speech": [
+    0.04,
+    4.433
+   ],
+   "words": 11,
+   "f0_median_hz": 200.0,
+   "raw": {
+    "hyp": "a defensive posture experts say the creature is holding its ground",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "a defensive posture experts say the creature is holding its ground",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "a defensive posture experts say the creature is holding its ground",
+    "errors": 0
+   }
+  },
+  "v_kaiju_brace_5": {
+   "id": "v_kaiju_brace_5",
+   "hash": "30568ec7f60de07dba05",
+   "spoken": "The target is bracing. The manual says to go around.",
+   "duration": 3.523,
+   "speech": [
+    0.09,
+    3.363
+   ],
+   "words": 10,
+   "f0_median_hz": 171.1,
+   "raw": {
+    "hyp": "the target is bracing the manual says to go around",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "the target is briefing the manual says to go around",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "the target is bracing the manual says to go around",
+    "errors": 0
+   }
+  },
+  "v_kaiju_brace_6": {
+   "id": "v_kaiju_brace_6",
+   "hash": "568d1e3b94f5a8f48ad7",
+   "spoken": "The creature has lowered its head and is not moving.",
+   "duration": 3.121,
+   "speech": [
+    0.04,
+    3.031
+   ],
+   "words": 10,
+   "f0_median_hz": 205.1,
+   "raw": {
+    "hyp": "the creature has lowered its head and is not moving",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "the creature has lowered its head and is not moving",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "the creature has lowered its head and is not moving",
+    "errors": 0
+   }
+  },
+  "v_kaiju_roar_1": {
+   "id": "v_kaiju_roar_1",
+   "hash": "88216a88e3490fc505fa",
+   "spoken": "Steady. It is only noise. Hold your positions.",
+   "duration": 3.421,
+   "speech": [
+    0.09,
+    3.261
+   ],
+   "words": 8,
+   "f0_median_hz": 94.1,
+   "raw": {
+    "hyp": "steady it is only noise holder positions",
+    "errors": 2
+   },
+   "processed": {
+    "hyp": "steady it is only noise hold your positions",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "steady it is only noise hold your positions",
+    "errors": 0
+   }
+  },
+  "v_kaiju_roar_2": {
+   "id": "v_kaiju_roar_2",
+   "hash": "38277e11fe8a469f781e",
+   "spoken": "Loud one. Charge is gone. Starting over.",
+   "duration": 2.933,
+   "speech": [
+    0.09,
+    2.773
+   ],
+   "words": 7,
+   "f0_median_hz": 113.5,
+   "raw": {
+    "hyp": "loud one charge is gone starting over",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "loud one charge is gone and starting over",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "loud one charge is gone starting over",
+    "errors": 0
+   }
+  },
+  "v_kaiju_roar_3": {
+   "id": "v_kaiju_roar_3",
+   "hash": "c0fea58eb6abb67d6fde",
+   "spoken": "The roar has reset our charge. Beginning again, per procedure.",
+   "duration": 3.746,
+   "speech": [
+    0.09,
+    3.586
+   ],
+   "words": 10,
+   "f0_median_hz": 166.7,
+   "raw": {
+    "hyp": "the roar has reset our charge beginning again per procedure",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "the roar has reset are charged beginning again per procedure",
+    "errors": 2
+   },
+   "raw2": {
+    "hyp": "the roar has reset our charge beginning again per procedure",
+    "errors": 0
+   }
+  },
+  "v_kaiju_roar_4": {
+   "id": "v_kaiju_roar_4",
+   "hash": "7b3606c89b67f02ecebc",
+   "spoken": "Let it scream. We are still here.",
+   "duration": 2.476,
+   "speech": [
+    0.09,
+    2.316
+   ],
+   "words": 7,
+   "f0_median_hz": 192.8,
+   "raw": {
+    "hyp": "let the screen we're still here",
+    "errors": 4
+   },
+   "processed": {
+    "hyp": "like if screen we're still here",
+    "errors": 5
+   },
+   "raw2": {
+    "hyp": "let it scream we are still here",
+    "errors": 0
+   }
+  },
+  "v_kaiju_roar_5": {
+   "id": "v_kaiju_roar_5",
+   "hash": "34656757438fd741c1cb",
+   "spoken": "The creature has issued a statement. No translation is available.",
+   "duration": 4.167,
+   "speech": [
+    0.04,
+    4.077
+   ],
+   "words": 10,
+   "f0_median_hz": 195.1,
+   "raw": {
+    "hyp": "creature has issued a statement no translation is available",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "the creature has issued a statement no translation is available",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "the creature has issued a statement no translation is available",
+    "errors": 0
+   }
+  },
+  "v_kaiju_roar_6": {
+   "id": "v_kaiju_roar_6",
+   "hash": "2fc257c62aad78754abf",
+   "spoken": "That sound was the creature. We apologize for the volume.",
+   "duration": 3.664,
+   "speech": [
+    0.04,
+    3.574
+   ],
+   "words": 10,
+   "f0_median_hz": 203.8,
+   "raw": {
+    "hyp": "that sound was the creature we apologize for the volume",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "that sound was the creature we apologize for the volume",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "that sound was the creature we apologize for the volume",
+    "errors": 0
+   }
+  },
+  "v_kaiju_roar_7": {
+   "id": "v_kaiju_roar_7",
+   "hash": "b64d31e5d92c3162bf93",
+   "spoken": "The creature has roared again. Windows are broken for several blocks.",
+   "duration": 4.191,
+   "speech": [
+    0.04,
+    4.101
+   ],
+   "words": 11,
+   "f0_median_hz": 193.9,
+   "raw": {
+    "hyp": "creature has roared again windows are broken for several blocks",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "the creature has roared again windows are broken for several blocks",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "the creature has roared again windows are broken for several blocks",
+    "errors": 0
+   }
+  },
+  "v_kaiju_roar_8": {
+   "id": "v_kaiju_roar_8",
+   "hash": "5835b0efbbc5bd3c6fc1",
+   "spoken": "Soldiers near the creature appear to be reconsidering their positions.",
+   "duration": 4.308,
+   "speech": [
+    0.04,
+    4.218
+   ],
+   "words": 10,
+   "f0_median_hz": 195.1,
+   "raw": {
+    "hyp": "soldiers near the creature appear to be reconsidering their possessions",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "soldiers near the creature appear to be reconsidering their possessions",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "soldiers near the creature appear to be reconsidering their positions",
+    "errors": 0
+   }
+  },
+  "v_kaiju_special_1": {
+   "id": "v_kaiju_special_1",
+   "hash": "dd387c27910e84a71515",
+   "spoken": "Get clear. It is charging.",
+   "duration": 2.211,
+   "speech": [
+    0.09,
+    2.051
+   ],
+   "words": 5,
+   "f0_median_hz": 105.6,
+   "raw": {
+    "hyp": "get clearer it is charging",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "get clear and is charging",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "get clear it is charging",
+    "errors": 0
+   }
+  },
+  "v_kaiju_special_2": {
+   "id": "v_kaiju_special_2",
+   "hash": "08510ab65d4ebf7e9c32",
+   "spoken": "Incoming. Get out of the way.",
+   "duration": 2.052,
+   "speech": [
+    0.09,
+    1.892
+   ],
+   "words": 6,
+   "f0_median_hz": 101.3,
+   "raw": {
+    "hyp": "incoming get out of the ways",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "incoming get out of the ways",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "incoming get out of the ways",
+    "errors": 1
+   }
+  },
+  "v_kaiju_special_3": {
+   "id": "v_kaiju_special_3",
+   "hash": "fc060034dcea135d725a",
+   "spoken": "The creature is preparing something. Officials advise distance.",
+   "duration": 4.116,
+   "speech": [
+    0.04,
+    4.026
+   ],
+   "words": 8,
+   "f0_median_hz": 200.0,
+   "raw": {
+    "hyp": "the creature is preparing something officials advise distance",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "the creature is preparing something officials advise distance",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "the creature is preparing something officials advise distance",
+    "errors": 0
+   }
+  },
+  "v_kaiju_special_4": {
+   "id": "v_kaiju_special_4",
+   "hash": "cf9d4be415e2ab645747",
+   "spoken": "We are told this is not normal behavior for any animal.",
+   "duration": 3.742,
+   "speech": [
+    0.04,
+    3.652
+   ],
+   "words": 11,
+   "f0_median_hz": 197.5,
+   "raw": {
+    "hyp": "we're told this is not normal behavior for any animal",
+    "errors": 2
+   },
+   "processed": {
+    "hyp": "we're told this is not normal behavior for any animal",
+    "errors": 2
+   },
+   "raw2": {
+    "hyp": "we are told this is not normal behavior for any animal",
+    "errors": 0
+   }
+  },
+  "v_kaiju_special_5": {
+   "id": "v_kaiju_special_5",
+   "hash": "d812921d271266c50da1",
+   "spoken": "Take cover. That is procedure.",
+   "duration": 1.842,
+   "speech": [
+    0.09,
+    1.682
+   ],
+   "words": 5,
+   "f0_median_hz": 173.9,
+   "raw": {
+    "hyp": "he covered that is procedure",
+    "errors": 2
+   },
+   "processed": {
+    "hyp": "take cover and that is procedure",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "take cover that is procedure",
+    "errors": 0
+   }
+  },
+  "v_kaiju_special_6": {
+   "id": "v_kaiju_special_6",
+   "hash": "406a3620ab08babb2e53",
+   "spoken": "Away from it. All of you.",
+   "duration": 1.845,
+   "speech": [
+    0.09,
+    1.685
+   ],
+   "words": 6,
+   "f0_median_hz": 201.3,
+   "raw": {
+    "hyp": "we from it all if he",
+    "errors": 3
+   },
+   "processed": {
+    "hyp": "away from it all of you",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "away from it all of you",
+    "errors": 0
+   }
+  },
+  "v_kaiju_special_7": {
+   "id": "v_kaiju_special_7",
+   "hash": "9d110e3004979b113ee1",
+   "spoken": "Viewers near the creature should consider being somewhere else.",
+   "duration": 3.25,
+   "speech": [
+    0.04,
+    3.16
+   ],
+   "words": 9,
+   "f0_median_hz": 195.1,
+   "raw": {
+    "hyp": "viewers near the creature should consider being somewhere else",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "viewers near the creature should consider being somewhere else",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "viewers near the creature should consider being somewhere else",
+    "errors": 0
+   }
+  },
+  "v_building_down_1": {
+   "id": "v_building_down_1",
+   "hash": "4da2bcd1096cb779e083",
+   "spoken": "Building down. That one counts against us.",
+   "duration": 3.245,
+   "speech": [
+    0.09,
+    3.085
+   ],
+   "words": 7,
+   "f0_median_hz": 94.4,
+   "raw": {
+    "hyp": "building down by one counts against us",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "building down by one counts against us",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "building down that one counts against us",
+    "errors": 0
+   }
+  },
+  "v_building_down_2": {
+   "id": "v_building_down_2",
+   "hash": "5073b8f3f52bad7ed819",
+   "spoken": "Another one down. The skyline is getting shorter.",
+   "duration": 3.242,
+   "speech": [
+    0.09,
+    3.082
+   ],
+   "words": 8,
+   "f0_median_hz": 115.1,
+   "raw": {
+    "hyp": "another one down the skyline is getting shorter",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "another one down the skyline is getting shorter",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "another one down the skyline is getting shorter",
+    "errors": 0
+   }
+  },
+  "v_building_down_3": {
+   "id": "v_building_down_3",
+   "hash": "1b2ff39a1ee38149702c",
+   "spoken": "Structure lost. Logging the address for the report.",
+   "duration": 3.217,
+   "speech": [
+    0.09,
+    3.057
+   ],
+   "words": 8,
+   "f0_median_hz": 166.7,
+   "raw": {
+    "hyp": "structure lost logging a dress for the report",
+    "errors": 2
+   },
+   "processed": {
+    "hyp": "structure lost blocking the address for the report",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "structure lost logging the address for the report",
+    "errors": 0
+   }
+  },
+  "v_building_down_4": {
+   "id": "v_building_down_4",
+   "hash": "3c618774607b858acf29",
+   "spoken": "Another building gone. I will remember it.",
+   "duration": 2.75,
+   "speech": [
+    0.09,
+    2.59
+   ],
+   "words": 7,
+   "f0_median_hz": 197.5,
+   "raw": {
+    "hyp": "another building gone i will remember it",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "another building go on i will remember it",
+    "errors": 2
+   },
+   "raw2": {
+    "hyp": "another building gone i will remember it",
+    "errors": 0
+   }
+  },
+  "v_building_down_5": {
+   "id": "v_building_down_5",
+   "hash": "7807ca685c3b6021ec98",
+   "spoken": "Another structure is down. Residents should make other arrangements.",
+   "duration": 4.06,
+   "speech": [
+    0.04,
+    3.97
+   ],
+   "words": 9,
+   "f0_median_hz": 207.8,
+   "raw": {
+    "hyp": "another structure is down residence should make other arrangements",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "another structure is down residence should make other arrangements",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "another structure is down residents should make other arrangements",
+    "errors": 0
+   }
+  },
+  "v_building_down_6": {
+   "id": "v_building_down_6",
+   "hash": "5ae31af1882562aa0b00",
+   "spoken": "That building has collapsed. It was recently renovated.",
+   "duration": 3.482,
+   "speech": [
+    0.04,
+    3.392
+   ],
+   "words": 8,
+   "f0_median_hz": 202.5,
+   "raw": {
+    "hyp": "that building has collapsed he was recently renovated",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "that building has collapsed he was recently renovated",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "that building has collapsed it was recently renovated",
+    "errors": 0
+   }
+  },
+  "v_building_down_7": {
+   "id": "v_building_down_7",
+   "hash": "fd1d246ad98dda1b678e",
+   "spoken": "One more building has left the skyline.",
+   "duration": 2.328,
+   "speech": [
+    0.04,
+    2.238
+   ],
+   "words": 7,
+   "f0_median_hz": 206.5,
+   "raw": {
+    "hyp": "one more building has left the skyline",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "one more building has left the skyline",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "one more building has left the skyline",
+    "errors": 0
+   }
+  },
+  "v_building_down_8": {
+   "id": "v_building_down_8",
+   "hash": "d0da81e53180a10ad292",
+   "spoken": "Another building is down. Insurance offices report heavy call volume.",
+   "duration": 4.692,
+   "speech": [
+    0.04,
+    4.602
+   ],
+   "words": 10,
+   "f0_median_hz": 202.5,
+   "raw": {
+    "hyp": "another building is down insurance offices report heavy call volume",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "another building is down insurance offices report heavy call volume",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "another building is down insurance offices report heavy call volume",
+    "errors": 0
+   }
+  },
+  "v_landmark_down_1": {
+   "id": "v_landmark_down_1",
+   "hash": "7426c25ba128faa472e7",
+   "spoken": "We just lost a landmark. The mayor will want names.",
+   "duration": 3.695,
+   "speech": [
+    0.09,
+    3.535
+   ],
+   "words": 10,
+   "f0_median_hz": 91.4,
+   "raw": {
+    "hyp": "we just lost the landmark the mayor will want names",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "we just lost the landmark the mayor will want names",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "we just lost a landmark the mayor will want names",
+    "errors": 0
+   }
+  },
+  "v_landmark_down_2": {
+   "id": "v_landmark_down_2",
+   "hash": "6745d20c4ef115aa2eb2",
+   "spoken": "Landmark destroyed. That one was on the postcards.",
+   "duration": 3.223,
+   "speech": [
+    0.09,
+    3.063
+   ],
+   "words": 8,
+   "f0_median_hz": 172.0,
+   "raw": {
+    "hyp": "landmark destroyed that was on the postcards",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "landmark destroyed that one was on the postcards",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "landmark destroyed that one was on the postcards",
+    "errors": 0
+   }
+  },
+  "v_landmark_down_3": {
+   "id": "v_landmark_down_3",
+   "hash": "2d39d1a66898a14047c5",
+   "spoken": "That stood for a hundred years. Remember it.",
+   "duration": 2.743,
+   "speech": [
+    0.09,
+    2.583
+   ],
+   "words": 8,
+   "f0_median_hz": 205.1,
+   "raw": {
+    "hyp": "apps to try hundred years remember it",
+    "errors": 4
+   },
+   "processed": {
+    "hyp": "up to two hundred years to remember it",
+    "errors": 5
+   },
+   "raw2": {
+    "hyp": "that stood for a hundred years remember it",
+    "errors": 0
+   }
+  },
+  "v_landmark_down_4": {
+   "id": "v_landmark_down_4",
+   "hash": "2cc8be6c3a828d322796",
+   "spoken": "A city landmark has been destroyed. Tours are canceled until further notice.",
+   "duration": 4.84,
+   "speech": [
+    0.04,
+    4.75
+   ],
+   "words": 12,
+   "f0_median_hz": 198.8,
+   "raw": {
+    "hyp": "city landmark has been destroyed two or canceled until further notice",
+    "errors": 3
+   },
+   "processed": {
+    "hyp": "the city landmark has been destroyed two or canceled until further notice",
+    "errors": 3
+   },
+   "raw2": {
+    "hyp": "a city landmark has been destroyed tour are cancelled until further notice",
+    "errors": 2
+   }
+  },
+  "v_landmark_down_5": {
+   "id": "v_landmark_down_5",
+   "hash": "b7da41ebda75d4742e81",
+   "spoken": "We have lost a landmark. It appears on our station logo.",
+   "duration": 3.779,
+   "speech": [
+    0.04,
+    3.689
+   ],
+   "words": 11,
+   "f0_median_hz": 200.0,
+   "raw": {
+    "hyp": "we have lost a landmark it appears on our station logo",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "we have lost a landmark it appears on our station logo",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "we have lost a landmark it appears on our station logo",
+    "errors": 0
+   }
+  },
+  "v_landmark_down_6": {
+   "id": "v_landmark_down_6",
+   "hash": "2a2f59bf19231d34f22a",
+   "spoken": "A beloved landmark is gone. The gift shop did not survive.",
+   "duration": 3.965,
+   "speech": [
+    0.04,
+    3.875
+   ],
+   "words": 11,
+   "f0_median_hz": 192.8,
+   "raw": {
+    "hyp": "the lavatory and mark is gone the gift shop did not survive",
+    "errors": 4
+   },
+   "processed": {
+    "hyp": "a beloved landmark is gone the gift shop did not survive",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "a beloved landmark is gone the gift shop did not survive",
+    "errors": 0
+   }
+  },
+  "v_collateral_human_1": {
+   "id": "v_collateral_human_1",
+   "hash": "543e6c09f08d873f9bae",
+   "spoken": "That shot was ours. That is three forms and a hearing.",
+   "duration": 3.751,
+   "speech": [
+    0.09,
+    3.591
+   ],
+   "words": 11,
+   "f0_median_hz": 90.9,
+   "raw": {
+    "hyp": "that shot was ours that is three forms and hearing",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "that show was ours that is three forms and hearing",
+    "errors": 2
+   },
+   "raw2": {
+    "hyp": "that shot was ours that is three forms and a hearing",
+    "errors": 0
+   }
+  },
+  "v_collateral_human_2": {
+   "id": "v_collateral_human_2",
+   "hash": "b75dafbec6b7c2e941e3",
+   "spoken": "We are doing its work for it. Check your backstop.",
+   "duration": 3.443,
+   "speech": [
+    0.09,
+    3.283
+   ],
+   "words": 10,
+   "f0_median_hz": 102.6,
+   "raw": {
+    "hyp": "we're doing it's work for it check your backstop",
+    "errors": 3
+   },
+   "processed": {
+    "hyp": "we're doing it's work for and check your backstop",
+    "errors": 4
+   },
+   "raw2": {
+    "hyp": "we are doing its work for it check your backstop",
+    "errors": 0
+   }
+  },
+  "v_collateral_human_3": {
+   "id": "v_collateral_human_3",
+   "hash": "0e2683aee3b4e66a8a19",
+   "spoken": "That one was ours. I will sign for it.",
+   "duration": 2.614,
+   "speech": [
+    0.09,
+    2.454
+   ],
+   "words": 9,
+   "f0_median_hz": 113.5,
+   "raw": {
+    "hyp": "that one was an hour's i will sign for it",
+    "errors": 2
+   },
+   "processed": {
+    "hyp": "that one was ours i will sign for it",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "that one was ours i will sign for it",
+    "errors": 0
+   }
+  },
+  "v_collateral_human_4": {
+   "id": "v_collateral_human_4",
+   "hash": "423d47e623d20c72c073",
+   "spoken": "We struck a building. I am required to report it. Reporting.",
+   "duration": 3.78,
+   "speech": [
+    0.09,
+    3.62
+   ],
+   "words": 11,
+   "f0_median_hz": 166.7,
+   "raw": {
+    "hyp": "we struck the building i am required to report it reporting",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "we struck the building i am required to report it reporting",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "we struck a building i am required to report it reporting",
+    "errors": 0
+   }
+  },
+  "v_collateral_human_5": {
+   "id": "v_collateral_human_5",
+   "hash": "f9ce5597a06631797929",
+   "spoken": "My shot. My building. It will not happen again.",
+   "duration": 3.718,
+   "speech": [
+    0.09,
+    3.558
+   ],
+   "words": 9,
+   "f0_median_hz": 202.5,
+   "raw": {
+    "hyp": "my shalt my building it to melt happen again",
+    "errors": 3
+   },
+   "processed": {
+    "hyp": "my shelf at my building a tool not happen again",
+    "errors": 4
+   },
+   "raw2": {
+    "hyp": "my shot my building it will not happen again",
+    "errors": 0
+   }
+  },
+  "v_collateral_human_6": {
+   "id": "v_collateral_human_6",
+   "hash": "71eede82dae7cdde5b11",
+   "spoken": "That damage was caused by the army. Officials declined to comment.",
+   "duration": 4.405,
+   "speech": [
+    0.04,
+    4.315
+   ],
+   "words": 11,
+   "f0_median_hz": 197.5,
+   "raw": {
+    "hyp": "that damage was caused by the army officials declined to comment",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "that damage was caused by the army officials declined to comment",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "that damage was caused by the army officials declined to comment",
+    "errors": 0
+   }
+  },
+  "v_collateral_human_7": {
+   "id": "v_collateral_human_7",
+   "hash": "63b55218fd35d3290ac7",
+   "spoken": "A stray army shot has struck a building. An inquiry is expected.",
+   "duration": 4.409,
+   "speech": [
+    0.04,
+    4.319
+   ],
+   "words": 12,
+   "f0_median_hz": 192.8,
+   "raw": {
+    "hyp": "stray army shot has struck the building an inquiry is expected",
+    "errors": 2
+   },
+   "processed": {
+    "hyp": "a stray army shot has struck the building an inquiry is expected",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "a stray army shot has struck a building an inquiry is expected",
+    "errors": 0
+   }
+  },
+  "v_collateral_human_8": {
+   "id": "v_collateral_human_8",
+   "hash": "09c19cacb21967c959f5",
+   "spoken": "The army has now hit the city it is defending.",
+   "duration": 2.982,
+   "speech": [
+    0.04,
+    2.892
+   ],
+   "words": 10,
+   "f0_median_hz": 193.9,
+   "raw": {
+    "hyp": "the army has now hit the city it is defending",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "the army has now hit the city it is defending",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "the army has now hit the city it is defending",
+    "errors": 0
+   }
+  },
+  "v_collateral_human_9": {
+   "id": "v_collateral_human_9",
+   "hash": "e93b53c9299f4308c68b",
+   "spoken": "Viewers should note the creature did not do that one.",
+   "duration": 2.822,
+   "speech": [
+    0.04,
+    2.732
+   ],
+   "words": 10,
+   "f0_median_hz": 188.2,
+   "raw": {
+    "hyp": "viewers should know the creature did not do that one",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "viewers should know the creature did not do that one",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "viewers should note the creature did not do that one",
+    "errors": 0
+   }
+  },
+  "v_collateral_human_10": {
+   "id": "v_collateral_human_10",
+   "hash": "167f16ecedb58c9e2ce4",
+   "spoken": "My mistake. Building is gone.",
+   "duration": 2.377,
+   "speech": [
+    0.09,
+    2.217
+   ],
+   "words": 5,
+   "f0_median_hz": 120.8,
    "raw": {
     "hyp": "my mistake building is gone",
     "errors": 0
    },
    "processed": {
+    "hyp": "my mistake of building is gone",
+    "errors": 1
+   },
+   "raw2": {
     "hyp": "my mistake building is gone",
     "errors": 0
    }
   },
   "v_collateral_human_11": {
    "id": "v_collateral_human_11",
-   "hash": "5afb85ec88222623b8ea",
+   "hash": "c60b41e851faed073608",
    "spoken": "We have damaged the city. I am starting the paperwork.",
-   "duration": 3.49,
+   "duration": 3.348,
    "speech": [
     0.09,
-    3.33
+    3.188
    ],
    "words": 10,
-   "f0_median_hz": 188.2,
+   "f0_median_hz": 168.4,
    "raw": {
-    "hyp": "we have damaged the city i am starting the paperwork",
-    "errors": 0
+    "hyp": "we have damaged the city i'm starting the paperwork",
+    "errors": 2
    },
    "processed": {
+    "hyp": "we have damaged the city i'm starting the paperwork",
+    "errors": 2
+   },
+   "raw2": {
     "hyp": "we have damaged the city i am starting the paperwork",
     "errors": 0
    }
   },
   "v_collateral_human_12": {
    "id": "v_collateral_human_12",
-   "hash": "9b79977beaa9db21419c",
+   "hash": "f3881a16ad6aed5d4b29",
    "spoken": "I missed, and the city paid.",
-   "duration": 2.09,
+   "duration": 1.871,
    "speech": [
     0.09,
-    1.93
+    1.711
    ],
    "words": 6,
-   "f0_median_hz": 139.1,
+   "f0_median_hz": 219.2,
    "raw": {
     "hyp": "i missed and the city paid",
     "errors": 0
    },
    "processed": {
+    "hyp": "i made it and that he paid",
+    "errors": 4
+   },
+   "raw2": {
     "hyp": "i missed and the city paid",
     "errors": 0
    }
   },
   "v_unit_lost_1": {
    "id": "v_unit_lost_1",
-   "hash": "6c0d7eda64a7f07dab92",
+   "hash": "c5235270b8c125a8c5e4",
    "spoken": "We have lost a unit. Fill the gap and keep firing.",
-   "duration": 3.755,
+   "duration": 3.709,
    "speech": [
     0.09,
-    3.595
+    3.549
    ],
    "words": 11,
-   "f0_median_hz": 92.0,
+   "f0_median_hz": 98.2,
    "raw": {
-    "hyp": "we have lost all units fill the gap and keep firing",
-    "errors": 2
+    "hyp": "we lost a unit fill the gap and keep firing",
+    "errors": 1
    },
    "processed": {
+    "hyp": "we lost the unit fill the gap and keep firing",
+    "errors": 2
+   },
+   "raw2": {
     "hyp": "we have lost a unit fill the gap and keep firing",
     "errors": 0
    }
   },
   "v_unit_lost_2": {
    "id": "v_unit_lost_2",
-   "hash": "00ae4ee8b26a68838e8d",
+   "hash": "fc1126cac3afafb1f3d2",
    "spoken": "Unit down. They did their part.",
-   "duration": 2.155,
+   "duration": 2.321,
    "speech": [
     0.09,
-    1.995
+    2.161
    ],
    "words": 6,
-   "f0_median_hz": 106.3,
+   "f0_median_hz": 122.1,
    "raw": {
-    "hyp": "unit down they did their part",
-    "errors": 0
+    "hyp": "unit down they did their parts",
+    "errors": 1
    },
    "processed": {
-    "hyp": "the unit down they did their part",
+    "hyp": "unit down they did their parts",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "unit down they did their parts",
     "errors": 1
    }
   },
   "v_unit_lost_3": {
    "id": "v_unit_lost_3",
-   "hash": "79a083269f7a08eb8107",
+   "hash": "4cf5c480a5f6a11c41a8",
    "spoken": "We have lost a unit. The time has been noted.",
-   "duration": 3.033,
+   "duration": 3.079,
    "speech": [
     0.09,
-    2.873
+    2.919
    ],
    "words": 10,
-   "f0_median_hz": 186.0,
+   "f0_median_hz": 173.9,
    "raw": {
     "hyp": "we have lost a unit the time has been noted",
     "errors": 0
    },
    "processed": {
-    "hyp": "we have lost a unit that time has been noted",
-    "errors": 1
+    "hyp": "we have lost a unit the time has been noted",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "we have lost a unit the time has been noted",
+    "errors": 0
    }
   },
   "v_unit_lost_4": {
    "id": "v_unit_lost_4",
-   "hash": "f0803b320ed0597d1d25",
+   "hash": "d3088671651fcc7ac65f",
    "spoken": "It took one of ours. Remember that when you fire.",
-   "duration": 3.355,
+   "duration": 3.056,
    "speech": [
     0.09,
-    3.195
+    2.896
    ],
    "words": 10,
-   "f0_median_hz": 137.9,
+   "f0_median_hz": 202.5,
    "raw": {
-    "hyp": "it took one of ours remember that when you file",
-    "errors": 1
+    "hyp": "it took one of ours remember that when you fire",
+    "errors": 0
    },
    "processed": {
-    "hyp": "it took one of ours remember that when you fly",
+    "hyp": "it took one of earth's remember that when you fire",
     "errors": 1
+   },
+   "raw2": {
+    "hyp": "it took one of ours remember that when you fire",
+    "errors": 0
    }
   },
   "v_unit_lost_5": {
    "id": "v_unit_lost_5",
-   "hash": "75ac6de88e65d64b0949",
+   "hash": "a04304a14b59040fa1b2",
    "spoken": "An army unit has been lost to the creature.",
-   "duration": 2.749,
+   "duration": 2.787,
    "speech": [
     0.04,
-    2.659
+    2.697
    ],
    "words": 9,
-   "f0_median_hz": 177.8,
+   "f0_median_hz": 200.0,
    "raw": {
     "hyp": "an army unit has been lost to the creature",
     "errors": 0
    },
    "processed": {
+    "hyp": "an army unit has been lost to the creature",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "an army unit has been lost to the creature",
     "errors": 0
    }
   },
   "v_unit_lost_6": {
    "id": "v_unit_lost_6",
-   "hash": "51da277505e5d22a9ada",
+   "hash": "57fb9dfbdc2240435cbf",
    "spoken": "The creature has destroyed an army unit. Its soldiers escaped, we understand.",
-   "duration": 5.149,
+   "duration": 5.013,
    "speech": [
     0.04,
-    5.059
+    4.923
    ],
    "words": 12,
-   "f0_median_hz": 173.9,
+   "f0_median_hz": 207.8,
    "raw": {
+    "hyp": "the creature has destroyed and armenian at its soldiers escaped we understand",
+    "errors": 3
+   },
+   "processed": {
     "hyp": "the creature has destroyed an army unit its soldiers escaped we understand",
     "errors": 0
    },
-   "processed": {
+   "raw2": {
     "hyp": "the creature has destroyed an army unit its soldiers escaped we understand",
     "errors": 0
    }
   },
   "v_unit_lost_7": {
    "id": "v_unit_lost_7",
-   "hash": "c928f05c268924e63131",
+   "hash": "52fdf8b5d9abc614eb86",
    "spoken": "Another army unit is out of action. The creature moves on.",
-   "duration": 3.882,
+   "duration": 3.831,
    "speech": [
     0.04,
-    3.792
+    3.741
    ],
    "words": 11,
-   "f0_median_hz": 173.9,
+   "f0_median_hz": 200.0,
    "raw": {
     "hyp": "another army unit is out of action the creature moves on",
     "errors": 0
    },
    "processed": {
+    "hyp": "another army unit is out of action the creature moves on",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "another army unit is out of action the creature moves on",
     "errors": 0
    }
   },
   "v_unit_lost_8": {
    "id": "v_unit_lost_8",
-   "hash": "8e57ec9ac007621c59d6",
+   "hash": "edbfee1483003d07db4f",
    "spoken": "The army has one unit fewer. The creature has not slowed.",
-   "duration": 3.844,
+   "duration": 3.788,
    "speech": [
     0.04,
-    3.754
+    3.698
    ],
    "words": 11,
-   "f0_median_hz": 177.8,
+   "f0_median_hz": 207.8,
    "raw": {
     "hyp": "the army has one unit fewer the creature has not slowed",
     "errors": 0
    },
    "processed": {
+    "hyp": "the army has one unit fewer the creature has not slowed",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "the army has one unit fewer the creature has not slowed",
     "errors": 0
    }
   },
   "v_unit_lost_9": {
    "id": "v_unit_lost_9",
-   "hash": "d88523d1b0ee4a55cd5c",
+   "hash": "54f52f9ea45cf02cbba3",
    "spoken": "Unit down. Hold your ground.",
-   "duration": 2.426,
+   "duration": 2.65,
    "speech": [
     0.09,
-    2.266
+    2.49
    ],
    "words": 5,
-   "f0_median_hz": 93.0,
+   "f0_median_hz": 94.1,
    "raw": {
-    "hyp": "unit down hold your ground",
-    "errors": 0
+    "hyp": "unit to our own hold your ground",
+    "errors": 3
    },
    "processed": {
+    "hyp": "unit down holder ground",
+    "errors": 2
+   },
+   "raw2": {
     "hyp": "unit down hold your ground",
     "errors": 0
    }
   },
   "v_unit_lost_10": {
    "id": "v_unit_lost_10",
-   "hash": "5de04da91bbc05187151",
+   "hash": "6c9fd28ebd6598c796c7",
    "spoken": "One down. Not the first time.",
-   "duration": 2.291,
+   "duration": 2.245,
    "speech": [
     0.09,
-    2.131
+    2.085
    ],
    "words": 6,
-   "f0_median_hz": 108.8,
+   "f0_median_hz": 115.1,
    "raw": {
     "hyp": "one down not the first time",
     "errors": 0
    },
    "processed": {
+    "hyp": "one down not the first time",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "one down not the first time",
     "errors": 0
    }
   },
   "v_unit_lost_11": {
    "id": "v_unit_lost_11",
-   "hash": "76c6de89fe0106094e58",
+   "hash": "64585b6802c703c66fc7",
    "spoken": "Casualty report filed. We remain in the fight.",
-   "duration": 3.471,
+   "duration": 3.256,
    "speech": [
     0.09,
-    3.311
+    3.096
    ],
    "words": 8,
-   "f0_median_hz": 188.2,
+   "f0_median_hz": 163.3,
    "raw": {
-    "hyp": "casualty reports filed we remain in the fight",
-    "errors": 1
+    "hyp": "casualty reports filed we remain in the fights",
+    "errors": 2
    },
    "processed": {
-    "hyp": "casualty reports filed we remain in the fight",
-    "errors": 1
+    "hyp": "casualty reports filed we remain in the fights",
+    "errors": 2
+   },
+   "raw2": {
+    "hyp": "casualty report filed we remain in the fight",
+    "errors": 0
    }
   },
   "v_unit_lost_12": {
    "id": "v_unit_lost_12",
-   "hash": "3537f8cc2b1ce17389fc",
+   "hash": "b2d85cf98199b222b653",
    "spoken": "It took another. I am still counting.",
-   "duration": 2.745,
+   "duration": 2.478,
    "speech": [
     0.09,
-    2.585
+    2.318
    ],
    "words": 7,
-   "f0_median_hz": 139.1,
+   "f0_median_hz": 200.0,
    "raw": {
-    "hyp": "it took another i am still counting",
-    "errors": 0
+    "hyp": "it took another i am still painting",
+    "errors": 1
    },
    "processed": {
+    "hyp": "it took another i am still painting",
+    "errors": 1
+   },
+   "raw2": {
     "hyp": "it took another i am still counting",
     "errors": 0
    }
   },
   "v_squad_wiped_1": {
    "id": "v_squad_wiped_1",
-   "hash": "2fec354cc34f54a26a01",
+   "hash": "910531e1879b6b7f9e33",
    "spoken": "A full squad is gone. The rest of you, hold the line.",
-   "duration": 4.101,
+   "duration": 3.81,
    "speech": [
     0.09,
-    3.941
+    3.65
    ],
    "words": 12,
-   "f0_median_hz": 90.4,
+   "f0_median_hz": 90.9,
    "raw": {
-    "hyp": "a full squad is gone the rest of you hold the line",
-    "errors": 0
+    "hyp": "full squad is gone the rest of you hold the line",
+    "errors": 1
    },
    "processed": {
+    "hyp": "the full squad is gone the rest of you hold the line",
+    "errors": 1
+   },
+   "raw2": {
     "hyp": "a full squad is gone the rest of you hold the line",
     "errors": 0
    }
   },
   "v_squad_wiped_2": {
    "id": "v_squad_wiped_2",
-   "hash": "6dbdeac88bf838957444",
+   "hash": "6fb36e359658c8d5ffae",
    "spoken": "Whole squad off the air. Fewer of you now.",
-   "duration": 3.167,
+   "duration": 3.366,
    "speech": [
     0.09,
-    3.007
+    3.206
    ],
    "words": 9,
-   "f0_median_hz": 92.5,
+   "f0_median_hz": 92.0,
    "raw": {
-    "hyp": "full squad off the air fewer of you now",
-    "errors": 1
+    "hyp": "whole squad off the air or fewer of you know",
+    "errors": 2
    },
    "processed": {
-    "hyp": "full squad off the air fewer of you now",
-    "errors": 1
+    "hyp": "whole squad of the year fewer of you know",
+    "errors": 3
+   },
+   "raw2": {
+    "hyp": "whole squad off the air fewer of you now",
+    "errors": 0
    }
   },
   "v_squad_wiped_3": {
    "id": "v_squad_wiped_3",
-   "hash": "ebfbe057ea76f119ec53",
+   "hash": "e994ab5b8130abf78e86",
    "spoken": "An entire army squad has been put out of action.",
-   "duration": 3.125,
+   "duration": 3.215,
    "speech": [
     0.04,
-    3.035
+    3.125
    ],
    "words": 10,
-   "f0_median_hz": 177.8,
+   "f0_median_hz": 205.1,
    "raw": {
     "hyp": "an entire army squad has been put out of action",
     "errors": 0
    },
    "processed": {
+    "hyp": "an entire army squad has been put out of action",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "an entire army squad has been put out of action",
     "errors": 0
    }
   },
   "v_squad_wiped_4": {
    "id": "v_squad_wiped_4",
-   "hash": "d7364cfd8ad17414ae2d",
+   "hash": "0d905bef638dbfd9d5f1",
    "spoken": "One squad is gone. Its commander has joined our camera team.",
-   "duration": 4.142,
+   "duration": 4.118,
    "speech": [
     0.04,
-    4.052
+    4.028
    ],
    "words": 11,
-   "f0_median_hz": 173.9,
+   "f0_median_hz": 202.5,
    "raw": {
     "hyp": "one squad is gone it's commander has joined our camera team",
     "errors": 1
    },
    "processed": {
-    "hyp": "once glad is don it's commander has joined our camera team",
-    "errors": 4
+    "hyp": "one squad is gone it's commander has joined our camera team",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "one squad is gone its commander has joined our camera team",
+    "errors": 0
    }
   },
   "v_squad_wiped_5": {
    "id": "v_squad_wiped_5",
-   "hash": "46f02da8151ad726cfbd",
+   "hash": "46c37571b3c00ae651ac",
    "spoken": "That squad is gone. Their sector is yours now.",
-   "duration": 3.407,
+   "duration": 3.601,
    "speech": [
     0.09,
-    3.247
+    3.441
    ],
    "words": 9,
-   "f0_median_hz": 89.4,
+   "f0_median_hz": 88.4,
    "raw": {
     "hyp": "that squad is gone there sector is yours now",
     "errors": 1
@@ -3078,619 +3690,743 @@
    "processed": {
     "hyp": "that squad is gone there sector is yours now",
     "errors": 1
+   },
+   "raw2": {
+    "hyp": "that squad is gone their sector is yours now",
+    "errors": 0
    }
   },
   "v_player_takeover_1": {
    "id": "v_player_takeover_1",
-   "hash": "2a171ab74ed3cb26f451",
+   "hash": "b41bcb510ad35634478c",
    "spoken": "Squad leader is down. Next in line, you have command.",
-   "duration": 4.182,
+   "duration": 3.876,
    "speech": [
     0.09,
-    4.022
+    3.716
    ],
    "words": 10,
-   "f0_median_hz": 93.0,
+   "f0_median_hz": 90.4,
    "raw": {
     "hyp": "squad leader is down next in line you have command",
     "errors": 0
    },
    "processed": {
+    "hyp": "squad leaders down next to him lying you have command",
+    "errors": 5
+   },
+   "raw2": {
     "hyp": "squad leader is down next in line you have command",
     "errors": 0
    }
   },
   "v_player_takeover_2": {
    "id": "v_player_takeover_2",
-   "hash": "96b86a8bb75f05e36a71",
+   "hash": "7c219938d66939b584d8",
    "spoken": "Lost our leader. Next in line takes over.",
-   "duration": 3.148,
+   "duration": 3.043,
    "speech": [
     0.09,
-    2.988
+    2.883
    ],
    "words": 8,
-   "f0_median_hz": 108.1,
+   "f0_median_hz": 111.9,
    "raw": {
     "hyp": "lost our leader next in line takes over",
     "errors": 0
    },
    "processed": {
+    "hyp": "lost our leader next in line takes over",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "lost our leader next in line takes over",
     "errors": 0
    }
   },
   "v_player_takeover_3": {
    "id": "v_player_takeover_3",
-   "hash": "9b7ee057263a34db811a",
+   "hash": "c512e3a5aa1f89dd5f1c",
    "spoken": "Command has passed down the line, as the manual directs.",
-   "duration": 3.285,
+   "duration": 3.683,
    "speech": [
     0.09,
-    3.125
+    3.523
    ],
    "words": 10,
-   "f0_median_hz": 177.8,
+   "f0_median_hz": 161.6,
    "raw": {
-    "hyp": "the man has passed down the line as the manual directs",
+    "hyp": "command has passed down the line as the manual to racks",
     "errors": 2
    },
    "processed": {
+    "hyp": "command has passed down the line as the manual directs",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "command has passed down the line as the manual directs",
     "errors": 0
    }
   },
   "v_player_takeover_4": {
    "id": "v_player_takeover_4",
-   "hash": "b91280fca35bac487f61",
+   "hash": "d29b6a0150b94b353e91",
    "spoken": "Command passes to the next unit. Carry on.",
-   "duration": 3.473,
+   "duration": 3.612,
    "speech": [
     0.09,
-    3.313
+    3.452
    ],
    "words": 8,
-   "f0_median_hz": 93.0,
+   "f0_median_hz": 90.4,
    "raw": {
-    "hyp": "command passes to the next unit carry on",
-    "errors": 0
+    "hyp": "amanda passes to the next unit carry on",
+    "errors": 1
    },
    "processed": {
+    "hyp": "commander passes to the next unit carry on",
+    "errors": 1
+   },
+   "raw2": {
     "hyp": "command passes to the next unit carry on",
     "errors": 0
    }
   },
   "v_molt_available_1": {
    "id": "v_molt_available_1",
-   "hash": "e33537caaf15297292e1",
+   "hash": "50e7251631c8e55c63c1",
    "spoken": "It has fed enough to grow. Watch for a cocoon.",
-   "duration": 3.64,
+   "duration": 3.523,
    "speech": [
     0.09,
-    3.48
+    3.363
    ],
    "words": 10,
-   "f0_median_hz": 88.9,
+   "f0_median_hz": 93.8,
    "raw": {
-    "hyp": "it has fed enough to grow watch for a cocoon",
-    "errors": 0
+    "hyp": "it is fed enough to grow watch for cocoon",
+    "errors": 2
    },
    "processed": {
+    "hyp": "it is fed enough to grow watch for cocoon",
+    "errors": 2
+   },
+   "raw2": {
     "hyp": "it has fed enough to grow watch for a cocoon",
     "errors": 0
    }
   },
   "v_molt_available_2": {
    "id": "v_molt_available_2",
-   "hash": "7952831284c0b8e58c7a",
+   "hash": "5296977c625bea359fa3",
    "spoken": "It is about to change. Do not let it rest.",
-   "duration": 3.31,
+   "duration": 2.91,
    "speech": [
     0.09,
-    3.15
+    2.75
    ],
    "words": 10,
-   "f0_median_hz": 139.1,
+   "f0_median_hz": 205.1,
    "raw": {
-    "hyp": "it is about to change do not let it rest",
-    "errors": 0
+    "hyp": "as a buyer to change to not let it rest",
+    "errors": 4
    },
    "processed": {
+    "hyp": "get her back to change to not laid to rest",
+    "errors": 6
+   },
+   "raw2": {
     "hyp": "it is about to change do not let it rest",
     "errors": 0
    }
   },
   "v_molt_available_3": {
    "id": "v_molt_available_3",
-   "hash": "1351f691f9d8b9a9898a",
+   "hash": "ec321ff63ac90f076dd8",
    "spoken": "Experts believe the creature is now ready to grow.",
-   "duration": 3.378,
+   "duration": 3.179,
    "speech": [
     0.04,
-    3.288
+    3.089
    ],
    "words": 9,
-   "f0_median_hz": 170.2,
+   "f0_median_hz": 200.0,
    "raw": {
-    "hyp": "experts believe the creature is now ready to go",
+    "hyp": "experts believe the creature is now ready to growl",
     "errors": 1
    },
    "processed": {
-    "hyp": "experts believe the creature is now ready to go",
+    "hyp": "experts believe the creature is now ready to growl",
     "errors": 1
+   },
+   "raw2": {
+    "hyp": "experts believe the creature is now ready to grow",
+    "errors": 0
    }
   },
   "v_molt_available_4": {
    "id": "v_molt_available_4",
-   "hash": "c936adb853169f885316",
+   "hash": "a32d43a63ce6ce4252d2",
    "spoken": "Scientists expect the creature to enter a cocoon at any moment.",
-   "duration": 3.918,
+   "duration": 3.844,
    "speech": [
     0.04,
-    3.828
+    3.754
    ],
    "words": 11,
-   "f0_median_hz": 173.9,
+   "f0_median_hz": 190.5,
    "raw": {
-    "hyp": "scientists expect the creature to enter a cocoon at any moment",
-    "errors": 0
+    "hyp": "scientists expect the creature to enter cocoon at any moment",
+    "errors": 1
    },
    "processed": {
+    "hyp": "scientists expect the creature to enter cocoon at any moment",
+    "errors": 1
+   },
+   "raw2": {
     "hyp": "scientists expect the creature to enter a cocoon at any moment",
     "errors": 0
    }
   },
   "v_cocoon_start_1": {
    "id": "v_cocoon_start_1",
-   "hash": "5564c7c3900e9d57a635",
+   "hash": "05d2bc1e12a21bffa629",
    "spoken": "It is in a cocoon. It is helpless. Find it.",
-   "duration": 3.52,
+   "duration": 3.376,
    "speech": [
     0.09,
-    3.361
+    3.216
    ],
    "words": 10,
-   "f0_median_hz": 93.3,
+   "f0_median_hz": 99.4,
    "raw": {
-    "hyp": "it is in a cocoon it is helpless find it",
-    "errors": 0
+    "hyp": "it is in a cocoon additional plus find it",
+    "errors": 3
    },
    "processed": {
+    "hyp": "it isn't a good crew mittens helpless find it",
+    "errors": 5
+   },
+   "raw2": {
     "hyp": "it is in a cocoon it is helpless find it",
     "errors": 0
    }
   },
   "v_cocoon_start_2": {
    "id": "v_cocoon_start_2",
-   "hash": "45bdd76ebbf09ff09555",
+   "hash": "c4489e7e2d38031e932c",
    "spoken": "Follow the heartbeat. We have ten seconds.",
-   "duration": 3.148,
+   "duration": 2.802,
    "speech": [
     0.09,
-    2.988
+    2.642
    ],
    "words": 7,
-   "f0_median_hz": 108.1,
+   "f0_median_hz": 121.2,
    "raw": {
     "hyp": "follow the heartbeat we have ten seconds",
     "errors": 0
    },
    "processed": {
+    "hyp": "follow the heartbeat we have ten seconds",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "follow the heartbeat we have ten seconds",
     "errors": 0
    }
   },
   "v_cocoon_start_3": {
    "id": "v_cocoon_start_3",
-   "hash": "cb80538fbf680005df88",
+   "hash": "632b3ec0674718e536df",
    "spoken": "A cocoon has formed around the creature. It is not moving.",
-   "duration": 3.764,
+   "duration": 3.621,
    "speech": [
     0.04,
-    3.674
+    3.531
    ],
    "words": 11,
-   "f0_median_hz": 173.9,
+   "f0_median_hz": 205.1,
    "raw": {
-    "hyp": "a cocoon has formed around the creature is not moving",
-    "errors": 1
+    "hyp": "cameron has formed around the creature is not moving",
+    "errors": 3
    },
    "processed": {
-    "hyp": "the cocoon has formed around the creature is not moving",
-    "errors": 2
+    "hyp": "cameron has formed around the creature is not moving",
+    "errors": 3
+   },
+   "raw2": {
+    "hyp": "a cocoon has formed around the creature it is not moving",
+    "errors": 0
    }
   },
   "v_cocoon_start_4": {
    "id": "v_cocoon_start_4",
-   "hash": "8314d2cc3acb907261e6",
+   "hash": "266923d6c496b7af0c52",
    "spoken": "The creature is resting. The army is not expected to allow it.",
-   "duration": 4.204,
+   "duration": 3.95,
    "speech": [
     0.04,
-    4.114
+    3.86
    ],
    "words": 12,
-   "f0_median_hz": 177.8,
+   "f0_median_hz": 205.1,
    "raw": {
     "hyp": "the creature is resting the army is not expected to allow it",
     "errors": 0
    },
    "processed": {
+    "hyp": "the creature is resting the army is not expected to allow it",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "the creature is resting the army is not expected to allow it",
     "errors": 0
    }
   },
   "v_molt_blast_1": {
    "id": "v_molt_blast_1",
-   "hash": "7186511ed777eac883be",
+   "hash": "b79259abdf676a7c511e",
    "spoken": "Blast wave. It is out and it is bigger. Fall back.",
-   "duration": 4.079,
+   "duration": 3.639,
    "speech": [
     0.09,
-    3.919
+    3.479
    ],
    "words": 11,
-   "f0_median_hz": 92.0,
+   "f0_median_hz": 93.0,
    "raw": {
-    "hyp": "last wave it is i'll bend it is bigger fall back",
-    "errors": 3
+    "hyp": "last wave is out in his bigger fall back",
+    "errors": 5
    },
    "processed": {
-    "hyp": "blast wave be dissolved and it is bigger fall back",
-    "errors": 3
+    "hyp": "blast wave is out and is bigger fall back",
+    "errors": 2
+   },
+   "raw2": {
+    "hyp": "blast wave it is out and it is bigger fall back",
+    "errors": 0
    }
   },
   "v_molt_blast_2": {
    "id": "v_molt_blast_2",
-   "hash": "b571de16ad6607574fb5",
+   "hash": "ddead2da90bd8212d5b9",
    "spoken": "The cocoon has opened. Target now exceeds all listed dimensions.",
-   "duration": 4.05,
+   "duration": 4.309,
    "speech": [
     0.09,
-    3.89
+    4.149
    ],
    "words": 10,
-   "f0_median_hz": 183.9,
+   "f0_median_hz": 163.3,
    "raw": {
-    "hyp": "the cocoon has opened target now exceeds all listed dimensions",
-    "errors": 0
+    "hyp": "a cocoon has opened target now exceeds all listed dimensions",
+    "errors": 1
    },
    "processed": {
-    "hyp": "that could come has opened target now exceeds all listed dimensions",
-    "errors": 3
+    "hyp": "the cocoon has opened target now exceeds all with the dimensions",
+    "errors": 2
+   },
+   "raw2": {
+    "hyp": "the cocoon has opened target now exceeds all listed dimensions",
+    "errors": 0
    }
   },
   "v_molt_blast_3": {
    "id": "v_molt_blast_3",
-   "hash": "4262c2683f37d6ab311c",
+   "hash": "7dcfb93c66883e6740ba",
    "spoken": "The cocoon has burst. The creature has emerged considerably larger.",
-   "duration": 4.238,
+   "duration": 4.336,
    "speech": [
     0.04,
-    4.148
+    4.246
    ],
    "words": 10,
-   "f0_median_hz": 173.9,
+   "f0_median_hz": 200.0,
    "raw": {
-    "hyp": "the cocoon has burst the creature has emerged considerably larger",
-    "errors": 0
+    "hyp": "they could clone has burst the creature has emerged considerably larger",
+    "errors": 3
    },
    "processed": {
-    "hyp": "the captain has burst the creature has emerged considerably larger",
-    "errors": 1
+    "hyp": "they could clone has burst the creature has emerged considerably larger",
+    "errors": 3
+   },
+   "raw2": {
+    "hyp": "the cocoon has burst the creature has emerged considerably larger",
+    "errors": 0
    }
   },
   "v_molt_blast_4": {
    "id": "v_molt_blast_4",
-   "hash": "97e3085263a92702e74b",
+   "hash": "d71191f56ca8ff232a64",
    "spoken": "A blast wave has cleared the area. The creature is out again.",
-   "duration": 3.955,
+   "duration": 3.837,
    "speech": [
     0.04,
-    3.865
+    3.747
    ],
    "words": 12,
-   "f0_median_hz": 174.9,
+   "f0_median_hz": 192.8,
    "raw": {
     "hyp": "a blast wave has cleared the area the creature is out again",
     "errors": 0
    },
    "processed": {
-    "hyp": "the blast wave has cleared the area the creature is out again",
-    "errors": 1
+    "hyp": "a blast wave has cleared the area the creature is out again",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "a blast wave has cleared the area the creature is out again",
+    "errors": 0
    }
   },
   "v_stage_2_1": {
    "id": "v_stage_2_1",
-   "hash": "fb6016a9074cf243a026",
+   "hash": "4b3570c20c02d0ba1d0b",
    "spoken": "It is the size of a building. Bring up the heavy units.",
-   "duration": 3.797,
+   "duration": 3.927,
    "speech": [
     0.09,
-    3.637
+    3.767
    ],
    "words": 12,
-   "f0_median_hz": 92.5,
+   "f0_median_hz": 96.4,
    "raw": {
-    "hyp": "it is the size of the building bring up the heavy units",
-    "errors": 1
+    "hyp": "it is the size of a building bring up the heavy units",
+    "errors": 0
    },
    "processed": {
-    "hyp": "it is the size of the building bring up a heavy units",
-    "errors": 2
+    "hyp": "it is the size of a building bring up a heavy units",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "it is the size of a building bring up the heavy units",
+    "errors": 0
    }
   },
   "v_stage_2_2": {
    "id": "v_stage_2_2",
-   "hash": "e5b24256b33d2818b058",
+   "hash": "cbcf4afd05e0d480a240",
    "spoken": "The district is the new line. All squads, redeploy.",
-   "duration": 4.215,
+   "duration": 3.963,
    "speech": [
     0.09,
-    4.055
+    3.803
    ],
    "words": 9,
-   "f0_median_hz": 87.9,
+   "f0_median_hz": 92.8,
    "raw": {
-    "hyp": "the district is the new line all squads redeployed",
-    "errors": 1
+    "hyp": "the district is the new line all squads redeploy",
+    "errors": 0
    },
    "processed": {
-    "hyp": "the district is the new line all squads redeployed",
-    "errors": 1
+    "hyp": "the district is the new line of all squads we deploy",
+    "errors": 3
+   },
+   "raw2": {
+    "hyp": "the district is the new line all squads redeploy",
+    "errors": 0
    }
   },
   "v_stage_2_3": {
    "id": "v_stage_2_3",
-   "hash": "84f73c829c0d321af22b",
+   "hash": "b634b9722323a6ab0112",
    "spoken": "The creature now stands as tall as a building. Traffic is affected.",
-   "duration": 4.448,
+   "duration": 4.204,
    "speech": [
     0.04,
-    4.358
+    4.114
    ],
    "words": 12,
-   "f0_median_hz": 172.0,
+   "f0_median_hz": 198.8,
    "raw": {
     "hyp": "the creature now stands as tall as a building traffic is affected",
     "errors": 0
    },
    "processed": {
+    "hyp": "the creature now stands as tall as a building traffic is affected",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "the creature now stands as tall as a building traffic is affected",
     "errors": 0
    }
   },
   "v_stage_2_4": {
    "id": "v_stage_2_4",
-   "hash": "02d18b79d4bafac7c91a",
+   "hash": "5f4615beac10677ab528",
    "spoken": "Good evening. The quarantine now covers the entire district.",
-   "duration": 4.081,
+   "duration": 4.008,
    "speech": [
     0.04,
-    3.991
+    3.918
    ],
    "words": 9,
-   "f0_median_hz": 172.0,
+   "f0_median_hz": 205.1,
    "raw": {
-    "hyp": "good evening the current team now covers the entire district",
-    "errors": 2
+    "hyp": "good evening the quarantine now covers the entire district",
+    "errors": 0
    },
    "processed": {
+    "hyp": "good evening the quarantine now covers the entire district",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "good evening the quarantine now covers the entire district",
     "errors": 0
    }
   },
   "v_stage_3_1": {
    "id": "v_stage_3_1",
-   "hash": "045cda38b987580c2abf",
+   "hash": "e055af298bacd89a0048",
    "spoken": "It is taller than the towers. The whole city is the battlefield.",
-   "duration": 4.327,
+   "duration": 4.262,
    "speech": [
     0.09,
-    4.167
+    4.102
    ],
    "words": 12,
-   "f0_median_hz": 92.0,
+   "f0_median_hz": 95.2,
    "raw": {
     "hyp": "it is taller than the towers the whole city is the battlefield",
     "errors": 0
    },
    "processed": {
+    "hyp": "it is taller than the towers the whole city is the battlefield",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "it is taller than the towers the whole city is the battlefield",
     "errors": 0
    }
   },
   "v_stage_3_2": {
    "id": "v_stage_3_2",
-   "hash": "bc4e607503a54c0470d5",
+   "hash": "bbdfa93ae33c8d669e1f",
    "spoken": "This is the last line. You have everything we have left.",
-   "duration": 4.088,
+   "duration": 3.913,
    "speech": [
     0.09,
-    3.928
+    3.753
    ],
    "words": 11,
-   "f0_median_hz": 90.9,
+   "f0_median_hz": 92.0,
    "raw": {
     "hyp": "this is the last line you have everything we have left",
     "errors": 0
    },
    "processed": {
+    "hyp": "this is the last line you have everything we have left",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "this is the last line you have everything we have left",
     "errors": 0
    }
   },
   "v_stage_3_3": {
    "id": "v_stage_3_3",
-   "hash": "c3abbab1afb43313837d",
+   "hash": "86fd2ed8ec4980da1679",
    "spoken": "The creature now stands taller than any building in the city.",
-   "duration": 3.425,
+   "duration": 3.498,
    "speech": [
     0.04,
-    3.335
+    3.408
    ],
    "words": 11,
-   "f0_median_hz": 173.9,
+   "f0_median_hz": 200.0,
    "raw": {
-    "hyp": "the creature now stands dollar than any building in the city",
-    "errors": 1
+    "hyp": "the creature now stands taller than any building in the city",
+    "errors": 0
    },
    "processed": {
+    "hyp": "the creature now stands taller than any building in the city",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "the creature now stands taller than any building in the city",
     "errors": 0
    }
   },
   "v_stage_3_4": {
    "id": "v_stage_3_4",
-   "hash": "48850e1f2b517a64c3c6",
+   "hash": "3b892f380f0f284f2e6d",
    "spoken": "Night has fallen. The creature is visible from every district.",
-   "duration": 4.046,
+   "duration": 3.924,
    "speech": [
     0.04,
-    3.956
+    3.834
    ],
    "words": 10,
-   "f0_median_hz": 173.9,
+   "f0_median_hz": 207.8,
    "raw": {
     "hyp": "night has fallen the creature is visible from every district",
     "errors": 0
    },
    "processed": {
+    "hyp": "night has fallen the creature is visible from every district",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "night has fallen the creature is visible from every district",
     "errors": 0
    }
   },
   "v_callin_inbound_1": {
    "id": "v_callin_inbound_1",
-   "hash": "0168221eef78078b5864",
+   "hash": "70b116626e4299b6c20d",
    "spoken": "Strike inbound. Keep it at the marker.",
-   "duration": 2.926,
+   "duration": 3.107,
    "speech": [
     0.09,
-    2.766
+    2.947
    ],
    "words": 7,
    "f0_median_hz": 95.2,
    "raw": {
-    "hyp": "strike inbound keep it at the marker",
-    "errors": 0
+    "hyp": "striking down to keep it up a marker",
+    "errors": 5
    },
    "processed": {
+    "hyp": "striking bound to keep it up a marker",
+    "errors": 5
+   },
+   "raw2": {
     "hyp": "strike inbound keep it at the marker",
     "errors": 0
    }
   },
   "v_callin_inbound_2": {
    "id": "v_callin_inbound_2",
-   "hash": "6e73d3dc5807a5c3c0bc",
+   "hash": "7492b8c2fb797a2ca3a9",
    "spoken": "Heavy fire on the way. Keep it still.",
-   "duration": 2.659,
+   "duration": 2.735,
    "speech": [
     0.09,
-    2.499
+    2.575
    ],
    "words": 8,
-   "f0_median_hz": 101.3,
+   "f0_median_hz": 108.8,
    "raw": {
     "hyp": "heavy fire on the way keep it still",
     "errors": 0
    },
    "processed": {
+    "hyp": "heavy fire 'em away keep it still",
+    "errors": 3
+   },
+   "raw2": {
     "hyp": "heavy fire on the way keep it still",
     "errors": 0
    }
   },
   "v_callin_inbound_3": {
    "id": "v_callin_inbound_3",
-   "hash": "762d5d4e945fe5989214",
+   "hash": "b18e2df52525fafcd46d",
    "spoken": "The army has called in a strike from outside the city.",
-   "duration": 3.226,
+   "duration": 3.081,
    "speech": [
     0.04,
-    3.136
+    2.991
    ],
    "words": 11,
-   "f0_median_hz": 173.9,
+   "f0_median_hz": 188.2,
    "raw": {
     "hyp": "the army has called in a strike from outside the city",
     "errors": 0
    },
    "processed": {
-    "hyp": "the army has communist right from outside the city",
-    "errors": 4
+    "hyp": "the army has called in a strike from outside the city",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "the army has called in a strike from outside the city",
+    "errors": 0
    }
   },
   "v_callin_inbound_4": {
    "id": "v_callin_inbound_4",
-   "hash": "9c9386113ef7c008b1f8",
+   "hash": "bbcd5129be1fca73ff50",
    "spoken": "We are told to expect a heavy strike in the area shortly.",
-   "duration": 3.701,
+   "duration": 3.298,
    "speech": [
     0.04,
-    3.611
+    3.208
    ],
    "words": 12,
-   "f0_median_hz": 172.0,
+   "f0_median_hz": 188.2,
    "raw": {
-    "hyp": "we are told to expect a heavy strike in the area shortly",
-    "errors": 0
+    "hyp": "we're told to expect the heavy strike in the area shortly",
+    "errors": 3
    },
    "processed": {
+    "hyp": "we're told to expect to have the strike in the area shortly",
+    "errors": 5
+   },
+   "raw2": {
     "hyp": "we are told to expect a heavy strike in the area shortly",
     "errors": 0
    }
   },
   "v_callin_inbound_5": {
    "id": "v_callin_inbound_5",
-   "hash": "e7eb1871eceaa4288806",
+   "hash": "748d4fc9f812690b5930",
    "spoken": "Strike is on its way. Keep it where it is.",
-   "duration": 3.191,
+   "duration": 3.479,
    "speech": [
     0.09,
-    3.031
+    3.319
    ],
    "words": 10,
-   "f0_median_hz": 91.4,
+   "f0_median_hz": 93.6,
    "raw": {
     "hyp": "strike is on its way keep it where it is",
     "errors": 0
    },
    "processed": {
+    "hyp": "strike is on its way keep it where it is",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "strike is on its way keep it where it is",
     "errors": 0
    }
   },
   "v_clock_3min_1": {
    "id": "v_clock_3min_1",
-   "hash": "291bee7467d3009cdc9f",
+   "hash": "d713c9f9c588c8707805",
    "spoken": "Three minutes. Hold it for three minutes and the city stands.",
-   "duration": 4.144,
+   "duration": 3.974,
    "speech": [
     0.09,
-    3.984
+    3.814
    ],
    "words": 11,
-   "f0_median_hz": 92.5,
+   "f0_median_hz": 98.2,
    "raw": {
-    "hyp": "three minutes hold it for three minutes and the city stands",
-    "errors": 0
+    "hyp": "three minutes hold it for three minutes in the city stands",
+    "errors": 1
    },
    "processed": {
+    "hyp": "three minutes hold of her three minutes from the city stands",
+    "errors": 3
+   },
+   "raw2": {
     "hyp": "three minutes hold it for three minutes and the city stands",
     "errors": 0
    }
   },
   "v_clock_3min_2": {
    "id": "v_clock_3min_2",
-   "hash": "adf471b0523e35a52ef2",
+   "hash": "1db224f70b8e5fc391aa",
    "spoken": "Three minutes remain on the clock. We are on schedule.",
-   "duration": 3.361,
+   "duration": 3.148,
    "speech": [
     0.09,
-    3.201
+    2.988
    ],
    "words": 10,
-   "f0_median_hz": 183.9,
+   "f0_median_hz": 160.0,
    "raw": {
     "hyp": "three minutes remained on the clock we're on schedule",
     "errors": 3
@@ -3698,39 +4434,47 @@
    "processed": {
     "hyp": "three minutes remained on the clock we're on schedule",
     "errors": 3
+   },
+   "raw2": {
+    "hyp": "three minutes remain on the clock we are on schedule",
+    "errors": 0
    }
   },
   "v_clock_3min_3": {
    "id": "v_clock_3min_3",
-   "hash": "a54a9f146b8329cd67fd",
+   "hash": "11224b6e53b39d2a0afb",
    "spoken": "The army expects to end this emergency in three minutes.",
-   "duration": 3.49,
+   "duration": 3.435,
    "speech": [
     0.04,
-    3.4
+    3.345
    ],
    "words": 10,
-   "f0_median_hz": 172.0,
+   "f0_median_hz": 205.1,
    "raw": {
-    "hyp": "the army expects to end this emergency and three minutes",
-    "errors": 1
+    "hyp": "the army expects to and this emergency and three minutes",
+    "errors": 2
    },
    "processed": {
-    "hyp": "the army expects to end this emergency and three minutes",
+    "hyp": "the army expects to and this emergency in three minutes",
     "errors": 1
+   },
+   "raw2": {
+    "hyp": "the army expects to end this emergency in three minutes",
+    "errors": 0
    }
   },
   "v_clock_3min_4": {
    "id": "v_clock_3min_4",
-   "hash": "b77a3b7788df28bfa23a",
+   "hash": "6a0c5aca82781247a262",
    "spoken": "Three minutes remain, and much of the city is still standing.",
-   "duration": 3.698,
+   "duration": 3.554,
    "speech": [
     0.04,
-    3.608
+    3.464
    ],
    "words": 11,
-   "f0_median_hz": 172.0,
+   "f0_median_hz": 202.5,
    "raw": {
     "hyp": "three minutes remained and much of the city is still standing",
     "errors": 1
@@ -3738,139 +4482,167 @@
    "processed": {
     "hyp": "three minutes remained and much of the city is still standing",
     "errors": 1
+   },
+   "raw2": {
+    "hyp": "three minutes remain and much of the city is still standing",
+    "errors": 0
    }
   },
   "v_clock_1min_1": {
    "id": "v_clock_1min_1",
-   "hash": "b59ba166d149514a51c2",
+   "hash": "c922fa1f12e49e2c88e9",
    "spoken": "One minute. Nobody gives ground. Nobody.",
-   "duration": 3.85,
+   "duration": 3.429,
    "speech": [
     0.09,
-    3.69
+    3.269
    ],
    "words": 6,
-   "f0_median_hz": 92.5,
+   "f0_median_hz": 98.2,
    "raw": {
-    "hyp": "one minute nobody gives ground nobody",
-    "errors": 0
+    "hyp": "one minute nobody gives grounds nobody",
+    "errors": 1
    },
    "processed": {
+    "hyp": "one minute nobody gives grounds nobody",
+    "errors": 1
+   },
+   "raw2": {
     "hyp": "one minute nobody gives ground nobody",
     "errors": 0
    }
   },
   "v_clock_1min_2": {
    "id": "v_clock_1min_2",
-   "hash": "2b3d82314e9192c335fa",
+   "hash": "30b265de3ce7bc683827",
    "spoken": "Sixty seconds. It will not have this city.",
-   "duration": 3.265,
+   "duration": 3.101,
    "speech": [
     0.09,
-    3.105
+    2.941
    ],
    "words": 8,
-   "f0_median_hz": 141.6,
+   "f0_median_hz": 213.3,
    "raw": {
-    "hyp": "sixty seconds it will not have this city",
-    "errors": 0
+    "hyp": "sixty seconds into multiple fifty",
+    "errors": 6
    },
    "processed": {
-    "hyp": "sixty seconds it will not have this city",
-    "errors": 0
+    "hyp": "that he head and into multiple fifty",
+    "errors": 8
+   },
+   "raw2": {
+    "hyp": "it will not have this city",
+    "errors": 2
    }
   },
   "v_clock_1min_3": {
    "id": "v_clock_1min_3",
-   "hash": "bc7c9f2fcc4721cd1901",
+   "hash": "1b1c2cfa8b954030fb58",
    "spoken": "One minute remains. City officials are preparing a statement.",
-   "duration": 3.868,
+   "duration": 3.939,
    "speech": [
     0.04,
-    3.778
+    3.849
    ],
    "words": 9,
-   "f0_median_hz": 172.0,
+   "f0_median_hz": 197.5,
    "raw": {
+    "hyp": "one minute remains city officials are preparing his statement",
+    "errors": 1
+   },
+   "processed": {
     "hyp": "one minute remains city officials are preparing a statement",
     "errors": 0
    },
-   "processed": {
+   "raw2": {
     "hyp": "one minute remains city officials are preparing a statement",
     "errors": 0
    }
   },
   "v_clock_1min_4": {
    "id": "v_clock_1min_4",
-   "hash": "50ea5f27861bffdc10b4",
+   "hash": "8e2de78b6cc170ce6daf",
    "spoken": "We are one minute from the end of the emergency.",
-   "duration": 2.787,
+   "duration": 2.855,
    "speech": [
     0.04,
-    2.697
+    2.765
    ],
    "words": 10,
-   "f0_median_hz": 173.9,
+   "f0_median_hz": 192.8,
    "raw": {
     "hyp": "we are one minute from the end of the emergency",
     "errors": 0
    },
    "processed": {
+    "hyp": "we are one minutes from the end of the emergency",
+    "errors": 1
+   },
+   "raw2": {
     "hyp": "we are one minute from the end of the emergency",
     "errors": 0
    }
   },
   "v_clock_10s_1": {
    "id": "v_clock_10s_1",
-   "hash": "733e08e64edf81124648",
+   "hash": "f7f1c71baa3d05cd2da9",
    "spoken": "Ten seconds. Hold.",
-   "duration": 2.227,
+   "duration": 2.251,
    "speech": [
     0.09,
-    2.067
+    2.091
    ],
    "words": 3,
-   "f0_median_hz": 95.2,
+   "f0_median_hz": 107.0,
    "raw": {
     "hyp": "ten seconds hold",
     "errors": 0
    },
    "processed": {
+    "hyp": "ten seconds hold",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "ten seconds hold",
     "errors": 0
    }
   },
   "v_clock_10s_2": {
    "id": "v_clock_10s_2",
-   "hash": "e26b78d92f91870f387c",
+   "hash": "29fa06994b37221d97cf",
    "spoken": "Ten seconds. Almost home.",
-   "duration": 2.209,
+   "duration": 2.289,
    "speech": [
     0.09,
-    2.049
+    2.129
    ],
    "words": 4,
-   "f0_median_hz": 104.6,
+   "f0_median_hz": 112.7,
    "raw": {
     "hyp": "ten seconds almost home",
     "errors": 0
    },
    "processed": {
+    "hyp": "ten seconds almost home",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "ten seconds almost home",
     "errors": 0
    }
   },
   "v_clock_10s_3": {
    "id": "v_clock_10s_3",
-   "hash": "b34be39047ab7989299e",
+   "hash": "d90239922039b4423f74",
    "spoken": "Ten seconds remain.",
-   "duration": 1.632,
+   "duration": 1.447,
    "speech": [
     0.04,
-    1.542
+    1.357
    ],
    "words": 3,
-   "f0_median_hz": 166.7,
+   "f0_median_hz": 200.0,
    "raw": {
     "hyp": "ten seconds remained",
     "errors": 1
@@ -3878,546 +4650,658 @@
    "processed": {
     "hyp": "ten seconds remained",
     "errors": 1
+   },
+   "raw2": {
+    "hyp": "ten seconds remain",
+    "errors": 0
    }
   },
   "v_clock_10s_4": {
    "id": "v_clock_10s_4",
-   "hash": "add66df062495f064dd7",
+   "hash": "8557a970e3af4a784b43",
    "spoken": "Ten seconds. The creature is almost out of time.",
-   "duration": 3.468,
+   "duration": 3.13,
    "speech": [
     0.04,
-    3.378
+    3.04
    ],
    "words": 9,
-   "f0_median_hz": 175.8,
+   "f0_median_hz": 205.1,
    "raw": {
     "hyp": "ten seconds the creature is almost out of time",
     "errors": 0
    },
    "processed": {
+    "hyp": "ten seconds the creature is almost out of time",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "ten seconds the creature is almost out of time",
     "errors": 0
    }
   },
   "v_kaiju_lowhp_1": {
    "id": "v_kaiju_lowhp_1",
-   "hash": "0f2b1836145ecb549660",
+   "hash": "1b99d6fae96b305a0ffa",
    "spoken": "It is hurt. It is slowing. Finish it.",
-   "duration": 3.215,
+   "duration": 3.045,
    "speech": [
     0.09,
-    3.055
+    2.885
    ],
    "words": 8,
-   "f0_median_hz": 91.4,
+   "f0_median_hz": 94.1,
    "raw": {
-    "hyp": "it is heard it is slowing finish it",
+    "hyp": "it is hard it is slowing finish it",
     "errors": 1
    },
    "processed": {
-    "hyp": "it is heard it is slowing finish it",
+    "hyp": "it is hard it is slowing finish it",
     "errors": 1
+   },
+   "raw2": {
+    "hyp": "it is hurt it is slowing finish it",
+    "errors": 0
    }
   },
   "v_kaiju_lowhp_2": {
    "id": "v_kaiju_lowhp_2",
-   "hash": "2895cd947e8568223710",
+   "hash": "9313f174f20b01655650",
    "spoken": "It is weak. Do not let it eat.",
-   "duration": 2.535,
+   "duration": 2.29,
    "speech": [
     0.09,
-    2.375
+    2.13
    ],
    "words": 8,
-   "f0_median_hz": 148.1,
+   "f0_median_hz": 214.8,
    "raw": {
-    "hyp": "it is weak do not let it eat",
-    "errors": 0
+    "hyp": "this week do not let it eat",
+    "errors": 3
    },
    "processed": {
+    "hyp": "because we can do not lead to eat",
+    "errors": 5
+   },
+   "raw2": {
     "hyp": "it is weak do not let it eat",
     "errors": 0
    }
   },
   "v_kaiju_lowhp_3": {
    "id": "v_kaiju_lowhp_3",
-   "hash": "34103fb8689bbab8d813",
+   "hash": "89dfc3529921d2849c59",
    "spoken": "The creature appears unwell. Viewers are asked not to approach it.",
-   "duration": 4.209,
+   "duration": 3.998,
    "speech": [
     0.04,
-    4.119
+    3.908
    ],
    "words": 11,
-   "f0_median_hz": 179.8,
+   "f0_median_hz": 195.1,
    "raw": {
-    "hyp": "the creature appears on well viewers are asked not to approach it",
-    "errors": 2
+    "hyp": "a creature appears on well viewers are asked not to approach it",
+    "errors": 3
    },
    "processed": {
     "hyp": "the creature appears on well viewers are asked not to approach it",
     "errors": 2
+   },
+   "raw2": {
+    "hyp": "the creature appears unwell viewers are asked not to approach it",
+    "errors": 0
    }
   },
   "v_kaiju_lowhp_4": {
    "id": "v_kaiju_lowhp_4",
-   "hash": "e3ea9ad95659818ffc3e",
+   "hash": "03ec8036334181856794",
    "spoken": "Experts suggest the creature eat something. It is badly hurt.",
-   "duration": 4.275,
+   "duration": 3.867,
    "speech": [
     0.04,
-    4.185
+    3.777
    ],
    "words": 10,
-   "f0_median_hz": 175.8,
+   "f0_median_hz": 200.0,
    "raw": {
-    "hyp": "experts suggest the creature eat something it is badly hurt",
-    "errors": 0
+    "hyp": "experts suggest the creature read something is badly hurt",
+    "errors": 2
    },
    "processed": {
-    "hyp": "experts suggest the creature eat something it is badly hurt",
-    "errors": 0
+    "hyp": "experts suggest the creature eat something is badly hurt",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "experts suggest the creature eats something it is badly hurt",
+    "errors": 1
    }
   },
   "v_bar_near_1": {
    "id": "v_bar_near_1",
-   "hash": "0399636aac196040a2e1",
+   "hash": "1d7a5d6029f1339625f3",
    "spoken": "The city cannot take much more. Stop it now.",
-   "duration": 3.497,
+   "duration": 3.512,
    "speech": [
     0.09,
-    3.337
+    3.352
    ],
    "words": 9,
-   "f0_median_hz": 92.0,
+   "f0_median_hz": 96.7,
    "raw": {
     "hyp": "the city cannot take much more stop it now",
     "errors": 0
    },
    "processed": {
+    "hyp": "the city cannot take much more stop it now",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "the city cannot take much more stop it now",
     "errors": 0
    }
   },
   "v_bar_near_2": {
    "id": "v_bar_near_2",
-   "hash": "40cf77963e0cdad7a579",
+   "hash": "e4d72f4d087262f578b8",
    "spoken": "Damage totals are near the limit. This is a formal warning.",
-   "duration": 3.636,
+   "duration": 3.77,
    "speech": [
     0.09,
-    3.476
+    3.61
    ],
    "words": 11,
-   "f0_median_hz": 183.9,
+   "f0_median_hz": 153.8,
    "raw": {
-    "hyp": "and vegetables are near the limit this is a formal warning",
-    "errors": 2
+    "hyp": "damage totals are near the limit this is a formal warning",
+    "errors": 0
    },
    "processed": {
+    "hyp": "damage totals are near the limit this is a formal warning",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "damage totals are near the limit this is a formal warning",
     "errors": 0
    }
   },
   "v_bar_near_3": {
    "id": "v_bar_near_3",
-   "hash": "8d95c6d8ddc0b86a0238",
+   "hash": "885ee73f5c26e169ee08",
    "spoken": "Damage to the city is approaching a critical level, officials warn.",
-   "duration": 4.312,
+   "duration": 4.443,
    "speech": [
     0.04,
-    4.222
+    4.353
    ],
    "words": 11,
-   "f0_median_hz": 172.0,
+   "f0_median_hz": 197.5,
    "raw": {
-    "hyp": "damage to the city is approaching a critical level officials lauren",
+    "hyp": "damage to the city is approaching a critical level officials warned",
     "errors": 1
    },
    "processed": {
-    "hyp": "damage to the city is approaching a critical level officials lauren",
+    "hyp": "damage to the city is approaching a critical level officials warned",
     "errors": 1
+   },
+   "raw2": {
+    "hyp": "damage to the city is approaching a critical level officials warn",
+    "errors": 0
    }
   },
   "v_bar_near_4": {
    "id": "v_bar_near_4",
-   "hash": "29ad85481d18365b3ef4",
+   "hash": "f82f86010335326dea8b",
    "spoken": "City engineers say the next few buildings matter a great deal.",
-   "duration": 4.078,
+   "duration": 3.985,
    "speech": [
     0.04,
-    3.988
+    3.895
    ],
    "words": 11,
-   "f0_median_hz": 172.0,
+   "f0_median_hz": 196.3,
    "raw": {
-    "hyp": "city engineers say the next few buildings matter a great deal",
-    "errors": 0
+    "hyp": "city engineers say the next few buildings matter great deal",
+    "errors": 1
    },
    "processed": {
+    "hyp": "city engineers say the next few buildings matter great deal",
+    "errors": 1
+   },
+   "raw2": {
     "hyp": "city engineers say the next few buildings matter a great deal",
     "errors": 0
    }
   },
   "v_end_humans_kill_1": {
    "id": "v_end_humans_kill_1",
-   "hash": "838b4aca2ef2aad851d3",
+   "hash": "175f9f41e907ee598f7e",
    "spoken": "Target is down. It is over. Well done, all of you.",
-   "duration": 4.213,
+   "duration": 3.956,
    "speech": [
     0.09,
-    4.053
+    3.796
    ],
    "words": 11,
-   "f0_median_hz": 91.4,
+   "f0_median_hz": 90.9,
    "raw": {
     "hyp": "target is down it is over well done all of you",
     "errors": 0
    },
    "processed": {
+    "hyp": "target is down it is over well done all of you",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "target is down it is over well done all of you",
     "errors": 0
    }
   },
   "v_end_humans_kill_2": {
    "id": "v_end_humans_kill_2",
-   "hash": "62e0eb257d8646ed7924",
+   "hash": "811dd4a17abe5bf438ce",
    "spoken": "It is not getting up. Good work.",
-   "duration": 1.994,
+   "duration": 2.403,
    "speech": [
     0.09,
-    1.834
+    2.243
    ],
    "words": 7,
-   "f0_median_hz": 106.0,
+   "f0_median_hz": 107.4,
    "raw": {
-    "hyp": "it is not giving up good work",
+    "hyp": "it is not getting up good works",
     "errors": 1
    },
    "processed": {
-    "hyp": "it is not giving up good work",
+    "hyp": "it is not getting not good works",
+    "errors": 2
+   },
+   "raw2": {
+    "hyp": "it is not getting up good works",
     "errors": 1
    }
   },
   "v_end_humans_kill_3": {
    "id": "v_end_humans_kill_3",
-   "hash": "b31bc2c2f3a65cfbd3c8",
+   "hash": "67a3ec34d47e82e19836",
    "spoken": "The creature is dead. We now return to our regular programming.",
-   "duration": 4.346,
+   "duration": 3.795,
    "speech": [
     0.04,
-    4.256
+    3.705
    ],
    "words": 11,
-   "f0_median_hz": 170.2,
+   "f0_median_hz": 200.0,
    "raw": {
-    "hyp": "the creature is dead we now return to our regular programming",
-    "errors": 0
+    "hyp": "creature is that we now return to our regular programming",
+    "errors": 2
    },
    "processed": {
+    "hyp": "the creature is dad we now return to our regular programming",
+    "errors": 1
+   },
+   "raw2": {
     "hyp": "the creature is dead we now return to our regular programming",
     "errors": 0
    }
   },
   "v_end_humans_kill_4": {
    "id": "v_end_humans_kill_4",
-   "hash": "c03b877628b0a53eed5a",
+   "hash": "99abb44a5c4fbe516b85",
    "spoken": "It is over. The creature has fallen and will not rise.",
-   "duration": 3.549,
+   "duration": 3.481,
    "speech": [
     0.04,
-    3.459
+    3.391
    ],
    "words": 11,
-   "f0_median_hz": 172.0,
+   "f0_median_hz": 197.5,
    "raw": {
     "hyp": "it is over the creature has fallen and will not rise",
     "errors": 0
    },
    "processed": {
+    "hyp": "it is over the creature has fallen and will not rise",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "it is over the creature has fallen and will not rise",
     "errors": 0
    }
   },
   "v_end_humans_clock_1": {
    "id": "v_end_humans_clock_1",
-   "hash": "73ebc008ed528599d876",
+   "hash": "d9c495040d15df01d8ee",
    "spoken": "Time. The city stands. Cease fire, all squads.",
-   "duration": 4.55,
+   "duration": 3.77,
    "speech": [
     0.09,
-    4.39
+    3.61
    ],
    "words": 8,
-   "f0_median_hz": 93.6,
+   "f0_median_hz": 95.2,
    "raw": {
-    "hyp": "hi i'm the city stands ceasefire all squads",
-    "errors": 4
+    "hyp": "time the city stands cease fire all squads",
+    "errors": 0
    },
    "processed": {
-    "hyp": "time the city stands ceasefire all squads",
-    "errors": 2
+    "hyp": "time the city stands ceasefire all squalid",
+    "errors": 3
+   },
+   "raw2": {
+    "hyp": "time the city stands cease fire all squads",
+    "errors": 0
    }
   },
   "v_end_humans_clock_2": {
    "id": "v_end_humans_clock_2",
-   "hash": "18445d7d5f5f70ca9319",
+   "hash": "4aa58a9d64e476957c4c",
    "spoken": "The clock has run out. The city is still here.",
-   "duration": 2.941,
+   "duration": 2.865,
    "speech": [
     0.09,
-    2.781
+    2.705
    ],
    "words": 10,
-   "f0_median_hz": 183.9,
+   "f0_median_hz": 156.1,
    "raw": {
-    "hyp": "the clock has run out this city is still here",
-    "errors": 1
+    "hyp": "the clock has run out the city is still here",
+    "errors": 0
    },
    "processed": {
+    "hyp": "the clock has run out the city is still here",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "the clock has run out the city is still here",
     "errors": 0
    }
   },
   "v_end_humans_clock_3": {
    "id": "v_end_humans_clock_3",
-   "hash": "1fa13f1f5bc52b977d27",
+   "hash": "2a39c4a2dbb4d3bd98a7",
    "spoken": "The emergency is over. The creature has run out of time.",
-   "duration": 3.775,
+   "duration": 3.843,
    "speech": [
     0.04,
-    3.685
+    3.753
    ],
    "words": 11,
-   "f0_median_hz": 175.8,
+   "f0_median_hz": 209.2,
    "raw": {
     "hyp": "the emergency is over the creature has run out of time",
     "errors": 0
    },
    "processed": {
+    "hyp": "the emergency is over the creature has run out of time",
+    "errors": 0
+   },
+   "raw2": {
     "hyp": "the emergency is over the creature has run out of time",
     "errors": 0
    }
   },
   "v_end_humans_clock_4": {
    "id": "v_end_humans_clock_4",
-   "hash": "ac6011769cf52932f9a8",
+   "hash": "c8dc4e91ed4dd22b816a",
    "spoken": "Officials have declared the city saved. Most of it remains.",
-   "duration": 3.816,
+   "duration": 3.978,
    "speech": [
     0.04,
-    3.726
+    3.888
    ],
    "words": 10,
-   "f0_median_hz": 175.8,
+   "f0_median_hz": 197.5,
    "raw": {
-    "hyp": "officials have declared the city saved most of it remains",
-    "errors": 0
+    "hyp": "officials have declared the city say that most of it remains",
+    "errors": 2
    },
    "processed": {
+    "hyp": "officials have declared the city say that most of it remains",
+    "errors": 2
+   },
+   "raw2": {
     "hyp": "officials have declared the city saved most of it remains",
     "errors": 0
    }
   },
   "v_end_kaiju_1": {
    "id": "v_end_kaiju_1",
-   "hash": "2cec94a2ef77f53e0786",
+   "hash": "6e3ae5228d8b5fe2612f",
    "spoken": "The city is lost. All squads, fall back. It is over.",
-   "duration": 4.722,
+   "duration": 4.083,
    "speech": [
     0.09,
-    4.562
+    3.923
    ],
    "words": 11,
-   "f0_median_hz": 88.4,
+   "f0_median_hz": 94.4,
    "raw": {
-    "hyp": "the city is lost all squads fall back it is over",
-    "errors": 0
+    "hyp": "the city is lost all squads fallback it is over",
+    "errors": 2
    },
    "processed": {
+    "hyp": "the city is lost all squads fullback it is over",
+    "errors": 2
+   },
+   "raw2": {
     "hyp": "the city is lost all squads fall back it is over",
     "errors": 0
    }
   },
   "v_end_kaiju_2": {
    "id": "v_end_kaiju_2",
-   "hash": "9c1e1cf5d9b92737c27b",
+   "hash": "5859242c016ce6c12543",
    "spoken": "We were not enough. Remember this city.",
-   "duration": 2.755,
+   "duration": 2.786,
    "speech": [
     0.09,
-    2.595
+    2.626
    ],
    "words": 7,
-   "f0_median_hz": 144.1,
+   "f0_median_hz": 216.2,
    "raw": {
-    "hyp": "we were not enough remember the city",
-    "errors": 1
+    "hyp": "really not enough remember the city",
+    "errors": 3
    },
    "processed": {
-    "hyp": "we were not enough to remember the city",
-    "errors": 2
+    "hyp": "we would not enough for them they pay fifty",
+    "errors": 6
+   },
+   "raw2": {
+    "hyp": "we were not enough remember this city",
+    "errors": 0
    }
   },
   "v_end_kaiju_3": {
    "id": "v_end_kaiju_3",
-   "hash": "1d20390a5b011f639b8d",
+   "hash": "f54c773c2267b043f78c",
    "spoken": "The city has fallen. This has been Channel Nine. Good night.",
-   "duration": 4.129,
+   "duration": 4.071,
    "speech": [
     0.04,
-    4.039
+    3.981
    ],
    "words": 11,
-   "f0_median_hz": 172.0,
+   "f0_median_hz": 198.8,
    "raw": {
     "hyp": "the city has fallen this has been channel nine good night",
     "errors": 0
    },
    "processed": {
-    "hyp": "the city has fallen this has been channel nine at night",
-    "errors": 1
+    "hyp": "the city has fallen this has been channel nine good night",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "the city has fallen this has been channel nine good night",
+    "errors": 0
    }
   },
   "v_end_kaiju_4": {
    "id": "v_end_kaiju_4",
-   "hash": "8a017b8727616c4f2e2f",
+   "hash": "deff9866727e59d92511",
    "spoken": "The creature has won. We remain on the air while we can.",
-   "duration": 3.861,
+   "duration": 3.473,
    "speech": [
     0.04,
-    3.771
+    3.383
    ],
    "words": 12,
-   "f0_median_hz": 177.8,
+   "f0_median_hz": 197.5,
    "raw": {
-    "hyp": "the creature has won we remain on the air while we can",
-    "errors": 0
+    "hyp": "creature has one we remain on the air while we can",
+    "errors": 2
    },
    "processed": {
-    "hyp": "the creature has lime we remain on the air while weekend",
-    "errors": 3
+    "hyp": "the creature has one we remain on the air while we can",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "the creature has won we remain on the air while we can",
+    "errors": 0
    }
   },
   "v_hearing_humans_win_1": {
    "id": "v_hearing_humans_win_1",
-   "hash": "f816062a6c21b71e7d5a",
+   "hash": "e4ebb50cb94570c5a086",
    "spoken": "This committee finds the creature was stopped. The damage will now be itemized. Please remain seated.",
-   "duration": 8.593,
+   "duration": 8.489,
    "speech": [
     0.03,
-    7.293
+    7.189
    ],
    "words": 16,
-   "f0_median_hz": 126.0,
+   "f0_median_hz": 107.4,
    "raw": {
-    "hyp": "this committee finds the creature was stopped the damage will melt the itemized please remain seated",
-    "errors": 2
+    "hyp": "this committee finds the creature was stopped the damage will now we are to mind please remain seated",
+    "errors": 4
    },
    "processed": {
-    "hyp": "this committee finds the creature will stop the damage will melt the itemized please remain seated heaped",
-    "errors": 5
+    "hyp": "this committee finds the creature was stocked up the damage will now be an itemized please remain seated",
+    "errors": 3
+   },
+   "raw2": {
+    "hyp": "this committee finds the creature was stopped the damage will now be itemized please remain seated",
+    "errors": 0
    }
   },
   "v_hearing_humans_win_2": {
    "id": "v_hearing_humans_win_2",
-   "hash": "edffd4c5823e9692a6f6",
+   "hash": "203c4b5e71c367bdb7e0",
    "spoken": "Let the minutes show the city was saved. Let them also show what it cost.",
-   "duration": 6.688,
+   "duration": 6.231,
    "speech": [
     0.03,
-    5.388
+    4.931
    ],
    "words": 15,
-   "f0_median_hz": 129.0,
+   "f0_median_hz": 117.6,
    "raw": {
-    "hyp": "let the minutes show the city will save let them also show what it cost",
-    "errors": 2
+    "hyp": "that the minute show the city was saved but i'm also show what it cost",
+    "errors": 4
    },
    "processed": {
-    "hyp": "let the minutes show the city was safety let them also show what it cost",
-    "errors": 1
+    "hyp": "that the minute show the city was saved but i'm also show what it cost",
+    "errors": 4
+   },
+   "raw2": {
+    "hyp": "let the minutes show the city was saved let them also show what it cost",
+    "errors": 0
    }
   },
   "v_hearing_humans_win_3": {
    "id": "v_hearing_humans_win_3",
-   "hash": "342a6fe09f0a88aea8d7",
+   "hash": "b1fdaf3efcf5c62dd839",
    "spoken": "The committee commends the squads. Claims for damaged property may be filed at the front desk.",
-   "duration": 7.718,
+   "duration": 7.747,
    "speech": [
     0.03,
-    6.418
+    6.447
    ],
    "words": 16,
-   "f0_median_hz": 129.0,
+   "f0_median_hz": 123.6,
    "raw": {
-    "hyp": "the committee commence the swabs fleeing for damage to property may be filed at the front desk",
+    "hyp": "the committee commence the squalid claims for damage to property may be filed the front desk",
     "errors": 5
    },
    "processed": {
-    "hyp": "the committee commands the sidewalks playing for damage to property may be filed at the front desk",
-    "errors": 5
+    "hyp": "the committee commence the squalls claims would damage to property may be filed the front desk",
+    "errors": 6
+   },
+   "raw2": {
+    "hyp": "the committee commends the squads claims for damaged property may be filed at the front desk",
+    "errors": 0
    }
   },
   "v_hearing_kaiju_win_1": {
    "id": "v_hearing_kaiju_win_1",
-   "hash": "a06dd109313c3fcc6a3e",
+   "hash": "bb7642688993482f6e75",
    "spoken": "This committee finds the city was lost. We will now determine who signs for it.",
-   "duration": 7.176,
+   "duration": 6.631,
    "speech": [
     0.03,
-    5.876
+    5.331
    ],
    "words": 15,
-   "f0_median_hz": 129.0,
+   "f0_median_hz": 115.1,
    "raw": {
-    "hyp": "this committee finds the city was lost we will melt determine who signed for it",
-    "errors": 2
+    "hyp": "this committee finds the city was lost we will now get them in the absence for it",
+    "errors": 5
    },
    "processed": {
-    "hyp": "this committee finds the city was lost we will melt determine who signed for it",
-    "errors": 2
+    "hyp": "this committee finds the city was lost we will now get them in signs for it",
+    "errors": 3
+   },
+   "raw2": {
+    "hyp": "this committee finds the city was lost we will now determine who signs for it",
+    "errors": 0
    }
   },
   "v_hearing_kaiju_win_2": {
    "id": "v_hearing_kaiju_win_2",
-   "hash": "ed616c621c923ed78227",
+   "hash": "c172449c744ce0866cfd",
    "spoken": "Let the minutes show the creature prevailed. The committee has questions for every commander in this room.",
-   "duration": 7.773,
+   "duration": 7.972,
    "speech": [
     0.03,
-    6.473
+    6.672
    ],
    "words": 17,
-   "f0_median_hz": 128.0,
+   "f0_median_hz": 112.7,
    "raw": {
-    "hyp": "let the minutes show the creature pretty old the committee has questions for every commander in this room",
-    "errors": 2
+    "hyp": "let them in its show the creature prevailed the committee has questions for every come on during this run",
+    "errors": 7
    },
    "processed": {
-    "hyp": "let them minutes show the creature prevails the committee has questions for every commander in this room",
-    "errors": 2
+    "hyp": "that the minutes show the creature prevailed the committee has questions for every come on they're in this room",
+    "errors": 4
+   },
+   "raw2": {
+    "hyp": "let the minutes show the creature prevailed the committee has questions for every commander in this room",
+    "errors": 0
    }
   },
   "v_hearing_kaiju_win_3": {
    "id": "v_hearing_kaiju_win_3",
-   "hash": "d888c25d7bc620b27a4a",
+   "hash": "c9acedf13d25a08429f1",
    "spoken": "The committee notes the loss of the city with regret. A full accounting begins now.",
-   "duration": 6.568,
+   "duration": 7.541,
    "speech": [
     0.03,
-    5.268
+    6.241
    ],
    "words": 15,
-   "f0_median_hz": 129.0,
+   "f0_median_hz": 119.4,
    "raw": {
-    "hyp": "the committee know it's the loss of the city with regret a full accounting begins now",
-    "errors": 2
+    "hyp": "the committee notes the loss of the city with regret a full accounting begins now",
+    "errors": 0
    },
    "processed": {
-    "hyp": "the committee know it's the loss of the city with regret a full accounting begins now",
-    "errors": 2
+    "hyp": "the committee notes the loss of the city with regret a full accounting begins now",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "the committee notes the loss of the city with regret a full accounting begins now",
+    "errors": 0
    }
   }
  }

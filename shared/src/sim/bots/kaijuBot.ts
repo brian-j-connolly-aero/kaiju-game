@@ -423,23 +423,33 @@ function swimAway(world: World, k: Kaiju, bs: BotState, thinking: boolean): bool
 interface StrikeWorth {
   swipe: number;
   stomp: number;
+  /** The tail sweep over the rear half (0 when it has not picked it). */
+  sweep: number;
 }
-const worth: StrikeWorth = { swipe: 0, stomp: 0 };
+const worth: StrikeWorth = { swipe: 0, stomp: 0, sweep: 0 };
 
-/** What a swipe along `yaw` and a stomp here would be worth right now, in bar points (units count as R.unitWorth each). */
-function strikeWorth(world: World, k: Kaiju, def: KaijuKindDef, st: KaijuStageDef, yaw: number): StrikeWorth {
+/**
+ * What a swipe along `yaw`, a stomp here and (when it has it) a tail sweep behind would be worth
+ * right now, in bar points (units count as R.unitWorth each).
+ */
+function strikeWorth(world: World, k: Kaiju, def: KaijuKindDef, st: KaijuStageDef, yaw: number, sweeps: boolean): StrikeWorth {
   const index = world.cityIndex;
   const swipe = def.actions.swipe;
   const stomp = def.actions.stomp;
+  const tail = def.actions.tailSweep;
   const structMult = modMult(k.mods, 'structureDamage');
   const swipeRange = swipe.reach * k.radius;
   const swipeDmg = perStage(swipe.structureDamage, k.stage) * structMult;
   const stompRadius = stomp.radius * k.radius;
   const stompDmg = perStage(stomp.structureDamage, k.stage) * structMult;
+  const tailRange = sweeps ? tail.reach * k.radius : 0;
+  const tailDmg = perStage(tail.structureDamage, k.stage) * structMult;
+  const rear = wrapAngle(k.yaw + Math.PI);
   worth.swipe = 0;
   worth.stomp = 0;
+  worth.sweep = 0;
 
-  structuresInCircle(world.cityQuery, k.x, k.z, Math.max(swipeRange, stompRadius), ids);
+  structuresInCircle(world.cityQuery, k.x, k.z, Math.max(swipeRange, stompRadius, tailRange), ids);
   for (const id of ids) {
     // What it tramples is not worth a blow: it will be walked through.
     if (index.sheight[id] <= st.trampleHeight && index.spassable[id] === 0) continue;
@@ -453,12 +463,16 @@ function strikeWorth(world: World, k: Kaiju, def: KaijuKindDef, st: KaijuStageDe
       const dmg = stompDmg * lerp(1, stomp.structureEdgeFraction, Math.min(1, dist / stompRadius));
       worth.stomp += (s.value * Math.min(hp, dmg)) / s.hp;
     }
+    if (dist < tailRange && obbInArc(s, k.x, k.z, rear, tail.arc / 2, tailRange)) {
+      worth.sweep += (s.value * Math.min(hp, tailDmg)) / s.hp;
+    }
   }
   for (const u of world.units) {
     if (!u.alive || u.y > k.height) continue;
     if (circleInArc(u.x, u.z, u.radius, k.x, k.z, yaw, swipe.arc / 2, swipeRange)) worth.swipe += R.unitWorth;
     const edge = Math.max(0, Math.hypot(u.x - k.x, u.z - k.z) - u.radius);
     if (edge <= stompRadius) worth.stomp += R.unitWorth * lerp(1, 0.4, edge / stompRadius);
+    if (tailRange > 0 && circleInArc(u.x, u.z, u.radius, k.x, k.z, rear, tail.arc / 2, tailRange)) worth.sweep += R.unitWorth;
   }
   propsInCircle(world.cityQuery, k.x, k.z, stompRadius, propIds);
   for (const id of propIds) worth.stomp += PROP_KINDS[world.city.props[id].kind].value;
@@ -485,14 +499,29 @@ function canAct(k: Kaiju): boolean {
   return k.phase === 'recover' && k.phaseDuration - k.phaseTime <= CHAIN_LEAD;
 }
 
-/** Swipes or stomps (each its own button) when either is worth something; returns whether it struck. */
+/** Seconds a verb takes from the press until the kaiju is free again. */
+function verbTime(def: KaijuKindDef, verb: 'swipe' | 'stomp' | 'tailSweep'): number {
+  const t = def.actions[verb].timing;
+  return t.windup + t.active + t.recover;
+}
+
+/**
+ * Swipes, stomps (each its own button) or, when it has the tail sweep and it pays better, sweeps
+ * what is behind it; returns whether it struck.
+ */
 function strike(world: World, k: Kaiju, bs: BotState, def: KaijuKindDef, st: KaijuStageDef, yaw: number): boolean {
   if (!canAct(k) || busyWith(bs, 'strike') || busyWith(bs, 'stomp')) return false;
-  const w = strikeWorth(world, k, def, st, yaw);
+  const sweepButton = readyMove(k, bs, 'tailSweep');
+  const w = strikeWorth(world, k, def, st, yaw, sweepButton !== null);
+  if (w.swipe <= 0 && w.stomp <= 0 && w.sweep <= 0) return false;
+  const swipeRate = w.swipe / verbTime(def, 'swipe');
+  const stompRate = w.stomp / verbTime(def, 'stomp');
+  if (sweepButton && w.sweep / verbTime(def, 'tailSweep') > Math.max(swipeRate, stompRate)) {
+    press(bs, sweepButton, TAP_TICKS, 10);
+    return true;
+  }
   if (w.swipe <= 0 && w.stomp <= 0) return false;
-  const swipeTime = def.actions.swipe.timing.windup + def.actions.swipe.timing.active + def.actions.swipe.timing.recover;
-  const stompTime = def.actions.stomp.timing.windup + def.actions.stomp.timing.active + def.actions.stomp.timing.recover;
-  press(bs, w.stomp / stompTime > (w.swipe / swipeTime) * R.stompBias ? 'stomp' : 'strike', TAP_TICKS);
+  press(bs, stompRate > swipeRate * R.stompBias ? 'stomp' : 'strike', TAP_TICKS);
   return true;
 }
 
@@ -506,11 +535,29 @@ function moveButton(k: Kaiju, verb: KaijuVerb): 'move1' | 'move2' | null {
   return slot === 0 ? 'move1' : slot === 1 ? 'move2' : null;
 }
 
-/** The move button of a move it has picked and can use now (off cooldown), or null. */
+/**
+ * The move button of a move it has picked and can use now (off cooldown), or null. One move at a
+ * time: none while either move button has just been pressed.
+ */
 function readyMove(k: Kaiju, bs: BotState, verb: KaijuVerb): 'move1' | 'move2' | null {
   const button = moveButton(k, verb);
-  if (!button || k.cooldowns[verb] > 0 || busyWith(bs, button)) return null;
+  if (!button || k.cooldowns[verb] > 0 || busyWith(bs, 'move1') || busyWith(bs, 'move2')) return null;
   return button;
+}
+
+/** The stunned unit nearest to it within `range` (a roar's stun is the moment to pounce), or null. */
+function nearestStunned(world: World, k: Kaiju, range: number): Unit | null {
+  let best: Unit | null = null;
+  let bestD = range;
+  for (const u of world.units) {
+    if (!u.alive || u.stun <= 0) continue;
+    const d = Math.hypot(u.x - k.x, u.z - k.z) - u.radius;
+    if (d < bestD) {
+      bestD = d;
+      best = u;
+    }
+  }
+  return best;
 }
 
 /** The molt cards: a moment to look at them, then a pick by preference, with some randomness. */
@@ -885,8 +932,13 @@ export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
   // Hungry and able to eat: food comes before chasing anybody (not before what is underfoot).
   const hungry = hurt && k.cooldowns.eat <= 0 && !k.held;
   let foe: Unit | null = null;
+  // Units its roar has stunned stand frozen for a moment: it goes for them.
+  const stunned = hungry ? null : nearestStunned(world, k, perStage(a.roar.radius, k.stage) * modMult(k.mods, 'roarRadius'));
   if (near.unit && (near.dist <= meleeRange || (bs.revenge > 0 && !hungry && near.dist <= revengeRange))) {
     foe = near.unit;
+    bs.rushTime = 0;
+  } else if (stunned) {
+    foe = stunned;
     bs.rushTime = 0;
   } else if (hungry) {
     bs.rushTime = 0;

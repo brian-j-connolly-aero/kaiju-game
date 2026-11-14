@@ -388,6 +388,8 @@ function hitUnit(world: World, u: Unit, hit: Hit): void {
 function stunUnit(world: World, u: Unit, seconds: number): void {
   u.stun = Math.max(u.stun, seconds);
   u.charge = 0;
+  // Its laser goes out with the charge (the orders system lets go of its plant).
+  if (u.state === 'charging') u.state = 'idle';
   emit(world, { type: 'unitStunned', unit: u.id, duration: seconds });
 }
 

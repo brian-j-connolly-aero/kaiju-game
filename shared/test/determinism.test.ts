@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   BUTTON_MASK,
-  COMMAND_IDS,
   createMatchConfig,
   createRng,
   createWorld,
@@ -65,7 +64,6 @@ describe('determinism', () => {
             aimPitch: rngRange(rng, -0.3, 0.2),
             buttons: change ? rngInt(rng, BUTTON_MASK + 1) : prev.buttons,
           };
-          if (p === 1 && rngChance(rng, 0.02)) next.wheel = COMMAND_IDS[rngInt(rng, COMMAND_IDS.length)];
           held[p] = next;
           return next;
         }),

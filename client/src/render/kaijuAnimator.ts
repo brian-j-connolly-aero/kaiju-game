@@ -1,8 +1,10 @@
 /**
  * Procedural animation of the lizard rig, driven entirely by the kaiju's action state
  * (ARCHITECTURE.md section 5): a walk cycle from its speed, the head leading the body, and a
- * pose for every wind-up, active and recovery phase, the brace, the roar, the stagger and the
- * beam. The wind-ups are the tells the humans read, so each one is a distinct silhouette.
+ * pose for every wind-up, active and recovery phase, the brace, the roar, the stagger, the
+ * beam, the charge (the head-down wind-up, the run with its longer, pounding stride, the
+ * stumble) and the tail sweep. The wind-ups are the tells the humans read, so each one is a
+ * distinct silhouette.
  *
  * The output is a set of rotations (radians, relative to the rest pose) for named nodes; the
  * view eases the rig toward them. Rotation signs (tools/art/README.md section 8): x positive is
@@ -115,6 +117,12 @@ const ROAR_ARMS: PoseTarget = { arm_L: [0.2, 0, 0.85], arm_R: [0.2, 0, -0.85], f
 const BEAM_BREATH: PoseTarget = { arm_L: [0.3, 0, 0], arm_R: [0.3, 0, 0] };
 const BEAM_ON: PoseTarget = { arm_L: [0.25, 0, 0.3], arm_R: [0.25, 0, -0.3] };
 const DEAD_ARMS: PoseTarget = { arm_L: [0.6, 0, 0.5], arm_R: [0.6, 0, -0.5] };
+/** The charge: the arms tucked back along the flanks, elbows bent, like a sprinter's. */
+const CHARGE_ARMS: PoseTarget = { arm_L: [0.65, 0, 0.12], arm_R: [0.65, 0, -0.12], forearm_L: [-0.85, 0, 0], forearm_R: [-0.85, 0, 0] };
+/** The stumble: both arms thrown forward and out to catch the fall. */
+const STUMBLE_ARMS: PoseTarget = { arm_L: [-1.25, 0, 0.75], arm_R: [-1.05, 0, -0.85], forearm_L: [-0.25, 0, 0], forearm_R: [-0.35, 0, 0], hand_L: [-0.4, 0, 0], hand_R: [-0.4, 0, 0] };
+/** The tail sweep: the arms out a little for balance. */
+const SWEEP_ARMS: PoseTarget = { arm_L: [-0.35, 0, 0.45], arm_R: [-0.35, 0, -0.45] };
 const EMPTY: PoseTarget = {};
 
 const ARM_NODES = ['arm_L', 'forearm_L', 'hand_L', 'arm_R', 'forearm_R', 'hand_R'] as const;
@@ -244,24 +252,28 @@ export function computeKaijuPose(input: KaijuAnimInput, pose: KaijuPose): KaijuP
   for (let i = 1; i <= 5; i++) add(`tail_${i}`, 0, Math.sin(time * 1.1 - i * 0.7) * 0.07);
 
   // --- walk -----------------------------------------------------------------------------------
+  // In a charge's run the stride is longer and the body pounds up and down (it runs at twice
+  // its walking speed, so the cycle, driven by the real speed, also comes twice as fast).
+  const running = action === 'charge' && phase === 'charge';
   const m = helpless ? 0 : clamp01(input.speed);
+  const stride = running ? 1.45 : 1;
   let swing = 0;
   if (m > 0.01) {
     const w = input.walkPhase;
     const s = Math.sin(w);
     const c = Math.cos(w);
-    add('leg_L', -s * 0.62 * m);
-    add('leg_R', s * 0.62 * m);
-    add('shin_L', Math.max(0, c) * 0.75 * m);
-    add('shin_R', Math.max(0, -c) * 0.75 * m);
+    add('leg_L', -s * 0.62 * m * stride);
+    add('leg_R', s * 0.62 * m * stride);
+    add('shin_L', Math.max(0, c) * 0.75 * m * stride);
+    add('shin_R', Math.max(0, -c) * 0.75 * m * stride);
     add('foot_L', -Math.max(0, c) * 0.3 * m);
     add('foot_R', -Math.max(0, -c) * 0.3 * m);
-    add('hips', 0, s * 0.06 * m, c * 0.05 * m);
-    add('torso', 0.08 * m, -s * 0.09 * m, -c * 0.04 * m);
+    add('hips', 0, s * 0.06 * m, c * 0.05 * m * stride);
+    add('torso', 0.08 * m, -s * 0.09 * m, -c * 0.04 * m * stride);
     // Close to the lens a claw swings far across the frame: a calm bob in first person.
-    swing = s * (assembly ? 0.03 : 0.3) * m;
+    swing = s * (assembly ? 0.03 : 0.3) * m * (running ? 0.4 : 1);
     for (let i = 1; i <= 5; i++) add(`tail_${i}`, 0, Math.sin(w - i * 0.8) * 0.13 * m);
-    pose.hipsLift += Math.abs(c) * 0.018 * input.height * m;
+    pose.hipsLift += Math.abs(c) * (running ? 0.045 : 0.018) * input.height * m;
   }
 
   // --- head: leads the body, looks where the player looks --------------------------------------
@@ -363,6 +375,72 @@ export function computeKaijuPose(input: KaijuAnimInput, pose: KaijuPose): KaijuP
     act(BEAM_ON, on);
     pose.hipsLift -= 0.03 * on * input.height;
     pose.jawOpen = Math.max(0.3 * w, on);
+  } else if (action === 'charge') {
+    // Seen from inside the head the lean is kept small: the camera rides the head.
+    const lean = assembly ? 0.35 : 1;
+    if (phase === 'windup') {
+      // The bull before the rush: shoulders low, head down, a foot scraping the ground, the
+      // tail up and stiff.
+      const w = ease;
+      const paw = Math.sin(t * 15);
+      pose.hipsLift -= 0.07 * w * input.height;
+      add('torso', 0.34 * w * lean);
+      add('neck', 0.2 * w * lean);
+      add('head', 0.32 * w * lean);
+      add('jaw', 0.08 * w);
+      add('leg_R', (-0.3 + paw * 0.35) * w);
+      add('shin_R', (0.5 + Math.max(0, paw) * 0.35) * w);
+      add('leg_L', 0.15 * w);
+      add('shin_L', 0.25 * w);
+      for (let i = 1; i <= 5; i++) add(`tail_${i}`, 0.08 * w);
+      act(CHARGE_ARMS, w);
+    } else if (phase === 'charge') {
+      // The run: low and forward, the head down like a ram, the tail straight out behind.
+      pose.hipsLift -= 0.03 * input.height;
+      add('torso', 0.44 * lean);
+      add('neck', 0.14 * lean);
+      add('head', 0.28 * lean);
+      for (let i = 1; i <= 5; i++) add(`tail_${i}`, 0.1);
+      act(CHARGE_ARMS, 1);
+    } else if (phase === 'stumble') {
+      // The stumble: it pitches forward and lurches to one side, a knee buckling, arms thrown
+      // out to catch itself, then wobbles back up shaking its head.
+      const lurch = u < 0.3 ? smoothstep(u / 0.3) : 1 - smoothstep((u - 0.3) / 0.7);
+      const wobble = Math.sin(t * 13) * (1 - u) * 0.22;
+      pose.stiffness = 14;
+      pose.hipsLift -= 0.1 * lurch * input.height;
+      add('torso', 0.6 * lurch * lean, wobble, (0.24 * lurch + wobble * 0.5) * lean);
+      add('neck', 0.25 * lurch * lean, wobble);
+      add('head', 0.3 * lurch, wobble * 1.6, -0.22 * lurch);
+      add('jaw', 0.35 * lurch);
+      add('leg_L', -0.6 * lurch);
+      add('shin_L', 1.0 * lurch);
+      add('leg_R', 0.3 * lurch);
+      for (let i = 1; i <= 5; i++) add(`tail_${i}`, -0.1 * lurch, wobble * 0.6);
+      act(STUMBLE_ARMS, lurch);
+      pose.jawOpen = 0.3 * lurch;
+    }
+  } else if (action === 'tailSweep') {
+    // Wind-up: the hips coil and the tail is drawn round to the right; active: the hips whip
+    // back and the tail lashes across behind, to the left; recover: it settles. The legs turn
+    // against the hips so the feet stay planted.
+    let coil = 0;
+    let lash = 0;
+    if (phase === 'windup') coil = ease;
+    else if (phase === 'active') {
+      coil = 1 - ease;
+      lash = ease;
+    } else if (phase === 'recover') lash = 1 - ease;
+    pose.stiffness = 30;
+    const hipsYaw = 0.25 * coil - 0.35 * lash;
+    add('hips', 0, hipsYaw);
+    add('leg_L', 0, -hipsYaw);
+    add('leg_R', 0, -hipsYaw);
+    add('torso', -0.06 * coil, -0.2 * coil + 0.18 * lash, 0.05 * lash);
+    add('head', 0, -0.25 * coil + 0.2 * lash);
+    add('tail_1', 0.04 * coil, 0.32 * coil - 0.48 * lash);
+    for (let i = 2; i <= 5; i++) add(`tail_${i}`, 0.03 * coil, 0.16 * coil - 0.24 * lash);
+    act(SWEEP_ARMS, Math.max(coil, lash));
   }
 
   // --- the arms: what the actions took, over each arm's base pose ------------------------------

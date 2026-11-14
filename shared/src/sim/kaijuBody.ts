@@ -261,11 +261,17 @@ export function castKaijuBody(
   return best !== Infinity;
 }
 
-/** How far a point is from the surface of a kaiju's hit volume (0 inside it). For blasts. */
+/**
+ * How far a point is from a kaiju's hit volume (0 inside it), for blasts. The body counts as the
+ * column it always was for a blast (flat at the bottom, so a shell bursting at its feet reaches
+ * it); the head and the tail as their capsules.
+ */
 export function kaijuBodyDistance(k: KaijuBodySource, x: number, y: number, z: number): number {
   const n = kaijuBodyCapsules(k, scratch);
-  let best = Infinity;
-  for (let i = 0; i < n; i++) {
+  const side = Math.max(0, Math.hypot(x - k.x, z - k.z) - kaijuShownRadius(k));
+  const above = Math.max(0, y - kaijuShownHeight(k));
+  let best = Math.hypot(side, above);
+  for (let i = 1; i < n; i++) {
     const c = scratch[i];
     const abx = c.bx - c.ax;
     const aby = c.by - c.ay;

@@ -284,6 +284,8 @@ export interface Squad {
    * meters): the squad-mates' places in the swarm are measured back along it. Server-side only.
    */
   trail: Vec2[];
+  /** How many trail points have ever been dropped from its front: a point's number (`trailBase` plus its index) stays its own. */
+  trailBase: number;
   /**
    * The squad-mates have formed up around the leader: set once the leader moves. Until then (a
    * fresh deployment) they stay where they were placed.
@@ -379,7 +381,7 @@ export interface Projectile {
   splash: number;
   structureDamage: number;
   cause: DamageKind;
-  /** Fired as part of a charged volley (the trigger shot, or a sub-unit with at least COMBAT_RULES.volleyMinCharge). */
+  /** Fired as part of a charged volley (the leader's own shot with it, or a squad-mate with at least COMBAT_RULES.volleyMinCharge). */
   volley: boolean;
   /** Fired at will by a sub-unit or bot (halves nerve damage). */
   atWill: boolean;

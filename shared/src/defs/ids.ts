@@ -129,14 +129,6 @@ export type FlightModel = (typeof FLIGHT_MODELS)[number];
 export const CALLIN_IDS = ['artillery'] as const;
 export type CallInId = (typeof CALLIN_IDS)[number];
 
-/**
- * The four entries of the old command wheel, in wheel order. Icons: `cmd_follow`, `cmd_moveto`,
- * `cmd_fireatwill`, `cmd_holdcharge`. The squads take no orders any more (docs/ROADMAP.md,
- * phase 1); the ids stay only while the input's `wheel` field does (net/input.ts).
- */
-export const COMMAND_IDS = ['follow', 'moveTo', 'fireAtWill', 'holdCharge'] as const;
-export type CommandId = (typeof COMMAND_IDS)[number];
-
 /** Animation and behavior state of one unit. */
 export const UNIT_STATES = ['idle', 'moving', 'charging', 'shaken', 'dead'] as const;
 export type UnitState = (typeof UNIT_STATES)[number];

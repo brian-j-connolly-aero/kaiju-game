@@ -21,7 +21,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from mbvoice import DOC_DIR, SCRATCH, SR, asr, dsp  # noqa: E402
+from mbvoice import DOC_DIR, SCRATCH, SR, asr, asr2, dsp, speakers  # noqa: E402
 from mbvoice.chains import apply_chain, chain_config  # noqa: E402
 from mbvoice.pipeline import master, raw_speech  # noqa: E402
 from mbvoice.script import load_lines  # noqa: E402
@@ -38,12 +38,17 @@ def line_sets() -> dict:
     radio = [l for l in lines if l["audience"] == "humans"]
     anchor = [l for l in lines if l["speaker"] == "Anchor"]
     chair = [l for l in lines if l["speaker"] == "Chair"]
+    squads = [l for l in lines if l["speaker"] in ("Granite", "Beacon", "Tempest")]
     return {
-        "radio": radio,                              # all 93 military lines
-        "radio sample": radio[::3],                  # every third military line (31)
-        "anchor": anchor,                            # all 82 news lines
-        "chair": chair + anchor[::3],                # the 6 hearing lines plus 28 news lines
+        "radio": radio,                              # all military lines (93 in the first script)
+        "radio sample": radio[::3],                  # every third military line (31 in the first script)
+        "anchor": anchor,                            # all news lines (82 in the first script)
+        "chair": chair + anchor[::3],                # the 6 hearing lines plus every third news line
         "hearing": chair,                            # the 6 hearing lines only
+        "squads": squads,                            # every line of the three squad voices (79)
+        "squads sample": squads[::2],                # every other one (40)
+        "anchor sample": anchor[::2],                # every other news line (43)
+        "Overlord sample": [l for l in lines if l["speaker"] == "Overlord"][::2],   # every other Overlord line (25)
         **{s: [l for l in lines if l["speaker"] == s] for s in ("Overlord", "Granite", "Beacon", "Tempest")},
     }
 
@@ -192,6 +197,57 @@ def _chair_voices2() -> list:
 
 
 GROUPS["chair_voices2"] = _chair_voices2()
+
+# The neural casting rounds: the voices short-listed by `audition.py neural`, each through the
+# character's own finished chain (today's defaults; Overlord's own radio settings for Overlord).
+OVERLORD_RADIO = {"band_hz": [260.0, 4000.0], "drive_db": 2.0, "static_db": -38.0}
+
+
+def K(voice, **kw):
+    return V("kokoro", voice, **kw)
+
+
+def P(voice, **kw):
+    return V("piper", voice, **kw)
+
+
+GROUPS["neural_overlord"] = [
+    (label, v, "radio", OVERLORD_RADIO, "Overlord", 380) for label, v in [
+        ("kokoro am_onyx", K("am_onyx")),
+        ("kokoro am_onyx rate 0.9", K("am_onyx", rate=0.9)),
+    ]]
+GROUPS["neural_overlord2"] = [
+    (label, v, "radio", {**OVERLORD_RADIO, **over}, "Overlord sample", 380) for label, v, over in [
+        ("am_onyx rate 0.9, Overlord's radio", K("am_onyx", rate=0.9), {}),
+        ("am_onyx rate 0.9, presence 7 dB", K("am_onyx", rate=0.9), {"presence_db": 7.0}),
+        ("am_onyx rate 0.9, presence 7 dB, band to 4.5 kHz", K("am_onyx", rate=0.9),
+         {"presence_db": 7.0, "band_hz": [260.0, 4500.0]}),
+        ("am_onyx rate 0.9, presence 9 dB at 2.4 kHz", K("am_onyx", rate=0.9),
+         {"presence_db": 9.0, "presence_hz": 2400.0}),
+        ("am_echo rate 0.85, Overlord's radio", K("am_echo", rate=0.85), {}),
+    ]]
+GROUPS["neural_squads"] = [
+    (label, v, "radio", {}, "squads sample", 300) for label, v in [
+        ("kokoro am_echo rate 0.95", K("am_echo", rate=0.95)),
+        ("kokoro am_liam rate 0.9", K("am_liam", rate=0.9)),
+        ("kokoro am_michael rate 0.9", K("am_michael", rate=0.9)),
+        ("kokoro am_fenrir rate 0.9", K("am_fenrir", rate=0.9)),
+        ("piper en_US-bryce-medium", P("en_US-bryce-medium")),
+        ("kokoro af_alloy rate 0.9", K("af_alloy", rate=0.9)),
+        ("kokoro af_sky rate 0.9", K("af_sky", rate=0.9)),
+        ("piper en_GB-alba-medium", P("en_GB-alba-medium")),
+    ]]
+GROUPS["neural_anchor"] = [
+    (label, v, "broadcast", {}, "anchor sample", 380) for label, v in [
+        ("kokoro af_heart rate 0.85", K("af_heart", rate=0.85)),
+        ("kokoro af_bella rate 0.85", K("af_bella", rate=0.85)),
+    ]]
+GROUPS["neural_chair"] = [
+    (label, v, "hall", {}, "chair", 650) for label, v in [
+        ("kokoro bm_george rate 0.85", K("bm_george", rate=0.85)),
+        ("kokoro bm_lewis rate 0.85", K("bm_lewis", rate=0.85)),
+        ("kokoro bm_fable rate 0.85", K("bm_fable", rate=0.85)),
+    ]]
 GROUPS["sweep_radio3"] = _radio_sweep3()
 GROUPS["sweep_hall2"] = _hall_sweep2()
 GROUPS["sweep_radio2"] = _radio_sweep2()
@@ -217,8 +273,9 @@ def run_one(args) -> dict:
         return res
     lines = line_sets()[set_name]
     cfg = chain_config(chain, over)
-    e_raw = e_proc = words = 0
-    f0s, secs, peaks = [], 0.0, []
+    second = group.startswith("neural")          # the neural casting rounds are also heard by asr2
+    e_raw = e_proc = e2 = words = 0
+    f0s, secs, peaks, misses, prints = [], 0.0, [], {}, []
     for l in lines:
         raw = raw_speech(l["text"], voice, pause)
         seed = int.from_bytes(hashlib.sha256(l["id"].encode()).digest()[:8], "little")
@@ -226,7 +283,13 @@ def run_one(args) -> dict:
         pre_peak = dsp.true_peak_db(y, SR) - dsp.lufs(y, SR)
         y = master(y)
         a, n = asr.word_errors(l["text"], asr.transcribe(raw, SR))
-        b, _ = asr.word_errors(l["text"], asr.transcribe(y, SR))
+        hyp = asr.transcribe(y, SR)
+        b, _ = asr.word_errors(l["text"], hyp)
+        if b:
+            misses[l["id"]] = hyp
+        if second:
+            e2 += asr.word_errors(l["text"], asr2.transcribe(y, SR))[0]
+            prints.append(speakers.voice_print(y, SR))
         e_raw += a
         e_proc += b
         words += n
@@ -244,6 +307,11 @@ def run_one(args) -> dict:
         "words_per_second": round(words / secs, 2),
         "peak_over_loudness_db": round(float(np.mean(peaks)), 1),
     }
+    if second:
+        res["wer2_processed"] = round(100 * e2 / words, 1)
+        res["misses"] = misses
+        mean = np.mean(prints, axis=0)
+        res["print"] = [round(float(v), 5) for v in mean / np.linalg.norm(mean)]   # for comparing candidates
     cache.write_text(json.dumps(res))
     return res
 
@@ -251,26 +319,34 @@ def run_one(args) -> dict:
 def main() -> None:
     names = sys.argv[1:] or ["summary"]
     if names == ["summary"]:
-        out = []
+        # The cache lives in scratch space, so a fresh machine has only what it ran itself: cached
+        # results replace the recorded ones of the same experiment, and recorded results that are
+        # not cached here are kept, never dropped.
+        DOC_DIR.mkdir(parents=True, exist_ok=True)
+        target = DOC_DIR / "experiments.json"
+        recorded = {(r["group"], r["label"]): r for r in json.loads(target.read_text())} if target.exists() else {}
+        out, fresh = [], 0
         for g, exps in GROUPS.items():
             for exp in exps:
                 c = EXP / f"{key_of(exp)}.json"
                 if c.exists():
                     r = json.loads(c.read_text())
                     r["group"], r["label"] = g, exp[0]
+                    r.pop("misses", None)            # kept in the cache for whoever reruns, not in the record
+                    r.pop("print", None)
                     out.append(r)
-        DOC_DIR.mkdir(parents=True, exist_ok=True)
-        target = DOC_DIR / "experiments.json"
+                    fresh += 1
+                elif (g, exp[0]) in recorded:
+                    out.append(recorded[(g, exp[0])])
         total = sum(len(v) for v in GROUPS.values())
-        if target.exists() and len(out) < len(json.loads(target.read_text())):
-            # the cache lives in scratch space; never replace recorded results with fewer
-            print(f"only {len(out)} of {total} experiments are cached in {EXP}; {target.name} left as it is. "
-                  f"Run the missing groups first.")
-            return
         target.write_text(json.dumps(out, indent=1) + "\n")
-        print("wrote", target, len(out), "of", total, "results")
+        print(f"wrote {target}: {len(out)} of {total} experiments ({fresh} from this machine's cache, "
+              f"{len(out) - fresh} as recorded)")
         return
     jobs = [(g, exp) for g in names for exp in GROUPS[g]]
+    from mbvoice.synth import split_threads
+    split_threads(2)
+    asr2.fetch()
     with Pool(2) as pool:
         for r in pool.imap_unordered(run_one, jobs):
             print(f"{r['group']:14s} {r['label']:28s} {r['line_set']:8s} raw {r['wer_raw']:5.1f}%  "

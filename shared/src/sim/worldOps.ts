@@ -4,7 +4,6 @@ import { TALLY_CLASSES, type TallyClass } from '../defs/ids';
 import { VOICE_RULES, VOICE_SIDE_RULES } from '../defs/voice';
 import { BUTTON_COUNT, neutralInput } from '../net/input';
 import { createBotState } from './bots/types';
-import type { SquadCommand } from './commands';
 import type { PlayerId, PlayerSlot } from './config';
 import type { PlayerTally, SimEvent, SimEventInput } from './events';
 import type { InputState, Kaiju, PlayerState, Squad, Unit, VoiceState, World } from './types';
@@ -91,14 +90,6 @@ export function drivenUnit(world: World, squad: Squad): Unit | null {
 export function isDriven(world: World, unit: Unit): boolean {
   return world.squads[unit.squad].driven === unit.id;
 }
-
-/**
- * The squads take no orders any more (docs/ROADMAP.md, phase 1: the command wheel, map orders
- * and the artillery button are gone). The server still accepts a `command` message from a
- * client of the moment and hands it here, where it is dropped. Remove this, `SquadCommand` and
- * the `command` message together once no client sends one.
- */
-export function queueCommand(_world: World, _player: PlayerId, _command: SquadCommand): void {}
 
 /**
  * The server's hook for people coming and going. `bot: true` gives a slot to a bot (its player

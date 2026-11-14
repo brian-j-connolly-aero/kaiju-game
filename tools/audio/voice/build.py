@@ -45,7 +45,8 @@ def main() -> int:
     ap.add_argument("--force", action="store_true", help="rebuild even if nothing changed")
     ap.add_argument("--no-verify", action="store_true", help="skip measurements, pictures and docs")
     ap.add_argument("--verify-only", action="store_true", help="measure and document the files already built")
-    ap.add_argument("--jobs", type=int, default=2, help="worker processes (default 2; the machine is shared)")
+    ap.add_argument("--jobs", type=int, default=2, help="worker processes (default 2; the machine is shared; the "
+                                                        "speech model uses $MB_TTS_THREADS threads in all, default 2)")
     args = ap.parse_args()
 
     lines = load_lines()
@@ -89,6 +90,11 @@ def main() -> int:
         print(f"voice: {len(lines)} lines in the script, {len(jobs)} to build "
               f"({len(lines) - len(jobs)} unchanged or not selected)")
         if jobs:
+            from mbvoice import asr2, models
+            from mbvoice.synth import split_threads
+            models.fetch_for_cast(cast)         # downloads neural voice models once, before the workers start
+            asr2.fetch()                        # and the second recognizer, which hears every line
+            split_threads(args.jobs)            # the workers share the speech model's two threads
             with Pool(max(1, args.jobs)) as pool:
                 for rec in pool.imap_unordered(build_line, jobs):
                     state["lines"][rec["id"]] = rec

@@ -324,6 +324,10 @@ export class MatchAudio {
         else if (e.action === 'brace' && e.phase === 'brace') a.play('kaiju_brace', at);
         else if (e.action === 'special' && e.phase === 'windup') a.play('kaiju_beam_charge', at);
         else if (e.action === 'special' && e.phase === 'special') this.startBeam(s.k, e.x, e.z);
+        // The moves a molt card gives (phase 1), on the sounds there are: the charge's run sets
+        // off with a thud and ends in a crash; the tail sweep whooshes like a swipe.
+        else if (e.action === 'charge' && (e.phase === 'charge' || e.phase === 'stumble')) a.play(`kaiju_stomp_s${s.stage}`, { ...at, y: 0, refDistance: REACH[s.stage] * (e.phase === 'stumble' ? 1.5 : 1) });
+        else if (e.action === 'tailSweep' && e.phase === 'windup') a.play(`kaiju_swipe_s${s.stage}`, at);
         if (e.action === 'special' && (e.phase === 'recover' || e.phase === 'idle')) {
           this.beam?.stop(0.4);
           this.beam = null;
@@ -434,14 +438,6 @@ export class MatchAudio {
         break;
       case 'callin':
         if (e.phase === 'inbound') a.play('arty_distant', { gain: 0.8 });
-        break;
-      case 'smoke':
-        // The canister bursts where it lands (a rush of air, heard by both sides).
-        a.play('gust', { x: e.x, y: 2, z: e.z, refDistance: e.radius * 2, gain: 0.8 });
-        break;
-      case 'mark':
-        // The squads hear the army's radio click; the kaiju hears nothing (it sees no marker).
-        if (this.side() === 'humans') a.play('radio_open', { gain: 0.7 });
         break;
       case 'matchPhase':
         if (e.phase === 'briefing') {

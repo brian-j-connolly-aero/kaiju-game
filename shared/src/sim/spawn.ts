@@ -291,6 +291,7 @@ export function createSquad(world: World, slot: PlayerSlot): Squad {
     eliminated: false,
     veteranSlots: new Array<boolean>(per).fill(false),
     trail: [],
+    trailBase: 0,
     formed: false,
     volleyReady: false,
   };
@@ -310,6 +311,7 @@ export function refillSquad(world: World, squad: Squad, stage: StageId): void {
   squad.level = stageDef(stage).humanLevel;
   squad.driven = squad.units[0];
   squad.eliminated = false;
+  squad.trailBase += squad.trail.length;
   squad.trail.length = 0;
   squad.formed = false;
   squad.volleyReady = false;

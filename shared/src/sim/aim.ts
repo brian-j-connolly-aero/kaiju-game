@@ -147,7 +147,8 @@ export function resolveAimPoint(
 }
 
 // ---------------------------------------------------------------------------------------------
-// Ground markers placed with the crosshair (move-to, call-ins)
+// Ground markers placed with the crosshair (no button places one in phase 1; the artillery
+// radio of phase 2 is meant to: startCallIn in sim/systems/weapons.ts)
 // ---------------------------------------------------------------------------------------------
 
 /** What marker placement needs to know about a kaiju. `Kaiju` satisfies it; a client can fill it from a snapshot and the stage definition. */

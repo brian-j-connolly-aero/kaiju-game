@@ -11,7 +11,7 @@ describe('action map', () => {
   it('binds every action on the keyboard, and the game verbs on the gamepad', () => {
     const b = defaultBindings();
     for (const action of BUTTON_ACTIONS) expect(b.keyboard[action].length, action).toBeGreaterThan(0);
-    for (const action of ['strike', 'grab', 'block', 'roar', 'special', 'molt', 'fire', 'callIn', 'wheel', 'map', 'camera'] as const) {
+    for (const action of ['strike', 'grab', 'stomp', 'move1', 'move2', 'molt', 'card1', 'card2', 'card3', 'fire', 'map', 'camera'] as const) {
       expect(b.gamepad[action].length, action).toBeGreaterThan(0);
     }
   });
@@ -20,16 +20,22 @@ describe('action map', () => {
     const b = defaultBindings();
     expect(glyphFor(b, 'strike', 'keyboard')).toEqual({ icon: 'ms_left', label: '' });
     expect(glyphFor(b, 'strike', 'gamepad')).toEqual({ icon: 'gp_rt', label: '' });
-    expect(glyphFor(b, 'roar', 'keyboard')).toEqual({ icon: 'kb_key', label: 'Q' });
+    expect(glyphFor(b, 'move1', 'keyboard')).toEqual({ icon: 'kb_key', label: 'Q' });
+    expect(glyphFor(b, 'stomp', 'keyboard')).toEqual({ icon: 'kb_key', label: '␣' });
+    // The three molt cards lie left, middle and right: 1, 2, 3, or the d-pad's left, up and right.
+    expect(['card1', 'card2', 'card3'].map((a) => glyphFor(b, a as 'card1', 'keyboard')?.label)).toEqual(['1', '2', '3']);
+    expect(['card1', 'card2', 'card3'].map((a) => glyphFor(b, a as 'card1', 'gamepad')?.icon)).toEqual(['gp_dpad_left', 'gp_dpad_up', 'gp_dpad_right']);
     expect(keyGlyph('Digit3')).toEqual({ icon: 'kb_key', label: '3' });
     expect(glyphFor(b, 'moveForward', 'gamepad')).toBeNull();
   });
 
   it('merges stored bindings over the defaults and ignores nonsense', () => {
-    const merged = mergeBindings({ keyboard: { roar: ['KeyG'], strike: 'nope', bogus: ['KeyZ'] }, gamepad: { roar: [3, 'x'] } });
-    expect(merged.keyboard.roar).toEqual(['KeyG']);
+    const merged = mergeBindings({ keyboard: { move1: ['KeyG'], strike: 'nope', bogus: ['KeyZ'], roar: ['KeyQ'] }, gamepad: { move1: [3, 'x'] } });
+    expect(merged.keyboard.move1).toEqual(['KeyG']);
     expect(merged.keyboard.strike).toEqual(['Mouse0']);
-    expect(merged.gamepad.roar).toEqual(defaultBindings().gamepad.roar);
+    expect(merged.gamepad.move1).toEqual(defaultBindings().gamepad.move1);
+    // A binding stored for an action that is gone (the old roar) is dropped.
+    expect('roar' in merged.keyboard).toBe(false);
     expect(mergeBindings(null)).toEqual(defaultBindings());
   });
 });
