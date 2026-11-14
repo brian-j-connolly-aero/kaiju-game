@@ -7,8 +7,9 @@
       "size": [11.0, 7.0, 9.0],
       "tris": 75,
       "chunks": 8,
-      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint", "blend": "multiply", "base": "#f6c9a0", "colors": ["#f3e3b3", "#f2a48b", "#a8d4f0", "#a9e5c5", "#f6c9a0", "#cfe8a0", "#f5f2ea", "#c9b5e8"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
-      "district": "suburb"
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint", "blend": "multiply", "base": "#f6c9a0", "colors": ["#f3e3b3", "#f2a48b", "#a8d4f0", "#a9e5c5", "#f6c9a0", "#cfe8a0", "#f5f2ea", "#c9b5e8"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "suburb",
+      "roof": {"part": "roof", "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color", "blend": "multiply", "base": "#d9d9d9", "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id"}
     },
     "bld_house_c": {
       "file": "models/bld_house_c.glb",
@@ -17,8 +18,9 @@
       "size": [8.0, 5.0, 8.0],
       "tris": 76,
       "chunks": 8,
-      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint", "blend": "multiply", "base": "#a8d4f0", "colors": ["#f3e3b3", "#f2a48b", "#a8d4f0", "#a9e5c5", "#f6c9a0", "#cfe8a0", "#f5f2ea", "#c9b5e8"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
-      "district": "suburb"
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint", "blend": "multiply", "base": "#a8d4f0", "colors": ["#f3e3b3", "#f2a48b", "#a8d4f0", "#a9e5c5", "#f6c9a0", "#cfe8a0", "#f5f2ea", "#c9b5e8"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "suburb",
+      "roof": {"part": "roof", "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color", "blend": "multiply", "base": "#d9d9d9", "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id"}
     },
     "bld_pavilion_a": {
       "file": "models/bld_pavilion_a.glb",
@@ -27,7 +29,7 @@
       "size": [16.0, 7.0, 12.0],
       "tris": 90,
       "chunks": 6,
-      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint", "blend": "multiply", "base": "#f5f2ea", "colors": ["#f5f2ea", "#b4e3dc", "#f6c9a0", "#a8d4f0", "#efb3b8"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint", "blend": "multiply", "base": "#f5f2ea", "colors": ["#f5f2ea", "#b4e3dc", "#f6c9a0", "#a8d4f0", "#efb3b8"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
       "district": "boardwalk"
     },
     "bld_rowhouse_a": {
@@ -37,8 +39,9 @@
       "size": [7.0, 8.8, 11.0],
       "tris": 86,
       "chunks": 12,
-      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint", "blend": "multiply", "base": "#ead2a0", "colors": ["#e6b566", "#ead2a0", "#f2a48b", "#f3e3b3", "#f6c9a0", "#e3c04f"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
-      "district": "oldtown"
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint", "blend": "multiply", "base": "#ead2a0", "colors": ["#e6b566", "#ead2a0", "#f2a48b", "#f3e3b3", "#f6c9a0", "#e3c04f"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "oldtown",
+      "roof": {"part": "roof", "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color", "blend": "multiply", "base": "#d9d9d9", "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id"}
     },
     "bld_shop_a": {
       "file": "models/bld_shop_a.glb",
@@ -47,8 +50,9 @@
       "size": [10.95, 5.0, 9.99],
       "tris": 70,
       "chunks": 6,
-      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint", "blend": "multiply", "base": "#a9e5c5", "colors": ["#f3e3b3", "#f2a48b", "#a8d4f0", "#a9e5c5", "#f6c9a0", "#cfe8a0", "#f5f2ea", "#c9b5e8"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
-      "district": "suburb"
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint", "blend": "multiply", "base": "#a9e5c5", "colors": ["#f3e3b3", "#f2a48b", "#a8d4f0", "#a9e5c5", "#f6c9a0", "#cfe8a0", "#f5f2ea", "#c9b5e8"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "suburb",
+      "roof": {"part": "roof", "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color", "blend": "multiply", "base": "#d9d9d9", "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id"}
     },
     "bld_shop_b": {
       "file": "models/bld_shop_b.glb",
@@ -57,8 +61,9 @@
       "size": [14.0, 8.0, 10.95],
       "tris": 74,
       "chunks": 6,
-      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint", "blend": "multiply", "base": "#e6b566", "colors": ["#e6b566", "#ead2a0", "#f2a48b", "#f3e3b3", "#f6c9a0", "#e3c04f"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
-      "district": "oldtown"
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint", "blend": "multiply", "base": "#e6b566", "colors": ["#e6b566", "#ead2a0", "#f2a48b", "#f3e3b3", "#f6c9a0", "#e3c04f"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "oldtown",
+      "roof": {"part": "roof", "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color", "blend": "multiply", "base": "#d9d9d9", "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id"}
     },
     "bld_shop_c": {
       "file": "models/bld_shop_c.glb",
@@ -67,8 +72,9 @@
       "size": [12.0, 10.0, 12.0],
       "tris": 60,
       "chunks": 8,
-      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint", "blend": "multiply", "base": "#f2a48b", "colors": ["#e6b566", "#ead2a0", "#f2a48b", "#f3e3b3", "#f6c9a0", "#e3c04f"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
-      "district": "oldtown"
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint", "blend": "multiply", "base": "#f2a48b", "colors": ["#e6b566", "#ead2a0", "#f2a48b", "#f3e3b3", "#f6c9a0", "#e3c04f"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "oldtown",
+      "roof": {"part": "roof", "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color", "blend": "multiply", "base": "#d9d9d9", "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id"}
     },
     "bld_shrine_a": {
       "file": "models/bld_shrine_a.glb",
@@ -77,8 +83,9 @@
       "size": [10.0, 11.0, 10.0],
       "tris": 112,
       "chunks": 8,
-      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint", "blend": "multiply", "base": "#f3e3b3", "colors": ["#f5f2ea", "#efb3b8", "#f3e3b3", "#f6c9a0", "#ead2a0"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
-      "district": "temple"
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: above 0.75 = wall that takes the building's color, 0.25 to 0.75 = roof (see roof), below 0.25 = never tint", "blend": "multiply", "base": "#f3e3b3", "colors": ["#f5f2ea", "#efb3b8", "#f3e3b3", "#f6c9a0", "#ead2a0"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "temple",
+      "roof": {"part": "roof", "mask": "COLOR_0 alpha 0.25 to 0.75 (written as 0.5): roof faces that take the district's roof color", "blend": "multiply", "base": "#d9d9d9", "hint": "multiply roof faces by roof color / base (per channel), the roof color being the district's (District.roof) in one of a few shades picked by the structure's id"}
     }
   }
 }

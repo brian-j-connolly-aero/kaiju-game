@@ -1,15 +1,18 @@
-"""Checks the voice script (shared/src/defs/voiceLines.json) against the rules it is written to:
-the schema of docs/ASSETS.md section 6, the writing rules of docs/VOICE_SCRIPT.md, and how the
-game picks lines (shared/src/defs/voice.ts, `chooseVoiceLines`): a cue about a squad is only ever
-spoken by that squad's own voice or by Overlord, so variety has to exist per voice, not just per
-cue. The build refuses to run on a script that breaks a rule."""
+"""Checks the voice script (shared/src/defs/voiceLines.json, and the client's event lines,
+client/src/audio/eventLines.json) against the rules it is written to: the schema of
+docs/ASSETS.md section 6, the writing rules of docs/VOICE_SCRIPT.md, and how the game picks
+lines (shared/src/defs/voice.ts, `chooseVoiceLines`): a cue about a squad is only ever spoken by
+that squad's own voice or by Overlord, so variety has to exist per voice, not just per cue. The
+event lines (client/src/audio/eventVoice.ts) are said by the client for events that have no cue
+of the simulation's; each of their cues is heard by the sides it has lines for. The build refuses
+to run on a script that breaks a rule."""
 
 from __future__ import annotations
 
 import re
 from collections import Counter, defaultdict
 
-from . import REPO
+from . import EVENT_TS, REPO
 
 VOICE_TS = REPO / "shared" / "src" / "defs" / "voice.ts"
 
@@ -54,6 +57,16 @@ def cue_ids() -> list[str]:
     return re.findall(r"'([a-z0-9.]+)'", block)
 
 
+def event_cue_ids() -> list[str]:
+    """The cues of the client's event lines, read from client/src/audio/eventVoice.ts (EVENT_CUES)."""
+    if not EVENT_TS.exists():
+        return []
+    src = EVENT_TS.read_text()
+    block = src[src.index("export const EVENT_CUES"):]
+    block = block[: block.index("} as const")]
+    return re.findall(r"^  '([a-z0-9.]+)': \{", block, re.M)
+
+
 def words_of(text: str) -> list[str]:
     return re.findall(r"[A-Za-z]+", text)
 
@@ -64,6 +77,7 @@ def check(lines: list[dict], dictionary: set[str] | None = None) -> tuple[list[s
     errors: list[str] = []
     warnings: list[str] = []
     cues = cue_ids()
+    events = event_cue_ids()
     ids: set[str] = set()
     texts: dict[str, str] = {}
     by_cue: dict[str, list[dict]] = defaultdict(list)
@@ -78,9 +92,11 @@ def check(lines: list[dict], dictionary: set[str] | None = None) -> tuple[list[s
         if i in ids:
             errors.append(f"{i}: duplicate id")
         ids.add(i)
-        if l["cue"] not in cues:
+        if l["cue"] not in cues and l["cue"] not in events:
             errors.append(f"{i}: unknown cue {l['cue']}")
             continue
+        if l["cue"] in events and l["audience"] == "all":
+            errors.append(f"{i}: an event line is for the radio or the news, not for everyone")
         if l["speaker"] not in CAST:
             errors.append(f"{i}: unknown speaker {l['speaker']}")
         elif CAST[l["speaker"]] != l["audience"]:
@@ -148,9 +164,18 @@ def check(lines: list[dict], dictionary: set[str] | None = None) -> tuple[list[s
                     errors.append(f"{cue}: {v} cannot speak here; the squad the cue is about is gone")
         elif voice["Overlord"] == 0:
             warnings.append(f"{cue}: no Overlord line; a squad without a voice of its own has nothing neutral")
+    # the client's event cues: lines numbered 1..n, and only the speakers the side hears
+    for cue in events:
+        ls = by_cue.get(cue, [])
+        if not ls:
+            errors.append(f"{cue}: an event cue with no lines (client/src/audio/eventVoice.ts lists it)")
+            continue
+        nums = [int(l["id"].rsplit("_", 1)[1]) for l in ls]
+        if nums != list(range(1, len(ls) + 1)):
+            errors.append(f"{cue}: lines must be numbered 1..n in file order, found {nums}")
     order = []
     for l in lines:
-        if l["cue"] not in order:
+        if l["cue"] in cues and l["cue"] not in order:
             order.append(l["cue"])
     if order != [c for c in cues if c in by_cue]:
         warnings.append("the cues are not in the order of VOICE_CUE_IDS")

@@ -16,9 +16,11 @@ export interface Materials {
   /** Lit, textured from the shared city atlas. */
   cityAtlas: THREE.MeshLambertMaterial;
   /**
-   * The city atlas for instanced buildings: the instance color paints only the wall faces the
-   * model masks (vertex color alpha 1), and the per-instance `instanceShade` darkens everything
-   * (docs/art/client-notes-city.md section 2). Opaque, always: alpha-0 faces must not vanish.
+   * The city atlas for instanced buildings, painted through the model's three-level mask in its
+   * vertex color alpha (docs/art/client-notes-city.md section 2): the instance color paints the
+   * wall faces (alpha above 0.75), the per-instance `instanceRoof` the roof faces (0.25 to 0.75:
+   * the district's roof color), and the per-instance `instanceShade` darkens everything. Opaque,
+   * always: alpha-0 faces must not vanish.
    */
   cityTint: THREE.MeshLambertMaterial;
   /** Lit vertex colors where the instance color only paints the faces masked by vertex alpha (cars). */
@@ -27,9 +29,17 @@ export interface Materials {
   building: THREE.MeshLambertMaterial;
   /**
    * The kaiju's body: `vcol` plus a rim of moonlight and a little of its own color at night, so
-   * the titan reads as an orange creature against a dark city, not as a black shape.
+   * the titan reads as an orange creature against a dark city, not as a black shape. (Each
+   * kaiju view draws with its own `kaijuSkin()`; this one never glows.)
    */
   kaiju: THREE.MeshLambertMaterial;
+  /**
+   * A kaiju body material of its own for one kaiju view: the shared rim light, plus its own
+   * glow (phase 3): the stripes the models mark (vertex color alpha 0.25 to 0.75,
+   * docs/ASSETS.md section 3) glow in `stripe`, and `flash` lights the whole hide (the power
+   * surge's bursts). Both are linear colors at any brightness; black is off.
+   */
+  kaijuSkin(): KaijuSkin;
   byKind(kind: MaterialKind): THREE.Material;
   /**
    * 0 by day, 1 at night: lights the windows and the kaiju's rim. `insideKaiju`: the camera is
@@ -69,12 +79,27 @@ function maskInstanceColor(material: THREE.Material): void {
 
 /** Name of the per-instance float attribute `cityTint` reads (1 = as built, below 1 = darker). */
 export const INSTANCE_SHADE = 'instanceShade';
+/** Name of the per-instance color attribute `cityTint` paints roof faces with (1, 1, 1 = as built). */
+export const INSTANCE_ROOF = 'instanceRoof';
 
-/** `cityTint`: masked instance color plus a separate shade for every face. */
+/**
+ * The paint mask's levels in a building's vertex color alpha (docs/art/client-notes-city.md
+ * section 2), read with margins: above `wall` the face is a wall that takes the building's
+ * color, from `roof` up to `wall` a roof that takes the district's roof color, below `roof`
+ * the art's own color. The files hold exact 0, 0.5 and 1 (a copy squeezed into bytes, 128/255).
+ */
+export const PAINT_MASK = { wall: 0.75, roof: 0.25 } as const;
+
+/** Which paint a face with mask value `a` takes: 'wall', 'roof' or 'none' (the shader's rule, for the CPU side). */
+export function maskLevel(a: number): 'wall' | 'roof' | 'none' {
+  return a >= PAINT_MASK.wall ? 'wall' : a >= PAINT_MASK.roof ? 'roof' : 'none';
+}
+
+/** `cityTint`: the wall paint and the roof paint through the three-level mask, plus a shade for every face. */
 function maskInstanceColorWithShade(material: THREE.Material): void {
   material.onBeforeCompile = (shader) => {
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', `#include <common>\n#ifdef USE_INSTANCING\nattribute float ${INSTANCE_SHADE};\n#endif`)
+      .replace('#include <common>', `#include <common>\n#ifdef USE_INSTANCING\nattribute float ${INSTANCE_SHADE};\nattribute vec3 ${INSTANCE_ROOF};\n#endif`)
       .replace(
         '#include <color_vertex>',
         [
@@ -88,7 +113,9 @@ function maskInstanceColorWithShade(material: THREE.Material): void {
           '#endif',
           '#ifdef USE_INSTANCING_COLOR',
           '  #ifdef USE_COLOR_ALPHA',
-          `    vColor.rgb *= mix( vec3( ${INSTANCE_SHADE} ), instanceColor.rgb * ${INSTANCE_SHADE}, color.a );`,
+          `    float mbWall = step( ${PAINT_MASK.wall.toFixed(2)}, color.a );`,
+          `    float mbRoof = step( ${PAINT_MASK.roof.toFixed(2)}, color.a ) * ( 1.0 - mbWall );`,
+          `    vColor.rgb *= mix( vec3( 1.0 ), instanceColor.rgb, mbWall ) * mix( vec3( 1.0 ), ${INSTANCE_ROOF}, mbRoof ) * ${INSTANCE_SHADE};`,
           '  #else',
           `    vColor.rgb *= instanceColor.rgb * ${INSTANCE_SHADE};`,
           '  #endif',
@@ -96,16 +123,38 @@ function maskInstanceColorWithShade(material: THREE.Material): void {
         ].join('\n'),
       );
   };
-  material.customProgramCacheKey = () => 'mb-city-tint';
+  material.customProgramCacheKey = () => 'mb-city-tint-roof';
 }
 
-/** Adds a rim light and a self-lift to a Lambert material; returns the uniforms to drive them. */
-function addRimLight(material: THREE.MeshLambertMaterial): { rimColor: { value: THREE.Color }; rimStrength: { value: number }; selfLift: { value: number } } {
-  const uniforms = { rimColor: { value: new THREE.Color(0x9db8ff) }, rimStrength: { value: 0 }, selfLift: { value: 0 } };
+/** One kaiju view's body material and its glow (`Materials.kaijuSkin`). */
+export interface KaijuSkin {
+  material: THREE.MeshLambertMaterial;
+  /** What the marked stripes glow with (linear; black: off). */
+  stripe: THREE.Color;
+  /** Light over the whole hide (linear; black: off). */
+  flash: THREE.Color;
+}
+
+/** The stripe mark in a kaiju model's vertex color alpha: from 0.25 to 0.75 (written 0.5; the hide is 1). */
+export const STRIPE_MASK = { from: 0.25, to: 0.75 } as const;
+
+type RimUniforms = { rimColor: { value: THREE.Color }; rimStrength: { value: number }; selfLift: { value: number } };
+
+/**
+ * A kaiju body material: Lambert with vertex colors, a rim light and a self-lift (the shared
+ * `rim` uniforms, which `setNight` drives for every kaiju at once) and its own glow: `stripe` on
+ * the faces the stripe mark picks out, `flash` everywhere.
+ */
+function kaijuSkinMaterial(rim: RimUniforms): KaijuSkin {
+  const material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  material.name = 'kaiju';
+  const stripe = { value: new THREE.Color(0, 0, 0) };
+  const flash = { value: new THREE.Color(0, 0, 0) };
+  const uniforms = { ...rim, stripeGlow: stripe, hideFlash: flash };
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform vec3 rimColor;\nuniform float rimStrength;\nuniform float selfLift;')
+      .replace('#include <common>', '#include <common>\nuniform vec3 rimColor;\nuniform float rimStrength;\nuniform float selfLift;\nuniform vec3 stripeGlow;\nuniform vec3 hideFlash;')
       .replace(
         '#include <emissivemap_fragment>',
         [
@@ -113,13 +162,17 @@ function addRimLight(material: THREE.MeshLambertMaterial): { rimColor: { value: 
           '{',
           '  float facing = clamp( dot( normal, normalize( vViewPosition ) ), 0.0, 1.0 );',
           '  float rim = 1.0 - facing;',
-          '  totalEmissiveRadiance += rimColor * ( rimStrength * rim * rim * rim ) + diffuseColor.rgb * selfLift;',
+          '  totalEmissiveRadiance += rimColor * ( rimStrength * rim * rim * rim ) + diffuseColor.rgb * selfLift + hideFlash;',
+          '  #ifdef USE_COLOR_ALPHA',
+          `    float mbStripe = step( ${STRIPE_MASK.from.toFixed(2)}, vColor.a ) * ( 1.0 - step( ${STRIPE_MASK.to.toFixed(2)}, vColor.a ) );`,
+          '    totalEmissiveRadiance += stripeGlow * mbStripe;',
+          '  #endif',
           '}',
         ].join('\n'),
       );
   };
-  material.customProgramCacheKey = () => 'mb-kaiju-rim';
-  return uniforms;
+  material.customProgramCacheKey = () => 'mb-kaiju-skin';
+  return { material, stripe: stripe.value, flash: flash.value };
 }
 
 export function createMaterials(assets: AssetStore): Materials {
@@ -158,9 +211,8 @@ export function createMaterials(assets: AssetStore): Materials {
     emissiveIntensity: 0,
   });
   building.name = 'building';
-  const kaiju = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-  kaiju.name = 'kaiju';
-  const rim = addRimLight(kaiju);
+  const rim: RimUniforms = { rimColor: { value: new THREE.Color(0x9db8ff) }, rimStrength: { value: 0 }, selfLift: { value: 0 } };
+  const kaiju = kaijuSkinMaterial(rim).material;
   // Kept where a console or a screenshot tool can reach them (to compare with the rim off).
   kaiju.userData.rim = rim;
 
@@ -172,6 +224,7 @@ export function createMaterials(assets: AssetStore): Materials {
     paint,
     building,
     kaiju,
+    kaijuSkin: () => kaijuSkinMaterial(rim),
     byKind(kind) {
       return kind === 'glow' ? glow : kind === 'city_atlas' ? cityAtlas : vcol;
     },

@@ -3,12 +3,12 @@
  * 5, "Supply crates and pick-ups"; numbers in defs/pickups.ts, CRATE_RULES).
  *
  * - When a stage starts, a crate comes down for every squad, on a street near its leader; then
- *   one every CRATE_RULES.every seconds for the squads still in the fight in turn, while fewer
- *   than CRATE_RULES.maxDown are down. A crate comes down by parachute on a street inside the
- *   bounds, at least a third of the bounds' half-size from the kaiju, over CRATE_RULES.fallTime
- *   seconds (`crate` 'drop', then 'land'), and lies there until it is taken or the stage ends
- *   ('gone'). What it holds is drawn with the match's random numbers; reinforcements are likelier
- *   the more units the squad it is meant for has lost.
+ *   one every CRATE_RULES.every seconds (per stage) for the squads still in the fight in turn,
+ *   while fewer than CRATE_RULES.maxDown are down. A crate comes down by parachute on a street
+ *   inside the bounds, at least a third of the bounds' half-size from the kaiju, over
+ *   CRATE_RULES.fallTime seconds (`crate` 'drop', then 'land'), and lies there until it is taken
+ *   or the stage ends ('gone'). What it holds is drawn with the match's random numbers;
+ *   reinforcements are likelier the more units the squad it is meant for has lost.
  * - Any living unit on the ground that comes within its radius plus CRATE_RULES.reach of a
  *   landed crate takes it for its squad (`crate` 'take'):
  *     machine gun, big cannon, missile pod   `squad.pickup`: the driven unit fires it instead of
@@ -340,7 +340,7 @@ function startSupply(world: World): void {
   clearSupply(world);
   const s = world.supply;
   s.stage = world.match.stage;
-  s.timer = CRATE_RULES.every;
+  s.timer = CRATE_RULES.every[s.stage - 1];
   s.turn = 0;
   if (world.config.crates === false) return;
   for (const squad of world.squads) if (!squad.eliminated) dropCrate(world, squad);
@@ -401,7 +401,7 @@ export function pickupSystem(world: World): void {
   const s = world.supply;
   s.timer -= DT;
   if (s.timer <= TIME_EPS) {
-    s.timer += CRATE_RULES.every;
+    s.timer += CRATE_RULES.every[m.stage - 1];
     if (world.config.crates !== false && world.crates.length < CRATE_RULES.maxDown[m.stage - 1]) {
       const squad = nextSquad(world);
       if (squad) dropCrate(world, squad);

@@ -72,24 +72,28 @@ squares clamped to the city, drawn as a thin glowing quarantine line; nobody can
 ### Destruction bar
 
 - Every structure has `hp` and a `value` (points). Damage to it adds `value × hpLost / maxHp`
-  points, whoever caused it. At 0 hp it is rubble: flat, passable, worth nothing more, and shots
-  that land on it cost nothing.
+  points, whoever caused it. At 0 hp it is rubble: worth nothing more, and shots that land on it
+  cost nothing. (Since phase 2 rubble is a heap half the building's height that still stops
+  shots and sight; units cross it at half speed: section 7, "Rubble and falls".)
 - Marks are computed per match from the value actually present, so every neighborhood is fair:
-  `P1 = 0.18 × V(stage 1 bounds)`, `P2 = max(1.6 × P1, 0.11 × V(stage 2 bounds))`,
+  `P1 = 0.145 × V(stage 1 bounds)`, `P2 = max(1.6 × P1, 0.11 × V(stage 2 bounds))`,
   `P3 = max(1.6 × P2, 0.30 × V(whole city))`. The three fractions are the pace knob; they were
-  tuned with the balance harness in Port Meridian (`docs/BALANCE.md` sections 8 to 10).
+  tuned with the balance harness in Port Meridian (`docs/BALANCE.md` sections 8 to 11). The
+  first was 0.18 until phase 3 packed the starting neighborhoods close, which made each worth
+  about a quarter more.
 - Display: a skyline with three towers. Points 0..P1 map to the first 21% of its width, P1..P2 to
   21..57%, P2..P3 to 57..100% (these are the doc's 15 / 40 / 70 marks, rescaled so the third
   tower is the end of the bar).
 - Tuning target (since phase 1: every stage about a fifth shorter than before, the owner's word
   after the first multiplayer playtest): contested stages of about 2:35 / 2:30 / 3:05 and a
-  match of about 8:15; a kaiju left alone fills a stage's segment in about two minutes. Measured
-  with `npm run sim` (bot against bot, Port Meridian, every start in turn, 40 matches) after
-  phase 2 (the second fraction lowered from 0.125 and the third raised from 0.29 to hold the
-  stages where phase 1 left them): contested stages of about 2:01 / 2:35 / 3:06 and 7:56 on
-  average (stage 1 is shorter than the aim because the squad-mates' stray fire fills the bar
-  too); alone 133 / 107 / 148 s for the three segments; the kaiju winning 16 of 40.
-  `docs/BALANCE.md` sections 9 and 10 have the tables.
+  match of about 8:15; a kaiju left alone fills a stage's segment in about two minutes. Phase 2
+  and phase 3 were each held within about a tenth of the stages before them. Measured with
+  `npm run sim` (bot against bot, Port Meridian, every start in turn, 40 matches) after phase
+  3's pacing pass (the first fraction lowered from 0.18): contested stages of about 2:00 / 2:32
+  / 3:02 and 7:37 on average (phase 2: 2:01 / 2:35 / 3:06 and 7:56; stage 1 is shorter than the
+  aim because the squad-mates' stray fire fills the bar too); alone 125 / 111 / 165 s for the
+  three segments; the kaiju winning 22 of 40. `docs/BALANCE.md` sections 9 to 11 have the
+  tables.
 
 ### The molt
 
@@ -527,14 +531,18 @@ already"; docs/ROADMAP.md).
 `PICKUP_WEAPONS`).
 
 - **Crates come down by parachute.** When a stage starts, one crate comes down for every squad,
-  on a street 25 to 90 m from its leader. Then one every 30 s, for the squads still in the fight
-  in turn, while fewer than 3 (stage 1), 4 (stage 2) or 5 (stage 3) are down (the first ones of
-  a stage come down whatever the count). A crate always lands on a street inside the bounds (not on a
-  bridge, in water, on rubble or in a building), at least a third of the bounds' half-size from
-  the kaiju (60 / 153 / 367 m), and at least 12 m from another crate; when there is no street at
-  that distance from the squad, anywhere on a street inside the bounds will do. It comes straight
-  down at a steady speed from 90 m over 4 s, then lies there until a unit takes it or the stage
-  ends (the molt). Anybody's squad may take a crate, whichever squad it was meant for.
+  on a street 25 to 90 m from its leader. Then one every 30 s at stage 1, every 12 s at stage 2
+  and every 15 s at stage 3 (with four squads in the fight: one for each squad every 2 minutes,
+  48 s and 60 s), for the squads still in the fight in turn, while fewer than 3 (stage 1), 6
+  (stage 2) or 8 (stage 3) are down (the first ones of a stage come down whatever the count).
+  Stages 2 and 3 had one every 30 s, with 4 and 5 down, until phase 3's pacing pass made
+  something new happen to a squad about every 20 to 25 s there too (`docs/BALANCE.md` section
+  11). A crate always lands on a street inside the bounds (not on a bridge, in water, on rubble
+  or in a building), at least a third of the bounds' half-size from the kaiju (60 / 153 / 367
+  m), and at least 12 m from another crate; when there is no street at that distance from the
+  squad, anywhere on a street inside the bounds will do. It comes straight down at a steady
+  speed from 90 m over 4 s, then lies there until a unit takes it or the stage ends (the molt).
+  Anybody's squad may take a crate, whichever squad it was meant for.
 - **What it holds** is drawn with the match's random numbers, weights machine gun 3, big cannon
   3, missile pod 3, artillery radio 2, reinforcements 1, and reinforcements 2 more for every unit
   the squad it is meant for has lost (so a squad down to its leader draws reinforcements 7 times
@@ -568,7 +576,11 @@ already"; docs/ROADMAP.md).
   --every-anchor`, with the city's phase 2 work in the same tree): 226 crates came down in 76
   minutes of play and two thirds were taken, about two a minute (machine guns 43, missile pods
   41, big cannons 28, artillery radios 24, reinforcements 14); 35 were still lying there when
-  their stage ended. The radios called 51 barrages; reinforcements brought 5 units back.
+  their stage ended. The radios called 51 barrages; reinforcements brought 5 units back. After
+  phase 3's pacing pass (40 matches, `docs/BALANCE.md` section 11): 1558 crates came down and
+  1237 were taken, at stage 2 about one every 42 s for each squad in the fight (1.4 a minute),
+  at stage 3 one every 63 s; the radios called 316 barrages and reinforcements brought 62 units
+  back.
 
 ### The two buttons, and the swarm
 
@@ -706,30 +718,38 @@ and plays any slot it is handed at any moment.
 - **Squad bot.** It only knows what the humans' map shows. Loop: drive to a firing position (a
   spot on a street at its own bearing, 50 to 90% of range out, with a line of fire; squads keep
   their bearings 70° apart so their fire crosses), its tank driven by throttle and hull turn
-  like a person's; stop; once its squad-mates have come up (or after 6 s), hold the volley
-  button so that they plant and charge; keep the crosshair on the kaiju (the visible height of
-  its body; ahead of it when it moves); and let go at full charge, waiting up to 2.5 s for a
-  neighbor that is nearly charged so the volleys land together, then hold it again. Whenever it
-  is not charging it fires at will (the leader shoots when it has the kaiju in range and in its
-  line of fire). It moves on when most of its guns have no clear line, lets go early and drives
-  away when the kaiju comes within 30% of range, and searches (last known position, then
-  around) while a hatchling, or a kaiju under water, is off the map; when the last known
-  position is out in the water it goes to the near bank instead and waits there. Its line of
-  fire and its crosshair go to what shows of a swimming kaiju (the spines). Into a staggered or
-  cocooned kaiju it does not charge: everybody fires as fast as the guns load. Its lines of fire
-  count rubble and fallen buildings up to their height, so it parks where it can shoot past
-  them. Where its leader sees the kaiju over a heap but most of its planted squad-mates do not,
-  it lets go, does not plant there again, and moves on, passing over that spot (15 m round it)
-  for 20 s; and when it reaches its firing spot with no line of fire at all (a hatchling among
-  heaps of rubble), it tries another side (its bearing turns 70°). (Before the phase 2
-  integration it planted and let go there over and over: at some starts not one squad fired a
-  charged volley at a hatchling standing still.) Phase 2: while the kaiju is not close (off the map, or farther than 1.5 times the
-  distance it backs off at, and not helpless) and it is not charging, it fetches a supply crate
-  coming down or lying within 60 m of its leader that no other bot squad is already going for
-  (giving up after 20 s). With a weapon pick-up it parks in that weapon's band of range: the
-  machine gun at 35 to 60% of range, the big cannon and the missile pod at 55 to 92%. With the
-  artillery radio it keeps volleying, even into a staggered or cocooned kaiju and even in the
-  lazy harness profile, since every charged volley calls a barrage.
+  like a person's (when the way lies behind it, it turns about the way it is already turning);
+  stop; once its squad-mates have come up (or after 6 s), hold the volley button so that they
+  plant and charge; keep the crosshair on the kaiju (the visible height of its body; ahead of it
+  when it moves); and let go at full charge, waiting up to 2.5 s for a neighbor that is nearly
+  charged so the volleys land together, then hold it again. Whenever it is not charging it fires
+  at will (the leader shoots when it has the kaiju in range and in its line of fire). It moves
+  on when most of its guns have no clear line, lets go early and drives away when the kaiju
+  comes within 30% of range, and searches (last known position, then around) while a hatchling,
+  or a kaiju under water, is off the map; when the last known position is out in the water it
+  goes to the near bank instead and waits there. Its line of fire and its crosshair go to what
+  shows of a swimming kaiju (the spines). Into a staggered or cocooned kaiju it does not charge:
+  everybody fires as fast as the guns load. Its lines of fire count rubble and fallen buildings
+  up to their height, so it parks where it can shoot past them. Where its leader sees the kaiju
+  over a heap but most of its planted squad-mates do not, it lets go, does not plant there
+  again, and moves on, passing over that spot (15 m round it) for 20 s; and when it reaches its
+  firing spot with no line of fire at all (a hatchling among heaps of rubble), it tries another
+  side (its bearing turns 70°). (Before the phase 2 integration it planted and let go there over
+  and over: at some starts not one squad fired a charged volley at a hatchling standing still.)
+  In the packed starting neighborhoods (phase 3) it looks for a firing position at spots every
+  20 m along the streets and checks the 24 that suit it best (bearing, distance, a short drive)
+  for a line of fire; it prefers one its squad-mates round it would share the line from (not a
+  gap between two houses that shows the kaiju to the leader alone); with no line from anywhere
+  50 to 90% of range out it looks closer in, down to 35% of range (never inside 1.25 times the
+  distance it backs off at); and with no line from there either it keeps going where it was
+  going and looks again from another side once there. Phase 2: while the kaiju is not close (off
+  the map, or farther than 1.5 times the distance it backs off at, and not helpless) and it is
+  not charging, it fetches a supply crate coming down or lying within 60 m of its leader on foot
+  (90 m in a tank, phase 3) that no other bot squad is already going for (giving up after 20 s).
+  With a weapon pick-up it parks in that weapon's band of range: the machine gun at 35 to 60% of
+  range, the big cannon and the missile pod at 55 to 92%. With the artillery radio it keeps
+  volleying, even into a staggered or cocooned kaiju and even in the lazy harness profile, since
+  every charged volley calls a barrage.
 - **Kaiju bot.** It goes for whatever standing structure (or car) pays best for the time it
   takes to reach and bring down, walks through what it tramples, swipes what it must, stomps
   when several things stand around it, and smashes what is in its way. It fights units that
@@ -800,10 +820,17 @@ server and every client build the identical city from code. No building list goe
 
 - 2200 × 2200 m. A river with at least 4 bridges, a bay or harbor edge, parks, plazas.
 - Districts with distinct silhouettes: downtown towers, old town, harbor and docks, industrial,
-  suburbs, university and science park, boardwalk and stadium, temple hill.
+  suburbs, university and science park, boardwalk and stadium, temple hill. Each has a roof
+  color of its own (phase 3), so each district and each start reads as its own place from above
+  and on the map (docs/CITY.md section 2).
 - At least 12 named landmarks (tallest tower, city hall dome, cathedral, stadium, ferris wheel,
   observatory, lighthouse, power plant, and so on). Landmarks are worth more and trigger chatter.
 - At least 8 neighborhood anchors in low-rise areas for stage 1 (cars, kiosks, houses in reach).
+  Since phase 3 their stage 1 squares are packed close: local streets 9 m wide with the houses
+  10 m from the middle line (a troop of tanks still passes with a meter to spare), small
+  gardens, back lanes lined with garages, bungalows and duplexes among the houses, and a
+  firehouse, a motel and a diner on the busier streets; the value inside each square is within
+  about 10% of the others (docs/CITY.md sections 6 and 13).
 - Roughly 2500 to 3200 structures and 4000 to 6000 small props (cars, kiosks, trees, lamps).
 - Structures collide as oriented boxes; props never block (vehicles and kaiju crush them).
 - The river is shallow: ground units wade at 50% speed; bridges are fast crossings and are
@@ -813,7 +840,14 @@ server and every client build the identical city from code. No building list goe
   has water a kaiju can swim in (section 4, "Swimming") within about 165 m of where the match
   starts, reachable along the streets without breaking anything. No street or building moved
   for it; it took the place of the tree belt outside the beltway (docs/CITY.md section 11).
-- Civilians are client-only fleeing sprites with no effect on play.
+- Civilians are client-only fleeing sprites with no effect on play. The monster squashes and
+  eats them (phase 3, section 8, "The monster's looks"): a cartoon puff, no gore.
+- Round the city (phase 3, scenery only: nothing walks there, no rule knows it is there, and
+  every rule still sees flat ground): beyond the Old Moat and a band of open land, low faceted
+  hills to the west, north and east, the River Wend coming down to the city through a valley
+  between them; to the south the open sea, with a headland far out to the south-west. They sit
+  in the haze and the light of the time of day like the city, and stand over the rooftops for a
+  squad in the street as well as behind the skyline for the titan (`client/src/render/scenery.ts`).
 
 ### Special buildings (phase 2, as built)
 
@@ -851,6 +885,14 @@ in the kind's `rewards` (`shared/src/defs/kaiju/lizard.ts`); all starting values
     static for 20 s (`match.staticUntil`, the tick it ends, in the snapshot): while it lasts the
     map shows nothing, so the squads know where the monster is only from what their units see
     within 250 m, at every stage (noise does not put it on the map either).
+- **Beyond the starting neighborhoods (phase 3).** Four more for every start along the way from
+  its anchor to downtown (20, 85, 150 and 215 m beyond its stage 1 square, the kinds in turn)
+  and six in the districts round downtown that the titan crosses at stage 3: 44 more, on street
+  fronts, at least 60 m from every landmark; every stage 2 square holds at least one of each
+  beyond its stage 1 square (docs/CITY.md section 13, numbers in `SPECIAL_SITES`). The rewards are
+  the same for every size of monster; the fireball never hurts one, and the mast falls away from
+  it. The fallen mast's top stays the hatchling's weapon only: at stages 2 and 3 the hand leaves
+  it and the feet crush it, like every city weapon.
 - **Measured** (ten bot matches, seeds 1 to 10, every start in turn): the hatchling's monster
   bot wrecked 19 of the 30 special buildings of the starting neighborhoods itself and the squads'
   fire 4 more (substation 9, gas station 8, radio mast 6 of 10); 10 more went at stage 2 and 3.
@@ -861,10 +903,13 @@ in the kind's `rewards` (`shared/src/defs/kaiju/lizard.ts`); all starting values
   under a warm glow, the mast's red lamps blink (a damaged one falters), all at the effect points
   the models mark. The surge: a blue-white flash over the yard, a ring, sparks from every
   insulator and lightning leaping from them to the monster for a second and a half (the crackle
-  on the monster's body for the eight seconds is the weapons' picture). The fireball: a low-poly
-  ball of flame swelling to the blast's 30 m and rolling upward as it burns down, a white flash,
-  two shock rings, burning debris, then fire on the ruin and a column of black smoke for 9 s, and
-  a shake for squads nearby. The mast tips over like any falling building, without its top 8 m:
+  on the monster's body for the eight seconds is the weapons' picture). The fireball (redrawn in
+  phase 3 so it reads as fire): a white flash and two shock rings, then dozens of lumpy puffs of
+  flame, white-hot in the middle and yellow to deep orange round it, flung out to about the
+  blast's 30 m and rolling upward, see-through at their edges, cooling through red to soot and
+  eaten away unevenly as they fade, fed for three seconds from the ruin so they rise as a column
+  under a cap of dark smoke (`client/src/render/fireball.ts`, one draw call); burning debris,
+  then fire on the ruin and black smoke for 9 s, and a shake for squads nearby. The mast tips over like any falling building, without its top 8 m:
   that section rides on it, whips over ahead of it as it lands, and is then the loose city weapon
   lying where the simulation puts it (a crash of steel, dust).
 
@@ -969,6 +1014,46 @@ software-drawn page, not yet felt by a person.
 - **The squad by a third-person camera.** On foot, the player's own squad-mates closer to the
   camera than 14 m fade, down to a sparse ghost of themselves at 4 m (a screen door of pixels, so
   they still hide nothing and still show where they are); the player's own soldier never fades.
+
+### The monster's looks (phase 3, as built)
+
+`docs/ROADMAP.md` phase 3: "two or three versions of each monster attack, slash trails, glowing
+stripes" and "the monster can squash and eat civilians (a puff, no gore)". All picture: the
+simulation's hit areas, timings and rules are the same for every look, and nothing here changes
+the game (`client/src/render/kaijuAnimator.ts`, `kaijuView.ts`, `kaijuTrails.ts`, `crowd.ts`).
+
+- **Looks.** The swipe: the right claw, the left claw (mirrored), or both claws raked down
+  together. The stomp: the right foot, the left foot, or a crouch and a hop that lands on both.
+  The tail sweep: coiled right and lashed left, or the other way round. The throw: overhand or
+  sidearm. The roar: head thrown up with the arms wide, or head thrust low and forward with the
+  arms spread low. The charge's stumble: pitching forward onto a knee, spinning out to the side,
+  or sitting down hard on its tail. The fast-food sign: a forehand, a backhand or an overhead
+  smash. Every look of an attack starts with that attack's tell (an arm raised high, rearing or
+  crouching for a stomp, the tail drawn back); a mirrored tell counts.
+- **The same look on every screen.** The look is a hash of the tick the attack began (for the
+  stumble, the tick the stumble began) and the kaiju, which every screen knows: a snapshot's
+  tick less its phase time is exactly the tick of the phase's `kaijuAction` event. The monster's
+  own player sees the press ahead of the server; until the server's phase arrives (a round trip
+  and the view's delay later) the attack shows only what its looks share, and the rest follows.
+- **Slash trails.** A band of orange light swept by the claws through a swipe's strike, by the
+  tail's last joint through a tail sweep, and by the fast-food sign's head through a swing, clear
+  at its tail and hot at its head, fading over the first half of the follow-through; worked out
+  from the motion, so it reads at any frame rate; blue-white and brighter in a power surge. A
+  stomping foot lands with a short orange shock ring and a flash.
+- **Glowing stripes.** The models mark their stripes (`docs/ASSETS.md` section 3). They glow with
+  rage: a faint ember red at none, hot orange at full; a slow throb, about every 2.6 s, while the
+  beam is picked and ready (the army's cue: it can breathe fire now); blazing while the beam
+  gathers and burns; a white-hot flare as a new body comes out of the cocoon; blue-white flicker
+  with the arcs during a power surge.
+- **Civilians.** Little groups, often ahead of where the monster walks; about a third freeze in
+  fright for a moment before they run (at 4 to 5 m/s, slower than the hatchling). A footstep
+  squashes those within 0.42 body radii of the foot (1 m at least), a stomp everyone in its
+  shockwave, a charge everyone its body runs over, the tail sweep everyone in its arc; each
+  vanishes in a cartoon puff (a white cloud, little stars) with a soft pop. A grab (or an eat)
+  that takes nothing the rules know (no `kaijuHeld` on its tick) with civilians in its reach
+  comes up with three to five of them in the claw; the monster lifts them to its mouth and gulps
+  them down with a puff (1.25 s; anything else it does gulps them at once). Each screen has its
+  own crowd: two players need not see the same people squashed.
 
 ### Controls (as built: `client/src/game/input/actions.ts`)
 
@@ -1173,3 +1258,23 @@ rules per cue in `shared/src/defs/voice.ts`):
   13 cues a minute. Before this pass both sides heard all of them (1,473 news lines, 1,484 radio
   lines). Now the news says 124 (about 1 a minute, 12 times fewer) and the radio 772 (about 6.7
   a minute, 52%). `test/voice.test.ts` holds a whole bot match to these limits.
+
+**Event lines (phases 2 and 3; as built, client only).** Some moments of phases 2 and 3 have no
+cue of the simulation's, so the client says a line for the simulation's own event
+(`client/src/audio/eventVoice.ts`; the script is `client/src/audio/eventLines.json`, in the
+same shape as `voiceLines.json`, built and checked with it). Every screen on a side picks the
+same line, by the event's tick, and each moment waits its own gap before it is said again on a
+screen:
+
+| Moment | Event | Radio (squads) | News (monster) | Gap |
+| --- | --- | --- | --- | --- |
+| A crate is coming for your squad | `crate` drop for the player's own squad | yes | no | 45 s |
+| Your squad's crate lies untouched 3 s after landing | `crate` land | yes | no | 45 s |
+| A radio mast falls | `mastFall` | yes | yes | 30 s |
+| A gas station goes up | `fireball` | yes | yes | 30 s |
+| A substation goes down (the power cut and the surge) | `powerSurge` | yes | yes | 30 s |
+| The monster takes up a garage door as a shield | `kaijuHeld` | yes | no | 90 s |
+| The monster gulps down a handful of civilians | the client's own gulp | no | yes | 90 s |
+
+So the news now also breaks in when the district's power goes out, a gas station explodes, a
+mast falls or the creature eats pedestrians; nothing else changed in what it says.

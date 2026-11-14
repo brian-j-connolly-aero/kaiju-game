@@ -17,14 +17,16 @@ from __future__ import annotations
 CITY_CAP = 900_000
 
 COUNTS = {
-    "house_a": 333, "house_b": 299, "house_c": 441, "rowhouse_a": 359, "shop_a": 132, "shop_b": 189,
-    "shop_c": 135, "apartment_a": 159, "apartment_b": 97, "apartment_c": 62, "office_a": 51,
-    "office_b": 35, "office_c": 28, "tower_a": 21, "tower_b": 12, "tower_c": 12, "factory_a": 45,
-    "factory_b": 7, "warehouse_a": 24, "bridge_a": 5, "meridian_tower": 1, "city_hall": 1, "tank_a": 28,
-    "crane_a": 15, "container_a": 58, "campus_a": 38, "pavilion_a": 24, "shrine_a": 72, "bridge_b": 1,
+    "house_a": 283, "house_b": 209, "house_c": 400, "rowhouse_a": 286, "shop_a": 114, "shop_b": 184,
+    "shop_c": 126, "apartment_a": 149, "apartment_b": 90, "apartment_c": 62, "office_a": 50,
+    "office_b": 34, "office_c": 28, "tower_a": 21, "tower_b": 12, "tower_c": 12, "factory_a": 40,
+    "factory_b": 7, "warehouse_a": 24, "bridge_a": 5, "meridian_tower": 1, "city_hall": 1, "tank_a": 26,
+    "crane_a": 15, "container_a": 58, "campus_a": 34, "pavilion_a": 17, "shrine_a": 77, "bridge_b": 1,
     "tidewater_cathedral": 1, "anchor_field": 1, "tidewheel": 1, "halcyon_observatory": 1,
     "farewell_light": 1, "kiln_point_power": 1, "sevenfold_temple": 1, "grand_station": 1,
     "signal_mast": 1, "gasworks": 1, "founders_clock": 1,
+    "substation_a": 24, "gasstation_a": 25, "radiomast_a": 25,
+    "bungalow_a": 314, "duplex_a": 158, "garage_a": 232, "diner_a": 10, "firehouse_a": 10, "motel_a": 10,
 }
 
 # triangles per state
@@ -44,10 +46,12 @@ BUDGETS = {
     "tidewheel": 1500, "halcyon_observatory": 1500, "farewell_light": 1500, "kiln_point_power": 1500,
     "sevenfold_temple": 1500, "grand_station": 1500, "signal_mast": 1500, "gasworks": 1500,
     "founders_clock": 1500,
-    # special buildings (roadmap phase 2; tools/art/city_special.py). A few stand in every
-    # starting neighborhood; they are not in COUNTS until count_city.ts is run on a city that
-    # places them. radiomast_a is in the small class by its volume (8 x 8 x 24 m).
+    # special buildings (roadmap phase 2; tools/art/city_special.py), in every starting
+    # neighborhood and, since phase 3, beyond them. radiomast_a is in the small class by its
+    # volume (8 x 8 x 24 m).
     "substation_a": 250, "gasstation_a": 250, "radiomast_a": 120,
+    # the small buildings of the starting neighborhoods (roadmap phase 3; tools/art/city_starts.py)
+    "bungalow_a": 120, "duplex_a": 120, "garage_a": 120, "diner_a": 120, "firehouse_a": 120, "motel_a": 120,
 }
 
 CHUNK_TRIS = 30

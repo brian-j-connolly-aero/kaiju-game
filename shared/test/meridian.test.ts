@@ -82,9 +82,22 @@ function inBounds(b: Bounds, x: number, z: number): boolean {
   return x >= b.minX && x <= b.maxX && z >= b.minZ && z <= b.maxZ;
 }
 
+const startSquares = city.anchors.map((a) => stageBounds(city, a.id, 1));
+const inAnyStart = (x: number, z: number): boolean => startSquares.some((b) => inBounds(b, x, z));
+
+/** A start's narrow local street (phase 3): no avenue, 9 m or less, its middle in a stage 1 square. */
+function isTightStreet(kind: string, width: number, x: number, z: number): boolean {
+  return kind === 'street' && width <= 9 && inAnyStart(x, z);
+}
+
+/** Distance from a point to the segment a..b. */
+function distToSeg(x: number, z: number, ax: number, az: number, bx: number, bz: number): number {
+  return Math.sqrt(distSqPointSegment2(x, z, ax, az, bx, bz));
+}
+
 describe('the game plays in Port Meridian; the placeholder is untouched', () => {
   it('is what getCity returns, and the placeholder is still what generateCity returns, to the last bit', () => {
-    expect(cityChecksum(getCity().city)).toBe(3115597894);
+    expect(cityChecksum(getCity().city)).toBe(1022541364);
     expect(cityChecksum(getCity().city)).toBe(cityChecksum(city));
     // The checksum the placeholder had before Port Meridian's archetypes were appended.
     expect(cityChecksum(generateCity())).toBe(1340881825);
@@ -94,8 +107,8 @@ describe('the game plays in Port Meridian; the placeholder is untouched', () => 
   });
 
   it('keeps the archetype list within the draw budget, append-only', () => {
-    // 48: one instanced batch per archetype and damage state (docs/CITY.md section 8).
-    expect(ARCHETYPES.length).toBeLessThanOrEqual(48);
+    // 56: one instanced batch per archetype and damage state (docs/CITY.md section 8).
+    expect(ARCHETYPES.length).toBeLessThanOrEqual(56);
     // The first 22 are the starter set, in their original order.
     expect(ARCHETYPES.slice(0, 22).map((a) => a.id)).toEqual([
       'house_a',
@@ -152,7 +165,7 @@ describe('Port Meridian: the data', () => {
     expect(nodes.length).toBeGreaterThan(400);
     expect(nodes.length).toBeLessThan(900);
     const used = new Set(city.structures.map((s) => s.archetype));
-    expect(used.size).toBeLessThanOrEqual(48);
+    expect(used.size).toBeLessThanOrEqual(56);
     // Every archetype appended for this city is actually used.
     for (const a of ARCHETYPES.slice(22)) expect(used.has(a.id), a.id).toBe(true);
   });
@@ -192,19 +205,22 @@ describe('Port Meridian: the data', () => {
         expect(wet, `${s.archetype} ${s.id} stands in water`).toBe(false);
       }
     }
-    // Streets: no wall within 12 m of a center line (a tank troop is 18 m wide) nor within 3 m of the roadway.
+    // Streets: no wall within 12 m of a center line (a tank troop is 18 m wide) nor within 3 m of
+    // the roadway; the narrow local streets of a start's stage 1 square (phase 3) within 10 m (the
+    // troop still has a meter to spare each side).
     let worst = Infinity;
     for (const e of edges) {
       const a = nodes[e.a];
       const b = nodes[e.b];
       const reach = 40;
       const box = { minX: Math.min(a.x, b.x) - reach, maxX: Math.max(a.x, b.x) + reach, minZ: Math.min(a.z, b.z) - reach, maxZ: Math.max(a.z, b.z) + reach };
+      const tight = isTightStreet(e.kind, e.width, (a.x + b.x) / 2, (a.z + b.z) / 2);
       for (const s of city.structures) {
         if (s.passable) continue;
         const r = Math.max(s.hx, s.hz) * 1.5;
         if (s.x < box.minX - r || s.x > box.maxX + r || s.z < box.minZ - r || s.z > box.maxZ + r) continue;
         const d = segToStructure(a.x, a.z, b.x, b.z, s);
-        const need = Math.max(e.width / 2 + 3, 12);
+        const need = Math.max(e.width / 2 + 3, tight ? 10 : 12);
         if (d - need < worst) worst = d - need;
       }
     }
@@ -280,9 +296,118 @@ describe('Port Meridian: the special buildings and the city weapons of every sta
     expect(city.props.some((p) => p.kind === 'mast')).toBe(false);
   });
 
+  it('puts more of them beyond the starts: one of each in every stage 2 square, on street fronts, away from the landmarks (phase 3)', () => {
+    const specials = city.structures.filter((s) => archetypeSpecial(s.archetype) !== null);
+    const landmarks = city.structures.filter((s) => s.landmark !== null);
+    const beyond = specials.filter((s) => !inAnyStart(s.x, s.z));
+    expect(beyond.length).toBeGreaterThanOrEqual(city.anchors.length * 3);
+    for (const a of city.anchors) {
+      const b1 = stageBounds(city, a.id, 1);
+      const b2 = stageBounds(city, a.id, 2);
+      for (const kind of ['substation', 'gasstation', 'radiomast'] as const) {
+        expect(
+          specials.some((s) => archetypeSpecial(s.archetype) === kind && inBounds(b2, s.x, s.z) && !inBounds(b1, s.x, s.z)),
+          `${a.name}: a ${kind} beyond its stage 1 square`,
+        ).toBe(true);
+      }
+    }
+    for (const s of beyond) {
+      // Wholly outside every start's square, apart from each other, clear of the landmarks.
+      for (const c of obbCorners(s)) expect(inAnyStart(c.x, c.z), `${s.archetype} ${s.id} in a start`).toBe(false);
+      for (const t of specials) if (t !== s) expect(Math.hypot(s.x - t.x, s.z - t.z), `${s.archetype} ${s.id}`).toBeGreaterThanOrEqual(45);
+      for (const lm of landmarks) {
+        let d = Infinity;
+        for (const c of obbCorners(s)) d = Math.min(d, distPointObb(c.x, c.z, lm));
+        for (const c of obbCorners(lm)) d = Math.min(d, distPointObb(c.x, c.z, s));
+        expect(d, `${s.archetype} ${s.id} by ${lm.landmark}`).toBeGreaterThanOrEqual(60 - 1e-6);
+      }
+      // On a street front: the middle of its front wall within its street's clearance and a few meters.
+      const front = { x: s.x + Math.sin(s.yaw) * s.hz, z: s.z + Math.cos(s.yaw) * s.hz };
+      let near = Infinity;
+      for (const e of edges) near = Math.min(near, distToSeg(front.x, front.z, nodes[e.a].x, nodes[e.a].z, nodes[e.b].x, nodes[e.b].z) - Math.max(e.width / 2 + 3, 12));
+      expect(near, `${s.archetype} ${s.id} off the street`).toBeLessThan(5);
+    }
+  });
+
   it('is checked by validateCity: a start without one of its specials is reported', () => {
     const missing = { ...city, structures: city.structures.map((s) => (s.archetype === 'gasstation_a' && Math.hypot(s.x - city.anchors[0].x, s.z - city.anchors[0].z) < 130 ? { ...s, archetype: 'shop_b', cls: 'shop' as const } : s)) };
     expect(validateCity(missing).some((p) => p.includes(city.anchors[0].name) && p.includes('gasstation'))).toBe(true);
+  });
+});
+
+describe('Port Meridian: the starting neighborhoods, packed close (phase 3)', () => {
+  const NEW_KINDS = ['bungalow_a', 'duplex_a', 'garage_a', 'diner_a', 'firehouse_a', 'motel_a'];
+
+  it('mixes in the new kinds: at least four of the six in every start, the diner, the motel and the firehouse on a busier street', () => {
+    for (const a of city.anchors) {
+      const b1 = stageBounds(city, a.id, 1);
+      const inside = city.structures.filter((s) => inBounds(b1, s.x, s.z));
+      const kinds = new Set(inside.filter((s) => NEW_KINDS.includes(s.archetype)).map((s) => s.archetype));
+      expect(kinds.size, `${a.name}: ${[...kinds].join(', ')}`).toBeGreaterThanOrEqual(4);
+      for (const s of inside) {
+        if (s.archetype !== 'diner_a' && s.archetype !== 'motel_a' && s.archetype !== 'firehouse_a') continue;
+        // The street its front looks onto: the nearest to the middle of its front wall.
+        const fx = s.x + Math.sin(s.yaw) * s.hz;
+        const fz = s.z + Math.cos(s.yaw) * s.hz;
+        let best = Infinity;
+        let kind = '';
+        for (const e of edges) {
+          const d = distToSeg(fx, fz, nodes[e.a].x, nodes[e.a].z, nodes[e.b].x, nodes[e.b].z) - e.width / 2;
+          if (d < best) {
+            best = d;
+            kind = e.kind;
+          }
+        }
+        expect(kind, `${a.name}: ${s.archetype} ${s.id}`).toBe('avenue');
+      }
+    }
+  });
+
+  it('has narrow local streets with the houses up close, still wide enough for a tank troop', () => {
+    for (const a of city.anchors) {
+      const b1 = stageBounds(city, a.id, 1);
+      let tight = 0;
+      let local = 0;
+      for (const e of edges) {
+        const x = (nodes[e.a].x + nodes[e.b].x) / 2;
+        const z = (nodes[e.a].z + nodes[e.b].z) / 2;
+        if (e.kind !== 'street' || !inBounds(b1, x, z)) continue;
+        const l = Math.hypot(nodes[e.a].x - nodes[e.b].x, nodes[e.a].z - nodes[e.b].z);
+        local += l;
+        if (e.width >= 8 && e.width <= 9) tight += l;
+      }
+      // (Hand-drawn streets such as Wharf Street keep their width.)
+      expect(tight / local, a.name).toBeGreaterThan(0.6);
+    }
+    // No wall nearer than 10 m to their middle line: checked with every street above (a troop is 18 m wide).
+  });
+
+  it('has back lanes through the deeper blocks, lined with garages, open at both ends', () => {
+    const lanes = city.lanes ?? [];
+    for (const a of city.anchors) {
+      const b1 = stageBounds(city, a.id, 1);
+      const mine = lanes.filter((l) => inBounds(b1, (l.ax + l.bx) / 2, (l.az + l.bz) / 2));
+      expect(mine.length, a.name).toBeGreaterThanOrEqual(1);
+      const garages = city.structures.filter((s) => s.archetype === 'garage_a' && inBounds(b1, s.x, s.z));
+      expect(garages.length, a.name).toBeGreaterThanOrEqual(5);
+    }
+    // Nothing is built on a lane: no wall within 5 m of its middle line.
+    for (const l of lanes) {
+      for (const s of city.structures) {
+        if (s.passable || Math.abs(s.x - l.ax) > 140 || Math.abs(s.z - l.az) > 140) continue;
+        expect(segToStructure(l.ax, l.az, l.bx, l.bz, s), `lane at ${l.ax}, ${l.az} and ${s.archetype} ${s.id}`).toBeGreaterThanOrEqual(5 - 1e-6);
+      }
+    }
+    // A lane is not a street: nothing routes along it, and it is not in the road graph.
+    for (const l of lanes) expect(nearestRoadNode(city.roads, l.ax, l.az)).toBeGreaterThanOrEqual(0);
+  });
+
+  it('gives every district a roof color of its own, which the checksum covers', () => {
+    const roofs = city.districts.map((d) => d.roof);
+    for (const d of city.districts) expect(d.roof, d.name).toBeTypeOf('number');
+    expect(new Set(roofs).size).toBe(city.districts.length);
+    const other = { ...city, districts: city.districts.map((d, i) => (i === 0 ? { ...d, roof: (d.roof ?? 0) ^ 1 } : d)) };
+    expect(meridianChecksum(other)).not.toBe(meridianChecksum(city));
   });
 });
 
@@ -290,8 +415,8 @@ describe('Port Meridian: the level', () => {
   it('is fair: the value in the stage 1 and stage 2 squares is about the same for every start', () => {
     const v1 = city.anchors.map((a) => valueInBounds(city, stageBounds(city, a.id, 1)));
     const v2 = city.anchors.map((a) => valueInBounds(city, stageBounds(city, a.id, 2)));
-    // Measured: 1.04 and 1.14. The design allows about 25%.
-    expect(Math.max(...v1) / Math.min(...v1)).toBeLessThanOrEqual(1.12);
+    // Measured since phase 3: 1.01 and 1.13. Stage 1 within about 10% (docs/CITY.md section 6); the design allows about 25%.
+    expect(Math.max(...v1) / Math.min(...v1)).toBeLessThanOrEqual(1.1);
     expect(Math.max(...v2) / Math.min(...v2)).toBeLessThanOrEqual(1.25);
     expect(Math.min(...v1)).toBeGreaterThan(1200);
     expect(Math.min(...v2)).toBeGreaterThan(14000);
@@ -502,8 +627,8 @@ describe('Port Meridian: identical on every machine', () => {
     const again = generatePortMeridian(CITY_SEED);
     // The city as delivered (docs/CITY.md). Chromium computes the same two numbers. When the city
     // is changed on purpose, these change: update them here and in docs/CITY.md.
-    expect(cityChecksum(city)).toBe(3115597894);
-    expect(meridianChecksum(city)).toBe(3365977326);
+    expect(cityChecksum(city)).toBe(1022541364);
+    expect(meridianChecksum(city)).toBe(894637982);
     expect(cityChecksum(again)).toBe(cityChecksum(city));
     expect(meridianChecksum(again)).toBe(meridianChecksum(city));
     expect(JSON.stringify(again)).toBe(JSON.stringify(city));

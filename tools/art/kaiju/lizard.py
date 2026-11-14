@@ -247,7 +247,7 @@ def build(stage: int) -> Rig:
     p = P(stage)
     rig = Rig()
     n = p.sides
-    stripe = p.stripe_color
+    stripe = parts.marked(p.stripe_color)      # stripe faces carry the glow mark (parts.STRIPE_ALPHA)
     rig.empty("root")
 
     # ------------------------------------------------------------------ hips
@@ -464,7 +464,7 @@ def build(stage: int) -> Rig:
         parts.paint_normal(g, DOWN, [(0.80, CREAM)])
         if p.stripes["tail"]:
             if last:
-                g.paint(stripe, where=lambda c, nr: nr.z > -0.5 and (c - a).dot(b - a) > 0.5 * (b - a).length_squared)
+                parts.paint(g, stripe, where=lambda c, nr: nr.z > -0.5 and (c - a).dot(b - a) > 0.5 * (b - a).length_squared)
             else:
                 parts.zigzag(g, a.lerp(b, 0.5), b - a, stripe, where=lambda c, nr: nr.z > -0.5)
         tan = (b - a).normalized()
@@ -559,7 +559,7 @@ def _head(rig: Rig, p: P, stripe) -> None:
     g.paint(ORANGE_LT, where=lambda c, nr: abs(nr.dot(LEFT)) > 0.55 and ahead(c) > y3
             and nr.dot(up_h) < 0.2 and nr.dot(up_h) > -0.5)
     for y0, y1 in ((ys[1], ys[2]), (ys[3], ys[4])):      # the rust bands: over the top and both bevels
-        g.paint(stripe, where=lambda c, nr, y0=y0, y1=y1: nr.dot(up_h) > 0.3 and y0 < ahead(c) < y1)
+        parts.paint(g, stripe, where=lambda c, nr, y0=y0, y1=y1: nr.dot(up_h) > 0.3 and y0 < ahead(c) < y1)
 
     # ---- eyes and brows sit on the facet that drops from the skull to the snout
     es = hd["eye"] * L

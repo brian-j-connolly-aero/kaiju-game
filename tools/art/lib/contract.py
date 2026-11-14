@@ -200,6 +200,19 @@ def archetype_for(asset: str) -> dict | None:
     return None
 
 
+# A model may rise above its archetype's box with one slim part (a tower, a mast): the height
+# in meters the whole intact model then has. The game still collides with the archetype's box,
+# and the size class and the budget still come from it.
+TALL_PARTS = {
+    "firehouse_a": 12.0,      # the hose tower at its back corner (the building itself is 9 m)
+}
+
+
+def model_height(aid: str, height: float) -> float:
+    """The height the intact model of an archetype is checked against."""
+    return float(TALL_PARTS.get(aid, height))
+
+
 def archetype_dims(arch: dict):
     """(width, depth, height) from an archetype record, tolerant of field spellings."""
     if not arch:

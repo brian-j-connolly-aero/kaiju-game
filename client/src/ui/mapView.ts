@@ -60,6 +60,22 @@ const ZONE_GROUND: Record<District['zone'], string> = {
   boardwalk: '#41302a',
 };
 
+/**
+ * A district's ground on the map: its roof color (phase 3, roofs colored by district), sunk into
+ * the night-blue map, so each district, and each starting neighborhood, is its own place on the
+ * map as it is from the monster's height. The buildings on it keep the colors of their state.
+ * A district without a roof color keeps its zone's ground.
+ */
+export function districtGround(d: Pick<District, 'zone' | 'roof'>): string {
+  const roof = d.roof;
+  if (roof === undefined) return ZONE_GROUND[d.zone] ?? COLORS.land;
+  const mix = (shift: number, dark: number): number => Math.round(dark + (((roof >> shift) & 255) - dark) * 0.38);
+  const r = mix(16, 0x1e);
+  const g = mix(8, 0x23);
+  const b = mix(0, 0x30);
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+}
+
 export class MapView {
   readonly root = el('div', 'map hidden');
   open = false;
@@ -223,7 +239,7 @@ export class MapView {
       ctx.closePath();
     };
     for (const d of city.districts) {
-      ctx.fillStyle = ZONE_GROUND[d.zone] ?? COLORS.land;
+      ctx.fillStyle = districtGround(d);
       polygon(d.polygon);
       ctx.fill();
     }

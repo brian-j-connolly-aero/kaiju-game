@@ -5303,6 +5303,390 @@
     "hyp": "the committee notes the loss of the city with regret a full accounting begins now",
     "errors": 0
    }
+  },
+  "v_crate_drop_1": {
+   "id": "v_crate_drop_1",
+   "hash": "2a5b6741a72309a86f83",
+   "spoken": "Supply drop on its way to you. Watch for the parachute.",
+   "duration": 3.732,
+   "speech": [
+    0.09,
+    3.572
+   ],
+   "words": 11,
+   "f0_median_hz": 93.0,
+   "raw": {
+    "hyp": "supply drop on its way to you watch for the parachute",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "supply drop on its way to you watch for the parachute",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "supply drop on its way to you watch for the parachute",
+    "errors": 0
+   }
+  },
+  "v_crate_drop_2": {
+   "id": "v_crate_drop_2",
+   "hash": "75d329b474c5d3203055",
+   "spoken": "Supplies inbound on your position. Go and get them.",
+   "duration": 3.689,
+   "speech": [
+    0.09,
+    3.529
+   ],
+   "words": 9,
+   "f0_median_hz": 92.0,
+   "raw": {
+    "hyp": "supplies inbound on your position go and get them",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "supplies inbound on your position go and get them",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "supplies inbound on your position go and get them",
+    "errors": 0
+   }
+  },
+  "v_crate_land_1": {
+   "id": "v_crate_land_1",
+   "hash": "4cb1487d3d650ec4095c",
+   "spoken": "Supplies are down beside you. Do not leave them lying there.",
+   "duration": 3.714,
+   "speech": [
+    0.09,
+    3.554
+   ],
+   "words": 11,
+   "f0_median_hz": 92.0,
+   "raw": {
+    "hyp": "supplies are down beside you do not leave them lying there",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "supplies are down beside you do not leave them lying there",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "supplies are down beside you do not leave them lying there",
+    "errors": 0
+   }
+  },
+  "v_crate_land_2": {
+   "id": "v_crate_land_2",
+   "hash": "d4fd9a740823d9bcab05",
+   "spoken": "Your supplies are on the ground. Go and collect them.",
+   "duration": 3.499,
+   "speech": [
+    0.09,
+    3.339
+   ],
+   "words": 10,
+   "f0_median_hz": 90.4,
+   "raw": {
+    "hyp": "your supplies are on the ground to go and collect 'em",
+    "errors": 2
+   },
+   "processed": {
+    "hyp": "your supplies are on the ground to go in collecting",
+    "errors": 4
+   },
+   "raw2": {
+    "hyp": "your supplies are on the ground go and collect them",
+    "errors": 0
+   }
+  },
+  "v_mast_down_1": {
+   "id": "v_mast_down_1",
+   "hash": "fdd251090ffe61e16217",
+   "spoken": "The radio mast is down. Your maps will show only static.",
+   "duration": 4.155,
+   "speech": [
+    0.09,
+    3.995
+   ],
+   "words": 11,
+   "f0_median_hz": 93.6,
+   "raw": {
+    "hyp": "the radio mast is down your maps will show only static",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "the radio mast is down your maps will show only static",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "the radio mast is down your maps will show only static",
+    "errors": 0
+   }
+  },
+  "v_mast_down_2": {
+   "id": "v_mast_down_2",
+   "hash": "102260946b0d574d56c4",
+   "spoken": "Radio mast destroyed. Maps are blank until further notice.",
+   "duration": 4.039,
+   "speech": [
+    0.09,
+    3.879
+   ],
+   "words": 9,
+   "f0_median_hz": 155.3,
+   "raw": {
+    "hyp": "radio mast destroyed maps are blank until further notice",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "radio mast destroyed maps are blank until further notice",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "radio mass destroyed maps are blank until further notice",
+    "errors": 1
+   }
+  },
+  "v_mast_down_3": {
+   "id": "v_mast_down_3",
+   "hash": "c481438b49f44fcfadbe",
+   "spoken": "A radio mast has fallen. Army maps are said to be blank.",
+   "duration": 3.828,
+   "speech": [
+    0.04,
+    3.738
+   ],
+   "words": 12,
+   "f0_median_hz": 203.8,
+   "raw": {
+    "hyp": "radio mast has fallen army maps are said to be blank",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "the radio mast has fallen army maps are said to be blank",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "a radio mast has fallen army maps are said to be blank",
+    "errors": 0
+   }
+  },
+  "v_gas_station_1": {
+   "id": "v_gas_station_1",
+   "hash": "7325b0baa28a7f659d4d",
+   "spoken": "Gas station just went up. Stay clear of the fire.",
+   "duration": 3.314,
+   "speech": [
+    0.09,
+    3.154
+   ],
+   "words": 10,
+   "f0_median_hz": 113.1,
+   "raw": {
+    "hyp": "gas station just one up stay clear of the fire",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "gas station just one of the state clear of the fire",
+    "errors": 4
+   },
+   "raw2": {
+    "hyp": "gas station just went up stay clear of the fire",
+    "errors": 0
+   }
+  },
+  "v_gas_station_2": {
+   "id": "v_gas_station_2",
+   "hash": "5728eb23f5411db30a2c",
+   "spoken": "The gas station has gone up. Stay away from the flames.",
+   "duration": 3.697,
+   "speech": [
+    0.09,
+    3.537
+   ],
+   "words": 11,
+   "f0_median_hz": 202.5,
+   "raw": {
+    "hyp": "a gas station has gone up stay away from the flames",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "the gas station has gone up the week and the frames",
+    "errors": 4
+   },
+   "raw2": {
+    "hyp": "the gas station has gone up stay away from the flames",
+    "errors": 0
+   }
+  },
+  "v_gas_station_3": {
+   "id": "v_gas_station_3",
+   "hash": "0ca79ea7a859a2f9f7dc",
+   "spoken": "A gas station has exploded. Fuel prices are expected to rise.",
+   "duration": 4.598,
+   "speech": [
+    0.04,
+    4.508
+   ],
+   "words": 11,
+   "f0_median_hz": 195.1,
+   "raw": {
+    "hyp": "gas station has exploded fuel prices are expected to rise",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "and gas station has exploded fuel prices are expected to rise",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "a gas station has exploded fuel prices are expected to rise",
+    "errors": 0
+   }
+  },
+  "v_power_cut_1": {
+   "id": "v_power_cut_1",
+   "hash": "4fae391a0bbfaa167bde",
+   "spoken": "A substation is down. The target took its power.",
+   "duration": 3.671,
+   "speech": [
+    0.09,
+    3.511
+   ],
+   "words": 9,
+   "f0_median_hz": 93.6,
+   "raw": {
+    "hyp": "the substation is down the target took its power",
+    "errors": 1
+   },
+   "processed": {
+    "hyp": "the substation is down the target to cut the power",
+    "errors": 4
+   },
+   "raw2": {
+    "hyp": "a substation is down the target took its power",
+    "errors": 0
+   }
+  },
+  "v_power_cut_2": {
+   "id": "v_power_cut_2",
+   "hash": "f006941762846a696c1c",
+   "spoken": "Power is out across the district. The target is surging.",
+   "duration": 3.476,
+   "speech": [
+    0.09,
+    3.316
+   ],
+   "words": 10,
+   "f0_median_hz": 163.3,
+   "raw": {
+    "hyp": "how're is al across the district the target is surging",
+    "errors": 2
+   },
+   "processed": {
+    "hyp": "power is out across the district the target is surging",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "power is out across the district the target is surging",
+    "errors": 0
+   }
+  },
+  "v_power_cut_3": {
+   "id": "v_power_cut_3",
+   "hash": "b5cd6b829b28fdf9acf1",
+   "spoken": "The district has lost power. The creature appears to be glowing.",
+   "duration": 3.877,
+   "speech": [
+    0.04,
+    3.787
+   ],
+   "words": 11,
+   "f0_median_hz": 200.0,
+   "raw": {
+    "hyp": "the district has lost power the creature appears to be glowing",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "the district has lost power the creature appears to be glowing",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "the district has lost power the creature appears to be glowing",
+    "errors": 0
+   }
+  },
+  "v_door_shield_1": {
+   "id": "v_door_shield_1",
+   "hash": "074ca8a1a9492462529c",
+   "spoken": "It is using a garage door as a shield. Go around it.",
+   "duration": 4.094,
+   "speech": [
+    0.09,
+    3.934
+   ],
+   "words": 12,
+   "f0_median_hz": 93.6,
+   "raw": {
+    "hyp": "it is using a garage door as a shield go around it",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "it is using the garage door as a shield go around it",
+    "errors": 1
+   },
+   "raw2": {
+    "hyp": "it is using a garage door as a shield go around it",
+    "errors": 0
+   }
+  },
+  "v_civilians_eaten_1": {
+   "id": "v_civilians_eaten_1",
+   "hash": "8a7b88221339be187c16",
+   "spoken": "Reports confirm the creature is eating pedestrians. Please keep to the crosswalks.",
+   "duration": 5.115,
+   "speech": [
+    0.04,
+    5.025
+   ],
+   "words": 12,
+   "f0_median_hz": 207.8,
+   "raw": {
+    "hyp": "reports confirm the creature is eating pedestrians please keep to the crosswalks",
+    "errors": 0
+   },
+   "processed": {
+    "hyp": "reports confirm the creature is eating pedestrians please keep to the crosswalks",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "reports confirm the creature is eating pedestrians please keep to the crosswalks",
+    "errors": 0
+   }
+  },
+  "v_civilians_eaten_2": {
+   "id": "v_civilians_eaten_2",
+   "hash": "6a5e74e8ea687ff54f0a",
+   "spoken": "The creature has eaten several pedestrians. Officials advise staying indoors.",
+   "duration": 5.064,
+   "speech": [
+    0.04,
+    4.974
+   ],
+   "words": 10,
+   "f0_median_hz": 195.1,
+   "raw": {
+    "hyp": "creature has to eat in several pedestrians officials advise staying indoors",
+    "errors": 4
+   },
+   "processed": {
+    "hyp": "the creature has eaten several pedestrians officials advise staying indoors",
+    "errors": 0
+   },
+   "raw2": {
+    "hyp": "the creature has eaten several pedestrians officials advise staying indoors",
+    "errors": 0
+   }
   }
  }
 }

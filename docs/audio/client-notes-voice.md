@@ -323,3 +323,5 @@ Recommended changes:
   within 0.2.
 - **Bus levels and ducking were not touched.** For reference: while a line plays, music is
   lowered to 0.4 and effects to 0.65 (`DUCK_MUSIC`, `DUCK_SFX`, `audioEngine.ts:54`, `:55`).
+  (Since phase 3's sound task, effects go down to 0.5: measured at the busiest stage 3 moment,
+  a radio line then stands 5 dB over everything else instead of 3; `docs/STATUS.md`.)

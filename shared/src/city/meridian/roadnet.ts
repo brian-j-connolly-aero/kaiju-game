@@ -6,7 +6,12 @@
  * plain arithmetic, so the same network comes out on every machine.
  */
 
-import { distSqPointSeg, quant, segSeg, type SegHit } from './geo';
+import * as GEO from './geo';
+import type { SegHit } from './geo';
+
+// The functions the hot loops call, read once into this module: under the module loaders the
+// game and its tests run in, every read of an imported binding goes through a getter.
+const { distSqPointSeg, quant, segSeg } = GEO;
 
 export type RoadKind = 'street' | 'avenue' | 'bridge';
 
@@ -29,6 +34,17 @@ export interface RoadSpec {
   stub: boolean;
   /** Patch the street was generated for, or -1. */
   patch: number;
+  /**
+   * A local street inside a start's stage 1 square (phase 3, "packed closer together where the
+   * match starts"): a narrower roadway, and buildings nearer to it (build.ts `streetClearance`).
+   */
+  tight?: boolean;
+  /**
+   * A back lane (lanes.ts): open ground through the middle of a block, lined with garages. Not a
+   * street: it is not in the road graph (nothing routes along it), it carries no props, and no
+   * lot fronts it but the garages'.
+   */
+  lane?: boolean;
 }
 
 export interface NetNode {

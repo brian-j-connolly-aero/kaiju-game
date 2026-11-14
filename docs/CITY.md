@@ -7,7 +7,10 @@ every landmark and every ordinary building type, described so it can be modeled 
 Status: **the game plays in Port Meridian** (since 12 November): the server, the client, the
 sandbox, the bots and the balance harness all build it through `getCity()`. The placeholder grid
 city is kept for tests and as a development option. Section 9 says what the switch did; the
-client's part (district tint, draw-call count) was done on 12 November (section 8).
+client's part (district tint, draw-call count) was done on 12 November (section 8). Since phase
+3 (14 November) the ten starting neighborhoods are packed close, six new kinds of buildings
+stand in them, every district has a roof color, and more special buildings stand beyond the
+starts (section 13).
 
 ![The whole city](city/map.png)
 
@@ -19,7 +22,7 @@ north is up, east is to the right, exactly like the in-game map):
 | `map.png` | The whole city, colored by district, buildings shaded by height, landmarks in red, starting neighborhoods as orange dots. |
 | `roads.png` | The street network the army's vehicles drive on, with bridges and the ford. |
 | `heat.png` | Where the value is: the brighter, the more points a kaiju earns by wrecking it. |
-| `anchors.png`, `anchor_<name>.png` | For each starting neighborhood, the stage 1 square (blue) and stage 2 square (orange), with the value inside each. |
+| `anchors.png`, `anchor_<name>.png` | For each starting neighborhood, the stage 1 square (blue) and stage 2 square (orange), with the value inside each; the special buildings are purple dots. The close-ups (2 pixels per meter) color the garages, the back lanes, the diner, the motel, the firehouse and the three special buildings each their own way (legend along the bottom). |
 | `district_<name>.png` | A close-up of each district at 1 meter per pixel. |
 | `model.png`, `model_downtown.png` | An "architect's model": every building as an extruded box, seen from the south-west. |
 
@@ -44,7 +47,9 @@ the bay between the Old Town on the west bank and the downtown towers on the eas
   Boardwalk** (stadium, ferris wheel, beach) on the west side of the bay.
 - Along the west, north and east edges lie the low-rise neighborhoods where a match starts:
   **Bellhaven**, **Temple Hill** (terraces on a round hill around a temple), **Hollowmere**,
-  **Northgate** and **Easter Green**.
+  **Northgate** and **Easter Green**. Where a match starts they are packed close: narrow
+  streets, houses up to the pavement, back lanes lined with garages, and a diner, a motel and a
+  firehouse on the busier streets (section 13).
 - A **beltway** runs all the way round the city edge. It is where army squads arrive in the
   last stage. Outside it, along the west, north and east edges, runs the **Old Moat**, where a
   young Gragnor can swim (section 11).
@@ -88,26 +93,59 @@ color family. A white model shows the tint exactly; a dark one hardly changes.
 The client applies it (`client/src/render/cityView.ts`): a building's wall faces (those its
 model masks for paint, `docs/art/client-notes-city.md` section 2) take one of the colors its
 model offers, picked by the structure's id, times the tint of the district its center is in.
-Roofs, glass, signs and doors keep the art's colors. Landmarks are one-offs and are modeled in
-their final colors; the tint is for ordinary buildings only.
+Roofs take the district's roof color (below); glass, signs and doors keep the art's colors.
+Landmarks are one-offs and are modeled in their final colors; the tint is for ordinary
+buildings only.
+
+**Roof colors** (phase 3: "roofs colored by district"). Every district also has a **roof color**
+(`District.roof` in the city data, beside `District.tint`; the full city checksum covers both).
+The models draw their roofs in light neutral greys and mark them in their vertex colors (alpha
+0.5; wall paint is 1, the art's own color 0); the client paints those faces the district's roof
+color, a few shades apart from building to building (picked by the structure's id), so a street
+is not one flat color. One color per instance, no extra draw calls. Landmarks, bridges and the
+three special buildings keep their own colors. The client draws it since phase 3 (four shades,
+picked by the structure's id; standing, damaged, falling and in the mounds), and the map paints
+each district's ground in its roof color, sunk into the dark map. The colors are chosen so that every district,
+and so every starting neighborhood, reads as its own place from the monster's height and on the
+map: neighbors differ in hue or in lightness. The two starts in Hollowmere (Alder Row,
+Dovecote) and the two in Northgate (Ivy Court, Harrow Lane) share their district's roofs.
+
+| District | Roof color | Looks like | Starts |
+|---|---|---|---|
+| Downtown | `#7c8794` | steel grey flat tops | |
+| Old Town | `#b04e36` | old red clay tiles | |
+| Temple Hill | `#cf7442` | terracotta | Fennel Hill |
+| Hollowmere | `#6b8a46` | moss green | Alder Row, Dovecote |
+| Northgate | `#45484f` | charcoal | Ivy Court, Harrow Lane |
+| Easter Green | `#9c3530` | brick red | Easter Green |
+| Bellhaven | `#55709a` | slate blue | Bellhaven |
+| University | `#6e5470` | plum slate | |
+| Halcyon Science Park | `#b4bcc4` | pale aluminium | |
+| The Cinder Works | `#6a5c52` | soot, a warm brown-grey | Cinder Flats |
+| The Docks | `#a65a2c` | rust | Gull Point |
+| The Boardwalk | `#5c9c98` | faded teal | Juniper Bay |
+
+(The data: `DISTRICT_ROOFS` in `shared/src/city/meridian/layout.ts`. The art's side: the roof
+mask, `docs/art/client-notes-city.md`.)
 
 | District | Map tint | Street pattern | Buildings | Structures | Value |
 |---|---|---|---|---|---|
-| Downtown | slate blue | regular grid | towers, offices, big apartments | 183 | 42 104 |
-| Old Town | warm sand | crooked, irregular | row houses, shops, small apartment blocks | 202 | 7 972 |
-| Temple Hill | dusty rose | rings and spokes round the temple | houses, shrines, cloister halls | 322 | 8 426 |
-| Hollowmere | pale green | curving suburban streets | detached houses | 285 | 2 349 |
-| Northgate | pale green | grid with a diagonal avenue | houses, row houses, the television mast | 372 | 5 394 |
-| Easter Green | pale green | garden suburb round a green | houses, a few apartments | 177 | 2 844 |
-| Bellhaven | pale green | small grid | houses, high street shops | 195 | 2 645 |
-| University | lavender | quads | lecture halls, row houses, clock tower | 103 | 7 331 |
-| Halcyon Science Park | lavender | grid cut by the diagonal Harrow Road | offices, labs, observatory | 114 | 8 882 |
-| The Cinder Works | warm grey-brown | big lots | factories, tanks, power station, workers' rows | 169 | 5 362 |
-| The Docks | blue-grey | big lots and a crooked fishing quarter | cranes, containers, warehouses, gasworks | 388 | 11 664 |
-| The Boardwalk | peach | small grid and a seafront strip | pavilions, hotels, stadium, ferris wheel | 187 | 5 693 |
+| Downtown | slate blue | regular grid | towers, offices, big apartments | 183 | 42 953 |
+| Old Town | warm sand | crooked, irregular | row houses, shops, small apartment blocks | 199 | 8 050 |
+| Temple Hill | dusty rose | rings and spokes round the temple | houses, shrines, cloister halls | 345 | 8 987 |
+| Hollowmere | pale green | curving suburban streets | detached houses, bungalows, duplexes, garages | 366 | 3 837 |
+| Northgate | pale green | grid with a diagonal avenue | houses, row houses, the television mast | 476 | 6 938 |
+| Easter Green | pale green | garden suburb round a green | houses, bungalows, a few apartments | 222 | 3 593 |
+| Bellhaven | pale green | small grid | houses, duplexes, high street shops | 267 | 3 748 |
+| University | lavender | quads | lecture halls, row houses, clock tower | 105 | 7 532 |
+| Halcyon Science Park | lavender | grid cut by the diagonal Harrow Road | offices, labs, observatory | 115 | 8 729 |
+| The Cinder Works | warm grey-brown | big lots | factories, tanks, power station, workers' rows | 226 | 6 233 |
+| The Docks | blue-grey | big lots and a crooked fishing quarter | cranes, containers, warehouses, gasworks | 435 | 12 640 |
+| The Boardwalk | peach | small grid and a seafront strip | pavilions, hotels, stadium, ferris wheel | 248 | 6 238 |
 
-(Structures and value counted inside each district polygon. Totals: 2695 structures worth
-110 896 points. The Farewell Light stands on the harbor mole, outside every district.)
+(Structures and value counted inside each district polygon, since phase 3. Totals: 3185
+structures worth 119 478 points; before phase 3, 2695 structures worth 110 896 points. The
+Farewell Light stands on the harbor mole, outside every district.)
 
 **Downtown.** The prize of stage 3. A tight grid of 14 m streets between the 22 m ring avenues,
 blocks filled edge to edge with offices and towers (12 to 165 m), Meridian Tower in the middle
@@ -127,9 +165,10 @@ rings and long cloister halls on the outer terraces. Pale plaster, terracotta, r
 neighborhoods (Fennel Hill on the west slope, and the Pilgrims Rise high street) lie here. Tanners
 Ford, the one marked ford over the river, leads from the hill to the University.
 
-**Hollowmere, Northgate, Easter Green, Bellhaven (the suburbs).** The hatchling's pantry: detached
-houses with yards (to hide in), corner shops, parked cars, small greens and plazas (open spots
-where squads can catch a hatchling). Hollowmere has curving streets and cul-de-sacs; Northgate is a
+**Hollowmere, Northgate, Easter Green, Bellhaven (the suburbs).** The hatchling's pantry: houses,
+bungalows and duplexes close together on narrow streets, back lanes lined with garages (to hide
+behind), corner shops, a diner, a motel and a firehouse, parked cars, small greens and plazas
+(open spots where squads can catch a hatchling). Hollowmere has curving streets and cul-de-sacs; Northgate is a
 plain grid crossed by Harrow Road, with Signal Hill and its mast; Easter Green is a garden suburb
 in rings round a round green; Bellhaven is a small grid with a high street. Pastel walls, grey and
 red roofs, lots of trees.
@@ -277,10 +316,11 @@ notch between a landmark and a block of flats.
 
 ## 4. The ordinary buildings
 
-43 archetypes in total (the cap is 48 since phase 2, see section 8): the 22 the placeholder city
+49 archetypes in total (the cap is 56 since phase 3, see section 8): the 22 the placeholder city
 already had, 18 appended for Port Meridian (6 new ordinary types, one new bridge, 11 new
-landmarks), and the 3 special buildings of phase 2 (section 12). Size is width x depth x height
-in meters. The class decides what the game counts (end-screen tallies).
+landmarks), the 3 special buildings of phase 2 (section 12) and the 6 kinds phase 3 added for
+the starting neighborhoods (marked *(phase 3)* below; section 13). Size is width x depth x
+height in meters. The class decides what the game counts (end-screen tallies).
 
 Rules of thumb for gameplay: houses (5 to 9 m) are the hatchling's food; shops and low blocks
 (up to 12 m) get trampled by the juvenile; apartments and offices stop the juvenile; towers above
@@ -322,6 +362,12 @@ the middle spans and railings plain and repeating along the length, so a stretch
 | `pavilion_a` *(new)* | shop | 16 x 12 x 7 | Boardwalk | Striped seaside pavilion (arcade, bandstand, bathhouse) with a canvas roof and flags. |
 | `shrine_a` *(new)* | shop | 10 x 10 x 11 | Temple Hill, Old Town | Small wayside shrine in the Sevenfold Temple's invented style: three stacked round drums with flat brim roofs and one bronze bell on a rope, cream and terracotta, no symbols, no upturned eaves. |
 | `bridge_b` *(new)* | bridge | 22 x 110 x 36 | river mouth | The Grand Harbor Bridge (section 3). Placed 24 x 103.5 m. |
+| `bungalow_a` *(phase 3)* | house | 10 x 9 x 5 | starting neighborhoods, suburbs, the shore | A one-story bungalow with a deep front porch on posts, a low hipped roof and a chimney. Hp 75, value 7. |
+| `duplex_a` *(phase 3)* | house | 12 x 10 x 7 | starting neighborhoods, suburbs | A two-story semi-detached pair, mirrored halves, two front doors with small porches under one long gable roof, two chimneys. Hp 110, value 11. |
+| `garage_a` *(phase 3)* | house | 8 x 7 x 4 | the back lanes of the starts, back gardens | A detached two-car garage and workshop, two ribbed roll-up doors (the look of `prop_garagedoor`), a low gable roof. Doors face the lane. Hp 40 (one hatchling swipe), value 4. |
+| `diner_a` *(phase 3)* | shop | 16 x 10 x 5 | one per start, on an avenue | A roadside diner: a long body with rounded ends in pastel and chrome, a band of big windows, a picture sign on the roof (a steaming cup or a slice of pie, no letters). Hp 130, value 13. |
+| `firehouse_a` *(phase 3)* | shop | 14 x 16 x 9 | one per start, on an avenue | A small brick fire station: two tall red engine doors at the front, a slim hose tower at a back corner that may rise to 12 m (the game counts the 9 m body). Hp 200, value 18. |
+| `motel_a` *(phase 3)* | shop | 24 x 10 x 7 | one per start, on an avenue | A two-story motel row: doors and windows in a row, an open walkway with a railing along the upper floor, a stair at one end, a picture sign on a pole (a crescent moon and a star, no letters). Hp 170, value 16. |
 
 Ids are append-only: never rename or reorder. Art files are named after them.
 
@@ -333,7 +379,13 @@ Ids are append-only: never rename or reorder. Art files are named after them.
   wide) are drawn by hand: the Meridian Beltway round the edge, Kingsway north-south through the
   center, River Drive and East Ring round downtown, the diagonal Harrow Road, Foundry Street, Quay
   Road, Shore Road, Old Post Road, Ironmongers Road, Northern Avenue and Meridian Avenue. Local
-  streets (8 to 14 m) grow inside each district in its own pattern.
+  streets (8 to 14 m) grow inside each district in its own pattern. Inside a starting
+  neighborhood's stage 1 square they are 9 m wide (the short closes 8 m) and the houses stand
+  10 m from their middle line instead of 12 (phase 3, section 13): 323 pieces, 21.7 km.
+- **Back lanes** (phase 3, section 13): 82 straight pieces, 6.5 km, through the middle of the
+  deeper blocks of the starts, lined with garages. A lane is not a street: it is not in the road
+  graph (nothing plans a route along it), it is open ground anyone may cross, and no building
+  comes within 5 m of its middle line. The city data lists them for drawing (`CityData.lanes`).
 - **The river** is shallow: units wade across it anywhere at half speed. Six bridge decks cross it
   (the Northgate bridge at the north edge, two on the Temple Hill / University reach, two either
   side of Chapter Island, and the Grand Harbor Bridge at the mouth), plus **Tanners Ford**, a
@@ -350,37 +402,40 @@ Ids are append-only: never rename or reorder. Art files are named after them.
   the river, Founders Plaza, Exchange Square, Station Square, Market Square, the Stadium
   Concourse, Wheel Plaza, the Embankment Promenade along the downtown waterfront and Juniper
   Strand (the beach).
-- **Props** (5588): parked and moving cars, taxis, vans, trucks, buses at stops, kiosks on plazas
+- **Props** (5575): parked and moving cars, taxis, vans, trucks, buses at stops, kiosks on plazas
   and high streets, trees in parks and along avenues, lamps, traffic lights at junctions,
   benches, hydrants and billboards; and since phase 2 the city weapons by the houses and shops
-  of the starts (230: section 12).
+  of the starts (227: section 12).
 
 ---
 
 ## 6. The starting neighborhoods (anchors) and fairness
 
 A match starts at one of ten neighborhoods. All lie in low-rise areas 920 m from the center; the
-stage 1 square (180 m half-size) holds only houses, shops, cars and kiosks, with yards to hide in
-and a green or plaza for squads to catch a hatchling in. The destruction bar marks are fractions
-of the value inside these squares, so the value inside them is kept close for every start
-(measured with the game's own `stageBounds` and `valueInBounds`):
+stage 1 square (180 m half-size) holds only houses, shops, cars and kiosks, packed close since
+phase 3 (narrow streets, small gardens, back lanes with garages: section 13), and a green or
+plaza for squads to catch a hatchling in. The destruction bar marks are fractions of the value
+inside these squares, so the value inside them is kept close for every start (measured with the
+game's own `stageBounds` and `valueInBounds`):
 
 | Anchor | Position (E, N) | Value in stage 1 square | Value in stage 2 square | Landmarks in the stage 2 square |
 |---|---|---|---|---|
-| Alder Row | -920, 920 | 1341 | 17 302 | Sevenfold Temple |
-| Bellhaven | -920, -240 | 1326 | 18 011 | Tidewater Cathedral |
-| Cinder Flats | 920, -235 | 1375 | 18 646 | Kiln Point Power Station |
-| Dovecote | -540, 920 | 1381 | 17 914 | Sevenfold Temple, Grand Meridian Station, Founders Clock Tower |
-| Easter Green | 920, 380 | 1348 | 18 701 | Kiln Point Power Station |
-| Fennel Hill | -928, 328 | 1352 | 19 168 | Tidewater Cathedral, Sevenfold Temple |
-| Gull Point | 920, -720 | 1381 | 16 923 | Number Three Gasworks |
-| Harrow Lane | 920, 920 | 1384 | 17 257 | Halcyon Observatory, Signal Hill Mast |
-| Ivy Court | 240, 920 | 1415 | 18 413 | Halcyon Observatory, Grand Meridian Station, Founders Clock Tower |
-| Juniper Bay | -920, -600 | 1402 | 17 128 | Tidewater Cathedral, Anchor Field, The Tidewheel |
+| Alder Row | -920, 920 | 1742 | 17 755 | Sevenfold Temple |
+| Bellhaven | -920, -240 | 1730 | 18 055 | Tidewater Cathedral |
+| Cinder Flats | 920, -235 | 1730 | 18 824 | Kiln Point Power Station |
+| Dovecote | -540, 920 | 1721 | 17 851 | Sevenfold Temple, Grand Meridian Station, Founders Clock Tower |
+| Easter Green | 920, 380 | 1730 | 19 027 | Kiln Point Power Station |
+| Fennel Hill | -928, 328 | 1736 | 19 637 | Tidewater Cathedral, Sevenfold Temple |
+| Gull Point | 920, -720 | 1734 | 17 314 | Number Three Gasworks |
+| Harrow Lane | 920, 920 | 1738 | 17 681 | Halcyon Observatory, Signal Hill Mast |
+| Ivy Court | 240, 920 | 1726 | 18 327 | Halcyon Observatory, Grand Meridian Station, Founders Clock Tower |
+| Juniper Bay | -920, -600 | 1731 | 17 324 | Tidewater Cathedral, Anchor Field, The Tidewheel |
 
-(Since phase 2, with the three special buildings of each start standing among the houses.)
-Spread: stage 1 within 7% (1326 to 1415), stage 2 within 14% (16 923 to 19 168); the target was
-about 25%. No stage 2 square reaches the downtown core.
+(Since phase 3, packed close. Before, with phase 2's special buildings: 1326 to 1415 and 16 923
+to 19 168.) Spread: stage 1 within 1.2% (1721 to 1742; the target since phase 3 is about 10%),
+stage 2 within 14% (17 314 to 19 637; about 25% allowed). No stage 2 square reaches the
+downtown core. The knobs that balance the starts are each start's `tight` settings and its
+parked cars (`layout.ts`, section 13).
 
 ---
 
@@ -390,13 +445,18 @@ All numbers below were measured on the shared 4-core machine while other work wa
 (load average 2.3 to 4.7; another program's headless browser used up to 3.6 cores at times). The
 machine was never idle.
 
-**Size** (since phase 2, section 12): 2664 structures, 5588 props, 43 archetypes, 13 landmarks
-plus the landmark bridge, 6 bridge decks, 30 special buildings (3 per start), 12 districts, 10
-anchors, 27 parks and plazas, and the Old Moat (section 11).
+**Size** (since phase 3, section 13): 3185 structures, 5575 props, 49 archetypes, 13 landmarks
+plus the landmark bridge, 6 bridge decks, 74 special buildings (3 in every start and 44 beyond
+them), 82 back lane pieces, 12 districts with their tints and roof colors, 10 anchors, 27 parks
+and plazas, and the Old Moat (section 11). (Phase 2: 2664 structures, 5588 props, 43
+archetypes, 30 special buildings.)
 
-**Same everywhere**: city checksum (seed 9001, the game's seed) 3115597894, full checksum
-(`meridianChecksum`, which also covers streets, areas, districts and their tints) 3365977326.
-For seed 9002 the city checksum is 1387892865 and the full checksum 973293805. (Before phase 2's
+**Same everywhere**: city checksum (seed 9001, the game's seed) 1022541364, full checksum
+(`meridianChecksum`, which also covers streets, areas, districts with their tints and roof
+colors, and the back lanes) 894637982. For seed 9002 the city checksum is 2420564289 and the
+full checksum 1288996068. (Phase 2's city: 3115597894 and 3365977326, for seed 9002
+1387892865 and 973293805. The phase 3 code uses only the same exact arithmetic and passes the
+scan; the Chromium run was not repeated. Before phase 2's
 special buildings and city weapons: 2695 structures and 5362 props, checksums 3570529651 and
 3898350366, for seed 9002 485795498 and 3758613154; Node 22 and headless Chromium 153 computed
 exactly the same numbers then, from an esbuild bundle of the generator run in both. The phase 2
@@ -416,6 +476,11 @@ beltway, which it replaced.) The placeholder city is unchanged: 1340881825 from 
   nothing measurable, not kept) did not move the cold number: it is the engine compiling about
   4000 lines of generator code the first time, spread across all steps (yard opening about 80 ms,
   street fronts about 45 ms, props about 23 ms, streets about 15 ms, ground about 14 ms).
+- Since phase 3 (section 13), on this machine as it is now (it has become slower: the phase 2
+  city's first build measured 337 to 363 ms of processor time under the test runner, against
+  the 166 to 212 above): the phase 3 city 310 to 400 ms, median about 330; warm 89 to 105 ms
+  (the phase 2 city 80 to 92). Phase 3 sped up the yard opener and the lot search without
+  changing what they build, which paid for most of the extra buildings.
 - So the cold build is **at the 200 ms budget, not reliably under it**. It happens once, when the
   server starts or the page loads (behind the loading screen). `shared/test/meridianCold.test.ts`
   times that first build on its own and fails over 400 ms of main-thread processor time. If the
@@ -457,8 +522,8 @@ What this says:
 
 ## 8. Budget
 
-- **Archetypes**: 43 of 48 (40 until phase 2's special buildings), every one from its art file,
-  one material each. The client draws one
+- **Archetypes**: 49 of 56 (40 until phase 2's special buildings, 43 until phase 3's six kinds),
+  every one from its art file, one material each. The client draws one
   instanced batch per archetype, per damage state (intact, damaged, rubble) and per material of
   its model, and only batches that have instances are drawn (`client/src/render/cityView.ts`),
   plus one draw for all falling collapse pieces. One more archetype would cost up to 3 calls.
@@ -468,7 +533,26 @@ What this says:
   with 480 pieces falling, 166 calls and 367,000 triangles. The most seen in a five-page match:
   130 calls and 462,000 triangles. Budget: 350 and 1.5 million.
 - **District tint**: free in draw calls (one color per instance, set once at load).
-- **Counts**: 2664 structures (allowed 2500 to 3200), 5588 props (4000 to 6000).
+- **Counts**: 3185 structures (allowed 2500 to 3200), 5575 props (4000 to 6000). Phase 3 added
+  about 520 small buildings to the starts (houses, garages: at most 120 triangles each in their
+  art, so about 60,000 more triangles with the whole city in view) and 44 special buildings;
+  the six new kinds add up to 18 batches (draw calls) when all are drawn in all three states.
+- **Phase 3, measured** (14 November, headless Chromium drawing in software, the phase 3 city
+  with the roof colors, the back lanes and the hills; `node tools/playtest/shots.mjs --only
+  x-city-cost`): in a start at stage 1 from the squad's third-person camera 120 draw calls and
+  455,000 triangles, from the hatchling's 120 and 422,000; at stage 3 from the titan's camera 135
+  and 449,000; the whole city from 1.7 km up at night 135 and 400,000. Well inside the budget
+  (350 and 1.5 million). The roof colors cost no draw call (one more value per instance); the
+  hills are one draw call and about 6,300 triangles (measured by hiding them: one call and 6,300
+  to 6,500 triangles fewer); the back lanes one draw call and 164 triangles; the sea and the
+  river's way north are in the water's own mesh (780 triangles); the gas station's fireball is
+  one draw call while it burns (at most 240 puffs of 80 triangles).
+- **Phase 3 integration, measured again** on the finished tree (`docs/STATUS.md`, the last
+  section): the same `x-city-cost` numbers (120 / 455,000 for the squad and 120 / 422,000 for
+  the hatchling at stage 1; 135 / 449,000 for the titan and 134 / 400,000 for the whole city at
+  night); the stage visits of `shots.mjs` 126 to 157 calls and 422,000 to 483,000 triangles; the
+  most a page drew in two whole five-page and three-page matches, 163 calls and 589,000
+  triangles. All well inside the budget.
 
 ---
 
@@ -558,10 +642,16 @@ needed; sections 9 and 10 how they moved since, to 0.18 / 0.11 / 0.30). The step
   streets, landmarks, anchors, districts and their building tints, and the patches that tell the
   generator what to grow).
 - `shared/src/city/meridian/*.ts`: the generator (`generate.ts` is the entry,
-  `generatePortMeridian(seed)`); `palettes.ts` sets which buildings each patch uses; `build.ts`
-  places bridge decks (as wide as their road plus a meter each side), landmarks (with the 20 m
-  apron), street fronts and yards, then opens every yard that would trap a squad.
-- Tests: `shared/test/meridian.test.ts` (the data, the level, identical on every machine),
+  `generatePortMeridian(seed)`); `palettes.ts` sets which buildings each patch uses (and the
+  packed versions of the starts); `build.ts` places bridge decks (as wide as their road plus a
+  meter each side), landmarks (with the 20 m apron), street fronts and yards, then opens every
+  yard that would trap a squad; `lanes.ts` the back lanes of the starts and their garages;
+  `specials.ts` the special buildings (in the starts and beyond); `starts.ts` the diner, the
+  motel and the firehouse of every start; `lots.ts` the search for a lot on a street front they
+  share.
+- Tests: `shared/test/meridian.test.ts` (the data, the level, the packed starts, identical on
+  every machine), `shared/test/specials.test.ts` (the special buildings' rewards, with every size
+  of monster),
   `shared/test/meridianPlay.test.ts` (deployment and bot matches), `shared/test/meridianCold.test.ts`
   (the first build's time).
 - `shared/scripts/cityMap.ts`: the pictures. `npm run sim`: the
@@ -637,8 +727,9 @@ kind; the models are the art stream's):
 | `radiomast_a` | factory | 8 x 8 x 24 | 120, 15 | A red and white lattice radio mast; nodes `lamp` (red lamps) and `top`, the top 8 m section (it lies apart once the mast has fallen: the `mast` prop). |
 
 - **Where** (`shared/src/city/meridian/specials.ts`, run after the landmarks and before the
-  street fronts): for every anchor and each of the three in turn, every lot along the streets
-  near the anchor's stage 1 square (a front facing the street, at the street's clearance plus a
+  street fronts; since phase 3 the lot search is `lots.ts`, lots 6 m apart, and more special
+  buildings stand beyond the starts: section 13): for every anchor and each of the three in turn,
+  every lot along the streets near the anchor's stage 1 square (a front facing the street, at the street's clearance plus a
   meter, plus the tall setback for the mast) is scored: best in the special's own direction
   from the anchor (three directions a third of a turn apart, turned by the seed), about 75 m
   out, with a jitter from the seed; then the best lots are tried in turn until one is wholly
@@ -673,3 +764,152 @@ were measured on a quieter one); a profile puts the specials' placement at about
 `meridianCold.test.ts` (the first build in a fresh process) passed. Nothing else moved: the
 streets, the landmarks and the districts are the same.
 
+
+---
+
+## 13. Phase 3: the starts packed close, six new kinds of buildings, roofs by district, special buildings beyond the starts (14 November, the city's simulation task)
+
+`docs/ROADMAP.md`, phase 3: "more kinds of buildings, packed closer together where the match
+starts; roofs colored by district". The owner's reason: the army is 10 to 20% faster than the
+monster at every stage, and tighter streets and shorter sight lines keep that fair (a squad can
+get out of sight; the monster can still corner one). And `docs/BALANCE.md` section 10: after
+stage 1 something new happened to the monster only about every 30 s and to a squad every 33 to
+58 s, so more special buildings stand beyond the starts.
+
+![Juniper Bay, packed close](city/anchor_juniper_bay.png)
+
+**The starting neighborhoods, packed close.** Inside every stage 1 square:
+
+- **Narrow streets.** The local streets are 9 m wide (the short closes 8 m; they were 11, at Gull
+  Point 10) and the houses stand 10 m from their middle line instead of 12. The street network
+  is the one it was (the same junctions and pieces), only narrower. Still wide enough for every
+  squad: a tank troop, the last stage's squad, is 18 m wide and has a meter to spare each side;
+  a tank or a section of infantry has room to pass. The avenues through and along the squares
+  keep their width and their 12 m: they are the army's routes in and out.
+- **Houses close to the street and to each other.** Front gardens of half a meter (3 m along the
+  avenues), a meter or three between neighbors, and every four or five houses a passage 12 m
+  wide through to the gardens behind, so no garden is walled in.
+- **Back lanes with garages.** Every block 56 to 130 m deep gets a lane through its middle,
+  along its long sides, open to the cross street at both ends, and garages along it with their
+  doors to the lane (a 12 m passage every four garages). 82 pieces, 6.5 km in all. A lane is
+  open ground, not a street: no route is planned along it, nothing is parked on it, and the
+  client draws it as a gravel track (`CityData.lanes`, since phase 3).
+- **No more cottages scattered in the gardens**: the blocks hold their rows and their lanes.
+- **The new kinds.** The bungalow and the duplex join each start's houses (each start keeps its
+  own flavor: suburb, garden suburb, old suburb, terraces, worker rows, harbor village, beach
+  village, the temple slope); the garages line the lanes; and every start has a firehouse, a
+  roadside motel and a diner, each on an avenue (the beltway or a frame avenue) wholly inside
+  its square, 40 m from each other and from the special buildings, about 100 m from the anchor
+  (`shared/src/city/meridian/starts.ts`). Every start has at least five of the six kinds
+  (Juniper Bay's beach village builds no duplexes); a test asks for four.
+- **What a start keeps**: its green or plaza; its three special buildings (now 60 to 88 m from
+  the anchor); its 21 city weapons; the streets in one piece; and fairness (section 6: stage 1
+  within 1.2%).
+
+| Start | Buildings in the square (phase 2 → now) | Bungalows / duplexes / garages | Back lanes | Median sight line (phase 2 → now) |
+|---|---|---|---|---|
+| Alder Row | 95 → 149 | 27 / 19 / 22 | 725 m | 88 → 62 m |
+| Bellhaven | 116 → 179 | 16 / 14 / 38 | 903 m | 74 → 44 m |
+| Cinder Flats | 120 → 176 | 26 / 14 / 25 | 592 m | 78 → 46 m |
+| Dovecote | 127 → 176 | 32 / 20 / 29 | 817 m | 60 → 38 m |
+| Easter Green | 114 → 162 | 33 / 25 / 13 | 227 m | 74 → 50 m |
+| Fennel Hill | 119 → 160 | 23 / 20 / 5 | 285 m | 64 → 48 m |
+| Gull Point | 126 → 175 | 39 / 7 / 8 | 507 m | 66 → 48 m |
+| Harrow Lane | 116 → 163 | 40 / 13 / 18 | 629 m | 70 → 52 m |
+| Ivy Court | 110 → 176 | 14 / 21 / 36 | 772 m | 80 → 52 m |
+| Juniper Bay | 123 → 190 | 50 / 0 / 33 | 1068 m | 70 → 46 m |
+
+(Sight lines: from points every 12 m along the streets inside each square, in 16 directions at
+3 m above the ground, how far until a building. Over all ten starts the median went from 72 m to
+48 m, the mean from 97 m to 79 m, and the share of lines of 100 m or more from 40% to 31%.
+Buildings cover about 12% of each square, against 8% before. The ring-and-spoke starts, Easter
+Green and Fennel Hill, have few blocks a straight lane fits, so few lanes.)
+
+**Balancing the starts.** Each start's packed version is data (`layout.ts`, the patch's
+`tight`): its palette (`palettes.ts`, the `...Tight` ones), how many of its lots are built
+(`keep`, 0.735 to 1.11), how many lane lots get a garage (`garages`), and regular passages for
+the denser terraces (`rowEvery`, `rowGap`). Their street patterns give some starts much more
+street front than others, so the terraces of Ivy Court and Cinder Flats leave more lots empty,
+and Alder Row, Dovecote, Easter Green and Harrow Lane keep more parked cars (`cars`), as in
+phase 2. Value in the stage 1 squares: 1721 to 1742 (phase 2: 1326 to 1415). The bar's first
+mark is a fraction of it, so stage 1 asks for about a quarter more wrecking than in phase 2.
+
+**The rest of the city.** Every street with an end outside the squares is as it was (507 of
+507), and 86% of the buildings outside the squares stand exactly where they stood (91% of those
+more than 40 m outside one). The others changed where a start's edge meets them (a row along a
+street that begins inside a square), round the special buildings beyond the starts, and where
+the bungalow, the duplex and the garage joined the suburbs outside the starts (the suburb,
+garden suburb, old suburb, harbor and beach village palettes, and the back gardens' cottages).
+The gardens' trees and drives and the
+scattered city weapons now take their random draws from where their building stands, not from
+its place in the list, so a change in one neighborhood no longer reshuffles them elsewhere.
+
+**Roofs by district**: section 2 (the colors, and how the client uses them).
+
+**Special buildings beyond the starts** (`specials.ts`; the numbers are `SPECIAL_SITES` in
+`layout.ts`, for a pacing pass to tune):
+
+- For every start, four more along the straight way from its anchor to downtown, at 20, 85, 150
+  and 215 m beyond the edge of its stage 1 square, the kinds in turn (each start beginning one
+  further on). Each stands on a street front within 75 m of its point, outside every stage 1
+  square, wholly inside that start's stage 2 square, 60 m from every landmark and 50 m from any
+  other special building. A site is left out where a special building of its kind already
+  stands within 90 m of its point (a neighbor's: the stage 2 squares overlap).
+- Six more for the titan at stage 3, in the districts round downtown it crosses on its way to
+  the towers: the Old Town, Wendside, Halcyon Gate, the Cinder Works, the Customs Quarter and the
+  shore hotels.
+- 44 in all (74 with the starts' 30). Every stage 2 square holds 10 to 17 outside its stage 1
+  square, at least one of each kind (`validateCity` checks this too).
+- The rewards are unchanged, and a bigger monster sets them off as it should (tests in
+  `shared/test/specials.test.ts`): a juvenile that walks through a substation tramples it and
+  gets the surge; a titan whose body reaches over a gas station takes nothing from its fireball
+  (it never hurts a monster), while a troop beside it does; a radio mast falls away from a titan
+  standing right beside it, its top lands clear of the titan's body, and the static comes.
+- **The fallen mast's top stays the hatchling's weapon only.** At stages 2 and 3 it lies where it
+  fell; the juvenile's hand leaves it and its feet crush it, like every city weapon. A bigger
+  monster's reward from a mast is the 20 s of static on the army's map and the fall itself, and
+  the city weapons stay "small monster first". Nothing in the rules changed for this.
+- **Measured** (20 bot matches, seeds 1 to 20, every start twice, the same matches on phase 2's
+  city alongside): the monster got a special building's reward 43 / 41 / 32 times at stages 1 /
+  2 / 3, at stage 2 one every 60 s of play and at stage 3 one every 119 s (phase 2's city: 41 /
+  14 / 8, one every 205 s and 435 s). It came within 60 m of a standing one every 67 s at stage
+  2. The goal was one every 30 to 45 s; the placement is not what holds it back. The monster bot
+  goes for a special building only while no squad is close (`BOT_RULES.kaiju`: `specialReach`
+  220 m and `specialCalm` 110 m at stage 2, not at all at stage 3), and the juvenile spends most
+  of stage 2 near the squads. A trial with the sites in a zigzag either side of the way made no
+  difference. The levers: `SPECIAL_SITES` and those bot numbers.
+
+**Checked.** `validateCity` (no problems); the city and Port Meridian tests, with the checksums of
+section 7; the deployment tests (every perimeter point of every stage of every start, and no
+spot along the city edge where a troop could be put and not drive out); and
+`npm run sim -- --seeds 10 --every-anchor` twice (seeds 1 to 10 and 11 to 20):
+
+| | Stage 1 | Stage 2 | Stage 3 (completed) | Match | Monster wins | Units stuck | Monster stuck |
+|---|---|---|---|---|---|---|---|
+| Phase 2's city, seeds 1 to 10 | 2:00 | 2:23 | 2:28 (4) | 7:34 | 4 of 10 | 0.01% (longest 3.0 s), 1 give-up | 0 s |
+| Phase 3, seeds 1 to 10 | 2:16 | 1:59 | 2:42 (4) | 7:39 | 4 of 10 | 0.01% (longest 2.0 s), 1 give-up | 0 s |
+| Phase 3, seeds 11 to 20 | 2:26 | 2:06 | 3:06 (5) | 7:31 | 5 of 10 | 0.01% (longest 4.2 s), no give-ups | 0.1 s |
+
+No match errored and the monster never stuck. Stage 1 is longer (its square is worth more), and
+the squads lose more units there (7.1 and 4.1 a match against 3.8) and break the hatchling's
+nerve less often (0.6 and 0.7 against 1.0): the packed streets hide it well. The pace is the
+pacing pass's to set (the bar fractions in `shared/src/defs/rules.ts`). (It did: the first
+fraction went from 0.18 to 0.145, the special buildings stayed as they are, and the squad bot
+learned the packed streets; `docs/BALANCE.md` section 11.)
+
+**What else changed in the generator** (for engineers):
+
+- `tightenStartStreets` (`build.ts`) narrows the local streets of the squares after the street
+  plan (`RoadSpec.tight`); `planLanes` and `buildLaneRows` (`lanes.ts`) make the lanes (builder
+  streets with `RoadSpec.lane`, left out of the road graph) and their garages; `lots.ts` is the
+  lot search the special buildings and the starts' shops share.
+- The yard opener: in a start's square even the smallest enclosed speck of ground is opened (the
+  packed blocks leave small courtyards a squad could be put down in); the tight streets and,
+  except for the troop, the lanes count as open roadway; and the troop's round now asks for the
+  9.75 m a troop is deployed with, not 9.25 m (a corridor 19 m wide behind a row of houses had
+  read as a way out). It is faster too: each wall is weighed once per try and only near the
+  pocket, which builds exactly the same city.
+- Build time: the generator reads the functions its hot loops import once per module (under
+  the module loaders the game and its tests use, every read of an imported binding goes through
+  a getter), the start squares once, and takes the best lots off a heap; all this builds exactly
+  the same city. Section 7 has the times.

@@ -17,6 +17,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { deflateSync } from 'node:zlib';
 import {
+  archetypeSpecial,
   generateCity,
   generatePortMeridian,
   PROP_KINDS,
@@ -309,6 +310,17 @@ const CLASS_COLOR: Record<string, RGB> = {
   bridge: [90, 90, 100],
   landmark: [214, 40, 60],
 };
+/** Buildings that get a color of their own on the close-ups: the special buildings (phase 2) and the starts' own shops and garages (phase 3). */
+const ARCHETYPE_COLOR: Record<string, RGB> = {
+  substation_a: [120, 60, 200],
+  gasstation_a: [150, 80, 220],
+  radiomast_a: [100, 40, 170],
+  garage_a: [150, 132, 118],
+  diner_a: [230, 90, 150],
+  motel_a: [40, 160, 160],
+  firehouse_a: [200, 30, 30],
+};
+const LANE: RGB = [214, 204, 186];
 const LAND: RGB = [236, 234, 226];
 const WATER: RGB = [112, 170, 222];
 const PARK: RGB = [150, 204, 130];
@@ -398,11 +410,23 @@ function drawRoads(v: View, city: CityData): void {
   }
 }
 
+function drawLanes(v: View, city: CityData): void {
+  for (const l of city.lanes ?? []) {
+    const a = px(v, l.ax, l.az);
+    const b = px(v, l.bx, l.bz);
+    v.canvas.line(a[0], a[1], b[0], b[1], Math.max(1, l.width * v.scale), LANE);
+  }
+}
+
+function structureColor(s: Structure): RGB {
+  return ARCHETYPE_COLOR[s.archetype] ?? CLASS_COLOR[s.cls] ?? [128, 128, 128];
+}
+
 function drawStructures(v: View, city: CityData, dim = false): void {
   const c = v.canvas;
   for (const s of city.structures) {
     if (s.passable) continue;
-    const base = CLASS_COLOR[s.cls] ?? [128, 128, 128];
+    const base = structureColor(s);
     // Taller is darker: the skyline reads from above.
     const k = 1.12 - Math.min(1, s.height / 170) * 0.62;
     const col = dim ? mix(shade(base, k), LAND, 0.55) : shade(base, k);
@@ -455,6 +479,7 @@ function boundsOutline(v: View, b: Bounds, width: number, col: RGB): void {
 
 function drawCity(v: View, city: CityData, o: DrawOptions): void {
   drawGround(v, city, o);
+  drawLanes(v, city);
   drawRoads(v, city);
   drawStructures(v, city, o.dim);
   if (o.props) drawProps(v, city);
@@ -575,9 +600,10 @@ function renderAnchors(city: CityData, file: string): void {
     const b1 = stageBounds(city, a.id, 1);
     const b2 = stageBounds(city, a.id, 2);
     for (const s of city.structures) {
-      if (!s.landmark) continue;
+      const special = archetypeSpecial(s.archetype) !== null;
+      if (!s.landmark && !special) continue;
       const p = px(v, s.x, s.z);
-      v.canvas.disc(p[0], p[1], 3, [214, 40, 60]);
+      v.canvas.disc(p[0], p[1], special ? 2.5 : 3, special ? structureColor(s) : [214, 40, 60]);
     }
     boundsOutline(v, b2, 3, [255, 122, 26]);
     boundsOutline(v, b1, 3, [20, 150, 190]);
@@ -624,6 +650,19 @@ function renderDistrict(city: CityData, index: number, file: string): void {
   v.canvas.save(file);
 }
 
+/** A row of colored squares with names along the bottom of a picture. */
+function legend(v: View, items: ReadonlyArray<readonly [string, RGB]>): void {
+  const c = v.canvas;
+  let x = 8;
+  const y = c.h - 26;
+  c.rect(0, y - 6, c.w, c.h, [255, 255, 255]);
+  for (const [name, col] of items) {
+    c.rect(x, y, x + 16, y + 16, col);
+    c.text(x + 22, y + 4, name, INK, 1);
+    x += 30 + textWidth(name, 1);
+  }
+}
+
 function renderAnchorCloseup(city: CityData, anchor: number, file: string): void {
   const a = city.anchors[anchor];
   const b1 = stageBounds(city, anchor, 1);
@@ -635,6 +674,18 @@ function renderAnchorCloseup(city: CityData, anchor: number, file: string): void
   const q = px(v, a.x, a.z);
   v.canvas.disc(q[0], q[1], 6, [255, 122, 26]);
   v.canvas.text(8, 8, `${a.name.toUpperCase()}  STAGE 1 SQUARE (360 M)  VALUE ${valueInBounds(city, b1)}  2 PX PER M`, INK, 2);
+  legend(v, [
+    ['HOUSE', CLASS_COLOR.house],
+    ['SHOP', CLASS_COLOR.shop],
+    ['GARAGE', ARCHETYPE_COLOR.garage_a],
+    ['BACK LANE', LANE],
+    ['DINER', ARCHETYPE_COLOR.diner_a],
+    ['MOTEL', ARCHETYPE_COLOR.motel_a],
+    ['FIREHOUSE', ARCHETYPE_COLOR.firehouse_a],
+    ['SUBSTATION', ARCHETYPE_COLOR.substation_a],
+    ['GAS STATION', ARCHETYPE_COLOR.gasstation_a],
+    ['RADIO MAST', ARCHETYPE_COLOR.radiomast_a],
+  ]);
   v.canvas.save(file);
 }
 

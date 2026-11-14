@@ -273,17 +273,6 @@ export class Effects {
     this.ring(x, z, r * 2.2, 0xffd9a0, 0.5, 0.85);
   }
 
-  /** A tongue of flame rolling out (a fireball's surface): the explosion picture, moving and growing. */
-  flame(x: number, y: number, z: number, size: number, vx: number, vy: number, vz: number, life = 0.9): void {
-    const p = this.spawn('burst', this.anims.explosion, x, y, z, size, life, 0xffffff, 1);
-    p.vx = vx;
-    p.vy = vy;
-    p.vz = vz;
-    p.grow = size * 0.6;
-    p.drag = 1.4;
-    p.rot = this.rand() * 6.283;
-  }
-
   /** A puff of a smoke column: rises `rise` meters a second and spreads slowly (a fire's smoke). */
   plume(x: number, y: number, z: number, size: number, rise: number, color = 0x2a2624, life = 5, alpha = 0.7): void {
     const p = this.spawn('smoke', this.anims.smoke, x, y, z, size, life, color, alpha);
@@ -349,6 +338,37 @@ export class Effects {
         g.gravity = 22;
       }
     }
+  }
+
+  // --- the monster's looks (phase 3) -----------------------------------------------------------
+
+  /**
+   * A cartoon puff (docs/ROADMAP.md phase 3: a civilian squashed or gulped): a round white cloud
+   * that pops out and is gone, a few little stars thrown up, a faint ring on the ground. Nothing
+   * else is left behind: no bodies, nothing gory. `size` is about the puff's width (meters).
+   */
+  cartoonPuff(x: number, y: number, z: number, size: number): void {
+    const s = Math.max(0.4, size);
+    for (let i = 0; i < 3; i++) {
+      const a = this.rand() * 6.283;
+      const p = this.spawn('smoke', this.anims.smoke, x + Math.cos(a) * s * 0.2, y + s * (0.35 + this.rand() * 0.2), z + Math.sin(a) * s * 0.2, s * 0.65, 0.42 + this.rand() * 0.18, 0xffffff, 0.95);
+      p.vx = Math.cos(a) * s * 1.4;
+      p.vz = Math.sin(a) * s * 1.4;
+      p.vy = s * 0.9;
+      p.grow = s * 2.4;
+      p.drag = 4;
+    }
+    for (let i = 0; i < 3; i++) {
+      const a = this.rand() * 6.283;
+      const p = this.spawn('glow', this.anims.spark, x, y + s * 0.5, z, s * (0.28 + this.rand() * 0.12), 0.45 + this.rand() * 0.2, 0xfff1a8, 1);
+      p.vx = Math.cos(a) * s * 2.2;
+      p.vz = Math.sin(a) * s * 2.2;
+      p.vy = s * (2.2 + this.rand() * 1.2);
+      p.gravity = s * 9;
+      p.drag = 1.2;
+    }
+    // (A ring on the ground only for a puff on the ground: not under a gulp at the mouth.)
+    if (y < s) this.ring(x, z, s * 0.9, 0xffffff, 0.3, 0.55);
   }
 
   get count(): number {

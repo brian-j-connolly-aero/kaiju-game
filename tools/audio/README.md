@@ -12,10 +12,13 @@ tools/audio/
   music/build.sh       score (Python) -> MIDI -> fluidsynth -> mix and master -> .ogg + .mp3
   music/mbmusic/       the score, the instruments, the mixdown and the measurements
   sfx/build.sh         synthesis (numpy, scipy) -> master -> .ogg + .mp3, docs/audio/SFX.md
-  sfx/mbsfx/           one Python function per sound, grouped by family
+  sfx/mbsfx/           one Python function per sound, grouped by family (moves.py, army.py and
+                       city.py hold the sounds of phases 1 to 3)
   voice/build.sh       offline speech synthesis -> radio / broadcast / hall chain -> .ogg + .mp3,
                        docs/audio/VOICE.md, docs/VOICE_SCRIPT.md
-  voice/cast.json      who speaks with which synthesizer voice and processing chain
+  voice/cast.json      who speaks with which synthesizer voice and processing chain; the lines
+                       themselves are shared/src/defs/voiceLines.json and the client's event
+                       lines, client/src/audio/eventLines.json
   voice/pronounce.json respellings fed to the synthesizer (subtitles never change)
   voice/build_state.json  what each line was last built from (for rebuilding only what changed)
   voice/tryline.py     try a wording in a voice before it goes into the script
@@ -65,7 +68,8 @@ Environment variables: `MB_SCRATCH_ROOT` (where intermediate files go, default
 ## 3. Reproducible
 
 From unchanged sources a full rebuild gives back every `.ogg` and `.mp3` byte for byte, and the
-same manifests and documents (checked on 726 files, November 2026). The encoders are run with
+same manifests and documents (checked on 726 files, November 2026; and on the sound effects
+again after phase 3 added 38 sounds: none of the older files changed by a byte). The encoders are run with
 fixed settings and the synthesis uses fixed random seeds. At the end of a run the script says
 how many files differ from the last commit; after a rebuild with no source change that number
 should be 0. If it is not, something in the tools changed (an ffmpeg or fluidsynth upgrade, for
@@ -98,3 +102,12 @@ and fails if a file breaks the rules in its document. Then run `npm run check`.
   `ui_ready`, `ui_hover`) read about 23 ms long.
 - The game must run offline: no builder fetches anything at build time either, apart from the
   one-time setup script.
+- The voice script is two files. `shared/src/defs/voiceLines.json` holds the lines for the
+  simulation's cues (the audio tools only read it); `client/src/audio/eventLines.json` holds the
+  lines the game says itself for moments of phases 2 and 3 that have no cue (a crate coming, a
+  mast, a gas station or a substation going down, a garage door, civilians eaten), with their
+  cues listed in `client/src/audio/eventVoice.ts`. The voice builder checks, builds, measures
+  and documents both together, and a line id must be unique across the two.
+- Sound effects whose variants are not interchangeable: `kaiju_stumble_s1..s3`, whose three
+  variants are the three stumble looks, in order. Every other sound's variants are picked at
+  random by the game.

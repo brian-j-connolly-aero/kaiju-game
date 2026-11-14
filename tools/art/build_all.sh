@@ -77,6 +77,16 @@ if [ -f package.json ] && grep -q '"assets:manifest"' package.json; then
   fi
 fi
 
+# The roof sheets (docs/art/previews/city_roofs_test.png, city_roofs_districts.png): every
+# ordinary building's roof mask in a loud color, and the roofs in their districts' colors.
+# Redrawn only when a building, the atlas or the colors changed.
+if [ -z "${MB_NO_PREVIEWS:-}" ]; then
+  echo "=== roof sheets"
+  if ! "$PY" tools/art/city/roofs.py; then
+    failed="$failed roofs"
+  fi
+fi
+
 if [ -n "$failed" ]; then
   echo "BUILD FAILED:$failed" >&2
   exit 1

@@ -5,8 +5,8 @@ how the art gets reviewed without opening the game, and they feed the progress s
 
 | Folder | What is in it |
 | --- | --- |
-| `previews/` | One **contact sheet** per model: front, left side, back and a three-quarter view, plus extra views where they matter (the kaiju's first-person view, a building's damaged, rubble and collapse states). |
-| `concept/` | One or more **beauty shots** per model: lit, with a sky or studio backdrop and a shadow on the ground. This is the picture to judge "does it look good". |
+| `previews/` | One **contact sheet** per model: front, left side, back and a three-quarter view, plus extra views where they matter (the kaiju's first-person view, a building's damaged, rubble and collapse states). Two more sheets cover the roofs of all ordinary buildings: `city_roofs_test.png` paints every roof that takes its district's color a loud green (a roof left grey was missed), and `city_roofs_districts.png` shows the roofs in several districts' colors. |
+| `concept/` | One or more **beauty shots** per model: lit, with a sky or studio backdrop and a shadow on the ground. This is the picture to judge "does it look good". For the six small buildings of the starting neighborhoods: `city_starts_scale.png` (each one whole, and damaged behind it, beside the older house, shop and apartment block, with the hatchling and a soldier) and `city_starts_street.png` (a street of them in three districts' wall and roof colors). |
 | `conventions/` | Test pictures that prove the pipeline itself is right (which way is forward, left and right not swapped, joints bend the right way, wall textures the right way up). Not game art. |
 | `palette.png` | Every named color the models are painted with. |
 

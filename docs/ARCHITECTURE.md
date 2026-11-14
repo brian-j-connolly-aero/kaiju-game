@@ -290,7 +290,12 @@ list can be empty: `VOICE_SIDE_RULES` limits the news to a short list of cues an
 radio its own longer waits and budget, without changing which cues are emitted or the random
 numbers they draw. Clients play
 `event.lines.humans` or `event.lines.kaiju` in order (ids are also the audio file names); they
-do not choose lines themselves. (`pickVoiceLine` remains for tools that only have a cue.)
+do not choose lines themselves. (`pickVoiceLine` remains for tools that only have a cue.) The
+one exception is the client's event lines (`client/src/audio/eventVoice.ts`, phase 3): moments
+of phases 2 and 3 that have no cue (a crate for your squad, a mast, a gas station or a
+substation going down, a garage door taken up as a shield, civilians eaten), said for the
+simulation's own events and picked by the event's tick, so a side still hears the same line on
+every screen (`DESIGN.md` section 8, "Event lines").
 
 How the human side is put together (`DESIGN.md` section 5 has the rules):
 
@@ -336,7 +341,8 @@ How the human side is put together (`DESIGN.md` section 5 has the rules):
   starts one (`startCallIn(world, squad, callIn, x, z)`) with each charged volley while the
   squad has barrages left.
 - **Supply crates and pick-ups** (`systems/pickups.ts`, numbers in `defs/pickups.ts`): a crate
-  for every squad when a stage starts and one every 30 s after, on a street near a squad
+  for every squad when a stage starts and one every `CRATE_RULES.every` seconds after (per stage:
+  30 / 12 / 15), on a street near a squad
   (`dropCrate`), taken by the nearest unit that touches it once it has landed; weapon pick-ups
   and the radio are squad state (`pickup`, `barrages`) until the stage ends or the squad is
   wiped out; reinforcements bring the dead back by parachute (`unit.drop`, `unit.y`: the
@@ -441,7 +447,9 @@ and does not move. A client predicting its own unit needs its mirrored city's fa
 
 The city (`shared/src/city`): `generatePortMeridian(seed)` (`city/meridian/`, `docs/CITY.md`)
 builds Port Meridian as `CityData` (structures, props, road graph, water and park areas,
-districts, neighborhood anchors) identically on every machine; `cityChecksum` verifies it.
+districts with their building tint and, since phase 3, their roof color `District.roof`,
+neighborhood anchors, and the back lanes of the starts, `lanes`, for drawing only: not part of
+the road graph) identically on every machine; `cityChecksum` verifies it.
 `buildCityIndex` makes the static spatial index; a `CityQuery` is that index plus one match's
 live state (structure hp, live props, which structures lie fallen and which way:
 `structureFall`, `fallen`) and is what every query takes: `structuresInCircle`,
@@ -451,14 +459,17 @@ the welcome's city checksum, the build stamp, the client and the sandbox all get
 it. The old placeholder grid (`generateCity(seed)`) is kept for tests and as a development
 option: `getCity(seed, 'placeholder')`, `npm run sim -- --city placeholder`. Building Port
 Meridian takes about 210 ms of processor time the first time in a fresh process and about
-47 ms after that (Node 22, this machine).
+47 ms after that (Node 22, this machine, phase 2; since phase 3 and on the machine as it is now,
+about 330 and 95 ms: `docs/CITY.md` section 7).
 `stageBounds(city, anchor, stage)` gives the playable square for a stage.
 Since phase 2 every anchor's stage 1 square holds the three special buildings (archetypes with a
 `special` kind: `archetypeSpecial(id)` says which; placed by `city/meridian/specials.ts`) and a
 handful of each city weapon prop (`PropKindDef.cityWeapon`, `CITY_WEAPON_KINDS`; placed by
 `city/meridian/furnish.ts`); `validateCity(city, { specials })` checks both (on by default; pass
-`false` for the placeholder grid, which has neither). The archetype list is capped at 48 (43 now):
-the client draws one batch per archetype and damage state.
+`false` for the placeholder grid, which has neither). Since phase 3 more special buildings stand
+beyond the starts (one of each at least in every stage 2 square, also checked), and the stage 1
+squares are packed close (`docs/CITY.md` section 13). The archetype list is capped at 56 (49
+now): the client draws one batch per archetype and damage state.
 
 Everything tunable is data in `shared/src/defs/`. Kaiju kinds, unit types, weapons and upgrades
 are registered definitions; systems read definitions and `mods`, never hardcode a kind. Adding a
@@ -900,12 +911,19 @@ layout, requires bumping `SNAPSHOT_VERSION` / `PROTOCOL_VERSION`.
   walk cycles, wind-ups and recoveries are procedural, driven by the action state and timers.
   The kaiju's arms blend toward the pose targets the manifest gives each model (`poses`); in the
   player's own first-person view the head is locked to the aim and the arms ride on it, so
-  snout and claws stay in one place on screen (`docs/art/client-notes-kaiju-lizard.md`).
+  snout and claws stay in one place on screen (`docs/art/client-notes-kaiju-lizard.md`). Each
+  attack has two or three looks, a hash of the tick it began (a snapshot's tick less its phase
+  time), so every screen shows the same one; each kaiju view draws its body with its own
+  material, whose stripes (marked in the vertex color alpha) glow with its rage; slash trails
+  are one dynamic mesh for every trail (`DESIGN.md` section 8, "The monster's looks").
 - Structures: per archetype one instanced mesh per visual state (intact, damaged, rubble), all
   on the one city atlas material (read with glTF texture coordinates: unflipped, mipmapped).
   The instance color paints only the wall faces a model masks (vertex color alpha), with the
   building's color and its district's tint; a per-instance `instanceShade` darkens the whole
-  building as damage deepens. Collapse is a client-only effect: the archetype's own chunk
+  building as damage deepens. Since phase 3 the mask has three levels (1 wall, 0.5 roof, 0 the
+  art's own color): a second per-instance color, `instanceRoof`, paints the roof faces in the
+  district's roof color (`District.roof`, in one of four shades picked by the structure's id),
+  standing, damaged, in the mounds and on the falling pieces, with no extra draw call. Collapse is a client-only effect: the archetype's own chunk
   meshes, tumbled with cheap fake physics and copied each frame into one shared buffer (one
   draw call for every falling piece), dust, then rubble. Measured with the whole city in view
   at stage 3, every state drawn and 480 pieces falling: 166 draw calls, 367,000 triangles
@@ -919,10 +937,17 @@ layout, requires bumping `SNAPSHOT_VERSION` / `PROTOCOL_VERSION`.
   (`setStructureFallen`, so prediction and the client's casts meet a fallen building where the
   server does), keeps the city weapons lying loose (`loose`, from the welcome's city state, the
   `looseProp` events and `kaijuHeld` with source 'loose'), and takes both over on a resync.
-- The map (`ui/mapView.ts`) draws the city from `CityData`: district ground in its map tint
-  with the district's name, streets, water, bridges, buildings by state, and each landmark as
+- The map (`ui/mapView.ts`) draws the city from `CityData`: district ground in its roof color
+  sunk into the dark map (phase 3; its zone's tint for a district without one) with the
+  district's name, streets, water, bridges, buildings by state, and each landmark as
   a small picture of its own model (`render/landmarkPictures.ts`, painted on the processor so
   the frame never waits on a read-back from the graphics processor).
+- Scenery round the city (`render/scenery.ts`, phase 3): low faceted hills to the west, north
+  and east beyond the open land round the city, one mesh of about 6,300 triangles in the
+  ground's group with a haze of its own (the city's fog would hide them; past the fog's far
+  distance they take a capped share of the fog's color, their feet all of it); the open sea to
+  the south, a headland far to the south-west and the River Wend's way north are water
+  triangles in the ground's water mesh. Nothing in the simulation knows they are there.
 - UI is DOM over the canvas. The no-reading rule in `DESIGN.md` §8 is binding. A HUD picture
   pinned to a point in the world (the tank's gun reticle) is placed from `MatchRuntime.onCamera`,
   which runs once the frame's camera is in place (shake included) and before the frame is drawn,
@@ -946,8 +971,10 @@ layout, requires bumping `SNAPSHOT_VERSION` / `PROTOCOL_VERSION`.
     under `mb.settings`, next to the session token (`mb.token`), the callsign (`mb.name`) and
     stored bindings (`mb.bindings`).
 - Sound (`client/src/audio`; as built: `docs/STATUS.md` section 7.6). What the rest of the
-  client may call on the `AudioEngine`: `play` and `loop` (effects by manifest id), `playMusic`,
-  `say` and `clearVoice` (voice lines), `preload` / `preloadMusic` / `preloadVoice`, `unlock`
+  client may call on the `AudioEngine`: `play` and `loop` (effects by manifest id; `play` picks
+  a sound's variant at random, never the one it played last, or the one named by `variant`),
+  `playMusic`, `say` and `clearVoice` (voice lines), `preload` / `preloadMusic` /
+  `preloadVoice`, `unlock`
   (from a click or key press), `setMuted`, and for the settings panel `setMasterVolume(v)` and
   `getMasterVolume()`: 0 to 1, eased, kept if set before the first click. Everything passes one
   limiter before the master volume, and a sound has a limited number of copies, so callers need
@@ -1000,7 +1027,9 @@ layout, requires bumping `SNAPSHOT_VERSION` / `PROTOCOL_VERSION`.
   crate of each kind, fire each weapon pick-up and call an artillery barrage, all confirmed by
   what the sandbox sent back. `shots.mjs`
   takes pictures of every stage from both sides and of the scripted extras in the sandbox, and
-  fails on any console error.
+  fails on any console error; phase 3's extras also fail when a screen draws another look of an
+  attack than the tick says (`--only x-monster`), and measure the frame's draw calls and
+  triangles (`--only x-city-cost`).
 - Never commit secrets. Never add a dependency that needs a network service at runtime: the
   game must run fully offline on one PC plus a tunnel.
 

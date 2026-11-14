@@ -370,6 +370,21 @@ Previews show `client/public/assets/textures/city_atlas.png` on those faces (and
 `mb.set_preview_atlas("/path/to/draft.png")` uses a draft. Nothing is ever embedded in the
 `.glb`. Proof picture with numbered tiles: `docs/art/conventions/structure_test_sheet.png`.
 
+**Roofs of ordinary buildings take their district's color.** In the game the client paints
+them (roadmap phase 3), so the city kit draws roof faces in light neutral grey and marks them
+with **`COLOR_0` alpha 0.5** (walls that take the building's color carry 1, everything else 0;
+`docs/ASSETS.md` section 3). A new building marks its roof simply by asking for one with the
+city kit (`tools/art/city/README.md`): `b.gable`, `b.hip`, `b.shed`, `b.sawtooth`, a block's
+`roof=`, and any face you map on `tile_red`, `tile_slate`, `tile_terra`, `gravel`, `tar` or
+`metal` (a dormer roof, a porch roof, a canopy top) are moved onto the grey roofs and marked by
+the kit (`kit.GREY_ROOFS`). A roof face with no picture (a floating slab, a setback cap) uses
+`region="roof_plain"`. Use those regions for roofs only: walls, chimneys, plant rooms, water
+tanks, parapet tops, solar panels and signs stay off them and keep their own colors. A roof that is glass, copper or canvas
+uses its own region (`glass_roof`, `copper`, an awning) and is not painted; an archetype with no
+colored roof at all goes in `OWN_ROOFS` in `tools/art/city/style.py`, with the reason. Check
+with `tools/art/city/check.py <id>` (rule `roof`) and `tools/art/city/roofs.py --test`, which
+paints every marked roof face loud green in `docs/art/previews/city_roofs_test.png`.
+
 ## 10. Validation
 
 ```bash

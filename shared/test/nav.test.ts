@@ -5,6 +5,7 @@ import {
   corridorClear,
   createRng,
   createSteer,
+  findClearSpot,
   rngInt,
   setTankMove,
   setWorldMove,
@@ -197,8 +198,11 @@ describe('finding the way', () => {
     const b = world.match.bounds;
     holdFire(world);
     const leader = world.units[0];
-    const tx = leader.x < (b.minX + b.maxX) / 2 ? b.maxX - 60 : b.minX + 60;
-    const tz = leader.z < (b.minZ + b.maxZ) / 2 ? b.maxZ - 100 : b.minZ + 100;
+    // The far side of the square, on open ground (the nearest spot there a unit fits).
+    const far = { x: leader.x < (b.minX + b.maxX) / 2 ? b.maxX - 60 : b.minX + 60, z: leader.z < (b.minZ + b.maxZ) / 2 ? b.maxZ - 100 : b.minZ + 100 };
+    findClearSpot(world.cityQuery, far.x, far.z, leader.radius, b, [], far, true);
+    const tx = far.x;
+    const tz = far.z;
     const speed = UNIT_TYPES[leader.type].speed;
     const way = Math.abs(tx - leader.x) + Math.abs(tz - leader.z);
     const steer = createSteer();

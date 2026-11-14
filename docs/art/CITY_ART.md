@@ -55,11 +55,11 @@ side (the simulation collides with the box); the kit refuses a building that doe
 
 ## 3. How districts differ at a glance
 
-| District | Walls (atlas) | Wall colors (tint) | Roofs | Signs and accents |
+| District | Walls (atlas) | Wall colors (tint) | Roof shapes (the color is the district's) | Signs and accents |
 | --- | --- | --- | --- | --- |
-| Suburbs | plaster sash, clapboard | cream, salmon, sky, mint, peach, lime, white, lilac | red tile gables and hips | red, blue, green doors; corner-shop pictures |
-| Old Town | plaster sash, brick sash, shopfronts | ochre, sand, salmon, cream, mustard | red tile, steep; chimneys | blade signs, striped awnings |
-| Temple Hill | plaster, arcade | white, rose, cream, peach | terracotta, tiered and turned up | no symbols; terracotta and gold trim |
+| Suburbs | plaster sash, clapboard | cream, salmon, sky, mint, peach, lime, white, lilac | tile gables and hips | red, blue, green doors; corner-shop pictures |
+| Old Town | plaster sash, brick sash, shopfronts | ochre, sand, salmon, cream, mustard | tile, steep; chimneys | blade signs, striped awnings |
+| Temple Hill | plaster, arcade | white, rose, cream, peach | round tiles, tiered and turned up | no symbols; terracotta and gold trim |
 | Downtown | glass (teal, dark, blue), stone grid, lobby, plinth | stone, slate, white, concrete | flat, plant rooms, masts with beacons | abstract crown marks (rings, chevron) |
 | University | brick sash, stone grid | stone, sand | slate | none |
 | Cinder Works, Docks | works brick, metal cladding, loading | concrete, slate, sand, mustard | sawtooth, corrugated metal, tanks | gold and rust; roller doors |
@@ -69,6 +69,18 @@ The wall color is a **tint**: walls on tintable regions carry a mask (vertex col
 the manifest lists the district's colors, so one model can be painted many ways. The client
 applies it: each copy takes one of the colors, times its district's building tint
 (`docs/CITY.md` section 2).
+
+The roof color is the **district's** (roadmap phase 3): every ordinary building draws its roof
+faces in light neutral grey, with the tile, slate or seam pattern kept as lighter and darker
+lines, and marks them (vertex color alpha 0.5); the game paints them in the district's roof
+color, a few shades apart from building to building, so each district, and each starting
+neighborhood, reads as its own place from the monster's height: terracotta on Temple Hill,
+slate blue in Bellhaven, moss green in Hollowmere, charcoal in Northgate, soot in the Cinder
+Works (`District.roof` in the city data). The table above gives the roof shapes. Landmarks,
+bridges and the special buildings keep their own roof colors, as do glass, copper and canvas
+roofs. How it is made: `tools/art/city/README.md` section 2a. Pictures:
+`docs/art/previews/city_roofs_districts.png` and the check sheet `city_roofs_test.png`.
+
 Signs are pictures only (a cup, a loaf, a fish, scissors, a key, glasses...), never words, and
 never a cross (not even a pharmacy's: the pharmacy sign is a pill) or any religious symbol.
 
@@ -104,26 +116,35 @@ it came from, broken faces in rubble, origin at its own center, at most 30 trian
 
 ## 5. Budgets (triangles per state)
 
-From the real city (`npx tsx tools/art/city/count_city.ts`: 2695 structures). Every archetype
-gets its class ceiling from `docs/ASSETS.md` except a few simple shapes. The sum of count x
-budget is **440,920 triangles** for the whole intact city, half of the 900,000 cap, and only
-the camera's surroundings are ever on screen.
+From the real city (`npx tsx tools/art/city/count_city.ts`: 3185 structures, counted again
+after phase 3 packed the starting neighborhoods). Every archetype gets its class ceiling from
+`docs/ASSETS.md` except a few simple shapes. The sum of count x budget is **502,290 triangles**
+for the whole intact city, a little over half of the 900,000 cap, and only the camera's
+surroundings are ever on screen.
 
 | Archetypes | Count | Budget | Triangles |
 | --- | --- | --- | --- |
-| house_a 333, house_b 299, house_c 441, rowhouse_a 359 | 1432 | 120 | 171,840 |
-| shop_a 132, shop_b 189, shop_c 135, pavilion_a 24, shrine_a 72 | 552 | 120 | 66,240 |
-| apartment_a 159, apartment_b 97, apartment_c 62, office_a 51, office_b 35, campus_a 38 | 442 | 250 | 110,500 |
+| house_a 283, house_b 209, house_c 400, rowhouse_a 286 | 1178 | 120 | 141,360 |
+| bungalow_a 314, duplex_a 158, garage_a 232 (phase 3) | 704 | 120 | 84,480 |
+| shop_a 114, shop_b 184, shop_c 126, pavilion_a 17, shrine_a 77 | 518 | 120 | 62,160 |
+| diner_a 10, firehouse_a 10, motel_a 10 (phase 3) | 30 | 120 | 3,600 |
+| apartment_a 149, apartment_b 90, apartment_c 62, office_a 50, office_b 34, campus_a 34 | 419 | 250 | 104,750 |
 | office_c 28, tower_a 21, tower_b 12, tower_c 12 | 73 | 500 | 36,500 |
-| factory_a 45, factory_b 7, crane_a 15, bridge_a 5 | 72 | 250 | 18,000 |
-| warehouse_a 24 / tank_a 28 / container_a 58 | 110 | 220 / 200 / 120 | 17,840 |
+| factory_a 40, factory_b 7, crane_a 15, bridge_a 5 | 67 | 250 | 16,750 |
+| warehouse_a 24 / tank_a 26 / container_a 58 | 108 | 220 / 200 / 120 | 17,440 |
+| substation_a 24 / gasstation_a 25 / radiomast_a 25 (the special buildings) | 74 | 250 / 250 / 120 | 15,250 |
 | bridge_b 1 | 1 | 500 | 500 |
 | the 13 landmarks, one each | 13 | 1500 | 19,500 |
 
+The total rose from 440,920 at the last count (2695 structures): the packed starting
+neighborhoods hold about 540 more buildings, and the 74 special buildings are counted now. The
+six new kinds' whole models are 40 to 84 triangles, well under their budget of 120.
+
 **Draw calls**: the client draws one instanced batch per building type, per state and per
 material, and only batches that have buildings in them. With one material that is at most
-40 x 3 = 120 calls for every building in the city, plus one for all falling chunks: well inside
-the 350 budget (measured in the sandbox at night, everything included: 79 to 96 calls). A second
+49 x 3 = 147 calls for every building in the city, plus one for all falling chunks: well inside
+the 350 budget (measured in phase 3 with everything on screen included: 120 to 135 calls; see
+`docs/CITY.md` section 8). A second
 material (for example `glow` for a beacon) would double a building's calls: use the atlas's
 glowing swatches (`lamp`, `beacon`, `neon_pink`, `neon_mint`, `lit_glass`) instead.
 

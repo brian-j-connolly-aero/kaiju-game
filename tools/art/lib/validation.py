@@ -394,8 +394,11 @@ def validate_file(path: str, kind: str | None = None, size_class: str | None = N
     dims = contract.archetype_dims(contract.archetype_for(asset)) if structural else None
     if dims:
         w, d, h = dims
+        box_h = h
+        h = contract.model_height(str((contract.archetype_for(asset) or {}).get("id")), h)
         dev = max(abs(size[0] - w) / w, abs(size[2] - d) / d, abs(size[1] - h) / h)
-        msg = f"archetype is {w:g} x {d:g} footprint, {h:g} tall; model is {size[0]:.2f} x {size[2]:.2f}, {size[1]:.2f} tall"
+        tall = f" (a slim part may reach {h:g} m)" if h != box_h else ""
+        msg = f"archetype is {w:g} x {d:g} footprint, {box_h:g} tall{tall}; model is {size[0]:.2f} x {size[2]:.2f}, {size[1]:.2f} tall"
         if dev > 0.15:
             rep.add(FAIL, "archetype", msg + " (more than 15% off: collision boxes come from the archetype)")
         elif dev > 0.05:

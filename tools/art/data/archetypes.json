@@ -798,6 +798,121 @@
       "passable": false,
       "hp": 120,
       "value": 15
+    },
+    {
+      "id": "bungalow_a",
+      "model": "bld_bungalow_a",
+      "class": "house",
+      "footprint": [
+        10,
+        9
+      ],
+      "height": 5,
+      "sizeClass": "small",
+      "landmark": null,
+      "zones": [
+        "suburb",
+        "boardwalk",
+        "harbor"
+      ],
+      "passable": false,
+      "hp": 75,
+      "value": 7
+    },
+    {
+      "id": "duplex_a",
+      "model": "bld_duplex_a",
+      "class": "house",
+      "footprint": [
+        12,
+        10
+      ],
+      "height": 7,
+      "sizeClass": "small",
+      "landmark": null,
+      "zones": [
+        "suburb",
+        "oldtown"
+      ],
+      "passable": false,
+      "hp": 110,
+      "value": 11
+    },
+    {
+      "id": "garage_a",
+      "model": "bld_garage_a",
+      "class": "house",
+      "footprint": [
+        8,
+        7
+      ],
+      "height": 4,
+      "sizeClass": "small",
+      "landmark": null,
+      "zones": [
+        "suburb"
+      ],
+      "passable": false,
+      "hp": 40,
+      "value": 4
+    },
+    {
+      "id": "diner_a",
+      "model": "bld_diner_a",
+      "class": "shop",
+      "footprint": [
+        16,
+        10
+      ],
+      "height": 5,
+      "sizeClass": "small",
+      "landmark": null,
+      "zones": [
+        "suburb",
+        "boardwalk",
+        "harbor"
+      ],
+      "passable": false,
+      "hp": 130,
+      "value": 13
+    },
+    {
+      "id": "firehouse_a",
+      "model": "bld_firehouse_a",
+      "class": "shop",
+      "footprint": [
+        14,
+        16
+      ],
+      "height": 9,
+      "sizeClass": "small",
+      "landmark": null,
+      "zones": [
+        "suburb",
+        "oldtown"
+      ],
+      "passable": false,
+      "hp": 200,
+      "value": 18
+    },
+    {
+      "id": "motel_a",
+      "model": "bld_motel_a",
+      "class": "shop",
+      "footprint": [
+        24,
+        10
+      ],
+      "height": 7,
+      "sizeClass": "small",
+      "landmark": null,
+      "zones": [
+        "suburb",
+        "boardwalk"
+      ],
+      "passable": false,
+      "hp": 170,
+      "value": 16
     }
   ],
   "props": [

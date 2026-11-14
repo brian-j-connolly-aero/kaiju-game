@@ -16,9 +16,10 @@ export const START_WEAPONS_MIN = 3;
 
 export interface ValidateOptions {
   /**
-   * Check what every starting neighborhood must hold for phase 2 (default true): one of each
-   * special building, wholly inside its stage 1 square and 40 to 120 m from the anchor, and a
-   * handful of each city weapon. The old placeholder grid has neither (pass false for it).
+   * Check what every starting neighborhood must hold for phases 2 and 3 (default true): one of
+   * each special building, wholly inside its stage 1 square and 40 to 120 m from the anchor, a
+   * handful of each city weapon, and one more of each special building in its stage 2 square
+   * beyond the stage 1 square. The old placeholder grid has none of it (pass false for it).
    */
   specials?: boolean;
 }
@@ -94,7 +95,8 @@ export function validateCity(city: CityData, options: ValidateOptions = {}): str
 /**
  * Phase 2's promise to every start (docs/ROADMAP.md): a power substation, a gas station and a
  * radio mast inside its stage 1 square, each 40 to 120 m from the anchor and at a different spot,
- * and a handful of each city weapon to pick up.
+ * and a handful of each city weapon to pick up; and phase 3's: one more of each in its stage 2
+ * square, outside its stage 1 square.
  */
 function validateStarts(city: CityData): string[] {
   const problems: string[] = [];
@@ -121,6 +123,16 @@ function validateStarts(city: CityData): string[] {
       let n = 0;
       for (const p of city.props) if (p.kind === kind && p.x >= b1.minX && p.x <= b1.maxX && p.z >= b1.minZ && p.z <= b1.maxZ) n++;
       if (n < START_WEAPONS_MIN) problems.push(`anchor ${a.id} (${a.name}): only ${n} ${kind} in its stage 1 square`);
+    }
+    // Phase 3: something to find after stage 1, on the way toward downtown.
+    const b2 = stageBounds(city, a.id, 2);
+    for (const kind of SPECIAL_KINDS) {
+      const beyond = city.structures.some((s) => {
+        if (archetypeSpecial(s.archetype) !== kind) return false;
+        if (s.x < b2.minX || s.x > b2.maxX || s.z < b2.minZ || s.z > b2.maxZ) return false;
+        return s.x < b1.minX || s.x > b1.maxX || s.z < b1.minZ || s.z > b1.maxZ;
+      });
+      if (!beyond) problems.push(`anchor ${a.id} (${a.name}): no ${kind} in its stage 2 square beyond its stage 1 square`);
     }
   }
   return problems;

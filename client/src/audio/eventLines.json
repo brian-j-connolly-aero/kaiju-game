@@ -1,0 +1,18 @@
+[
+  { "id": "v_crate_drop_1", "cue": "crate.drop", "audience": "humans", "speaker": "Overlord", "text": "Supply drop on its way to you. Watch for the parachute." },
+  { "id": "v_crate_drop_2", "cue": "crate.drop", "audience": "humans", "speaker": "Overlord", "text": "Supplies inbound on your position. Go and get them." },
+  { "id": "v_crate_land_1", "cue": "crate.land", "audience": "humans", "speaker": "Overlord", "text": "Supplies are down beside you. Do not leave them lying there." },
+  { "id": "v_crate_land_2", "cue": "crate.land", "audience": "humans", "speaker": "Overlord", "text": "Your supplies are on the ground. Go and collect them." },
+  { "id": "v_mast_down_1", "cue": "mast.down", "audience": "humans", "speaker": "Overlord", "text": "The radio mast is down. Your maps will show only static." },
+  { "id": "v_mast_down_2", "cue": "mast.down", "audience": "humans", "speaker": "Beacon", "text": "Radio mast destroyed. Maps are blank until further notice." },
+  { "id": "v_mast_down_3", "cue": "mast.down", "audience": "kaiju", "speaker": "Anchor", "text": "A radio mast has fallen. Army maps are said to be blank." },
+  { "id": "v_gas_station_1", "cue": "gas.station", "audience": "humans", "speaker": "Granite", "text": "Gas station just went up. Stay clear of the fire." },
+  { "id": "v_gas_station_2", "cue": "gas.station", "audience": "humans", "speaker": "Tempest", "text": "The gas station has gone up. Stay away from the flames." },
+  { "id": "v_gas_station_3", "cue": "gas.station", "audience": "kaiju", "speaker": "Anchor", "text": "A gas station has exploded. Fuel prices are expected to rise." },
+  { "id": "v_power_cut_1", "cue": "power.cut", "audience": "humans", "speaker": "Overlord", "text": "A substation is down. The target took its power." },
+  { "id": "v_power_cut_2", "cue": "power.cut", "audience": "humans", "speaker": "Beacon", "text": "Power is out across the district. The target is surging." },
+  { "id": "v_power_cut_3", "cue": "power.cut", "audience": "kaiju", "speaker": "Anchor", "text": "The district has lost power. The creature appears to be glowing." },
+  { "id": "v_door_shield_1", "cue": "door.shield", "audience": "humans", "speaker": "Overlord", "text": "It is using a garage door as a shield. Go around it." },
+  { "id": "v_civilians_eaten_1", "cue": "civilians.eaten", "audience": "kaiju", "speaker": "Anchor", "text": "Reports confirm the creature is eating pedestrians. Please keep to the crosswalks." },
+  { "id": "v_civilians_eaten_2", "cue": "civilians.eaten", "audience": "kaiju", "speaker": "Anchor", "text": "The creature has eaten several pedestrians. Officials advise staying indoors." }
+]

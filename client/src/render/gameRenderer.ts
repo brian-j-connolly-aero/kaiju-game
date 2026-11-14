@@ -18,6 +18,8 @@ import {
   unitTypeDef,
   type Bounds,
   type CityData,
+  type KaijuActionEvent,
+  type KaijuKindDef,
   type SimEvent,
   type SnapKaiju,
   type StageId,
@@ -34,6 +36,7 @@ import { atlasPixels, renderLandmarkPictures } from './landmarkPictures';
 import { Crowd } from './crowd';
 import { Effects } from './effects';
 import { buildGround, setGroundNight } from './ground';
+import { TrailRibbons } from './kaijuTrails';
 import { KaijuView, type KaijuOverride } from './kaijuView';
 import { LineBatch } from './lineBatch';
 import { createMaterials, type Materials } from './materials';
@@ -76,6 +79,10 @@ export interface RenderStats {
   sprites: number;
   /** Props (and wrecks) in the instance buffers right now. */
   props: number;
+  /** Civilians in the streets right now, and how many have been squashed and eaten since the page opened. */
+  civilians: number;
+  squashed: number;
+  eaten: number;
 }
 
 /** Sounds and shakes the picture asks for; the match screen wires them to audio and the camera. */
@@ -85,6 +92,10 @@ export interface RenderCues {
   onSplash?: (k: SnapKaiju) => void;
   /** Windows burst out of buildings by the monster's feet (render/weight.ts): `panes` bits of glass round (x, y, z). */
   onGlass?: (x: number, y: number, z: number, panes: number) => void;
+  /** Civilians squashed at (x, y, z) (render/crowd.ts, phase 3): `count` of them, each in a puff. */
+  onSquash?: (x: number, y: number, z: number, count: number) => void;
+  /** A handful of civilians gulped down at the monster's mouth (x, y, z). */
+  onGulp?: (x: number, y: number, z: number, count: number) => void;
 }
 
 const FOG: Record<StageId, FogRange> = {
@@ -104,6 +115,9 @@ const CURTAIN: Record<StageId, number> = { 1: 2.5, 2: 7, 3: 20 };
 
 /** Seconds a roar's shockwave takes to reach the edge of its radius. */
 const ROAR_WAVE = 0.8;
+
+/** A footstep squashes the civilians within this many body radii of the foot (phase 3). */
+const FOOT_SQUASH = 0.42;
 
 /**
  * An effect due a moment from now: the dust thrown up along a roar's spreading front, and a
@@ -126,7 +140,9 @@ export class GameRenderer {
   readonly sky: Sky;
   readonly effects: Effects;
   readonly lines = new LineBatch(256);
-  readonly stats: RenderStats = { calls: 0, triangles: 0, particles: 0, projectiles: 0, chunks: 0, sprites: 0, props: 0 };
+  /** The monster's slash trails (claws, tail, the club), all in one mesh (render/kaijuTrails.ts). */
+  readonly trails = new TrailRibbons();
+  readonly stats: RenderStats = { calls: 0, triangles: 0, particles: 0, projectiles: 0, chunks: 0, sprites: 0, props: 0, civilians: 0, squashed: 0, eaten: 0 };
   cues: RenderCues = {};
 
   private readonly assets: AssetStore;
@@ -136,6 +152,12 @@ export class GameRenderer {
   private readonly glow: QuadBatch;
   private readonly units: UnitsView;
   private readonly crowd: Crowd;
+  /**
+   * Grabs (and eats) whose hand closed this frame: unless the simulation said it took something
+   * (`kaijuHeld` on the same tick), the hand comes up with a handful of civilians in reach
+   * (render/crowd.ts; client only, phase 3).
+   */
+  private readonly emptyGrabs: Array<{ kaiju: number; tick: number; x: number; z: number; yaw: number }> = [];
   private readonly projectiles: ProjectilesView;
   /** Phase 2: the monster's city weapons and surge (events), the army's crates and its artillery. */
   private readonly weaponsFx: WeaponsFx;
@@ -213,6 +235,7 @@ export class GameRenderer {
       this.glow.mesh,
       this.effects.group,
       this.lines.mesh,
+      this.trails.mesh,
       this.motion.lines.mesh,
       this.boundary.mesh,
     );
@@ -304,6 +327,7 @@ export class GameRenderer {
     this.weight?.clear();
     this.motion.clear();
     this.collapses.clear();
+    this.emptyGrabs.length = 0;
     this.pending.length = 0;
     this.lastRoar.time = -1e9;
   }
@@ -484,6 +508,8 @@ export class GameRenderer {
         break;
       }
       case 'kaijuHeld': {
+        // The hand took something the rules know: no handful of civilians.
+        for (let i = this.emptyGrabs.length - 1; i >= 0; i--) if (this.emptyGrabs[i].kaiju === e.kaiju && this.emptyGrabs[i].tick === e.tick) this.emptyGrabs.splice(i, 1);
         if (!city) break;
         if (e.source === 'prop') city.setPropAlive(e.sourceId, false);
         else if (e.source === 'propWreck') city.setWreck(e.sourceId, false);
@@ -496,6 +522,10 @@ export class GameRenderer {
         const st = kaijuStageDef(k.kind, k.stage);
         const def = kaijuKindDef(k.kind);
         const r = st.bodyRadius;
+        // The monster's looks (phase 3): the stomp's shock ring at the landing foot; civilians
+        // squashed under a stomp and in the tail's sweep; a grab that may close on a handful.
+        this.kaijuViews[e.kaiju]?.onAction(e, k, fx);
+        this.civiliansUnder(e, r, def);
         if (e.action === 'stomp' && e.phase === 'active') {
           const radius = def.actions.stomp.radius * r;
           fx.ring(e.x, e.z, radius, 0xfff1d0, 0.55);
@@ -746,10 +776,47 @@ export class GameRenderer {
     this.collapses.clear();
   }
 
-  /** A kaiju's foot came down (its view's gait): the sound and the shake (the match runtime), and the street. */
-  private footstep(k: SnapKaiju): void {
+  /** A kaiju's foot came down at (x, z) (its view's gait): the sound and the shake (the match runtime), the street, and anyone under it. */
+  private footstep(k: SnapKaiju, x: number, z: number): void {
     this.cues.onStep?.(k);
     if (k.phase !== 'cocoon') this.weight?.step(k, this.mirror?.query ?? null);
+    this.squashed(this.crowd.squash(x, z, Math.max(1, kaijuStageDef(k.kind, k.stage).bodyRadius * FOOT_SQUASH), this.effects), x, z);
+  }
+
+  /** Civilians squashed at (x, z): the comic pop (the match runtime's sound). */
+  private squashed(count: number, x: number, z: number): void {
+    if (count > 0) this.cues.onSquash?.(x, 0.5, z, count);
+  }
+
+  /**
+   * What a kaiju's action does to the civilians around it (client only, phase 3): a stomp
+   * squashes everyone in its shockwave, a tail sweep everyone its arc passes over, and a grab
+   * (or an eat) is noted: unless the rules take something on the same tick, its hand comes up
+   * with a handful of them (`resolveGrabs`).
+   */
+  private civiliansUnder(e: KaijuActionEvent, r: number, def: KaijuKindDef): void {
+    if (e.action === 'stomp' && e.phase === 'active') {
+      this.squashed(this.crowd.squash(e.x, e.z, def.actions.stomp.radius * r, this.effects), e.x, e.z);
+    } else if (e.action === 'tailSweep' && e.phase === 'active') {
+      this.squashed(this.crowd.squashArc(e.x, e.z, e.yaw, def.actions.tailSweep.reach * r, Math.PI / 2, this.effects), e.x, e.z);
+    } else if ((e.action === 'grab' && e.phase === 'active') || (e.action === 'eat' && e.phase === def.actions.eat.activePhase)) {
+      this.emptyGrabs.push({ kaiju: e.kaiju, tick: e.tick, x: e.x, z: e.z, yaw: e.yaw });
+    }
+  }
+
+  /** The grabs of this frame's events that took nothing the rules know: a handful of civilians, if any are in reach. */
+  private resolveGrabs(): void {
+    for (const g of this.emptyGrabs) {
+      const k = this.kaijuAt(g.kaiju);
+      const view = this.kaijuViews[g.kaiju];
+      if (!k || !view || this.crowd.holding(g.kaiju)) continue;
+      const grab = kaijuKindDef(k.kind).actions.grab;
+      const reach = grab.reach * kaijuStageDef(k.kind, k.stage).bodyRadius;
+      // Three to five of them, the same on every screen that has them there.
+      const max = 3 + ((g.tick * 7 + g.kaiju) % 3);
+      if (this.crowd.takeHandful(g.kaiju, g.x, g.z, g.yaw, reach, grab.arc / 2, max) > 0) view.startSnack();
+    }
+    this.emptyGrabs.length = 0;
   }
 
   // --- per frame -------------------------------------------------------------------------------
@@ -835,13 +902,14 @@ export class GameRenderer {
     this.markers.begin();
     this.glow.begin();
     this.lines.begin();
+    this.trails.begin();
 
     if (frame && view) {
       const query = this.mirror?.query ?? null;
       frame.kaijus.forEach((k, i) => {
         let kv = this.kaijuViews[i];
         if (!kv) {
-          kv = new KaijuView(this.assets, this.materials, { onStep: (kk) => this.footstep(kk), onSplash: (kk) => this.cues.onSplash?.(kk) });
+          kv = new KaijuView(this.assets, this.materials, { onStep: (kk, x, z) => this.footstep(kk, x, z), onSplash: (kk) => this.cues.onSplash?.(kk) }, this.trails);
           this.kaijuViews[i] = kv;
           this.scene.add(kv.group);
         }
@@ -851,8 +919,11 @@ export class GameRenderer {
           insideHead: own && view.kaijuInsideHead,
           camera: this.camera.position,
           local: k.id === view.localKaiju,
+          tick: frame.tick,
         });
         const st = kaijuStageDef(k.kind, k.stage);
+        // A charge runs down whoever is in its path.
+        if (k.phase === 'charge' && k.alive) this.squashed(this.crowd.squash(k.x, k.z, st.bodyRadius, this.effects), k.x, k.z);
         if (k.phase !== 'cocoon' || k.id === view.localKaiju || view.seesKaiju) {
           this.decals.push(k.x, 0.12, k.z, st.bodyRadius * 3.4, st.bodyRadius * 3.4, this.ringShadowUv(), 0, 0, 0, 0, 0.6);
         }
@@ -895,8 +966,20 @@ export class GameRenderer {
         const spread = Math.min(420, 90 + st.height * 4);
         const known = view.seesKaiju || focus.known;
         const cam = this.camera.position;
-        this.crowd.update(dt, time, query, frame.bounds, known ? frame.kaijus : NO_KAIJUS, known ? focus.x : cam.x, known ? focus.z : cam.z, spread, 25 + st.height * 3, this.camera);
+        this.crowd.update(dt, time, query, frame.bounds, known ? frame.kaijus : NO_KAIJUS, known ? focus.x : cam.x, known ? focus.z : cam.z, spread, 25 + st.height * 3, this.camera, known ? focus.vx : 0, known ? focus.vz : 0);
       }
+      this.crowd.updateHandfuls(
+        dt,
+        time,
+        this.camera,
+        (owner) => this.kaijuViews[owner] ?? null,
+        (owner) => {
+          const k = frame.kaijus[owner];
+          return k ? kaijuStageDef(k.kind, k.stage).height : 4.5;
+        },
+        this.effects,
+        (x, y, z, n) => this.cues.onGulp?.(x, y, z, n),
+      );
 
       this.artillery.update(dt);
       this.crates.update(frame.crates, frame.tick, dt, this.camera, this.lines);
@@ -907,6 +990,7 @@ export class GameRenderer {
     }
 
     this.endEvents();
+    this.resolveGrabs();
     this.stats.chunks = this.city ? this.city.update(dt) : 0;
     // Props are drawn out to a distance that grows with the camera's height (and hop at the monster's feet).
     const cam = this.camera.position;
@@ -929,8 +1013,12 @@ export class GameRenderer {
     this.markers.end();
     this.glow.end();
     this.lines.end();
+    this.trails.end();
     this.stats.particles = this.effects.count;
     this.stats.projectiles = this.projectiles.count;
+    this.stats.civilians = this.crowd.count;
+    this.stats.squashed = this.crowd.tally.squashed;
+    this.stats.eaten = this.crowd.tally.eaten;
   }
 
   private shadowUvCache: number[] | null = null;

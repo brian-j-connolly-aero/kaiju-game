@@ -3,6 +3,13 @@
  * the thing it holds (a city weapon by its grip: render/kaijuWeapons.ts), its weak point, its
  * beam and its power surge. The rig is whatever the AssetStore has for `kaiju_<kind>_s<stage>`:
  * the art file or the box stand-in, the same code drives both.
+ *
+ * Phase 3 (docs/ROADMAP.md, "looks"): the look of each attack (`attackVariant` of the tick it
+ * began, so every screen shows the same one), slash trails from the claw tips and the tail tip
+ * through a strike and a short shock ring where a stomping foot lands (render/kaijuTrails.ts),
+ * stripes that glow with rage (the models mark them; this view's own body material, its
+ * `KaijuSkin`, lights them), and a handful of civilians lifted to the mouth (render/crowd.ts
+ * holds them; this view poses the arm and says when they are gulped).
  */
 
 import * as THREE from 'three';
@@ -12,11 +19,13 @@ import {
   COMBAT_RULES,
   beamPath,
   createBeamPath,
+  DT,
   kaijuKindDef,
   kaijuStageDef,
   perStage,
   type CityQuery,
   type HeldObject,
+  type KaijuActionEvent,
   type KaijuActionId,
   type KaijuPhase,
   type SnapKaiju,
@@ -24,9 +33,22 @@ import {
 import type { AssetStore } from '../assets/assetStore';
 import type { Effects } from './effects';
 import { HeldWeapon, SurgeArcs } from './kaijuWeapons';
-import { computeKaijuPose, createKaijuPose, posesFromManifest, type NodePose, type PoseTable } from './kaijuAnimator';
+import {
+  ATTACK_VARIANTS,
+  attackVariant,
+  computeKaijuPose,
+  createKaijuPose,
+  posesFromManifest,
+  SNACK_GULP,
+  SNACK_TIME,
+  type KaijuAnimInput,
+  type KaijuPose,
+  type NodePose,
+  type PoseTable,
+} from './kaijuAnimator';
+import { addTrailPoint, clearTrail, createTrailPath, stompShock, type TrailPath, type TrailRibbons } from './kaijuTrails';
 import type { LineBatch } from './lineBatch';
-import type { Materials } from './materials';
+import type { KaijuSkin, Materials } from './materials';
 import { SceneRig } from './sceneRig';
 
 export interface KaijuOverride {
@@ -38,8 +60,8 @@ export interface KaijuOverride {
 }
 
 export interface KaijuViewCallbacks {
-  /** A foot came down. */
-  onStep?: (k: SnapKaiju) => void;
+  /** A foot came down, at (x, z) on the ground. */
+  onStep?: (k: SnapKaiju, x: number, z: number) => void;
   /** It went into the water to swim, or came up out of it (sim/swim.ts). */
   onSplash?: (k: SnapKaiju) => void;
 }
@@ -62,6 +84,11 @@ export interface KaijuViewFrame {
   camera?: THREE.Vector3;
   /** The local player's own kaiju (in either view): a javelin in its hand shows an aim line. */
   local?: boolean;
+  /**
+   * The (fractional) server tick the frame shows (`FrameState.tick`): with the snapshot's phase
+   * time it says the tick the phase began, which picks the attack's look.
+   */
+  tick?: number;
 }
 
 const NOT_LOCAL: KaijuViewFrame = { firstPerson: false, insideHead: false };
@@ -74,6 +101,41 @@ const WEAK_GLOW = 0xc9a6ff;
 const SWIM_TILT = 0.35;
 const SWIM_SINK = 0.72;
 const SWIM_BACK = 0.1;
+
+/**
+ * The stripes' glow (linear colors, times the brightness): a deep ember red when rage is low,
+ * hot orange as it fills; a white-hot flare as the new body comes out of the cocoon.
+ */
+const STRIPE_LOW = { r: 1, g: 0.13, b: 0.02 };
+const STRIPE_HIGH = { r: 1, g: 0.36, b: 0.06 };
+const STRIPE_FLARE = { r: 1, g: 0.85, b: 0.6 };
+/** Brightness of the stripes: at no rage, at full rage, the pulse of a special that is ready (low to high), the beam. */
+const STRIPE_IDLE = 0.12;
+const STRIPE_FULL = 0.75;
+const STRIPE_READY = [0.7, 1.25] as const;
+const STRIPE_BEAM = 1.5;
+/** The ready pulse: about one slow throb every 2.6 seconds. */
+const READY_PULSE = 2.4;
+/** Seen from inside its own head the stripes on the snout and claws glow this much less. */
+const STRIPE_FIRST_PERSON = 0.45;
+/** How long the molt's flare takes to die down (seconds). */
+const FLARE_TIME = 2.4;
+/** Points along a slash trail. */
+const TRAIL_POINTS = 10;
+/**
+ * A trail is the band between a tip's path and a point part of the way in from it to its node's
+ * pivot: here the pivot itself, so a claw slash is the band the whole hand sweeps, from the wrist
+ * to the claw tips, and the tail's the band its last joint sweeps.
+ */
+const CLAW_INNER = 0;
+const TAIL_INNER = 0;
+/** The width of the glowing edge along the tip (body heights). */
+const TRAIL_EDGE = 0.03;
+/** The follow-through: a trail fades out over this share of the recovery. */
+const TRAIL_FADE = 0.45;
+/** Seen from inside its own head: the trail starts this far into the strike (the claw is above the view before) and is fainter. */
+const TRAIL_FP_FROM = 0.3;
+const TRAIL_FP_FADE = 0.5;
 
 function heldModelId(held: HeldObject): string {
   switch (held.kind) {
@@ -88,11 +150,18 @@ function heldModelId(held: HeldObject): string {
   }
 }
 
+/** Ticks a phase of `seconds` lasts in the simulation (it ends on the tick its time reaches its length). */
+function phaseTicks(seconds: number): number {
+  return seconds > 0 ? Math.ceil(seconds / DT - 1e-6) : 0;
+}
+
 export class KaijuView {
   readonly group = new THREE.Group();
   private readonly assets: AssetStore;
   private readonly materials: Materials;
   private readonly callbacks: KaijuViewCallbacks;
+  /** This view's own body material: its stripes glow with this kaiju's rage. */
+  private readonly skin: KaijuSkin;
   private rig: SceneRig | null = null;
   private rigKey = '';
   /** The rig's pose targets from the manifest (null: the stand-in's fallback). */
@@ -112,6 +181,8 @@ export class KaijuView {
   private readonly weapon: HeldWeapon;
   private readonly surge: SurgeArcs;
   private readonly pose = createKaijuPose();
+  /** A pose the trails sample the strike with (the drawn one is `current`). */
+  private readonly sample = createKaijuPose();
   private readonly current = new Map<string, NodePose>();
   private hipsLift = 0;
   /** Swimming, as drawn: eased toward the snapshot's `submerge` so it glides down and up. */
@@ -122,6 +193,38 @@ export class KaijuView {
   private walkPhase = 0;
   private lastStepHalf = 0;
   private deadTime = 0;
+  /** The look of the attack being drawn: which action, the tick its first phase began, and the look. */
+  private look = { action: 'none' as KaijuActionId, start: Number.NaN, variant: 0 };
+  /** The look of the charge's stumble, by the tick the stumble began. */
+  private stumble = { start: Number.NaN, variant: 0 };
+  /** The look drawn on the last frame (null: not known yet). */
+  private lookNow: number | null = 0;
+  /** The molt's flare on the stripes: 1 as the new body comes out, dying down. */
+  private flare = 0;
+  /** Seconds since the hand closed on a handful of civilians (null: none in the hand). */
+  private snackTime: number | null = null;
+  /** The claw tips and the tail tip, each in its own node's frame. */
+  private readonly tips = new Map<string, THREE.Vector3>();
+  /** The feet where they stand at rest, in the model's frame (where a stomp lands). */
+  private readonly feet = new Map<string, THREE.Vector3>();
+  private readonly input: KaijuAnimInput = {
+    time: 0,
+    walkPhase: 0,
+    speed: 0,
+    headYaw: 0,
+    headPitch: 0,
+    action: 'none',
+    phase: 'idle',
+    phaseTime: 0,
+    phaseDuration: 0,
+    holding: false,
+    height: 1,
+  };
+  /** The tip and inner paths of up to two slash trails (both claws in the rake). */
+  private readonly tipPaths: TrailPath[] = [createTrailPath(), createTrailPath()];
+  private readonly innerPaths: TrailPath[] = [createTrailPath(), createTrailPath()];
+  /** Where every slash trail of the frame is drawn (the renderer's; none: no trails). */
+  private readonly ribbons: TrailRibbons | null;
   /** World position of the first-person camera anchor, valid after update(). */
   readonly camAnchor = new THREE.Vector3();
   /** World position of the mouth, valid after update(). */
@@ -130,13 +233,17 @@ export class KaijuView {
   /** World position of the `hold` anchor (the hand, where a held thing sits), valid after update() when `hasHand`. */
   readonly hand = new THREE.Vector3();
   hasHand = false;
+  /** Seen from inside its own head on the last frame (anything in the hand is shrunk to fit). */
+  firstPerson = false;
 
-  constructor(assets: AssetStore, materials: Materials, callbacks: KaijuViewCallbacks = {}) {
+  constructor(assets: AssetStore, materials: Materials, callbacks: KaijuViewCallbacks = {}, ribbons: TrailRibbons | null = null) {
     this.assets = assets;
     this.materials = materials;
     this.callbacks = callbacks;
+    this.ribbons = ribbons;
+    this.skin = materials.kaijuSkin();
     this.weapon = new HeldWeapon(assets, materials);
-    this.surge = new SurgeArcs(materials);
+    this.surge = new SurgeArcs();
     for (const name of this.pose.rotations.keys()) this.current.set(name, { x: 0, y: 0, z: 0 });
   }
 
@@ -150,6 +257,21 @@ export class KaijuView {
     return this.weapon.end;
   }
 
+  /** The look of the attack drawn on the last frame (`attackVariant`; null while not known). */
+  get attackLook(): number | null {
+    return this.lookNow;
+  }
+
+  /** Seconds since the hand closed on a handful of civilians, or null (render/crowd.ts). */
+  get snack(): number | null {
+    return this.snackTime;
+  }
+
+  /** The hand closed on a handful of civilians: it lifts them to the mouth and gulps them down. */
+  startSnack(): void {
+    this.snackTime = 0;
+  }
+
   /** A shot hit the garage door in the hand: it jolts. */
   shieldHit(damage: number): void {
     this.weapon.hit(damage);
@@ -158,8 +280,10 @@ export class KaijuView {
   private ensureRig(k: SnapKaiju): SceneRig {
     const key = `kaiju_${k.kind}_s${k.stage}`;
     if (!this.rig || this.rigKey !== key) {
+      // Grown into its next body: the stripes flare as it comes out of the cocoon.
+      if (this.rig && this.rigKey.startsWith(`kaiju_${k.kind}_s`) && Number(this.rigKey.slice(-1)) < k.stage) this.flare = 1;
       this.rig?.dispose();
-      this.rig = new SceneRig(this.assets.model(key), this.materials, this.materials.kaiju);
+      this.rig = new SceneRig(this.assets.model(key), this.materials, this.skin.material);
       this.rigKey = key;
       this.armsOnHead = false;
       this.poses = this.assets.hasModel(key) ? posesFromManifest(this.assets.manifest.models[key]?.poses) : null;
@@ -170,8 +294,39 @@ export class KaijuView {
       // and tail spikes) get their own material, so they can heat up with rage and the beam.
       this.ember ??= this.materials.glow.clone();
       for (const node of ['head', 'spines', 'tail_1', 'tail_2', 'tail_3', 'tail_4', 'tail_5']) this.rig.setNodeMaterial(node, 'glow', this.ember);
+      this.findTips(this.rig);
     }
     return this.rig;
+  }
+
+  /** The claw tips and the tail tip (the farthest point of each from its pivot), and the feet at rest. */
+  private findTips(rig: SceneRig): void {
+    this.tips.clear();
+    this.feet.clear();
+    const nodes = rig.model.nodes;
+    nodes.forEach((node, i) => {
+      if (node.name === 'hand_L' || node.name === 'hand_R' || node.name === 'tail_5') {
+        let best = -1;
+        const tip = new THREE.Vector3();
+        for (const part of node.parts) {
+          const pos = part.geometry.getAttribute('position');
+          if (!pos) continue;
+          for (let j = 0; j < pos.count; j++) {
+            const d = pos.getX(j) ** 2 + pos.getY(j) ** 2 + pos.getZ(j) ** 2;
+            if (d > best) {
+              best = d;
+              tip.set(pos.getX(j), pos.getY(j), pos.getZ(j));
+            }
+          }
+        }
+        if (best > 0) this.tips.set(node.name, tip);
+      }
+      if (node.name === 'foot_L' || node.name === 'foot_R') {
+        const at = new THREE.Vector3();
+        for (let j = i; j >= 0; j = nodes[j].parent) at.add(nodes[j].position);
+        this.feet.set(node.name, at.setY(0));
+      }
+    });
   }
 
   private dropHeld(): void {
@@ -212,6 +367,98 @@ export class KaijuView {
       const scale = this.heldScale * fp;
       this.held.root.scale.setScalar(scale);
       this.held.root.position.set(0, -this.heldHeight * 0.5 * fp, 0);
+    }
+  }
+
+  /**
+   * The look of the attack being drawn (render/kaijuAnimator.ts `attackVariant`), or null while
+   * it is not known: the local player's own press shown before the server's phase has reached
+   * the view. Every screen works it out alike from the snapshot: its tick less its phase time is
+   * the tick the phase began (exactly the tick of the phase's `kaijuAction` event); an attack's
+   * look is kept from its first phase on.
+   */
+  private lookFor(k: SnapKaiju, action: KaijuActionId, phase: KaijuPhase, tick: number | undefined): number | null {
+    if (!ATTACK_VARIANTS[action]) return 0;
+    if (k.action !== action || k.phase === 'idle' || k.phase !== phase) {
+      // Shown ahead of the server, or the frame between two phases: the look kept, if any.
+      return this.look.action === action && k.action === action ? this.look.variant : null;
+    }
+    const timing = kaijuKindDef(k.kind).actions[action as Exclude<KaijuActionId, 'none'>]?.timing;
+    if (!timing) return 0;
+    if (tick === undefined || !(k.phaseTime > 0)) {
+      // The very first frame of a phase (its start lies between two snapshots): a new attack's
+      // look is not known yet; a later phase of the same attack keeps its look.
+      const first = phase === 'stumble' || phase === (timing.windup > 0 ? 'windup' : kaijuKindDef(k.kind).actions[action as Exclude<KaijuActionId, 'none'>].activePhase);
+      return !first && this.look.action === action ? this.look.variant : null;
+    }
+    const phaseStart = Math.round(tick - k.phaseTime / DT);
+    if (action === 'charge') {
+      if (phase !== 'stumble') return 0;
+      if (this.stumble.start !== phaseStart) this.stumble = { start: phaseStart, variant: attackVariant('charge', phaseStart, k.id) };
+      return this.stumble.variant;
+    }
+    const windup = phaseTicks(timing.windup);
+    const active = phaseTicks(timing.active);
+    // The tick the attack began: its wind-up's start (or, for an attack without one, its active
+    // phase's). Seen first in a later phase (a page that joined in the middle), it is reckoned back.
+    const earlier = phase === 'windup' ? 0 : phase === 'recover' ? windup + active : windup;
+    let start = phaseStart - earlier;
+    const kept = this.look.action === action && this.look.start <= phaseStart && phaseStart - this.look.start <= windup + active + 1;
+    if (kept && earlier > 0) start = this.look.start;
+    if (this.look.action !== action || this.look.start !== start) this.look = { action, start, variant: attackVariant(action, start, k.id) };
+    return this.look.variant;
+  }
+
+  /**
+   * The stripes' glow (the models mark them in the vertex color alpha): faint when rage is
+   * low, stronger as it fills, a slow pulse when the beam is ready (so the army can read "it is
+   * charged"), blazing while the beam burns, a white-hot flare as a new body comes out of the
+   * cocoon. During a power surge the arcs take over (SurgeArcs sets the skin after this).
+   */
+  private updateGlow(k: SnapKaiju, action: KaijuActionId, phase: KaijuPhase, phaseTime: number, phaseDuration: number, dt: number, time: number, firstPerson: boolean): number {
+    const rage = clamp01(k.rage / COMBAT_RULES.rageMax);
+    const def = kaijuKindDef(k.kind);
+    const beamReady = (k.moves[0] === 'beam' || k.moves[1] === 'beam') && k.rage >= def.actions.special.rageCost && k.cooldowns.special <= 0;
+    let level = STRIPE_IDLE + (STRIPE_FULL - STRIPE_IDLE) * rage * Math.sqrt(rage);
+    let heat = rage;
+    if (beamReady) {
+      const throb = 0.5 - 0.5 * Math.cos(time * READY_PULSE);
+      level = STRIPE_READY[0] + (STRIPE_READY[1] - STRIPE_READY[0]) * throb * throb;
+    }
+    if (action === 'special' && phase !== 'idle') {
+      const gather = phase === 'windup' ? clamp01(phaseTime / Math.max(0.01, phaseDuration)) : phase === 'recover' ? 0.5 : 1;
+      level = Math.max(level, STRIPE_BEAM * gather);
+      heat = Math.max(heat, gather);
+    }
+    if (!k.alive) level = 0;
+    this.flare = Math.max(0, this.flare - dt / FLARE_TIME);
+    const flare = this.flare * this.flare * 2.2;
+    const hot = clamp01(rage * 0.8 + (beamReady ? 0.2 : 0));
+    const fp = firstPerson ? STRIPE_FIRST_PERSON : 1;
+    this.skin.stripe.setRGB(
+      ((STRIPE_LOW.r + (STRIPE_HIGH.r - STRIPE_LOW.r) * hot) * level + STRIPE_FLARE.r * flare) * fp,
+      ((STRIPE_LOW.g + (STRIPE_HIGH.g - STRIPE_LOW.g) * hot) * level + STRIPE_FLARE.g * flare) * fp,
+      ((STRIPE_LOW.b + (STRIPE_HIGH.b - STRIPE_LOW.b) * hot) * level + STRIPE_FLARE.b * flare) * fp,
+    );
+    this.skin.flash.setRGB(0.25 * flare, 0.2 * flare, 0.15 * flare);
+    return Math.max(heat, this.flare);
+  }
+
+  /** Sets the rig to a pose (rotations, hips) and, seen from inside the head, locks the head to the aim. */
+  private applyPose(rig: SceneRig, rotations: Map<string, NodePose>, hipsLift: number, k: SnapKaiju, assembly: boolean): void {
+    for (const [name, r] of rotations) rig.setRotation(name, r.x, r.y, r.z);
+    rig.setOffset('hips', 0, hipsLift, 0);
+    // Seen from inside the head: lock the head to the aim (it carries the camera anchor, the
+    // snout and, riding on it, the arms), so the claws keep their place whatever the body does.
+    if (assembly) {
+      const neck = rig.node('neck');
+      const head = rig.node('head');
+      if (neck && head) {
+        this.group.updateMatrixWorld(true);
+        neck.getWorldQuaternion(quat).invert();
+        aimQuat.setFromEuler(aimEuler.set(-k.aimPitch, k.aimYaw, 0, 'YXZ'));
+        head.quaternion.copy(quat).multiply(aimQuat);
+      }
     }
   }
 
@@ -274,50 +521,58 @@ export class KaijuView {
     if (half !== this.lastStepHalf) {
       this.lastStepHalf = half;
       if (speed > stage.topSpeed * 0.15 && !cocooned && this.swim < 0.3) {
-        this.callbacks.onStep?.(k);
         // The foot that just landed kicks up dust beside the body.
         const side = half % 2 === 0 ? 1 : -1;
         const fx = k.x + Math.cos(k.yaw) * side * stage.bodyRadius * 0.45;
         const fz = k.z - Math.sin(k.yaw) * side * stage.bodyRadius * 0.45;
+        this.callbacks.onStep?.(k, fx, fz);
         effects.dust(fx, 0.1, fz, stage.bodyRadius * 0.45, k.stage === 1 ? 2 : 4);
       }
     }
 
+    // --- a handful of civilians on the way to the mouth --------------------------------------------
+    if (this.snackTime !== null) {
+      // Anything else it does gulps them at once.
+      if (phase !== 'idle' && this.snackTime < SNACK_GULP) this.snackTime = SNACK_GULP;
+      this.snackTime += dt;
+      if (this.snackTime >= SNACK_TIME || cocooned || !k.alive) this.snackTime = null;
+    }
+
     // --- pose --------------------------------------------------------------------------------------
     const assembly = view.firstPerson && phase !== 'dead' && phase !== 'cocoon';
+    this.firstPerson = assembly;
     if (assembly !== this.armsOnHead) {
       this.armsOnHead = assembly;
       rig.ride('arm_L', assembly ? 'head' : null);
       rig.ride('arm_R', assembly ? 'head' : null);
     }
-    computeKaijuPose(
-      {
-        time,
-        walkPhase: this.walkPhase,
-        speed: speed / Math.max(0.1, stage.topSpeed),
-        headYaw: angleDiff(k.aimYaw, k.yaw),
-        headPitch: k.aimPitch,
-        action,
-        phase,
-        phaseTime,
-        phaseDuration,
-        holding: k.held !== null,
-        height: stage.height,
-        poses: this.poses ?? undefined,
-        firstPerson: assembly,
-      },
-      this.pose,
-    );
+    const look = this.lookFor(k, action, phase, view.tick);
+    this.lookNow = look;
+    const input = this.input;
+    input.time = time;
+    input.walkPhase = this.walkPhase;
+    input.speed = speed / Math.max(0.1, stage.topSpeed);
+    input.headYaw = angleDiff(k.aimYaw, k.yaw);
+    input.headPitch = k.aimPitch;
+    input.action = action;
+    input.phase = phase;
+    input.phaseTime = phaseTime;
+    input.phaseDuration = phaseDuration;
+    input.holding = k.held !== null;
+    input.height = stage.height;
+    input.poses = this.poses ?? undefined;
+    input.firstPerson = assembly;
+    input.variant = look;
+    input.snack = this.snackTime;
+    computeKaijuPose(input, this.pose);
     const blend = 1 - Math.exp(-this.pose.stiffness * dt);
     for (const [name, target] of this.pose.rotations) {
       const c = this.current.get(name) as NodePose;
       c.x += (target.x - c.x) * blend;
       c.y += (target.y - c.y) * blend;
       c.z += (target.z - c.z) * blend;
-      rig.setRotation(name, c.x, c.y, c.z);
     }
     this.hipsLift += (this.pose.hipsLift - this.hipsLift) * blend;
-    rig.setOffset('hips', 0, this.hipsLift, 0);
 
     // --- swimming ------------------------------------------------------------------------------------
     this.updateSwim(k, dt, speed, effects);
@@ -341,6 +596,7 @@ export class KaijuView {
       rig.root.rotation.set(0, 0, 0);
       rig.root.position.set(0, 0, 0);
     }
+    this.applyPose(rig, this.current, this.hipsLift, k, assembly);
 
     // The weak point shows, and throbs, only while staggered. The throb never shrinks it below
     // 1.1: the shards at the shoulder blades only show above about 0.95 (art notes, section 5).
@@ -351,27 +607,13 @@ export class KaijuView {
       if (weak.visible) weak.scale.setScalar(throb);
     }
 
-    // The embers and eyes heat up with rage and while the beam gathers and burns.
+    // The stripes glow with rage; the embers and eyes heat up with it and while the beam gathers and burns.
+    const heat = this.updateGlow(k, action, phase, phaseTime, phaseDuration, dt, time, assembly);
     if (this.ember) {
-      const rage = clamp01(k.rage / COMBAT_RULES.rageMax);
-      const beamHeat = action === 'special' ? (phase === 'windup' ? clamp01(phaseTime / Math.max(0.01, phaseDuration)) : phase === 'recover' ? 0.5 : 1) : 0;
-      const heat = Math.max(rage, beamHeat);
       const flicker = 1 + Math.sin(time * 7.3) * 0.06 * heat;
-      this.ember.color.setScalar((0.8 + heat * 0.8) * flicker);
+      this.ember.color.setScalar((0.8 + Math.min(1, heat) * 0.8) * flicker + this.flare * 0.6);
     }
 
-    // Seen from inside the head: lock the head to the aim (it carries the camera anchor, the
-    // snout and, riding on it, the arms), so the claws keep their place whatever the body does.
-    if (assembly) {
-      const neck = rig.node('neck');
-      const head = rig.node('head');
-      if (neck && head) {
-        this.group.updateMatrixWorld(true);
-        neck.getWorldQuaternion(quat).invert();
-        aimQuat.setFromEuler(aimEuler.set(-k.aimPitch, k.aimYaw, 0, 'YXZ'));
-        head.quaternion.copy(quat).multiply(aimQuat);
-      }
-    }
     // With the camera pulled back into the skull the claws would be seen from behind.
     const hideLimbs = assembly && view.insideHead;
     rig.setVisible('arm_L', !hideLimbs);
@@ -384,8 +626,8 @@ export class KaijuView {
     if (this.weapon.kind !== null || k.surge > 0 || this.surge.active) {
       this.group.updateMatrixWorld(true);
       const u = phaseDuration > 0 ? Math.min(1, phaseTime / phaseDuration) : 0;
-      this.weapon.update(k, { action, phase, u }, dt, time, { firstPerson: assembly, local: view.local === true, camera: view.camera }, lines);
-      this.surge.update(k, rig, this.ember, dt, lines, effects, rig.root.visible);
+      this.weapon.update(k, { action, phase, u, variant: look }, dt, time, { firstPerson: assembly, local: view.local === true, camera: view.camera }, lines, this.ribbons);
+      this.surge.update(k, rig, this.ember, this.skin, dt, lines, effects, rig.root.visible);
     }
 
     // A staggered kaiju's weak point also gets a halo of its light, toward whoever looks: from a
@@ -424,6 +666,84 @@ export class KaijuView {
       lines.push(tmp.x, tmp.y, tmp.z, tmp2.x, tmp2.y, tmp2.z, width * 1.3, 1.0, 0.95, 0.75, 1.0);
       effects.glowAt(tmp2.x, tmp2.y, tmp2.z, width * (4 + Math.sin(time * 50)) * 1.6, 0xffb060, 0.06);
       if (Math.floor(time * 30) % 2 === 0) effects.dust(tmp2.x, tmp2.y, tmp2.z, width * 1.5, 1, 0x554a44);
+    }
+
+    // --- slash trails (last: they pose the rig along the strike, then put it back) ----------------
+    if (rig.root.visible && !hideLimbs) this.slashTrails(k, rig, action, phase, phaseTime, phaseDuration, look, assembly, stage.height, lines);
+  }
+
+  /**
+   * The slash trails of a swipe's claws and a tail sweep's tail: the band the tip sweeps through
+   * the strike, worked out by posing the rig at moments of it (so it reads at any frame rate),
+   * drawn up to now; through the follow-through it fades.
+   */
+  private slashTrails(k: SnapKaiju, rig: SceneRig, action: KaijuActionId, phase: KaijuPhase, phaseTime: number, phaseDuration: number, look: number | null, assembly: boolean, height: number, lines: LineBatch): void {
+    const ribbons = this.ribbons;
+    if (!ribbons || (action !== 'swipe' && action !== 'tailSweep') || look === null) return;
+    if (phase !== 'active' && phase !== 'recover') return;
+    const timing = kaijuKindDef(k.kind).actions[action].timing;
+    const u = phaseDuration > 0 ? clamp01(phaseTime / phaseDuration) : 1;
+    const head = phase === 'active' ? u : 1;
+    const from = assembly ? head * TRAIL_FP_FROM : 0;
+    const fade = (phase === 'active' ? 1 : 1 - u / TRAIL_FADE) * (assembly ? TRAIL_FP_FADE : 1);
+    if (fade <= 0.01 || head <= 0.02) return;
+    const tail = action === 'tailSweep';
+    const names = tail ? ['tail_5'] : look === 2 ? ['hand_R', 'hand_L'] : [look === 1 ? 'hand_L' : 'hand_R'];
+    const inner = tail ? TAIL_INNER : CLAW_INNER;
+    const objects: THREE.Object3D[] = [];
+    const tips: THREE.Vector3[] = [];
+    for (const name of names) {
+      const node = rig.node(name);
+      const tip = this.tips.get(name);
+      if (node && tip) {
+        objects.push(node);
+        tips.push(tip);
+      }
+    }
+    if (objects.length === 0) return;
+    for (let j = 0; j < objects.length; j++) {
+      clearTrail(this.tipPaths[j]);
+      clearTrail(this.innerPaths[j]);
+    }
+    const input = this.input;
+    const sample: KaijuPose = this.sample;
+    for (let i = 0; i <= TRAIL_POINTS; i++) {
+      input.phase = 'active';
+      input.phaseDuration = timing.active;
+      input.phaseTime = (from + ((head - from) * i) / TRAIL_POINTS) * timing.active;
+      computeKaijuPose(input, sample);
+      this.applyPose(rig, sample.rotations, sample.hipsLift, k, assembly);
+      this.group.updateMatrixWorld(true);
+      for (let j = 0; j < objects.length; j++) {
+        const m = objects[j].matrixWorld;
+        tmp.copy(tips[j]).applyMatrix4(m);
+        addTrailPoint(this.tipPaths[j], tmp.x, tmp.y, tmp.z);
+        tmp.copy(tips[j]).multiplyScalar(inner).applyMatrix4(m);
+        addTrailPoint(this.innerPaths[j], tmp.x, tmp.y, tmp.z);
+      }
+    }
+    // Back to the pose drawn this frame.
+    this.applyPose(rig, this.current, this.hipsLift, k, assembly);
+    this.group.updateMatrixWorld(true);
+    // (Seen from inside its own head the glowing edge would cross the crosshair: the band alone.)
+    const edge = assembly ? 0 : height * TRAIL_EDGE;
+    for (let j = 0; j < objects.length; j++) ribbons.ribbon(this.tipPaths[j], this.innerPaths[j], fade, k.surge > 0, lines, edge);
+  }
+
+  /**
+   * One of this kaiju's actions changed phase (the simulation's `kaijuAction`, handed on by the
+   * renderer): a stomp's foot (or, for the hop, both feet) lands with a short shock ring.
+   */
+  onAction(e: KaijuActionEvent, k: SnapKaiju, effects: Effects): void {
+    if (e.action !== 'stomp' || e.phase !== 'active' || !this.rig) return;
+    const look = this.look.action === 'stomp' ? this.look.variant : 2;
+    const st = kaijuStageDef(k.kind, k.stage);
+    this.group.updateMatrixWorld(true);
+    for (const name of look === 2 ? ['foot_L', 'foot_R'] : [look === 1 ? 'foot_L' : 'foot_R']) {
+      const foot = this.feet.get(name);
+      if (!foot) continue;
+      tmp.copy(foot).applyMatrix4(this.group.matrixWorld);
+      stompShock(effects, tmp.x, tmp.z, st.bodyRadius * 1.25, k.surge > 0);
     }
   }
 
@@ -495,6 +815,7 @@ export class KaijuView {
   hide(): void {
     this.group.visible = false;
     this.surge.reset();
+    this.snackTime = null;
   }
 
   dispose(): void {
@@ -503,6 +824,7 @@ export class KaijuView {
     this.dropHeld();
     this.weapon.dispose();
     this.surge.reset();
+    this.skin.material.dispose();
     this.group.removeFromParent();
   }
 }

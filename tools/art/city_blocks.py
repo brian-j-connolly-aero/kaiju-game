@@ -327,7 +327,7 @@ def office_b(b):
     # the floating roof over the terrace
     for x in (-9.0, 9.0):
         pillar(b, x, -8.0, shaft.z1, top.z1 + 2.0, s=0.5)
-    slab(b, -12.0, -9.0, 12.0, 9.0, top.z1 + 2.0, 0.5, col="#f2efe8", top="#d8d4ca")
+    slab(b, -12.0, -9.0, 12.0, 9.0, top.z1 + 2.0, 0.5, col="#f2efe8", region="roof_plain")   # the roof seen from above
     b.roof_box(-4.0, 4.0, top.z1, 5.0, 4.0, 1.8, region="metal_plain", top="white")
     b.bite_hint = (12.0, -9.0, 50.0)
 
@@ -431,7 +431,7 @@ def tower_b(b):
         tier = octagon(w, w, c)
         ring_walls(b, tier, z, z + h, "glass_blue")
         ring_walls(b, tier, z + h, z + h + 1.2, "cornice")
-        cap(b, tier, z + h + 1.2, col="#7d828c")
+        cap(b, tier, z + h + 1.2, "roof_plain")          # a flat roof: the district's roof color
         solid_prism(b, tier, z, z + h + 1.2)
         z += h + 1.2
     lant = octagon(6.0, 6.0, 1.8)

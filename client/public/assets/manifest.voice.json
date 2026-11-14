@@ -883,6 +883,70 @@
     "v_hearing_kaiju_win_3": {
       "base": "audio/voice/v_hearing_kaiju_win_3",
       "duration": 7.541
+    },
+    "v_crate_drop_1": {
+      "base": "audio/voice/v_crate_drop_1",
+      "duration": 3.732
+    },
+    "v_crate_drop_2": {
+      "base": "audio/voice/v_crate_drop_2",
+      "duration": 3.689
+    },
+    "v_crate_land_1": {
+      "base": "audio/voice/v_crate_land_1",
+      "duration": 3.714
+    },
+    "v_crate_land_2": {
+      "base": "audio/voice/v_crate_land_2",
+      "duration": 3.499
+    },
+    "v_mast_down_1": {
+      "base": "audio/voice/v_mast_down_1",
+      "duration": 4.155
+    },
+    "v_mast_down_2": {
+      "base": "audio/voice/v_mast_down_2",
+      "duration": 4.039
+    },
+    "v_mast_down_3": {
+      "base": "audio/voice/v_mast_down_3",
+      "duration": 3.828
+    },
+    "v_gas_station_1": {
+      "base": "audio/voice/v_gas_station_1",
+      "duration": 3.314
+    },
+    "v_gas_station_2": {
+      "base": "audio/voice/v_gas_station_2",
+      "duration": 3.697
+    },
+    "v_gas_station_3": {
+      "base": "audio/voice/v_gas_station_3",
+      "duration": 4.598
+    },
+    "v_power_cut_1": {
+      "base": "audio/voice/v_power_cut_1",
+      "duration": 3.671
+    },
+    "v_power_cut_2": {
+      "base": "audio/voice/v_power_cut_2",
+      "duration": 3.476
+    },
+    "v_power_cut_3": {
+      "base": "audio/voice/v_power_cut_3",
+      "duration": 3.877
+    },
+    "v_door_shield_1": {
+      "base": "audio/voice/v_door_shield_1",
+      "duration": 4.094
+    },
+    "v_civilians_eaten_1": {
+      "base": "audio/voice/v_civilians_eaten_1",
+      "duration": 5.115
+    },
+    "v_civilians_eaten_2": {
+      "base": "audio/voice/v_civilians_eaten_2",
+      "duration": 5.064
     }
   }
 }

@@ -14,8 +14,13 @@ Rules (FAIL unless marked WARN):
   rubble     inside the footprint (+0.3 m) and no taller than 35% of the building
   material   only `city_atlas` (one material: one draw call per state)
   uv         every texture coordinate inside the atlas, every triangle inside one region
-  tint       COLOR_0 alpha is 0 or 1 only; tinted faces exist only on tintable regions (WARN)
-  manifest   the entry has "tint" and "district" (WARN when the model is not in a manifest)
+  mask       COLOR_0 alpha is 0, 0.5 or 1 only (the paint mask: never tint, roof, wall)
+  tint       faces with alpha 1 exist only on tintable regions (WARN)
+  roof       alpha 0.5 exactly on the grey roof regions (atlas Region.roof); an ordinary building
+             (kit.roof_masked) has roof faces (WARN if none), a landmark, bridge, special
+             building or roofless archetype none
+  manifest   the entry has "tint" and "district", and "roof" when the model has roof faces
+             (WARN; also WARN when the model is not in a manifest)
 Exit code 0 when everything passes.
 """
 from __future__ import annotations
@@ -96,7 +101,8 @@ def check_model(mid: str) -> Report:
     lo, hi = g.bounds(g.subtree("intact"))
     size = hi - lo
     bad = []
-    for label, got, want in (("width", size[0], W), ("height", size[1], H), ("depth", size[2], D)):
+    top = contract.model_height(aid, H)       # above the box only with a slim part (contract.TALL_PARTS)
+    for label, got, want in (("width", size[0], W), ("height", size[1], top), ("depth", size[2], D)):
         tol = style.fit_tolerance(want)
         if abs(got - want) > tol:
             bad.append(f"{label} {got:.2f} vs {want:g} (tolerance {tol:.2f})")
@@ -106,7 +112,8 @@ def check_model(mid: str) -> Report:
     if abs(lo[1]) > 0.02:
         bad.append(f"lowest point y = {lo[1]:.3f}")
     rep.add("FAIL" if bad else "PASS", "fit",
-            "; ".join(bad) if bad else f"{size[0]:.2f} x {size[2]:.2f} m, {size[1]:.2f} m tall = archetype {W:g} x {D:g} x {H:g}")
+            "; ".join(bad) if bad else f"{size[0]:.2f} x {size[2]:.2f} m, {size[1]:.2f} m tall = archetype {W:g} x {D:g} x {H:g}"
+            + (f" (a slim part reaches {top:g} m)" if top != H else ""))
     limit = budgets.budget(aid)
     for state in ("intact", "damaged", "rubble"):
         t = g.tris(g.subtree(state))
@@ -137,10 +144,17 @@ def check_model(mid: str) -> Report:
     low = rhi[1] <= 0.35 * H + 0.01
     rep.add("PASS" if inside and low else "FAIL", "rubble",
             f"{rhi[1]:.2f} m tall, inside the footprint: {inside}")
-    # materials, uv, tint
+    # materials, uv, the paint mask (walls 1, roofs 0.5, the rest 0)
     rects = _region_rects()
     mats, uv_bad, uv_cross, alpha_bad, tint_wrong = set(), 0, 0, 0, 0
+    from city import kit
+    masked = kit.roof_masked(aid)
+    # roof triangles in intact and in every node; 0.5 off a grey roof; a grey roof without 0.5;
+    # a colored roof (tile_red, gravel...) on an ordinary building, which the kit turns grey
+    roof_tris, roof_any, roof_off, roof_bare, roof_colored = 0, 0, 0, 0, 0
     tintable = {name for name, r in atlas.REGIONS.items() if r.tint}
+    grey_roofs = {name for name, r in atlas.REGIONS.items() if r.roof}
+    intact_nodes = {n.index for n in g.subtree("intact")}
     for n, p in _prims(g, g.reachable()):
         mats.add(p.material)
         if p.uvs is None:
@@ -151,6 +165,7 @@ def check_model(mid: str) -> Report:
             uv_bad += 1
         px = uv[:, 0] * atlas.W
         py = uv[:, 1] * atlas.H
+        has_alpha = p.colors is not None and p.colors.shape[1] == 4
         for tri in p.indices:
             xs, ys = px[tri], py[tri]
             reg = None
@@ -160,18 +175,45 @@ def check_model(mid: str) -> Report:
                     break
             if reg is None:
                 uv_cross += 1
-            elif p.colors is not None and p.colors.shape[1] == 4 and p.colors[tri[0], 3] > 0.5 and reg not in tintable:
+                continue
+            a = float(p.colors[tri[0], 3]) if has_alpha else 1.0
+            if a > 0.75 and reg not in tintable:
                 tint_wrong += 1
-        if p.colors is not None and p.colors.shape[1] == 4:
+            roof = 0.25 <= a <= 0.75
+            if roof and reg not in grey_roofs:
+                roof_off += 1
+            elif not roof and reg in grey_roofs:
+                roof_bare += 1
+            elif roof:
+                roof_any += 1
+                roof_tris += int(n.index in intact_nodes)
+            if masked and reg in kit.GREY_ROOFS:
+                roof_colored += 1
+        if has_alpha:
             a = p.colors[:, 3]
-            alpha_bad += int(((a > 0.01) & (a < 0.99)).sum())
+            alpha_bad += int(((a > 0.01) & (np.abs(a - 0.5) > 0.01) & (a < 0.99)).sum())
     rep.add("PASS" if mats == {contract.MAT_ATLAS} else "FAIL", "material", f"materials: {sorted(map(str, mats))}")
     rep.add("PASS" if not uv_bad and not uv_cross else "FAIL", "uv",
             "every triangle maps inside one atlas region" if not uv_bad and not uv_cross else
             f"{uv_bad} outside the atlas, {uv_cross} triangles straddle regions")
-    rep.add("PASS" if not alpha_bad else "FAIL", "tint", "alpha is 0 or 1" if not alpha_bad else f"{alpha_bad} vertices with partial alpha")
+    rep.add("PASS" if not alpha_bad else "FAIL", "mask",
+            "alpha is 0, 0.5 or 1" if not alpha_bad else f"{alpha_bad} vertices with an alpha other than 0, 0.5, 1")
     if tint_wrong:
         rep.add("WARN", "tint", f"{tint_wrong} tinted triangles on regions not authored for tinting")
+    if roof_off or roof_bare:
+        rep.add("FAIL", "roof", f"{roof_off} triangles with the roof mask off the grey roofs, "
+                                f"{roof_bare} grey roof triangles without it")
+    elif not masked:
+        rep.add("PASS" if not roof_any else "FAIL", "roof",
+                "keeps its own roof colors (no roof mask)" if not roof_any else
+                f"{roof_any} roof triangles, but this archetype keeps its own roof colors")
+    elif roof_colored:
+        rep.add("FAIL", "roof", f"{roof_colored} triangles on colored roofs ({', '.join(sorted(kit.GREY_ROOFS))}): "
+                                f"an ordinary building's roofs are grey (build it with the kit)")
+    else:
+        rep.add("PASS" if roof_tris else "WARN", "roof",
+                f"intact: {roof_tris} roof triangles take the district's roof color" if roof_tris else
+                "no roof faces: an ordinary building with a roof marks it (tools/art/README.md section 9)")
     # manifest
     entry = None
     for mf in glob.glob(os.path.join(contract.ASSETS, "manifest.*.json")):
@@ -184,8 +226,12 @@ def check_model(mid: str) -> Report:
     if entry is None:
         rep.add("WARN", "manifest", "not listed in any partial manifest")
     else:
-        miss = [k for k in ("tint", "district") if k not in entry]
-        rep.add("WARN" if miss else "PASS", "manifest", f"entry lacks {miss}" if miss else "entry has tint and district")
+        need = ("tint", "district", "roof") if roof_tris else ("tint", "district")
+        miss = [k for k in need if k not in entry]
+        stray = ["roof"] if "roof" in entry and not roof_tris else []
+        rep.add("WARN" if miss or stray else "PASS", "manifest",
+                f"entry lacks {miss}" if miss else f"entry has {stray} but the model no roof faces" if stray else
+                f"entry has {', '.join(need)}")
     return rep
 
 

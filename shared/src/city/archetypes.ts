@@ -6,8 +6,9 @@
  * The first 22 entries are the starter set the placeholder city is built from; the entries after
  * them were appended for Port Meridian (docs/CITY.md describes every one for the artists). The
  * list is append-only and ids are stable: art files are named after them, and the client draws
- * one instanced batch per archetype and damage state, so the whole list is capped at 48 (40 until
- * phase 2 added the three special buildings; phase 3 adds more kinds of buildings).
+ * one instanced batch per archetype and damage state, so the whole list is capped at 56 (40 until
+ * phase 2 added the three special buildings, 48 until phase 3 added six more kinds of buildings
+ * for the starting neighborhoods).
  *
  * Tuning notes (starting values): hp is set against the kaiju's structure damage per stage
  * (swipe 40 / 300 / 2000), so a house takes about two hatchling swipes, a mid-rise three
@@ -157,6 +158,19 @@ export const ARCHETYPES: readonly ArchetypeDef[] = [
   special('substation_a', 'substation', 'factory', 22, 16, 9, 150, 15, ['suburb', 'industrial']),
   special('gasstation_a', 'gasstation', 'shop', 26, 20, 7, 160, 15, ['suburb', 'harbor', 'industrial']),
   special('radiomast_a', 'radiomast', 'factory', 8, 8, 24, 120, 15, ['suburb', 'industrial']),
+
+  // --- Phase 3 (docs/ROADMAP.md, "more kinds of buildings, packed closer together where the match
+  // starts"): six kinds for the starting neighborhoods and the low-rise suburbs. All are houses
+  // or shops (a hatchling can wreck them; the juvenile tramples them). The bungalow and the
+  // duplex sit among the houses, the garages along the back lanes; the diner, the firehouse and
+  // the motel face the busier streets. A garage falls to one hatchling swipe (40).
+  building('bungalow_a', 'house', 10, 9, 5, 75, 7, ['suburb', 'boardwalk', 'harbor']),
+  building('duplex_a', 'house', 12, 10, 7, 110, 11, ['suburb', 'oldtown']),
+  building('garage_a', 'house', 8, 7, 4, 40, 4, ['suburb']),
+  building('diner_a', 'shop', 16, 10, 5, 130, 13, ['suburb', 'boardwalk', 'harbor']),
+  // The hose tower at a back corner may rise to 12 m; the game counts the 9 m body.
+  building('firehouse_a', 'shop', 14, 16, 9, 200, 18, ['suburb', 'oldtown']),
+  building('motel_a', 'shop', 24, 10, 7, 170, 16, ['suburb', 'boardwalk']),
 ];
 
 const BY_ID = new Map<string, ArchetypeDef>(ARCHETYPES.map((a) => [a.id, a]));

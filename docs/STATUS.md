@@ -4,7 +4,17 @@ Living status file. Keep it short and true: when you finish a task, update what 
 the stubs you filled in, and add any decision the docs left open. Contracts live in
 `ARCHITECTURE.md`; numbers live in `DESIGN.md` and `shared/src/defs/`.
 
-Last updated by: the phase 2 integration (the last section: the four phase 2 builders' work and
+Last updated by: the phase 3 integration (the last section: the seven phase 3 builders' work
+run together and played end to end in the browser, the pace re-checked, the slide pictures, and
+`docs/PLAYTEST.md`, a page for the owner's next playtest), after the phase 3 tasks of
+`docs/ROADMAP.md` ("looks and sound"): the pacing pass (the stage times held where phase 2 left
+them, something new about every 20 to 25 s at every stage, the squad bot in the packed streets),
+the sound (the missing sounds, 16 new voice lines), the city on screen (roofs by district, the
+hills, the fireball), the monster's looks (attack versions, trails, glowing stripes, civilians),
+the city simulation (the starts packed close, six new kinds of buildings, roofs by district,
+special buildings beyond the starts) and the two art tasks (the roof mark, the six new building
+models). Before them: the
+phase 2 integration (the four phase 2 builders' work and
 the art run together, the squad bot's volleys behind rubble fixed, the pace held where phase 1
 left it, the "something every 20 seconds" check, the game played end to end in the browser),
 after the phase 2 tasks of `docs/ROADMAP.md` ("something happening every 20 seconds": the
@@ -62,7 +72,7 @@ Everything below is in `shared/` (`@mb/shared`) unless it says otherwise, is cov
   projectile types, the artillery call-in, the supply crates and pick-ups (`pickups.ts`), rubble
   and falls (`rubble.ts`), the mods and upgrades schema with an empty pool, and the voice cue
   list with a typed, validating loader for `voiceLines.json`.
-- **`city/`:** `CityData` types, 43 archetypes (the three special buildings among them), 20 prop
+- **`city/`:** `CityData` types, 49 archetypes (the three special buildings and phase 3's six kinds among them), 20 prop
   kinds (the six city weapons among them), the spatial index and its queries (`CityIndex` /
   `CityQuery`, rubble mounds and fallen buildings included), stage bounds, road graph helpers (`findRoadPath`),
   `validateCity`, `cityChecksum`, a cached `getCity()` that builds **Port Meridian**
@@ -177,9 +187,9 @@ Everything below is in `shared/` (`@mb/shared`) unless it says otherwise, is cov
   outside the bounds), `shared/test/meridianPlay.test.ts` (deployment at every start and
   stage), besides `molt.test.ts`,
   `bots.test.ts` and `voice.test.ts`.
-- **Root scripts:** `scripts/dev.mjs`, `scripts/lint.mjs`. `npm run assets:manifest` now runs
-  `tools/build-manifest.mjs`; `scripts/merge-manifests.mjs` is the older merge-only script,
-  no longer referenced by anything and safe to delete.
+- **Root scripts:** `scripts/dev.mjs`, `scripts/lint.mjs`, `scripts/precompress.mjs`.
+  `npm run assets:manifest` runs `tools/build-manifest.mjs` (the older merge-only script,
+  `scripts/merge-manifests.mjs`, was deleted in the phase 3 integration).
 
 ## 3. What is stubbed
 
@@ -548,9 +558,11 @@ Server
   3:01, matches of about 7:30, 16 kills in 40. Phase 2 added the special buildings, city
   weapons, crates and rubble; `p2` 0.11 and `p3` 0.30 hold the pace (section 10): the kaiju bot
   wins 16 of 40, stages of about 2:01 / 2:35 / 3:06, matches of about 7:56, 9 of 40 on the
-  clock. Balance waits for the owner's next playtest; real players will move it. Numbers nobody
-  has tuned yet: action move multipliers, wade damage, rage per bar segment, prop values,
-  archetype hp and value, and everything new in phases 1 and 2.
+  clock. Phase 3 packed the starts close and sent more crates; `p1` 0.145 holds the pace
+  (section 11): the kaiju bot wins 22 of 40, stages of about 2:00 / 2:32 / 3:02, matches of
+  about 7:37, 5 of 40 on the clock. Balance waits for the owner's next playtest; real players
+  will move it. Numbers nobody has tuned yet: action move multipliers, wade damage, rage per bar
+  segment, prop values, archetype hp and value, and everything new in phases 1 to 3.
 - Nerve breaks only when charged volleys (60% charge or more) from two different squads land
   within 5 s of each other (`DESIGN.md` sections 3 and 5). A bot kaiju is staggered about 1.6 /
   3 / 3.5 times a stage. Four idle people, or the client's autopilot squad (which holds the
@@ -561,12 +573,16 @@ Server
 - Rubble hides a hatchling well: from street level a heap of house rubble covers most of it,
   and since phase 2 the squad bots fire half as many charged volleys at stage 1 as in phase 1
   (and break its nerve a third as often). The squad bot moves on when its squad-mates have no
-  line and tries other sides (the phase 2 integration), but it still only parks on road nodes
-  and street midpoints, never on top of a heap.
+  line and tries other sides (the phase 2 integration); since phase 3 it looks for a spot every
+  20 m along the streets and comes closer when nothing in its usual range has a line, but it
+  still only parks on streets, never on top of a heap or on a green, and phase 3's packed starts
+  hide the hatchling better still (sight lines along their streets: median 48 m, from 72 m).
 - The bots have played Port Meridian from every start (`docs/BALANCE.md` section 8 lists what
   was wrong and fixed). In 60 matches nobody was stuck longer than 3.1 s (the kaiju 9.7 s),
   nobody left the bounds, units spent 0.1 to 0.4% of their time out in open water. The squad
-  bot still finds firing positions only on road nodes and street midpoints.
+  bot finds firing positions only on streets. Since phase 3, squad-mates of tank troops at stage
+  3 give up a route about once in four matches (11 in 40): the swarm's places are checked for
+  room, not for a way there (`swarmSlot` in `sim/squads.ts`).
 - The kaiju grows where its cocoon was if its new body fits there; otherwise it stands up at
   the nearest spot with room (`findStandingRoom` in `sim/spawn.ts`), and the kaiju bot picks
   hiding places with room for the next body.
@@ -654,21 +670,30 @@ client/src/assets/
   procedural/       geo.ts, models.ts (box stand-in for every model id), textures.ts, sprites.ts
 client/src/render/
   gameRenderer.ts   scene, per-frame update from a FrameState, simulation events -> visuals, stats
-  materials.ts      vcol / glow / city_atlas shared materials, paint-mask tint, placeholder building material
+  materials.ts      vcol / glow / city_atlas shared materials, paint-mask tint (walls, and since phase 3 roofs in
+                    the district's roof color), placeholder building material, each kaiju view's own skin
+                    (its stripes' glow)
   sky.ts            gradient dome, sun or moon disc, two cloud rings on the horizon, fog and lights per time of day
-  ground.ts         land, roads, parks, plazas, water, far plain from CityData
+  ground.ts         land, roads, parks, plazas, water, far plain from CityData; phase 3: the back lanes
+                    (gravel), the hills round the city and the sea beyond it
+  scenery.ts        phase 3: the hills on the horizon (one mesh, its own haze), the coast and the river's way north
   cityView.ts       instanced structures per archetype and state (wall tint, damage shade), props near the
                     camera, collapse pieces (the art's chunk meshes in one dynamic buffer)
   structureGeometry.ts  an archetype's three states and chunk meshes from its .glb, or painted boxes
   landmarkPictures.ts   the map's landmark pictures, painted on the processor from the models
   sceneRig.ts, instancedRig.ts   the rig abstraction: one posable copy, or many instanced copies, of a RigModel
   kaijuAnimator.ts, kaijuView.ts animation from the action state toward the manifest's pose targets;
-                    first-person head lock; cocoon, held object, weak point halo, embers, beam
-  unitsView.ts, crowd.ts         vehicles, soldier sprites, lasers, markers; fleeing civilians
+                    first-person head lock; cocoon, held object, weak point halo, embers, beam;
+                    phase 3: each attack's two or three looks (picked from the tick it began), the
+                    stripes glowing with rage (the view's own body material), the handful's arm
+  kaijuTrails.ts    phase 3: the slash trails (claws, tail, the club) in one mesh, a stomp's shock ring
+  unitsView.ts, crowd.ts         vehicles, soldier sprites, lasers, markers; fleeing civilians (squashed and
+                    eaten since phase 3: a puff, no gore)
   projectilesView.ts, effects.ts projectiles flown from events; explosions, dust, rings, flashes (four
                     batches: added light, alpha-blended bursts, smoke, ground)
   quadBatch.ts, lineBatch.ts, boundary.ts   instanced sprite quads; glowing lines; the quarantine line
   specialsView.ts   the special buildings' lights from afar and their rewards (surge arcs, fireball, mast)
+  fireball.ts       phase 3: the gas station's fireball, rolling puffs of flame and smoke in one batch
   kaijuWeapons.ts, heldProps.ts   a city weapon in the monster's hand by its grip (club trail, javelin aim
                     line, the door's dents) and the power surge's arcs on its body
   weaponsFx.ts      the city weapons' and the surge's events: blasts, splash, sparks, pieces, knock-downs
@@ -689,8 +714,10 @@ client/src/ui/      hud.ts, mapView.ts (view only), subtitles.ts, settingsPanel.
                     volleyMeter.ts (the squad's volley meter round the crosshair), gunReticle.ts (a tank
                     gun's own sight)
 client/src/kaiju.css                the monster's HUD kit, card picker and controls-card pieces (next to styles.css)
-client/src/audio/   audioEngine.ts (effects with voice limits, staged music, voice queue with ducking, limiter, master
-                    volume, cache of decoded files), matchAudio.ts (events and frame state -> sound); see 7.6
+client/src/audio/   audioEngine.ts (effects with voice limits and variants, staged music, voice queue with ducking,
+                    limiter, master volume, cache of decoded files), matchAudio.ts (events and frame state ->
+                    sound); see 7.6; eventVoice.ts and eventLines.json (phase 3: the 16 radio and news lines the
+                    client says for crates, the mast, the gas station, the power cut, the door, people eaten)
 client/test/        net.test.ts, game.test.ts, manifestTool.test.ts, audioEngine.test.ts, matchAudio.test.ts
                     (both on fakeAudio.ts, a silent stand-in for Web Audio that records what was started),
                     input.test.ts (on fakeBrowser.ts: a window, a document and a browser's side of pointer
@@ -700,13 +727,17 @@ client/test/        net.test.ts, game.test.ts, manifestTool.test.ts, audioEngine
                     pieces, landmark pictures, the night ground, sleeping lobby seats, the
                     autopilot's volleys, the thrown object leaving the hand), cityWeight.test.ts
                     (phase 2: mounds, falls, the mirror, sway and hops, the thumps and lenses),
-                    weapons.test.ts (phase 2: grips, the kit's pictures, missiles, crates, static)
+                    weapons.test.ts (phase 2: grips, the kit's pictures, missiles, crates, static),
+                    monsterLooks.test.ts (phase 3: looks from the tick, trails, stripes, civilians),
+                    cityLooks.test.ts (phase 3: the hills and the sea, the fireball)
 tools/build-manifest.mjs            the assets:manifest script
 tools/playtest/smoke.mjs, shots.mjs the multi-client smoke playtest; stage screenshots from the sandbox
 tools/playtest/scripted.mjs, driver.mjs   two sessions played with real inputs; the hands and eyes it uses
 tools/playtest/scriptedWeapons.mjs, shotsWeapons.mjs   phase 2's weapons and pick-ups: real-input sessions and
                     picture extras in the sandbox
-tools/playtest/shotsCity.mjs        phase 2's city picture extras: special buildings, rubble and falls, weight, speed
+tools/playtest/shotsCity.mjs        the city picture extras: special buildings, rubble and falls, weight, speed (phase 2);
+                    roofs by district, the packed starts, the hills, the fireball, the frame cost (phase 3)
+tools/playtest/shotsMonster.mjs     phase 3's monster extras: every look of every attack, trails, stripes, civilians
 ```
 
 How a frame flows: `App.tick` picks the screen, calls its `frame`, then `MatchRuntime.update`:
@@ -740,15 +771,15 @@ rigs are posed, so the kaiju camera sits exactly on `cam_fp`) -> audio -> `rende
 
 | Where | What is there now | What it should become |
 | --- | --- | --- |
-| `render/structureGeometry.ts`, `render/cityView.ts` | All 43 archetypes come from their art files (states, chunk meshes, atlas, night atlas, wall tint). The painted boxes remain only as the fallback for a missing file. One instanced mesh per archetype, state and material, never culled (the whole city is 360,000 triangles); props are repacked around the camera. | Nothing needed for the budget. District roof colors (`docs/art/client-notes-city.md` section 6) if the art adds a second mask. |
+| `render/structureGeometry.ts`, `render/cityView.ts` | All 49 archetypes come from their art files (states, chunk meshes, atlas, night atlas, wall tint, and since phase 3 the roofs in their district's roof color). The painted boxes remain only as the fallback for a missing file. One instanced mesh per archetype, state and material, never culled (the whole city is about 400,000 triangles); props are repacked around the camera. | Nothing needed for the budget. |
 | `render/kaijuAnimator.ts` | One pose function for the lizard node list; the arms blend toward the art's pose targets (`poses` in the manifest; the box stand-in has the old numbers as its fallback). Swipe wind-up, stomp, roar, beam and death arms are still built-in numbers. | Per-kind animation sets for the Tier 2 kaiju; footfall timing against the art. |
-| `render/effects.ts`, `projectilesView.ts` | Sparkler bursts, dust, rings and flashes from `fx.png`; capped at 520 particles, and a bright particle is never drawn wider than 0.6 of its distance from the camera. Phase 2 added glass, sparks, tumbling bits (`fx_debris_4`), flames, smoke columns and lingering fire (the gas station's). `fx_debris_1..3` are drawn by nothing yet. No searchlights or tracers at night. | The effects pass (night fires, tracers, searchlights, water splashes, beam scorch, debris). |
-| `render/sky.ts`, `render/ground.ts` | Three presets, the two cloud panoramas on horizon rings (sun gap at the sunset sun), a sun or moon disc; windows light up at sunset and night through the city's night atlas; the ground goes to dim warm greys at night (paving under blue moonlight read as water) and to warm stone at sunset (it read lavender under the violet sky light). The afternoon's light from below is a pale paving grey (it was olive, and turned cream walls in shade olive). | Per-stage polish. |
-| `render/crowd.ts` | 260 civilians near the kaiju who run from it and wander otherwise; they do not follow streets. | Street-following crowds, panic sound. |
+| `render/effects.ts`, `projectilesView.ts` | Sparkler bursts, dust, rings and flashes from `fx.png`; capped at 520 particles, and a bright particle is never drawn wider than 0.6 of its distance from the camera. Phase 2 added glass, sparks, tumbling bits (`fx_debris_4`), smoke columns and lingering fire (the gas station's); phase 3 the civilians' cartoon puff (`cartoonPuff`), and the gas station's fireball moved to `fireball.ts` (its old flame ball, `flame`, is gone). `fx_debris_1..3` are drawn by nothing yet. No searchlights or tracers at night. | The effects pass (night fires, tracers, searchlights, water splashes, beam scorch, debris). |
+| `render/sky.ts`, `render/ground.ts` | Three presets, the two cloud panoramas on horizon rings (sun gap at the sunset sun), a sun or moon disc; windows light up at sunset and night through the city's night atlas; the ground goes to dim warm greys at night (paving under blue moonlight read as water) and to warm stone at sunset (it read lavender under the violet sky light). The afternoon's light from below is a pale paving grey (it was olive, and turned cream walls in shade olive). Since phase 3 hills ring the city to the west, north and east and the sea lies to the south (`render/scenery.ts`). | Per-stage polish. |
+| `render/crowd.ts` | 260 civilians near the kaiju, in little groups (often ahead of it), who run from it (some freeze first) and wander otherwise; squashed and eaten since phase 3. They do not follow streets. | Street-following crowds, panic sound. |
 | `ui/hud.ts`, `styles.css` | Functional HUD: skyline bar with three marks, sun-and-moon arc, meters, squad pips, verb hints with glyphs, crosshair, status pictures. Cramped below about 700 px wide. | The designed HUD (skyline that crumbles, portraits, stat bars). |
 | `ui/iconArt.ts` | Stand-in drawings for every icon id, shown for the moment an icon's file takes to load (and with `?assets=none`); since phase 2 every one of them has its real SVG file in `assets/ui/` (110 files, the pick-up pictures and the squad's controls-card pictures among them). | Nothing, unless the instant stand-in is no longer wanted: then this file can go. |
 | `app/screens/*` | Plain panels: home (callsign, create, join by code), lobby (seats, role, ready, practice, start), briefing (portrait, names), end (winner, pictogram tally, front page with a photo). | Kaiju and faction select with stat bars, the playable tutorial, the hearing, the draft. |
-| `ui/mapView.ts` | 2D canvas map of Port Meridian (a view only): district ground in map tints with names, streets, river and bay, bridges, buildings by state, landmark pictures, friendly units, the kaiju when known, the supply crates (phase 2); animated static while a radio mast's static lasts. | Zoom and pan; rubble drawn as heaps. |
+| `ui/mapView.ts` | 2D canvas map of Port Meridian (a view only): district ground in its roof color (since phase 3) with names, streets, river and bay, bridges, buildings by state, landmark pictures, friendly units, the kaiju when known, the supply crates (phase 2); animated static while a radio mast's static lasts. | Zoom and pan; rubble drawn as heaps. |
 | `audio/matchAudio.ts` | Every event has a sound, and the audio directors' notes for the client are applied (7.6); combat stem follows a simple "shots or lasers recently" heat. No march or crowd loops (the player's own tank has its engine since phase 2, a substation near the player hums); none of the Tier 2 unit sounds (their units do not exist yet). Nobody has listened to any of it: all checks are counts and measured levels. | A listening pass, unit loops, per-stage ambience balance, the Tier 2 wiring in `docs/audio/client-notes-sfx.md` section 4. |
 | `game/autoplay.ts` | Plays both sides well enough to finish a match; no pathfinding for the kaiju, street routing for humans; the squad parks and fires charged volleys together with the others as the squad bots do (`volleyVerdict`). | Nothing: it is a test tool. |
 | `game/input/actions.ts` | Default bindings only; bindings are data and are stored, but there is no rebinding screen (the settings panel has volume, mouse speed, inverted look and fullscreen). Gamepad: standard mapping, never tried on real hardware; the menus cannot be worked with a gamepad (Tab, Space and Enter do work on their buttons). | Key rebinding; gamepad focus in the menus; controller tuning. |
@@ -3408,3 +3439,939 @@ were retaken under their names.)
   the monster winning 40% that is not lopsided; the final pacing pass is phase 3's.
 - The slide pictures were taken with a free camera in the sandbox, not from a match people
   played; the door and the artillery are from the army's side, with its heads-up display.
+
+## Phase 3 art: roofs colored by district, the models (14 November, the roof-mask task)
+
+The art half of the owner's "roofs colored by district". The roof of every ordinary building
+is now drawn in light grey and marked, so the game can paint it in its district's roof color
+(terracotta on Temple Hill, slate blue in Bellhaven, moss green in Hollowmere, charcoal in
+Northgate, soot in the Cinder Works) and each neighborhood reads as its own place from the
+monster's height. The game does not use the mark yet: that is the city client builder's job
+(below).
+
+**What changed**
+
+- **The mark.** A building's vertex colors carry a fourth number (alpha) that tells the game
+  what it may repaint. It had two values (1 = wall the game may color, 0 = leave alone) and now
+  has three: **0.5 = roof**. Roof faces carry it in every state: the whole building, the damaged
+  one, the flying collapse pieces, and the rubble heap, whose first slab is now a piece of the
+  roof, so a ruin keeps a patch of its district's color.
+- **Light grey roofs.** Six new grey roof pictures in the shared building picture sheet (the
+  atlas): clay tiles, slates, round tiles, a flat roof membrane, corrugated metal and a plain
+  grey. They keep the old patterns as lighter and darker lines and all average the same grey
+  (`#d9d9d9`), so the game's "district color divided by that grey" shows the district color.
+  They sit in space nothing used; every older pixel of the atlas is unchanged (compared).
+- **Done once, in the kit.** Building scripts still ask for "red tiles" or "gravel"; on an
+  ordinary building the kit swaps those faces onto the grey roofs and marks them
+  (`tools/art/city/kit.py`, `grey_roofs`). So the six new building kinds coming next get the
+  mark for free. Two roofs that were plain paint became marked roofs: the setback tops of
+  `tower_b` and the floating roof of `office_b`.
+- **Who keeps their own roof colors, and why** (`tools/art/city/style.py`, `OWN_ROOFS`): the
+  landmarks, the bridges and the three special buildings (as decided); the storage tank (its
+  lid is painted steel, like a rooftop water tank); the harbor crane and the container stack
+  (no roof); `tower_c` (its slanted roof is dark glass); the seaside pavilion (its roof is a
+  red and white striped canvas tent, the Boardwalk's signature, painted like the awnings).
+  Copper crowns and lanterns, glass roofs and skylights, chimneys, plant rooms, water tanks,
+  parapet tops and signs keep their colors on every building.
+- **20 building models re-made** (`bld_*.glb`; the five above with no roof to mark came out
+  unchanged), their review sheets redrawn, the asset list entries given a `roof` note with the
+  grey to divide by.
+- **Checks and pictures.** The city check has two new rules (`mask`: only 0, 0.5 and 1;
+  `roof`: marks only on the grey roofs, no colored roof left on an ordinary building, no mark on
+  a building that keeps its own roof). A new art test builds a small house with the kit and
+  checks the mark in every state (`tools/art/tests/test_city_roofs.py`). A new tool,
+  `tools/art/city/roofs.py`, draws the two roof pictures; the art build redraws them when a
+  building changes.
+
+**Pictures**
+
+- `docs/art/previews/city_roofs_test.png`: every ordinary building, whole, damaged, as rubble
+  and as collapse pieces, with every marked roof face painted loud green. All roofs are green;
+  no wall is; the buildings that keep their own roofs are labeled with the reason.
+- `docs/art/previews/city_roofs_districts.png`: one street of houses and shops in Temple Hill,
+  Bellhaven, Hollowmere and Northgate colors, then the Cinder Works and Downtown, each roof a
+  few shades apart, as the game should draw them (colors from the city data).
+
+**Measured**
+
+- Triangles: unchanged in every state of all 20 re-made models (compared with the committed
+  files); the whole and damaged shapes are identical, only colors, texture positions and the
+  mark changed. Roof triangles on the whole buildings run from 2 (`shop_a`, a flat roof behind
+  its parapet) to 56 (`tower_b`).
+- The six grey roofs average the target grey within 0.1%.
+- Art contract check (`tools/art/validate.py --all`): 76 files pass, 5 warnings, all of them
+  there before. City check (`tools/art/city/check.py --all`): 43 buildings pass. Art pipeline
+  tests (`tools/art/tests/run_all.sh`), including the new one: pass. Asset list merge and
+  `npm run assets:manifest -- --check`: up to date.
+- `npm run check` at the end of this task: type check and lint pass; 8 tests fail, all in the
+  city files the city simulation builder was editing at the same time
+  (`shared/test/meridian.test.ts`, `meridianPlay.test.ts`, `matchSoak.test.ts`: prop counts and
+  start fairness of the new layout). None of them reads an art file.
+
+**Still open**
+
+- The game does not read the roof mark yet. Until the city client builder does what
+  `docs/art/client-notes-city.md` section 2 ("Roofs") describes, roofs show light grey, half
+  painted in the wall color. Expected.
+- `docs/CITY.md` section 2 still says roofs keep the art's colors; that file and
+  `District.roof` belong to the city simulation builder, who is changing them now.
+- Owner's call: the pavilion keeps its red and white stripes, the storage tank its grey lid and
+  `office_c` its green copper crown. Each is one line to change.
+- On a few heaps the roof slab ends up under the mounds (`campus_a`), so no district color
+  shows there.
+- The older beauty shots in `docs/art/concept/` (`city_homes.png`, `city_blocks.png`, the
+  lineups) still show the old red and slate roofs; redrawn now they would show unpainted grey
+  roofs. Worth redoing once the game paints the roofs.
+- No sounds are involved; nothing is missing.
+
+## Phase 3 art: six new kinds of buildings for the starting neighborhoods (14 November, the new-buildings task)
+
+**What was done**
+
+Six new building models for the neighborhoods where a match starts, where the small monster
+(4.5 m) meets them first. Each has everything an ordinary building has: whole, damaged and
+rubble states, collapse pieces, the wall paint mark, the roof mark (so its roof takes its
+district's color) and its entry in the asset list. Signs are pictures only.
+
+| Model | Size | What you see |
+| --- | --- | --- |
+| `bld_bungalow_a` | 10 x 9 m, 5 m tall | one low roof over the house and its deep front porch, four white posts, a chimney |
+| `bld_duplex_a` | 12 x 10 m, 7 m | two mirrored homes under one long roof, a red door and a blue door, two chimneys |
+| `bld_garage_a` | 8 x 7 m, 4 m | two ribbed roll-up doors under a gable with a wrench sign |
+| `bld_diner_a` | 16 x 10 m, 5 m | a pastel body with rounded ends, big windows all round, a chrome edge, a steaming cup on the roof |
+| `bld_firehouse_a` | 14 x 16 m, 9 m (tower 12 m) | brick, two tall red engine doors with a brass bell between them, a slim hose tower |
+| `bld_motel_a` | 24 x 10 m, 7 m | a row of doors on two floors, an upstairs walkway with a railing, a stair, a moon sign on a pole |
+
+- Made by `tools/art/city_starts.py` with the city kit; their eight new pictures (the motel's
+  rooms, the firehouse front, the diner's wall, chrome edge and sign, the roll-up door, the
+  motel sign, stair treads) are in the part of the shared picture sheet kept for homes
+  (`tools/art/city/atlas_extra/homes.py`). Nothing else on the sheet moved (compared pixel by
+  pixel: only that block changed).
+- The firehouse's tower is the one thing in the city that stands above its building's box (12 m
+  on a 9 m building). The game still treats the building as 9 m tall; the art checks know about
+  the exception (`TALL_PARTS` in `tools/art/lib/contract.py`) and a new small test guards it.
+- The helper code the small buildings share moved out of `tools/art/city_homes.py` into
+  `tools/art/city/parts.py`. The older homes rebuilt byte for byte the same afterwards.
+- Docs: `docs/ASSETS.md` (section 3, City), `docs/art/client-notes-city.md` (new section 8, a
+  note per model), `tools/art/city/README.md`, `docs/art/README.md`, `docs/art/CITY_ART.md`.
+
+**Pictures**
+
+- `docs/art/previews/bld_<name>.png` for each of the six: front, back, street level, night,
+  damaged, rubble and pieces, with the soldier and the hatchling for scale.
+- `docs/art/concept/city_starts_scale.png`: each one whole, with its damaged state behind it,
+  beside the older house, corner shop and apartment block.
+- `docs/art/concept/city_starts_street.png`: a street of them in Hollowmere, Bellhaven and
+  Temple Hill wall and roof colors, as the game should paint them.
+
+**Measured**
+
+- Triangles, whole / damaged / rubble (limit 120 each): bungalow 70 / 112 / 73, duplex
+  76 / 111 / 73, garage 40 / 100 / 73, diner 64 / 120 / 71, firehouse 50 / 108 / 67, motel
+  84 / 102 / 71. Collapse pieces: 6 each, 8 for the firehouse and the motel.
+- Art contract check (`tools/art/validate.py --all`): 82 files pass, 5 warnings, all on older
+  models. City check (`tools/art/city/check.py --all`): 49 buildings pass. Art pipeline tests
+  (`tools/art/tests/run_all.sh`) pass, with the new tall-part test. Asset list merged and up to
+  date (82 models).
+
+**Still open**
+
+- The firehouse's brick keeps its own color, so it takes no wall paint (its roofs do take the
+  district's color). Brick is what makes it a fire station.
+- The motel's sign is a sleeping moon with three small sparkles and a bed, not a crescent with
+  a star beside it: the city's art rules keep clear of anything that looks like a real emblem.
+- In the damaged state the diner uses its whole triangle allowance (120 of 120).
+- In the review pictures some rubble heaps show a hair-thin pink edge on a slab lying on them
+  (most on the garage). It comes from the shared heap maker, which leaves a 2 cm gap between a
+  slab and its underside on every building; pink marks a face seen from behind, which the game
+  simply does not draw. I did not change the shared heap maker and did not look at it in the
+  running game.
+- The triangle total for the whole city in `docs/art/CITY_ART.md` does not count the six yet;
+  re-count once the city layout is final (`npx tsx tools/art/city/count_city.ts`).
+- The review sheets of the older buildings were not redrawn (their models and pictures did not
+  change); a full art rebuild will redraw them because the shared picture sheet has a new stamp.
+- Sounds: none needed for these models. Nice to have later: a fire bell when a firehouse falls
+  (about 1.5 s, a brass bell clanging down and cut short).
+
+## Phase 3: the city: the starts packed close, six new kinds, roofs by district, special buildings beyond the starts (14 November, the city-simulation task)
+
+`docs/ROADMAP.md` phase 3, "more kinds of buildings, packed closer together where the match
+starts; roofs colored by district", in the city's data and generator, plus special buildings
+after stage 1 (`docs/BALANCE.md` section 10). The whole story with pictures: `docs/CITY.md`
+section 13 (and sections 2, 4 to 8, 10, 12, which now say how things are).
+
+**Is the tree green? Yes.** `npm run check` passes with the two phase 3 art tasks' work in the
+same tree: type checks, lint (277 files clean, one `STUB(server)`), 888 tests in 69 files.
+
+**What changed**
+
+- **The ten starting neighborhoods are packed close** (`shared/src/city/meridian/`): inside
+  every stage 1 square the local streets are 9 m wide (closes 8 m) with the houses 10 m from the
+  middle line instead of 12 (`tightenStartStreets`; the street network is otherwise the same,
+  and a tank troop still has a meter to spare each side; the avenues keep 12 m), front gardens
+  of half a meter, a meter or three between houses with a 12 m passage every four or five, no
+  cottages scattered in the gardens, and a back lane through every block 56 to 130 m deep,
+  lined with garages (`lanes.ts`; 82 pieces, 6.5 km; lanes are open ground, not streets, listed
+  in `CityData.lanes` for drawing). Each start keeps its flavor through its own packed palette
+  (`palettes.ts`, the `...Tight` ones) and its balancing knobs (`layout.ts`, the patch's
+  `tight`: `keep`, `garages`, `rowEvery`, `rowGap`).
+- **Six building kinds** appended to `city/archetypes.ts`, in the order decided: `bungalow_a`
+  (house, hp 75, value 7), `duplex_a` (house, 110, 11), `garage_a` (house, 40, 4: one hatchling
+  swipe), `diner_a` (shop, 130, 13), `firehouse_a` (shop, 200, 18), `motel_a` (shop, 170, 16).
+  The cap is 56 (`meridian.test.ts`, `docs/CITY.md` section 8). Every start has at least five
+  of them, and a firehouse, a motel and a diner on an avenue (`starts.ts`); the bungalow, the
+  duplex and the garage also joined the suburbs outside the starts. `npm run export:defs` was
+  run (the art builders made the six models from it).
+- **Roof colors by district**: `District.roof` (`city/types.ts`), one per district
+  (`DISTRICT_ROOFS` in `layout.ts`: terracotta on Temple Hill, slate blue in Bellhaven, moss
+  green in Hollowmere, charcoal in Northgate, brick red in Easter Green, faded teal at the
+  Boardwalk, soot in the Cinder Works, and so on; the table is in `docs/CITY.md` section 2),
+  covered by `meridianChecksum` like the tint.
+- **Special buildings beyond the starts** (`specials.ts`; data `SPECIAL_SITES` in `layout.ts`):
+  for every start four more along the way to downtown (20, 85, 150 and 215 m beyond its square,
+  the kinds in turn), six more round downtown for the titan; 44 in all, 74 with the starts'.
+  On street fronts, 60 m from landmarks, 50 m apart; every stage 2 square holds 10 to 17 beyond
+  its stage 1 square, at least one of each kind (`validateCity` checks it). The rewards are
+  unchanged; four tests in `specials.test.ts` check them with a juvenile and a titan. **The
+  fallen mast's top stays the hatchling's weapon only** (decided here: the bigger monster's
+  reward is the static and the fall; at stages 2 and 3 the hand leaves the top and the feet crush
+  it, as for every city weapon; no rule changed).
+- **The yard opener** (`build.ts`): opens even the smallest enclosed courtyard inside a start's
+  square; treats the narrow streets and (not for a troop) the lanes as open roadway; and asks for
+  9.75 m round a troop, as its deployment does, not 9.25 m (a corridor 19 m wide behind a row of
+  houses at the edge of Dovecote's square had read as a way out). Also faster, with the same
+  results.
+- **Furnishing** (`furnish.ts`): the gardens' trees and drives and the scattered city weapons
+  draw their random numbers from where their building stands, so building more in one place no
+  longer reshuffles them elsewhere; garages get no garden; the start's narrow streets are no
+  longer mistaken for the harbor mole (which had covered them in lamps and benches).
+- **Build time**: the lot search the special buildings and the shops share (`lots.ts`, best lots
+  off a heap, lots 6 m apart), the hot imported functions read once per module, the start
+  squares worked out once, the opener's wall search limited to each pocket. The bigger city now
+  builds in about the time the phase 2 city did (below).
+- **Pictures** (`shared/scripts/cityMap.ts`): the close-ups color the garages, lanes, the three
+  shops and the special buildings each their own way, with a legend; the overview marks the
+  special buildings. Every picture in `docs/city/` was redrawn.
+- **Tests**: `meridian.test.ts` (checksums; the street rule for the narrow streets; the starts'
+  fairness now within 10%; new: the six kinds and the shops on avenues, narrow streets in every
+  start, lanes with garages and nothing built on them, roof colors and the checksum covering them,
+  the special buildings beyond the starts); `specials.test.ts` (four new, above). Two tests that
+  had picked a spot in the old city were pointed at the new one: the prediction test walks at
+  Fennel Hill instead of Harrow Lane (the walk must bump into a house), and a navigation test
+  takes the nearest open ground to its far corner (the corner now stands in a house). Nothing
+  was loosened.
+- **Docs**: `docs/CITY.md` (sections 1, 2, 4 to 8, 10, 12, new 13), `docs/DESIGN.md` section 7,
+  `docs/ARCHITECTURE.md` (the city paragraph), this file.
+
+**Measured**
+
+- The city: 3185 structures (2664 in phase 2; the allowance is 2500 to 3200), 5575 props, 49
+  archetypes, 74 special buildings, 227 city weapons (21 in every start). Checksums: city
+  1022541364, full 894637982 (seed 9002: 2420564289, 1288996068). `validateCity`: no problems.
+- Packing (`docs/CITY.md` section 13): buildings in the ten squares 1166 → 1706; they cover about
+  12% of each square (8%); the median sight line along their streets 72 → 48 m.
+- Fairness, value in the stage 1 squares: 1721 to 1742 (1.2%; phase 2 1326 to 1415). Stage 2:
+  17 314 to 19 637 (14%).
+- The rest of the city: every street outside the squares unchanged; 86% of the buildings
+  outside them exactly where they were.
+- Bot matches (`npm run sim -- --seeds 10 --every-anchor`, seeds 1 to 10 and 11 to 20; the
+  phase 2 city, seeds 1 to 10, earlier today): stage times when completed 2:16 / 1:59 / 2:42 and
+  2:26 / 2:06 / 3:06 (phase 2 city 2:00 / 2:23 / 2:28), matches 7:39 and 7:31 (7:34), the monster
+  won 4 and 5 of 10 (4 of 10). No errors; the monster never stuck (longest 0.1 s); units stuck
+  0.01% of their time, one give-up in 20 matches (as before). At stage 1 the squads lost more
+  units (7.1 and 4.1 a match against 3.8) and staggered the hatchling less (0.6 and 0.7 against
+  1.0): the packed streets hide it.
+- Special building rewards (20 matches each, the same seeds): stage 1 / 2 / 3, 43 / 41 / 32 (one
+  every 66 / 60 / 119 s of play); phase 2's city 41 / 14 / 8 (one every 58 / 205 / 435 s).
+- Build time on this machine as it is now (slower than when section 7 of `docs/CITY.md` was
+  measured): the first build 310 to 400 ms of processor time under the test runner, median about
+  330 (the phase 2 city: 337 to 363); warm 89 to 105 ms (80 to 92). `meridianCold.test.ts`
+  allows 400: both cities are close to it on this machine.
+
+**For the pacing builder** (do not read these as tuned: nothing about the pace was changed)
+
+- Stage 1 is longer because its square is worth a quarter more (the bar's first mark is a
+  fraction of it): about 2:16 to 2:26 against 2:00. `MATCH_RULES.bar.p1` is the lever.
+- At stage 2 the monster bot met a special building's reward every 60 s, not the 30 to 45 s
+  asked for. It goes for one only while no squad is within 110 m (`BOT_RULES.kaiju`
+  `specialReach` / `specialCalm` / `specialGain`; at stage 3 it never seeks them and tramples
+  them in passing). `SPECIAL_SITES` (count, distances, the six outer sites) is the city's lever;
+  a zigzag of sites was tried and made no difference.
+
+**Still open**
+
+- The client: the roof color (`District.roof`) and the back lanes (`CityData.lanes`) are not
+  drawn yet (the city client builder's), and `docs/art/CITY_ART.md`'s whole-city triangle total
+  can now be re-counted (`npx tsx tools/art/city/count_city.ts`: 3185 buildings; the six new
+  kinds add about 45,000 triangles whole).
+- Squad-mates fall out of the swarm a little more often (3.0 and 3.9% of their time against
+  2.8%). In a first version one squad-mate at Bellhaven kept being sent to a place in its swarm
+  inside a garden it could not reach (the swarm's places are checked for room, not for a way
+  there: `swarmSlot` in `sim/squads.ts`). The city no longer leaves that garden, but the swarm's
+  rule is unchanged, so another packed corner may show it again.
+- The first build is at its 400 ms test limit on this machine (the phase 2 city too). The next
+  step, if it fails: build once on the server and ship the checksum (`docs/CITY.md` section 7).
+- The two starts built in rings (Easter Green, Fennel Hill) have few blocks a straight lane
+  fits, so few lanes and garages (227 and 285 m of lane).
+- Not played by a person yet; the sight lines were measured from the streets at 3 m.
+- Sounds: none needed for this work.
+
+## Phase 3: the monster's looks: attack versions, slash trails, glowing stripes, civilians (14 November, the monster-looks task)
+
+`docs/ROADMAP.md` phase 3, "two or three versions of each monster attack, slash trails, glowing
+stripes" and "the monster can squash and eat civilians (a puff, no gore)". All picture: no rule,
+hit area or timing of the simulation changed. The rules of what is drawn are in `DESIGN.md`
+section 8, "The monster's looks"; for players, `PLAYING.md` (the monster's part and "What the
+pictures mean").
+
+**What changed**
+
+- **Two or three looks of every attack** (`client/src/render/kaijuAnimator.ts`). The swipe: the
+  right claw, the left claw (the same motion turned over), or both claws raked down together. The
+  stomp: either foot, or a crouch and a hop landing on both. The tail sweep either way round. The
+  throw overhand or sidearm. The roar with the head thrown up or thrust low and forward. The
+  charge's stumble: forward onto a knee, spinning out to the side, or down hard on its tail. The
+  fast-food sign: a forehand, a backhand, an overhead smash (the sign follows the look:
+  `clubDirection` in `heldProps.ts`). Look 0 of each is the motion of before. Every look keeps its
+  attack's tell. The new strike targets the head could cut through are made from the art's own
+  checked targets (the rake ends where the grab does, with its mirror; the sidearm lets go where
+  the overhand does; the backhand is cocked as in the brace; the smash ends where the grab does),
+  and all of them were checked on the three exported stages with the art's pose checker
+  (`tools/art/kaiju/poses.py`: no arm through the head or jaw, from outside or in first person).
+- **The same look on every screen.** `attackVariant(action, tick, kaiju)` is a hash of the tick
+  the attack began; the view reads that tick off the snapshot it draws (its tick less its phase
+  time, which is exactly the tick of the phase's `kaijuAction` event: a test plays a real
+  simulation to prove it) and keeps it through the attack; a page that joins mid-attack reckons it
+  back. The monster's own player sees a press before the server's word: until then the attack
+  shows what its looks share (both arms rising, the weight settling, the tail lifting).
+- **Slash trails** (`client/src/render/kaijuTrails.ts`, new): one system and one draw call for
+  every trail: a ribbon swept between two paths, clear at its tail and hot at its head, with a
+  hot rim and (in third person) a thin glow along the tip so it carries to a distant eye. The
+  claws' trail (the whole hand from the wrist to the claw tips) through a swipe's strike, the
+  tail's last joint through a tail sweep, the fast-food sign's head through a swing (phase 2's
+  club trail, moved onto it). The paths come from posing the rig at moments of the strike, so a
+  trail is the same at any frame rate. Orange; blue-white and brighter in a power surge. A
+  stomping foot (both, for the hop) lands with a short orange shock ring and a flash. Seen from
+  inside the head the band alone, fainter, from a third of the way into the strike.
+- **Glowing stripes.** The art marks them: COLOR_0 alpha 0.5 on every stripe face of
+  `kaiju_lizard_s1` to `_s3` (150, 161 and 183 triangles), nothing else changed in the files
+  (`tools/art/kaiju/parts.py` and `lizard.py`; `docs/ASSETS.md` section 3;
+  `docs/art/client-notes-kaiju-lizard.md` section 15). The client lights them: each kaiju view
+  has its own body material (`Materials.kaijuSkin`: the shared rim light, plus a stripe glow and
+  a flash over the hide). Faint ember red with no rage, hot orange at full, a slow throb when the
+  beam is picked and ready, blazing while it gathers and burns, white-hot as a new body comes out
+  of the cocoon; the surge's arcs take the stripes over (blue-white flicker) and its flash, which
+  used the shared material's emissive, is the view's own now. Glowing facets (eyes, embers) heat
+  with the same.
+- **Civilians** (`client/src/render/crowd.ts`). Still 260, in the one sprite batch with the
+  soldiers, client only. They now come in little groups, often ahead of where the monster walks,
+  a third freeze in fright for a moment, and they run at 4 to 5 m/s (they ran at 6.7). A footstep
+  (the view's gait now says where the foot came down), a stomp, a charge and the tail's sweep
+  squash those under them, each in a cartoon puff (`Effects.cartoonPuff`: a white cloud, little
+  stars) with a pop. A grab (or an eat) that takes nothing the rules know (no `kaijuHeld` on its
+  tick) with people in reach comes up with three to five of them in the claw: the arm lifts them
+  to the open mouth, the jaws close, a puff, a gulp (1.25 s; anything else it does gulps them at
+  once). Smaller in a hatchling's claw than in the street (at most 0.3 body heights), shrunk and
+  perched on the claw in first person.
+- **Sounds** (stand-ins from `assets/audio/sfx`, wired through two new render cues,
+  `onSquash` and `onGulp`, in `client/src/app/matchRuntime.ts` and `client/src/audio/matchAudio.ts`):
+  the pop is the hover blip played low, the gulp the grab played slow. The list of what is really
+  missing is under "Still open".
+- **Tests** (`client/test/monsterLooks.test.ts`, 12): the look from the tick (pure, every look
+  turns up) and from a real simulation's snapshots; the looks themselves (the swipe turned over,
+  the rake, the feet, the hop, the tail either way, the low roar, nothing chosen before the look
+  is known); the view drawing the look of the tick, keeping it, reckoning it back, unknown for the
+  local press; trails only through the strike and follow-through; the stomp's shock ring; two
+  kaiju with their own stripes, faint and bright; the handful gulped when another action starts;
+  the stripe mark in the three shipped models as the material reads it; civilians squashed by a
+  foot and by the tail's arc only, a handful taken nearest first and gulped at the mouth.
+- **Playtest extras** (`tools/playtest/shotsMonster.mjs`, new, wired into `shots.mjs`:
+  `--only x-monster`): `x-monster-looks-s1`, `-s2`, `-s3` hold the sandbox still and show the
+  kaiju at chosen moments of every look of every attack (third person from beside it, a few in
+  first person), the look picked by the tick as every screen picks it, and fail if the page drew
+  another; then the stripes at rage 0, 50 and 100, with the beam ready (two moments of the throb)
+  and in a surge. `x-monster-play` plays real presses: swipes (each look drawn must be the look of
+  the tick the sandbox began it on), a walk through a crowd, a stomp in a crowd and a grab into a
+  crowd (the handful lifted and eaten), in third and first person.
+
+**Measured**
+
+- The rebuild of the three lizard models: identical to the files before it but for the alpha of
+  the stripe faces (node tree, pivots, positions, indices, RGB colors, the manifest entries with
+  their poses); `tools/art/validate.py` passes; `tools/art/tests/run_all.sh` passes.
+- The pose checker on the new strike targets, all three stages: no arm cuts the head or jaw, the
+  forearms and hands touch nothing else, the arms not each other; the ends in first person stay
+  at least 0.19 from the crosshair (the art asks 0.14).
+- `node tools/playtest/shots.mjs --only x-monster` (headless Chromium drawing in software on a
+  machine shared with another builder, load 3 to 9 on 4 cores), last run on the final build:
+  passed, no console errors. Every frame of every look at the three stages drew the look it was
+  set up for. Played for real, two runs: swipes began on ticks whose looks were 2, 2, 2, 2 and
+  then 1, 2, 2, 0, and every strike the page caught drew the look of its tick; walking through a
+  lane of 12 civilians the footsteps squashed 4, then 3; a stomp in a crowd squashed 15, then 16;
+  a grab into a crowd came up with a handful, and 5, then 4, were eaten. Earlier runs while
+  building it gave the same.
+- The hatchling on the autopilot in its own neighborhood for 85 s of play: 260 civilians round it
+  all the time (0 to 3 within 15 m: they run), 10 squashed with no help, none eaten (the autopilot
+  grabs cars). Sprites in the batch: 420 of its 2,600.
+- `node tools/playtest/scripted.mjs --only kaiju` on the final build: 32 of 32 confirmed by the
+  server, no console errors. The run before it stopped at the second molt: the click on a card
+  waited for the card to stop moving, and by then the cards were gone (a click timing in a slow
+  headless page; nothing on the cards changed here). It had passed 32 of 32 earlier too.
+- `npm run check`: types, lint (282 files clean) and 912 tests in 71 files, all passing.
+
+**Pictures for the slides** (`docs/progress/`, JPEG, 1920 by 1080; taken in the sandbox with the
+game held still at the chosen moment, by a scratch script, `/tmp/mb-scratch/monster-looks/slides.mjs`)
+
+| File | One sentence |
+| --- | --- |
+| `phase3-monster-rake.jpg` | At sunset the juvenile rakes down with both claws, an orange slash trail behind each hand. |
+| `phase3-monster-stripes.jpg` | At night the titan roars with its rage full and its beam ready, every stripe glowing hot orange. |
+| `phase3-monster-handful.jpg` | The hatchling lifts a handful of people it scooped off the street up to its open jaws. |
+
+**Still open**
+
+- Sounds that are really missing (stand-ins from the sounds there are play now):
+  - the squash: a soft comic pop, a cork or a bubble, 0.1 to 0.15 s, three or four pitches (now
+    the menu's hover blip played low);
+  - the gulp: a cartoon swallow, about 0.4 s (now the grab played slow);
+  - the two-claw rake: a heavier double whoosh (now the one-claw swipe's sound);
+  - the tail sweep: a whip-like whoosh of its own (now the swipe's sound);
+  - the hop: a double thud as both feet land (now the stomp's);
+  - the charge's stumble: a heavy sit-down thump for the fall on the tail, a skid for the spin-out
+    (both now the stomp's);
+  - nice to have: a low hum under the stripes' throb while the beam is ready.
+  - `crowd_panic_loop` (distant shouting, no words) is in the sound files but nothing plays it; it
+    could sit under the street while civilians are near the camera.
+- Nobody has played it with a mouse yet: every check above is a script or a picture.
+- Civilians are drawn by each screen on its own (they always were), so two players see different
+  people squashed. The handful's size comes from the tick, but how many are in reach differs.
+- A grab only comes up with people when the rules give it nothing to hold (no car, wreck, kiosk
+  or loose city weapon such as a propane tank in reach), which is rare in a city that full: the
+  autopilot never managed it, a person has to grab at an empty stretch of street.
+- Footsteps squash only who is under the foot: walking through a lane of 12 squashed 3 to 4, the
+  rest ran.
+- In first person the slash trail is a faint sheet on purpose (it must not hide the street).
+- The art previews of the three lizard stages (`docs/art/previews/`) were not drawn again: the
+  look is the same (only the hidden stripe mark changed); the next art build redraws them.
+- `tools/playtest/shotsMonster.mjs` keeps its own copy of `attackVariant` (the playtest runs in
+  plain Node): a change to the hash in `kaijuAnimator.ts` must be made there too (the extras fail
+  loudly if the two differ).
+
+## Phase 3: the city's looks on screen: roofs by district, the new buildings, hills on the horizon, the fireball (14 November, the city-client task)
+
+`docs/ROADMAP.md` phase 3, the client's half of "more kinds of buildings, packed closer together
+where the match starts; roofs colored by district" and "hills on the horizon", and a gas station
+fireball that reads as fire. The city simulation task and the two art tasks above made the data
+and the models; this task draws them. The monster-looks builder worked in the same tree at the
+same time (their section is just above).
+
+**Is the tree green? Yes, at the time of writing.** `npm run check` passes with both builders'
+work in the tree: type checks, lint (282 files, one `STUB(server)`), 912 tests in 71 files.
+
+**What changed**
+
+- **Roofs colored by district** (`client/src/render/materials.ts`, `cityView.ts`). The building
+  material reads the paint mask in three levels, with margins (`PAINT_MASK`: above 0.75 wall,
+  0.25 to 0.75 roof, below that the art's own color). Every building batch carries one more value
+  per instance, the roof paint (`instanceRoof`): the district's roof color (`District.roof`) in
+  one of four shades picked by the building's id (`ROOF_SHADES`, as the art notes suggest),
+  divided by the grey the model's roofs are drawn in (the manifest's `roof.base`, read by the new
+  `AssetStore.modelRoof`). No extra draw call. The falling pieces take it on their roof faces
+  and the mounds keep the roof slab's mark, so a ruin shows a patch of its district's color.
+  Landmarks, bridges and the three special buildings keep their own colors. Roofs never glow at
+  night (the night lights are a separate picture, black under every roof).
+- **The map** (`client/src/ui/mapView.ts`) paints each district's ground in its roof color sunk
+  into the dark map (`districtGround`), so the starts and the districts are told apart there too;
+  the buildings on it keep the colors of their state.
+- **The new buildings and the packed starts.** The six new kinds (bungalow, duplex, garage,
+  diner, firehouse, motel) needed no change: confirmed in the browser whole, damaged, falling
+  to pieces and as mounds, the firehouse's tower at its full 12 m. If a model is missing, a box
+  stand-in takes its place through every state (a test). The back lanes are drawn as gravel
+  tracks between the garages (`ground.ts`, one mesh of 164 triangles).
+- **The third-person cameras in the narrow streets: no change needed.** Measured below; neither
+  camera ever sits inside a wall, and both are clear of houses most of the time.
+- **Hills on the horizon** (`client/src/render/scenery.ts`, new; added to the ground in
+  `ground.ts`). Low faceted hills to the west, north and east, from about 520 m beyond the city
+  limit (past the Old Moat and a band of open land), about 150 to 250 m high on the nearest
+  hills and 300 to 600 m on the far ridges, meadow at their feet, woods on the slopes, heath and
+  rock on the tops; the
+  River Wend comes down to the city through a valley between them (its water drawn on to the
+  far ridges); to the south the open sea, and a headland far out to the south-west. One mesh,
+  one draw call, 6,292 triangles, lit like the city. The city's fog would hide hills that far
+  out, so they have a haze of their own: like the city up close, beyond the fog's reach a capped
+  share of the fog's color growing with distance, their feet sinking into the haze. Scenery only:
+  nothing in the simulation knows they are there.
+- **The gas station's fireball** (`client/src/render/fireball.ts`, new; `specialsView.ts`). The
+  solid faceted ball is gone (and `Effects.flame`, which only it used). In its place, 61 lumpy
+  puffs of flame and smoke: a white-hot core, a shell of yellow to deep orange flung out to about
+  the blast's size, a cap of soot, and for three seconds a stream rising from the ruin, so the
+  fire rolls up into a column under dark smoke. Each puff glows from within, is see-through at its
+  edges, cools through red to soot and is eaten away unevenly as it fades; the smoke is lit as
+  brightly as the time of day. The white flash, the two shock rings, the burning debris and the
+  fire and smoke on the ruin for 9 s stay. One draw call while it burns.
+- **Tests**: `client/test/city.test.ts` (the mask's three levels; the roof paint and its shades;
+  every district's houses carrying their roof paint and the landmarks and special buildings none;
+  the paint kept through damage, rubble and a moved slot; the falling pieces' roofs in the roof
+  color and walls in the wall color; a different map ground for every district; box stand-ins
+  for the six new kinds); `client/test/cityLooks.test.ts` (new: the hills flat over the city and
+  the open land round it, rising to the west, north and east, the sea to the south with its
+  headland, the river's valley, one mesh turned to the sky; the fireball's colors, its column,
+  and that it is gone in a few seconds).
+- **Playtest** (`tools/playtest/shotsCity.mjs`, wired into `shots.mjs`): `x-city-roofs` (three
+  corners of the city from a titan's height and one from a juvenile's, by day, at sunset and at
+  night, a block wrecked, the map), `x-city-starts` (the squad's and the hatchling's own cameras
+  along and across the most built-up narrow street, the six new kinds whole and wrecked, a back
+  lane, the start from above), `x-city-hills` (from the street of three starts and from a
+  titan's height, at noon, at sunset and at night; the sea and the headland), `x-city-fireball`
+  (every frame for six seconds, each named by its time after the blast), `x-city-cost` (the draw
+  calls and triangles below). Run with `node tools/playtest/shots.mjs --only x-city`.
+- **Docs**: `docs/art/client-notes-city.md` (the roofs and the six marked as applied),
+  `docs/CITY.md` (sections 2, 8, 13), `docs/DESIGN.md` (section 7), `docs/ARCHITECTURE.md` (the
+  city drawing, the map, the scenery), `docs/PLAYING.md` ("The city": the roof colors, the hills,
+  the packed starts).
+
+**Measured** (headless Chromium drawing in software, on a machine shared with the other builder:
+load 5 to 10 on 4 cores, so frame rates of 1 to 5 a second say nothing about a real computer)
+
+- **Frame cost** (`x-city-cost`): in a start at stage 1 from the squad's third-person camera 120
+  draw calls and 455,000 triangles, from the hatchling's 120 and 422,000; at stage 3 from the
+  titan's camera 135 and 449,000; the whole city from 1.7 km up at night 135 and 400,000. The
+  budget (`docs/CITY.md` section 8) is 350 draw calls and 1.5 million triangles. Hiding the hills
+  takes off one draw call and 6,300 to 6,500 triangles. The roof colors cost no draw call.
+- **The cameras in the packed starts** (a scratch replay of the two controllers' camera rules
+  over every start: every 8 m of every street in the stage 1 squares, seven places across each,
+  16 headings; against the same on phase 2's city): the squad's camera on foot has to come in
+  short of a wall 9.5% of the time (phase 2's city: 4.6%), to less than half its distance 3.4%
+  (1.4%); a tank's camera 6.4% (4.5%) and 2.5% (1.5%); the hatchling's camera rises over a roof
+  13.5% of the time (7.8%), by 0.06 of its height on average, and finds no clear height 0.1% of
+  the time (as before). Never inside a wall: the cameras stop 0.6 m short of the first one. What
+  a camera sees ahead along its heading before a building: median 78 m (184 m on phase 2's
+  city): the packed starts at work. In the browser, along and across the most built-up narrow
+  street of Alder Row, the squad's camera was 99 to 100% clear and the hatchling's 100%, lifted
+  0.1 and 0.33 of its height.
+- `node tools/playtest/shots.mjs --only x-city` (every phase 2 and phase 3 city extra): passed,
+  no console errors. Looked at: roofs in their district's colors from both heights at all three
+  times of day (Temple Hill's terracotta, Hollowmere's moss green and Northgate's charcoal side by
+  side; Bellhaven's slate blue, the Old Town's red clay and the Boardwalk's teal; Easter Green's
+  brick red against the Cinder Works' soot), dark but still in their hue at night with no glow;
+  damaged roofs, mounds with a patch of roof, falling pieces in roof color; the map; the new
+  kinds and the lanes; the hills from every side; the fireball frame by frame. The phase 2
+  extras (the special buildings' rewards, mounds and falls, the stomp's sway, the tank at speed,
+  the squad fade, the propane tank) still pass.
+
+**Pictures for the slides** (`docs/progress/`, JPEG, 1920 by 1080; taken in the sandbox by a
+scratch script, `/tmp/mb-scratch/city-client/slides.mjs`: three with a free camera, the street
+from the squad's own third-person camera)
+
+| File | One sentence |
+| --- | --- |
+| `phase3-roofs-by-district.jpg` | From the monster's height every district has its own roof color, and the river comes down to the city between green hills. |
+| `phase3-hills-on-the-horizon.jpg` | At sunset the titan looks over downtown to the hills on the horizon and the river's valley. |
+| `phase3-gas-station-fireball.jpg` | A gas station goes up in rolling, see-through flames that turn into a column of dark smoke. |
+| `phase3-packed-start-street.jpg` | A squad in a narrow street of a starting neighborhood, the houses close, the hills over the rooftops. |
+
+**Still open**
+
+- Sounds that are really missing (none was needed for the roofs, the hills, the lanes or the new
+  buildings): the fireball's own sound, a deep rolling whoomp with a roar of flame dying into
+  crackle, about 3 s, when the gas station goes up (now two explosions stacked, then the fire
+  loop); a fire bell clanging and cut short, about 1.5 s, when a firehouse comes down (the art
+  builder's suggestion; nothing plays for it now beyond the usual crumble).
+- The smoke that stays on the ruin for 9 s after the puffs have gone is phase 2's flat sprite
+  plume; it reads, but less solid than the puffs.
+- Only ever drawn by a software renderer; not seen on a real graphics card.
+- The squad's camera comes in short of a wall about twice as often in the packed starts. It was
+  left as it is; if players find it cramped, the lever is to let it rise over the wall as the
+  monster's camera does (`humanController.ts`).
+- At sunset from the titan's height the haze at the foot of the hills is a thick band; by day
+  and at night it is lighter. The levers: `HILL_HAZE` in `render/scenery.ts`.
+- Not played by a person yet.
+
+## Phase 3: the missing sounds and new voice lines (14 November, the sound task)
+
+`docs/ROADMAP.md` phase 3, "looks and sound": every sound that phases 1 to 3 borrowed from another
+event now has its own, the sounds heard most often come in several versions, the mix was
+measured at its busiest, and the radio and the news have 16 new lines for what phases 2 and 3
+added. Rules and wiring: `docs/audio/SFX.md` (generated), `DESIGN.md` section 8 ("Event lines"),
+`ASSETS.md` section 6.
+
+**Is the tree green? Yes, at the time of writing.** `npm run check` passes: type checks, lint
+(283 files clean, one `STUB(server)`), 919 tests in 71 files. A first full run had one failure
+in `shared/test/meridianPlay.test.ts` (a bot gave up on a route once), in the bots the pacing
+builder was changing at the same time; it passed on its own four minutes later, and so did the
+next full run.
+
+**What changed**
+
+- **38 new sounds: everything the earlier builders listed as borrowed has its own now.** Made
+  with the project's sound tools in the style of the others (synthesized from code, no
+  recordings; new `tools/audio/sfx/mbsfx/moves.py`,
+  `army.py`, `city.py`), and wired in `client/src/audio/matchAudio.ts`:
+  - The monster: the two-claw rake (two cuts a moment apart), the hop onto both feet (two
+    booms), the tail sweep (a deep sweep with a whip-crack at the tip), the charge (feet digging
+    in and a bellow; the gallop is its footsteps, which now pound harder and lower while it
+    runs), the stumble (three falls, one for each of its three animations: onto a knee, spinning
+    out, sitting down hard), and the gulp of a handful of civilians. Each at the three sizes
+    except the gulp, which is pitched by stage.
+  - The army: machine-gun bursts and their rounds landing (a chip, a ricochet or a smack), the
+    big cannon, tank tracks (silent at a standstill, faster with speed), the supply plane and its
+    parachute (also for reinforcements), a crate landing and being opened, the artillery
+    marker's smoke flare, and ringing ears for the player's own squad stunned by the roar (its
+    shaking sound now comes when the stun ends, as the picture shows it).
+  - The city: the gas station's fireball (a deep whoomp, a roar of flame dying into crackle), a
+    propane tank's bang and roar, steel and concrete groaning as a building falls over, a
+    firehouse's alarm bell cut short as it comes down, a standing substation's hum, the power
+    surge (the transformer blows, arcs leap, the district's power whines down) and the crackle on
+    the monster while it lasts, shots clanging off the garage door, the fast-food sign's swing
+    and its hollow bong, the civilians' pop (soft, comic, four pitches in the music's key, never
+    a cry), air rushing past the player near top speed (and the monster in its charge), and
+    radio static when a mast falls.
+- **Variety.** The swipe and the stomp now have three versions per stage (the first is the old
+  file, byte for byte), the machine gun, the bullet hits and the door's clang three each, the big
+  cannon two, the pop four; footsteps already had three. The game never plays the same version
+  twice running (it used to pick at random, repeats included), and it nudges the pitch of
+  footsteps, shots and pops by a few percent (`client/src/audio/audioEngine.ts`, `pickVariant`).
+- **Sounds follow the pictures.** The rake, the hop and the stumble are chosen by the same look
+  every screen draws (`attackLook` in `matchAudio.ts`, from `attackVariant`). The whooshes of the
+  swipe, the rake, the tail and the sign now start so that they peak as the strike comes
+  through; they used to start with the wind-up, a third of a second early at stage 1.
+- **16 new voice lines**, 11 for the radio and 5 for the news, in the existing cast and its radio
+  and broadcast sound (`client/src/audio/eventLines.json`, said by
+  `client/src/audio/eventVoice.ts`). The radio tells a squad its supply crate is coming and
+  reminds it once if the crate lies untouched, reports a radio mast down (maps static), a gas
+  station gone up, a substation down (the monster surging), and warns when the monster takes up
+  a garage door as a shield. The news reports the mast, the gas station, the power cut and,
+  calmly, the creature eating pedestrians ("Please keep to the crosswalks."). The simulation has
+  no voice cue for these moments and `shared/` was not to be touched this round, so the client
+  says them for the simulation's own events: every screen of a side picks the same line (by the
+  event's tick), and each moment waits 30 to 90 s before it is said again. The voice tools build,
+  check and document them together with the 221 lines of the simulation's script; their script
+  check now reads both files.
+- **The mix:** while someone speaks, effects are lowered to 0.5 of their level (was 0.65); see
+  below.
+- Docs: `ASSETS.md` sections 1 (the neural speech engines; it listed only the old robotic ones)
+  and 6 (the new sounds, the event lines), `DESIGN.md` section 8, `ARCHITECTURE.md` (the voice
+  contract's one exception), `PLAYING.md` (subtitles), `tools/audio/README.md`,
+  `docs/audio/client-notes-voice.md`; `docs/audio/SFX.md`, `docs/audio/VOICE.md` and
+  `docs/VOICE_SCRIPT.md` were written again by their builders.
+
+**Measured**
+
+- Sound build: 129 sounds, 195 versions, 390 files, every check passed (loudness within 1.5 dB
+  of each sound's target, peaks below -1 dB of full scale, no clicks, clean loops, and each new
+  family longer, darker and louder from stage 1 to 3). Built again from the same sources, none of
+  the older files changed by a byte. The sound files grew from 8.2 to 10.9 MB; the game's script
+  bundle by 8 kB.
+- Voice build: 237 lines, 0 failures. The new lines are at -16.1 LUFS (loudness units relative to
+  full scale), like the others, true peaks at most -1.25 dB. The modern speech recognizer heard
+  15 of the 16 word for word ("mast" once as "mass"); pocketsphinx, the old one, missed 18 words
+  in 169 (11 in a hundred; 15 over the whole script). Two wordings were changed after trials:
+  "crate" was heard as "craig", and "use" can be said two ways (the script check refuses it).
+- The mix, measured in offline renders of the game's own audio engine and match audio in
+  headless Chromium (no speakers needed), the committed code against this one:
+  - The busiest moment, heard from 70 m: stage 3, six artillery shells landing, a gas station's
+    fireball, a tower falling over, a firehouse coming down, a roar, two tanks, a machine gun,
+    rockets, a tank lost, the music and a radio line, all within nine seconds. Peak -2.0 dB of
+    full scale before and after (nothing above -1, nothing clipped); the loudest 400 ms -13.6
+    before, -13.7 now; the spread between loud and quiet moments 10.1 and 10.2 dB. It got no
+    louder and no flatter.
+  - The radio line in it stood 3.4 dB over everything else, and its worst half second 0.5 dB
+    under it. With the deeper duck it stands 5.5 dB over, and its worst half second 1.7 dB over.
+  - Each sound alone at 30 m (stage 2; the loudest 400 ms, in dB), against the sound it replaced
+    and the sound it sits beside, from which the game's gains were set:
+
+    | Sound | Now | Before (borrowed) | Beside it |
+    | --- | ---: | ---: | --- |
+    | Gas station fireball | -16.3 | -16.3 | artillery shell -16.9 |
+    | Propane tank thrown | -19.1 | -18.1 | tank shell hit -21.6 |
+    | Power surge | -16.5 | -17.6 | the fireball -16.3 |
+    | Building falling over (groan) | -21.1 | -20.9 | its crash as it lands -20.0 |
+    | Charge | -19.8 | -20.8 | stomp -20.7 |
+    | Stumble | -20.6 | -20.7 | stomp -20.7 |
+    | Tail sweep | -24.0 | -25.2 | swipe -25.2 |
+    | Big cannon | -20.9 | -22.1 | tank shot -22.4 |
+    | Machine-gun burst | -32.0 | -35.2 | rocket shot -29.4 |
+    | Shots off the garage door | -29.3 | -29.7 | shot hitting a building -25.2 |
+    | Sign hitting soldiers | -23.4 | -23.3 | |
+    | Supply plane and chute | -23.9 | -24.3 | |
+    | Crate landing | -29.8 | -29.8 | |
+    | Gulp | -27.6 | -29.4 | eating -25.7 |
+    | Civilians' pop | -36.6 | -36.7 | |
+
+  - The engine played at most 26 sounds at once in the busy render (28 allowed).
+- `node tools/playtest/smoke.mjs` (five pages, the production build): the match ran to its end
+  at stage 3 with no console errors and no warnings on any page, so no sound or voice file was
+  asked for that is not there. `npm run build` passes (the script bundle is 1,514 kB; the
+  build's size warning above 1,500 kB was already there at 1,506). `npm run assets:manifest --
+  --check`: up to date (129 sounds, 237 voice lines).
+- Tests (lean): `client/test/matchAudio.test.ts` (the rake, the hop and the stumble's own fall
+  chosen by the look; a whoosh started to peak at the strike; one ear-ring for a stunned squad
+  and its shaking after the stun; the event lines valid, each with its file in the manifest and
+  no id shared with the simulation's; a crate's line for its own squad only, its reminder once;
+  the radio and the news each their own line for a mast, not again within the gap) and
+  `client/test/audioEngine.test.ts` (never the same version twice running, the one asked for when
+  asked).
+
+**Still open**
+
+- Nobody has listened: the machine has no speakers. Everything above is measured or drawn
+  (spectrograms in `docs/audio/sfx/`). The groan of a falling building, the power surge and the
+  fire bell are the furthest from anything recorded; listen to those first.
+- The whooshes now come with the strike, not the wind-up: right by the pictures, but no person
+  has felt it with a mouse yet.
+- `crowd_panic_loop` is still not played. The crowd is kept around the monster, so it could sit
+  under the street near it, but the sound's own notes warn that close up it may sound like a
+  choir warming up: someone should listen before it is wired. The low hum under the stripes'
+  throb while the beam is ready (a nice-to-have) was not made.
+- Still borrowed where the existing sound fits and nobody listed it as missing: a thrown
+  antenna or mast hisses off with the shell's whoosh and thuds with a building hit, the water
+  tank bursts with the river's splash played lower, the missile pod is two rocket launches, a
+  broken garage door crumples with the car crush (after its own clang), the fast-food sign
+  breaks with the street furniture's break and glass.
+- The event lines are the client's: the simulation's balance harness and bots know nothing of
+  them, and a page that misses an event (a reconnection) misses its line. If the simulation
+  ever gets cues for these moments, the lines can move into its script unchanged.
+- The mix renders and their scripts live in scratch (`/tmp/mb-scratch/sound/mix/`), not in the
+  repository; the method is above.
+
+## Phase 3: the final pacing pass (14 November, the pacing task)
+
+`docs/ROADMAP.md` phase 3, "final pacing pass": keep the stage times where phase 2 left them
+now that the starts are packed close, make something new happen to the monster and to each
+squad about every 20 to 25 s at every stage (phase 2 managed it only at stage 1), and check the
+squad bots in the packed streets. The whole story with tables: `docs/BALANCE.md` section 11.
+
+**Is the tree green? Yes.** `npm run check` passes with the sound and city-client builders'
+work in the same tree: type checks, lint (283 files clean, one `STUB(server)`), 921 tests in 71
+files.
+
+**What changed**
+
+- **Stage 1 back to two minutes** (`MATCH_RULES.bar.p1` 0.18 to 0.145, `defs/rules.ts`): the
+  packed starts are worth about a quarter more, which had made stage 1 a fifth longer.
+  `p2`, `p3` and the clock are unchanged.
+- **More supply crates at stages 2 and 3** (`CRATE_RULES`, `defs/pickups.ts`): `every` is now
+  per stage, 30 / 12 / 15 s (was 30 s at every stage), and `maxDown` 3 / 6 / 8 (was 3 / 4 / 5).
+  With four squads each gets one every 2 minutes, 48 s and 60 s, besides the one every squad
+  gets when a stage starts. How they are shared is unchanged (in turn; 88% of the crates taken at
+  stage 2 went to the squad they were meant for). `sim/systems/pickups.ts` reads the interval
+  per stage (two lines).
+- **The squad bot** (`sim/bots/squadBot.ts`, numbers in `BOT_RULES.squad`): in the packed
+  starts it looks for a firing spot every 20 m along the streets and checks the 24 best for a
+  line of fire (was the middles of streets and 8); prefers a spot its squad-mates would share the
+  line from; with no line from anywhere in its band tries closer in (down to 35% of range);
+  with no line at all keeps going where it was going instead of re-picking every look. Two bugs
+  fixed: a squad that backed off to a spot a step short of where it feels safe stayed there,
+  backing off, for the rest of the stage; a tank whose way lay straight behind it rocked left
+  and right on the spot for ever (the hull answers the stick a tick late). In a tank it now
+  fetches crates within 90 m (60 m on foot, as before), as far as they come down from it.
+  `BotState.inner` is new.
+- **Not changed:** the special buildings beyond the starts (`SPECIAL_SITES`; the juvenile already
+  meets one every 55 s and the monster something new every 13 s at stage 2), the kaiju bot, the
+  city, its checksums and pictures.
+- **Tests**: `bots.test.ts` two new (an idle hatchling on the green of Dovecote, seed 16, where
+  two squads of four used to fire no charged volley; a squad that backs off along a street ending
+  just inside its safe distance); `pickups.test.ts` checks stage 2's own interval and limit;
+  `defs.test.ts` the new first fraction; `helpers.ts` gained a `roads` option for hand-made test
+  cities. Nothing was loosened.
+- **Docs**: `BALANCE.md` (section 2 and new section 11), `DESIGN.md` (sections 2 and 5: the bar,
+  the crates, the squad bot), `ARCHITECTURE.md` (the crate sentence), `PLAYING.md` (how often
+  crates come), this file.
+
+**Measured** (`npm run sim -- --seeds 20 --every-anchor`, seeds 1 to 20 and 21 to 40, and
+`--unopposed`; the counts with the phase 2 script, now `/tmp/mb-scratch/pacing/trial.ts`)
+
+| | Stage 1 | Stage 2 | Stage 3 | Match | Monster wins |
+| --- | --- | --- | --- | --- | --- |
+| Phase 2 | 2:01 | 2:35 | 3:06 | 7:56 | 16 of 40 |
+| Phase 3 as the builders left it | 2:23 | 2:04 | 3:09 | 7:48 | 19 of 40 |
+| Phase 3 as shipped | 2:00 | 2:32 | 3:02 | 7:37 | 22 of 40 (55%) |
+| Alone, phase 2 / as shipped (segment filled after) | 2:13 / 2:05 | 1:47 / 1:51 | 2:28 / 2:45 | 6:49 / 7:02 | |
+
+| Something new, on average | Stage 1 | Stage 2 | Stage 3 |
+| --- | --- | --- | --- |
+| The monster, before / after | 11 s / 11 s | 23 s / 13 s | 11 s / 8 s |
+| A squad, before / after | 17 s / 17 s | 42 s / 24 s | 29 s / 23 s |
+
+- Every contested stage within a few seconds of phase 2; the match 20 s shorter. A lone titan
+  takes a tenth longer than in phase 2 (2:45 against 2:28). 5 matches of 40 ended on the clock
+  (phase 2: 9). The monster wins 55%: inside 30 to 70%, so balance was left alone.
+- What fills a squad's stage 2: crates (1.4 a minute), barrages and reinforcements (0.6),
+  special buildings going off near it or the map's static (0.6). Stage 3: falling buildings
+  (1.4), crates (1.0).
+- The squads' charged volleys per minute in the fight, stage 1 / 2 / 3: 1.55 / 2.33 / 2.17
+  (phase 2: 1.77 / 2.66 / 2.58; this tree with the old bot: 1.13 / 1.74 / 2.20).
+- At a hatchling standing still (fast stage 1, all ten starts, seeds 1 to 12, 480 squads): 25
+  squads fired no charged volley (5%; as built 31, phase 2 16).
+- Navigation: units stuck 0.01 to 0.03% of their time, as before; units gave up a route 11 times
+  in 40 matches (as built: about once in 20).
+
+**Still open**
+
+- **A crate every 48 s for each squad at stage 2** is a lot: the bots spend 13% of their time
+  fetching them (7% at stage 1, 9% at stage 3) and volley less for it. The owner's playtest will
+  say whether people like it or ignore it. Half the squads still have a quiet stretch of about a
+  minute at stages 2 and 3 (median longest: 51 and 61 s).
+- **Sounds**: crates now come down two to two and a half times as often at stages 2 and 3 (in the
+  whole match, one every 12 s at stage 2), so their parachute and landing sounds and any radio
+  line for them play that much more often. For whoever mixes the sound (no file of theirs was
+  touched).
+- **The idle hatchling**: about 1 squad in 20 still fires no charged volley in a whole stage 1
+  at a hatchling standing still in the middle of a green ringed by houses (Cinder Flats, Gull
+  Point, Dovecote, Bellhaven). The nearest streets with a view lie inside the distance a squad
+  backs off at, and the bot only parks on streets; the bot changes made no difference there over
+  800 squads. A person would walk onto the green.
+- **Squad-mates that cannot follow**: 11 route give-ups in 40 matches against about 1 in 20
+  before, nearly all tank troops' squad-mates at stage 3; one in a courtyard it could not drive
+  out of gave up four times (`swarmSlot` in `sim/squads.ts` checks a place for room, not for a way
+  there; the city task's open item). Not fixed here (not this task's file).
+- The client's autopilot (`client/src/game/autoplay.ts`) drives tanks with the same helper
+  (`setTankMove` in `sim/movement.ts`) and may rock the same way when its way lies straight
+  behind; the fix here is in the squad bot only.
+- Bots, not people; 40 matches a measurement, with about 10 points of noise on a win rate.
+
+## Phase 3 integration: everything together, played end to end, ready for the owner's playtest (14 November, the integration task)
+
+The seven phase 3 builders' work (the roof mark and the six new building models; the city
+simulation, the monster's looks and the pacing pass; the city on screen and the sound) was run
+together, checked, played end to end in the browser and measured. For the owner's next evening:
+`docs/PLAYTEST.md`, linked from `README.md`.
+
+**Is the tree green? Yes.** `npm run check` passes: type checks, lint (283 files clean, one
+`STUB(server)`), 921 tests in 71 files. It already passed when this task started (the same
+counts): the builders had reconciled the files they shared. Nothing under `shared/src/net/`
+or `shared/src/sim/events.ts` changed this round, so the snapshot and the welcome's city state
+are as phase 2 left them and `SNAPSHOT_VERSION` stays 4 (`origin/main`'s; the local branch
+named `main` in this checkout is older, from before phase 1, and is not what was merged).
+
+**What changed**
+
+- **The scripted playtest's grab at stage 1** (`tools/playtest/scripted.mjs`): it walks straight
+  at a car, and in the packed starting neighborhoods the nearest car often stands behind a row of
+  houses or garages the hatchling cannot pass. It now goes first for the nearest car with nothing
+  in the way (and says how far the car was when a grab still finds nothing). The first full run
+  had failed that grab (and so could not try the throw); the kaiju session then passed 32 of 32.
+  The first run did not record where the car was, so this is the likely cause, not a proven one.
+- **The whole-city triangle count** (`tools/art/city/budgets.py` `COUNTS`, `docs/art/CITY_ART.md`
+  section 5): counted again on the final city (3185 structures, the six new kinds and the 74
+  special buildings now in it): 502,290 triangles for the whole intact city, of the 900,000
+  allowed (440,920 at the last count).
+- **Leftovers**: `scripts/merge-manifests.mjs` (superseded by `tools/build-manifest.mjs` long
+  ago, referenced by nothing) is deleted; a stale "until their art files are in" comment on the
+  city weapons' box stand-ins; `tools/art/city/README.md`'s "the client does not read the roof
+  level yet"; `DESIGN.md` section 2's "rubble is flat"; this file's module map (the new
+  `scenery.ts`, `fireball.ts`, `eventVoice.ts`, `cityLooks.test.ts`), placeholders table (49
+  archetypes, the map's district colors, the hills, the cartoon puff) and known risks (phase 3's
+  pace, the squad bot in the packed streets, squad-mates that cannot follow).
+- **Docs**: `docs/PLAYTEST.md` (new), `README.md` (links it), `ROADMAP.md` (phase 3 marked
+  built), `ARCHITECTURE.md` (the phase 3 playtest checks), `BALANCE.md` (section 11, the re-check
+  below), `DESIGN.md` section 2, `docs/art/CITY_ART.md` section 5, this file.
+
+**Measured** (headless Chromium drawing in software on this 4-core machine, one run at a time)
+
+- `npm run export:defs` (no change) and `-- --check`; the art contract checker (`tools/art/validate.py
+  --all -q`: 82 models, 0 failed, the 5 old warnings); the city check (`tools/art/city/check.py
+  --all`: 49 buildings pass); the art pipeline tests (`tools/art/tests/run_all.sh`: pass); the icon
+  checker (`node tools/art/ui/preview.cjs --check`: 108 of 108); `npm run assets:manifest --
+  --check` (82 models, 129 sounds, 237 voice lines: up to date). Every new model is in the city,
+  every new sound has a call site, every one of the 16 event lines a cue that says it; no stand-in
+  is left where the real file exists.
+- `npm run build`: passes; Vite's warning that the main script (1,515 kB, 455 kB compressed) is
+  over its 1,500 kB warning mark is still there, as it was for the builders.
+- `node tools/playtest/smoke.mjs` (five pages on the autopilot against the real server, a whole
+  fast match): PASSED, no console errors or warnings on any page; the match reached stage 3 and the
+  humans won on the clock after 150 s of play; snapshots of 875 bytes, about 52 kbit/s down per
+  page; at most 163 draw calls and 523,000 triangles on a page. Again with `--reconnect --players
+  3`: PASSED; the page whose connection was dropped came back and saw the end (at most 162 calls,
+  589,000 triangles).
+- `node tools/playtest/scripted.mjs` (every session): 109 of 112 confirmed, no console errors. The
+  two failures: the monster's grab at stage 1 (made sturdier above: 32 of 32 on the next run) and, once,
+  the volley meter's "fired" look (the server confirmed the volley at full charge; the next run of
+  the squad and tank sessions confirmed all 33, the meter's look included, with nothing changed: a
+  page drawing a frame a second can miss it). With those runs every one of the 112 checks has
+  been confirmed (monster 32, squad 24, tank 9, the phase 2 weapons and pick-ups 47).
+- `node tools/playtest/shots.mjs` (every stage from both sides and every extra, 595 pictures):
+  PASSED, no console errors. Looked at: the stage views (Temple Hill's terracotta and Hollowmere's
+  moss green in the starts, the hills behind the skyline, the titan at night, the juvenile and
+  the titan in a power surge, the firehouse's red doors, the new radio line about a substation),
+  the maps (each district's ground in its roof color), the phase 3 city extras (roofs by
+  district, the six new kinds whole and wrecked, a gravel back lane, the hills from every side,
+  the fireball frame by frame), the monster extras (every look of every attack drawn as the tick
+  says at all three stages; the rake, the hop, the tail's trail; the stripes from rage 0 to 100,
+  the beam's throb and the surge; a stomp squashed 16 civilians, a grab came up with a handful and
+  3 were eaten), and the phase 2 extras (crates, artillery, city weapons) in the packed city. One
+  picture, the stage 1 squad's map, shows the street instead: that visit runs on the autopilot,
+  which drives the buttons itself, and its M press was lost (the next press opened the map); the
+  scripted run's real M key opened it both times.
+- **Pace** (`npm run sim -- --seeds 20 --every-anchor`, and the 40-match count of
+  `docs/BALANCE.md` section 11 with the pacing task's scratch script): exactly the pacing task's
+  numbers, as a deterministic simulation that nothing has changed since should give: seeds 1 to
+  20, stages of 2:02 / 2:34 / 3:11 and matches of 7:41, the monster winning 12 of 20 (3 on the
+  clock); 40 matches, 2:00 / 2:32 / 3:02, 7:37, 22 of 40 (55%), 5 on the clock. Something new for
+  the monster every 10.7 / 12.7 / 7.9 s and for a squad every 17.0 / 24.4 / 23.2 s at stages 1 /
+  2 / 3 (a 20-second stretch with something in it: 85 / 77 / 84% and 68 / 56 / 53%). No stage
+  moved, so nothing was retuned.
+- **Frame cost** (`x-city-cost`, against the budget of 350 draw calls and 1.5 million triangles,
+  `docs/CITY.md` section 8): stage 1 in a start, the squad's camera 120 calls and 455,000
+  triangles, the hatchling's 120 and 422,000; stage 3, the titan's camera 135 and 449,000, the
+  whole city from 1.7 km up at night 134 and 400,000. The stage visits of `shots.mjs` drew 126 to
+  157 calls and 422,000 to 483,000 triangles; the most any smoke page drew, 163 calls and 589,000.
+  The hills cost one call and about 6,300 triangles.
+
+**Pictures for the slides** (`docs/progress/`, JPEG, 1920 by 1080, 220 to 490 KB; the four new
+ones taken in the sandbox with the game held still, by a scratch script,
+`/tmp/mb-scratch/integrate/slides.mjs`; the other four are the builders')
+
+| File | One sentence |
+| --- | --- |
+| `phase3-monster-swipe-night.jpg` | At night a juvenile full of rage swipes with its right claw: a bright slash trail, its stripes glowing hot orange. |
+| `phase3-monster-rake.jpg` (the monster builder's) | At sunset the juvenile rakes down with both claws, an orange slash trail behind each hand. |
+| `phase3-monster-hop-stomp.jpg` | The hatchling hops onto both feet in a crowd: a shock ring at each foot, and the people under it vanish in cartoon puffs. |
+| `phase3-monster-handful.jpg` (the monster builder's) | The hatchling lifts a handful of people it scooped off the street up to its open jaws. |
+| `phase3-start-from-the-monster.jpg` | Over the juvenile's shoulder: Fennel Hill's packed streets under Temple Hill's terracotta roofs, green hills beyond. |
+| `phase3-new-buildings.jpg` | The new motel and firehouse on a Juniper Bay avenue under the Boardwalk's teal roofs, the hatchling down the street for scale. |
+| `phase3-hills-on-the-horizon.jpg` (the city client's) | At sunset the titan looks over downtown to the hills on the horizon and the river's valley. |
+| `phase3-gas-station-fireball.jpg` (the city client's) | A gas station goes up in rolling, see-through flames that turn into a column of dark smoke. |
+
+(The builders' other three, `phase3-monster-stripes.jpg`, `phase3-roofs-by-district.jpg` and
+`phase3-packed-start-street.jpg`, stay in `docs/progress/` as spares.)
+
+**Where `docs/requirements.md` (the owner's own brief, not edited) is now out of date**
+
+- A match of about 12 minutes: now about 8 (the clock is 9:36), since phase 1.
+- First person by default on both sides: now third person by default (V switches).
+- The monster's controls (strike tap or hold, grab tap or hold, block, roar, special): now one
+  move per button (left swipe or throw, right grab or eat, Space stomp, F molt), and the moves
+  picked at the molts on Q and E (beam, roar or charge; then one of the two left, or brace or tail
+  sweep). The beam is not in the starting kit and the brace is not free.
+- The roar shakes nerve and resets volley charge: it now freezes units for 2.5 s first.
+- The squad's radial command wheel (follow, move, fire at will, hold and charge) and the
+  presentation table's "Commands": gone; two buttons (fire; hold to charge a volley, let go to
+  fire) and squad-mates that follow as a swarm and shoot by themselves.
+- Call-ins placed with a ground marker: artillery comes only from the radio in a supply crate.
+- The molt's upgrade draft for both sides: not built (Tier 2); the monster picks a new move from
+  three picture cards instead, and the intermission is 8 s.
+- Rubble as flat grey ground: since phase 2 a heap half the building's height that blocks shots
+  and sight.
+- Civilians only flee: they still change nothing, and now the monster squashes and eats them (a
+  cartoon puff).
+- Not in the brief at all (they came from `docs/ROADMAP.md`): special buildings, the city weapons,
+  supply crates and pick-ups, the monster's weight, falling buildings, swimming, "never alone",
+  tank driving, roofs by district, the hills. Still unbuilt from it: the other kaiju and
+  factions, front-page photos, the playable tutorial, two-kaiju and kaiju-against-kaiju matches;
+  its open questions are answered in `DESIGN.md` section 0 but still unticked.
+
+**Still open**
+
+- Nobody has played phase 3 yet, and nobody has listened to its sounds (no speakers here):
+  everything above is scripts, bots and pictures drawn without a graphics card. Each phase 3
+  section above lists what is untried by a person; they still are.
+- The squad's camera is pulled in by walls twice as often in the packed starts; rubble and the
+  packed streets hide the hatchling well; bot squads still get no shot at a hatchling standing
+  still on a green; squad-mates of tank troops give up a route about once in four matches at
+  stage 3 (`swarmSlot`, `sim/squads.ts`). Crates come often at stages 2 and 3 (one every 12 s at
+  stage 2 across the match). All in `docs/PLAYTEST.md`'s risks for the owner.
+- Sounds still missing: the low hum under the stripes' throb while the beam is ready (a
+  nice-to-have); `crowd_panic_loop` is still not played.
+- The build's size warning (above). The scripted harness can still lose a quick key press or a
+  frame-timed look on a page drawing a frame a second; both were confirmed on a re-run.

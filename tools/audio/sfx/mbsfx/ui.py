@@ -206,3 +206,16 @@ def camera_shutter(rng, v):
         return k
     slap = parts.thump(n_(0.05), 420, 260, 0.01, 0.035)
     return _seq(0.14, [(0.0, leaf(2600), 0.5), (0.008, slap, 0.7), (0.07, leaf(3300), 0.42)])
+
+
+@sfx("radio_static", "ui", level=-24.0,
+     use="The radio mast falls: the squads' radios fill with harsh static and a falling whine, and break up "
+         "(their maps go to static at the same moment).")
+def radio_static(rng, v):
+    dur = 1.4
+    n = n_(dur)
+    st = _static(rng, dur)
+    gate = dsp.lp((dsp.wander(n, rng, 22.0) > -0.35).astype(float), 300.0, 1)            # the signal breaking up
+    squeal = dsp.sine(dsp.env([(0, 2600), (dur, 700)], n, "exp") * (1 + 0.01 * np.sin(TAU * 9 * dsp.secs(n))))
+    shape = dsp.env([(0, 0), (0.012, 1.0), (0.9, 0.8), (dur, 0.0)], n)
+    return dsp.mix((st * (0.35 + 0.65 * gate) * shape, 0.5), (dsp.lp(squeal, 3500, 2) * shape * gate, 0.06))

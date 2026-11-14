@@ -143,14 +143,35 @@ export function reachFromGrip(bounds: THREE.Box3, grip: GripInfo): number {
 
 /** Where the fast-food sign points while it is only held: up, a little out to the right and forward. */
 const CLUB_REST = new THREE.Vector3(-0.25, 1, 0.35).normalize();
-/** ...and at the top of the wind-up: cocked up and back over the right shoulder. */
-const CLUB_COCKED = new THREE.Vector3(-0.7, 0.45, -0.55).normalize();
-/** The swing, in the body's frame round the aim: from behind the right shoulder across the front to the left. */
+/**
+ * ...and at the top of the wind-up, by the look of the swing (render/kaijuAnimator.ts): cocked up
+ * and back over the right shoulder (the forehand), over the left (the backhand), straight up
+ * behind the head (the overhead smash); raised, while the look is not known yet.
+ */
+const CLUB_COCKED = [
+  new THREE.Vector3(-0.7, 0.45, -0.55).normalize(),
+  new THREE.Vector3(0.75, 0.45, -0.5).normalize(),
+  new THREE.Vector3(-0.15, 0.85, -0.5).normalize(),
+] as const;
+const CLUB_RAISED = new THREE.Vector3(-0.3, 1, 0.05).normalize();
+/** The forehand's swing, in the body's frame round the aim: from behind the right shoulder across the front to the left. */
 const SWING_FROM = (-125 * Math.PI) / 180;
 const SWING_TO = (80 * Math.PI) / 180;
+/** The overhead smash: from up and back over the head, down to the ground in front (angle up from the aim). */
+const SMASH_FROM = (115 * Math.PI) / 180;
+const SMASH_TO = (-30 * Math.PI) / 180;
 
-function swingDir(f: number, out: THREE.Vector3): THREE.Vector3 {
-  const t = SWING_FROM + (SWING_TO - SWING_FROM) * f;
+/** The sign's direction `f` (0..1) through the swing of look `look`, and (optional) the way its head moves. */
+function swingDir(look: number, f: number, out: THREE.Vector3, motion?: THREE.Vector3): THREE.Vector3 {
+  if (look === 2) {
+    const p = SMASH_FROM + (SMASH_TO - SMASH_FROM) * f;
+    motion?.set(0, -Math.cos(p), Math.sin(p));
+    return out.set(-0.12, Math.sin(p), Math.cos(p)).normalize();
+  }
+  // The backhand is the forehand turned over: from behind the left shoulder across to the right.
+  const side = look === 1 ? -1 : 1;
+  const t = side * (SWING_FROM + (SWING_TO - SWING_FROM) * f);
+  motion?.set(side * Math.cos(t), 0, -side * Math.sin(t));
   return out.set(Math.sin(t), 0.35 - 0.55 * f, Math.cos(t)).normalize();
 }
 
@@ -160,19 +181,19 @@ const smooth = (u: number): number => u * u * (3 - 2 * u);
  * Which way the fast-food sign points, in the frame of the aim (x to the model's left, y up, z
  * along the aim), at time `u` (0..1) of `phase` of a club action; the rest direction outside one.
  * `motion` (optional) gets the way the head of the sign is moving (the swing's tangent), or the
- * front when it is not swinging: the sign's face is kept toward it.
+ * front when it is not swinging: the sign's face is kept toward it. `look` is the swing's look
+ * (0 forehand, 1 backhand, 2 overhead smash; null not known yet: the sign is only raised).
  */
-export function clubDirection(phase: string, u: number, out: THREE.Vector3, motion?: THREE.Vector3): THREE.Vector3 {
+export function clubDirection(phase: string, u: number, out: THREE.Vector3, motion?: THREE.Vector3, look: number | null = 0): THREE.Vector3 {
   const f = Math.max(0, Math.min(1, u));
+  const k = look === null ? 0 : Math.max(0, Math.min(2, Math.round(look)));
   if (phase === 'windup') {
-    out.copy(CLUB_REST).lerp(CLUB_COCKED, smooth(f)).normalize();
+    out.copy(CLUB_REST).lerp(look === null ? CLUB_RAISED : CLUB_COCKED[k], smooth(f) * (look === null ? 0.6 : 1)).normalize();
     motion?.set(0, 0, 1);
   } else if (phase === 'active') {
-    swingDir(f, out);
-    const t = SWING_FROM + (SWING_TO - SWING_FROM) * f;
-    motion?.set(Math.cos(t), 0, -Math.sin(t));
+    swingDir(k, f, out, motion);
   } else if (phase === 'recover') {
-    swingDir(1, out).lerp(CLUB_REST, smooth(f)).normalize();
+    swingDir(k, 1, out).lerp(CLUB_REST, smooth(f)).normalize();
     motion?.set(0, 0, 1);
   } else {
     out.copy(CLUB_REST);

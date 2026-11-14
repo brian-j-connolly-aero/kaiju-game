@@ -63,16 +63,29 @@ export const BOT_RULES = {
     stillSpeed: 0.25,
     /** Stage 1, kaiju not on the map: the squad searches; it has reached a search point within this many meters. */
     searchReach: 25,
-    /** Candidate firing positions examined for a line of fire per look. */
-    spotCandidates: 8,
+    /**
+     * Candidate firing positions examined for a line of fire per look, from parking spots this
+     * many meters apart along the streets (phase 3: in the packed starts a line of fire is often
+     * a gap between two houses; docs/BALANCE.md section 11).
+     */
+    spotCandidates: 24,
+    spotStep: 20,
+    /**
+     * With no line of fire from any spot in its band (a hatchling on the green in the middle of
+     * a packed block), it looks for one closer in: down to this, of range, but never inside this
+     * many times the distance it backs off at.
+     */
+    innerStandoff: 0.35,
+    innerMargin: 1.25,
 
     /**
      * Supply crates (phase 2): it fetches one coming down or lying within this many meters of
-     * its leader while the kaiju is not close (unknown, or farther than this many times the
-     * distance it backs off at), unless another bot squad is already on its way to it; it gives
-     * up after this many seconds.
+     * its leader (per stage: on foot at stage 1; the tanks reach every crate that comes down for
+     * them, 25 to 90 m away: docs/BALANCE.md section 11) while the kaiju is not close (unknown, or
+     * farther than this many times the distance it backs off at), unless another bot squad is
+     * already on its way to it; it gives up after this many seconds.
      */
-    crateRange: 60,
+    crateRange: [60, 90, 90] as PerStage<number>,
     crateCalm: 1.5,
     crateGiveUp: 20,
     /**

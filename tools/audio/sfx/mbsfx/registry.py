@@ -46,5 +46,9 @@ def sfx(id: str, family: str, *, variants: int = 1, loop: float = 0.0, level: fl
 
 def load_all() -> dict[str, Spec]:
     from . import humans, kaiju, ui, world  # noqa: F401  (importing registers the sounds)
+    # phases 1 to 3 (docs/ROADMAP.md): the monster's moves and attack looks, the army's pick-ups
+    # and crates, the city's special buildings and weapons; after the first four, so the
+    # manifest keeps its order and the new sounds follow
+    from . import army, city, moves  # noqa: F401
     from . import tier2  # noqa: F401  (last, so the Tier 2 sounds follow the others in the manifest)
     return REGISTRY

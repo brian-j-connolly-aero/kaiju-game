@@ -19,12 +19,20 @@ Facades, ground strips, plain walls and doors have a `_dmg` twin of the same siz
 destruction generator swaps a face onto the twin (broken glass, soot, cracks; at night some
 of the holes glow with fire).
 
+Roofs come twice. The colored roofs (tile_red, tile_slate, tile_terra, gravel, tar, metal) are
+for landmarks, bridges and the special buildings, which keep their own colors. Ordinary
+buildings get the same patterns in light neutral grey (roof_tile, roof_slate, roof_terra,
+roof_flat, roof_metal, and the flat swatch roof_plain; `Region.roof`): faces on them carry the
+roof mask and the game paints them in their district's roof color. Every grey roof averages
+ROOF_BASE (in linear light), the `base` of the manifest's roof entry.
+
 Blocks reserved for the building families (each family paints only its own block, from its
 own file `tools/art/city/atlas_extra/<family>.py`; see README):
 
     homes      x   0..128, y 256..384     blocks     x 128..256, y 256..384
     industry   x 256..384, y 256..384     landmarks  x 512..1024, y 256..512
-    spare      x 384..512, y 256..384; x 0..512, y 384..512; x 384..1024, y 192..256 (kit)
+    spare      x 384..512, y 256..384; x 0..512, y 384..512; x 768..1024, y 192..256 (kit;
+               x 448..768 there holds the grey roofs)
 """
 from __future__ import annotations
 
@@ -40,6 +48,7 @@ import numpy as np
 from . import style
 
 W, H = 1024, 512
+ROOF_BASE = "#d9d9d9"      # what every grey roof region averages (linear light): the roof entry's base
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 TEXTURES = os.path.join(REPO, "client", "public", "assets", "textures")
@@ -58,6 +67,7 @@ class Region:
     bay_px: int = 16                # facade: pixels per bay
     storey_px: int = 16             # facade: pixels per storey (24 for ground strips)
     tint: bool = False              # authored to be tinted (light neutral wall pixels)
+    roof: bool = False              # a grey roof: faces on it carry the roof mask (COLOR_0 alpha 0.5)
     twin: str | None = None         # name of the damaged twin
     owner: str = "kit"
     note: str = ""
@@ -80,7 +90,7 @@ class Region:
 
     def as_dict(self) -> dict:
         return {"x": self.x, "y": self.y, "w": self.w, "h": self.h, "kind": self.kind,
-                "bay_px": self.bay_px, "storey_px": self.storey_px, "tint": self.tint,
+                "bay_px": self.bay_px, "storey_px": self.storey_px, "tint": self.tint, "roof": self.roof,
                 "twin": self.twin, "owner": self.owner, "note": self.note}
 
 
@@ -195,6 +205,16 @@ def _layout() -> None:
         SWATCHES[name] = (col, emi)
     add_region("staves", 5 * C, 3 * C + 32, 16, 16, "texture", note="wooden water tank staves")
     add_region("grille", 5 * C + 16, 3 * C + 32, 16, 16, "texture", note="metal grille")
+    # the roofs of ordinary buildings: the colored roofs' patterns in light neutral grey, the
+    # same size as the roof each stands for (kit.GREY_ROOFS), so a face moves over by an offset
+    grey = [("roof_tile", "clay tiles"), ("roof_slate", "slates"), ("roof_terra", "round clay tiles"),
+            ("roof_flat", "flat roof membrane (for gravel and tar)"), ("roof_metal", "corrugated metal")]
+    for i, (name, note) in enumerate(grey):
+        add_region(name, (7 + i) * C, 3 * C, C, C, "texture", roof=True,
+                   note=f"{note}, light grey: takes the district's roof color")
+    add_region("roof_plain", 5 * C + 32, 3 * C + 32, 16, 16, "swatch", roof=True,
+               note=f"flat roof grey {ROOF_BASE} (small or plain roofs): takes the district's roof color")
+    SWATCHES["roof_plain"] = (ROOF_BASE, None)
 
 
 SIGNS = ["cup", "loaf", "fish", "shoe", "scissors", "key", "glasses", "bowl",
@@ -706,6 +726,66 @@ def _roofs(cv, r, rng):
         for _ in range(8):
             y, x = rng.integers(r.h - 8), rng.integers(r.w - 8)
             c[y:y + rng.integers(3, 9), x:x + rng.integers(3, 9)] *= 0.85
+
+
+def _grey(k: float) -> str:
+    """ROOF_BASE times k, as a hex color (neutral grey)."""
+    v = int(round(min(255.0, hexrgb(ROOF_BASE)[0] * k)))
+    return f"#{v:02x}{v:02x}{v:02x}"
+
+
+def _srgb_to_lin(a):
+    a = np.clip(a / 255.0, 0.0, 1.0)
+    return np.where(a <= 0.04045, a / 12.92, ((a + 0.055) / 1.055) ** 2.4)
+
+
+def _lin_to_srgb(a):
+    a = np.clip(a, 0.0, 1.0)
+    return 255.0 * np.where(a <= 0.0031308, a * 12.92, 1.055 * a ** (1 / 2.4) - 0.055)
+
+
+def mean_to(c, target: str) -> None:
+    """Scale a region (in linear light) so that its average is the grey `target`: then a roof
+    multiplied by color / target shows that color on average, pattern and all."""
+    lin = _srgb_to_lin(c)
+    want = float(_srgb_to_lin(hexrgb(target))[0])
+    for _ in range(6):                     # again after the brightest pixels clip at white
+        lin = np.clip(lin * want / max(float(lin.mean()), 1e-6), 0.0, 1.0)
+    c[...] = _lin_to_srgb(lin)
+
+
+@painter("roof_tile", "roof_slate", "roof_terra", "roof_flat", "roof_metal")
+def _grey_roofs(cv, r, rng):
+    """The roofs of ordinary buildings: the colored roofs' patterns as light neutral greys (the
+    game multiplies them by the district's roof color), each averaging ROOF_BASE."""
+    c, _ = cv.view(r)
+    if r.name == "roof_tile":
+        roof_tiles(c, rng, _grey(1.0), _grey(0.75))
+    elif r.name == "roof_slate":
+        roof_tiles(c, rng, _grey(1.0), _grey(0.72), rows=2, joint=4)
+        for _ in range(r.w // 2):                                       # a few slates a shade off
+            y, x = rng.integers(r.h), rng.integers(r.w - 4)
+            if y % 2:
+                c[y, x:x + 4] *= 0.92 + 0.12 * rng.random()
+    elif r.name == "roof_terra":
+        roof_tiles(c, rng, _grey(1.0), _grey(0.78), rows=2, joint=2)
+    elif r.name == "roof_flat":
+        fill(c, _grey(1.0), rng, 5)                                     # a pale membrane
+        c[:, ::8] *= 0.92                                               # welded seams, 1.5 m sheets
+        for x0 in range(0, r.w, 8):
+            off = int(rng.integers(0, 24))
+            c[off::24, x0:x0 + 8] *= 0.95                               # sheet ends
+        for _ in range(7):                                              # patches
+            y, x = rng.integers(r.h - 10), rng.integers(r.w - 10)
+            c[y:y + rng.integers(4, 10), x:x + rng.integers(4, 10)] *= 0.93 + 0.1 * rng.random()
+        spots = rng.random((r.h, r.w)) < 0.03
+        c[spots] *= 0.88
+    elif r.name == "roof_metal":
+        corrugated(c, rng, base=_grey(1.0))
+        for _ in range(5):                                              # weathered patches
+            y, x = rng.integers(r.h - 6), rng.integers(r.w - 6)
+            c[y:y + rng.integers(2, 6), x:x + rng.integers(2, 5)] *= 0.86 + 0.08 * rng.random()
+    mean_to(c, ROOF_BASE)
 
 
 @painter("interior")

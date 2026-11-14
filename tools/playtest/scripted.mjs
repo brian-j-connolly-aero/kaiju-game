@@ -309,12 +309,32 @@ async function playKaiju(origin, opts, errors) {
     const grab = async (name) => {
       await free();
       p = await driver.probe();
-      const around = await driver.surroundings(p.kaiju.x, p.kaiju.z, 90, 40);
-      const cars = around.props.filter((c) => /car|van|taxi|bus|truck/.test(String(c.kind)));
-      if (cars.length === 0 && p.kaiju.stage < 2) {
+      const around = await driver.surroundings(p.kaiju.x, p.kaiju.z, 90, 600);
+      const nearby = around.props.filter((c) => /car|van|taxi|bus|truck/.test(String(c.kind)));
+      if (nearby.length === 0 && p.kaiju.stage < 2) {
         report.skip(name, `no car within 90 m of the kaiju (${around.props.length} props nearby); nothing a hatchling can pick up`);
         return false;
       }
+      // walkTo walks straight, and in the packed starting neighborhoods (phase 3) the nearest car
+      // often stands behind a row of houses or garages the body cannot pass: cars with nothing
+      // in the way come first, nearest first.
+      const body = [2.4, 9, 26][p.kaiju.stage - 1];
+      const tramples = [3.5, 12, 70][p.kaiju.stage - 1];
+      const walls = around.structures.filter((s) => !s.passable && s.height > tramples);
+      const clearTo = (t) => {
+        const d = Math.hypot(t.x - p.kaiju.x, t.z - p.kaiju.z);
+        for (let u = 1; u < d - 2; u++) {
+          const x = p.kaiju.x + ((t.x - p.kaiju.x) * u) / d;
+          const z = p.kaiju.z + ((t.z - p.kaiju.z) * u) / d;
+          for (const s of walls) {
+            const c = Math.cos(s.yaw);
+            const sn = Math.sin(s.yaw);
+            if (Math.abs((x - s.x) * c - (z - s.z) * sn) < s.hx + body && Math.abs((x - s.x) * sn + (z - s.z) * c) < s.hz + body) return false;
+          }
+        }
+        return true;
+      };
+      const cars = [...nearby.filter(clearTo), ...nearby.filter((c) => !clearTo(c))];
       // A car if there is one (stop short of it: a hatchling crushes a car it walks onto); from
       // stage 2 the hand tears a piece off the nearest building when no car is in reach.
       const target = cars[0] ?? around.structures.find((s) => !s.passable);
@@ -344,7 +364,8 @@ async function playKaiju(origin, opts, errors) {
         }
         if (attempt === 1 && staggeredSince(from)) continue;
         p = await driver.probe();
-        report.fail(name, `pressed the right button; kaijuHeld ${event ? 'seen' : 'NOT seen'}, snapshot held=${JSON.stringify(p.kaiju.held)}; actions: ${actionsSince(from)}`);
+        const gap = target ? `, the ${cars[0] ? `${cars[0].kind} aimed at (a clear way: ${clearTo(cars[0])})` : 'building aimed at'} ${fmt(Math.hypot(target.x - p.kaiju.x, target.z - p.kaiju.z), 1)} m from the kaiju` : '';
+        report.fail(name, `pressed the right button; kaijuHeld ${event ? 'seen' : 'NOT seen'}, snapshot held=${JSON.stringify(p.kaiju.held)}; actions: ${actionsSince(from)}${gap}`);
         return false;
       }
       return false;

@@ -22,17 +22,23 @@
  * - fire at will: whenever it is not charging a volley, the leader shoots when it has the
  *   kaiju in range and a clear line of fire.
  * - supply crates (phase 2): while the kaiju is not close and it is not charging, it fetches a
- *   crate coming down or lying within BOT_RULES.squad.crateRange of its leader (one no other
- *   bot squad is already going for), then goes back to work. With a weapon pick-up it parks in
- *   that weapon's band of range (the machine gun closer in, the big cannon and the missile pod
- *   at range); with the artillery radio it keeps volleying (even into a staggered or cocooned
- *   kaiju, and even as the lazy harness profile), since every charged volley calls a barrage.
+ *   crate coming down or lying within BOT_RULES.squad.crateRange (per stage) of its leader (one
+ *   no other bot squad is already going for), then goes back to work. With a weapon pick-up it
+ *   parks in that weapon's band of range (the machine gun closer in, the big cannon and the
+ *   missile pod at range); with the artillery radio it keeps volleying (even into a staggered or
+ *   cocooned kaiju, and even as the lazy harness profile), since every charged volley calls a
+ *   barrage.
  * - lines of fire count rubble and fallen buildings (up to their height), so it parks where it
  *   can shoot past them and moves on when one is in the way. That goes for its planted
  *   squad-mates too: when most of them have no line from where it parked (its leader may still
  *   see over the heap), it does not plant there again, moves on, and passes over that spot for a
  *   while (BOT_RULES.squad.blockedRadius, blockedTime); and when it reaches its firing spot with
  *   no line at all (a hatchling among heaps), it tries another side (lookAgain).
+ * - the packed starting neighborhoods (phase 3), where a line of fire is often a gap between two
+ *   houses: it looks at spots all along the streets, not only their middles, and prefers one its
+ *   squad-mates round it would share the line from; with no line from anywhere in its band (a
+ *   hatchling on the green in the middle of a block) it tries closer in; with none from there
+ *   either it keeps going where it was going instead of turning for a new spot at every look.
  *
  * It only knows what the humans' map shows (`kaiju.known`) and what it reads off its own
  * squad. It is deliberately beatable: it parks in plain sight and never guards a place the
@@ -44,12 +50,13 @@
 import { castSegment, inWater } from '../../city/spatialIndex';
 import type { CityData } from '../../city/types';
 import { BOT_RULES } from '../../defs/bots';
+import { perStage } from '../../defs/ids';
 import { kaijuStageDef } from '../../defs/kaiju/index';
 import { DT, SQUAD_RULES } from '../../defs/rules';
 import { unitTypeDef } from '../../defs/units';
 import { modMult } from '../../defs/upgrades';
 import { projectileTypeDef, weaponDef } from '../../defs/weapons';
-import { angleDiff, angleDist, wrapAngle, yawFromTo } from '../../math/angle';
+import { angleDiff, angleDist, DEG, wrapAngle, yawFromTo } from '../../math/angle';
 import { boundsContains } from '../../math/geom';
 import { rngInt } from '../../math/rng';
 import { clamp } from '../../math/scalar';
@@ -71,29 +78,31 @@ const TAP_TICKS = 2;
 const ARRIVE = 3;
 /** A firing position this close to where another squad stands or is going is crowded. */
 const CROWD = 30;
+/** A tank's way more than this far round from its hull's heading counts as behind it. */
+const BEHIND = 150 * DEG;
 const VOLLEY = BtnIndex.volley;
 
 const steer = createSteer();
 const muzzle: Vec3 = { x: 0, y: 0, z: 0 };
 const mark: Vec3 = { x: 0, y: 0, z: 0 };
 
-/** Places a squad could park: every crossroads and the middle of every street, per city. */
+/** Places a squad could park: every crossroads, and along every street a spot about every S.spotStep meters (at least its middle), per city. */
 const spotCache = new WeakMap<CityData, Float64Array>();
 
 function parkingSpots(city: CityData): Float64Array {
   let spots = spotCache.get(city);
   if (!spots) {
     const { nodes, edges } = city.roads;
-    spots = new Float64Array((nodes.length + edges.length) * 2);
-    let i = 0;
-    for (const n of nodes) {
-      spots[i++] = n.x;
-      spots[i++] = n.z;
-    }
+    const out: number[] = [];
+    for (const n of nodes) out.push(n.x, n.z);
     for (const e of edges) {
-      spots[i++] = (nodes[e.a].x + nodes[e.b].x) / 2;
-      spots[i++] = (nodes[e.a].z + nodes[e.b].z) / 2;
+      const a = nodes[e.a];
+      const b = nodes[e.b];
+      // The street from one crossroads to the next, cut into pieces of about spotStep: a spot where each piece ends.
+      const n = Math.max(2, Math.round(Math.hypot(b.x - a.x, b.z - a.z) / S.spotStep));
+      for (let i = 1; i < n; i++) out.push(a.x + ((b.x - a.x) * i) / n, a.z + ((b.z - a.z) * i) / n);
     }
+    spots = Float64Array.from(out);
     spotCache.set(city, spots);
   }
   return spots;
@@ -161,16 +170,16 @@ const candX: number[] = [];
 const candZ: number[] = [];
 
 /**
- * Chooses where to drive to: a parking spot between `lo` and `hi` of weapon range from the
- * target point, near the squad's bearing, not far to drive, not on top of another squad, and
- * (when the kaiju is on the map) with a line of fire. Falls back to the point on its bearing.
+ * Gathers the cheapest S.spotCandidates parking spots between `lo` and `hi` of weapon range from
+ * the target point (into candCost, candX, candZ, cheapest first): near the squad's bearing, near
+ * `want` of range, not far to drive, not on top of another squad, not where its squad-mates
+ * found no line a moment ago, and (running away) not past the thing it is running from.
  */
-function pickFiringSpot(
+function gatherSpots(
   world: World,
   squad: Squad,
   leader: Unit,
   bs: BotState,
-  k: Kaiju | null,
   tx: number,
   tz: number,
   range: number,
@@ -185,7 +194,6 @@ function pickFiringSpot(
   const toKaijuX = tx - leader.x;
   const toKaijuZ = tz - leader.z;
   const toKaiju = Math.hypot(toKaijuX, toKaijuZ) || 1;
-  const height = unitTypeDef(leader.type).muzzleHeight;
   candCost.length = 0;
   candX.length = 0;
   candZ.length = 0;
@@ -223,23 +231,125 @@ function pickFiringSpot(
       candZ.length = S.spotCandidates;
     }
   }
+}
 
-  if (candCost.length === 0) {
+/**
+ * Whether squad-mates gathered round a leader at (x, z) would have a line of fire too: from at
+ * least two of the points `spacing` to either side of its line, and one and two spacings behind
+ * it (a gap between two houses shows the kaiju to the leader standing in it, and to nobody else).
+ */
+function roomForMates(world: World, x: number, z: number, height: number, k: Kaiju, spacing: number): boolean {
+  const d = Math.hypot(x - k.x, z - k.z) || 1;
+  // Away from the kaiju, and across.
+  const bx = ((x - k.x) / d) * spacing;
+  const bz = ((z - k.z) / d) * spacing;
+  let n = 0;
+  if (lineOfFire(world, x - bz, z + bx, height, k) >= 0) n++;
+  if (lineOfFire(world, x + bz, z - bx, height, k) >= 0) n++;
+  if (n >= 2) return true;
+  if (lineOfFire(world, x + bx, z + bz, height, k) >= 0) n++;
+  if (n >= 2) return true;
+  if (n === 0) return false;
+  return lineOfFire(world, x + 2 * bx, z + 2 * bz, height, k) >= 0;
+}
+
+/**
+ * The cheapest gathered spot with a line of fire to the kaiju from a gun `height` above the
+ * street (with `spacing` > 0: one its squad-mates round it would share, roomForMates); -1 when
+ * none has one.
+ */
+function firstWithLine(world: World, height: number, k: Kaiju, spacing: number): number {
+  for (let i = 0; i < candCost.length; i++) {
+    if (lineOfFire(world, candX[i], candZ[i], height, k) < 0) continue;
+    if (spacing > 0 && !roomForMates(world, candX[i], candZ[i], height, k, spacing)) continue;
+    return i;
+  }
+  return -1;
+}
+
+/**
+ * Chooses where to drive to: a parking spot between `lo` and `hi` of weapon range from the
+ * target point (see gatherSpots) with a line of fire when the kaiju is on the map. When none in
+ * that band has one (a hatchling in the middle of a packed block, behind a row of houses from
+ * every street round it), it tries the spots closer in, down to `inner` of range: the edge of
+ * the green it stands on. With no line from there either it keeps going where it was going, and
+ * looks from another side once there (lookAgain). Falls back to the point on its bearing.
+ */
+function pickFiringSpot(
+  world: World,
+  squad: Squad,
+  leader: Unit,
+  bs: BotState,
+  k: Kaiju | null,
+  tx: number,
+  tz: number,
+  range: number,
+  lo: number,
+  hi: number,
+  want: number,
+  fleeing: boolean,
+  inner: number,
+): void {
+  const b = world.match.bounds;
+  const inset = leader.radius + 2;
+  const height = unitTypeDef(leader.type).muzzleHeight;
+  bs.inner = false;
+  gatherSpots(world, squad, leader, bs, tx, tz, range, lo, hi, want, fleeing);
+  if (candCost.length === 0 && !(k && inner < lo)) {
     // No street in the band (a small or empty stage): the point on its bearing will have to do.
     bs.goalX = clamp(tx + Math.sin(bs.bearing) * want * range, b.minX + inset, b.maxX - inset);
     bs.goalZ = clamp(tz + Math.cos(bs.bearing) * want * range, b.minZ + inset, b.maxZ - inset);
     return;
   }
-  let pick = 0;
-  if (k) {
-    for (let i = 0; i < candCost.length; i++) {
-      if (lineOfFire(world, candX[i], candZ[i], height, k) < 0) continue;
-      pick = i;
-      break;
+  if (!k) {
+    bs.goalX = candX[0];
+    bs.goalZ = candZ[0];
+    return;
+  }
+  // Best a spot its squad-mates would share the line from; then one closer in; then any line at all.
+  const spacing = fleeing ? 0 : formationSpacing(leader);
+  let pick = firstWithLine(world, height, k, spacing);
+  if (pick >= 0) {
+    bs.goalX = candX[pick];
+    bs.goalZ = candZ[pick];
+    return;
+  }
+  const lone = spacing > 0 ? firstWithLine(world, height, k, 0) : -1;
+  const loneX = lone >= 0 ? candX[lone] : NaN;
+  const loneZ = lone >= 0 ? candZ[lone] : NaN;
+  const cheapX = candCost.length > 0 ? candX[0] : NaN;
+  const cheapZ = candCost.length > 0 ? candZ[0] : NaN;
+  if (!fleeing && inner < lo) {
+    gatherSpots(world, squad, leader, bs, tx, tz, range, inner, lo, lo, false);
+    pick = firstWithLine(world, height, k, spacing);
+    if (pick >= 0) {
+      bs.goalX = candX[pick];
+      bs.goalZ = candZ[pick];
+      bs.inner = true;
+      return;
     }
   }
-  bs.goalX = candX[pick];
-  bs.goalZ = candZ[pick];
+  if (lone >= 0) {
+    bs.goalX = loneX;
+    bs.goalZ = loneZ;
+    return;
+  }
+  if (!fleeing) {
+    // No line from anywhere near: keep going where it was going while that is still in the band
+    // (rather than turning for whichever spot is cheapest from here, look after look, and never
+    // getting anywhere).
+    const gd = Math.hypot(bs.goalX - tx, bs.goalZ - tz);
+    const away = Math.hypot(bs.goalX - leader.x, bs.goalZ - leader.z);
+    const blocked = bs.blockedFor > 0 && Math.hypot(bs.goalX - bs.blockedX, bs.goalZ - bs.blockedZ) < S.blockedRadius;
+    if (away > S.lookAgain && gd >= lo * range && gd <= hi * range && !blocked) return;
+  }
+  if (Number.isNaN(cheapX)) {
+    bs.goalX = clamp(tx + Math.sin(bs.bearing) * want * range, b.minX + inset, b.maxX - inset);
+    bs.goalZ = clamp(tz + Math.cos(bs.bearing) * want * range, b.minZ + inset, b.maxZ - inset);
+    return;
+  }
+  bs.goalX = cheapX;
+  bs.goalZ = cheapZ;
 }
 
 function setMode(bs: BotState, mode: SquadBotMode): void {
@@ -260,12 +370,12 @@ function crateById(world: World, id: number): Crate | null {
 }
 
 /**
- * A supply crate worth fetching: the nearest one coming down or lying within S.crateRange of
- * the leader that no other bot squad is already on its way to. Returns its id, or -1.
+ * A supply crate worth fetching: the nearest one coming down or lying within S.crateRange (per
+ * stage) of the leader that no other bot squad is already on its way to. Returns its id, or -1.
  */
 function crateToFetch(world: World, squad: Squad, leader: Unit): number {
   let best = -1;
-  let bestD: number = S.crateRange;
+  let bestD: number = perStage(S.crateRange, world.match.stage);
   for (const c of world.crates) {
     const d = Math.hypot(c.x - leader.x, c.z - leader.z);
     if (d > bestD) continue;
@@ -336,6 +446,7 @@ export function squadBot(world: World, p: PlayerState, squad: Squad): void {
     bs.crateTime = 0;
     bs.matesBlind = false;
     bs.blockedFor = 0;
+    bs.inner = false;
     releaseAll(bs);
   }
 
@@ -361,6 +472,8 @@ export function squadBot(world: World, p: PlayerState, squad: Squad): void {
   const dist = Math.hypot(tx - leader.x, tz - leader.z);
   const helpless = known && (k.phase === 'stagger' || k.phase === 'cocoon');
   const retreatDist = Math.max(S.retreatAt * range, S.retreatRadii * k.radius + S.retreatMargin);
+  // How far in it may come for a line of fire when its band has none (a fraction of range).
+  const innerMin = Math.max(S.innerStandoff, (S.innerMargin * retreatDist) / range);
 
   // --- Think ------------------------------------------------------------------------------------
   if (bs.blockedFor > 0) bs.blockedFor -= DT;
@@ -407,7 +520,10 @@ export function squadBot(world: World, p: PlayerState, squad: Squad): void {
     } else if (!known) {
       setMode(bs, 'search');
     } else if (bs.mode === 'retreat') {
-      if (dist > Math.max(S.safeAt * range, retreatDist * 1.3)) setMode(bs, 'approach');
+      // Far enough; or at the spot it ran to, which can be a step short of that (it stops within
+      // ARRIVE of it): it used to wait there for ever.
+      const there = Math.hypot(bs.goalX - leader.x, bs.goalZ - leader.z) <= ARRIVE + 1 && dist > retreatDist;
+      if (dist > Math.max(S.safeAt * range, retreatDist * 1.3) || there) setMode(bs, 'approach');
     } else if (bs.mode === 'search') {
       setMode(bs, 'approach');
     } else if (bs.mode === 'hold') {
@@ -422,8 +538,8 @@ export function squadBot(world: World, p: PlayerState, squad: Squad): void {
         setMode(bs, 'approach');
       }
     } else {
-      // Approaching: anywhere in the band with a line of fire will do.
-      const lo = helpless ? S.closeInMin : standoffMin;
+      // Approaching: anywhere in the band with a line of fire will do (closer in, when it is going to a spot there).
+      const lo = helpless ? S.closeInMin : bs.inner ? Math.min(standoffMin, innerMin) : standoffMin;
       const blocked = bs.blockedFor > 0 && Math.hypot(leader.x - bs.blockedX, leader.z - bs.blockedZ) < S.blockedRadius;
       if (bs.los && !blocked && dist >= lo * range && dist <= standoffMax * range) setMode(bs, 'hold');
       else if (known && !bs.los && Math.hypot(bs.goalX - leader.x, bs.goalZ - leader.z) < S.lookAgain) {
@@ -441,9 +557,9 @@ export function squadBot(world: World, p: PlayerState, squad: Squad): void {
     } else if (bs.mode === 'approach') {
       const want = helpless ? S.closeInStandoff : standoff;
       const lo = helpless ? S.closeInMin : standoffMin;
-      pickFiringSpot(world, squad, leader, bs, k, tx, tz, range, lo, standoffMax, want, false);
+      pickFiringSpot(world, squad, leader, bs, k, tx, tz, range, lo, standoffMax, want, false, Math.min(lo, innerMin));
     } else if (bs.mode === 'retreat') {
-      pickFiringSpot(world, squad, leader, bs, k, tx, tz, range, S.safeAt, 1.1, S.standoff, true);
+      pickFiringSpot(world, squad, leader, bs, k, tx, tz, range, S.safeAt, 1.1, S.standoff, true, S.safeAt);
     } else if (bs.mode === 'search') {
       const reached = Math.hypot(bs.goalX - leader.x, bs.goalZ - leader.z) < S.searchReach;
       if (!bs.lastChecked) {
@@ -505,8 +621,21 @@ export function squadBot(world: World, p: PlayerState, squad: Squad): void {
   input.aimPitch = clamp(aimPitch, -MAX_AIM_PITCH, MAX_AIM_PITCH);
   if (moving) {
     // A tank is driven by throttle and hull turn; infantry goes where the stick points.
-    if (type.drive) setTankMove(input, leader.yaw, steer.dirX, steer.dirZ, steer.throttle);
-    else setWorldMove(input, steer.dirX, steer.dirZ, steer.throttle);
+    if (type.drive) {
+      let dirX = steer.dirX;
+      let dirZ = steer.dirZ;
+      if (angleDist(Math.atan2(dirX, dirZ), leader.yaw) > BEHIND) {
+        // Its way lies behind: it turns about the way it is already turning (else to the left)
+        // until the way is in front, not left and right by turns. The hull answers the stick a
+        // tick later, and a hair either side of straight behind is a full turn either way: it
+        // used to rock on the spot for ever (a troop that had driven down a street to a crate,
+        // its squad-mates behind it).
+        const side = leader.control.moveX > 0 ? -1 : 1;
+        dirX = Math.sin(leader.yaw + side * BEHIND);
+        dirZ = Math.cos(leader.yaw + side * BEHIND);
+      }
+      setTankMove(input, leader.yaw, dirX, dirZ, steer.throttle);
+    } else setWorldMove(input, steer.dirX, steer.dirZ, steer.throttle);
   }
 
   // --- The volley, and fire at will -----------------------------------------------------------------

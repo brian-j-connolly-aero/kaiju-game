@@ -1,29 +1,35 @@
 /**
- * The special buildings of Port Meridian (docs/ROADMAP.md phase 2; DESIGN.md section 7): every
- * starting neighborhood gets a power substation, a gas station and a radio mast, each on a street
- * front 40 to 120 m from the anchor and inside the stage 1 square, in three directions about 120
- * degrees apart (turned by the seed), so the hatchling has three milestones to chase between
- * fights. They go in after the landmarks and before the street fronts, so the houses fill in
- * around them, and the yard opener (`openPockets`) never takes one out.
+ * The special buildings of Port Meridian (docs/ROADMAP.md phases 2 and 3; DESIGN.md section 7):
+ * power substations, gas stations and radio masts, each on a street front.
+ *
+ * - Every starting neighborhood gets one of each, 40 to 120 m from the anchor and wholly inside
+ *   the stage 1 square, in three directions about 120 degrees apart (turned by the seed), so the
+ *   hatchling has three milestones to chase between fights.
+ * - Beyond the starting neighborhoods (phase 3), more along the way from every start to downtown
+ *   and in the districts round downtown, so the juvenile and the titan meet one now and then too
+ *   (layout.ts `SPECIAL_SITES`, the numbers a pacing pass may tune).
+ *
+ * They go in after the landmarks and before the street fronts, so the houses fill in around them,
+ * and the yard opener (`openPockets`) never takes one out.
  *
  * Like the rest of the generator this uses only exact arithmetic (see generate.ts): directions
- * are table indexes, coordinates are snapped to 1/8 m.
+ * are table indexes or vectors made with Math.sqrt, coordinates are snapped to 1/8 m.
  */
 
 import { hash32 } from '../../math/rng';
 import { STAGES } from '../../defs/stages';
 import { archetypeDef } from '../archetypes';
 import type { Box } from './geo';
-import { boxExtentX, boxExtentZ, len, quant } from './geo';
-import { boxOnGround } from './ground';
-import { addStructure, clearOfBuildings, clearOfStreets, SHORE, streetClearance, TALL, TALL_SETBACK, type Builder } from './build';
-import { DIR_COS, DIR_COUNT, DIR_SIN, nearestDir, turnDir } from './dirs';
-import { ANCHORS, BUILD_LIMIT } from './layout';
+import { boxesTouch, boxExtentX, boxExtentZ, len } from './geo';
+import { inStartSquare, TALL, type Builder } from './build';
+import { DIR_COS, DIR_COUNT, DIR_SIN, turnDir } from './dirs';
+import { ANCHORS, DOWNTOWN, SPECIAL_SITES } from './layout';
+import { placeOnFront } from './lots';
 
 /** The three special archetypes, in the order they are placed. */
 export const SPECIAL_ARCHETYPE_IDS = ['substation_a', 'gasstation_a', 'radiomast_a'] as const;
 
-/** How far from the anchor (its center) a special building may stand. */
+/** How far from the anchor (its center) a start's own special building may stand. */
 export const SPECIAL_MIN_DIST = 40;
 export const SPECIAL_MAX_DIST = 120;
 /** It stands at least this far inside the stage 1 square, so a hatchling can get all round it. */
@@ -33,43 +39,17 @@ const APART = 45;
 /** Clear ground kept round a special building (other buildings come no closer). */
 const GAP = 4;
 /** Lots are tried every this many meters along a street. */
-const STEP = 3;
+const STEP = 6;
 /** The special's front stands this far behind the street clearance. */
 const SETBACK = 1;
 /** The preferred distance from the anchor; the score grows as a lot strays from it. */
 const PREFER_DIST = 75;
 /** Lots tried per special and anchor, best first (the expensive checks run in that order). */
 const MAX_CANDIDATES = 400;
-
-/** Candidate lots of one special at one start, as parallel arrays (no garbage: there are thousands). */
-let lotX: Float64Array = new Float64Array(4096);
-let lotZ: Float64Array = new Float64Array(4096);
-let lotScore: Float64Array = new Float64Array(4096);
-let lotDir: Int32Array = new Int32Array(4096);
-let lotCount = 0;
-
-function pushLot(x: number, z: number, dir: number, score: number): void {
-  if (lotCount === lotX.length) {
-    const grow = (a: Float64Array): Float64Array => {
-      const b = new Float64Array(a.length * 2);
-      b.set(a);
-      return b;
-    };
-    lotX = grow(lotX);
-    lotZ = grow(lotZ);
-    lotScore = grow(lotScore);
-    const d = new Int32Array(lotDir.length * 2);
-    d.set(lotDir);
-    lotDir = d;
-  }
-  lotX[lotCount] = x;
-  lotZ[lotCount] = z;
-  lotDir[lotCount] = dir;
-  lotScore[lotCount] = score;
-  lotCount++;
-}
-
-const box: Box = { x: 0, z: 0, hx: 0, hz: 0, dir: 0 };
+/** A special beyond the starts stands this far inside the stage 2 square of the start it is for. */
+const SQUARE2_MARGIN = 8;
+/** A radio mast beyond the starts (taller than a juvenile tramples) keeps this far from the landmarks' footprints at least: their 20 m apron. */
+const MAST_APRON = 20;
 
 /** The stage 1 square of an anchor (the same square `stageBounds` gives). */
 function startSquare(half: number, ax: number, az: number): { minX: number; maxX: number; minZ: number; maxZ: number } {
@@ -79,17 +59,64 @@ function startSquare(half: number, ax: number, az: number): { minX: number; maxX
   return { minX: cx - h, maxX: cx + h, minZ: cz - h, maxZ: cz + h };
 }
 
-/** A pseudo-random number in [0, 1) from integers (the jitter that keeps two equal lots apart). */
-function jitter(...parts: number[]): number {
-  return hash32(...parts) / 4294967296;
+/** The stage 2 square of an anchor (the same square `stageBounds` gives: the first slid toward downtown). */
+function stageTwoSquare(half: number, ax: number, az: number): { minX: number; maxX: number; minZ: number; maxZ: number } {
+  const h1 = STAGES[0].boundsHalfSize;
+  const h2 = STAGES[1].boundsHalfSize;
+  const slack = h2 - h1 > 0 ? h2 - h1 : 0;
+  const clampTo = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > hi ? hi : v);
+  const c1x = clampTo(ax, -half + h1, half - h1);
+  const c1z = clampTo(az, -half + h1, half - h1);
+  const cx = clampTo(c1x + clampTo(-DOWNTOWN[0] - c1x, -slack, slack), -half + h2, half - h2);
+  const cz = clampTo(c1z + clampTo(DOWNTOWN[1] - c1z, -slack, slack), -half + h2, half - h2);
+  return { minX: cx - h2, maxX: cx + h2, minZ: cz - h2, maxZ: cz + h2 };
+}
+
+/** A number in [0, 1) that keeps two equal lots apart: from the search, the street's side and the meters along it (plain integer arithmetic, cheap enough for thousands of lots). */
+function jitter(search: number, key: number, at: number): number {
+  return (((search % 8191) * 7 + (key % 8191) * 13 + at * 29) % 8191) / 8191;
+}
+
+/** True when the whole box lies inside the rectangle, `margin` in from its edges. */
+function boxInside(box: Box, r: { minX: number; maxX: number; minZ: number; maxZ: number }, margin: number): boolean {
+  const ex = boxExtentX(box);
+  const ez = boxExtentZ(box);
+  return box.x - ex >= r.minX + margin && box.x + ex <= r.maxX - margin && box.z - ez >= r.minZ + margin && box.z + ez <= r.maxZ - margin;
+}
+
+/** True when some corner (or the middle) of the box lies in a start's stage 1 square. */
+function touchesStartSquare(half: number, box: Box): boolean {
+  const ex = boxExtentX(box);
+  const ez = boxExtentZ(box);
+  return (
+    inStartSquare(half, box.x, box.z) ||
+    inStartSquare(half, box.x - ex, box.z - ez) ||
+    inStartSquare(half, box.x + ex, box.z - ez) ||
+    inStartSquare(half, box.x - ex, box.z + ez) ||
+    inStartSquare(half, box.x + ex, box.z + ez)
+  );
+}
+
+/** A special building placed so far: where and which. */
+interface Placed {
+  box: Box;
+  kind: number;
 }
 
 /**
- * Places the three special buildings of every anchor. Returns how many it placed (three per
- * anchor when every start has room, which `validateCity` checks).
+ * Places the special buildings: the three of every anchor, then those beyond the starts.
+ * Returns how many it placed (`validateCity` checks that every start has its three and every
+ * stage 2 square one of each beyond its stage 1 square).
  */
 export function buildSpecials(b: Builder, seed: number): number {
-  let placed = 0;
+  const placed: Placed[] = [];
+  buildStartSpecials(b, seed, placed);
+  buildSpecialsBeyond(b, seed, placed);
+  return placed.length;
+}
+
+/** The trio of every start, inside its stage 1 square. */
+function buildStartSpecials(b: Builder, seed: number, placed: Placed[]): void {
   for (let ai = 0; ai < ANCHORS.length; ai++) {
     const ax = -ANCHORS[ai].at[0];
     const az = ANCHORS[ai].at[1];
@@ -98,87 +125,103 @@ export function buildSpecials(b: Builder, seed: number): number {
     const turn = hash32(seed, 907, ai) % DIR_COUNT;
     const mine: Box[] = [];
     for (let k = 0; k < SPECIAL_ARCHETYPE_IDS.length; k++) {
-      const a = archetypeDef(SPECIAL_ARCHETYPE_IDS[k]);
       const want = turnDir(turn, Math.round((k * DIR_COUNT) / 3));
       const wx = DIR_SIN[want];
       const wz = DIR_COS[want];
-      const w = a.footprint[0];
-      const d = a.footprint[1];
-      const tall = a.height > TALL ? TALL_SETBACK : 0;
-      lotCount = 0;
-      for (const s of b.streets) {
-        if (!s.spec.lots || s.spec.kind === 'bridge' || s.spec.ford) continue;
-        // Only the streets that run through (or close to) the square.
-        if (Math.max(s.ax, s.bx) < sq.minX - 30 || Math.min(s.ax, s.bx) > sq.maxX + 30) continue;
-        if (Math.max(s.az, s.bz) < sq.minZ - 30 || Math.min(s.az, s.bz) > sq.maxZ + 30) continue;
-        const dx = s.bx - s.ax;
-        const dz = s.bz - s.az;
-        const l = len(dx, dz);
-        if (l < w + 4) continue;
-        const ux = dx / l;
-        const uz = dz / l;
-        const front = streetClearance(s.spec) + 0.5 + SETBACK + tall;
-        for (let side = -1; side <= 1; side += 2) {
-          const nx = -uz * side;
-          const nz = ux * side;
-          const facing = nearestDir(-nx, -nz);
-          const fx = DIR_SIN[facing];
-          const fz = DIR_COS[facing];
-          for (let at = 2; at <= l - w - 2; at += STEP) {
-            const mx = s.ax + ux * (at + w / 2) + nx * front;
-            const mz = s.az + uz * (at + w / 2) + nz * front;
-            const x = quant(mx - fx * (d / 2));
-            const z = quant(mz - fz * (d / 2));
-            const ox = x - ax;
-            const oz = z - az;
-            const dist = len(ox, oz);
-            if (dist < SPECIAL_MIN_DIST || dist > SPECIAL_MAX_DIST) continue;
-            // In the wanted direction if it can be, at about the preferred distance.
-            const along = (ox * wx + oz * wz) / dist;
-            const score = (1 - along) * 2 + (dist > PREFER_DIST ? dist - PREFER_DIST : PREFER_DIST - dist) / 60 + jitter(seed, 911, ai, k, s.id, side + 1, at) * 0.15;
-            pushLot(x, z, facing, score);
-          }
-        }
-      }
-      // Best first: each try takes the best lot not tried yet (ties by position; no engine sort).
-      const tries = Math.min(lotCount, MAX_CANDIDATES);
-      for (let i = 0; i < tries; i++) {
-        let bi = -1;
-        for (let j = 0; j < lotCount; j++) {
-          const sc = lotScore[j];
-          if (sc < 0) continue;
-          if (bi < 0) {
-            bi = j;
-            continue;
-          }
-          const bs = lotScore[bi];
-          if (sc < bs || (sc === bs && (lotX[j] < lotX[bi] || (lotX[j] === lotX[bi] && lotZ[j] < lotZ[bi])))) bi = j;
-        }
-        if (bi < 0) break;
-        // Tried: scores are never negative otherwise.
-        lotScore[bi] = -1;
-        box.x = lotX[bi];
-        box.z = lotZ[bi];
-        box.hx = w / 2;
-        box.hz = d / 2;
-        box.dir = lotDir[bi];
-        const ex = boxExtentX(box);
-        const ez = boxExtentZ(box);
-        if (box.x - ex < sq.minX + SQUARE_MARGIN || box.x + ex > sq.maxX - SQUARE_MARGIN) continue;
-        if (box.z - ez < sq.minZ + SQUARE_MARGIN || box.z + ez > sq.maxZ - SQUARE_MARGIN) continue;
-        let near = false;
-        for (const other of mine) if (len(other.x - box.x, other.z - box.z) < APART) near = true;
-        if (near) continue;
-        if (!clearOfStreets(b, box, tall)) continue;
-        if (!boxOnGround(b.g, box, SHORE, false, BUILD_LIMIT)) continue;
-        if (!clearOfBuildings(b, box, GAP)) continue;
-        const placedBox: Box = { x: box.x, z: box.z, hx: box.hx, hz: box.hz, dir: box.dir };
-        addStructure(b, a, placedBox);
-        mine.push(placedBox);
-        placed++;
-        break;
-      }
+      const searchKey = hash32(seed, 911, ai, k);
+      const box = placeOnFront(b, {
+        a: archetypeDef(SPECIAL_ARCHETYPE_IDS[k]),
+        cx: ax,
+        cz: az,
+        reach: SPECIAL_MAX_DIST,
+        street: () => true,
+        setback: SETBACK,
+        step: STEP,
+        score: (x, z, dist, key, at) => {
+          if (dist < SPECIAL_MIN_DIST) return -1;
+          // In the wanted direction if it can be, at about the preferred distance.
+          const along = ((x - ax) * wx + (z - az) * wz) / dist;
+          return (1 - along) * 2 + (dist > PREFER_DIST ? dist - PREFER_DIST : PREFER_DIST - dist) / 60 + jitter(searchKey, key, at) * 0.15;
+        },
+        accept: (box) => {
+          if (!boxInside(box, sq, SQUARE_MARGIN)) return false;
+          for (const other of mine) if (len(other.x - box.x, other.z - box.z) < APART) return false;
+          return true;
+        },
+        gap: GAP,
+        tries: MAX_CANDIDATES,
+      });
+      if (!box) continue;
+      mine.push(box);
+      placed.push({ box, kind: k });
     }
   }
-  return placed;
+}
+
+/**
+ * Phase 3: the specials beyond the starts (layout.ts `SPECIAL_SITES`). Along the way from every
+ * anchor to downtown, one at each of `path`'s distances beyond its stage 1 square, kinds in turn;
+ * then one at each of the `outer` points. A site whose kind already stands within `share` of its
+ * point (from a neighbor's way) is left out. Each stands on a street front within `reach` of its
+ * point, outside every stage 1 square, wholly inside the stage 2 square of its start (`outer`:
+ * of some start), `landmarkGap` from every landmark and `apart` from every other special.
+ */
+function buildSpecialsBeyond(b: Builder, seed: number, placed: Placed[]): void {
+  const sites = SPECIAL_SITES;
+  const site = (x: number, z: number, kind: number, square: { minX: number; maxX: number; minZ: number; maxZ: number } | null, tag: number): void => {
+    for (const p of placed) if (p.kind === kind && len(p.box.x - x, p.box.z - z) < sites.share) return;
+    const a = archetypeDef(SPECIAL_ARCHETYPE_IDS[kind]);
+    const tall = a.height > TALL;
+    const reach = sites.reach;
+    const searchKey = hash32(seed, 919, tag);
+    const box = placeOnFront(b, {
+      a,
+      cx: x,
+      cz: z,
+      reach,
+      street: () => true,
+      setback: SETBACK,
+      step: STEP,
+      // (Not in a start's square: its own trio is enough there.)
+      score: (lx, lz, d, key, at) => (inStartSquare(b.half, lx, lz) ? -1 : d / reach + jitter(searchKey, key, at) * 0.1),
+      accept: (box) => {
+        if (touchesStartSquare(b.half, box)) return false;
+        if (square && !boxInside(box, square, SQUARE2_MARGIN)) return false;
+        for (const p of placed) if (len(p.box.x - box.x, p.box.z - box.z) < sites.apart) return false;
+        for (let i = 0; i < b.structures.length; i++) {
+          const st = b.structures[i];
+          if (st.landmark === null) continue;
+          if (boxesTouch(box, b.boxes[i], sites.landmarkGap)) return false;
+          if (tall && boxesTouch(box, b.boxes[i], MAST_APRON)) return false;
+        }
+        return true;
+      },
+      gap: GAP,
+      tries: MAX_CANDIDATES,
+    });
+    if (box) placed.push({ box, kind });
+  };
+  for (let ai = 0; ai < ANCHORS.length; ai++) {
+    const ax = -ANCHORS[ai].at[0];
+    const az = ANCHORS[ai].at[1];
+    const sq1 = startSquare(b.half, ax, az);
+    const sq2 = stageTwoSquare(b.half, ax, az);
+    // The straight way to downtown, and where it leaves the stage 1 square.
+    const dx = -DOWNTOWN[0] - ax;
+    const dz = DOWNTOWN[1] - az;
+    const dl = len(dx, dz);
+    const ux = dx / dl;
+    const uz = dz / dl;
+    const tx = ux > 0 ? (sq1.maxX - ax) / ux : ux < 0 ? (sq1.minX - ax) / ux : Infinity;
+    const tz = uz > 0 ? (sq1.maxZ - az) / uz : uz < 0 ? (sq1.minZ - az) / uz : Infinity;
+    const out = tx < tz ? tx : tz;
+    for (let k = 0; k < sites.path.length; k++) {
+      const t = out + sites.path[k];
+      site(ax + ux * t, az + uz * t, (ai + k) % SPECIAL_ARCHETYPE_IDS.length, sq2, ai * 16 + k);
+    }
+  }
+  for (let k = 0; k < sites.outer.length; k++) {
+    const p = sites.outer[k];
+    site(-p[0], p[1], k % SPECIAL_ARCHETYPE_IDS.length, null, 1000 + k);
+  }
 }

@@ -20,6 +20,9 @@ to send. `host/stop.cmd` or `host/stop.sh` stops it.
 Send your friends **[docs/PLAYING.md](docs/PLAYING.md)**: what the game is, how to join, the
 controls and tips for both sides. In the game, H opens the controls card.
 
+Before the next playtest, read **[docs/PLAYTEST.md](docs/PLAYTEST.md)**: one page on what changed
+since the first multiplayer evening, what to try on each side, and the known risks.
+
 ## For developers
 
 - `docs/requirements.md`: the owner's design brief. `docs/ROADMAP.md`: the owner's decisions

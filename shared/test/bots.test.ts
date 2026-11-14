@@ -19,7 +19,7 @@ import {
   type SimEvent,
   type World,
 } from '../src/index';
-import { eventsOf, holdFire, HUMAN_PLAYER, input, KAIJU_PLAYER, makeTestWorld, placeKaiju, placeUnit, run, type TestWorldOptions } from './helpers';
+import { eventsOf, holdFire, HUMAN_PLAYER, input, KAIJU_PLAYER, makeTestWorld, parkUnits, placeKaiju, placeUnit, run, type TestWorldOptions } from './helpers';
 
 const SEC = TICK_RATE;
 const ROCKET_RANGE = WEAPONS.army_rocket_launchers.range;
@@ -232,6 +232,35 @@ describe('the squad bot', () => {
     // this seed, three squads of four fired no charged volley in a whole fast stage 1.
     const config = createMatchConfig({ anchor: 5, fast: true, bots: { kaijuHandicap: 1, humanHandicap: 0 } });
     const world = createWorld({ seed: 2496319090, config });
+    const volleys = world.squads.map(() => 0);
+    for (let t = 0; t < 150 * SEC && world.match.stage === 1 && world.match.phase !== 'ended'; t++) {
+      for (const e of world.step()) if (e.type === 'volley') volleys[e.squad]++;
+    }
+    for (const n of volleys) expect(n).toBeGreaterThan(0);
+  });
+
+  it('goes back to work from a spot it backed off to a step short of where it feels safe', () => {
+    // One short street just beyond the distance at which a squad that backed off feels safe
+    // again: it backs off along it and parks within a few meters of the spot it drove to, a step
+    // short of that distance. It used to stay there, backing off, for the rest of the stage.
+    const z = BOT_RULES.squad.safeAt * ROCKET_RANGE + 0.5;
+    const world = squadWorld({ roads: [[-10, z, 10, z]] });
+    const squad = world.squads[0];
+    for (const other of world.squads.slice(1)) other.eliminated = true;
+    parkUnits(world, squad.units);
+    squad.units.forEach((id, i) => placeUnit(world, id, -6 + i * 4, 30));
+    const events = run(world, 30 * SEC);
+    expect(world.players[squad.player].botState.mode).not.toBe('retreat');
+    expect(eventsOf(events, 'volley').length).toBeGreaterThan(0);
+  });
+
+  it('gets its volleys off at a hatchling standing on the green of a packed start (Port Meridian)', () => {
+    // Phase 3 packed the starting neighborhoods: from most streets round the green in the middle
+    // of Dovecote a row of houses hides a hatchling, and where a gap between two houses shows it
+    // to a leader its squad-mates often see nothing. With this seed two squads of four fired no
+    // charged volley in a whole fast stage 1.
+    const config = createMatchConfig({ anchor: 3, fast: true, bots: { kaijuHandicap: 1, humanHandicap: 0 } });
+    const world = createWorld({ seed: 16, config });
     const volleys = world.squads.map(() => 0);
     for (let t = 0; t < 150 * SEC && world.match.stage === 1 && world.match.phase !== 'ended'; t++) {
       for (const e of world.step()) if (e.type === 'volley') volleys[e.squad]++;

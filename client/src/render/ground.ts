@@ -1,12 +1,15 @@
 /**
  * The ground of the city, built from CityData: sidewalk-colored land, roads from the road
  * graph, parks, plazas and the river as flat painted areas (a model-city table), and a far
- * plain out to the haze. A handful of merged meshes, one per surface.
+ * plain out to the haze. A handful of merged meshes, one per surface. Round the city (phase 3,
+ * scenery.ts): the hills on the horizon (one mesh), the open sea to the south and the river's
+ * way north (both in the water's mesh).
  */
 
 import * as THREE from 'three';
 import type { CityData } from '@mb/shared';
 import type { AssetStore } from '../assets/assetStore';
+import { hillsGeometry, hillsMaterial, waterBeyond } from './scenery';
 
 /**
  * What each surface is multiplied by at full night. Pale paving under blue moonlight read as
@@ -41,6 +44,8 @@ interface NightSurface {
   material: THREE.MeshLambertMaterial;
   night: THREE.Color;
   sunset: readonly [number, number, number];
+  /** Its own color by day (the texture is multiplied by it); white when absent. */
+  day?: THREE.Color;
 }
 
 /**
@@ -57,11 +62,15 @@ export function setGroundNight(ground: THREE.Group, night: number, sunset = 0): 
   for (const s of surfaces) {
     const c = s.material.color.setRGB(1, 1, 1).lerp(s.night, n);
     c.setRGB(c.r * (1 + (s.sunset[0] - 1) * w), c.g * (1 + (s.sunset[1] - 1) * w), c.b * (1 + (s.sunset[2] - 1) * w));
+    if (s.day) c.multiply(s.day);
   }
 }
 
 /** Meters of ground one texture tile covers. */
 const TILE = 8;
+
+/** The back lanes' gravel: the rubble texture warmed toward packed sandy grit. */
+const LANE_GRAVEL = 0xf2e2c8;
 
 /**
  * `layer` 0 is the base; higher layers are painted over it. They sit a few centimeters higher
@@ -131,8 +140,9 @@ export function buildGround(city: CityData, assets: AssetStore): THREE.Group {
   const half = city.half;
   const nightSurfaces: NightSurface[] = [];
   group.userData.nightSurfaces = nightSurfaces;
-  const night = (material: THREE.MeshLambertMaterial, color: number, sunset: readonly [number, number, number] = SUNSET_TINT.paving): THREE.MeshLambertMaterial => {
-    nightSurfaces.push({ material, night: new THREE.Color(color), sunset });
+  const night = (material: THREE.MeshLambertMaterial, color: number, sunset: readonly [number, number, number] = SUNSET_TINT.paving, day?: number): THREE.MeshLambertMaterial => {
+    nightSurfaces.push({ material, night: new THREE.Color(color), sunset, day: day === undefined ? undefined : new THREE.Color(day) });
+    if (day !== undefined) material.color.set(day);
     return material;
   };
 
@@ -165,6 +175,8 @@ export function buildGround(city: CityData, assets: AssetStore): THREE.Group {
       else out.push(pa.x, pa.y, pb.x, pb.y, pc.x, pc.y);
     }
   }
+  // Beyond the city: the open sea to the south and the river's way north, in the water's own mesh.
+  for (const v of waterBeyond(half, F)) byKind.water.push(v);
   if (byKind.park.length > 0) group.add(flatMesh(byKind.park, 0.03, night(surface(assets.texture('ground_grass'), 1), NIGHT_TINT.grass, SUNSET_TINT.grass)));
   if (byKind.plaza.length > 0) group.add(flatMesh(byKind.plaza, 0.03, night(surface(assets.texture('ground_plaza'), 1), NIGHT_TINT.paving)));
   if (byKind.water.length > 0) {
@@ -196,5 +208,28 @@ export function buildGround(city: CityData, assets: AssetStore): THREE.Group {
     if (w > 0) quad(roads, node.x - w, node.z - w, node.x + w, node.z - w, node.x + w, node.z + w, node.x - w, node.z + w);
   });
   if (roads.length > 0) group.add(flatMesh(roads, 0.08, night(surface(assets.texture('ground_asphalt'), 3), NIGHT_TINT.asphalt, SUNSET_TINT.asphalt)));
+
+  // The back lanes of the starting neighborhoods (phase 3): gravel tracks between the garages.
+  // Not streets: drawn under the roads where they meet one.
+  const lanes: number[] = [];
+  for (const lane of city.lanes ?? []) {
+    const dx = lane.bx - lane.ax;
+    const dz = lane.bz - lane.az;
+    const len = Math.hypot(dx, dz);
+    if (len < 0.01) continue;
+    const nx = (-dz / len) * (lane.width / 2);
+    const nz = (dx / len) * (lane.width / 2);
+    quad(lanes, lane.ax + nx, lane.az + nz, lane.bx + nx, lane.bz + nz, lane.bx - nx, lane.bz - nz, lane.ax - nx, lane.az - nz);
+  }
+  if (lanes.length > 0) {
+    const gravel = flatMesh(lanes, 0.06, night(surface(assets.texture('ground_rubble'), 2), NIGHT_TINT.paving, SUNSET_TINT.paving, LANE_GRAVEL));
+    gravel.name = 'lanes';
+    group.add(gravel);
+  }
+
+  // The hills on the horizon: one mesh, dimmed at night and warmed at sunset like the fields.
+  const hills = new THREE.Mesh(hillsGeometry(half), night(hillsMaterial(), NIGHT_TINT.grass, SUNSET_TINT.far));
+  hills.name = 'hills';
+  group.add(hills);
   return group;
 }

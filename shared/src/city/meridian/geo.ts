@@ -8,6 +8,10 @@
 import type { Vec2 } from '../../math/vec';
 import { DIR_COS, DIR_SIN } from './dirs';
 
+/** The heading table, read once into this module (a read of the imported binding costs more in the hot loops). */
+const COS: readonly number[] = DIR_COS;
+const SIN: readonly number[] = DIR_SIN;
+
 /** Final coordinates are snapped to this step (1/8 m is exact in binary). */
 export const QUANT = 8;
 
@@ -128,8 +132,8 @@ const scratchHit: SegHit = { t: 0, u: 0 };
 
 /** The four corners of a box, into `out` as x0, z0, x1, z1, ... (local -x-z, +x-z, +x+z, -x+z). */
 export function boxCorners(b: Box, out: number[]): number[] {
-  const c = DIR_COS[b.dir];
-  const s = DIR_SIN[b.dir];
+  const c = COS[b.dir];
+  const s = SIN[b.dir];
   // Local +X is (cos, -sin), local +Z is (sin, cos).
   const xx = c * b.hx;
   const xz = -s * b.hx;
@@ -148,19 +152,19 @@ export function boxCorners(b: Box, out: number[]): number[] {
 
 /** Half extents of the axis-aligned rectangle around a box. */
 export function boxExtentX(b: Box): number {
-  return b.hx * Math.abs(DIR_COS[b.dir]) + b.hz * Math.abs(DIR_SIN[b.dir]);
+  return b.hx * Math.abs(COS[b.dir]) + b.hz * Math.abs(SIN[b.dir]);
 }
 
 export function boxExtentZ(b: Box): number {
-  return b.hx * Math.abs(DIR_SIN[b.dir]) + b.hz * Math.abs(DIR_COS[b.dir]);
+  return b.hx * Math.abs(SIN[b.dir]) + b.hz * Math.abs(COS[b.dir]);
 }
 
 /** True when two boxes come closer than `gap` (separating axis test on boxes grown by gap / 2 each). */
 export function boxesTouch(a: Box, b: Box, gap: number): boolean {
-  const ca = DIR_COS[a.dir];
-  const sa = DIR_SIN[a.dir];
-  const cb = DIR_COS[b.dir];
-  const sb = DIR_SIN[b.dir];
+  const ca = COS[a.dir];
+  const sa = SIN[a.dir];
+  const cb = COS[b.dir];
+  const sb = SIN[b.dir];
   const g = gap / 2;
   const ahx = a.hx + g;
   const ahz = a.hz + g;
@@ -183,8 +187,8 @@ export function boxesTouch(a: Box, b: Box, gap: number): boolean {
 
 /** Squared distance from a point to a box (0 inside). */
 export function distSqPointBox(px: number, pz: number, b: Box): number {
-  const c = DIR_COS[b.dir];
-  const s = DIR_SIN[b.dir];
+  const c = COS[b.dir];
+  const s = SIN[b.dir];
   const rx = px - b.x;
   const rz = pz - b.z;
   const lx = Math.abs(rx * c - rz * s) - b.hx;
@@ -196,8 +200,8 @@ export function distSqPointBox(px: number, pz: number, b: Box): number {
 
 /** Squared distance from the segment a..b to a box (0 when the segment touches or enters it). */
 export function distSqSegBox(ax: number, az: number, bx: number, bz: number, box: Box): number {
-  const c = DIR_COS[box.dir];
-  const s = DIR_SIN[box.dir];
+  const c = COS[box.dir];
+  const s = SIN[box.dir];
   // Into the box's own frame.
   const rax = ax - box.x;
   const raz = az - box.z;
