@@ -35,6 +35,11 @@ const AIM_RANGE = 900;
 
 export interface WheelState {
   open: boolean;
+  /**
+   * Opened with a quick tap of the wheel button rather than held: it stays open until an entry
+   * is picked (a left click, a number key, or the wheel button again).
+   */
+  sticky: boolean;
   /** The entry the pointer is on, or null in the dead center. */
   highlight: CommandId | null;
   /** Pointer offset from the wheel's center, each -1..1. */
@@ -49,6 +54,12 @@ const dir = { x: 0, y: 0, z: 0 };
 
 /** The wheel's four entries, by direction: up, right, down, left (COMMAND_IDS order clockwise from the top). */
 export const WHEEL_LAYOUT: readonly CommandId[] = COMMAND_IDS;
+/** How far the wheel's pointer moves per radian of look input (it spans -1..1 each way). */
+export const WHEEL_POINTER_GAIN = 3;
+/** The pointer picks an entry once it is this far from the middle. */
+export const WHEEL_DEAD_ZONE = 0.35;
+/** Let go of the wheel button sooner than this, with nothing picked, and the wheel stays open. */
+export const WHEEL_TAP_TIME = 0.3;
 
 export class HumanController implements Controller {
   readonly kind = 'human' as const;
@@ -59,12 +70,19 @@ export class HumanController implements Controller {
   /** Direction sent to the server (differs from the view in third person). */
   aimYaw = 0;
   aimPitch = 0;
-  readonly wheel: WheelState = { open: false, highlight: null, x: 0, y: 0 };
+  readonly wheel: WheelState = { open: false, sticky: false, highlight: null, x: 0, y: 0 };
   /** Where the crosshair lands. */
   readonly aimPoint: AimPoint = createAimPoint();
   /** Seconds since the local player last fired (for the recoil kick). */
   private pendingWheel: CommandId | null = null;
   private pendingMarker: GroundMarker | null = null;
+  /** Seconds the wheel has been open. */
+  private wheelTime = 0;
+  /**
+   * The left button picked a wheel entry: it fires nothing until it has been let go (and the
+   * samples have seen it let go).
+   */
+  private fireBlocked = false;
   private started = false;
   private lastX = 0;
   private lastZ = 0;
@@ -87,34 +105,70 @@ export class HumanController implements Controller {
     this.pendingMarker = marker;
   }
 
-  private updateWheel(input: ActionState): void {
+  /** Closes the wheel, sending the entry it is pointing at (if any). */
+  private closeWheel(pick: boolean): void {
+    const w = this.wheel;
+    w.open = false;
+    w.sticky = false;
+    if (pick && w.highlight) this.queueCommand(w.highlight, w.highlight === 'moveTo' ? this.groundMarker() : null);
+  }
+
+  /**
+   * The command wheel. Hold its button (right mouse button or Q, LB), point, let go: the entry
+   * pointed at is the order. While it is open the left mouse button (the trigger) picks the
+   * entry instead of firing, and the shot does not come back until that button is let go. A
+   * quick tap of the wheel button with nothing pointed at leaves the wheel open: point, then
+   * click (or press the wheel button again). The number keys give their order at any time and
+   * close the wheel.
+   */
+  private updateWheel(input: ActionState, dt: number): void {
     const w = this.wheel;
     if (input.pressed.wheel) {
-      w.open = true;
-      w.x = 0;
-      w.y = 0;
-      w.highlight = null;
-    }
-    if (w.open) {
+      if (w.open) {
+        // Pressed again while it waits open: that is the pick.
+        this.closeWheel(true);
+      } else {
+        w.open = true;
+        w.sticky = false;
+        w.x = 0;
+        w.y = 0;
+        w.highlight = null;
+        this.wheelTime = 0;
+      }
+    } else if (w.open) {
+      this.wheelTime += dt;
       // While the wheel is open the look input moves its pointer, not the view.
-      w.x = clamp(w.x + input.lookX * 2.2, -1, 1);
-      w.y = clamp(w.y + input.pointerY * 2.2, -1, 1);
-      if (Math.hypot(w.x, w.y) > 0.35) {
+      w.x = clamp(w.x + input.lookX * WHEEL_POINTER_GAIN, -1, 1);
+      w.y = clamp(w.y + input.pointerY * WHEEL_POINTER_GAIN, -1, 1);
+      if (Math.hypot(w.x, w.y) > WHEEL_DEAD_ZONE) {
         const a = Math.atan2(w.x, w.y);
         const quadrant = ((Math.round(a / (Math.PI / 2)) % 4) + 4) % 4;
         w.highlight = WHEEL_LAYOUT[quadrant];
       } else {
         w.highlight = null;
       }
-      if (!input.down.wheel) {
-        w.open = false;
-        if (w.highlight) this.queueCommand(w.highlight, w.highlight === 'moveTo' ? this.groundMarker() : null);
+      if (input.pressed.fire) {
+        // The left button picks; it does not fire.
+        this.fireBlocked = true;
+        this.closeWheel(true);
+      } else if (!input.down.wheel && !w.sticky) {
+        if (w.highlight || this.wheelTime >= WHEEL_TAP_TIME) this.closeWheel(true);
+        else w.sticky = true;
       }
     }
-    if (input.pressed.cmdFollow) this.queueCommand('follow', null);
-    if (input.pressed.cmdMoveTo) this.queueCommand('moveTo', this.groundMarker());
-    if (input.pressed.cmdFireAtWill) this.queueCommand('fireAtWill', null);
-    if (input.pressed.cmdHoldCharge) this.queueCommand('holdCharge', null);
+    const direct: CommandId | null = input.pressed.cmdFollow
+      ? 'follow'
+      : input.pressed.cmdMoveTo
+        ? 'moveTo'
+        : input.pressed.cmdFireAtWill
+          ? 'fireAtWill'
+          : input.pressed.cmdHoldCharge
+            ? 'holdCharge'
+            : null;
+    if (direct) {
+      if (w.open) this.closeWheel(false);
+      this.queueCommand(direct, direct === 'moveTo' ? this.groundMarker() : null);
+    }
   }
 
   /** The ground point under the crosshair, or null when it is on the sky. */
@@ -188,8 +242,10 @@ export class HumanController implements Controller {
     this.lastUnit = u.id;
     this.lastStage = stage;
     if (input.pressed.camera) this.thirdPerson = !this.thirdPerson;
-    if (!ctx.mapOpen) this.updateWheel(input);
-    else this.wheel.open = false;
+    if (!ctx.mapOpen) this.updateWheel(input, ctx.dt);
+    else this.closeWheel(false);
+    // The left button that picked a wheel entry fires again only once it has been let go.
+    if (this.fireBlocked && !input.down.fire && !input.held.fire) this.fireBlocked = false;
 
     if (input.aimOverride) {
       this.viewYaw = input.aimOverride.yaw;
@@ -226,7 +282,7 @@ export class HumanController implements Controller {
     ctx.session.aimPitch = this.aimPitch;
 
     // A little recoil when a shot actually leaves (the weapon was ready when Fire went down).
-    const firing = input.down.fire && !ctx.mapOpen && u.alive && u.cooldown <= 0.05 && u.shaken <= 0;
+    const firing = input.down.fire && !this.fireHeldBack && !ctx.mapOpen && u.alive && u.cooldown <= 0.05 && u.shaken <= 0;
     if (firing && !this.wasFiring) this.kick = 1;
     this.wasFiring = firing;
     this.kick = Math.max(0, this.kick - ctx.dt * 6);
@@ -244,8 +300,10 @@ export class HumanController implements Controller {
       out.moveX = input.moveX * c - input.moveZ * s;
       out.moveZ = input.moveZ * c + input.moveX * s;
       // The latch, not the instant: a click that began and ended between two samples still fires.
-      if (input.held.fire && !this.wheel.open) out.buttons |= Btn.fire;
+      if (input.held.fire && !this.fireHeldBack) out.buttons |= Btn.fire;
       if (input.held.callIn) out.buttons |= Btn.callIn;
+      if (input.held.smoke) out.buttons |= Btn.smoke;
+      if (input.held.mark && !this.wheel.open) out.buttons |= Btn.mark;
     }
     if (this.pendingWheel) {
       out.wheel = this.pendingWheel;
@@ -254,6 +312,11 @@ export class HumanController implements Controller {
       this.pendingMarker = null;
     }
     return out;
+  }
+
+  /** The trigger does nothing now: the wheel is open, or the left button that picked from it is still down. */
+  get fireHeldBack(): boolean {
+    return this.wheel.open || this.fireBlocked;
   }
 
   /** Whether the weapon's shot was just fired locally (for the HUD's crosshair pulse). */

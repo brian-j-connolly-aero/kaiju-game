@@ -62,12 +62,21 @@
  *                one, otherwise at the point where the aim ray meets the ground. Nothing happens
  *                while the call-in is cooling down.
  *
+ *   Btn.smoke    On the press, throws the squad's smoke at `marker` if this input carries one,
+ *                otherwise where the aim ray meets the ground, no further than the stage's
+ *                throw range (straight ahead at that range when the crosshair is on the sky).
+ *                Nothing happens while the smoke is cooling down. (sim/abilities.ts)
+ *   Btn.mark     On the press, marks the kaiju for the whole army when the driven unit has it
+ *                in sight within the stage's mark range and the crosshair is on or beside it.
+ *                Nothing happens (and nothing is spent) otherwise, or while it cools down.
+ *
  *   wheel        One-shot: the command picked on the wheel since the last input. 'follow' and
  *                'moveTo' set the movement order, 'fireAtWill' and 'holdCharge' the fire mode;
  *                picking the entry that is already set gives the order again (hold-and-charge
  *                then plants the squad afresh). What each does: sim/systems/unitOrders.ts.
- *   marker       One-shot ground point that goes with `wheel: 'moveTo'` or with Btn.callIn. When
- *                'moveTo' has no marker the server uses the point where the aim ray lands.
+ *   marker       One-shot ground point that goes with `wheel: 'moveTo'`, Btn.callIn or
+ *                Btn.smoke. When 'moveTo' has no marker the server uses the point where the
+ *                aim ray lands.
  *                Markers are pulled back inside the playable bounds.
  *
  *   The map view and the camera toggle are client-only. While the map is open the client sends
@@ -89,6 +98,8 @@ export const Btn = {
   molt: 1 << 5,
   fire: 1 << 6,
   callIn: 1 << 7,
+  smoke: 1 << 8,
+  mark: 1 << 9,
 } as const;
 
 export type ButtonName = keyof typeof Btn;
@@ -103,6 +114,8 @@ export const BUTTON_NAMES: readonly ButtonName[] = [
   'molt',
   'fire',
   'callIn',
+  'smoke',
+  'mark',
 ];
 export const BUTTON_COUNT = BUTTON_NAMES.length;
 export const BUTTON_MASK = (1 << BUTTON_COUNT) - 1;
@@ -117,6 +130,8 @@ export const BtnIndex: Readonly<Record<ButtonName, number>> = {
   molt: 5,
   fire: 6,
   callIn: 7,
+  smoke: 8,
+  mark: 9,
 };
 
 /** Ticks a kaiju button press is remembered while another action finishes (0.2 s). */

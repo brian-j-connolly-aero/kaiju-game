@@ -31,6 +31,7 @@ import { noteKaijuNoise } from './spotting';
 import { takeProp, takePropWreck } from './systems/cityDamage';
 import { applyHit, healKaiju } from './systems/damage';
 import { spawnProjectile } from './systems/projectiles';
+import { kaijuShownHeight, kaijuShownRadius } from './swim';
 import type { Hit, Kaiju, Unit, World } from './types';
 import { emit } from './worldOps';
 
@@ -463,7 +464,7 @@ export function beamTick(world: World, k: Kaiju, a: BeamSpecialDef): void {
   }
   for (const other of world.kaijus) {
     if (other === k || !other.alive) continue;
-    if (!beamTouches(beam, halfWidth, other.x, other.z, other.radius, 0, other.height)) continue;
+    if (!beamTouches(beam, halfWidth, other.x, other.z, kaijuShownRadius(other), 0, kaijuShownHeight(other))) continue;
     world.hits.push({ target: { entity: 'kaiju', id: other.id }, hit: kaijuHit(k, other.x, other.z, damage, nerve, 'beam') });
   }
 

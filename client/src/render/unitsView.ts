@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import {
   createAimPoint,
   createCastHit,
+  inSmoke,
   kaijuStageDef,
   rayVsCapsule,
   resolveAimPoint,
@@ -17,6 +18,7 @@ import {
   weaponDef,
   type CityQuery,
   type SnapKaiju,
+  type SmokeShape,
   type SnapUnit,
   type UnitTypeDef,
   type VerticalCapsule,
@@ -43,6 +45,11 @@ export interface UnitsViewContext {
   hideLocalLead: boolean;
   city: CityQuery | null;
   kaijus: SnapKaiju[];
+  /**
+   * The kaiju player's view: the smoke screens standing now. Units inside one show no marker and
+   * no laser (smoke hides them from the kaiju, sim/abilities.ts). Null for everyone else.
+   */
+  veil?: readonly SmokeShape[] | null;
 }
 
 interface Fallen {
@@ -233,7 +240,9 @@ export class UnitsView {
 
       // Marker: a cyan circle over every unit, a yellow diamond while it charges a volley.
       // (Not over the unit the player drives: they know where they are, and it would sit on the crosshair.)
-      if (!local) {
+      // The kaiju sees neither marker nor laser of a unit in smoke.
+      const veiled = !!ctx.veil && ctx.veil.length > 0 && inSmoke(ctx.veil, u.x, u.z);
+      if (!local && !veiled) {
         const size = Math.min(40, Math.max(1.6, dist * 0.022));
         const top = def.height + 1.2 + size * 0.5;
         const charging = u.laser || u.state === 'charging';
@@ -248,7 +257,7 @@ export class UnitsView {
       }
 
       // Targeting laser: from the muzzle along the aim to whatever it meets first.
-      if (u.laser && ctx.city) {
+      if (u.laser && ctx.city && !veiled) {
         const range = weaponDef(def.weapon).range;
         const oy = u.y + def.muzzleHeight;
         resolveAimPoint(ctx.city, u.x, oy, u.z, u.aimYaw, u.aimPitch, range, aim);

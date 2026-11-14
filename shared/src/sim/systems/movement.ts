@@ -5,7 +5,8 @@
  * `stepMovement`, and turns what the bodies walked through into city damage:
  * - a kaiju destroys structures up to its trample height and every prop it steps on;
  * - a wading kaiju (the titan) deals contact damage to the taller structures it pushes through;
- * - vehicles crush props; infantry walks around them.
+ * - vehicles crush props; infantry walks around them;
+ * - a swimming kaiju (sim/swim.ts) wrecks nothing at all.
  * It also points the kaiju's head: at the player's aim, within the head lead of the body, and
  * only at the special's reduced turn rate while a special (the beam) is running, with the
  * beam's own shake, pull and kick on top (`beamShake`).
@@ -22,6 +23,7 @@ import { clampAngleAround, turnToward, wrapAngle } from '../../math/angle';
 import { approach } from '../../math/scalar';
 import { beamShake, type BeamShake } from '../beam';
 import { createMoveResult, kaijuMoveParams, stepMovement, unitMoveParams, type MoveParams } from '../movement';
+import { kaijuSwimming } from '../swim';
 import type { World } from '../types';
 
 const params = {} as MoveParams;
@@ -74,6 +76,8 @@ export function movementSystem(world: World): void {
       k.act.beamSteering = false;
     }
 
+    // A swimming kaiju wrecks nothing: it passes under a bridge deck (sim/swim.ts).
+    if (kaijuSwimming(k)) continue;
     for (const id of result.trampled) {
       world.structureHits.push({ id, damage: Infinity, by: k.player, cause: 'trample' });
     }

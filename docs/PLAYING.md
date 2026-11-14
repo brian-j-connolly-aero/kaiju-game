@@ -75,13 +75,19 @@ glows for the first 20 seconds of a match.
 | --- | --- | --- |
 | Fire (also sets off your squad's volley) | Left button | Right trigger |
 | Command wheel: orders to your three other units (hold, point, let go) | Right button, or Q | Left bumper |
+| ...or tap it, point, and pick with a left click (the click does not fire) | Tap right button or Q, then left button | Tap left bumper, then right trigger |
 | Follow me / Move to / Fire at will / Hold and charge | 1 / 2 / 3 / 4 | D-pad up / right / down / left |
+| Smoke where your crosshair is (hides your squad from the monster) | G | Y |
+| Mark the monster for the whole army (crosshair on it, in sight) | R | Right bumper |
 | Artillery (stage 3 only) | E | X |
-| On the open map: move here / artillery here | Left click / right click | A / X |
+| On the open map: send your squad here | Left click | A |
+| On the open map, stage 3: artillery here | Click the artillery picture (or E), then left click; or right click | X, then A |
 | When your squad is wiped out, as a camera drone: up / down | Space / C | A / B |
 
 Your squad has one weapon (rockets at first, then a tank gun, then a troop of tanks), always on
-Fire; there is nothing to switch. The command wheel is not a weapon picker: its four pictures
+Fire; there is nothing to switch. While the command wheel is open the left button picks the
+order you are pointing at and closes the wheel; it never fires then. The picture you point at
+grows and gets a white ring. The command wheel is not a weapon picker: its four pictures
 are orders for the other three units of your squad (the three blue circles in its middle). The
 two orders they are following right now have a blue dot, and when you give a new one the two
 small order pictures at the bottom left of the screen pop.
@@ -105,7 +111,15 @@ small order pictures at the bottom left of the screen pop.
   squad's charge, the shell is your reload. The monster has a flame instead: its rage, which
   fires the beam.
 - **Colours and shapes:** cyan circles are the army, orange triangles are the monster, yellow
-  diamonds are volleys being charged. The orange eye over the monster means the army can see it.
+  diamonds are volleys being charged. The orange eye in the middle of the screen means a squad
+  leader can see the monster up close. The orange triangle over the monster (and a ring round
+  it on the map) shows only while a squad has marked it, or a squad leader has it in plain
+  sight; it is not there all the time any more.
+- **Grey clouds:** smoke. Nobody sees through it, and the monster cannot see the soldiers and
+  tanks inside it (their markers and laser lines disappear on its screen).
+- **Yellow diamonds at the edge of the monster's screen:** squads charging a volley at it, in
+  the direction they are (an arrow points at them). They grow as the charge builds, flash fast
+  when the volley is nearly ready, and blink white when it is fired.
 - **Pictures with a button, bottom right:** what you can do right now and which button does it.
 - **Subtitles:** what the radio (army) and the television news (monster) say out loud, with
   the speaker's name. The radio calls out what is happening in the fight; the news only breaks
@@ -115,7 +129,8 @@ small order pictures at the bottom left of the screen pop.
 ## Five tips for the monster
 
 1. Wreck buildings, not soldiers. Only the skyline wins; chasing tanks wastes the clock.
-2. Watch for yellow laser lines: a squad is charging a volley. Roar: every soldier and tank
+2. Watch for yellow laser lines, and the yellow diamonds at the edge of your screen: a squad is
+   charging a volley. Roar: every soldier and tank
    inside the orange shockwave flinches, loses its charge, stops firing for a few seconds and
    backs away. Or brace and face them.
 3. Face the guns. Hits on your back and sides hurt much more than hits on your front.
@@ -126,7 +141,7 @@ small order pictures at the bottom left of the screen pop.
    at squads; save the beam for a row of tall buildings. The beam bucks and pulls to one side
    as it burns: keep steering it back.
 
-## Five tips for the army
+## Six tips for the army
 
 1. Pair up. Press 4 (hold and charge), wait until the yellow lightning bar is full, then fire
    at the same moment as another squad. Say "volley now" on voice chat.
@@ -136,4 +151,7 @@ small order pictures at the bottom left of the screen pop.
 4. Spread out. A roar shakes everyone near it (no firing for a few seconds, charge gone), and
    a stomp throws squads around.
 5. Every miss lands somewhere, and the city is the monster's score. Aim at the monster, not at
-   the building behind it. At stage 3, use E or the map's right click for artillery.
+   the building behind it. At stage 3, use E for artillery, or pick it on the map and click.
+6. Press R with your crosshair on the monster to mark it for everyone: for ten seconds every
+   squad sees where it is and shoots straighter. Press G to throw smoke when it comes for your
+   parked guns: it cannot see them in the cloud. Both take half a minute to come back.

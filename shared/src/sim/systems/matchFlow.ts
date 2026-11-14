@@ -30,6 +30,7 @@ import { LAST_STAGE } from '../../defs/stages';
 import { unitTypeDef } from '../../defs/units';
 import { modMult } from '../../defs/upgrades';
 import { clamp } from '../../math/scalar';
+import { clearAbilities } from '../abilities';
 import { shoveUnit } from '../kaijuEffects';
 import { createMoveResult, stepMovement, unitMoveParams, type MoveInput, type MoveParams } from '../movement';
 import { deploySquads, findStandingRoom, setKaijuStage } from '../spawn';
@@ -116,6 +117,7 @@ export function beginStage(world: World, stage: StageId): void {
   }
   world.projectiles.length = 0;
   world.callIns.length = 0;
+  clearAbilities(world);
   deploySquads(world);
   m.phase = 'playing';
   m.phaseTime = 0;

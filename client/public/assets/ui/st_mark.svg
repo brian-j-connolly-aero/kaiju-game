@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Squad: mark the kaiju. The marker (a solid triangle pointing down) over the kaiju (a triangle), seen by everyone. -->
+  <path fill="currentColor" stroke="none" d="M20 5H44L32 20Z"/>
+  <path d="M32 30L52 59H12Z"/>
+  <path d="M8 12L4 8M56 12L60 8M10 22H4M54 22H60"/>
+</svg>

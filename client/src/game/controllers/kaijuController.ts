@@ -45,6 +45,8 @@ const MAX_LIFT = 2;
 const CHASE_PIVOT = 1.25;
 /** The lowest the chase camera goes (body heights): looking up, it slides along the ground. */
 const CHASE_FLOOR = 0.12;
+/** Swimming: the first-person eye never goes lower than this over the water (body heights). */
+const SWIM_EYE = 0.1;
 
 /**
  * The lift (body heights) that takes a chase camera at `wanted`, hanging from `pivot` above
@@ -281,6 +283,8 @@ export class KaijuController implements Controller {
       const anchor = ctx.renderer.kaijuCamAnchor(k.id);
       if (anchor) camera.position.copy(anchor);
       else camera.position.set(k.x, st.eyeHeight, k.z);
+      // Swimming, the head lies low in the water: the eyes stay just above the surface.
+      if (k.submerge > 0) camera.position.y = Math.max(camera.position.y, st.height * SWIM_EYE);
       const near = Math.max(0.08, st.height * 0.02);
       // From stage 2 on the head reaches past the body's collision circle: against a tower the
       // eye would be inside it. Hold it back, level with itself, short of the wall.

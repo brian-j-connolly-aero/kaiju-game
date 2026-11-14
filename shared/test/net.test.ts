@@ -71,8 +71,10 @@ function sampleKaiju(overrides: Partial<SnapKaiju> = {}): SnapKaiju {
     moltAvailable: true,
     wading: false,
     inWater: true,
+    submerge: 0,
     known: true,
     spotted: false,
+    marked: false,
     x: -812.375,
     z: 44.5,
     vx: 13.25,
@@ -109,6 +111,8 @@ function sampleSquad(overrides: Partial<SnapSquad> = {}): SnapSquad {
     moveTargetX: -340.5,
     moveTargetZ: 1022.5,
     callInCooldowns: [31.25, 0],
+    smokeCooldown: 12.5,
+    markCooldown: 0,
     ...overrides,
   };
 }
@@ -163,6 +167,7 @@ function sampleSnapshot(): Snapshot {
     kaijus: [sampleKaiju()],
     squads: [sampleSquad()],
     units: [sampleUnit()],
+    smokes: [{ id: 7, squad: 1, x: -120.5, z: 330.2, radius: 30, height: 28, timer: 9.25 }],
   };
 }
 
@@ -205,7 +210,7 @@ describe('snapshot codec', () => {
       const s = { ...base, kaijus: [sampleKaiju({ held })] };
       expect(decodeSnapshot(encodeSnapshot(s)).kaijus[0].held).toEqual(held);
     }
-    const kaijuFlags = ['alive', 'moltAvailable', 'wading', 'inWater', 'known', 'spotted'] as const;
+    const kaijuFlags = ['alive', 'moltAvailable', 'wading', 'inWater', 'known', 'spotted', 'marked'] as const;
     for (const flag of kaijuFlags) {
       const off = Object.fromEntries(kaijuFlags.map((f) => [f, false]));
       const k = sampleKaiju({ ...off, [flag]: true });
@@ -390,8 +395,8 @@ describe('welcome', () => {
 
 describe('input and command validation', () => {
   it('defines one bit per button', () => {
-    expect(BUTTON_COUNT).toBe(8);
-    expect(BUTTON_MASK).toBe(255);
+    expect(BUTTON_COUNT).toBe(10);
+    expect(BUTTON_MASK).toBe(1023);
     const bits = BUTTON_NAMES.map((n) => Btn[n]);
     expect(new Set(bits).size).toBe(BUTTON_COUNT);
     BUTTON_NAMES.forEach((name, i) => expect(Btn[name]).toBe(1 << i));

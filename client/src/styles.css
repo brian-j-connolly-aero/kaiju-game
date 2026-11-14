@@ -1095,6 +1095,24 @@ body {
   animation: none !important;
 }
 
+/* The kaiju player is under water, swimming (only its spines show). */
+.status-swim {
+  color: #8fd8ff;
+  font-size: 34px;
+  animation: none !important;
+}
+
+.status-swim.partial {
+  opacity: 0.45;
+}
+
+/* A squad has marked the kaiju for the whole army. */
+.status-marked {
+  color: var(--kaiju);
+  font-size: 34px;
+  animation: none !important;
+}
+
 .status-shaken,
 .status-offline,
 .status-callin {
@@ -1157,10 +1175,18 @@ body {
 }
 
 .wheel-slice.on {
-  border-color: var(--human);
-  background: rgba(30, 200, 224, 0.35);
+  border-color: #fff;
+  border-width: 4px;
+  background: rgba(30, 200, 224, 0.55);
   color: #fff;
-  transform: scale(1.15);
+  transform: scale(1.25);
+  box-shadow: 0 0 0 4px rgba(30, 200, 224, 0.6), 0 0 24px rgba(30, 200, 224, 0.8);
+}
+
+/* While one entry is pointed at, the others step back, so the pick is never in doubt. */
+.wheel.picking .wheel-slice:not(.on) {
+  opacity: 0.55;
+  transform: scale(0.92);
 }
 
 .wheel-up {
@@ -1179,9 +1205,24 @@ body {
   left: 110px;
 }
 
-.wheel-left.wheel-slice,
-.wheel-left.on {
+.wheel-left.wheel-slice {
   color: var(--volley);
+}
+
+.wheel-left.on {
+  color: #fff;
+}
+
+/* "Click to pick": the left mouse button under the hub while the wheel is open. */
+.wheel-click {
+  position: absolute;
+  left: -16px;
+  top: 34px;
+  width: 32px;
+  height: 32px;
+  font-size: 30px;
+  color: #fff;
+  opacity: 0.85;
 }
 
 .wheel-glyph {
@@ -1271,6 +1312,58 @@ body {
   cursor: crosshair;
   max-width: 96vw;
   max-height: 96vh;
+}
+
+.map canvas.calling {
+  cursor: cell;
+}
+
+/* The order a left click on the map places: the squad's marker, or (stage 3) the guns. */
+.map-tools {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.map-tool {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  color: var(--human);
+  background: var(--panel);
+  border: 3px solid var(--panel-edge);
+  cursor: pointer;
+}
+
+.map-tool.on {
+  color: #fff;
+  border-color: #fff;
+  background: rgba(30, 200, 224, 0.5);
+  transform: scale(1.12);
+}
+
+.map-tool-callin.on {
+  background: rgba(255, 217, 26, 0.45);
+}
+
+.map-tool-cover {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 0;
+  background: rgba(0, 0, 0, 0.6);
+  pointer-events: none;
 }
 
 /* --- subtitles ------------------------------------------------------------------------------ */
@@ -2025,4 +2118,60 @@ body:has(.controls:not(.hidden)) .briefing-sides {
     padding: 8px;
     gap: 5px;
   }
+}
+
+/* --- the kaiju's warnings of charging guns (ui/threats.ts) ---------------------------------- */
+
+.threats {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* One yellow diamond per squad charging at the kaiju: over the guns, or on the edge toward them. */
+.threat {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34px;
+  color: var(--volley);
+  opacity: 0.7;
+  transform: scale(var(--scale, 1));
+  filter: drop-shadow(0 2px 3px #000);
+}
+
+/* Charged past the point where a volley counts: lit, and pulsing fast. */
+.threat.hot {
+  opacity: 1;
+  animation: pulse 0.3s infinite;
+}
+
+/* The squad has just fired. */
+.threat.flash {
+  color: #fff;
+  animation: none;
+  filter: drop-shadow(0 0 10px var(--volley));
+}
+
+.threat-arrow {
+  display: none;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  border-left: 14px solid currentColor;
+  border-top: 9px solid transparent;
+  border-bottom: 9px solid transparent;
+  transform-origin: 0 0;
+  transform: rotate(var(--angle, 0rad)) translate(24px, -9px);
+}
+
+.threat.edge .threat-arrow {
+  display: block;
 }

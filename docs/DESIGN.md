@@ -214,7 +214,13 @@ Action timings are the tells. `r` = body radius for the stage.
 | Molt (hold 1 s) | Cocoon | 10 s | Only when a molt is available. |
 
 Walking over units deals trample damage (40 per second inside the body radius while moving).
-Dead at 0 hp. The kaiju sees the yellow targeting lasers of charging units.
+Dead at 0 hp. The kaiju sees the yellow targeting lasers of charging units, except those of units
+standing in smoke. In either view (it matters most in first person, where most lasers are
+beside or behind the head) each squad with guns charging at it is also a yellow diamond on the
+screen: over the guns when they are in view (first person only; third person sees the lasers),
+otherwise on the screen's edge in their direction with an arrow pointing out at them. It grows
+with the squad's charge, pulses fast from 60% (a volley that counts) and flashes white when the
+volley is fired (`client/src/ui/threats.ts`; polish pass 2).
 
 **How the verbs resolve** (as built; `shared/src/sim/systems/kaijuActions.ts` and
 `shared/src/sim/kaijuEffects.ts`). Per-action movement and turn multipliers are in the kind's
@@ -307,6 +313,35 @@ structure damage. 35 s cooldown, per player. A whole barrage on target is half a
 worth of nerve: it sets up a volley, it does not replace one (artillery never counts toward
 the two squads it takes to break the kaiju).
 
+### Smoke and marking (every squad, every level)
+
+Polish pass 2, after the owner's second set of notes ("allow all human players to do
+smoke/marking"). Neither is in `docs/requirements.md`; it lists spotting as the Air faction's
+strength (Tier 2), which this does not replace. Numbers in `SQUAD_ABILITIES`
+(`shared/src/defs/rules.ts`), rules in `shared/src/sim/abilities.ts`.
+
+- **Smoke (G / Y).** Thrown at the ground point under the crosshair, no further than 45 / 130 /
+  260 m from the leader by stage (straight ahead at that range with the crosshair on the sky).
+  A cloud 12 / 30 / 60 m in radius and 10 / 28 / 55 m high that stands for 14 s. No sight line
+  passes through it, either way: not the squads' spotting and map, not the kaiju bot's eyes.
+  Units standing in it are hidden from the kaiju: the kaiju bot does not pick them for
+  anything (lasers, dashes, the beam, throws, roars; it only finds one it bumps into, within
+  1.5 body radii), and the kaiju player's picture and map leave out their markers and lasers.
+  Shells, claws and blasts pass through smoke as through air. 30 s cooldown per squad; at most
+  12 clouds stand in a match (the oldest goes).
+- **Mark (R / RB).** With the kaiju in the leader's sight (no building and no smoke in between)
+  within 260 / 650 / 1300 m by stage and the crosshair on its body or within 1.5 body radii of
+  it, the leader marks it for 10 s: it is known (on every squad's map, at stage 1 too) and
+  spotted (scatter ×0.7) for every squad. 30 s cooldown per squad. A press with no kaiju to mark
+  does nothing and spends nothing.
+- Both cool down in the HUD's action pictures and come back ready at every new stage; the molt
+  clears every cloud and mark.
+- **The orange triangle over the kaiju** (the humans' 3D view, far away) shows only while the
+  kaiju is marked (larger, pulsing) or spotted by the spotting rules (a squad leader has it in
+  sight within 150 m); before this pass it floated over it whenever the map knew where it was,
+  which at stages 2 and 3 is always. The map is unchanged (it shows the kaiju when it is known)
+  and rings a marked kaiju.
+
 ### Commands (radial wheel of four pictograms)
 
 - **Follow me:** sub-units keep formation behind the leader.
@@ -334,8 +369,8 @@ units are rooted until they fire or get a new movement order.
 structures (adds to the bar), ground, or nothing. No friendly fire between human units.
 
 **Scatter multipliers** (aim error and artillery scatter): ×0.6 if the target is slowed,
-staggered or cocooned; ×0.7 if spotted (a player-driven unit has line of sight within 150 m; the
-Air faction widens this in Tier 2); ×1.0 / 0.8 / 0.6 by kaiju stage.
+staggered or cocooned; ×0.7 if spotted (a player-driven unit has line of sight within 150 m, or
+a squad has marked it; the Air faction widens this in Tier 2); ×1.0 / 0.8 / 0.6 by kaiju stage.
 
 **Lives:** when the driven unit dies, the player takes over a surviving sub-unit. When all four
 are gone the player is out until the next molt and gets a free-flying news drone camera (Tier 2:
@@ -432,9 +467,14 @@ photos for the front page).
   a standing deck has hit the bridge, and explosions beside it damage it like any structure.
 
 **Map view:** toggles a top-down city map at any time. The game does not pause; the player's
-unit idles. Shows bounds, rubble, friendly units, and the kaiju when it is known (always at
-stages 2 and 3; at stage 1 only while a human unit has line of sight within 250 m, or for 3 s
-after it roars, stomps or wrecks something). Move-to and call-in markers can be placed on the map.
+unit idles. Shows bounds, rubble, friendly units, smoke clouds, and the kaiju when it is known
+(always at stages 2 and 3; at stage 1 only while a human unit has line of sight within 250 m,
+for 3 s after it roars, stomps or wrecks something, or while a squad has marked it), with a
+ring round it while it is marked. Move-to and call-in markers can be placed on the map: a left
+click places the order picked in the picker at the map's left side, which is the move-to
+marker unless the artillery picture has been picked (it is there at stage 3 only; a click on it,
+or the call-in button, picks it, and it goes back to move-to after one call). The confirm button
+(A, Space) places the picked order at the map cursor. A right click still calls the guns at once.
 
 ### Bots
 
@@ -459,13 +499,17 @@ tick behind what it saw, and plays any slot it is handed at any moment.
   have no clear line, drives away when the kaiju comes within 30% of range, and searches (last
   known position, then around) while a hatchling is off the map. Into a staggered or cocooned
   kaiju it fires as fast as the guns load. At level 3 it marks artillery a little ahead of the
-  kaiju whenever the battery is ready, anywhere in the city.
+  kaiju whenever the battery is ready, anywhere in the city. It marks the kaiju when it has it
+  in sight and in the crosshair and nobody has marked it, at stage 1 or when its squad is at
+  least half charged (so the mark helps the volley). It throws smoke on its squad, a little
+  toward the kaiju, when the kaiju comes within 35% of range, or when it is parked with at
+  least half its guns charging and the kaiju is coming at it within 55% of range.
 - **Kaiju bot.** It goes for whatever standing structure (or car) pays best for the time it
   takes to reach and bring down, walks through what it tramples, swipes what it must, stomps
   when several things stand around it, and smashes what is in its way. It fights units that
   come close, takes revenge on the nearest squad for 10 s after a stagger, dashes at charging
   guns within reach for a few seconds when lasers are on it (they have to pack up and run),
-  roars at guns charging inside its roar, braces when four charged lasers are on it (2.5 s at
+  roars at guns charging inside its roar (none of this counts a unit standing in smoke), braces when four charged lasers are on it (2.5 s at
   most, then not again for 6 s), throws what is at hand at a squad in range, turns the beam on
   units in reach (else on something big), eats below 70% health, and when the molt is offered
   looks for ground where fewer guns can see it and where its next body will have room, for
@@ -541,9 +585,13 @@ shortcut that a page cannot cancel).
 | Kaiju: molt (hold 1 s, when a molt is there) | F | B |
 | Squad: fire (also the volley's trigger) | Left button | RT |
 | Squad: command wheel (hold, point, let go): orders to the three other units | Right button or Q | LB |
+| Squad: the open wheel's entry, by a click (the click does not fire) | Left button | RT |
 | Squad: follow me, move to, fire at will, hold and charge | 1, 2, 3, 4 | D-pad up, right, down, left |
+| Squad: smoke at the crosshair | G | Y |
+| Squad: mark the kaiju in the crosshair | R | RB |
 | Squad: artillery call-in (stage 3) | E | X |
-| On the map: move-to here, call-in here | Left click (or Space at the map cursor), right click | A, X |
+| On the map: the picked order here (move-to, or the guns once picked) | Left click (or Space at the map cursor) | A |
+| On the map: pick the guns (stage 3); the guns here at once | E or a click on their picture; right click | X |
 | Drone: up, down | Space, C | A, B |
 | Map | M or Tab | Back |
 | Camera (first or third person) | V | Right stick click |
@@ -551,10 +599,21 @@ shortcut that a page cannot cancel).
 | Controls card | H or Enter | Left stick click |
 
 **What a squad player can do.** A squad has no weapon choice: the driven unit has the one weapon
-of its level (rockets, a tank gun, a troop's guns) on Fire, plus the artillery call-in at stage 3.
+of its level (rockets, a tank gun, a troop's guns) on Fire, plus smoke and the mark at every
+stage and the artillery call-in at stage 3.
 The command wheel's four entries are orders to the squad's three other units, not weapons; its
 hub shows those three as cyan circles, and the two orders in force (one movement, one fire mode)
 carry a cyan dot. A new order makes the standing-orders pictures at the bottom left pop once.
+
+**Picking from the wheel** (polish pass 2: "block firing to allow selection with left mouse
+while the com wheel is open"). Held: hold the wheel button, point, let go. While the wheel is
+open the fire button (left mouse button, RT) picks the entry pointed at and closes the wheel;
+it fires nothing, and the shot only comes back once that button has been let go. A tap of the
+wheel button shorter than 0.3 s with nothing pointed at leaves the wheel open: point, then
+click (or press the wheel button again). The number keys give their order at any time and close
+it. The pointer moves 3 wheel radii per radian of mouse look and picks beyond 0.35 of a radius;
+the entry pointed at grows, gets a white ring and the others step back; the fire button's glyph
+sits under the hub while it is open.
 
 **The controls card** (`client/src/ui/controlsCard.ts`) teaches all of this without words:
 every control of the player's role, each as the button's glyph on the device in use (it

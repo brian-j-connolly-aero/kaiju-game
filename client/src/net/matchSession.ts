@@ -31,6 +31,7 @@ import {
   type SimEvent,
   type SnapKaiju,
   type SnapMatch,
+  type SnapSmoke,
   type SnapSquad,
   type SnapUnit,
   type Snapshot,
@@ -58,6 +59,8 @@ export interface FrameState {
   kaijus: SnapKaiju[];
   squads: SnapSquad[];
   units: SnapUnit[];
+  /** Smoke clouds standing now (sim/abilities.ts). */
+  smokes: SnapSmoke[];
   /** Playable bounds of the stage being shown. */
   bounds: Bounds;
   /** The unit the local player drives (already at its predicted position), or null. */
@@ -255,7 +258,7 @@ export class MatchSession {
   private kaijuParams(k: SnapKaiju, bounds: Bounds, now: number): MoveParams {
     let state: KaijuMoveState = k;
     const hint = this.predictedHint(k, now);
-    if (hint) state = { kind: k.kind, stage: k.stage, nerve: k.nerve, action: hint.verb, phase: 'windup' };
+    if (hint) state = { kind: k.kind, stage: k.stage, nerve: k.nerve, action: hint.verb, phase: 'windup', submerge: k.submerge };
     return kaijuMoveParams(state, bounds, undefined, this.params);
   }
 
@@ -311,6 +314,8 @@ export class MatchSession {
   private updateHint(buttons: number, k: SnapKaiju, now: number, seq: number): void {
     const pressed = buttons & ~this.lastButtons;
     if (pressed === 0 || k.phase !== 'idle' || !k.alive || this.hint) return;
+    // In the water a press only brings it up first (sim/swim.ts): nothing to show ahead of the server.
+    if (k.submerge > 0) return;
     // The view is still showing the tail of the last action: a hint now would be cut off by it.
     const drawn = this.frame?.localKaiju;
     if (drawn && drawn.phase !== 'idle') return;
@@ -368,6 +373,7 @@ export class MatchSession {
       kaijus: sampled.kaijus,
       squads: snap.squads,
       units: sampled.units,
+      smokes: snap.smokes,
       bounds: this.boundsFor(snap.match.stage),
       localUnit: null,
       localKaiju: null,

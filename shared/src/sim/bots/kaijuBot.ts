@@ -14,6 +14,9 @@
  * - Eating when hurt, from the hand, from within reach, or after a short walk to a car.
  * - The molt: when it may, it looks for a place where fewer guns can see it, for a few seconds
  *   at most, and cocoons there.
+ * - Swimming (sim/swim.ts): in trouble (its nerve near breaking, badly hurt) with deep water
+ *   close by, it slips into the water and swims away from the squads for a few seconds, then
+ *   goes back to work (it earns nothing in the water).
  *
  * It is deliberately beatable: it reacts to what is on top of it, never plans a route, and can
  * be baited away from the city by a squad that knows how.
@@ -37,9 +40,11 @@ import { boundsContains, circleInArc, obbInArc } from '../../math/geom';
 import { clamp, lerp } from '../../math/scalar';
 import type { Vec3 } from '../../math/vec';
 import { Btn, MAX_AIM_PITCH } from '../../net/input';
+import { hiddenFromKaiju } from '../abilities';
 import { findEdible, findGrabTarget } from '../kaijuEffects';
 import { laserOnKaiju } from '../squads';
 import { unitSeesKaiju } from '../spotting';
+import { canSwimAt, deepWaterAt, swimDef } from '../swim';
 import type { Kaiju, PlayerState, Unit, World } from '../types';
 import { beginBotInput, botHandicap, busyWith, heldButtons, hesitates, press, releaseAll } from './common';
 import type { BotState } from './types';
@@ -94,7 +99,8 @@ function lookAtSquads(world: World, k: Kaiju, bs: BotState): void {
   for (const u of world.units) {
     if (!u.alive) continue;
     if (!exposed && unitSeesKaiju(world, u, k, weaponRangeOf(world, u))) exposed = true;
-    if (!laserOnKaiju(world, u, k)) continue;
+    // A gun in smoke is not there as far as the kaiju can tell, laser and all.
+    if (!laserOnKaiju(world, u, k) || hiddenFromKaiju(world, u)) continue;
     lasers++;
     if (u.charge > charge) charge = u.charge;
     const d = Math.hypot(u.x - k.x, u.z - k.z) || 1;
@@ -313,6 +319,100 @@ function steer(world: World, k: Kaiju, bs: BotState, gx: number, gz: number, all
 }
 
 // ---------------------------------------------------------------------------------------------
+// Swimming away (sim/swim.ts)
+// ---------------------------------------------------------------------------------------------
+
+const SWIM_RINGS = 4;
+const SWIM_SPOKES = 16;
+
+/** Distance from (x, z) to the nearest living unit. */
+function unitDistance(world: World, x: number, z: number): number {
+  let best = Infinity;
+  for (const u of world.units) {
+    if (!u.alive) continue;
+    const d = Math.hypot(u.x - x, u.z - z);
+    if (d < best) best = d;
+  }
+  return best;
+}
+
+/** True when the straight line from a to b runs through water deep enough all the way (every 3 m). */
+function deepAllTheWay(world: World, ax: number, az: number, bx: number, bz: number, fit: number): boolean {
+  const d = Math.hypot(bx - ax, bz - az);
+  const n = Math.max(1, Math.ceil(d / 3));
+  for (let i = 1; i <= n; i++) {
+    if (!deepWaterAt(world.cityQuery, ax + ((bx - ax) * i) / n, az + ((bz - az) * i) / n, fit)) return false;
+  }
+  return true;
+}
+
+/**
+ * Where to swim: on dry land, the deep water nearest to it that is far from the squads; in the
+ * water, the stretch it can swim to in a straight line that is farthest from every unit.
+ * Writes bs.swimX, bs.swimZ; false when there is no such water.
+ */
+function chooseSwimPoint(world: World, k: Kaiju, bs: BotState, inWaterNow: boolean): boolean {
+  const swim = swimDef(k.kind, k.stage);
+  if (!swim) return false;
+  const fit = perStage(swim.fitRadii, k.stage) * k.radius;
+  const b = world.match.bounds;
+  const reach = (inWaterNow ? perStage(R.swimLegRadii, k.stage) : perStage(R.swimSearchRadii, k.stage)) * k.radius;
+  let best = -Infinity;
+  let found = false;
+  for (let ring = 1; ring <= SWIM_RINGS; ring++) {
+    const d = (reach * ring) / SWIM_RINGS;
+    for (let i = 0; i < SWIM_SPOKES; i++) {
+      const a = ((i + (ring % 2) * 0.5) / SWIM_SPOKES) * Math.PI * 2;
+      const x = k.x + Math.sin(a) * d;
+      const z = k.z + Math.cos(a) * d;
+      // Getting in, a point a little way out from the bank, so that it is under when it gets there.
+      const need = inWaterNow ? fit : fit + Math.min(0.5 * k.radius, 2);
+      if (!boundsContains(b, x, z, k.radius + 1) || !deepWaterAt(world.cityQuery, x, z, need)) continue;
+      if (inWaterNow && !deepAllTheWay(world, k.x, k.z, x, z, fit)) continue;
+      // In the water: as far from the guns as it can get. Getting in: near, and not into them.
+      const score = Math.min(unitDistance(world, x, z), 400) - (inWaterNow ? 0 : d * 1.5);
+      if (score > best) {
+        best = score;
+        bs.swimX = x;
+        bs.swimZ = z;
+        found = true;
+      }
+    }
+  }
+  return found;
+}
+
+/**
+ * Whether it is swimming away this tick (then bs.swimX, bs.swimZ is where to go). It starts
+ * under pressure when there is deep water within reach, and stops after R.swimMax seconds.
+ */
+function swimAway(world: World, k: Kaiju, bs: BotState, thinking: boolean): boolean {
+  if (bs.swimRest > 0) bs.swimRest -= DT;
+  if (!swimDef(k.kind, k.stage)) {
+    bs.swimFor = 0;
+    return false;
+  }
+  if (bs.swimFor <= 0) {
+    if (!thinking || bs.swimRest > 0 || k.held) return false;
+    const pressure = k.nerve >= R.swimNerve * kaijuKindDef(k.kind).nerveCapacity || (bs.exposed && k.hp < k.maxHp * R.swimBelow);
+    if (!pressure || !chooseSwimPoint(world, k, bs, canSwimAt(world.cityQuery, k, k.x, k.z))) return false;
+    bs.swimFor = R.swimMax;
+  }
+  bs.swimFor -= DT;
+  if (bs.swimFor <= 0) {
+    // Long enough: back to work, and not into the water again for a while.
+    bs.swimFor = 0;
+    bs.swimRest = R.swimRest;
+    bs.goal = 'none';
+    return false;
+  }
+  const inWaterNow = canSwimAt(world.cityQuery, k, k.x, k.z);
+  const arrived = Math.hypot(bs.swimX - k.x, bs.swimZ - k.z) < Math.max(3, k.radius);
+  if (inWaterNow && (thinking || arrived)) chooseSwimPoint(world, k, bs, true);
+  return true;
+}
+
+// ---------------------------------------------------------------------------------------------
 // Striking
 // ---------------------------------------------------------------------------------------------
 
@@ -406,6 +506,8 @@ function nearestUnit(world: World, k: Kaiju): { unit: Unit | null; dist: number 
   for (const u of world.units) {
     if (!u.alive) continue;
     const d = Math.hypot(u.x - k.x, u.z - k.z) - u.radius;
+    // In smoke it is only found by bumping into it.
+    if (d > k.radius * R.smokeFeelRadii && hiddenFromKaiju(world, u)) continue;
     if (d < dist) {
       dist = d;
       unit = u;
@@ -428,7 +530,7 @@ function beamUnit(world: World, k: Kaiju, st: KaijuStageDef, range: number, nx: 
     if (!u.alive) continue;
     const away = Math.hypot(u.x - k.x, u.z - k.z);
     // The beam starts at the mouth, ahead of the body: what stands under its chin is out of it.
-    if (away > range || away <= st.mouthForward + u.radius) continue;
+    if (away > range || away <= st.mouthForward + u.radius || hiddenFromKaiju(world, u)) continue;
     const d = Math.hypot(u.x - nx, u.z - nz);
     if (d >= bestD) continue;
     // The mouth, with the head turned toward this unit.
@@ -559,6 +661,22 @@ export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
   if (bs.goal === 'hide') bs.goal = 'none';
   bs.hideFor = 0;
 
+  // --- Swimming away: under pressure, with deep water near, it slips in and swims off ----------
+  if (swimAway(world, k, bs, thinking)) {
+    // No buttons: any of them would bring it up again.
+    releaseAll(bs);
+    moveYaw = steer(world, k, bs, bs.swimX, bs.swimZ, -1);
+    input.aimYaw = moveYaw;
+    input.aimPitch = 0;
+    input.moveZ = Math.hypot(bs.swimX - k.x, bs.swimZ - k.z) > 1 ? 1 : 0;
+    // Short of deep water, keep going (the bank may stand between it and the point).
+    if (input.moveZ === 0 && !canSwimAt(world.cityQuery, k, k.x, k.z)) input.moveZ = 1;
+    // On the way to the water it smashes what it does not walk round, as when it hides.
+    if (k.submerge <= 0 && !k.held && !st.wadesTall && canAct(k) && wallAhead(world, k, st, moveYaw) >= 0) strike(world, k, bs, def, st, k.aimYaw);
+    input.buttons = heldButtons(bs);
+    return;
+  }
+
   // --- Bracing against a charged volley ---------------------------------------------------------
   if (bs.bracing > 0 || (bs.lasers >= R.braceLasers && bs.laserCharge >= R.braceCharge && bs.braceRest <= 0 && k.phase === 'idle')) {
     bs.bracing += DT;
@@ -580,7 +698,7 @@ export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
     let inside = 0;
     let charging = 0;
     for (const u of world.units) {
-      if (!u.alive || Math.hypot(u.x - k.x, u.z - k.z) > radius) continue;
+      if (!u.alive || Math.hypot(u.x - k.x, u.z - k.z) > radius || hiddenFromKaiju(world, u)) continue;
       inside++;
       if (u.rooted && u.charge > 0.3) charging++;
     }
@@ -662,7 +780,7 @@ export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
     const range = perStage(R.rushRange, k.stage);
     let best = range;
     for (const u of world.units) {
-      if (!u.alive || !u.rooted) continue;
+      if (!u.alive || !u.rooted || hiddenFromKaiju(world, u)) continue;
       const d = Math.hypot(u.x - k.x, u.z - k.z);
       if (d < best) {
         best = d;

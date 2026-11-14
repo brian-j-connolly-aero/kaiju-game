@@ -324,13 +324,17 @@ describe('what each side hears (VOICE_SIDE_RULES)', () => {
     let cues = 0;
     let anchor = 0;
     let radio = 0;
+    const heard = new Set<string>();
     const { world } = runBotMatch({
       seed: 1,
       onTick: (_w, events) => {
         for (const e of events) {
           if (e.type !== 'voice' || e.cue === 'match.briefing') continue;
           cues++;
-          if (e.lines.kaiju.length > 0) anchor++;
+          if (e.lines.kaiju.length > 0) {
+            anchor++;
+            heard.add(e.cue);
+          }
           if (e.lines.humans.length > 0) radio++;
         }
       },
@@ -339,7 +343,13 @@ describe('what each side hears (VOICE_SIDE_RULES)', () => {
     // Before this pass both sides spoke for every cue: about 13 lines a minute each.
     expect(cues / minutes).toBeGreaterThan(10);
     expect(anchor / minutes).toBeLessThan(1.6);
-    expect(anchor).toBeGreaterThan(5);
+    // The news still has its say: every one of its cues that this match came to was heard (a
+    // match that ends at stage 2 has fewer of them than one that goes the distance).
+    const ending = world.match.winner === 'kaiju' ? 'end.kaiju' : `end.humans.${world.match.endReason}`;
+    const must = ['match.start', ending, world.match.winner === 'kaiju' ? 'hearing.kaiju.win' : 'hearing.humans.win'];
+    for (let stage = 2; stage <= world.match.stage; stage++) must.push('molt.available', `stage.${stage}`);
+    for (const cue of must) expect(heard, cue).toContain(cue);
+    expect(anchor).toBeGreaterThanOrEqual(new Set(must).size);
     expect(radio / cues).toBeLessThan(0.6);
     expect(radio / cues).toBeGreaterThan(0.4);
   });

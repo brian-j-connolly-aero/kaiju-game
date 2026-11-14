@@ -164,6 +164,7 @@ export function createActionMemory(): KaijuActionMemory {
     beamPitch: 0,
     beamSeed: 0,
     crossfireTick: -1e9,
+    swimPress: 0,
   };
 }
 
@@ -173,6 +174,9 @@ export function setKaijuStage(k: Kaiju, stage: StageId): void {
   k.stage = stage;
   k.radius = st.bodyRadius;
   k.height = st.height;
+  // A new body stands up out of whatever it was in.
+  k.submerge = 0;
+  k.swimSettle = 0;
 }
 
 export function createKaiju(id: number, slot: PlayerSlot, x: number, z: number, yaw: number): Kaiju {
@@ -213,9 +217,12 @@ export function createKaiju(id: number, slot: PlayerSlot, x: number, z: number, 
     upgrades: [],
     wading: false,
     inWater: false,
+    submerge: 0,
+    swimSettle: 0,
     known: false,
     knownTimer: 0,
     spotted: false,
+    marked: 0,
     recentHits: [],
     volleyHits: [],
   };
@@ -280,6 +287,8 @@ export function createSquad(world: World, slot: PlayerSlot): Squad {
     moveTarget: { x: 0, z: 0 },
     fireMode: 'atWill',
     callInCooldowns: [],
+    smokeCooldown: 0,
+    markCooldown: 0,
     upgrades: [],
     mods: emptyMods(),
     eliminated: false,
@@ -312,6 +321,8 @@ export function refillSquad(world: World, squad: Squad, stage: StageId): void {
   squad.orderBudget = SQUAD_RULES.orderBurst;
   squad.pendingOrders.length = 0;
   squad.callInCooldowns = levelDef.callIns.map(() => 0);
+  squad.smokeCooldown = 0;
+  squad.markCooldown = 0;
   squad.trail.length = 0;
   squad.formed = false;
   squad.volleyReady = false;

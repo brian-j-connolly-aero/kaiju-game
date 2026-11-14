@@ -151,10 +151,12 @@ marks). No text inside icons. No third-party icon sets.
 
 - Commands: `cmd_follow`, `cmd_moveto`, `cmd_fireatwill`, `cmd_holdcharge`.
 - Kaiju verbs: `k_swipe`, `k_stomp`, `k_grab`, `k_throw`, `k_eat`, `k_brace`, `k_roar`,
-  `k_special`, `k_molt`.
+  `k_special`, `k_molt`, `k_swim` (swimming: a row of spines over the waves; the HUD shows it
+  while the kaiju is under water, and the controls card pairs it with deep water).
 - Status: `st_health`, `st_nerve`, `st_rage`, `st_charge`, `st_reload` (one shell: the reload
   meter and the player's own shot), `st_veteran`, `st_spotted`, `st_crossfire`, `st_callin`,
-  `st_shaken`, `st_map`, `st_camera`, `st_sun`, `st_moon`.
+  `st_shaken`, `st_map`, `st_camera`, `st_sun`, `st_moon`, `st_smoke` (a squad's smoke: a
+  canister and its cloud), `st_mark` (mark the kaiju: the marker over a kaiju triangle).
 - Lobby: `lb_kaiju`, `lb_human`, `lb_ready`, `lb_host`, `lb_bot`, `lb_link`, `lb_play`, `lb_back`,
   `lb_create`, `lb_join`.
 - Factions: `fac_army`, `fac_air`, `fac_science`, `fac_faith`.

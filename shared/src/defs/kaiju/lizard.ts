@@ -86,6 +86,26 @@ export const LIZARD: KaijuKindDef = {
   reverseSpeedMult: 0.6,
   trampleDps: 40,
 
+  // Swimming (DESIGN.md section 4, "Swimming"; owner's note after the second playtest: "Gragnor
+  // should be able to swim in the river, still hittable but only a few spines exposed").
+  swim: {
+    // The hatchling and the juvenile; the titan is too big for any water and wades as before.
+    stages: [true, true, false],
+    // A hatchling needs 3.6 m of water across, a juvenile 6.3 m: enough for it to lie low in the
+    // Old Moat (20 m) with its flanks against the banks; the river and the bay are far wider.
+    fitRadii: [0.75, 0.35, 0],
+    diveTime: 1.0,
+    surfaceTime: 0.6,
+    settleTime: 1.5,
+    // 9.4 m/s at stage 1 (wading: 4.3), 15.4 m/s at stage 2 (wading: 11.9).
+    speedMult: 1.1,
+    turnMult: 0.8,
+    // 0.6 m of spines over a 2.6 m spread at stage 1; 4.5 m over a 9.9 m spread at stage 2.
+    exposedHeight: 0.14,
+    exposedRadius: 0.55,
+    sightMult: 0.4,
+  },
+
   actions: {
     swipe: {
       id: 'swipe',

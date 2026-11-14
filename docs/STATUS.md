@@ -1610,3 +1610,43 @@ controls back up??", and, as a squad, "Commo rose opened but I only ever could u
   over-the-shoulders view; levers `CHASE_PIVOT`, `CHASE_FLOOR` and the distance in
   `placeChase`). Movement in first person is still relative to the wanted heading, not the
   clamped head, as before. If the owner still wants weapon choice, that is a design change.
+
+## Polish pass 2: wheel and map clicks, smoke and marking, the monster's warnings (14 November, the squad-controls task)
+
+The owner's second set of notes, the squad side and the monster's first-person view. (The
+monster's swim and travel mode is another engineer's, in its own section.)
+
+- **Command wheel: the left button picks.** *Cause:* the wheel only took an order when its
+  button was let go; a left click while it was open fired the weapon. The "hold and charge"
+  picture is always drawn yellow (the volley colour) and the real highlight was a faint cyan
+  ring, so it looked as if entry 4 were stuck highlighted. The mouse path under pointer lock was
+  checked and works (a unit test feeds `movementX` / `movementY` through the real input manager
+  and controller: the highlight moves right, left, up and down). *Change*
+  (`client/src/game/controllers/humanController.ts`, `ui/commandWheel.ts`, `styles.css`): while
+  the wheel is open the fire button picks the entry pointed at and closes the wheel, and fires
+  nothing until it is let go; a quick tap of the wheel button leaves the wheel open to point and
+  click; the number keys close it. The entry pointed at grows with a white ring and glow, the
+  others fade, and the fire button's glyph sits under the hub. The pointer is a little faster.
+- **Map: left click places the order.** A picker at the map's left side (move-to, and the
+  artillery from stage 3, with its cooldown) chooses what a left click places; the call-in
+  button picks the artillery too, and it goes back to move-to after one call. Right click still
+  calls the guns at once; the confirm button places the picked order at the map cursor (on a
+  controller: X then A, where X alone used to call the guns).
+- **Smoke and marking for every squad** (`shared/src/sim/abilities.ts`, `SQUAD_ABILITIES` in
+  `defs/rules.ts`; DESIGN.md section 5, "Smoke and marking"). Not in the owner's design doc
+  before this (it gives spotting to the Air faction, Tier 2); nothing of it existed in the code.
+  Smoke (G / Y): a cloud at the crosshair that blocks every sight line and hides the guns in it
+  from the monster (the bot ignores them; the monster player's picture and map drop their
+  markers and lasers), 14 s, every 30 s. Mark (R / RB): with the monster in sight and in the
+  crosshair, every squad knows where it is and shoots straighter for 10 s, every 30 s. The
+  orange triangle over the monster now shows only while it is marked or a leader has it in
+  plain sight. Bots use both. Contract changes: two input buttons, snapshot version 2 (marked
+  flag, two cooldowns, the clouds), `smoke` and `mark` events (ARCHITECTURE.md).
+- **Monster in first person: warnings of charging guns** (`client/src/ui/threats.ts`): one
+  yellow diamond per squad charging at it, over the guns or on the screen's edge with an arrow
+  toward them; it grows with the charge, pulses from 60% and flashes when the volley is fired.
+- **Checked.** `npm run check`; `npm run build`; new tests `shared/test/abilities.test.ts` and
+  `client/test/squadControls.test.ts`; `tools/playtest/scripted.mjs` now also picks wheel
+  entries with a left click (held and tapped wheel) and checks that no shot leaves, throws
+  smoke, marks the monster, checks the map picker and the left-click marker, and looks for the
+  monster's warnings in first person. Balance: see below.

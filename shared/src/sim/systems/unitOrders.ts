@@ -4,11 +4,13 @@
  * The player drives one unit of the squad (the input system has already copied their stick,
  * aim and trigger onto it). This system runs everything else about a squad:
  *
- * - Perception first: `updateSpotting` refreshes `kaiju.spotted` and `kaiju.known`.
+ * - Perception first: smoke clouds and marks wear off (`updateAbilities`), then
+ *   `updateSpotting` refreshes `kaiju.spotted` and `kaiju.known`.
  * - Lives: when the driven unit is dead and others live, the player takes over the nearest
  *   survivor (`takeover`). (The damage system marks the squad eliminated when the last one dies.)
  * - Commands from `player.commands`. The movement order ('follow' / 'moveTo') and the fire mode
- *   ('atWill' / 'charge') are independent; a call-in request starts a mission if it is ready.
+ *   ('atWill' / 'charge') are independent; a call-in request starts a mission if it is ready,
+ *   and smoke and a mark are thrown or set if they are (sim/abilities.ts).
  *   Wheel orders cost planning (hold points, routes), so a squad carries them out from a small
  *   budget (`takeOrders`): a few at once, then a few a second, the newest of each kind first
  *   in line. However many commands a client sends, the work per squad is bounded.
@@ -56,6 +58,7 @@ import { projectileTypeDef, weaponDef } from '../../defs/weapons';
 import { angleDist, clampAngleAround, turnToward, yawFromTo, yawOf } from '../../math/angle';
 import { approach, clamp } from '../../math/scalar';
 import type { Vec2, Vec3 } from '../../math/vec';
+import { markKaiju, throwSmoke, updateAbilities } from '../abilities';
 import { createAimPoint, resolveAimPoint } from '../aim';
 import type { SquadCommand } from '../commands';
 import { setWorldMove } from '../movement';
@@ -70,6 +73,7 @@ import {
   updateTrail,
 } from '../squads';
 import type { Squad, Unit, World } from '../types';
+import { kaijuShownHeight } from '../swim';
 import { emit } from '../worldOps';
 import { say } from './voice';
 
@@ -153,7 +157,7 @@ function holdAndCharge(world: World, squad: Squad, u: Unit): void {
     const type = unitTypeDef(u.type);
     const d = Math.hypot(k.x - u.x, k.z - u.z);
     yaw = clampAngleAround(yawFromTo(u.x, u.z, k.x, k.z), u.arcYaw, COMBAT_RULES.chargeHalfArc);
-    pitch = Math.atan2(k.height * SQUAD_RULES.aimHeights[0] - (u.y + type.muzzleHeight), Math.max(d, 1e-6));
+    pitch = Math.atan2(kaijuShownHeight(k) * SQUAD_RULES.aimHeights[0] - (u.y + type.muzzleHeight), Math.max(d, 1e-6));
   }
   const step = SQUAD_RULES.aimTurnRate * DT;
   c.aimYaw = clampAngleAround(turnToward(c.aimYaw, yaw, step), u.arcYaw, COMBAT_RULES.chargeHalfArc);
@@ -234,6 +238,12 @@ function applyCommand(world: World, squad: Squad, leader: Unit, c: SquadCommand)
     case 'callIn':
       startCallIn(world, squad, leader, c);
       return;
+    case 'smoke':
+      throwSmoke(world, squad, leader, c.x, c.z);
+      return;
+    case 'mark':
+      markKaiju(world, squad, leader, leader.control.aimYaw, leader.control.aimPitch);
+      return;
   }
   const parked = squad.moveOrder === 'follow';
   for (const id of squad.units) {
@@ -262,8 +272,8 @@ interface OrderTick {
 }
 
 /**
- * Takes this tick's commands for a squad. Call-ins go straight through (their cooldown is the
- * limit). Wheel orders join the squad's short queue, where a newer movement order replaces an
+ * Takes this tick's commands for a squad. Call-ins, smoke and marks go straight through (their
+ * cooldown is the limit). Wheel orders join the squad's short queue, where a newer movement order replaces an
  * older one that has not been carried out yet and a newer fire mode an older fire mode, and
  * are carried out in the order they came as far as the squad's order budget reaches
  * (SQUAD_RULES.orderBurst at once, refilled at ordersPerSecond). Every order plans afresh for
@@ -275,7 +285,7 @@ function takeOrders(world: World, squad: Squad, leader: Unit, commands: readonly
   squad.orderBudget = Math.min(SQUAD_RULES.orderBurst, squad.orderBudget + SQUAD_RULES.ordersPerSecond * DT);
   const pending = squad.pendingOrders;
   for (const c of commands) {
-    if (c.type === 'callIn') {
+    if (c.type === 'callIn' || c.type === 'smoke' || c.type === 'mark') {
       applyCommand(world, squad, leader, c);
       continue;
     }
@@ -442,7 +452,7 @@ function findShot(world: World, squad: Squad, u: Unit): boolean {
       mark.x = k.x + k.vx * t;
       mark.z = k.z + k.vz * t;
       for (let h = 0; h < SQUAD_RULES.aimHeights.length; h++) {
-        mark.y = k.height * SQUAD_RULES.aimHeights[h];
+        mark.y = kaijuShownHeight(k) * SQUAD_RULES.aimHeights[h];
         if (castSegment(world.cityQuery, muzzle, mark, undefined, -1, true)) continue;
         nav.shotAt = k.id;
         nav.shotHeight = h;
@@ -462,7 +472,7 @@ function findShot(world: World, squad: Squad, u: Unit): boolean {
   const tx = k.x + k.vx * t;
   const tz = k.z + k.vz * t;
   want.yaw = yawFromTo(u.x, u.z, tx, tz);
-  want.pitch = Math.atan2(k.height * SQUAD_RULES.aimHeights[nav.shotHeight] - muzzle.y, Math.max(Math.hypot(tx - u.x, tz - u.z), 1e-6));
+  want.pitch = Math.atan2(kaijuShownHeight(k) * SQUAD_RULES.aimHeights[nav.shotHeight] - muzzle.y, Math.max(Math.hypot(tx - u.x, tz - u.z), 1e-6));
   return true;
 }
 
@@ -543,6 +553,8 @@ function orderSubUnit(world: World, squad: Squad, leader: Unit, u: Unit, rank: n
 
 export function unitOrderSystem(world: World): void {
   if (world.match.phase !== 'playing') return;
+  // Clouds thin out and marks wear off before anybody looks.
+  updateAbilities(world);
   updateSpotting(world);
   const orderTick: OrderTick = { moveToPlanned: false };
 

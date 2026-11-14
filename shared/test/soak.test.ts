@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   beginStage,
   boundsContains,
+  Btn,
   BUTTON_MASK,
   COMMAND_IDS,
   createMatchConfig,
@@ -25,6 +26,15 @@ import {
  * on the real city at every stage. Nothing may throw, go non-finite, escape the bounds or end
  * up inside a wall, whatever the inputs are.
  */
+/**
+ * Random buttons from one draw of 0..255: the first eight buttons as drawn, and smoke and mark
+ * (added later) pressed together with some of them, so that the draws, and so the rest of the
+ * chaos, stay what they were before those two buttons existed.
+ */
+function chaosButtons(v: number): number {
+  return (v | ((v & 0x81) === 0x81 ? Btn.smoke : 0) | ((v & 0x42) === 0x42 ? Btn.mark : 0)) & BUTTON_MASK;
+}
+
 describe('simulation soak with random inputs', () => {
   function checkInvariants(world: World, lastBar: number): void {
     const b = world.match.bounds;
@@ -105,7 +115,7 @@ describe('simulation soak with random inputs', () => {
             moveZ: change ? rngRange(rng, -0.3, 1) : prev.moveZ,
             aimYaw: prev.aimYaw + rngRange(rng, -0.08, 0.08) + (change ? rngRange(rng, -1.5, 1.5) : 0),
             aimPitch: rngRange(rng, -0.4, 0.3),
-            buttons: change ? rngInt(rng, BUTTON_MASK + 1) : prev.buttons,
+            buttons: change ? chaosButtons(rngInt(rng, 256)) : prev.buttons,
           };
           if (p > 0 && rngChance(rng, 0.01)) {
             next.wheel = COMMAND_IDS[rngInt(rng, COMMAND_IDS.length)];
@@ -141,7 +151,7 @@ describe('simulation soak with random inputs', () => {
       expect(world.match.stage).toBe(stage);
     }
     // The squads did their part of the chaos too: shots, volleys, call-ins, lost units, takeovers.
-    const wanted = ['projectileSpawn', 'projectileHit', 'volley', 'callin', 'kaijuHit', 'unitDestroyed', 'takeover'];
+    const wanted = ['projectileSpawn', 'projectileHit', 'volley', 'callin', 'smoke', 'kaijuHit', 'unitDestroyed', 'takeover'];
     expect(wanted.filter((type) => !seen.has(type))).toEqual([]);
     // The kaiju walked through things: props at every stage, buildings once it was big enough.
     expect(eventCount).toBeGreaterThan(50);

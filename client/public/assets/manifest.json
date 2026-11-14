@@ -5555,6 +5555,9 @@
     "k_stomp": {
       "file": "ui/k_stomp.svg"
     },
+    "k_swim": {
+      "file": "ui/k_swim.svg"
+    },
     "k_swipe": {
       "file": "ui/k_swipe.svg"
     },
@@ -5633,6 +5636,9 @@
     "st_map": {
       "file": "ui/st_map.svg"
     },
+    "st_mark": {
+      "file": "ui/st_mark.svg"
+    },
     "st_moon": {
       "file": "ui/st_moon.svg"
     },
@@ -5647,6 +5653,9 @@
     },
     "st_shaken": {
       "file": "ui/st_shaken.svg"
+    },
+    "st_smoke": {
+      "file": "ui/st_smoke.svg"
     },
     "st_spotted": {
       "file": "ui/st_spotted.svg"

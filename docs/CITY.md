@@ -384,14 +384,16 @@ All numbers below were measured on the shared 4-core machine while other work wa
 (load average 2.3 to 4.7; another program's headless browser used up to 3.6 cores at times). The
 machine was never idle.
 
-**Size**: 2695 structures, 5541 props, 40 archetypes, 13 landmarks plus the landmark bridge,
-6 bridge decks, 12 districts, 10 anchors, 27 parks and plazas.
+**Size**: 2695 structures, 5362 props, 40 archetypes, 13 landmarks plus the landmark bridge,
+6 bridge decks, 12 districts, 10 anchors, 27 parks and plazas, and the Old Moat (section 11).
 
-**Same everywhere**: city checksum (seed 9001, the game's seed) 1739170986, full checksum
-(`meridianChecksum`, which also covers streets, areas, districts and their tints) 1876286051.
+**Same everywhere**: city checksum (seed 9001, the game's seed) 3570529651, full checksum
+(`meridianChecksum`, which also covers streets, areas, districts and their tints) 3898350366.
 Node 22 and headless Chromium 153 compute exactly the same numbers (an esbuild bundle of the
-generator, run in both). For seed 9002 the city checksum is 2320056143 and the full checksum
-424900319. The placeholder city is unchanged: 1340881825 from both `generateCity()` and
+generator, run in both). For seed 9002 the city checksum is 485795498 and the full checksum
+3758613154. (Before the Old Moat, 14 November: 5541 props, checksums 1739170986 and 1876286051;
+for seed 9002, 2320056143 and 424900319. The moat changed nothing but the tree belt outside the
+beltway, which it replaced.) The placeholder city is unchanged: 1340881825 from both `generateCity()` and
 `getCity()`.
 
 **Build time** (generation plus spatial index):

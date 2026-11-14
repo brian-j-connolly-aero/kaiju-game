@@ -1,7 +1,7 @@
 /** Builds the snapshot of a World (server side). */
 
 import type { World } from '../sim/types';
-import type { SnapKaiju, SnapSquad, SnapUnit, Snapshot } from './snapshot';
+import type { SnapKaiju, SnapSmoke, SnapSquad, SnapUnit, Snapshot } from './snapshot';
 
 /**
  * Captures the world as a Snapshot. `ackSeq` is per client: pass the receiving player's
@@ -20,6 +20,7 @@ export function snapshotOfWorld(world: World, ackSeq = 0): Snapshot {
     inWater: k.inWater,
     known: k.known,
     spotted: k.spotted,
+    marked: k.marked > 0,
     x: k.x,
     z: k.z,
     vx: k.vx,
@@ -38,6 +39,7 @@ export function snapshotOfWorld(world: World, ackSeq = 0): Snapshot {
     phaseDuration: k.phaseDuration,
     held: k.held,
     cooldowns: { ...k.cooldowns },
+    submerge: k.submerge,
   }));
   const squads: SnapSquad[] = world.squads.map((s) => ({
     id: s.id,
@@ -52,7 +54,10 @@ export function snapshotOfWorld(world: World, ackSeq = 0): Snapshot {
     moveTargetX: s.moveTarget.x,
     moveTargetZ: s.moveTarget.z,
     callInCooldowns: [s.callInCooldowns[0] ?? 0, s.callInCooldowns[1] ?? 0],
+    smokeCooldown: s.smokeCooldown,
+    markCooldown: s.markCooldown,
   }));
+  const smokes: SnapSmoke[] = world.smokes.map((c) => ({ id: c.id, squad: c.squad, x: c.x, z: c.z, radius: c.radius, height: c.height, timer: c.timer }));
   const units: SnapUnit[] = world.units.map((u) => {
     const squad = world.squads[u.squad];
     return {
@@ -101,5 +106,6 @@ export function snapshotOfWorld(world: World, ackSeq = 0): Snapshot {
     kaijus,
     squads,
     units,
+    smokes,
   };
 }

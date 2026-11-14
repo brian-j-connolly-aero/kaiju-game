@@ -6,6 +6,9 @@
  * These are orders to the squad's three other units, not weapons (the leader has one weapon,
  * on Fire). The pictures say so: the hub is the three of them, in the army's cyan circles, and
  * the two orders they are following right now (one movement, one fire mode) carry a cyan dot.
+ *
+ * The entry pointed at is lit (white ring, larger) and the others step back. Under the hub the
+ * fire button's glyph says that a click picks (it does not fire while the wheel is open).
  */
 
 import type { CommandId, SnapSquad } from '@mb/shared';
@@ -25,6 +28,7 @@ export class CommandWheel {
   private readonly slices = new Map<CommandId, { root: HTMLElement; glyph: HTMLElement; action: ButtonAction }>();
   private readonly hub = el('div', 'wheel-hub', [el('div', 'wheel-mate'), el('div', 'wheel-mate'), el('div', 'wheel-mate')]);
   private readonly pointer = el('div', 'wheel-pointer');
+  private readonly click = glyph(null, 'wheel-click');
   private lastDevice = '';
 
   constructor() {
@@ -34,7 +38,7 @@ export class CommandWheel {
       this.slices.set(entry.id, { root: slice, glyph: g, action: entry.action });
       this.root.append(slice);
     }
-    this.root.append(this.hub, this.pointer);
+    this.root.append(this.hub, this.pointer, this.click);
   }
 
   /** `squad` is the player's own squad (its standing orders are marked), or null. */
@@ -44,7 +48,9 @@ export class CommandWheel {
     if (device !== this.lastDevice) {
       this.lastDevice = device;
       for (const slice of this.slices.values()) setGlyph(slice.glyph, glyphFor(bindings, slice.action, device));
+      setGlyph(this.click, glyphFor(bindings, 'fire', device));
     }
+    this.root.classList.toggle('picking', state.highlight !== null);
     for (const [id, slice] of this.slices) {
       slice.root.classList.toggle('on', state.highlight === id);
       const now = squad !== null && (id === 'follow' ? squad.moveOrder === 'follow' : id === 'moveTo' ? squad.moveOrder === 'moveTo' : id === 'fireAtWill' ? squad.fireMode !== 'charge' : squad.fireMode === 'charge');

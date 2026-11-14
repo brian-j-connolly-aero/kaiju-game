@@ -74,6 +74,8 @@ export interface RenderStats {
 /** Sounds and shakes the picture asks for; the match screen wires them to audio and the camera. */
 export interface RenderCues {
   onStep?: (k: SnapKaiju) => void;
+  /** The kaiju went into the water to swim, or came up (sim/swim.ts). */
+  onSplash?: (k: SnapKaiju) => void;
 }
 
 const FOG: Record<StageId, FogRange> = {
@@ -525,6 +527,20 @@ export class GameRenderer {
       case 'volley':
         fx.ring(e.x, e.z, 6 + e.charge * 8, 0xffd91a, 0.4);
         break;
+      case 'smoke':
+        // The canister bursts; the screen itself is drawn from the snapshots while it stands.
+        fx.dust(e.x, 0.5, e.z, e.radius * 0.6, 8, 0xd6d6d0);
+        break;
+      case 'mark': {
+        // The squads see the marker pulse over it as it is marked (the kaiju is not told).
+        const k = this.lastFrame?.kaijus[e.kaiju];
+        if (k && this.lastView && e.kaiju !== this.lastView.localKaiju) {
+          const h = kaijuStageDef(k.kind, k.stage).height;
+          fx.ring(k.x, k.z, kaijuStageDef(k.kind, k.stage).bodyRadius * 3, 0xff7a1a, 0.7, 0.9);
+          fx.glowAt(k.x, h * 1.2, k.z, h * 0.8, 0xff7a1a, 0.4, 0.8);
+        }
+        break;
+      }
       case 'callin': {
         if (e.phase === 'marked') {
           // Kept until the mission reports 'done' (or, if that never comes, a while after the barrage).
@@ -613,7 +629,7 @@ export class GameRenderer {
       frame.kaijus.forEach((k, i) => {
         let kv = this.kaijuViews[i];
         if (!kv) {
-          kv = new KaijuView(this.assets, this.materials, { onStep: (kk) => this.cues.onStep?.(kk) });
+          kv = new KaijuView(this.assets, this.materials, { onStep: (kk) => this.cues.onStep?.(kk), onSplash: (kk) => this.cues.onSplash?.(kk) });
           this.kaijuViews[i] = kv;
           this.scene.add(kv.group);
         }
@@ -627,14 +643,18 @@ export class GameRenderer {
         if (k.phase !== 'cocoon' || k.id === view.localKaiju || view.seesKaiju) {
           this.decals.push(k.x, 0.12, k.z, st.bodyRadius * 3.4, st.bodyRadius * 3.4, this.ringShadowUv(), 0, 0, 0, 0, 0.6);
         }
-        // An orange triangle marks the kaiju for the humans when it is far away and known.
+        // An orange triangle over the kaiju, far away, only while a squad has marked it or a
+        // squad leader has it in plain sight (the spotting rules): not always (polish pass 2).
+        // A mark makes it bigger and pulse.
         const dist = Math.hypot(k.x - this.camera.position.x, k.z - this.camera.position.z);
-        if (k.id !== view.localKaiju && (k.known || view.seesKaiju) && k.alive && dist > st.height * 5) {
-          const size = Math.min(60, Math.max(3, dist * 0.03));
-          this.markers.push(k.x, st.height + size, k.z, size, size, this.triangleUv, 0, 1, 0.48, 0.1, 0.95);
+        if (k.id !== view.localKaiju && (k.marked || k.spotted) && k.alive && dist > st.height * 5) {
+          const size = Math.min(k.marked ? 44 : 30, Math.max(3, dist * (k.marked ? 0.026 : 0.018)));
+          const glow = k.marked ? 0.75 + 0.25 * Math.sin(time * 6) : 0.85;
+          this.markers.push(k.x, st.height + size, k.z, size, size, this.triangleUv, 0, 1, 0.48, 0.1, glow);
         }
       });
       for (let i = frame.kaijus.length; i < this.kaijuViews.length; i++) this.kaijuViews[i]?.hide();
+      this.effects.setClouds(frame.smokes);
 
       this.units.update(
         frame.units,
@@ -647,6 +667,7 @@ export class GameRenderer {
           hideLocalLead: view.hideLocalLead,
           city: query,
           kaijus: frame.kaijus,
+          veil: view.localKaiju >= 0 ? frame.smokes : null,
         },
         this.lines,
         this.effects,

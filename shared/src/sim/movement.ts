@@ -25,7 +25,7 @@ import type { Mods, SteerModel, UnitTypeDef } from '../defs/schema';
 import { modMult } from '../defs/upgrades';
 import { angleDiff, turnToward, yawOf } from '../math/angle';
 import { createContact, type Bounds, type Contact } from '../math/geom';
-import { clamp, clamp01 } from '../math/scalar';
+import { clamp, clamp01, lerp } from '../math/scalar';
 
 /** The moving part of a body. Kaiju and Unit both satisfy it. */
 export interface MoveBody {
@@ -272,6 +272,8 @@ export interface KaijuMoveState {
   phase: KaijuPhase;
   action: KaijuActionId;
   nerve: number;
+  /** Swimming (sim/swim.ts): 0 standing, 1 under. Absent counts as 0. */
+  submerge?: number;
 }
 
 /**
@@ -306,6 +308,15 @@ export function kaijuMoveParams(k: KaijuMoveState, bounds: Bounds, mods?: Mods, 
   p.wadeSpeedMult = st.wadeSpeedMult;
   p.waterSpeedMult = st.waterSpeedMult;
   p.bounds = bounds;
+  // Swimming: from wading toward its swimming speed as it goes under, with no water slowdown.
+  const sub = k.submerge ?? 0;
+  const swim = sub > 0 ? def.swim : undefined;
+  if (swim) {
+    const top = st.topSpeed * nerveSlow * speedMod;
+    p.topSpeed = lerp(top * st.waterSpeedMult, top * swim.speedMult, sub);
+    p.waterSpeedMult = 1;
+    p.turnRate *= lerp(1, swim.turnMult, sub);
+  }
   return p;
 }
 

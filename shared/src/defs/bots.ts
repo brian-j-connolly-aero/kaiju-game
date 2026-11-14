@@ -57,6 +57,20 @@ export const BOT_RULES = {
     callInLead: 3.5,
     /** Candidate firing positions examined for a line of fire per look. */
     spotCandidates: 8,
+    /**
+     * Marking (sim/abilities.ts): the leader marks the kaiju when it has it in sight and nobody
+     * has marked it, and its squad is charged at least this much or the kaiju is off the map
+     * (the mark keeps it there).
+     */
+    markCharge: 0.5,
+    /**
+     * Smoke: thrown between the squad and the kaiju when the kaiju comes within this, of range
+     * (it covers the retreat), or when the squad is planted and the kaiju is dashing at it
+     * within this, of range, with at least this share of the squad's guns charging.
+     */
+    smokeRetreatAt: 0.35,
+    smokeRushAt: 0.55,
+    smokeCharging: 0.5,
   },
 
   kaiju: {
@@ -89,6 +103,8 @@ export const BOT_RULES = {
     rushRange: [110, 280, 450] as PerStage<number>,
     rushMax: 7,
     rushRest: 7,
+    /** A unit in smoke is hidden from it; it still finds one it bumps into, within this many radii. */
+    smokeFeelRadii: 1.5,
     /** It roars when at least this many units stand inside the roar radius and are charging or it is hurt. */
     roarUnits: 2,
     /** It braces when at least this many lasers are on it with this much charge, for at most this long. */
@@ -106,6 +122,22 @@ export const BOT_RULES = {
     /** Throwing: at a unit within this fraction of the longest throw, at most once every so many seconds. */
     throwRange: 0.8,
     throwEvery: 7,
+
+    /**
+     * Swimming away (sim/swim.ts, at the stages it can swim): in trouble (its nerve this full,
+     * or its health below this while guns can see it) with deep water within this many radii,
+     * it slips into the water and swims away from the squads for at most this long, then not
+     * again for this long (no stalling in the water: it earns nothing there). Under, it picks a
+     * new stretch of water every so often, this many radii ahead at most. Tuned with the balance
+     * harness: water any farther away costs it more, running to it with its back to the guns,
+     * than the swim gives back.
+     */
+    swimNerve: 0.7,
+    swimBelow: 0.4,
+    swimSearchRadii: [10, 8, 0] as PerStage<number>,
+    swimMax: 8,
+    swimRest: 30,
+    swimLegRadii: [20, 10, 0] as PerStage<number>,
 
     /** The molt: it looks for a place out of sight for at most this long, then cocoons where it stands. */
     hideTime: 16,

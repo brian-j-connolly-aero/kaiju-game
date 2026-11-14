@@ -20,6 +20,7 @@ import {
   factionLevelDef,
   kaijuKindDef,
   MATCH_RULES,
+  SQUAD_ABILITIES,
   unitTypeDef,
   weaponDef,
   type CommandId,
@@ -220,6 +221,8 @@ export class Hud {
       fire: hint('st_reload', 'fire'),
       wheel: hint('cmd_holdcharge', 'wheel'),
       callIn: hint('st_callin', 'callIn'),
+      smoke: hint('st_smoke', 'smoke'),
+      mark: hint('st_mark', 'mark'),
       map: hint('st_map', 'map'),
       camera: hint('st_camera', 'camera'),
     };
@@ -233,7 +236,9 @@ export class Hud {
     this.statusIcons = {
       crossfire: icon('st_crossfire', 'status-icon status-crossfire'),
       spotted: icon('st_spotted', 'status-icon status-spotted'),
+      marked: icon('st_mark', 'status-icon status-marked'),
       shaken: icon('st_shaken', 'status-icon status-shaken'),
+      swim: icon('k_swim', 'status-icon status-swim'),
       nerveBreak: icon('st_nerve', 'status-icon status-break'),
       volley: icon('st_charge', 'status-icon status-volley'),
       callin: icon('st_callin', 'status-icon status-callin'),
@@ -460,6 +465,8 @@ export class Hud {
       const callInFull = Math.max(callIn ? callInDef(callIn).cooldown : 1, this.callInPeak);
       this.cooldown(this.humanHints.callIn, wait / callInFull);
       this.cooldown(this.humanHints.fire, lu.cooldown / this.reloadFull(lu));
+      this.cooldown(this.humanHints.smoke, own.smokeCooldown / SQUAD_ABILITIES.smoke.cooldown);
+      this.cooldown(this.humanHints.mark, own.markCooldown / SQUAD_ABILITIES.mark.cooldown);
     }
 
     // The mouse is free and the game wants it: say "click" (mouse players only).
@@ -477,8 +484,12 @@ export class Hud {
     setClass(s.nerveBreak, 'on', (this.statusUntil.nerveBreak ?? 0) > now);
     setClass(s.volley, 'on', (this.statusUntil.volley ?? 0) > now);
     setClass(s.callin, 'on', (this.statusUntil.callin ?? 0) > now);
-    setClass(s.spotted, 'on', !!boss && boss.spotted && view.mode !== 'drone');
+    setClass(s.spotted, 'on', !!boss && boss.spotted && !boss.marked && view.mode !== 'drone');
+    setClass(s.marked, 'on', !!boss && boss.marked && view.mode !== 'kaiju');
     setClass(s.shaken, 'on', !!lu && lu.shaken > 0);
+    // The kaiju player under water (sim/swim.ts): faint while going down or coming up.
+    setClass(s.swim, 'on', !!lk && lk.submerge > 0);
+    setClass(s.swim, 'partial', !!lk && lk.submerge > 0 && lk.submerge < 1);
     setClass(s.offline, 'on', view.reconnecting);
     setClass(s.eliminated, 'on', view.mode === 'drone' && session.role.kind === 'human');
   }

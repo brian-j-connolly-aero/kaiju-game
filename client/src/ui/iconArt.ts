@@ -39,6 +39,7 @@ const ART: Record<string, string> = {
   k_roar: `<path d="M8 22 L26 32 L8 42 Z" ${F}/><path d="M34 20 Q40 32 34 44 M44 14 Q54 32 44 50 M54 8 Q66 32 54 56" ${S}/>`,
   k_special: `<path d="M6 32 L40 32" stroke="currentColor" stroke-width="10" stroke-linecap="round" fill="none"/><path d="M48 14 L56 22 M52 32 L60 32 M48 50 L56 42" ${S}/>`,
   k_molt: `<path d="M32 6 Q52 22 50 40 Q48 58 32 58 Q16 58 14 40 Q12 22 32 6 Z" ${S}/><path d="M26 22 L34 30 L28 38 L36 46" ${S}/>`,
+  k_swim: `<path d="M12 36 L19 21 L25 36 Z M24 36 L32 14 L40 36 Z M39 36 L46 22 L52 36 Z" ${F}/><path d="M5 41 Q11.5 35.5 18 41 T31 41 T44 41 T57 41 M10 53 Q16.5 47.5 23 53 T36 53 T49 53" ${S}/>`,
   // --- status ---
   st_health: `<path d="M32 54 L10 32 Q4 18 18 14 Q28 12 32 24 Q36 12 46 14 Q60 18 54 32 Z" ${F}/>`,
   st_nerve: `<path d="M6 34 L18 34 L24 14 L34 50 L42 26 L46 34 L58 34" ${S}/>`,
@@ -47,6 +48,8 @@ const ART: Record<string, string> = {
   st_charge: `<path d="M32 8 L52 32 L32 56 L12 32 Z" ${F}/>`,
   st_veteran: `<path d="M12 26 L32 10 L52 26 M12 44 L32 28 L52 44" ${S}/>`,
   st_spotted: `<path d="M4 32 Q32 6 60 32 Q32 58 4 32 Z" ${S}/><circle cx="32" cy="32" r="8" ${F}/>`,
+  st_smoke: `<path d="M15 43 Q6 43 7 35 Q8 27 17 28 Q18 18 28 18 Q36 11 44 19 Q55 18 56 29 Q61 37 53 43 Z" ${S}/><rect x="26" y="48" width="12" height="11" rx="2" ${F}/>`,
+  st_mark: `<path d="M20 5 L44 5 L32 20 Z" ${F}/><path d="M32 30 L52 59 L12 59 Z" ${S}/><path d="M8 12 L4 8 M56 12 L60 8 M10 22 L4 22 M54 22 L60 22" ${S}/>`,
   st_crossfire: `<path d="M8 8 L56 56 M56 8 L8 56" ${S}/><path d="M56 56 L42 54 M56 56 L54 42 M8 56 L22 54 M8 56 L10 42" ${S}/>`,
   st_callin: `<circle cx="32" cy="38" r="16" ${S}/><path d="M32 4 L32 30 M24 22 L32 30 L40 22" ${S}/>`,
   st_shaken: `<path d="M8 20 Q16 10 24 20 T40 20 T56 20 M8 34 Q16 24 24 34 T40 34 T56 34 M8 48 Q16 38 24 48 T40 48 T56 48" ${S}/>`,

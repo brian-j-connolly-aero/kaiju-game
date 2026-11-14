@@ -5,6 +5,7 @@
 
 import {
   Btn,
+  BUTTON_MASK,
   cityChecksum,
   CLOSE_REPLACED,
   CLOSE_SEAT_RELEASED,
@@ -430,7 +431,9 @@ describe('match loop', () => {
     expect(Math.hypot(state.moveX, state.moveZ)).toBeLessThanOrEqual(1.0001);
     expect(Math.abs(state.aimYaw)).toBeLessThanOrEqual(Math.PI + 1e-9);
     expect(Math.abs(state.aimPitch)).toBeLessThan(Math.PI / 2);
-    expect(state.buttons).toBe(0xff);
+    // Every bit the game has (ten buttons since smoke and mark), and nothing above them.
+    expect(state.buttons).toBe(BUTTON_MASK);
+    expect(BUTTON_MASK).toBe(0x3ff);
   });
 
   it('brings a connected but silent player to a stop instead of leaving them walking', () => {
