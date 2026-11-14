@@ -67,9 +67,9 @@ const WEAK_GLOW = 0xc9a6ff;
  * Swimming: how far the body tips forward (radians), and how far it sinks and slides back
  * (body heights), all the way under. Tuned by eye so the spines' ridge shows (sim/swim.ts).
  */
-const SWIM_TILT = 1.4;
-const SWIM_SINK = 0.17;
-const SWIM_BACK = 0.45;
+const SWIM_TILT = 0.35;
+const SWIM_SINK = 0.72;
+const SWIM_BACK = 0.1;
 
 function heldModelId(held: HeldObject): string {
   switch (held.kind) {

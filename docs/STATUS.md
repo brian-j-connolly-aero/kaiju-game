@@ -1652,9 +1652,15 @@ monster's swim and travel mode is another engineer's, in its own section.)
   monster's warnings in first person. Balance: see below.
 - **Balance** (`npm run sim -- --seeds 60 --every-anchor`; before: monster 47% of 60, about
   10:30). With smoke and marking alone: 29 of 60 (48%), 9:42. With the other engineer's swim
-  work also in the tree: 26 of 60 (43%), 9:51; seeds 61 to 120: 31 of 60 (52%), 9:44. Bots
-  mark about 30 times and smoke about 10 to 18 times a match. Within the 8-point band, so no
-  retune. Matches are about half a minute shorter.
+  work also in the tree: 26 of 60 (43%), 9:51; seeds 61 to 120: 31 of 60 (52%), 9:44. After
+  the kaiju bot fix below: 23 of 60 (38%), 10:05, and seeds 61 to 120: 30 of 60 (50%), 9:53;
+  53 of 120 together (44%). Bots mark about 30 times and smoke about 10 to 18 times a match.
+  Within the 8-point band over 120 matches, so no retune; single batches of 60 swing by about
+  ten points.
+- **Kaiju bot fix** (`shared/src/sim/bots/kaijuBot.ts`): a hurt kaiju bot walking to food with
+  a house in the way leaned on the house for the rest of the match (found by the bot-match soak
+  test, seed 103, once smoke and marks changed how matches go). It now smashes what stands in
+  the way of a meal, as it already did on the way to anything else.
 - **Test changes made on purpose.** Ten buttons instead of eight (`net.test.ts`,
   `gameRoom.test.ts`); the wheel test holds the button a moment before letting go in the
   middle (a quick tap now leaves it open); the random-input soak draws the same random numbers

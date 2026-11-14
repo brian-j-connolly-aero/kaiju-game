@@ -372,11 +372,18 @@ async function main() {
         u.z = k.z + inward.z * 16 + along.z * 70;
         u.vx = 0;
         u.vz = 0;
+      });
+      // (A unit that jumps looks toward the middle of the zone: turn it once it has landed.)
+      await sleep(600);
+      await page.evaluate(() => {
+        const w = window.__mb.internals.ctx.client.local.world;
+        const k = w.kaijus[0];
+        const me = window.__mb.state().me;
         const c = window.__mb.internals.ctx.runtime.controller;
-        c.viewYaw = Math.atan2(k.x - u.x, k.z - u.z);
+        c.viewYaw = Math.atan2(k.x - me.x, k.z - me.z);
         c.viewPitch = -0.05;
       });
-      await sleep(2000);
+      await sleep(1500);
       await shot('1-spines-from-the-bank');
     });
   }

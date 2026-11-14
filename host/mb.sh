@@ -60,7 +60,7 @@ find_engine() {
   if [ $have_podman = 0 ] && [ $have_docker = 0 ]; then
     fail "Neither Podman nor Docker is installed.
 Install one of them, then run this again (docs/HOSTING.md, section 9, has the details):
-  - Ubuntu 24.04 or newer, also in WSL:   sudo apt install podman podman-compose
+  - Ubuntu 24.04 or newer, also in WSL:   sudo apt install podman podman-compose aardvark-dns
   - Ubuntu 22.04, also in WSL:            sudo apt install docker.io docker-compose-v2
   - Or install Docker Desktop on Windows and turn on its WSL integration."
   fi
@@ -99,7 +99,7 @@ Either of these fixes it:
         sudo apt install docker.io docker-compose-v2
         sudo usermod -aG docker \$USER
     then close this terminal, open a new one and run this again.
-  - Or use Ubuntu 24.04 or newer, where   sudo apt install podman podman-compose   works.
+  - Or use Ubuntu 24.04 or newer, where   sudo apt install podman podman-compose aardvark-dns   works.
 docs/HOSTING.md, section 9, has the details."
   elif [ $podman_ok = 1 ]; then
     fail "Podman works, but its compose part is missing.

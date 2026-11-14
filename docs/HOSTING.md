@@ -216,7 +216,7 @@ host/mb.sh link     print the links again
 The scripts use Podman if it works, otherwise Docker. What to install depends on the Ubuntu
 version, also inside WSL (`lsb_release -ds` shows which one you have):
 
-- **Ubuntu 24.04 or newer:** `sudo apt install podman podman-compose`. This is the setup the
+- **Ubuntu 24.04 or newer:** `sudo apt install podman podman-compose aardvark-dns`. This is the setup the
   scripts were tried with (Podman 4.9).
 - **Ubuntu 22.04:** its Podman (version 3.4) is too old and it offers no `podman-compose`, so
   use Docker there:
