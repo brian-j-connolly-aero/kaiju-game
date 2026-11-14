@@ -11,25 +11,34 @@
  *             while at the start of a match, so a new player finds it)
  *   center    crosshair (the squad's volley meter and the tank's gun reticle sit around it:
  *             ui/volleyMeter.ts, ui/gunReticle.ts)
+ *
+ * The squad's pick-ups (phase 2): Fire's picture is the weapon a crate gave (machine gun, big
+ * cannon, missile pod) while the squad has it; the artillery radio sits beside Volley with a pip
+ * for each barrage left; when the squad takes a crate its picture pops up over the crosshair.
  */
 
 import {
   barDisplayFraction,
   clamp01,
   COMBAT_RULES,
+  CRATE_RULES,
   kaijuKindDef,
   MATCH_RULES,
+  pickupWeaponDef,
   unitTypeDef,
   volleyMeter,
   weaponDef,
+  type PickupId,
+  type PickupKind,
   type SnapKaiju,
   type SnapSquad,
   type SnapUnit,
 } from '@mb/shared';
+import { pickupIcon } from '../assets/iconRaster';
 import { glyphFor, keyLayoutVersion, type Bindings, type ButtonAction, type InputDevice } from '../game/input/actions';
 import type { FrameState, MatchSession } from '../net/matchSession';
 import { skylinePath } from './iconArt';
-import { el, glyph, icon, setGlyph, uiMarkup } from './icons';
+import { el, glyph, icon, setGlyph, setIcon, uiMarkup } from './icons';
 import { KaijuKit } from './kaijuKit';
 
 export interface HudView {
@@ -94,6 +103,11 @@ const CONTROLS_GLOW = 20;
 const SKY_W = 400;
 const SKY_H = 44;
 
+/** Fire's picture: the weapon pick-up the squad has, or its own shot. */
+export function fireIcon(squad: Pick<SnapSquad, 'pickup'> | undefined): string {
+  return squad && squad.pickup !== 'none' ? pickupIcon(squad.pickup) : 'st_reload';
+}
+
 export class Hud {
   readonly root = el('div', 'hud');
   private readonly barFill: SVGRectElement;
@@ -129,6 +143,13 @@ export class Hud {
   private readonly capture: HTMLElement;
   private readonly menuHint: Hint;
   private readonly controlsHint: Hint;
+  /** The artillery radio beside Volley, with a pip for each barrage left. */
+  private readonly radio: HTMLElement;
+  private readonly radioPips: HTMLElement[] = [];
+  /** A crate's picture popping up over the crosshair when the squad takes it. */
+  private readonly taken: HTMLElement;
+  private lastFire = '';
+  private lastBarrages = -1;
   private lastBar = -1;
   /** The longest reload seen since the weapon was last ready (a modifier can lengthen it). */
   private reloadPeak = 0;
@@ -209,7 +230,11 @@ export class Hud {
     };
     this.droneHints = { rise: hint('ui_rise', 'rise'), sink: hint('ui_sink', 'sink'), map: hint('st_map', 'map') };
     this.hintsKaiju = this.kit.root;
-    this.hintsHuman = el('div', 'hints', Object.values(this.humanHints).map((h) => h.root));
+    for (let i = 0; i < CRATE_RULES.barrages; i++) this.radioPips.push(el('div', 'radio-pip'));
+    this.radio = el('div', 'squad-radio hidden', [icon('pk_artilleryradio'), el('div', 'radio-pips', this.radioPips)]);
+    const human = Object.values(this.humanHints).map((h) => h.root);
+    human.splice(1, 0, this.radio);
+    this.hintsHuman = el('div', 'hints', human);
     this.hintsDrone = el('div', 'hints', Object.values(this.droneHints).map((h) => h.root));
 
     // --- crosshair and status pictures ---
@@ -228,6 +253,7 @@ export class Hud {
     this.status = el('div', 'status', Object.values(this.statusIcons));
     // "Click": shown while the game wants the mouse and the pointer is free.
     this.capture = el('div', 'capture hidden', [icon('ms_left')]);
+    this.taken = el('div', 'pickup-taken hidden', [icon('pk_machinegun')]);
     // The settings panel and the button that opens it.
     this.menuHint = hint('ui_settings', 'menu');
     this.menuHint.root.classList.add('hint-menu');
@@ -242,6 +268,7 @@ export class Hud {
       el('div', 'hud-bottom-right', [this.hintsKaiju, this.hintsHuman, this.hintsDrone, this.controlsHint.root]),
       this.crosshair,
       this.status,
+      this.taken,
       this.capture,
     );
     // Nothing is shown until the first `update` has said what this player is and has: before
@@ -254,6 +281,15 @@ export class Hud {
   /** Lights a status picture for a moment (crossfire, a nerve break, a volley). */
   flash(name: 'crossfire' | 'nerveBreak' | 'volley' | 'callin', now: number, seconds = 1.6): void {
     this.statusUntil[name] = now + seconds;
+  }
+
+  /** The player's squad took a supply crate: its picture pops up over the crosshair. */
+  pickupTaken(kind: PickupKind): void {
+    const pic = this.taken.firstElementChild as HTMLElement | null;
+    if (pic) setIcon(pic, pickupIcon(kind));
+    this.taken.classList.remove('hidden', 'pop');
+    void this.taken.offsetWidth;
+    this.taken.classList.add('pop');
   }
 
   private ensureSquads(count: number): void {
@@ -301,10 +337,13 @@ export class Hud {
     setClass(h.root, 'unavailable', !ready);
   }
 
-  /** The full reload time of the driven unit's weapon (the definition, or longer if seen longer). */
-  private reloadFull(lu: SnapUnit): number {
+  /**
+   * The full reload time of the driven unit's weapon (the definition, a weapon pick-up's own
+   * when the squad has one, or longer if seen longer).
+   */
+  private reloadFull(lu: SnapUnit, pickup: PickupId): number {
     this.reloadPeak = lu.cooldown > 0 ? Math.max(this.reloadPeak, lu.cooldown) : 0;
-    return Math.max(weaponDef(unitTypeDef(lu.type).weapon).cooldown, this.reloadPeak, 0.01);
+    return Math.max(pickupWeaponDef(weaponDef(unitTypeDef(lu.type).weapon), pickup).cooldown, this.reloadPeak, 0.01);
   }
 
   update(frame: FrameState, session: MatchSession, view: HudView, now: number): void {
@@ -376,7 +415,7 @@ export class Hud {
       setMeter(this.health, lu.hp / Math.max(1, lu.maxHp));
       setMeter(this.nerve, lu.nerve / COMBAT_RULES.unitNerveCapacity);
       setClass(this.nerve.root, 'danger', lu.shaken > 0 || lu.stun > 0);
-      setMeter(this.reload, 1 - clamp01(lu.cooldown / this.reloadFull(lu)));
+      setMeter(this.reload, 1 - clamp01(lu.cooldown / this.reloadFull(lu, frame.squads[session.role.squadId]?.pickup ?? 'none')));
     }
 
     // Squads.
@@ -399,8 +438,24 @@ export class Hud {
       setGlyph(this.controlsHint.glyph, glyphFor(view.bindings, 'controls', view.device));
     }
     if (lk) this.kit.update(lk, now);
+    // The squad's pick-ups: Fire shows the weapon a crate gave; the radio its barrages left.
+    const fire = fireIcon(own);
+    if (fire !== this.lastFire) {
+      this.lastFire = fire;
+      const pic = this.humanHints.fire.root.querySelector('.hint-icon > .icon') as HTMLElement | null;
+      if (pic) setIcon(pic, fire);
+      setClass(this.humanHints.fire.root, 'pickup', fire !== 'st_reload');
+      // A new weapon reloads at its own pace: the cover's full turn is measured afresh.
+      this.reloadPeak = 0;
+    }
+    const barrages = own ? own.barrages : 0;
+    if (barrages !== this.lastBarrages) {
+      this.lastBarrages = barrages;
+      setClass(this.radio, 'hidden', barrages <= 0);
+      this.radioPips.forEach((p, i) => setClass(p, 'on', i < barrages));
+    }
     if (lu && own) {
-      this.cooldown(this.humanHints.fire, lu.cooldown / this.reloadFull(lu));
+      this.cooldown(this.humanHints.fire, lu.cooldown / this.reloadFull(lu, own.pickup));
       // The volley's picture: lit while the squad-mates charge, glowing once the volley counts
       // (the big meter round the crosshair says how far: ui/volleyMeter.ts).
       const charge = volleyMeter(frame.units, own.id);

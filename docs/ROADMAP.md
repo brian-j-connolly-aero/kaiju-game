@@ -91,6 +91,8 @@ file is the newer intent: change `DESIGN.md` to match as each piece is built.
 
 ## Phase 2: something happening every 20 seconds
 
+**Built** (14 November 2026; `docs/STATUS.md`, the phase 2 sections at its end). In bot matches something new happens about every 10 to 15 s at stage 1, but only every 30 to 60 s at stage 2 and, for a squad, every 33 s at stage 3 (`docs/BALANCE.md` section 10).
+
 - **Monster weight:** footsteps shake the screen, cars bounce, windows shatter, buildings wobble
   when it stomps, the view widens while it walks. The army gets a sense of speed too.
 - **Special buildings** in every starting neighborhood, each with a reward you can see:

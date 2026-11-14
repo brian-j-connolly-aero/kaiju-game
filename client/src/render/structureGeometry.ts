@@ -6,10 +6,16 @@
  * Without it each state is a painted box: walls that repeat a window tile once per storey, a
  * roof, a cracked and scorched version, and a low grey heap. A real model's collapse pieces are
  * kept as meshes (`ChunkBox.mesh`); a box stand-in's are plain boxes.
+ *
+ * Rubble stays (docs/ROADMAP.md phase 2): a building that collapses where it stands is a mound
+ * half its height (RUBBLE_RULES, the same shape the simulation's shots and sight meet), so the
+ * rubble state is built here from the building's own collapse pieces, piled up and tilted, in
+ * its own paint: a heap of that building, not a grey box. A building that falls over lies on its
+ * side as its damaged model (`fall`), with the art's low rubble left on its footprint (`base`).
  */
 
 import * as THREE from 'three';
-import type { ArchetypeDef } from '@mb/shared';
+import { RUBBLE_RULES, type ArchetypeDef } from '@mb/shared';
 import type { MaterialKind, RigModel } from '../assets/rigModel';
 import { box, boxOn, merge, paint } from '../assets/procedural/geo';
 import { sequence } from '../assets/procedural/textures';
@@ -45,11 +51,25 @@ export interface ChunkMesh {
 }
 
 export interface ArchetypeGeometry {
-  /** Parts for the states intact, damaged, rubble. */
+  /** Parts for the states intact, damaged, rubble (the rubble a mound: `moundHeight`). */
   states: [StatePart[], StatePart[], StatePart[]];
   chunks: ChunkBox[];
   /** True when built from boxes (the instance color then carries the building's tone). */
   procedural: boolean;
+  /** What tips over and then lies on its side when the structure falls over (its damaged model; a mast's lattice below its top). */
+  fall: StatePart[];
+  /** What stays on the footprint of a structure that fell over: the art's low rubble. */
+  base: StatePart[];
+  /**
+   * A radio mast's top section (the art's `top` node, in its own frame: the origin on the mast's
+   * axis where it breaks off), drawn tumbling while the mast falls; null for everything else.
+   */
+  top: { parts: StatePart[]; at: THREE.Vector3 } | null;
+}
+
+/** How tall the mound of a collapsed structure of this archetype is (meters): the simulation's `srubble` (city/spatialIndex.ts). */
+export function moundHeight(def: Pick<ArchetypeDef, 'height' | 'passable'>): number {
+  return def.passable ? 0 : Math.min(RUBBLE_RULES.maxHeight, def.height * RUBBLE_RULES.heightShare);
 }
 
 const WINDOW_WIDTH = 12;
@@ -196,24 +216,30 @@ function proceduralStates(def: ArchetypeDef): ArchetypeGeometry {
     }
   }
 
-  // Rubble: a low grey heap inside the footprint.
-  const heap = Math.min(2.2, Math.max(0.5, h * 0.12));
-  const rubble: THREE.BufferGeometry[] = [plain(boxOn(w * 0.96, heap * 0.35, d * 0.96, RUBBLE[0], 0, 0, 0))];
-  for (let i = 0; i < 5; i++) {
-    const rw = w * (0.2 + next() * 0.3);
-    const rd = d * (0.2 + next() * 0.3);
-    const g = boxOn(rw, heap * (0.5 + next() * 0.6), rd, RUBBLE[1 + (i % 3)], (w - rw) * (next() - 0.5), 0, (d - rd) * (next() - 0.5));
-    rubble.push(plain(g));
-  }
+  // Rubble: a grey heap inside the footprint, as tall as the mound the simulation counts (a low
+  // one for a bridge deck, which leaves none).
+  const heapOf = (heap: number): THREE.BufferGeometry => {
+    const parts: THREE.BufferGeometry[] = [plain(boxOn(w * 0.96, heap * 0.35, d * 0.96, RUBBLE[0], 0, 0, 0))];
+    for (let i = 0; i < 5; i++) {
+      const rw = w * (0.2 + next() * 0.3);
+      const rd = d * (0.2 + next() * 0.3);
+      const g = boxOn(rw, heap * (0.5 + next() * 0.5), rd, RUBBLE[1 + (i % 3)], (w - rw) * (next() - 0.5), 0, (d - rd) * (next() - 0.5));
+      parts.push(plain(g));
+    }
+    return merge(parts);
+  };
+  const low = Math.min(2.2, Math.max(0.5, h * 0.12));
+  const mound = moundHeight(def);
+  const base: StatePart[] = [{ geometry: heapOf(low), material: 'building' }];
+  const damagedParts: StatePart[] = [{ geometry: merge(damaged), material: 'building' }];
 
   return {
-    states: [
-      [{ geometry: merge(intact), material: 'building' }],
-      [{ geometry: merge(damaged), material: 'building' }],
-      [{ geometry: merge(rubble), material: 'building' }],
-    ],
+    states: [[{ geometry: merge(intact), material: 'building' }], damagedParts, mound > 0 ? [{ geometry: heapOf(mound), material: 'building' }] : base],
     chunks: proceduralChunks(w, h, d),
     procedural: true,
+    fall: damagedParts,
+    base,
+    top: null,
   };
 }
 
@@ -275,6 +301,171 @@ export function chunkMesh(geometries: THREE.BufferGeometry[], center: THREE.Vect
   return { position: new Float32Array(positions), uv: new Float32Array(uvs), color: new Float32Array(colors) };
 }
 
+/** A small seeded generator from a string (the archetype id), so every client piles a mound the same way. */
+function seeded(id: string): () => number {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619);
+  return sequence(h >>> 0);
+}
+
+const pileMatrix = new THREE.Matrix4();
+const pileQuat = new THREE.Quaternion();
+const pileEuler = new THREE.Euler();
+const pilePos = new THREE.Vector3();
+const pileScale = new THREE.Vector3();
+
+/**
+ * The mound a collapsed building leaves (docs/ROADMAP.md phase 2, "rubble stays"), piled from its
+ * own collapse pieces: each piece keeps its place over the footprint, pulled in a little the
+ * higher it stood, squashed toward the pile's height and tilted; the pile is then scaled to
+ * stand exactly `height` meters high (the simulation's mound, which stops shots and sight). The
+ * pieces keep their atlas coordinates and their wall mask, so the heap shows the building's own
+ * walls, windows and roof in its own paint. Null when there are no art pieces or no mound.
+ */
+export function moundGeometry(chunks: readonly ChunkBox[], def: Pick<ArchetypeDef, 'id' | 'footprint' | 'height'>, height: number): THREE.BufferGeometry | null {
+  const pieces = chunks.filter((c) => c.mesh).sort((a, b) => a.y - b.y);
+  if (pieces.length === 0 || !(height > 0)) return null;
+  const [w, d] = def.footprint;
+  const h = Math.max(0.5, def.height);
+  const next = seeded(def.id);
+  // A piece of a tall building is squashed hard (its 20 m floors become a 6 m slab of the heap).
+  const squash = Math.min(0.9, Math.max(0.28, (height / h) * 1.25));
+  const positions: number[] = [];
+  const uvs: number[] = [];
+  const colors: number[] = [];
+  for (const c of pieces) {
+    const mesh = c.mesh as ChunkMesh;
+    const t = Math.min(1, Math.max(0, c.y / h));
+    const pull = 1 - 0.32 * t;
+    pilePos.set(c.x * pull + (next() - 0.5) * w * 0.14, t * height * 0.85, c.z * pull + (next() - 0.5) * d * 0.14);
+    // Tilted up to about 32 degrees either way, turned a little: broken, but never far enough to stick out of the heap.
+    pileQuat.setFromEuler(pileEuler.set((next() - 0.5) * 1.1, (next() - 0.5) * 0.6, (next() - 0.5) * 1.1));
+    pileMatrix.compose(pilePos, pileQuat, pileScale.set(0.86 + next() * 0.1, squash, 0.86 + next() * 0.1));
+    const e = pileMatrix.elements;
+    const count = mesh.position.length / 3;
+    for (let v = 0; v < count; v++) {
+      const x = mesh.position[v * 3];
+      const y = mesh.position[v * 3 + 1];
+      const z = mesh.position[v * 3 + 2];
+      positions.push(e[0] * x + e[4] * y + e[8] * z + e[12], e[1] * x + e[5] * y + e[9] * z + e[13], e[2] * x + e[6] * y + e[10] * z + e[14]);
+      uvs.push(mesh.uv[v * 2], mesh.uv[v * 2 + 1]);
+      colors.push(mesh.color[v * 4], mesh.color[v * 4 + 1], mesh.color[v * 4 + 2], mesh.color[v * 4 + 3]);
+    }
+  }
+  // Exactly the mound's height (pieces under the ground are hidden by it), and no wider than the
+  // footprint and a little spill.
+  let top = 0;
+  let spillX = 0;
+  let spillZ = 0;
+  for (let i = 0; i < positions.length; i += 3) {
+    top = Math.max(top, positions[i + 1]);
+    spillX = Math.max(spillX, Math.abs(positions[i]));
+    spillZ = Math.max(spillZ, Math.abs(positions[i + 2]));
+  }
+  const sy = top > 0 ? height / top : 1;
+  const sx = spillX > (w / 2) * 1.08 ? ((w / 2) * 1.08) / spillX : 1;
+  const sz = spillZ > (d / 2) * 1.08 ? ((d / 2) * 1.08) / spillZ : 1;
+  for (let i = 0; i < positions.length; i += 3) {
+    positions[i] *= sx;
+    positions[i + 1] *= sy;
+    positions[i + 2] *= sz;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4));
+  g.computeVertexNormals();
+  return g;
+}
+
+/**
+ * One geometry from several atlas parts (unindexed: position, texture coordinates, color with
+ * the wall mask in its alpha), so a mound and the art's rubble under it are one draw call.
+ */
+export function mergeAtlasParts(parts: readonly THREE.BufferGeometry[]): THREE.BufferGeometry {
+  const positions: number[] = [];
+  const uvs: number[] = [];
+  const colors: number[] = [];
+  for (const source of parts) {
+    const g = source.index ? source.toNonIndexed() : source;
+    const position = g.getAttribute('position');
+    const uv = g.getAttribute('uv');
+    const color = g.getAttribute('color');
+    for (let v = 0; v < position.count; v++) {
+      positions.push(position.getX(v), position.getY(v), position.getZ(v));
+      uvs.push(uv ? uv.getX(v) : 0, uv ? uv.getY(v) : 0);
+      if (color) colors.push(color.getX(v), color.getY(v), color.getZ(v), color.itemSize >= 4 ? color.getW(v) : 0);
+      else colors.push(1, 1, 1, 0);
+    }
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  out.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  out.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4));
+  out.computeVertexNormals();
+  return out;
+}
+
+/**
+ * The triangles of `source` that lie within `radius` of the vertical axis through (ax, az), cut
+ * off at height `cut` (what is above it is dropped, edges crossing it end on it; texture
+ * coordinates and colors follow). The radio mast's lattice without its top: what falls over.
+ */
+export function latticeBelow(source: THREE.BufferGeometry, ax: number, az: number, radius: number, cut: number): THREE.BufferGeometry {
+  const g = source.index ? source.toNonIndexed() : source;
+  const position = g.getAttribute('position');
+  const uv = g.getAttribute('uv');
+  const color = g.getAttribute('color');
+  const colorSize = color ? color.itemSize : 0;
+  const out = { position: [] as number[], uv: [] as number[], color: [] as number[] };
+  // One vertex as a flat record: x y z u v r g b a.
+  const vertex = (i: number): number[] => [
+    position.getX(i),
+    position.getY(i),
+    position.getZ(i),
+    uv ? uv.getX(i) : 0,
+    uv ? uv.getY(i) : 0,
+    color ? color.getX(i) : 1,
+    color ? color.getY(i) : 1,
+    color ? color.getZ(i) : 1,
+    color && colorSize >= 4 ? color.getW(i) : 1,
+  ];
+  const emit = (v: number[]): void => {
+    out.position.push(v[0], v[1], v[2]);
+    out.uv.push(v[3], v[4]);
+    out.color.push(v[5], v[6], v[7], v[8]);
+  };
+  const lerp = (a: number[], b: number[]): number[] => {
+    const t = (cut - a[1]) / (b[1] - a[1]);
+    return a.map((x, k) => x + (b[k] - x) * t);
+  };
+  for (let i = 0; i + 2 < position.count; i += 3) {
+    const tri = [vertex(i), vertex(i + 1), vertex(i + 2)];
+    if (tri.some((v) => Math.hypot(v[0] - ax, v[2] - az) > radius)) continue;
+    // Clip the triangle to y <= cut (Sutherland-Hodgman against one plane), then fan it.
+    const poly: number[][] = [];
+    for (let k = 0; k < 3; k++) {
+      const a = tri[k];
+      const b = tri[(k + 1) % 3];
+      const aIn = a[1] <= cut;
+      const bIn = b[1] <= cut;
+      if (aIn) poly.push(a);
+      if (aIn !== bIn) poly.push(lerp(a, b));
+    }
+    for (let k = 1; k + 1 < poly.length; k++) {
+      emit(poly[0]);
+      emit(poly[k]);
+      emit(poly[k + 1]);
+    }
+  }
+  const result = new THREE.BufferGeometry();
+  result.setAttribute('position', new THREE.Float32BufferAttribute(out.position, 3));
+  result.setAttribute('uv', new THREE.Float32BufferAttribute(out.uv, 2));
+  result.setAttribute('color', new THREE.Float32BufferAttribute(out.color, 4));
+  result.computeVertexNormals();
+  return result;
+}
+
 function fromModel(model: RigModel, def: ArchetypeDef): ArchetypeGeometry | null {
   const find = (name: string): number => model.nodes.findIndex((n) => n.name === name);
   const intactIndex = find('intact');
@@ -285,7 +476,7 @@ function fromModel(model: RigModel, def: ArchetypeDef): ArchetypeGeometry | null
   const rubbleIndex = find('rubble');
   const damaged = damagedIndex >= 0 ? partsOfNode(model, damagedIndex) : intact;
   const fallback = proceduralStates(def);
-  const rubble = rubbleIndex >= 0 ? partsOfNode(model, rubbleIndex) : fallback.states[2];
+  const rubble = rubbleIndex >= 0 ? partsOfNode(model, rubbleIndex) : fallback.base;
 
   // Collapse pieces: the art's own meshes, kept centered on their own middle.
   const chunks: ChunkBox[] = [];
@@ -304,10 +495,40 @@ function fromModel(model: RigModel, def: ArchetypeDef): ArchetypeGeometry | null
     const mesh = atlasParts.length > 0 ? chunkMesh(atlasParts.map((p) => p.geometry), center) : undefined;
     chunks.push({ x: center.x, y: center.y, z: center.z, w: size.x, h: size.y, d: size.z, mesh });
   });
+
+  // The mound: the building's own pieces piled half its height, on the art's low rubble (a
+  // bridge deck keeps the art's rubble alone).
+  const pile = moundGeometry(chunks, def, moundHeight(def));
+  const atlasRubble = rubble.filter((p) => p.material === 'city_atlas');
+  const mound: StatePart[] = pile
+    ? [{ geometry: mergeAtlasParts([pile, ...atlasRubble.map((p) => p.geometry)]), material: 'city_atlas' }, ...rubble.filter((p) => p.material !== 'city_atlas')]
+    : rubble;
+
+  // A radio mast: only its lattice falls (the pad and the hut stay with the stump), and without
+  // the top section, which tumbles on its own and lands as a city weapon (docs/ASSETS.md section 3).
+  const topIndex = find('top');
+  let top: ArchetypeGeometry['top'] = null;
+  let fall: StatePart[] = damaged.length > 0 ? damaged : intact;
+  if (topIndex >= 0 && model.nodes[topIndex].parts.length > 0) {
+    const node = model.nodes[topIndex];
+    const at = new THREE.Vector3();
+    for (let i = topIndex; i >= 0; i = model.nodes[i].parent) at.add(model.nodes[i].position);
+    let reach = 0;
+    for (const part of node.parts) {
+      const p = part.geometry.getAttribute('position');
+      for (let v = 0; v < p.count; v++) reach = Math.max(reach, Math.hypot(p.getX(v), p.getZ(v)));
+    }
+    top = { parts: node.parts.map((p) => ({ geometry: p.geometry, material: p.material })), at };
+    const radius = Math.max(1.2, reach * 2.5);
+    fall = intact.map((p) => ({ geometry: latticeBelow(p.geometry, at.x, at.z, radius, at.y), material: p.material }));
+  }
   return {
-    states: [intact, damaged.length > 0 ? damaged : intact, rubble],
+    states: [intact, damaged.length > 0 ? damaged : intact, mound],
     chunks: chunks.length > 0 ? chunks : fallback.chunks,
     procedural: false,
+    fall,
+    base: rubble,
+    top,
   };
 }
 

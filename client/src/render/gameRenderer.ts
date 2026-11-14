@@ -26,8 +26,10 @@ import type { AssetStore } from '../assets/assetStore';
 import { frameRect } from '../assets/spriteAtlas';
 import type { CityMirror } from '../net/cityMirror';
 import { hintPose, type ActionHint, type FrameState } from '../net/matchSession';
+import { ArtilleryView } from './artilleryView';
 import { Boundary } from './boundary';
 import { CityView } from './cityView';
+import { CratesView } from './cratesView';
 import { atlasPixels, renderLandmarkPictures } from './landmarkPictures';
 import { Crowd } from './crowd';
 import { Effects } from './effects';
@@ -39,6 +41,11 @@ import { ProjectilesView } from './projectilesView';
 import { QuadBatch } from './quadBatch';
 import { Sky, type FogRange } from './sky';
 import { UnitsView } from './unitsView';
+import { WeaponsFx, type WeaponsFxContext } from './weaponsFx';
+// Phase 2, the city and the monster's weight: special buildings, the street under its feet, the army's speed.
+import { MotionFx } from './motionFx';
+import { SpecialsView } from './specialsView';
+import { KaijuWeight } from './weight';
 
 export interface RenderView {
   /** The kaiju the local player controls, or -1. */
@@ -76,6 +83,8 @@ export interface RenderCues {
   onStep?: (k: SnapKaiju) => void;
   /** The kaiju went into the water to swim, or came up (sim/swim.ts). */
   onSplash?: (k: SnapKaiju) => void;
+  /** Windows burst out of buildings by the monster's feet (render/weight.ts): `panes` bits of glass round (x, y, z). */
+  onGlass?: (x: number, y: number, z: number, panes: number) => void;
 }
 
 const FOG: Record<StageId, FogRange> = {
@@ -92,18 +101,6 @@ const WEAK_POINT_COLOR = 0xc9a6ff;
 
 /** Height of the faint curtain above the quarantine line, by stage: a line first, a wall never. */
 const CURTAIN: Record<StageId, number> = { 1: 2.5, 2: 7, 3: 20 };
-
-interface GroundMark {
-  /** Call-in mission id. */
-  id: number;
-  x: number;
-  z: number;
-  radius: number;
-  until: number;
-  r: number;
-  g: number;
-  b: number;
-}
 
 /** Seconds a roar's shockwave takes to reach the edge of its radius. */
 const ROAR_WAVE = 0.8;
@@ -128,7 +125,7 @@ export class GameRenderer {
   readonly materials: Materials;
   readonly sky: Sky;
   readonly effects: Effects;
-  readonly lines = new LineBatch(128);
+  readonly lines = new LineBatch(256);
   readonly stats: RenderStats = { calls: 0, triangles: 0, particles: 0, projectiles: 0, chunks: 0, sprites: 0, props: 0 };
   cues: RenderCues = {};
 
@@ -140,6 +137,25 @@ export class GameRenderer {
   private readonly units: UnitsView;
   private readonly crowd: Crowd;
   private readonly projectiles: ProjectilesView;
+  /** Phase 2: the monster's city weapons and surge (events), the army's crates and its artillery. */
+  private readonly weaponsFx: WeaponsFx;
+  private readonly crates: CratesView;
+  private readonly artillery: ArtilleryView;
+  private readonly fxContext: WeaponsFxContext = {
+    kaiju: (id) => this.kaijuAt(id),
+    unit: (id) => this.lastFrame?.units[id],
+    view: (id) => this.kaijuViews[id],
+    inside: (id) => this.insideKaiju(id),
+  };
+  /** Phase 2: the special buildings, the monster's weight on the street, the army's dust and speed streaks. */
+  private specials: SpecialsView | null = null;
+  private weight: KaijuWeight | null = null;
+  private readonly motion = new MotionFx();
+  /**
+   * Structures that went to rubble on this frame's events: they collapse where they stand at the
+   * end of the events, unless a `structureFall` on the same tick tips them over instead.
+   */
+  private readonly collapses = new Set<number>();
   private readonly boundary = new Boundary();
   private readonly kaijuViews: KaijuView[] = [];
   private city: CityView | null = null;
@@ -155,7 +171,6 @@ export class GameRenderer {
    * once, so joining (or a sandbox starting) at stage 3 never opens on a fading afternoon sky.
    */
   private stageSeen = false;
-  private readonly marks: GroundMark[] = [];
   private readonly pending: PendingFx[] = [];
   /** The latest roar, so that the units it shakes jolt when its front reaches them. */
   private lastRoar = { x: 0, z: 0, radius: 0, time: -1e9 };
@@ -177,22 +192,28 @@ export class GameRenderer {
 
     const atlas = assets.atlas;
     if (!atlas) throw new Error('renderer needs the sprite atlas (call AssetStore.preload first)');
-    this.sprites = new QuadBatch(atlas.texture, { mode: 'upright', capacity: 2600, alphaTest: 0.5 });
+    this.sprites = new QuadBatch(atlas.texture, { mode: 'upright', capacity: 2600, alphaTest: 0.5, dither: true });
     this.decals = new QuadBatch(atlas.texture, { mode: 'ground', capacity: 300, renderOrder: 3, depthBias: 4 });
     this.markers = new QuadBatch(atlas.texture, { mode: 'facing', capacity: 128, renderOrder: 18, fog: false });
     this.glow = new QuadBatch(atlas.texture, { mode: 'facing', capacity: 256, additive: true, renderOrder: 17 });
     this.units = new UnitsView(assets, this.materials, this.sprites, this.decals, this.markers);
     this.crowd = new Crowd(assets, this.sprites);
     this.projectiles = new ProjectilesView(assets, this.materials, this.glow);
+    this.weaponsFx = new WeaponsFx(assets, this.materials, this.effects, this.units);
+    this.crates = new CratesView(assets, this.materials, this.effects, this.glow);
+    this.artillery = new ArtilleryView(assets, this.effects, this.decals);
     this.scene.add(
       this.units.group,
       this.projectiles.group,
+      this.weaponsFx.group,
+      this.crates.group,
       this.sprites.mesh,
       this.decals.mesh,
       this.markers.mesh,
       this.glow.mesh,
       this.effects.group,
       this.lines.mesh,
+      this.motion.lines.mesh,
       this.boundary.mesh,
     );
     const first = (id: string, out: number[]): void => {
@@ -215,10 +236,14 @@ export class GameRenderer {
     this.cityData = city;
     if (this.city) this.scene.remove(this.city.group);
     if (this.ground) this.scene.remove(this.ground);
+    if (this.specials) this.scene.remove(this.specials.group);
     this.ground = buildGround(city, this.assets);
     this.city = new CityView(city, this.assets, this.materials);
+    this.specials = new SpecialsView(city, this.assets);
+    this.weight = new KaijuWeight(city, this.city, this.effects);
+    this.weight.onGlass = (x, y, z, panes) => this.cues.onGlass?.(x, y, z, panes);
     this.pictures = null;
-    this.scene.add(this.ground, this.city.group);
+    this.scene.add(this.ground, this.city.group, this.specials.group);
   }
 
   /**
@@ -272,7 +297,13 @@ export class GameRenderer {
     this.projectiles.clear();
     this.units.clear();
     this.crowd.clear();
-    this.marks.length = 0;
+    this.weaponsFx.clear();
+    this.crates.clear();
+    this.artillery.clear();
+    this.specials?.clear();
+    this.weight?.clear();
+    this.motion.clear();
+    this.collapses.clear();
     this.pending.length = 0;
     this.lastRoar.time = -1e9;
   }
@@ -367,6 +398,16 @@ export class GameRenderer {
         // These only change lasting state: handled as always.
         this.handleEvent(e);
         break;
+      case 'structureFall':
+        // It lies where it fell, at once.
+        if (city) {
+          city.setStage(e.id, 3, false);
+          city.setFallen(e.id, e.side, 0);
+        }
+        break;
+      case 'looseProp':
+        city?.setLoose(e.id, e.state === 'down' ? { id: e.id, prop: e.prop, x: e.x, z: e.z, yaw: e.yaw } : null);
+        break;
       default:
         break;
     }
@@ -384,21 +425,28 @@ export class GameRenderer {
     }
     const fx = this.effects;
     const city = this.city;
+    // The monster's city weapons and surge (weaponsFx.ts), the army's crates.
+    this.weaponsFx.handleEvent(e, this.fxContext);
+    if (e.type === 'crate') this.crates.handleEvent(e);
+    // Falls, rubble, loose city weapons, the special buildings, the street under the monster's feet.
+    this.cityEvent(e);
     switch (e.type) {
       case 'projectileSpawn': {
         const k = e.owner === 'kaiju' ? this.kaijuAt(e.ownerId) : undefined;
         // A thrown thing leaves the model's hand (the simulation throws it from a point of its own).
         const view = e.owner === 'kaiju' && e.projectile === 'thrown' ? this.kaijuViews[e.ownerId] : undefined;
         this.projectiles.spawn(e, k ? kaijuStageDef(k.kind, k.stage).bodyRadius * 0.9 : 3, view?.hasHand ? view.hand : null);
-        if (e.owner === 'unit') {
-          this.units.noteFired(e.ownerId, this.time);
-          fx.flash(e.x, e.y, e.z, e.projectile === 'rocket' ? 2.5 : 5, 0xffffff, 0.1);
-          fx.puff(e.x, e.y, e.z, e.projectile === 'rocket' ? 1.5 : 3, 0xd8d2c4, 0.6, 0.5);
-        }
+        if (e.owner === 'unit') this.muzzle(e.ownerId, e.projectile, e.x, e.y, e.z);
         break;
       }
       case 'projectileHit': {
-        this.projectiles.hit(e);
+        // A city weapon the kaiju threw has its own picture where it lands (weaponsFx.ts).
+        const prop = this.projectiles.hit(e);
+        if (prop) {
+          this.weaponsFx.landed(e, prop);
+          break;
+        }
+        this.artillery.shellHit(e);
         const r = Math.max(2, e.splash);
         if (e.target === 'water') fx.splash(e.x, e.z, r);
         else if (e.target === 'none') fx.puff(e.x, e.y, e.z, r * 0.6);
@@ -410,17 +458,14 @@ export class GameRenderer {
       }
       case 'structureStage': {
         if (!city) break;
-        const info = city.setStage(e.id, e.stage, true);
+        // To rubble: it collapses where it stands at the end of this frame's events, unless a
+        // `structureFall` of the same tick tips it over instead (`collapses`, `endEvents`).
+        const info = city.setStage(e.id, e.stage, e.stage < 3);
         city.flush();
-        if (info) {
-          if (e.stage >= 3) {
-            fx.dust(info.x, 0.5, info.z, info.radius * 1.3, Math.min(22, 8 + Math.round(info.height / 6)));
-            fx.dust(info.x, info.height * 0.35, info.z, info.radius, 6);
-            fx.ring(info.x, info.z, info.radius * 2.2, 0xd8cfbd, 0.9, 0.6);
-          } else {
-            fx.dust(info.x, info.height * 0.5, info.z, info.radius * 0.6, 4);
-            fx.glowAt(info.x, info.height * 0.6, info.z, info.radius * 1.6, 0xffe0b0, 0.08);
-          }
+        if (e.stage >= 3) this.collapses.add(e.id);
+        else if (info) {
+          fx.dust(info.x, info.height * 0.5, info.z, info.radius * 0.6, 4);
+          fx.glowAt(info.x, info.height * 0.6, info.z, info.radius * 1.6, 0xffe0b0, 0.08);
         }
         break;
       }
@@ -560,16 +605,10 @@ export class GameRenderer {
       case 'volley':
         fx.ring(e.x, e.z, 6 + e.charge * 8, 0xffd91a, 0.4);
         break;
-      case 'callin': {
-        if (e.phase === 'marked') {
-          // Kept until the mission reports 'done' (or, if that never comes, a while after the barrage).
-          this.marks.push({ id: e.id, x: e.x, z: e.z, radius: e.radius, until: this.time + e.delay + 8, r: 1, g: 0.3, b: 0.2 });
-        } else if (e.phase === 'done') {
-          const i = this.marks.findIndex((m) => m.id === e.id);
-          if (i >= 0) this.marks.splice(i, 1);
-        }
+      case 'callin':
+        // The artillery radio's fire mission: smoke, a closing ring, big explosions (artilleryView.ts).
+        this.artillery.handleCallIn(e);
         break;
-      }
       case 'cocoon':
         fx.dust(e.x, 0.5, e.z, 6, 10, 0xb89a80);
         break;
@@ -587,6 +626,130 @@ export class GameRenderer {
       default:
         break;
     }
+  }
+
+  /**
+   * A unit's shot leaves its muzzle: each weapon its own flash, so they read apart (phase 2's
+   * pick-ups): rockets a small flash and a puff, a tank's shell a bigger one, the machine gun a
+   * quick small flicker, the big cannon a great flash, a ring of blast on the ground and a kick
+   * of the hull, the missile pod a burst of smoke.
+   */
+  private muzzle(unitId: number, type: string, x: number, y: number, z: number): void {
+    const fx = this.effects;
+    this.units.noteFired(unitId, this.time, type === 'heavyShell');
+    if (type === 'tracer') {
+      fx.flash(x, y, z, 1.8, 0xffffff, 0.05);
+    } else if (type === 'heavyShell') {
+      fx.flash(x, y, z, 9, 0xffffff, 0.14);
+      fx.puff(x, y, z, 5, 0xd8d2c4, 1.1, 0.6);
+      fx.ring(x, z, 9, 0xf1e2c4, 0.4, 0.7);
+      fx.dust(x, 0.4, z, 4, 5);
+    } else if (type === 'missile') {
+      fx.flash(x, y, z, 3, 0xffffff, 0.08);
+      fx.puff(x, y, z, 2.5, 0xe8e2d6, 1.2, 0.55);
+    } else {
+      fx.flash(x, y, z, type === 'rocket' ? 2.5 : 5, 0xffffff, 0.1);
+      fx.puff(x, y, z, type === 'rocket' ? 1.5 : 3, 0xd8d2c4, 0.6, 0.5);
+    }
+  }
+
+  /**
+   * The city's and the monster's weight's part of an event (docs/ROADMAP.md phase 2): buildings
+   * falling over, loose city weapons, a propane tank set off where it stands, the special
+   * buildings' rewards (specialsView.ts), and the landings that shake the street (weight.ts).
+   */
+  private cityEvent(e: SimEvent): void {
+    const city = this.city;
+    const fx = this.effects;
+    const query = this.mirror?.query ?? null;
+    switch (e.type) {
+      case 'structureFall': {
+        if (!city) break;
+        const s = this.cityData?.structures[e.id];
+        if (e.phase === 'falling') {
+          // It tips over instead of collapsing where it stood: dust bursts from its foot.
+          this.collapses.delete(e.id);
+          city.setStage(e.id, 3, false);
+          city.setFallen(e.id, e.side, e.duration);
+          if (s) {
+            fx.dust(s.x, 0.5, s.z, Math.max(s.hx, s.hz) * 1.2, 10);
+            fx.ring(s.x, s.z, Math.max(s.hx, s.hz) * 2, 0xd8cfbd, 0.8, 0.5);
+          }
+        } else {
+          // (A page that came back mid-fall redrew it as rubble: it lies down now.)
+          if (!city.fallen(e.id)) city.setFallen(e.id, e.side, 0);
+          city.land(e.id);
+          // It lands along its length: a wall of dust from its foot to where its top hit.
+          const width = s ? Math.max(s.hx, s.hz) : 6;
+          const length = Math.hypot(e.topX - e.x, e.topZ - e.z);
+          const n = Math.min(12, 3 + Math.round(length / 10));
+          for (let i = 0; i <= n; i++) {
+            const f = i / n;
+            fx.dust(e.x + (e.topX - e.x) * f, 0.5, e.z + (e.topZ - e.z) * f, width * 0.9, 2, 0xcfc4ae);
+          }
+          fx.ring(e.topX, e.topZ, width * 3, 0xd8cfbd, 0.7, 0.7);
+          fx.debris(e.topX, 1, e.topZ, width * 0.8, 8, 0xa8a094, Math.max(0.8, width * 0.12));
+        }
+        break;
+      }
+      case 'looseProp':
+        city?.setLoose(e.id, e.state === 'down' ? { id: e.id, prop: e.prop, x: e.x, z: e.z, yaw: e.yaw } : null);
+        // A fallen mast's top comes to rest: dust where it lies.
+        if (e.state === 'down' && e.cause === 'mast') fx.dust(e.x, 0.4, e.z, 4, 6);
+        break;
+      case 'kaijuHeld':
+        if (e.source === 'loose') city?.setLoose(e.sourceId, null);
+        break;
+      case 'propaneBlast':
+        // Set off where it stood, or crushed: the city's (a thrown tank or one in the hand: weaponsFx.ts).
+        if (e.how === 'ground' || e.how === 'crushed') fx.propaneBlast(e.x, e.y, e.z, e.radius);
+        break;
+      case 'powerSurge':
+      case 'fireball':
+      case 'mastFall':
+        this.specials?.handleEvent(e, fx);
+        break;
+      case 'kaijuAction': {
+        // A stomp lands, a charge ends in its stumble: the buildings round it sway, windows burst, cars jump.
+        const k = this.kaijuAt(e.kaiju);
+        if (!k || !this.weight) break;
+        if (e.action === 'stomp' && e.phase === 'active') this.weight.land(e.x, e.z, k.kind, k.stage, query);
+        else if (e.action === 'charge' && e.phase === 'stumble') {
+          const r = kaijuStageDef(k.kind, k.stage).bodyRadius * 1.4;
+          this.weight.land(e.x + Math.sin(e.yaw) * r, e.z + Math.cos(e.yaw) * r, k.kind, k.stage, query, 0.8);
+        }
+        break;
+      }
+      case 'moltBlast': {
+        // The new body comes out of the cocoon: it lands like a stomp, only harder.
+        const k = this.kaijuAt(e.kaiju);
+        if (k) this.weight?.land(e.x, e.z, k.kind, k.stage, query, 1.25);
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  /** The end of a frame's events: what went to rubble and did not fall over collapses where it stood. */
+  private endEvents(): void {
+    const city = this.city;
+    if (!city || this.collapses.size === 0) return;
+    const fx = this.effects;
+    for (const id of this.collapses) {
+      const info = city.collapse(id);
+      if (!info) continue;
+      fx.dust(info.x, 0.5, info.z, info.radius * 1.3, Math.min(22, 8 + Math.round(info.height / 6)));
+      fx.dust(info.x, info.height * 0.35, info.z, info.radius, 6);
+      fx.ring(info.x, info.z, info.radius * 2.2, 0xd8cfbd, 0.9, 0.6);
+    }
+    this.collapses.clear();
+  }
+
+  /** A kaiju's foot came down (its view's gait): the sound and the shake (the match runtime), and the street. */
+  private footstep(k: SnapKaiju): void {
+    this.cues.onStep?.(k);
+    if (k.phase !== 'cocoon') this.weight?.step(k, this.mirror?.query ?? null);
   }
 
   // --- per frame -------------------------------------------------------------------------------
@@ -678,7 +841,7 @@ export class GameRenderer {
       frame.kaijus.forEach((k, i) => {
         let kv = this.kaijuViews[i];
         if (!kv) {
-          kv = new KaijuView(this.assets, this.materials, { onStep: (kk) => this.cues.onStep?.(kk), onSplash: (kk) => this.cues.onSplash?.(kk) });
+          kv = new KaijuView(this.assets, this.materials, { onStep: (kk) => this.footstep(kk), onSplash: (kk) => this.cues.onSplash?.(kk) });
           this.kaijuViews[i] = kv;
           this.scene.add(kv.group);
         }
@@ -687,6 +850,7 @@ export class GameRenderer {
           firstPerson: own,
           insideHead: own && view.kaijuInsideHead,
           camera: this.camera.position,
+          local: k.id === view.localKaiju,
         });
         const st = kaijuStageDef(k.kind, k.stage);
         if (k.phase !== 'cocoon' || k.id === view.localKaiju || view.seesKaiju) {
@@ -711,6 +875,8 @@ export class GameRenderer {
           localUnit: view.localUnit,
           localSquad: view.localSquad,
           hideLocalLead: view.hideLocalLead,
+          // Third person from a unit: its own squad fades near the camera.
+          fadeSquadNear: view.localUnit >= 0 && !view.hideLocalLead,
           city: query,
           kaijus: frame.kaijus,
         },
@@ -732,28 +898,23 @@ export class GameRenderer {
         this.crowd.update(dt, time, query, frame.bounds, known ? frame.kaijus : NO_KAIJUS, known ? focus.x : cam.x, known ? focus.z : cam.z, spread, 25 + st.height * 3, this.camera);
       }
 
-      // Call-in marks on the ground.
-      for (let i = 0; i < this.marks.length; i++) {
-        const m = this.marks[i];
-        if (m.until < time) {
-          this.marks[i] = this.marks[this.marks.length - 1];
-          this.marks.pop();
-          i--;
-          continue;
-        }
-        const pulse = 0.55 + 0.4 * Math.sin(time * 9);
-        this.decals.push(m.x, 0.2, m.z, m.radius * 2, m.radius * 2, this.ringUv, 0, m.r, m.g, m.b, pulse);
-      }
-
-      this.projectiles.update(frame.tick, dt, this.effects, this.camera);
+      this.artillery.update(dt);
+      this.crates.update(frame.crates, frame.tick, dt, this.camera, this.lines);
+      this.weaponsFx.update(dt);
+      this.projectiles.update(frame.tick, dt, this.effects, this.camera, this.lines);
       this.applyStage(frame.match.stage, !this.stageSeen);
       this.stageSeen = true;
     }
 
+    this.endEvents();
     this.stats.chunks = this.city ? this.city.update(dt) : 0;
-    // Props are drawn out to a distance that grows with the camera's height.
+    // Props are drawn out to a distance that grows with the camera's height (and hop at the monster's feet).
     const cam = this.camera.position;
-    this.stats.props = this.city ? this.city.updateProps(cam.x, cam.z, Math.min(950, 330 + cam.y * 2.6)) : 0;
+    this.stats.props = this.city ? this.city.updateProps(cam.x, cam.z, Math.min(950, 330 + cam.y * 2.6), dt) : 0;
+    this.weight?.tick(dt);
+    const city = this.city;
+    if (city) this.specials?.update(dt, this.camera, (id) => city.stageOf(id), frame?.kaijus ?? NO_KAIJUS, this.effects, this.sky.fog);
+    if (frame && view) this.motion.update(dt, frame.units, frame.localUnit ?? null, this.camera, this.effects, this.sky.fog);
     this.runPending();
     this.effects.update(dt, this.camera);
     this.boundary.update(dt, time);

@@ -56,6 +56,14 @@ const ART: Record<string, string> = {
   k_charge: `<path d="M20 20 Q26 10 38 11 L52 16 L60 37 L42 41 Q35 47 27 46 Q19 44 18 34 Z" ${F}/><path d="M3 16 L12 16 M3 28 L8 28 M3 40 L12 40 M8 53 L21 53" ${S}/>`,
   k_tailsweep: `<path d="M4 59 Q3 24 38 12 Q52 8 60 11 Q47 15 36 23 Q22 35 20 59 Z" ${F}/><path d="M29 47 Q35 33 51 27 M40 53 Q46 42 59 38" ${S}/>`,
   k_swim: `<path d="M12 36 L19 21 L25 36 Z M24 36 L32 14 L40 36 Z M39 36 L46 22 L52 36 Z" ${F}/><path d="M5 41 Q11.5 35.5 18 41 T31 41 T44 41 T57 41 M10 53 Q16.5 47.5 23 53 T36 53 T49 53" ${S}/>`,
+  // The city as a weapon and the power surge (phase 2; the art files are in public/assets/ui):
+  // the sign swung as a club, a javelin thrown point first, the garage door as a shield, the
+  // hand letting go, a lightning bolt.
+  k_club: `<path d="M7 58 L37 30" ${S}/><path d="M31 16 Q31 3 44 3 Q57 3 57 16 Z M30 19 L58 19 L58 24.5 L30 24.5 Z M33 27.5 L55 27.5 Q55 33.5 49 33.5 L39 33.5 Q33 33.5 33 27.5 Z" ${F}/>`,
+  k_javelin: `<path d="M9 55 L46 18 M27 26 L42 41 M20.5 34.5 L30 44" ${S}/><path d="M60 4 L43 13.5 L50.5 21 Z" ${F}/>`,
+  k_shield: `<path d="M16 7 L57 7 L57 57 L16 57 Z" ${F}/><path d="M4 15 L10 19 M3 32 L10 32 M4 49 L10 45" ${S}/>`,
+  k_drop: `<path d="M22 6 L42 6 L48 18 M22 6 L16 18" ${S}/><path d="M25 38 L39 38 Q43.5 38 43.5 42.5 Q43.5 47 39 47 L25 47 Q20.5 47 20.5 42.5 Q20.5 38 25 38 Z" ${F}/><path d="M8 57 L56 57" ${S}/>`,
+  k_surge: `<path d="M38 3 L13 36 L29.5 36 L23.5 61 L51 25 L34.5 25 Z" ${F}/>`,
   // --- status ---
   st_health: `<path d="M32 54 L10 32 Q4 18 18 14 Q28 12 32 24 Q36 12 46 14 Q60 18 54 32 Z" ${F}/>`,
   st_nerve: `<path d="M6 34 L18 34 L24 14 L34 50 L42 26 L46 34 L58 34" ${S}/>`,

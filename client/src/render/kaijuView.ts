@@ -1,7 +1,8 @@
 /**
  * One kaiju on screen: the rig for its current stage, posed by the animator, with the cocoon,
- * the thing it holds, its weak point and its beam. The rig is whatever the AssetStore has for
- * `kaiju_<kind>_s<stage>`: the art file or the box stand-in, the same code drives both.
+ * the thing it holds (a city weapon by its grip: render/kaijuWeapons.ts), its weak point, its
+ * beam and its power surge. The rig is whatever the AssetStore has for `kaiju_<kind>_s<stage>`:
+ * the art file or the box stand-in, the same code drives both.
  */
 
 import * as THREE from 'three';
@@ -22,6 +23,7 @@ import {
 } from '@mb/shared';
 import type { AssetStore } from '../assets/assetStore';
 import type { Effects } from './effects';
+import { HeldWeapon, SurgeArcs } from './kaijuWeapons';
 import { computeKaijuPose, createKaijuPose, posesFromManifest, type NodePose, type PoseTable } from './kaijuAnimator';
 import type { LineBatch } from './lineBatch';
 import type { Materials } from './materials';
@@ -58,6 +60,8 @@ export interface KaijuViewFrame {
   insideHead: boolean;
   /** Where the camera is (for the weak point's halo, drawn on the side facing it). */
   camera?: THREE.Vector3;
+  /** The local player's own kaiju (in either view): a javelin in its hand shows an aim line. */
+  local?: boolean;
 }
 
 const NOT_LOCAL: KaijuViewFrame = { firstPerson: false, insideHead: false };
@@ -104,6 +108,9 @@ export class KaijuView {
   private cocoon: SceneRig | null = null;
   private held: SceneRig | null = null;
   private heldKey = '';
+  /** A city weapon in the hand, held by its grip (phase 2). */
+  private readonly weapon: HeldWeapon;
+  private readonly surge: SurgeArcs;
   private readonly pose = createKaijuPose();
   private readonly current = new Map<string, NodePose>();
   private hipsLift = 0;
@@ -128,7 +135,24 @@ export class KaijuView {
     this.assets = assets;
     this.materials = materials;
     this.callbacks = callbacks;
+    this.weapon = new HeldWeapon(assets, materials);
+    this.surge = new SurgeArcs(materials);
     for (const name of this.pose.rotations.keys()) this.current.set(name, { x: 0, y: 0, z: 0 });
+  }
+
+  /** The city weapon in the hand, or null (for effects: where a sign breaks, a door is hit). */
+  get weaponKind(): string | null {
+    return this.weapon.kind;
+  }
+
+  /** The far end of the city weapon in the hand (the sign's head), valid after update(). */
+  get weaponEnd(): THREE.Vector3 {
+    return this.weapon.end;
+  }
+
+  /** A shot hit the garage door in the hand: it jolts. */
+  shieldHit(damage: number): void {
+    this.weapon.hit(damage);
   }
 
   private ensureRig(k: SnapKaiju): SceneRig {
@@ -141,6 +165,7 @@ export class KaijuView {
       this.poses = this.assets.hasModel(key) ? posesFromManifest(this.assets.manifest.models[key]?.poses) : null;
       this.group.add(this.rig.root);
       this.dropHeld();
+      this.surge.reset();
       // The glowing facets outside the weak point (eyes, the embers at the roots of the spines
       // and tail spikes) get their own material, so they can heat up with rage and the beam.
       this.ember ??= this.materials.glow.clone();
@@ -153,6 +178,7 @@ export class KaijuView {
     this.held?.dispose();
     this.held = null;
     this.heldKey = '';
+    this.weapon.set(null, null);
   }
 
   private updateHeld(k: SnapKaiju, rig: SceneRig, firstPerson: boolean): void {
@@ -161,7 +187,11 @@ export class KaijuView {
     if (key !== this.heldKey) {
       this.dropHeld();
       const hold = rig.node('hold');
-      if (held && hold) {
+      if (held && hold && held.kind === 'prop' && this.weapon.handles(held.prop)) {
+        // A city weapon: held by its grip and turned the way it is used (kaijuWeapons.ts).
+        this.weapon.set(held.prop, hold);
+        this.heldKey = key;
+      } else if (held && hold) {
         const model = this.assets.model(key);
         this.held = new SceneRig(model, this.materials);
         this.heldKey = key;
@@ -349,6 +379,14 @@ export class KaijuView {
     rig.setVisible('jaw', !hideLimbs);
 
     this.updateHeld(k, rig, assembly);
+    // A city weapon in the hand and the power surge (kaijuWeapons.ts): both read the hand and the
+    // nodes where this frame's pose has put them.
+    if (this.weapon.kind !== null || k.surge > 0 || this.surge.active) {
+      this.group.updateMatrixWorld(true);
+      const u = phaseDuration > 0 ? Math.min(1, phaseTime / phaseDuration) : 0;
+      this.weapon.update(k, { action, phase, u }, dt, time, { firstPerson: assembly, local: view.local === true, camera: view.camera }, lines);
+      this.surge.update(k, rig, this.ember, dt, lines, effects, rig.root.visible);
+    }
 
     // A staggered kaiju's weak point also gets a halo of its light, toward whoever looks: from a
     // squad's eye, across a dark city, the crystal alone is a few pixels.
@@ -456,12 +494,15 @@ export class KaijuView {
 
   hide(): void {
     this.group.visible = false;
+    this.surge.reset();
   }
 
   dispose(): void {
     this.rig?.dispose();
     this.cocoon?.dispose();
     this.dropHeld();
+    this.weapon.dispose();
+    this.surge.reset();
     this.group.removeFromParent();
   }
 }

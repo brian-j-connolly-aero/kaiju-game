@@ -45,6 +45,18 @@ export interface LocalMatchControl {
   world: World;
   /** Moves the match straight to a stage, as the end of a molt does. */
   toStage(stage: StageId): void;
+  /**
+   * Changes the world between two steps (a playtest setting a scene: a city weapon laid in
+   * reach, a supply crate dropped beside a squad) and sends the events `change` raised with the
+   * next snapshot, as if a step had raised them.
+   */
+  apply(change: (world: World) => void): void;
+  /**
+   * Holds the simulation still (or lets it run on): the page keeps drawing the last snapshot,
+   * so a playtest on a slow machine can take a picture of a moment that lasts a fraction of a
+   * second (a swing, a shell in the air).
+   */
+  pause(paused: boolean): void;
 }
 
 type Handlers = { [K in ServerMessageType]: Array<(payload: ServerMessages[K]) => void> };
@@ -91,6 +103,7 @@ export function createLocalLink(options: LocalMatchOptions, subscribe: (link: Ro
   let last = 0;
   let owed = 0;
   let closed = false;
+  let paused = false;
 
   const stepOnce = (): void => {
     const inputs: Array<PlayerInput | null> = [];
@@ -129,7 +142,7 @@ export function createLocalLink(options: LocalMatchOptions, subscribe: (link: Ro
     last = performance.now();
     timer = setInterval(() => {
       const now = performance.now();
-      owed = Math.min(owed + (now - last) / 1000, DT * MAX_CATCH_UP_TICKS);
+      owed = paused ? 0 : Math.min(owed + (now - last) / 1000, DT * MAX_CATCH_UP_TICKS);
       last = now;
       while (owed >= DT) {
         owed -= DT;
@@ -196,6 +209,16 @@ export function createLocalLink(options: LocalMatchOptions, subscribe: (link: Ro
       // Events raised outside a step are collected by hand so the client still hears them.
       world.events = [];
       beginStage(world, stage);
+      for (const e of world.events) pending.push(e);
+      world.events = [];
+    },
+    pause(on) {
+      paused = on;
+    },
+    apply(change) {
+      if (closed) return;
+      world.events = [];
+      change(world);
       for (const e of world.events) pending.push(e);
       world.events = [];
     },

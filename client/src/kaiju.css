@@ -93,6 +93,176 @@
   color: var(--kaiju);
 }
 
+/* --- the city as a weapon and the power surge (phase 2) ---------------------------------------- */
+
+/* The fast-food sign's swings left: three pips along the foot of Strike's picture. */
+.kit-pips {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 3px;
+  display: none;
+  justify-content: center;
+  gap: 4px;
+}
+
+.hint.swings .kit-pips {
+  display: flex;
+}
+
+.kit-pip {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.55);
+  background: transparent;
+}
+
+.kit-pip.on {
+  border-color: var(--volley);
+  background: var(--volley);
+  box-shadow: 0 0 5px var(--volley);
+}
+
+/* A propane tank in the hand can go off: Strike's frame throbs red. */
+.hint.volatile .hint-icon {
+  border-color: #ff4a3a;
+  animation: kit-volatile 0.8s ease-in-out infinite;
+}
+
+@keyframes kit-volatile {
+  0%,
+  100% {
+    box-shadow: 0 0 2px rgba(255, 74, 58, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 14px rgba(255, 74, 58, 0.95);
+  }
+}
+
+/* A garage door in the hand: the door, the front it covers (a wedge over it) and its strength left. */
+.kit-shield {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  width: 46px;
+  height: 64px;
+  color: var(--kaiju);
+  font-size: 30px;
+  align-self: flex-end;
+  margin-bottom: 30px;
+}
+
+.kit-shield-arc {
+  position: absolute;
+  top: -2px;
+  left: 50%;
+  width: 46px;
+  height: 46px;
+  margin-left: -23px;
+  border-radius: 50%;
+  /* 70 degrees each side of straight ahead (the top). */
+  background: conic-gradient(from -70deg, rgba(255, 122, 26, 0.45) 0 140deg, transparent 140deg);
+  -webkit-mask: radial-gradient(circle, transparent 58%, #000 60%);
+  mask: radial-gradient(circle, transparent 58%, #000 60%);
+}
+
+.kit-shield-bar {
+  width: 42px;
+  height: 7px;
+  margin-top: 3px;
+  border-radius: 4px;
+  background: rgba(14, 18, 30, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  overflow: hidden;
+}
+
+.kit-shield-fill {
+  height: 100%;
+  width: 100%;
+  background: var(--kaiju);
+}
+
+.kit-shield.low .kit-shield-fill {
+  background: #ff4a3a;
+  animation: pulse 0.5s infinite;
+}
+
+/* The power surge: a bolt in a blue-white ring that runs down; it pops in when the surge starts. */
+.kit-surge {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(14, 18, 30, 0.75);
+  color: #dfe6ff;
+  font-size: 32px;
+  filter: drop-shadow(0 0 6px rgba(200, 212, 255, 0.9));
+}
+
+.kit-surge .icon {
+  animation: kit-crackle 0.18s steps(2) infinite;
+}
+
+.kit-surge-ring {
+  --fill: 1;
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: conic-gradient(#e4ebff calc(var(--fill) * 1turn), rgba(255, 255, 255, 0.12) 0);
+  -webkit-mask: radial-gradient(circle, transparent 62%, #000 64%);
+  mask: radial-gradient(circle, transparent 62%, #000 64%);
+}
+
+.kit-surge.start {
+  animation: kit-surge-in 0.7s ease-out;
+}
+
+@keyframes kit-surge-in {
+  0% {
+    transform: scale(2.4);
+    filter: drop-shadow(0 0 22px #fff);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes kit-crackle {
+  0% {
+    transform: translate(0, 0);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(1px, -1px);
+    opacity: 0.75;
+  }
+}
+
+/* Surging: every move slot flashes blue-white (they are all full, and fill three times as fast). */
+.kaiju-kit.surging .kit-slot:not(.empty) .slot-box,
+.kaiju-kit.surging .kit-strike .hint-icon,
+.kaiju-kit.surging .kit-stomp .hint-icon {
+  animation: kit-surge-flash 0.35s ease-in-out infinite alternate;
+}
+
+@keyframes kit-surge-flash {
+  0% {
+    box-shadow: 0 0 4px rgba(200, 212, 255, 0.4);
+    border-color: rgba(200, 212, 255, 0.6);
+  }
+  100% {
+    box-shadow: 0 0 16px rgba(228, 235, 255, 1);
+    border-color: #fff;
+  }
+}
+
 /* While the cards are up (the cocoon and the intermission) the kit stays on screen: it is where the pick lands. */
 .hud.cinematic.cards .hud-bottom-right {
   display: flex;

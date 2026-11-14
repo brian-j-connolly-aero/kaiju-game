@@ -26,6 +26,11 @@ import type { HudView } from '../ui/hud';
 /** The front page photo is this wide at most, and is not retaken more often than this (seconds). */
 const PHOTO_WIDTH = 640;
 const PHOTO_EVERY = 5;
+/**
+ * How hard a kaiju's footfall thumps the view right by its foot, by stage (in the shake's units:
+ * a fraction of the stage's own size): a nudge for the hatchling, a jolt for the titan.
+ */
+const STEP_THUMP: Record<1 | 2 | 3, number> = { 1: 0.3, 2: 0.45, 3: 0.55 };
 
 /**
  * What goes to the server while the body cannot act (outside play): no movement and no buttons,
@@ -100,7 +105,7 @@ export class MatchRuntime {
     this.player = role === 'kaiju' ? new KaijuController(deps.thirdPerson) : role === 'human' ? new HumanController(deps.thirdPerson) : null;
     this.controller = this.player ?? this.drone;
     deps.renderer.beginMatch(deps.session.mirror, 1, deps.session.boundsFor(1));
-    deps.renderer.cues = { onStep: (k) => this.onStep(k), onSplash: (k) => this.matchAudio.splash(k) };
+    deps.renderer.cues = { onStep: (k) => this.onStep(k), onSplash: (k) => this.matchAudio.splash(k), onGlass: (x, y, z, panes) => this.matchAudio.glass(x, y, z, panes) };
     // Whatever was pressed in the menus is not the first input of the match.
     deps.input.sampleTaken();
   }
@@ -139,13 +144,30 @@ export class MatchRuntime {
     return Math.hypot(x - c.x, z - c.z);
   }
 
+  /**
+   * A kaiju's foot came down (docs/ROADMAP.md phase 2, "monster weight"): everyone near it feels
+   * it, a nudge at stage 1 and a jolt at stage 3, strongest by the foot and gone a few body heights
+   * away. The monster's own view feels its weight more gently, and pounds in a charge.
+   */
   private onStep(k: SnapKaiju): void {
     this.matchAudio.step(k);
     const st = kaijuStageDef(k.kind, k.stage);
+    const weight = STEP_THUMP[k.stage];
+    if (k.id === this.session.role.kaijuId) {
+      const charging = k.action === 'charge' && k.phase === 'charge';
+      this.shake.thump(weight * (charging ? 1.3 : 0.55));
+      if (charging) this.shake.add(0.1);
+      return;
+    }
+    const reach = st.height * 6 + 40;
     const d = this.distanceToCamera(k.x, k.z);
-    if (k.id !== this.session.role.kaijuId && d < st.height * 5) this.shake.add(0.12 * (1 - d / (st.height * 5)));
-    // The monster's own footfalls jolt its view only while it charges: the run should pound.
-    else if (k.id === this.session.role.kaijuId && k.action === 'charge' && k.phase === 'charge') this.shake.add(0.1);
+    if (d < reach) this.shake.thump(weight * (1 - d / reach) ** 2);
+  }
+
+  /** A weight landing at (x, z) (a stomp, a stumble, a building falling flat, a fireball): a thump fading out to `reach`. */
+  private landing(x: number, z: number, reach: number, amount: number): void {
+    const d = this.distanceToCamera(x, z);
+    if (d < reach) this.shake.thump(amount * (1 - d / reach) ** 1.5);
   }
 
   handleEvent(e: SimEvent): void {
@@ -177,6 +199,30 @@ export class MatchRuntime {
         const kick =
           e.action === 'stomp' && e.phase === 'active' ? { reach: h * 8, amount: 0.7 } : e.action === 'charge' && e.phase === 'stumble' ? { reach: h * 7, amount: 0.6 } : e.action === 'tailSweep' && e.phase === 'active' ? { reach: h * 5, amount: 0.35 } : null;
         if (kick && d < kick.reach) this.shake.add(kick.amount * (1 - d / kick.reach));
+        // A stomp and a stumble land with the monster's whole weight.
+        if (kick && e.action !== 'tailSweep') this.landing(e.x, e.z, kick.reach, STEP_THUMP[k.stage] * (e.kaiju === this.session.role.kaijuId ? 1.2 : 1.8));
+        break;
+      }
+      case 'fireball': {
+        // The gas station goes up: squads nearby are rocked.
+        const reach = e.radius * 7;
+        const d = this.distanceToCamera(e.x, e.z);
+        if (d < reach) this.shake.add(0.85 * (1 - d / reach));
+        this.landing(e.x, e.z, reach, 0.5);
+        break;
+      }
+      case 'structureFall': {
+        if (e.phase !== 'landed') break;
+        // A tower comes down full length: the ground jumps along it.
+        const s = this.session.mirror.city.structures[e.id];
+        const reach = (s ? s.height : 60) * 2.5 + 60;
+        this.landing((e.x + e.topX) / 2, (e.z + e.topZ) / 2, reach, 0.6);
+        break;
+      }
+      case 'propaneBlast': {
+        const reach = e.radius * 6;
+        const d = this.distanceToCamera(e.x, e.z);
+        if (d < reach) this.shake.add(0.5 * (1 - d / reach));
         break;
       }
       case 'cityCollapse': {
@@ -209,9 +255,13 @@ export class MatchRuntime {
         }
         break;
       }
-      case 'moltBlast':
+      case 'moltBlast': {
         this.shake.add(1);
+        // The new body comes out of the cocoon and lands: the hardest thump of the match.
+        const k = frame?.kaijus[e.kaiju];
+        this.landing(e.x, e.z, e.shoveRadius * 4 + 100, (k ? STEP_THUMP[k.stage] : 0.5) * 2);
         break;
+      }
       case 'matchEnd':
         this.result = e;
         if (!this.photo) this.wantPhoto = 0.05;

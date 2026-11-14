@@ -8,9 +8,12 @@
  * Port Meridian is drawn as itself: each district's ground in its map tint (docs/CITY.md
  * section 2) with its name, the real road network, the river and the bay, bridges as roads over
  * the water, and every landmark as a small picture of its own model.
+ *
+ * Phase 2: the army's supply crates show as the picture of what they hold. While a fallen radio
+ * mast's static lasts (`match.staticUntil`), the squads' map shows nothing but animated static.
  */
 
-import { kaijuStageDef, type Bounds, type CityData, type District } from '@mb/shared';
+import { kaijuStageDef, PICKUP_IDS, type Bounds, type CityData, type District, type PickupKind } from '@mb/shared';
 import type { FrameState, MatchSession } from '../net/matchSession';
 import { el } from './icons';
 
@@ -34,6 +37,18 @@ const COLORS = {
 };
 
 /** District ground on the map, by zone: the map tints of docs/CITY.md section 2, darkened for a night-blue map. */
+/**
+ * Whether a player of this role sees static on the map at this tick: the squads (and nobody
+ * else) while a fallen radio mast's static lasts (DESIGN.md section 7, "Special buildings").
+ */
+export function mapShowsStatic(role: 'kaiju' | 'human' | 'spectator', tick: number, staticUntil: number): boolean {
+  return role === 'human' && staticUntil > 0 && tick < staticUntil;
+}
+
+/** Frames of static, made once and shown in turn. */
+const STATIC_FRAMES = 4;
+const STATIC_SIZE = 128;
+
 const ZONE_GROUND: Record<District['zone'], string> = {
   downtown: '#2b3653',
   oldtown: '#3b3426',
@@ -56,6 +71,11 @@ export class MapView {
   private frames = 0;
   private pictureSource: (() => Map<string, HTMLCanvasElement>) | null = null;
   private pictures: Map<string, HTMLCanvasElement> | null = null;
+  /** The pick-ups' pictures for the crates (cyan, decoded once they are asked for). */
+  private readonly pickups = new Map<PickupKind, HTMLImageElement>();
+  private noise: HTMLCanvasElement[] = [];
+  /** True while the map shows static (for the sound of it, and the automation hook). */
+  staticShown = false;
 
   constructor() {
     const ctx = this.canvas.getContext('2d');
@@ -74,6 +94,16 @@ export class MapView {
   setLandmarkPictures(source: () => Map<string, HTMLCanvasElement>): void {
     this.pictureSource = source;
     this.pictures = null;
+  }
+
+  /** Where the pick-ups' pictures come from (each asked for once). */
+  setPickupPictures(source: (kind: PickupKind) => Promise<HTMLImageElement | null>): void {
+    for (const kind of PICKUP_IDS) {
+      if (kind === 'none') continue;
+      void source(kind).then((img) => {
+        if (img) this.pickups.set(kind, img);
+      });
+    }
   }
 
   setOpen(open: boolean): void {
@@ -106,8 +136,67 @@ export class MapView {
     const b = frame.bounds;
     const pad = (b.maxX - b.minX) * 0.08;
     this.view = { minX: b.minX - pad, minZ: b.minZ - pad, maxX: b.maxX + pad, maxZ: b.maxZ + pad };
+    // Static (a radio mast fell): nothing but the noise, a new frame of it every frame.
+    this.staticShown = mapShowsStatic(session.role.kind, frame.tick, frame.match.staticUntil);
+    if (this.staticShown) {
+      this.drawStatic(this.frames++);
+      return;
+    }
     // A full redraw a few times a second is plenty.
     if (this.frames++ % 4 === 0) this.draw(frame, session);
+  }
+
+  /**
+   * The map's static: grey snow, rolling bands and a dark frame. It says "no signal" without a
+   * word: nothing on it is the city, the squads or the kaiju.
+   */
+  private drawStatic(n: number): void {
+    const ctx = this.ctx;
+    const s = this.size();
+    if (this.noise.length === 0) {
+      let seed = 12345;
+      for (let f = 0; f < STATIC_FRAMES; f++) {
+        const c = document.createElement('canvas');
+        c.width = STATIC_SIZE;
+        c.height = STATIC_SIZE;
+        const pen = c.getContext('2d');
+        if (!pen) break;
+        const img = pen.createImageData(STATIC_SIZE, STATIC_SIZE);
+        for (let i = 0; i < img.data.length; i += 4) {
+          seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+          const v = 30 + ((seed >>> 24) * 190) / 255;
+          img.data[i] = v;
+          img.data[i + 1] = v;
+          img.data[i + 2] = v + 8;
+          img.data[i + 3] = 255;
+        }
+        pen.putImageData(img, 0, 0);
+        this.noise.push(c);
+      }
+    }
+    const noise = this.noise[n % this.noise.length];
+    if (!noise) return;
+    ctx.imageSmoothingEnabled = false;
+    // Shifted a little every frame so the snow never stands still.
+    const shift = (n * 37) % STATIC_SIZE;
+    const cell = s / STATIC_SIZE;
+    ctx.save();
+    ctx.translate(-shift * cell, 0);
+    ctx.drawImage(noise, 0, 0, s, s);
+    ctx.drawImage(noise, s, 0, s, s);
+    ctx.restore();
+    // Two bands rolling down it, and the screen's dark edge.
+    for (let b = 0; b < 2; b++) {
+      const y = (((n * 6 + b * s * 0.5) % s) + s) % s;
+      ctx.fillStyle = b === 0 ? 'rgba(255, 255, 255, 0.13)' : 'rgba(0, 0, 0, 0.25)';
+      ctx.fillRect(0, y, s, s * 0.06);
+    }
+    const edge = ctx.createRadialGradient(s / 2, s / 2, s * 0.3, s / 2, s / 2, s * 0.75);
+    edge.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    edge.addColorStop(1, 'rgba(0, 0, 0, 0.6)');
+    ctx.fillStyle = edge;
+    ctx.fillRect(0, 0, s, s);
+    ctx.imageSmoothingEnabled = true;
   }
 
   private draw(frame: FrameState, session: MatchSession): void {
@@ -276,6 +365,26 @@ export class MapView {
         ctx.beginPath();
         ctx.arc(m.x, m.y, r + 3, 0, Math.PI * 2);
         ctx.stroke();
+      }
+    }
+
+    // Supply crates (the squads' map): the picture of what each holds in a dark disc; faint
+    // while it is still coming down.
+    if (!viewerIsKaiju) {
+      for (const c of frame.crates) {
+        const m = this.toMap(c.x, c.z);
+        const r = 11;
+        ctx.globalAlpha = c.fall > 0 ? 0.55 : 1;
+        ctx.fillStyle = 'rgba(10, 18, 30, 0.85)';
+        ctx.strokeStyle = COLORS.human;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(m.x, m.y, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        const img = this.pickups.get(c.kind);
+        if (img) ctx.drawImage(img, m.x - r * 0.75, m.y - r * 0.75, r * 1.5, r * 1.5);
+        ctx.globalAlpha = 1;
       }
     }
 

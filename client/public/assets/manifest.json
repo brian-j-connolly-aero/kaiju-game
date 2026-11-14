@@ -5858,11 +5858,20 @@
     "k_charge": {
       "file": "ui/k_charge.svg"
     },
+    "k_club": {
+      "file": "ui/k_club.svg"
+    },
+    "k_drop": {
+      "file": "ui/k_drop.svg"
+    },
     "k_eat": {
       "file": "ui/k_eat.svg"
     },
     "k_grab": {
       "file": "ui/k_grab.svg"
+    },
+    "k_javelin": {
+      "file": "ui/k_javelin.svg"
     },
     "k_molt": {
       "file": "ui/k_molt.svg"
@@ -5870,11 +5879,17 @@
     "k_roar": {
       "file": "ui/k_roar.svg"
     },
+    "k_shield": {
+      "file": "ui/k_shield.svg"
+    },
     "k_special": {
       "file": "ui/k_special.svg"
     },
     "k_stomp": {
       "file": "ui/k_stomp.svg"
+    },
+    "k_surge": {
+      "file": "ui/k_surge.svg"
     },
     "k_swim": {
       "file": "ui/k_swim.svg"

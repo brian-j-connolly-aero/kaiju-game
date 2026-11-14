@@ -37,6 +37,14 @@ export const BOT_RULES = {
     clearLines: 0.6,
     /** A parked squad waits this long with no line of fire before it moves on. */
     losPatience: 4,
+    /**
+     * A spot where its planted squad-mates found no line of fire (rubble in the way) is passed
+     * over within this many meters, for this many seconds.
+     */
+    blockedRadius: 15,
+    blockedTime: 20,
+    /** Approaching, within this many meters of its firing spot and still no line of fire: it tries another side (its bearing turns by bearingSpread). */
+    lookAgain: 8,
     /** A parked squad stays put until the kaiju is beyond this, of range. */
     leaveAt: 0.97,
     /** It lets go of the volley button at this charge; with the kaiju helpless it does not charge at all. */

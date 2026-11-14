@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Kaiju: power surge. A lightning bolt with sparks jumping off it. -->
+  <path fill="currentColor" stroke="none" d="M38 3L13 36H29.5L23.5 61L51 25H34.5Z"/>
+  <path d="M7 13L12 18"/>
+  <path d="M55 46L59 51"/>
+  <path d="M55 10L59 6"/>
+</svg>

@@ -4,7 +4,7 @@ Monster Battle 9001 has a no-reading rule: apart from names and subtitles, nothi
 text. These user interface (UI) pictograms are therefore the game's whole language. Each one has
 to be understood in under a second by someone who has never played.
 
-- **Files:** `client/public/assets/ui/<name>.svg`, 102 icons and `skyline.svg`. The names are the
+- **Files:** `client/public/assets/ui/<name>.svg`, 107 icons and `skyline.svg`. The names are the
   contract in `docs/ASSETS.md` section 5.
 - **Format:** hand-written SVG (Scalable Vector Graphics, a drawing written as text). No drawing
   program is involved: to change an icon, edit its file.
@@ -128,6 +128,11 @@ They wear human cyan. The shell that means "a shot" elsewhere in the set is in t
 | `k_swim` | Swimming | Only the row of spines shows above two waves |
 | `k_charge` | Charge (a move picked at a molt) | The Lizard's head lowered like a ram, two spines laid back, rushing forward with four speed lines behind it |
 | `k_tailsweep` | Tail sweep (a move picked at a molt) | The spiked tail lashing round in a wide arc, two motion lines following it |
+| `k_club` | Strike with a fast-food sign: swing it (phase 2) | A burger on a pole, two arcs of its swing behind it |
+| `k_javelin` | Strike with an antenna or a mast's top: a javelin (phase 2) | A straight pole with two crossbars and a sharp point, two speed lines behind it |
+| `k_shield` | A garage door held up as a shield (phase 2; no button, a status beside the kit) | The door with its slats, three shots glancing off its face |
+| `k_drop` | Grab with a city weapon in the hand: let go of it (phase 2) | The clawed hand opening over a line of ground, a tank falling out of it |
+| `k_surge` | A power surge (phase 2; the ring beside the kit) | A lightning bolt with three sparks jumping off it |
 
 ### Status
 

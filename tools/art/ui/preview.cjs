@@ -61,7 +61,10 @@ const GROUPS = [
     id: 'kaiju',
     title: 'Kaiju verbs',
     tint: 'kaiju',
-    icons: ['k_swipe', 'k_stomp', 'k_grab', 'k_throw', 'k_eat', 'k_brace', 'k_roar', 'k_special', 'k_molt', 'k_swim', 'k_charge', 'k_tailsweep'],
+    icons: [
+      'k_swipe', 'k_stomp', 'k_grab', 'k_throw', 'k_eat', 'k_brace', 'k_roar', 'k_special', 'k_molt', 'k_swim', 'k_charge', 'k_tailsweep',
+      'k_club', 'k_javelin', 'k_shield', 'k_drop', 'k_surge',
+    ],
   },
   {
     id: 'status',

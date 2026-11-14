@@ -55,6 +55,16 @@ export interface BotState {
   /** The supply crate it is fetching (mode 'crate'; -1: none), and for how long it has been at it. */
   crate: number;
   crateTime: number;
+  /**
+   * Parked: its planted squad-mates had no line of fire from here at the last look (rubble or a
+   * fallen building in the way), so a volley from this spot would go into the heap. It does not
+   * plant here again; it moves on, and passes over firing spots near (blockedX, blockedZ) for
+   * `blockedFor` more seconds.
+   */
+  matesBlind: boolean;
+  blockedX: number;
+  blockedZ: number;
+  blockedFor: number;
 
   // --- Kaiju bot ---------------------------------------------------------------------------
   goal: KaijuBotGoal;
@@ -142,6 +152,10 @@ export function createBotState(): BotState {
     aimHeight: -1,
     crate: -1,
     crateTime: 0,
+    matesBlind: false,
+    blockedX: 0,
+    blockedZ: 0,
+    blockedFor: 0,
 
     goal: 'none',
     goalId: -1,

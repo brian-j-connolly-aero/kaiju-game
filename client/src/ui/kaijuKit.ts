@@ -3,7 +3,15 @@
  * one move per button). Pictures only, each over the glyph of its button on the device in use:
  *
  *   the starting kit   Strike (a swipe; with something in the hand, the throw), Grab (a grab;
- *                      with something in the hand, eating it) and Stomp
+ *                      with something in the hand, eating it) and Stomp. With a city weapon in
+ *                      the hand (phase 2) Strike shows what it does with it (a javelin thrown
+ *                      point first, the fast-food sign swung, with a pip for each swing left,
+ *                      anything else thrown; a propane tank pulses red, it can go off in the
+ *                      hand) and Grab shows the drop (a city weapon is never eaten)
+ *   the shield         a garage door in the hand: the door, the front it covers and its strength
+ *                      left
+ *   the surge          a power surge (a substation wrecked): a bolt in a ring that runs down
+ *                      over its 8 seconds, and the move slots flash
  *   two move slots     what the molts put on the two move buttons. Empty: a faint locked egg.
  *                      Filled: the move's picture inside a ring that fills as the move comes
  *                      ready (its cooldown; for the beam, the rage it needs), bright when ready
@@ -14,7 +22,7 @@
  * makes the slot flash when it does.
  */
 
-import { kaijuKindDef, kaijuMoveVerb, LAST_STAGE, type KaijuMove, type KaijuMoveId, type SnapKaiju } from '@mb/shared';
+import { heldCityWeapon, heldEdible, kaijuKindDef, kaijuMoveVerb, LAST_STAGE, strikeVerb, type HeldObject, type KaijuMove, type KaijuMoveId, type SnapKaiju } from '@mb/shared';
 import { glyphFor, type Bindings, type ButtonAction, type InputDevice } from '../game/input/actions';
 import { el, glyph, icon, setGlyph, setIcon } from './icons';
 
@@ -30,6 +38,25 @@ export const MOVE_ICON: Readonly<Record<KaijuMove, string>> = {
 /** The picture of a slot's move, or the empty slot's egg. */
 export function moveIcon(move: KaijuMoveId): string {
   return move === 'none' ? 'k_molt' : MOVE_ICON[move];
+}
+
+/**
+ * What the Strike button's picture is with this in the hand: the swipe with nothing, the club
+ * with a fast-food sign, a javelin with an antenna or a radio mast's top, a throw with anything
+ * else (docs/ROADMAP.md phase 2).
+ */
+export function strikeIcon(held: HeldObject | null): string {
+  const verb = strikeVerb(held);
+  if (verb === 'swipe') return 'k_swipe';
+  if (verb === 'club') return 'k_club';
+  const weapon = heldCityWeapon(held);
+  return weapon === 'antenna' || weapon === 'mast' ? 'k_javelin' : 'k_throw';
+}
+
+/** ...and the Grab button's: the grab with nothing, the meal with something it can eat, the drop with a city weapon. */
+export function grabIcon(held: HeldObject | null): string {
+  if (!held) return 'k_grab';
+  return heldEdible(held) ? 'k_eat' : 'k_drop';
 }
 
 interface Tile {
@@ -65,6 +92,17 @@ export class KaijuKit {
   private readonly rings: [HTMLElement, HTMLElement];
   private readonly molt = tile('k_molt', 'molt', 'kit-molt hidden');
   private readonly camera = tile('st_camera', 'camera', 'kit-camera');
+  /** The fast-food sign's swings left, under Strike. */
+  private readonly pips: HTMLElement[] = [];
+  /** A garage door in the hand: the door over the front it covers, and its strength left. */
+  private readonly shield: HTMLElement;
+  private readonly shieldBar: HTMLElement;
+  /** The power surge: a bolt in a ring that runs down as it does. */
+  private readonly surge: HTMLElement;
+  private readonly surgeRing: HTMLElement;
+  private lastShield = -1;
+  private lastSurge = -1;
+  private lastPips = -1;
   /** What each slot shows, and the longest wait seen since it was last ready (the ring's full turn). */
   private readonly shown: [KaijuMoveId, KaijuMoveId] = ['none', 'none'];
   private readonly peak = [0, 0];
@@ -85,7 +123,13 @@ export class KaijuKit {
       s.box.prepend(this.rings[i]);
       s.root.dataset.slot = String(i);
     });
-    this.root = el('div', 'hints kaiju-kit', [this.strike.root, this.grab.root, this.stomp.root, this.slots[0].root, this.slots[1].root, this.molt.root, this.camera.root]);
+    for (let i = 0; i < 3; i++) this.pips.push(el('div', 'kit-pip'));
+    this.strike.box.append(el('div', 'kit-pips', this.pips));
+    this.shieldBar = el('div', 'kit-shield-fill');
+    this.shield = el('div', 'kit-shield hidden', [el('div', 'kit-shield-arc'), icon('k_shield'), el('div', 'kit-shield-bar', [this.shieldBar])]);
+    this.surgeRing = el('div', 'kit-surge-ring');
+    this.surge = el('div', 'kit-surge hidden', [this.surgeRing, icon('k_surge')]);
+    this.root = el('div', 'hints kaiju-kit', [this.surge, this.shield, this.strike.root, this.grab.root, this.stomp.root, this.slots[0].root, this.slots[1].root, this.molt.root, this.camera.root]);
   }
 
   /** Every tile's glyph for the device in use (call when the device or the keyboard's layout changes). */
@@ -121,10 +165,11 @@ export class KaijuKit {
     this.now = now;
     const def = kaijuKindDef(k.kind);
     // The starting kit: what Strike and Grab do depends on the hand.
-    setIcon(this.strike.pic, k.held ? 'k_throw' : 'k_swipe');
-    setIcon(this.grab.pic, k.held ? 'k_eat' : 'k_grab');
-    // With something in the hand and the last meal too recent, Grab does nothing.
-    const eatWait = k.held && k.cooldowns.eat > 0 ? k.cooldowns.eat / Math.max(0.01, def.actions.eat.cooldown) : 0;
+    setIcon(this.strike.pic, strikeIcon(k.held));
+    setIcon(this.grab.pic, grabIcon(k.held));
+    this.updateWeapon(k);
+    // With something edible in the hand and the last meal too recent, Grab does nothing.
+    const eatWait = heldEdible(k.held) && k.cooldowns.eat > 0 ? k.cooldowns.eat / Math.max(0.01, def.actions.eat.cooldown) : 0;
     const cover = Math.round(Math.min(1, eatWait) * 20) / 20;
     if (cover !== this.lastCover) {
       this.lastCover = cover;
@@ -132,7 +177,7 @@ export class KaijuKit {
     }
     setClass(this.grab.root, 'unavailable', cover > 0);
     setClass(this.stomp.root, 'active', k.action === 'stomp' && k.phase !== 'idle');
-    setClass(this.strike.root, 'active', (k.action === 'swipe' || k.action === 'throw') && k.phase !== 'idle');
+    setClass(this.strike.root, 'active', (k.action === 'swipe' || k.action === 'throw' || k.action === 'club') && k.phase !== 'idle');
 
     // The two slots.
     for (let i = 0; i < 2; i++) this.updateSlot(i, k);
@@ -141,6 +186,45 @@ export class KaijuKit {
     const offered = k.moltAvailable && k.stage < LAST_STAGE;
     setClass(this.molt.root, 'hidden', !offered);
     setClass(this.molt.root, 'glow', offered);
+  }
+
+  /** The sign's swings, the door's strength, the propane tank's warning and the surge. */
+  private updateWeapon(k: SnapKaiju): void {
+    const def = kaijuKindDef(k.kind);
+    const weapon = heldCityWeapon(k.held);
+    // A fast-food sign: one pip per swing left.
+    const pips = weapon === 'foodsign' ? Math.max(0, Math.min(3, Math.round(k.clubSwings))) : -1;
+    if (pips !== this.lastPips) {
+      this.lastPips = pips;
+      setClass(this.strike.root, 'swings', pips >= 0);
+      this.pips.forEach((p, i) => setClass(p, 'on', i < pips));
+    }
+    // A propane tank: it can go off in the hand (a shot landing within 2 m of it).
+    setClass(this.strike.root, 'volatile', weapon === 'propane');
+    // A garage door: its strength left, as a bar under the door.
+    const door = weapon === 'garagedoor' ? Math.round(Math.max(0, Math.min(1, k.shieldHp / def.cityWeapons.garagedoor.hp)) * 40) / 40 : -1;
+    if (door !== this.lastShield) {
+      this.lastShield = door;
+      setClass(this.shield, 'hidden', door < 0);
+      if (door >= 0) {
+        this.shieldBar.style.width = `${(door * 100).toFixed(1)}%`;
+        setClass(this.shield, 'low', door < 0.3);
+      }
+    }
+    // The power surge: the ring runs down over its seconds; the move slots flash meanwhile.
+    const surge = k.surge > 0 ? Math.round(Math.max(0, Math.min(1, k.surge / def.rewards.surge.duration)) * 60) / 60 : -1;
+    if (surge !== this.lastSurge) {
+      const started = this.lastSurge < 0 && surge >= 0;
+      this.lastSurge = surge;
+      setClass(this.surge, 'hidden', surge < 0);
+      setClass(this.root, 'surging', surge >= 0);
+      if (surge >= 0) this.surgeRing.style.setProperty('--fill', surge.toFixed(3));
+      if (started) {
+        this.surge.classList.remove('start');
+        void this.surge.offsetWidth;
+        this.surge.classList.add('start');
+      }
+    }
   }
 
   private updateSlot(i: number, k: SnapKaiju): void {

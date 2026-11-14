@@ -565,8 +565,8 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
 - Server → client: `lobby` `{ lobby, you }` (on joining and on every change), `welcome` (seed,
   config, your ids, the tick, the anchor, a city checksum, full structure and prop state as
   bytes), `snap` (binary, 15 Hz: tick, the acknowledgement of your inputs (section 4.3), match
-  scalars, every kaiju, squad and unit; compact fixed layout from `shared/src/net/snapshot.ts`, about 800
-  bytes for a Tier 1 match), `events` (array of `SimEvent` with their tick), `pong { t, tick }`.
+  scalars, every kaiju, squad and unit, the supply crates; compact fixed layout from
+  `shared/src/net/snapshot.ts`, about 860 bytes for a Tier 1 match), `events` (array of `SimEvent` with their tick), `pong { t, tick }`.
   Payload types: `ServerMessages`. `snap` is the only message sent as raw bytes; everything else
   is plain data in the library's own encoding (MessagePack), in which the `cityState` bytes of
   the welcome arrive as a `Uint8Array`.
@@ -909,7 +909,16 @@ layout, requires bumping `SNAPSHOT_VERSION` / `PROTOCOL_VERSION`.
   meshes, tumbled with cheap fake physics and copied each frame into one shared buffer (one
   draw call for every falling piece), dust, then rubble. Measured with the whole city in view
   at stage 3, every state drawn and 480 pieces falling: 166 draw calls, 367,000 triangles
-  (`docs/CITY.md` section 8).
+  (`docs/CITY.md` section 8). Phase 2: the rubble state is a mound piled from the archetype's own
+  chunk meshes (as high as the simulation's `srubble`); a structure that falls over moves to a
+  fourth batch per archetype, made the first time one of its kind falls (its damaged model, the
+  instance matrix turned about the footprint edge it fell over, plus the art's low rubble), so
+  falls add at most two draw calls per archetype that has fallen. Swaying after a stomp and the
+  fall itself rewrite instance matrices; the city view never re-batches for them.
+- The client's mirrored city (`client/src/net/cityMirror.ts`) follows `structureFall` 'landed'
+  (`setStructureFallen`, so prediction and the client's casts meet a fallen building where the
+  server does), keeps the city weapons lying loose (`loose`, from the welcome's city state, the
+  `looseProp` events and `kaijuHeld` with source 'loose'), and takes both over on a resync.
 - The map (`ui/mapView.ts`) draws the city from `CityData`: district ground in its map tint
   with the district's name, streets, water, bridges, buildings by state, and each landmark as
   a small picture of its own model (`render/landmarkPictures.ts`, painted on the processor so
@@ -952,7 +961,12 @@ layout, requires bumping `SNAPSHOT_VERSION` / `PROTOCOL_VERSION`.
   practice option (bot kaiju), see section 4.4. `?sandbox=1|2|3` runs the shared simulation
   inside the page (one player against the bots, starting at that stage) behind the same
   message interface as a room: it is how stages are looked at without a server
-  (`tools/playtest/shots.mjs`). All page flags are listed in `client/src/app/params.ts`.
+  (`tools/playtest/shots.mjs`). Its control (`__mb.internals.ctx.client.local`, sandbox only)
+  can also set a scene between two steps and send the events that raises (`apply(change)`: a
+  city weapon laid in reach, a crate put down) and hold the simulation still while a slow page
+  takes a picture (`pause(on)`; the page keeps drawing the newest snapshot); the phase 2
+  playtests use both (`tools/playtest/scriptedWeapons.mjs`, `shotsWeapons.mjs`). All page flags
+  are listed in `client/src/app/params.ts`.
 - Client layout and data flow: `docs/STATUS.md` section 7. The rule that keeps it in pieces:
   `net/` knows nothing of three.js or the DOM beyond timers, `render/` knows nothing of the
   network or the HUD (it draws a `FrameState` and is handed events), `ui/` is DOM only, and the
@@ -982,7 +996,9 @@ layout, requires bumping `SNAPSHOT_VERSION` / `PROTOCOL_VERSION`.
   with zero console errors, and screenshots are captured for visual review (`smoke.mjs`).
   `scripted.mjs` plays the kaiju and a squad with real key and mouse events (and a tank in the
   sandbox) and passes only when every action was attempted and the server confirmed each one;
-  an action it could not get to is reported as not attempted, never as passed. `shots.mjs`
+  an action it could not get to is reported as not attempted, never as passed. Its phase 2 sessions (`--only weapons`) pick up, drop and use every city weapon and take a
+  crate of each kind, fire each weapon pick-up and call an artillery barrage, all confirmed by
+  what the sandbox sent back. `shots.mjs`
   takes pictures of every stage from both sides and of the scripted extras in the sandbox, and
   fails on any console error.
 - Never commit secrets. Never add a dependency that needs a network service at runtime: the

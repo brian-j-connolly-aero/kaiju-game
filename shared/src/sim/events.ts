@@ -389,8 +389,9 @@ export interface RoarEvent extends EventBase {
  * A call-in mission (`startCallIn`) has its marker on the ground ('marked'), its first shell has
  * been released and is falling ('inbound'), or its last shell has landed ('done': take the
  * marker away). The shells are `projectileSpawn` events with owner 'callin' and this mission's
- * id. A mission that is still running when a stage ends is dropped without a 'done'. Nothing
- * starts one in phase 1 (the artillery button is gone); phase 2's artillery radio will.
+ * id. A mission that is still running when a stage ends is dropped without a 'done'. Only the
+ * artillery radio starts one (phase 2: a squad's charged volley while it has barrages left;
+ * sim/systems/weapons.ts); there is no artillery button.
  */
 export interface CallInEvent extends EventBase {
   type: 'callin';

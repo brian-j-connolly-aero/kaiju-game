@@ -243,7 +243,12 @@ marks). No text inside icons. No third-party icon sets.
   (the Lizard's head lowered like a ram with its spines laid back, speed lines behind it) and
   `k_tailsweep` (the spiked tail lashing round in an arc, two motion lines after it). The moves
   a molt card gives use `k_special` (the beam), `k_roar`, `k_charge`, `k_tailsweep` and
-  `k_brace`; an empty move slot shows `k_molt`, faint.
+  `k_brace`; an empty move slot shows `k_molt`, faint. The city as a weapon and the power surge
+  (phase 2; drawn by the weapons client, `client/src/ui/kaijuKit.ts`): `k_club` (the fast-food
+  sign swung: a burger on a pole with two arcs of its swing), `k_javelin` (an antenna thrown
+  point first: a pole with two crossbars and a sharp point, speed lines behind), `k_shield` (a
+  garage door with its slats, shots glancing off its face), `k_drop` (the clawed hand opening
+  over the ground, what it held falling out) and `k_surge` (a lightning bolt with sparks).
 - Status: `st_health`, `st_nerve`, `st_rage`, `st_charge`, `st_reload` (one shell: the reload
   meter and the player's own shot), `st_veteran`, `st_spotted`, `st_crossfire`, `st_callin`,
   `st_shaken`, `st_map`, `st_camera`, `st_sun`, `st_moon`. (`st_callin` is shown only when an

@@ -480,9 +480,9 @@ as written (the deploy rule, the kaiju bot, `cache.ts`, which now takes `getCity
 item 3 was not needed (no archetype changed); item 4: every test listed passes, none loosened
 (the clock-end bug was fixed in the simulation, the nav test's missing sub-unit was a navigation
 fault on the new city and was fixed with several others, the molt test searches both cities);
-items 6 and 7: the documents are updated and the bar fractions are now 0.18 / 0.125 / 0.31
+items 6 and 7: the documents are updated and the bar fractions were set to 0.18 / 0.125 / 0.31
 (`docs/BALANCE.md` section 8 has every batch, and the bot and navigation fixes the new city
-needed). The steps as they were planned:
+needed; sections 9 and 10 how they moved since, to 0.18 / 0.11 / 0.30). The steps as they were planned:
 
 1. **Fix the two bot and spawn problems first** (they show up on this city, and they skew any
    balance numbers taken before they are fixed):

@@ -3,8 +3,9 @@
  * (ARCHITECTURE.md section 5): a walk cycle from its speed, the head leading the body, and a
  * pose for every wind-up, active and recovery phase, the brace, the roar, the stagger, the
  * beam, the charge (the head-down wind-up, the run with its longer, pounding stride, the
- * stumble) and the tail sweep. The wind-ups are the tells the humans read, so each one is a
- * distinct silhouette.
+ * stumble), the tail sweep, the fast-food sign's club swing and the flinch when a propane tank
+ * goes off in the hand. The wind-ups are the tells the humans read, so each one is a distinct
+ * silhouette.
  *
  * The output is a set of rotations (radians, relative to the rest pose) for named nodes; the
  * view eases the rig toward them. Rotation signs (tools/art/README.md section 8): x positive is
@@ -123,6 +124,11 @@ const CHARGE_ARMS: PoseTarget = { arm_L: [0.65, 0, 0.12], arm_R: [0.65, 0, -0.12
 const STUMBLE_ARMS: PoseTarget = { arm_L: [-1.25, 0, 0.75], arm_R: [-1.05, 0, -0.85], forearm_L: [-0.25, 0, 0], forearm_R: [-0.35, 0, 0], hand_L: [-0.4, 0, 0], hand_R: [-0.4, 0, 0] };
 /** The tail sweep: the arms out a little for balance. */
 const SWEEP_ARMS: PoseTarget = { arm_L: [-0.35, 0, 0.45], arm_R: [-0.35, 0, -0.45] };
+/**
+ * The flinch (a propane tank went off in the hand): the burnt right hand flung out and back,
+ * the left arm up across the face.
+ */
+const FLINCH_ARMS: PoseTarget = { arm_R: [0.45, 0, -1.05], forearm_R: [-0.3, 0, 0], hand_R: [-0.6, 0, 0], arm_L: [-1.45, -0.35, 0.35], forearm_L: [-1.2, 0, 0] };
 const EMPTY: PoseTarget = {};
 
 const ARM_NODES = ['arm_L', 'forearm_L', 'hand_L', 'arm_R', 'forearm_R', 'hand_R'] as const;
@@ -304,6 +310,20 @@ export function computeKaijuPose(input: KaijuAnimInput, pose: KaijuPose): KaijuP
     add('head', 0.6);
     add('jaw', 0.5);
     act(DEAD_ARMS, 1);
+  } else if (phase === 'flinch') {
+    // A propane tank went off in the hand (phase 2): the body jerks back and turns away from
+    // the blast, then shakes it off.
+    const jolt = u < 0.2 ? smoothstep(u / 0.2) : 1 - smoothstep((u - 0.2) / 0.8);
+    const shake = Math.sin(t * 40) * 0.06 * (1 - u);
+    pose.stiffness = 28;
+    pose.hipsLift -= 0.03 * jolt * input.height;
+    add('torso', -0.32 * jolt, 0.28 * jolt, shake);
+    add('neck', -0.18 * jolt, 0.3 * jolt);
+    add('head', -0.25 * jolt, 0.45 * jolt, shake * 2);
+    add('jaw', 0.5 * jolt);
+    for (let i = 1; i <= 5; i++) add(`tail_${i}`, -0.06 * jolt, shake);
+    act(FLINCH_ARMS, jolt);
+    pose.jawOpen = 0.5 * jolt;
   } else if (phase === 'brace' || action === 'brace') {
     // Crouched behind crossed arms.
     pose.hipsLift -= 0.07 * input.height;
@@ -344,6 +364,18 @@ export function computeKaijuPose(input: KaijuAnimInput, pose: KaijuPose): KaijuP
     const a = phase === 'recover' || phase === 'active' ? 1 - ease : 0;
     act(P.throw_windup, w);
     act(P.throw_release, a);
+  } else if (action === 'club') {
+    // The fast-food sign (phase 2): cocked back over the right shoulder with the body wound up,
+    // then swung right across the front as the body turns into it, then brought back.
+    const cock = phase === 'windup' ? ease : phase === 'active' ? 1 - ease : 0;
+    const a = phase === 'active' ? ease : phase === 'recover' ? 1 - ease : 0;
+    pose.stiffness = phase === 'active' ? 34 : 22;
+    add('torso', -0.15 * cock + 0.22 * a, -0.5 * cock + 0.75 * a);
+    add('hips', 0, -0.22 * cock + 0.28 * a);
+    add('head', 0, 0.12 * cock - 0.1 * a);
+    for (let i = 1; i <= 5; i++) add(`tail_${i}`, 0, 0.12 * cock - 0.16 * a);
+    act(P.throw_windup, cock);
+    act(P.swipe_hit, a);
   } else if (phase === 'eat' || action === 'eat') {
     const chew = Math.sin(t * 11);
     act(P.eat, 1);

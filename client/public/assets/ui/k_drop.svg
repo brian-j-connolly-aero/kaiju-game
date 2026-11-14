@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Kaiju verb: drop. The clawed hand opens over the ground and what it held falls out of it. -->
+  <g transform="translate(18.5 3) scale(.52)">
+    <path fill="currentColor" stroke="none" d="M19 -2H34L32.5 10.5 36 12 46.5 18 52 30 51.5 41 41 51.5 44.5 41 44 32 39.5 24 32 21H21L13.5 24 9 32 8.5 41 12 51.5 1.5 41 1 30 6.5 18 17 12 20.5 10.5Z"/>
+  </g>
+  <path fill="currentColor" stroke="none" d="M25 38H39Q43.5 38 43.5 42.5Q43.5 47 39 47H25Q20.5 47 20.5 42.5Q20.5 38 25 38Z"/>
+  <path d="M8 57H56"/>
+</svg>

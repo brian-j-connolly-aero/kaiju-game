@@ -14,11 +14,13 @@ import {
   Btn,
   clampAngleAround,
   decodeSnapshot,
+  heldEdible,
   kaijuKindDef,
   kaijuMoveParams,
   kaijuMoveVerb,
   kaijuStageDef,
   stageBounds,
+  strikeVerb,
   unitMoveParams,
   unitTypeDef,
   type Bounds,
@@ -30,6 +32,7 @@ import {
   type MoveParams,
   type PlayerInput,
   type SimEvent,
+  type SnapCrate,
   type SnapKaiju,
   type SnapMatch,
   type SnapSquad,
@@ -58,6 +61,8 @@ export interface FrameState {
   kaijus: SnapKaiju[];
   squads: SnapSquad[];
   units: SnapUnit[];
+  /** Army supply crates coming down or on the ground (phase 2), as the snapshot drawn has them. */
+  crates: SnapCrate[];
   /** Playable bounds of the stage being shown. */
   bounds: Bounds;
   /** The unit the local player drives (already at its predicted position), or null. */
@@ -103,6 +108,8 @@ const MOVE_BITS = [Btn.move1, Btn.move2] as const;
  * went down. The order is the simulation's: molt, brace, the first move, the second, stomp,
  * strike, grab. A Grab with empty hands is shown as a grab: whether the server eats a kiosk
  * instead depends on what lies in reach, and the server's own phase takes over the picture.
+ * With a city weapon in the hand (phase 2) Strike swings a fast-food sign and throws anything
+ * else (`strikeVerb`), and Grab drops it, which has no wind-up to show (`heldEdible`).
  */
 export function hintVerb(k: SnapKaiju, buttons: number, pressed: number): KaijuVerb | null {
   if (pressed & Btn.molt && k.moltAvailable) return null;
@@ -117,8 +124,8 @@ export function hintVerb(k: SnapKaiju, buttons: number, pressed: number): KaijuV
     if (ready) return verb;
   }
   if (pressed & Btn.stomp) return 'stomp';
-  if (pressed & Btn.strike) return k.held ? 'throw' : 'swipe';
-  if (pressed & Btn.grab) return k.held ? (k.cooldowns.eat <= 0 ? 'eat' : null) : 'grab';
+  if (pressed & Btn.strike) return strikeVerb(k.held);
+  if (pressed & Btn.grab) return k.held ? (heldEdible(k.held) && k.cooldowns.eat <= 0 ? 'eat' : null) : 'grab';
   return null;
 }
 
@@ -403,6 +410,7 @@ export class MatchSession {
       kaijus: sampled.kaijus,
       squads: snap.squads,
       units: sampled.units,
+      crates: snap.crates,
       bounds: this.boundsFor(snap.match.stage),
       localUnit: null,
       localKaiju: null,

@@ -21,6 +21,12 @@ export interface QuadBatchOptions {
   additive?: boolean;
   /** Cut out pixels more transparent than this instead of blending (crisp pixel art that writes depth). */
   alphaTest?: number;
+  /**
+   * With `alphaTest`: a quad's own alpha below 1 keeps only that share of its pixels, in a fine
+   * fixed pattern (a screen door), so a cut-out sprite can fade (the player's own squad near a
+   * third-person camera) and still write depth.
+   */
+  dither?: boolean;
   /** Draw order among transparent things. */
   renderOrder?: number;
   fog?: boolean;
@@ -72,11 +78,20 @@ uniform sampler2D map;
 varying vec2 vUv;
 varying vec4 vColor;
 #include <fog_pars_fragment>
+#ifdef DITHER
+  // An ordered 4 by 4 pattern of thresholds (0 to 15/16) across the screen.
+  float bayer2(vec2 a) { a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }
+  float bayer4(vec2 a) { return bayer2(0.5 * a) * 0.25 + bayer2(a); }
+#endif
 void main() {
   vec4 texel = texture2D(map, vUv);
   vec4 color = texel * vColor;
   #ifdef ALPHA_CUT
-    if (color.a < ALPHA_CUT) discard;
+    #ifdef DITHER
+      if (texel.a < ALPHA_CUT || vColor.a <= bayer4(gl_FragCoord.xy)) discard;
+    #else
+      if (color.a < ALPHA_CUT) discard;
+    #endif
   #endif
   gl_FragColor = color;
   #include <colorspace_fragment>
@@ -129,6 +144,7 @@ export class QuadBatch {
     defines[options.mode === 'upright' ? 'MODE_UPRIGHT' : options.mode === 'facing' ? 'MODE_FACING' : 'MODE_GROUND'] = 1;
     if (options.additive) defines.ADDITIVE = 1;
     if (options.alphaTest !== undefined) defines.ALPHA_CUT = options.alphaTest.toFixed(3);
+    if (options.alphaTest !== undefined && options.dither) defines.DITHER = 1;
     const cut = options.alphaTest !== undefined;
     const material = new THREE.ShaderMaterial({
       uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { map: { value: null } }]),

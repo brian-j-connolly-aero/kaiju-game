@@ -99,6 +99,25 @@ export function drivesLikeTank(u: Pick<SnapUnit, 'type' | 'driven'>): boolean {
   return u.driven && unitTypeDef(u.type).drive !== undefined;
 }
 
+/**
+ * The army's sense of speed (docs/ROADMAP.md phase 2): how many degrees wider the lens is at
+ * `share` of the unit's top speed. A little on foot, more in a tank, most near its top speed.
+ */
+export function speedLensWidening(share: number, vehicle: boolean): number {
+  const s = Math.min(1.1, Math.max(0, share));
+  return vehicle ? 9 * s * s : 3 * s;
+}
+
+/** On foot: meters per step (a running soldier), how high the view bobs (meters) and rolls (radians) at full speed. */
+const STEP_LENGTH = 2.2;
+const BOB_HEIGHT = 0.07;
+const BOB_ROLL = 0.006;
+/** A tank's chase camera trails its speed by this many seconds of travel (it pulls back as the tank speeds up). */
+const TANK_LAG = 0.11;
+/** How far a tank's camera leans into a turn: radians per radian a second of the hull's turn, and at most. */
+const TANK_LEAN = 0.05;
+const TANK_LEAN_MAX = 0.045;
+
 export class HumanController implements Controller {
   readonly kind = 'human' as const;
   thirdPerson: boolean;
@@ -133,6 +152,14 @@ export class HumanController implements Controller {
   /** How much of the way from the unit to the chase camera is free of walls (eased). */
   private clear = 1;
   private readonly pivot = { x: 0, y: 0, z: 0 };
+  /** The sense of speed: the lens's widening (degrees, eased), the step bob's phase, the tank camera's trailing speed and lean. */
+  private widen = 0;
+  private stepPhase = 0;
+  private stepShare = 0;
+  private readonly trail = { x: 0, z: 0 };
+  private lean = 0;
+  private lastYaw = 0;
+  private lastYawUnit = -1;
 
   constructor(thirdPerson = false) {
     this.thirdPerson = thirdPerson;
@@ -191,6 +218,7 @@ export class HumanController implements Controller {
 
     const def = unitTypeDef(u.type);
     const eyeY = u.y + def.eyeHeight;
+    this.updateMotion(ctx, u);
     this.updateClearance(ctx);
     if (this.thirdPerson && !input.aimOverride) {
       // Aim from the unit at what the camera's center ray lands on.
@@ -256,15 +284,56 @@ export class HumanController implements Controller {
     return this.kick;
   }
 
-  /** Where the chase camera wants to be, walls or no walls. */
+  /**
+   * Once per frame, the sense of speed: the lens widens with the speed, the step bob runs on
+   * foot, a tank's camera trails its speed and leans into the hull's turn. All eased, so a
+   * redeploy or a takeover does not jerk the view.
+   */
+  private updateMotion(ctx: ControlContext, u: SnapUnit): void {
+    const def = unitTypeDef(u.type);
+    const dt = ctx.dt;
+    const speed = u.alive ? Math.hypot(u.vx, u.vz) : 0;
+    const share = speed / Math.max(0.1, def.speed);
+    const vehicle = def.body === 'vehicle';
+    const target = speedLensWidening(share, vehicle);
+    this.widen += (target - this.widen) * (1 - Math.exp(-dt * (target > this.widen ? 2.5 : 1.8)));
+    this.stepShare += (Math.min(1, share) - this.stepShare) * (1 - Math.exp(-dt * 6));
+    this.stepPhase += (speed * dt * Math.PI) / STEP_LENGTH;
+    const ease = 1 - Math.exp(-dt * 4);
+    if (vehicle) {
+      this.trail.x += (u.vx - this.trail.x) * ease;
+      this.trail.z += (u.vz - this.trail.z) * ease;
+      // The hull's turn rate, from its heading this frame and last (not across a takeover).
+      let turn = 0;
+      if (this.lastYawUnit === u.id && dt > 0) turn = wrapAngle(u.yaw - this.lastYaw) / dt;
+      const lean = clamp(-turn * TANK_LEAN, -TANK_LEAN_MAX, TANK_LEAN_MAX);
+      this.lean += (lean - this.lean) * (1 - Math.exp(-dt * 5));
+    } else {
+      this.trail.x *= 1 - ease;
+      this.trail.z *= 1 - ease;
+      this.lean *= 1 - ease;
+    }
+    this.lastYaw = u.yaw;
+    this.lastYawUnit = u.id;
+  }
+
+  /**
+   * Where the chase camera wants to be, walls or no walls. A tank's camera trails its speed (it
+   * hangs back as the tank speeds up and catches up as it slows); on foot the view bobs in step.
+   */
   private chasePosition(ctx: ControlContext, out: { x: number; y: number; z: number }): void {
     const u = ctx.frame.localUnit;
     if (!u) return;
     const { back, up } = chaseOffset(u.type);
     const cp = Math.cos(this.viewPitch);
-    out.x = u.x - Math.sin(this.viewYaw) * back * cp;
-    out.y = Math.max(1, u.y + up - Math.sin(this.viewPitch) * back * 0.6);
-    out.z = u.z - Math.cos(this.viewYaw) * back * cp;
+    out.x = u.x - Math.sin(this.viewYaw) * back * cp - this.trail.x * TANK_LAG;
+    out.y = Math.max(1, u.y + up - Math.sin(this.viewPitch) * back * 0.6) + this.bob();
+    out.z = u.z - Math.cos(this.viewYaw) * back * cp - this.trail.z * TANK_LAG;
+  }
+
+  /** The step bob on foot (meters up): a little lift on every stride, more at a run. */
+  private bob(): number {
+    return this.tank ? 0 : Math.abs(Math.sin(this.stepPhase)) * BOB_HEIGHT * this.stepShare;
   }
 
   /** The point above the unit that the chase camera hangs from (always in the open). */
@@ -301,7 +370,7 @@ export class HumanController implements Controller {
     const def = unitTypeDef(u.type);
     if (!this.thirdPerson) {
       out.x = u.x;
-      out.y = u.y + def.eyeHeight + (def.body === 'vehicle' ? 0.6 : 0);
+      out.y = u.y + def.eyeHeight + (def.body === 'vehicle' ? 0.6 : 0) + this.bob() * 0.8;
       out.z = u.z;
       return;
     }
@@ -336,7 +405,11 @@ export class HumanController implements Controller {
     this.updateGun(ctx);
     this.cameraPosition(ctx, this.eye);
     camera.position.set(this.eye.x, this.eye.y, this.eye.z);
-    setLens(camera, this.thirdPerson ? 58 : 66, 0.25, 9000);
+    // The lens widens with speed (rounded so the projection is not rebuilt every frame for nothing).
+    setLens(camera, (this.thirdPerson ? 58 : 66) + Math.round(this.widen * 20) / 20, 0.25, 9000);
     aimCamera(camera, this.viewYaw, this.viewPitch + this.kick * 0.012);
+    // A tank's camera leans into the hull's turn; a soldier's view rolls a touch with each stride.
+    const roll = this.tank ? this.lean : Math.sin(this.stepPhase) * BOB_ROLL * this.stepShare * (this.thirdPerson ? 0.5 : 1);
+    if (roll !== 0) camera.rotateZ(roll);
   }
 }

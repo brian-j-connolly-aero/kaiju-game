@@ -5,7 +5,9 @@
  * around a glyph means "hold it"; a small arrow between pictures means "then".
  *
  * The kaiju's tiles (docs/ROADMAP.md phase 1: one move per button): the starting kit (swipe or
- * throw, grab or eat, stomp), the molt with its three cards, the two move buttons as empty slots
+ * throw, grab or eat, stomp), the city weapons at stage 1 (phase 2: the sign swung, an antenna
+ * thrown as a javelin, the door held up as a shield, Grab dropping one), the molt with its three
+ * cards, the two move buttons as empty slots
  * that the molts fill, then every move a card can give, on whichever move button it lands on
  * (the brace held), and swimming. Stages a control is limited to show as the HUD's three growing
  * triangles. The squad's tiles (docs/ROADMAP.md phase 1: two buttons): moving, aiming, Fire,
@@ -143,8 +145,16 @@ export function kaijuTiles(kind: KaijuKindId): CardTile[] {
     { id: 'eat', group: 'verbs', verb: 'eat', parts: [picture('k_grab', 'dim'), then, button('grab'), picture('k_eat', 'kaiju'), picture('st_health')] },
     // Nothing to pick up, but a kiosk in reach: the grab button eats that.
     { id: 'eat-kiosk', group: 'verbs', verb: 'eat', parts: [picture('tl_kiosk', 'dim'), then, button('grab'), picture('k_eat', 'kaiju')] },
-    // Phase 2, the city as a weapon: a fast-food sign in the hand is swung (a stand-in picture until the weapon's own).
-    { id: 'club', group: 'verbs', verb: 'club', parts: [picture('k_grab', 'dim'), then, button('strike'), picture('k_swipe', 'kaiju')], stages: stagesFrom(1).filter((s) => s <= def.cityWeapons.grabStage) },
+  );
+  // Phase 2, the city as a weapon (the hatchling only): a fast-food sign in the hand is swung, an
+  // antenna or a mast's top thrown as a javelin, a garage door held up as a shield (no button:
+  // it takes the shots from the front by itself), and Grab drops a city weapon (never eaten).
+  const small = stagesFrom(1).filter((s) => s <= def.cityWeapons.grabStage);
+  tiles.push(
+    { id: 'club', group: 'verbs', verb: 'club', parts: [picture('k_grab', 'dim'), then, button('strike'), picture('k_club', 'kaiju')], stages: small },
+    { id: 'javelin', group: 'verbs', parts: [picture('k_grab', 'dim'), then, button('strike'), picture('k_javelin', 'kaiju')], stages: small },
+    { id: 'shield', group: 'verbs', parts: [picture('k_grab', 'dim'), then, picture('k_shield', 'kaiju')], stages: small },
+    { id: 'drop', group: 'verbs', parts: [picture('k_grab', 'dim'), then, button('grab'), picture('k_drop', 'kaiju')], stages: small },
   );
   // Swimming (sim/swim.ts) has no button: walk into deep water and stand, and it goes under.
   if (def.swim) {

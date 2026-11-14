@@ -19,9 +19,14 @@
  *   --no-assets      procedural fallbacks only
  *   --no-extras      skip the scripted extras (the squad's volley and its meter, the tank's
  *                    reticles and driving, the monster's kit and molt cards, charge, tail sweep,
- *                    roar and its stun, beam, stagger, the city giving way, swimming)
+ *                    roar and its stun, beam, stagger, the city giving way, swimming; phase 2's
+ *                    city weapons, power surge, crates, pick-up weapons, artillery and
+ *                    reinforcements: x-weapons-kit, x-weapons-army, x-pickups in shotsWeapons.mjs;
+ *                    the special buildings, rubble and falls, the monster's weight, the army's
+ *                    speed: x-city-* in shotsCity.mjs)
  *   --only TAGS      only the extras whose names start with one of these (comma separated, for
  *                    example `x-kaiju-swim,x-human-swim`), and none of the stage visits
+ *   --dist DIR       serve this build of the client instead of client/dist
  *
  * The Chromium flags are the ones documented in smoke.mjs.
  */
@@ -32,11 +37,14 @@ import { createRequire } from 'node:module';
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { disablePointerLock } from './driver.mjs';
+import { cityExtras } from './shotsCity.mjs';
+import { weaponExtras } from './shotsWeapons.mjs';
 import { CHROMIUM_ARGS } from './smoke.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const require = createRequire(import.meta.url);
-const dist = join(root, 'client', 'dist');
+/** The built client to serve (`--dist DIR`: a build of one's own, beside another builder's). */
+let dist = join(root, 'client', 'dist');
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -64,6 +72,7 @@ function parseArgs(argv) {
     else if (a === '--height') opts.height = Number(next()) || 540;
     else if (a === '--no-assets') opts.noAssets = true;
     else if (a === '--no-extras') opts.extras = false;
+    else if (a === '--dist') dist = resolve(next());
     else if (a === '--only') {
       opts.only = next().split(',').filter(Boolean);
       opts.stages = [];
@@ -1003,6 +1012,14 @@ async function main() {
       await sleep(1500);
       await shot('1-spines-from-the-bank');
     });
+
+    // Phase 2: the monster's city weapons and power surge, the army's crates, pick-up weapons,
+    // artillery and reinforcements (shotsWeapons.mjs).
+    await weaponExtras(visit, opts.out);
+
+    // Phase 2: the special buildings, rubble and falls, the monster's weight, the army's sense of
+    // speed (shotsCity.mjs).
+    await cityExtras(visit, opts.out);
   }
 
   server.close();
