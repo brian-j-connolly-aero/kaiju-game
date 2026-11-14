@@ -44,6 +44,10 @@ BUDGETS = {
     "tidewheel": 1500, "halcyon_observatory": 1500, "farewell_light": 1500, "kiln_point_power": 1500,
     "sevenfold_temple": 1500, "grand_station": 1500, "signal_mast": 1500, "gasworks": 1500,
     "founders_clock": 1500,
+    # special buildings (roadmap phase 2; tools/art/city_special.py). A few stand in every
+    # starting neighborhood; they are not in COUNTS until count_city.ts is run on a city that
+    # places them. radiomast_a is in the small class by its volume (8 x 8 x 24 m).
+    "substation_a": 250, "gasstation_a": 250, "radiomast_a": 120,
 }
 
 CHUNK_TRIS = 30

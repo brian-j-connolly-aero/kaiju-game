@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Kaiju verb: club. The fast-food sign swung like a club: a burger on a pole, two arcs of its swing behind it. -->
+  <path d="M7 58L37 30"/>
+  <path fill="currentColor" stroke="none" d="M31 16Q31 3 44 3Q57 3 57 16Z"/>
+  <rect x="30" y="19" width="28" height="5.5" rx="2.75" fill="currentColor" stroke="none"/>
+  <path fill="currentColor" stroke="none" d="M33 27.5H55Q55 33.5 49 33.5H39Q33 33.5 33 27.5Z"/>
+  <path d="M8.5 13A48 48 0 0 1 23.5 7.5"/>
+  <path d="M7 27A36 36 0 0 1 18 21"/>
+</svg>

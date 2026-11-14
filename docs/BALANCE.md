@@ -17,11 +17,12 @@ npm run sim -- --seeds 10 --unopposed          # no squads: how fast a kaiju fil
 npm run sim -- --seeds 10 --kaiju-handicap 0.3 # the kaiju bot hesitates 30% of the time
 npm run sim -- --seeds 10 --human-handicap 0.3 # the same for the squads
 npm run sim -- --seeds 20 --trigger-happy      # squads that hold the trigger instead of charging volleys
+npm run sim -- --seeds 20 --no-crates          # no army supply crates (phase 2): what the pick-ups are worth
 npm run sim -- --seeds 8 --fast                # the short MB_FAST timers and bar
 npm run sim -- --seeds 3 --events --json       # event counts; reports as JSON
 npm run sim -- --seeds 20 --every-anchor       # match i starts at anchor i mod 10: every start equally often
 npm run sim -- --seeds 20 --nav                # also how the bots got about (stuck, wading, the bay, hanging back)
-npm run sim -- --seeds 20 --bar 0.18,0.125,0.29  # try other bar fractions for this run only
+npm run sim -- --seeds 20 --bar 0.18,0.11,0.30  # try other bar fractions for this run only
 npm run sim -- --seeds 20 --clock 576          # try another match clock (seconds) for this run only
 npm run sim -- --seeds 5 --city placeholder    # the old grid city (a development option)
 ```
@@ -55,7 +56,8 @@ plus or minus 11 points of noise; the three batches in section 4 show it.
 | Undisciplined fire is clearly worse than charged, coordinated volleys at breaking the kaiju's nerve | `--trigger-happy` against the default run: staggers, wins |
 
 Since phase 1 (section 9) the owner wants every stage about a fifth shorter than section 8
-measured: contested stages near 2:35, 2:30 and 3:05, matches near 8:15, a 9:36 clock.
+measured: contested stages near 2:35, 2:30 and 3:05, matches near 8:15, a 9:36 clock. Phase 2
+(section 10) was held to within about a tenth of where phase 1 left the stages.
 
 ## 3. Before
 
@@ -820,3 +822,138 @@ stage 3: reached 19, completed 11, segment filled after 3:02, stage time when co
 - Stage 3 is very sensitive to `p3` (0.31 to 0.27 took it from 4:12 to 2:43): a titan that
   reaches the downtown towers before the squads close in finishes quickly, one that does not is
   staggered again and again.
+
+## 10. Phase 2 pacing: held where phase 1 left it (14 November, the phase 2 integration)
+
+Phase 2 (`docs/ROADMAP.md`: special buildings, city weapons, supply crates and pick-ups, rubble
+that stays, buildings that fall over) could speed the monster up or slow it down. The rule for
+this pass: if a stage moved more than about a tenth from phase 1's numbers (section 9), bring it
+back with the bar fractions; report the monster's win rate and step in on balance only if it is
+lopsided (under 20% or over 80%). The final pacing pass is phase 3's.
+
+### What phase 2 did to the pace
+
+Measured on the whole phase 2 tree as its four builders left it, with section 9's bar
+(`npm run sim -- --seeds 20 --every-anchor`, seeds 1 to 20 and 21 to 40, and `--unopposed`):
+
+| | Stage 1 | Stage 2 | Stage 3 | Match | Kaiju wins |
+| --- | --- | --- | --- | --- | --- |
+| Phase 1 (section 9, 40 matches) | 2:02 | 2:27 | 3:01 | 7:31 | 20 of 40 |
+| Phase 2 as built, seeds 1 to 20 | 1:59 | 2:54 | 2:48 | 7:59 | 7 of 20 |
+| Phase 2 as built, seeds 21 to 40 | 2:02 | 2:59 | 2:53 | 8:06 | 8 of 20 |
+| Alone, phase 1 (segment filled after) | 2:03 | 1:57 | 2:44 | 7:06 | |
+| Alone, phase 2 as built | 2:13 | 2:05 | 2:09 | 6:49 | |
+
+(Contested stage times are for stages the kaiju completed: 15 of 39 third stages here, against
+20 in phase 1, so that column is a small and lucky sample.)
+
+- **Stage 2 got a fifth longer** (2:57 against 2:27). The juvenile now spends more of the stage
+  fighting: it killed nearly three times as many units there (4.5 to 4.8 a match against 1.7)
+  and ate more (healed 250 to 360 hp against 170), while the squads, with their pick-ups,
+  fired more volleys (31 to 36 against 27).
+- **A lone titan finishes a fifth sooner** (2:09 against 2:44): a tower that falls over brings
+  down what it lands on, and those count for the bar.
+- **Stage 1 held**, although it changed inside: the squads fire half as many charged volleys
+  there (15 a match against 29) and break the hatchling's nerve a third as often (0.6 against
+  2.1). Rubble from a house hides most of a hatchling (`DESIGN.md` section 7, "Rubble and
+  falls"), the garage door takes shots from the front, and the squads' own stray fire still
+  fills most of the first segment.
+
+### Found on the way: the squads stopped firing at a hatchling behind rubble
+
+The scripted playtest's squad session (`tools/playtest/scripted.mjs`) waits for another squad's
+charged volley to hit the kaiju; in phase 2 none ever did. The squad bot parked where its leader
+saw the hatchling's head over a heap of rubble, held the volley button, found that most of its
+planted squad-mates had no line (rubble now blocks their lines too) and let go; with nobody
+planted the leader alone saw the kaiju again, so it planted again, and so on for the whole stage,
+its "no line of fire" patience reset every other look. Where no firing spot near its bearing had
+a line at all, it drove to the best one anyway and waited there for ever. With a hatchling
+standing still (the playtest's monster player does nothing), in a whole fast stage 1 not one
+squad fired a charged volley at the playtest's start, and over the ten starts (one seed) 24
+squads of 40 fired none: at least one at every start, all four at one.
+
+Fixed in `shared/src/sim/bots/squadBot.ts` (numbers in `BOT_RULES.squad`): a squad whose planted
+squad-mates had no line does not plant there again; it moves on after its usual 4 s and passes
+over that spot (15 m round it) for 20 s; and one that reaches its firing spot with no line at all
+tries another side (its bearing turns 70°). Now 1 squad of the 40 fires none (phase 1's code: 2
+of 40). Two tests in `shared/test/bots.test.ts` hold it: a wall that hides the kaiju from one
+side, and a start and seed where three squads of four fired none.
+
+### What changed
+
+| Number (`shared/src/defs/rules.ts`) | Before | After | Why |
+| --- | --- | --- | --- |
+| `MATCH_RULES.bar.p2` | 0.125 | 0.11 | Stage 2 back from about 2:57 to about 2:35. |
+| `MATCH_RULES.bar.p3` | 0.29 | 0.30 | A lone titan's last segment back from 2:21 to 2:28 (phase 1: 2:44); contested stage 3 stays near 3:00. |
+| `p1`, the clock | 0.18, 9:36 | unchanged | Stage 1 and the match length held. |
+
+The second mark is `max(1.6 × P1, p2 × V(stage 2))`, and at every start the second term is the
+larger by five times, so `p2` alone sets it. Trials on the tree before the squad bot fix (stage 2
+was 2:54 and 2:59 there with 0.125):
+
+| p2, p3 | Seeds | Stage 2 | Stage 3 (completed) | Match | Kaiju wins | Alone: stage 2 / 3 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0.11, 0.29 | 1 to 20 | 2:33 | 3:00 (8) | 7:45 | 8 of 20 | 1:47 / 2:21 |
+| 0.11, 0.29 | 21 to 40 | 2:36 | 2:45 (11) | 7:38 | 11 of 20 | |
+| 0.10, 0.29 | 1 to 20 | 2:18 | 2:19 (8) | 7:11 | 8 of 20 | |
+| 0.11, 0.30 | 1 to 20 | 2:33 | 2:59 (8) | 7:44 | 8 of 20 | 1:47 / 2:28 |
+| 0.11, 0.30 | 21 to 40 | 2:36 | 2:37 (10) | 7:35 | 10 of 20 | |
+
+### The result (the bar above and the squad bot fix, the tree as shipped)
+
+| | Stage 1 | Stage 2 | Stage 3 | Match | Kaiju wins |
+| --- | --- | --- | --- | --- | --- |
+| Phase 1 (section 9) | 2:02 | 2:27 | 3:01 | 7:31 | 20 of 40 (50%) |
+| Seeds 1 to 20 | 1:58 | 2:18 | 2:35 (10) | 7:16 | 10 of 20 (7 kills, 3 by the clock) |
+| Seeds 21 to 40 | 2:04 | 2:51 | 3:58 (6) | 8:35 | 6 of 20 (8 kills, 6 by the clock) |
+| All 40 | 2:01 (-1%) | 2:35 (+5%) | 3:06 (+3%) | 7:56 (+5%) | 16 of 40 (40%) |
+| Alone (`--unopposed`, 10 starts) | 2:13 (+8%) | 1:47 (-9%) | 2:28 (-10%) | 6:49 (-4%) | |
+
+- Every stage is within about a tenth of phase 1, contested and alone. The two batches differ a
+  lot (stage 2 2:18 against 2:51, stage 3 2:35 against 3:58): with 20 matches a batch is noisy,
+  and the third stage's column counts only the 16 third stages the kaiju finished.
+- The monster wins 40% (16 of 40; 50% in phase 1). Not lopsided, so balance was left alone, as
+  the owner asked. 9 of the 40 matches ended on the clock (4 of 40 in phase 1): more third
+  stages run out of time, the squads staggering the titan more often (4.7 to 7.0 staggers a
+  match against 4.5).
+- Collateral (the squads' own misses) is about what it was: 140 / 580 / 1020 points a match at the
+  three stages, against 145 / 525 / 1383.
+
+### Something happening every 20 seconds
+
+`docs/ROADMAP.md` names phase 2 "something happening every 20 seconds". Counted over the same 40
+matches (a scratch script built on `shared/scripts/botMatch.ts`'s `onTick`): the moments when
+something new happens to the monster or to a squad, of the kinds phase 2 added. For the monster:
+a special building pays out (whoever wrecked it), it picks up, throws or swings a city weapon, a
+squad takes a crate in sight of it (180 / 300 / 600 m by stage), a building falls over in sight,
+or a radio's barrage is called onto it. For a squad (only while it is in the fight): it takes a
+crate, a fireball or a surge goes off in sight of its leader (150 / 250 / 400 m) or a mast's
+static covers its map, the monster picks up, throws or swings a city weapon in sight, a propane
+tank goes off in sight, a building falls over in sight, or its own radio's barrage or
+reinforcements come. Things on the same half-second count as one moment.
+
+| | Something new, on average | 20-second stretches with something new | Longest quiet stretch (median) | Met? |
+| --- | --- | --- | --- | --- |
+| Stage 1, monster | every 10 s | 86% | 30 s | Yes |
+| Stage 1, a squad | every 15 s | 73% | 38 s | Yes, most of the time |
+| Stage 2, monster | every 30 s | 47% | 71 s | No |
+| Stage 2, a squad | every 58 s | 27% | 94 s | No |
+| Stage 3, monster | every 11 s | 64% | 53 s | On average yes, but falls come in bunches |
+| Stage 3, a squad | every 33 s | 34% | 97 s | No |
+
+What fills them, per minute of play: at stage 1 the monster's city weapons (2.2), crates taken
+near it (2.1), special buildings (1.1); a squad's city weapons seen (2.3), specials (0.8), crates
+(0.8). At stage 2: crates (1.2 near the monster, 0.6 per squad), barrages (0.7), specials (0.3),
+falls (0.1). At stage 3: falls (4.9 near the monster, 1.4 per squad), crates (0.8 and 0.4).
+Stage 1 is where phase 2 put its new things (all ten special-building trios stand in the starting
+neighborhoods, the city weapons are the hatchling's), and it meets the goal; stages 2 and 3 do
+not, for a squad least of all. Levers for later (the owner's call, not tuned here): more crates
+at stages 2 and 3 (`CRATE_RULES`: one every 30 s for the squads in turn), special buildings
+beyond the starting neighborhoods, city weapons a juvenile can lift.
+
+### Limits
+
+- Bots, not people, and 40 matches. The squads' rubble behavior is new; a person finds a line
+  round a heap faster than the bot does, or not at all.
+- The "something new" counts are for this definition of "in sight"; a player who watches the
+  map or hears the radio notices more.

@@ -61,7 +61,12 @@ describe('spotted: a driven unit has the kaiju in sight within the spotting rang
     run(world, 1);
     expect(unitSeesKaiju(world, world.units[0], k, COMBAT_RULES.spotRange)).toBe(false);
     expect(k.spotted).toBe(false);
+    // Brought down, the building is a mound half as high, which still hides a hatchling...
     world.structureHp[0] = 0;
+    run(world, 1);
+    expect(k.spotted).toBe(false);
+    // ...from everybody but a unit standing on top of it.
+    placeUnit(world, 0, 300, 60);
     run(world, 1);
     expect(k.spotted).toBe(true);
   });

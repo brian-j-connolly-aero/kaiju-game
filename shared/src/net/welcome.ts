@@ -25,6 +25,6 @@ export function welcomeFor(world: World, playerId: PlayerId): WelcomeMessage {
     tick: world.tick,
     anchor: world.match.anchor,
     cityChecksum: checksum,
-    cityState: encodeCityState(world.structureStage, world.propAlive, world.propWreck, world.city.props.length),
+    cityState: encodeCityState(world.structureStage, world.propAlive, world.propWreck, world.city.props.length, world.structureFall, world.loose),
   };
 }

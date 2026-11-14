@@ -9,10 +9,13 @@
  *   MATCH_RULES.revealAfterNoise seconds after it made noise (see `noteKaijuNoise`).
  * - Swimming (sim/swim.ts): while it is all the way under, the stage 1 rule holds at every stage,
  *   and both distances shrink to the swim's `sightMult` (only the spines show).
+ * - Static (phase 2: a radio mast fell, `match.staticUntil`, sim/systems/specials.ts): the map
+ *   shows nothing, at any stage, so only what the units see themselves (within
+ *   MATCH_RULES.revealSightRange) puts the kaiju on it; noise does not.
  *
  * Line of sight runs from the unit's eye to the kaiju's upper body and is blocked by standing
- * structures. Bridge decks do not block it: a unit or a kaiju on a bridge stands inside the
- * deck's box.
+ * structures and by the mounds of collapsed and fallen ones, up to their height. Bridge decks do
+ * not block it: a unit or a kaiju on a bridge stands inside the deck's box.
  */
 
 import { lineOfSight } from '../city/spatialIndex';
@@ -42,7 +45,8 @@ export function unitSeesKaiju(world: World, unit: Unit, kaiju: Kaiju, range: num
   target.x = kaiju.x;
   target.y = kaijuShownHeight(kaiju) * SIGHT_TARGET_HEIGHT;
   target.z = kaiju.z;
-  return lineOfSight(world.cityQuery, eye, target, true);
+  // Rubble and fallen buildings hide it up to their height (docs/ROADMAP.md, phase 2).
+  return lineOfSight(world.cityQuery, eye, target, true, true);
 }
 
 /**
@@ -55,7 +59,9 @@ export function noteKaijuNoise(kaiju: Kaiju): void {
 
 /** Refreshes `spotted` and `known` for every kaiju and calls it on the radio when that changes. */
 export function updateSpotting(world: World): void {
-  const stageKnown = stageDef(world.match.stage).kaijuAlwaysKnown;
+  // The map shows static (a radio mast fell): it shows nothing, so only sight counts.
+  const jammed = world.tick < world.match.staticUntil;
+  const stageKnown = stageDef(world.match.stage).kaijuAlwaysKnown && !jammed;
   for (const k of world.kaijus) {
     // Under water it is never simply known, at any stage: it has to be seen (sim/swim.ts).
     const alwaysKnown = stageKnown && !kaijuUnder(k);
@@ -83,7 +89,7 @@ export function updateSpotting(world: World): void {
     }
     k.spotted = spotted;
 
-    const known = alwaysKnown || seen || k.knownTimer > 0;
+    const known = alwaysKnown || seen || (k.knownTimer > 0 && !jammed);
     if (known !== k.known) {
       k.known = known;
       // At later stages it is out of sight only while it swims; otherwise there is nothing to announce.

@@ -21,6 +21,18 @@
  * - a cocoon on the map is a target like any other, only better: the squad closes in on it.
  * - fire at will: whenever it is not charging a volley, the leader shoots when it has the
  *   kaiju in range and a clear line of fire.
+ * - supply crates (phase 2): while the kaiju is not close and it is not charging, it fetches a
+ *   crate coming down or lying within BOT_RULES.squad.crateRange of its leader (one no other
+ *   bot squad is already going for), then goes back to work. With a weapon pick-up it parks in
+ *   that weapon's band of range (the machine gun closer in, the big cannon and the missile pod
+ *   at range); with the artillery radio it keeps volleying (even into a staggered or cocooned
+ *   kaiju, and even as the lazy harness profile), since every charged volley calls a barrage.
+ * - lines of fire count rubble and fallen buildings (up to their height), so it parks where it
+ *   can shoot past them and moves on when one is in the way. That goes for its planted
+ *   squad-mates too: when most of them have no line from where it parked (its leader may still
+ *   see over the heap), it does not plant there again, moves on, and passes over that spot for a
+ *   while (BOT_RULES.squad.blockedRadius, blockedTime); and when it reaches its firing spot with
+ *   no line at all (a hatchling among heaps), it tries another side (lookAgain).
  *
  * It only knows what the humans' map shows (`kaiju.known`) and what it reads off its own
  * squad. It is deliberately beatable: it parks in plain sight and never guards a place the
@@ -37,7 +49,7 @@ import { DT, SQUAD_RULES } from '../../defs/rules';
 import { unitTypeDef } from '../../defs/units';
 import { modMult } from '../../defs/upgrades';
 import { projectileTypeDef, weaponDef } from '../../defs/weapons';
-import { angleDiff, angleDist, yawFromTo } from '../../math/angle';
+import { angleDiff, angleDist, wrapAngle, yawFromTo } from '../../math/angle';
 import { boundsContains } from '../../math/geom';
 import { rngInt } from '../../math/rng';
 import { clamp } from '../../math/scalar';
@@ -47,7 +59,7 @@ import { setTankMove, setWorldMove } from '../movement';
 import { createSteer, steerToward } from '../nav';
 import { formationSpacing, nearestKaiju, squadCharge } from '../squads';
 import { kaijuShownHeight } from '../swim';
-import type { Kaiju, PlayerState, Squad, Unit, World } from '../types';
+import type { Crate, Kaiju, PlayerState, Squad, Unit, World } from '../types';
 import { beginBotInput, botHandicap, heldButtons, hesitates, press, releaseAll } from './common';
 import type { BotState, SquadBotMode } from './types';
 
@@ -106,7 +118,8 @@ function lineOfFireAt(world: World, x: number, z: number, height: number, k: Kai
   mark.x = k.x;
   mark.y = kaijuShownHeight(k) * h;
   mark.z = k.z;
-  return !castSegment(world.cityQuery, muzzle, mark, undefined, -1, true);
+  // Rubble and fallen buildings block it up to their height: the bot looks for a line round them.
+  return !castSegment(world.cityQuery, muzzle, mark, undefined, -1, true, true);
 }
 
 const bank = { x: 0, z: 0 };
@@ -181,6 +194,8 @@ function pickFiringSpot(
     const x = spots[i];
     const z = spots[i + 1];
     if (!boundsContains(b, x, z, inset)) continue;
+    // Its squad-mates could not shoot from round here a moment ago.
+    if (bs.blockedFor > 0 && Math.hypot(x - bs.blockedX, z - bs.blockedZ) < S.blockedRadius) continue;
     const d = Math.hypot(x - tx, z - tz);
     if (d < lo * range || d > hi * range) continue;
     const lx = x - leader.x;
@@ -233,6 +248,38 @@ function setMode(bs: BotState, mode: SquadBotMode): void {
   bs.blind = 0;
   bs.waited = 0;
   bs.gather = 0;
+  bs.crateTime = 0;
+  bs.matesBlind = false;
+  if (mode !== 'crate') bs.crate = -1;
+}
+
+/** The supply crate with this id, while it is still coming down or lying there; else null. */
+function crateById(world: World, id: number): Crate | null {
+  for (const c of world.crates) if (c.id === id) return c;
+  return null;
+}
+
+/**
+ * A supply crate worth fetching: the nearest one coming down or lying within S.crateRange of
+ * the leader that no other bot squad is already on its way to. Returns its id, or -1.
+ */
+function crateToFetch(world: World, squad: Squad, leader: Unit): number {
+  let best = -1;
+  let bestD: number = S.crateRange;
+  for (const c of world.crates) {
+    const d = Math.hypot(c.x - leader.x, c.z - leader.z);
+    if (d > bestD) continue;
+    let claimed = false;
+    for (const other of world.squads) {
+      if (other.id === squad.id) continue;
+      const ob = botOf(world, other);
+      if (ob && ob.mode === 'crate' && ob.crate === c.id) claimed = true;
+    }
+    if (claimed) continue;
+    best = c.id;
+    bestD = d;
+  }
+  return best;
 }
 
 /** Keeps the volley button down this tick (the squad-mates plant, or stay planted, and charge). */
@@ -285,12 +332,24 @@ export function squadBot(world: World, p: PlayerState, squad: Squad): void {
     bs.blind = 0;
     bs.waited = 0;
     bs.los = false;
+    bs.crate = -1;
+    bs.crateTime = 0;
+    bs.matesBlind = false;
+    bs.blockedFor = 0;
     releaseAll(bs);
   }
 
   const type = unitTypeDef(leader.type);
   const weapon = weaponDef(type.weapon);
   const range = weapon.range * modMult(squad.mods, 'weaponRange');
+  // With a weapon pick-up it parks in that weapon's band: the machine gun closer in, the big
+  // cannon and the missile pod at range.
+  const band = squad.pickup !== 'none' ? S.pickupBand[squad.pickup] : null;
+  const standoffMin = band ? band[0] : S.standoffMin;
+  const standoff = band ? band[1] : S.standoff;
+  const standoffMax = band ? band[2] : S.standoffMax;
+  // With the artillery radio every charged volley calls a barrage: it keeps volleying.
+  const radio = squad.barrages > 0;
   const known = k.known;
   if (known) {
     bs.lastX = k.x;
@@ -304,6 +363,7 @@ export function squadBot(world: World, p: PlayerState, squad: Squad): void {
   const retreatDist = Math.max(S.retreatAt * range, S.retreatRadii * k.radius + S.retreatMargin);
 
   // --- Think ------------------------------------------------------------------------------------
+  if (bs.blockedFor > 0) bs.blockedFor -= DT;
   bs.thinkTimer -= DT;
   if (bs.thinkTimer <= 0) {
     bs.thinkTimer = S.think;
@@ -320,13 +380,30 @@ export function squadBot(world: World, p: PlayerState, squad: Squad): void {
         planted++;
         if (lineOfFireAt(world, u.x, u.z, u.y + unitTypeDef(u.type).muzzleHeight, k, bs.aimHeight)) clear++;
       }
-      if (planted > 0 && clear < planted * S.clearLines) bs.los = false;
+      if (planted > 0) {
+        // Remembered for this spot: the leader alone seeing the kaiju (once they have let go)
+        // does not make a volley from here worth planting again.
+        bs.matesBlind = clear < planted * S.clearLines;
+        if (bs.matesBlind) bs.los = false;
+      }
     }
     spreadBearing(world, squad, bs);
 
+    // A supply crate is worth a detour while the kaiju is not close (and not helpless: then it is the target).
+    const calm = !known || (!helpless && dist > retreatDist * S.crateCalm);
+    const fetch = bs.mode !== 'crate' && bs.mode !== 'retreat' && !bs.charging && calm ? crateToFetch(world, squad, leader) : -1;
+    if (bs.mode === 'crate') bs.crateTime += S.think;
     if (known && dist < retreatDist && !helpless) {
       if (bs.mode !== 'retreat') bs.bearing = yawFromTo(k.x, k.z, leader.x, leader.z);
       setMode(bs, 'retreat');
+    } else if (bs.mode === 'crate' && (!crateById(world, bs.crate) || !calm || bs.crateTime > S.crateGiveUp)) {
+      // Taken (by us, or by somebody else), gone, or no time for it now.
+      setMode(bs, known ? 'approach' : 'search');
+    } else if (fetch >= 0) {
+      setMode(bs, 'crate');
+      bs.crate = fetch;
+    } else if (bs.mode === 'crate') {
+      // On its way to the crate.
     } else if (!known) {
       setMode(bs, 'search');
     } else if (bs.mode === 'retreat') {
@@ -334,18 +411,37 @@ export function squadBot(world: World, p: PlayerState, squad: Squad): void {
     } else if (bs.mode === 'search') {
       setMode(bs, 'approach');
     } else if (bs.mode === 'hold') {
-      bs.blind = bs.los ? 0 : bs.blind + S.think;
-      if (dist > S.leaveAt * range || bs.blind > S.losPatience) setMode(bs, 'approach');
+      bs.blind = bs.los && !bs.matesBlind ? 0 : bs.blind + S.think;
+      if (dist > (standoffMax + S.leaveAt - S.standoffMax) * range || bs.blind > S.losPatience) {
+        if (bs.matesBlind) {
+          // Somewhere else, then: not round here for a while.
+          bs.blockedX = leader.x;
+          bs.blockedZ = leader.z;
+          bs.blockedFor = S.blockedTime;
+        }
+        setMode(bs, 'approach');
+      }
     } else {
       // Approaching: anywhere in the band with a line of fire will do.
-      const lo = helpless ? S.closeInMin : S.standoffMin;
-      if (bs.los && dist >= lo * range && dist <= S.standoffMax * range) setMode(bs, 'hold');
+      const lo = helpless ? S.closeInMin : standoffMin;
+      const blocked = bs.blockedFor > 0 && Math.hypot(leader.x - bs.blockedX, leader.z - bs.blockedZ) < S.blockedRadius;
+      if (bs.los && !blocked && dist >= lo * range && dist <= standoffMax * range) setMode(bs, 'hold');
+      else if (known && !bs.los && Math.hypot(bs.goalX - leader.x, bs.goalZ - leader.z) < S.lookAgain) {
+        // There, and still no line (a hatchling among heaps of rubble): look from another side.
+        bs.bearing = wrapAngle(bs.bearing + S.bearingSpread);
+      }
     }
 
-    if (bs.mode === 'approach') {
-      const want = helpless ? S.closeInStandoff : S.standoff;
-      const lo = helpless ? S.closeInMin : S.standoffMin;
-      pickFiringSpot(world, squad, leader, bs, k, tx, tz, range, lo, S.standoffMax, want, false);
+    if (bs.mode === 'crate') {
+      const c = crateById(world, bs.crate);
+      if (c) {
+        bs.goalX = c.x;
+        bs.goalZ = c.z;
+      }
+    } else if (bs.mode === 'approach') {
+      const want = helpless ? S.closeInStandoff : standoff;
+      const lo = helpless ? S.closeInMin : standoffMin;
+      pickFiringSpot(world, squad, leader, bs, k, tx, tz, range, lo, standoffMax, want, false);
     } else if (bs.mode === 'retreat') {
       pickFiringSpot(world, squad, leader, bs, k, tx, tz, range, S.safeAt, 1.1, S.standoff, true);
     } else if (bs.mode === 'search') {
@@ -425,7 +521,8 @@ export function squadBot(world: World, p: PlayerState, squad: Squad): void {
   // Parked, it lets the squad-mates come up before they plant (for a while: not for ever).
   if (bs.mode === 'hold' && !bs.charging && straggling && bs.gather < S.gatherWait) bs.gather += DT;
   const gathered = !straggling || bs.gather >= S.gatherWait;
-  const volleying = known && bs.los && bs.mode === 'hold' && mates > 0 && (bs.charging || gathered) && !helpless && !world.config.bots?.triggerHappy;
+  const lazy = world.config.bots?.triggerHappy === true;
+  const volleying = known && bs.los && bs.mode === 'hold' && mates > 0 && (bs.charging || (gathered && !bs.matesBlind)) && (!helpless || radio) && (!lazy || radio);
   if (bs.charging && !volleying) {
     // Moving off (the kaiju came close, the line of fire went), or it is helpless: let go now.
     letGoVolley(bs);

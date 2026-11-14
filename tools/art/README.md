@@ -392,7 +392,7 @@ probably a mistake; `--strict` treats warnings as failures; `-q` prints only pro
 | `materials`, `attributes` | only `vcol`, `glow`, `city_atlas`; vertex colors and texture coordinates where needed |
 | `flat-shading`, `winding`, `inside-out` | one normal per triangle; closed shapes face outward |
 | `required-nodes`, `anchors`, `hierarchy` | node names from ASSETS.md; anchors are empties; `weak_point` glows; the lizard tree is wired as drawn |
-| `single-mesh` | props are exactly one mesh node |
+| `single-mesh` | props are exactly one mesh node; the six city weapons (`tools/art/props_weapons.py`) also carry an empty `grip` under it; the supply crate carries `beacon` and the parachute `hook` (`tools/art/props_supply.py`). These anchors are the only other nodes a prop may have |
 | `left-right`, `facing` | `_L` on +X and `_R` on -X; `cam_fp`, `mouth`, `muzzle`, `head` toward +Z, tail toward -Z |
 | `origin` | stands on y = 0 with the origin inside the footprint (or centered, for flying things) |
 | `size`, `true-size`, `archetype`, `prop-size` | plausible meters; lizard stages 4.5 / 32 / 115 m tall (within 10%); egg and cocoon 1 m; structures match their archetype; props match the height and radius the game uses (warning) |

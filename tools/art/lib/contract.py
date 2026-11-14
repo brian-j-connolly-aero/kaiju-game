@@ -73,9 +73,21 @@ REQUIRED_NODES = {
     "faith_belltruck": ["hull", "bell"],
     "faith_ark": ["base", "lid"],
 }
+# City weapons (roadmap phase 2): props the stage 1 kaiju grabs and uses. Each is still one
+# mesh node, plus an empty `grip` under it: the point the hand closes on. See ASSETS.md
+# section 3 "City weapons" and tools/art/props_weapons.py.
+GRIP_PROPS = ("prop_propane", "prop_watertank", "prop_antenna", "prop_foodsign", "prop_garagedoor",
+              "prop_mast")
+REQUIRED_NODES.update({a: [a, "grip"] for a in GRIP_PROPS})
+# Supply drop (roadmap phase 2, "army pick-ups"; tools/art/props_supply.py): the crate carries
+# an empty `beacon` on its lid (light, smoke, and the point it hangs from), the parachute an
+# empty `hook` where its lines meet (the model's origin).
+REQUIRED_NODES.update({"prop_crate": ["prop_crate", "beacon"], "prop_parachute": ["prop_parachute", "hook"]})
+# Empties a prop may carry beside its one mesh.
+PROP_ANCHORS = {"grip", "beacon", "hook"}
 
 # Nodes that must be empties (no mesh): anchors the code reads positions from.
-EMPTY_NODES = {"cam_fp", "mouth", "hold", "muzzle"}
+EMPTY_NODES = {"cam_fp", "mouth", "hold", "muzzle", "grip", "beacon", "hook"}
 # Nodes that must be meshes using only the glow material.
 GLOW_NODES = {"weak_point"}
 

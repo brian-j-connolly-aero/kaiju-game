@@ -6,7 +6,8 @@
  * The first 22 entries are the starter set the placeholder city is built from; the entries after
  * them were appended for Port Meridian (docs/CITY.md describes every one for the artists). The
  * list is append-only and ids are stable: art files are named after them, and the client draws
- * one instanced batch per archetype and damage state, so the whole list is capped at 40.
+ * one instanced batch per archetype and damage state, so the whole list is capped at 48 (40 until
+ * phase 2 added the three special buildings; phase 3 adds more kinds of buildings).
  *
  * Tuning notes (starting values): hp is set against the kaiju's structure damage per stage
  * (swipe 40 / 300 / 2000), so a house takes about two hatchling swipes, a mid-rise three
@@ -14,7 +15,7 @@
  */
 
 import type { StructureClass } from '../defs/ids';
-import type { ZoneTag } from './types';
+import type { SpecialKind, ZoneTag } from './types';
 
 export interface ArchetypeDef {
   id: string;
@@ -30,6 +31,8 @@ export interface ArchetypeDef {
   landmark: string | null;
   /** True for bridge decks (never block movement). */
   passable: boolean;
+  /** A special building (SPECIAL_KINDS): wrecking it pays a reward once (sim/systems/specials.ts). Absent for every other archetype. */
+  special?: SpecialKind;
 }
 
 function building(
@@ -56,6 +59,20 @@ function landmark(
   zones: readonly ZoneTag[],
 ): ArchetypeDef {
   return { id, cls: 'landmark', footprint: [width, depth], height, hp, value, zones, landmark: name, passable: false };
+}
+
+function special(
+  id: string,
+  kind: SpecialKind,
+  cls: StructureClass,
+  width: number,
+  depth: number,
+  height: number,
+  hp: number,
+  value: number,
+  zones: readonly ZoneTag[],
+): ArchetypeDef {
+  return { id, cls, footprint: [width, depth], height, hp, value, zones, landmark: null, passable: false, special: kind };
 }
 
 export const ARCHETYPES: readonly ArchetypeDef[] = [
@@ -130,6 +147,16 @@ export const ARCHETYPES: readonly ArchetypeDef[] = [
   landmark('signal_mast', 'Signal Hill Mast', 16, 16, 160, 3000, 500, ['suburb']),
   landmark('gasworks', 'Number Three Gasworks', 56, 56, 44, 4000, 600, ['industrial']),
   landmark('founders_clock', 'Founders Clock Tower', 12, 12, 62, 2000, 400, ['university']),
+
+  // --- The special buildings (docs/ROADMAP.md phase 2; DESIGN.md section 7, "Special buildings").
+  // One of each stands in every starting neighborhood, on a street front 40 to 120 m from where
+  // the match can start (meridian/specials.ts). A hatchling wrecks one in three to five swipes
+  // (40 each); each is worth what a shop is. Wrecking one pays a reward, once: the substation a
+  // power surge, the gas station a fireball, the radio mast falls (its top can be thrown) and the
+  // army's map turns to static. The placeholder city never places them.
+  special('substation_a', 'substation', 'factory', 22, 16, 9, 150, 15, ['suburb', 'industrial']),
+  special('gasstation_a', 'gasstation', 'shop', 26, 20, 7, 160, 15, ['suburb', 'harbor', 'industrial']),
+  special('radiomast_a', 'radiomast', 'factory', 8, 8, 24, 120, 15, ['suburb', 'industrial']),
 ];
 
 const BY_ID = new Map<string, ArchetypeDef>(ARCHETYPES.map((a) => [a.id, a]));
@@ -138,6 +165,11 @@ export function archetypeDef(id: string): ArchetypeDef {
   const def = BY_ID.get(id);
   if (!def) throw new Error(`archetype "${id}" is not defined`);
   return def;
+}
+
+/** The special building an archetype is (SPECIAL_KINDS), or null for every other one. */
+export function archetypeSpecial(id: string): SpecialKind | null {
+  return BY_ID.get(id)?.special ?? null;
 }
 
 /** Model id in the asset manifest for an archetype. */

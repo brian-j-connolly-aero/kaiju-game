@@ -87,6 +87,8 @@ export class Effects {
       dust: anim('fx_dust'),
       fire: anim('fx_fire'),
       debris: anim('fx_debris'),
+      // Small broken bits (glass, torn metal): the fourth debris picture when the art has it.
+      bits: anim(has('fx_debris_4') ? 'fx_debris_4' : 'fx_debris'),
       flash: anim('fx_flash'),
       spark: anim('fx_spark'),
       glow: anim('fx_glow'),
@@ -230,6 +232,123 @@ export class Effects {
     const p = this.spawn('burst', this.anims.fire, x, y + size / 2, z, size, 0.6, 0xffffff, 1);
     p.rot = 0;
     p.vy = size * 0.5;
+  }
+
+  // --- the city and the monster's weight (phase 2) ----------------------------------------------
+
+  /**
+   * A propane tank going off (docs/ROADMAP.md phase 2, "the city as a weapon"). One effect for
+   * every way a tank goes off (thrown, shot where it stands, in the monster's hand, crushed), so
+   * they all look alike: a white flash, a ball of flame that rolls upward, a ring of air on the
+   * ground, sparks and torn metal flying, then black smoke. `radius` is the blast's (8 m; 3.5 m
+   * for a crushed one).
+   */
+  propaneBlast(x: number, y: number, z: number, radius: number): void {
+    const r = Math.max(2, radius);
+    const base = Math.max(0, y);
+    this.spawn('glow', this.anims.glow, x, base + r * 0.4, z, r * 5, 0.5, 0xffa040, 0.85);
+    this.spawn('burst', this.anims.flash, x, base + r * 0.3, z, r * 2.6, 0.18, 0xffffff, 1);
+    this.spawn('burst', this.anims.explosionGround, x, base + r * 0.75, z, r * 1.5, 0.55, 0xffffff, 1).rot = 0;
+    // The ball of flame: a few fireballs that start together and roll up and out.
+    for (let i = 0; i < 5; i++) {
+      const a = this.rand() * 6.283;
+      const out = r * (0.6 + this.rand() * 0.8);
+      const p = this.spawn('burst', this.anims.explosion, x + Math.cos(a) * r * 0.15, base + r * (0.25 + this.rand() * 0.3), z + Math.sin(a) * r * 0.15, r * (0.7 + this.rand() * 0.45), 0.75 + this.rand() * 0.35, 0xffffff, 1);
+      p.vx = Math.cos(a) * out;
+      p.vz = Math.sin(a) * out;
+      p.vy = r * (1.1 + this.rand() * 0.7);
+      p.grow = r * 0.7;
+      p.drag = 1.6;
+      p.rot = 0;
+    }
+    for (let i = 0; i < 3; i++) this.fire(x + (this.rand() - 0.5) * r * 0.6, base, z + (this.rand() - 0.5) * r * 0.6, r * (0.45 + this.rand() * 0.3));
+    this.sparks(x, base + r * 0.3, z, r, 10, 0xffd890);
+    this.debris(x, base + r * 0.3, z, r * 0.9, 6, 0xd8d8d0, 0.35);
+    for (let i = 0; i < 3; i++) {
+      const p = this.spawn('smoke', this.anims.smoke, x + (this.rand() - 0.5) * r * 0.5, base + r * (0.8 + this.rand() * 0.6), z + (this.rand() - 0.5) * r * 0.5, r * 1.1, 2.2 + this.rand() * 1.2, 0x2e2a28, 0.75);
+      p.vy = r * 0.55;
+      p.grow = r * 0.8;
+      p.drag = 0.3;
+    }
+    this.ring(x, z, r * 2.2, 0xffd9a0, 0.5, 0.85);
+  }
+
+  /** A tongue of flame rolling out (a fireball's surface): the explosion picture, moving and growing. */
+  flame(x: number, y: number, z: number, size: number, vx: number, vy: number, vz: number, life = 0.9): void {
+    const p = this.spawn('burst', this.anims.explosion, x, y, z, size, life, 0xffffff, 1);
+    p.vx = vx;
+    p.vy = vy;
+    p.vz = vz;
+    p.grow = size * 0.6;
+    p.drag = 1.4;
+    p.rot = this.rand() * 6.283;
+  }
+
+  /** A puff of a smoke column: rises `rise` meters a second and spreads slowly (a fire's smoke). */
+  plume(x: number, y: number, z: number, size: number, rise: number, color = 0x2a2624, life = 5, alpha = 0.7): void {
+    const p = this.spawn('smoke', this.anims.smoke, x, y, z, size, life, color, alpha);
+    p.vy = rise;
+    p.grow = size * 0.35;
+    p.vx = (this.rand() - 0.5) * size * 0.3;
+    p.vz = (this.rand() - 0.5) * size * 0.3;
+  }
+
+  /**
+   * Sparks that leap and fall (electricity, torn metal): `count` bright points thrown up and out
+   * from (x, y, z) within `reach` meters, drawn added.
+   */
+  sparks(x: number, y: number, z: number, reach: number, count: number, color = 0xbfe4ff, life = 0.45): void {
+    for (let i = 0; i < count; i++) {
+      const a = this.rand() * 6.283;
+      const speed = reach * (1.2 + this.rand() * 2.2);
+      const p = this.spawn('glow', this.anims.spark, x, y, z, Math.max(0.25, reach * (0.06 + this.rand() * 0.07)), life * (0.6 + this.rand() * 0.8), color, 1);
+      p.vx = Math.cos(a) * speed;
+      p.vz = Math.sin(a) * speed;
+      p.vy = speed * (0.2 + this.rand() * 0.9);
+      p.gravity = reach * 7;
+      p.drag = 0.8;
+    }
+  }
+
+  /** Pieces thrown out of a blast or a fall: `count` tumbling bits of `size` meters (about), tinted `color`. */
+  debris(x: number, y: number, z: number, reach: number, count: number, color = 0xb8b0a4, size = 0.5): void {
+    for (let i = 0; i < count; i++) {
+      const a = this.rand() * 6.283;
+      const speed = reach * (0.8 + this.rand() * 1.6);
+      const p = this.spawn('burst', this.anims.bits, x, y, z, size * (0.6 + this.rand() * 0.9), 0.9 + this.rand() * 0.6, color, 1);
+      p.vx = Math.cos(a) * speed;
+      p.vz = Math.sin(a) * speed;
+      p.vy = speed * (0.6 + this.rand() * 0.8);
+      p.gravity = 20;
+      p.spin = (this.rand() - 0.5) * 14;
+      p.animate = false;
+    }
+  }
+
+  /**
+   * Windows bursting out of a wall: glass bits that fly out along the wall's outward normal
+   * (nx, nz) from (x, y, z), glint as they turn, and rain down. `size` is the spread (meters).
+   */
+  glass(x: number, y: number, z: number, nx: number, nz: number, size: number, count: number): void {
+    for (let i = 0; i < count; i++) {
+      const out = size * (0.8 + this.rand() * 1.6);
+      const side = (this.rand() - 0.5) * size * 1.6;
+      const p = this.spawn('burst', this.anims.bits, x - nz * side * 0.4, y + (this.rand() - 0.5) * size * 0.6, z + nx * side * 0.4, Math.max(0.2, size * (0.08 + this.rand() * 0.1)), 1.1 + this.rand() * 0.7, 0xd8f0ff, 0.95);
+      p.vx = nx * out - nz * side;
+      p.vz = nz * out + nx * side;
+      p.vy = out * (0.2 + this.rand() * 0.5);
+      p.gravity = 22;
+      p.spin = (this.rand() - 0.5) * 18;
+      p.animate = false;
+      if (i % 3 === 0) {
+        // A glint where the light catches a falling pane.
+        const g = this.spawn('glow', this.anims.spark, p.x, p.y, p.z, p.size * 1.6, 0.35 + this.rand() * 0.3, 0xe8f6ff, 0.9);
+        g.vx = p.vx;
+        g.vz = p.vz;
+        g.vy = p.vy;
+        g.gravity = 22;
+      }
+    }
   }
 
   get count(): number {

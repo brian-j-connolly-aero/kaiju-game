@@ -10,8 +10,9 @@
  * - Deterministic and identical on every JavaScript engine. Use the seeded generator from
  *   math/rng.ts, and never let a branch (place it or not, which id comes next) depend on the
  *   last bits of a Math.sin / Math.cos / Math.atan2 result: engines may round those differently.
- * - `validateCity(city)` returns no problems: ids equal array indexes, no overlapping
- *   structures, everything inside the city, at least 8 neighborhood anchors.
+ * - `validateCity(city, { specials: false })` returns no problems: ids equal array indexes, no
+ *   overlapping structures, everything inside the city, at least 8 neighborhood anchors. (This
+ *   placeholder places none of phase 2's special buildings and city weapons; Port Meridian must.)
  *
  * What this placeholder builds: a 100 m street grid; a straight river with 5 bridges; a few
  * parks; low-rise outskirts rising to towers downtown; a small industrial corner; two landmark

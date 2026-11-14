@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Pick-up: missile pod. A launcher box with six round tubes, and a finned missile leaving it toward the upper right. -->
+  <path fill="currentColor" stroke="none" fill-rule="evenodd" d="M8 34H40Q44 34 44 38V56Q44 60 40 60H8Q4 60 4 56V38Q4 34 8 34ZM8.5 41.5a4 4 0 1 0 8 0a4 4 0 1 0-8 0ZM20 41.5a4 4 0 1 0 8 0a4 4 0 1 0-8 0ZM31.5 41.5a4 4 0 1 0 8 0a4 4 0 1 0-8 0ZM8.5 52.5a4 4 0 1 0 8 0a4 4 0 1 0-8 0ZM20 52.5a4 4 0 1 0 8 0a4 4 0 1 0-8 0ZM31.5 52.5a4 4 0 1 0 8 0a4 4 0 1 0-8 0Z"/>
+  <g transform="translate(47.5 16) rotate(45)">
+    <path fill="currentColor" stroke="none" d="M0 -17C3.5 -13 5 -10 5 -6V4L8.5 10V13.5H-8.5V10L-5 4V-6C-5 -10 -3.5 -13 0 -17Z"/>
+  </g>
+</svg>

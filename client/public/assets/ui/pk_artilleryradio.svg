@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Pick-up: artillery radio. A field radio with two dials, its aerial sending three waves, and a falling shell cut out of its face (shell = a shot: this radio calls the guns). -->
+  <g transform="translate(5.5 0)">
+    <path d="M14 30V7"/>
+    <path d="M21.8 7.2A11 11 0 0 1 21.8 22.8"/>
+    <path d="M32.7 5.5A21 21 0 0 1 32.7 24.5"/>
+    <path d="M43.5 5.4A31 31 0 0 1 43.5 24.6"/>
+    <path fill="currentColor" stroke="none" fill-rule="evenodd" d="M10 30H43Q48 30 48 35V55Q48 60 43 60H10Q5 60 5 55V35Q5 30 10 30ZM12 39.5a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0-7 0ZM12 50.5a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0-7 0ZM34 55.8C37.3 52.6 38.3 50.2 38.3 47V40.6L35.9 37.8H38.8V34.2H29.2V37.8H32.1L29.7 40.6V47C29.7 50.2 30.7 52.6 34 55.8Z"/>
+  </g>
+</svg>

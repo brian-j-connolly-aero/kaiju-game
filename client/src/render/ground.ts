@@ -100,6 +100,24 @@ function flatMesh(xz: number[], y: number, material: THREE.Material): THREE.Mesh
   return mesh;
 }
 
+/**
+ * A square from (x0, z0) to (x1, z1) as an n by n grid of up-facing quads. One quad as big as
+ * the city (or the plain round it, 18 km across) was sometimes dropped whole for a frame by a
+ * software renderer, the paving vanishing to show the plain under it: smaller triangles are
+ * clipped like any others.
+ */
+function grid(out: number[], x0: number, z0: number, x1: number, z1: number, n: number): void {
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      const ax = x0 + ((x1 - x0) * i) / n;
+      const bx = x0 + ((x1 - x0) * (i + 1)) / n;
+      const az = z0 + ((z1 - z0) * j) / n;
+      const bz = z0 + ((z1 - z0) * (j + 1)) / n;
+      quad(out, ax, az, bx, az, bx, bz, ax, bz);
+    }
+  }
+}
+
 /** Two triangles for the quad a-b-c-d, wound so the face looks up (+Y). */
 function quad(out: number[], ax: number, az: number, bx: number, bz: number, cx: number, cz: number, dx: number, dz: number): void {
   // Up-facing means counter-clockwise seen from above, which is clockwise in (x, z) numbers.
@@ -121,13 +139,13 @@ export function buildGround(city: CityData, assets: AssetStore): THREE.Group {
   // Far plain: out to where the fog ends.
   const far: number[] = [];
   const F = 9000;
-  quad(far, -F, -F, F, -F, F, F, -F, F);
+  grid(far, -F, -F, F, F, 24);
   const farTexture = assets.texture('ground_far');
   group.add(flatMesh(far, -0.25, night(surface(farTexture), NIGHT_TINT.paving, SUNSET_TINT.far)));
 
   // The city square.
   const land: number[] = [];
-  quad(land, -half, -half, half, -half, half, half, -half, half);
+  grid(land, -half, -half, half, half, 24);
   group.add(flatMesh(land, 0, night(surface(assets.texture('ground_sidewalk')), NIGHT_TINT.paving)));
 
   // Parks, plazas, water.

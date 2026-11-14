@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Squad controls: the turret. A tank from above, hull drawn open so the turret shows; turret and gun swung round (the curved arrow) toward a ring: where the mouse looks. -->
+  <rect x="9.5" y="31" width="24" height="25" rx="2"/>
+  <path d="M9.5 28V59.5M33.5 28V59.5"/>
+  <circle cx="21.5" cy="43.5" r="6.5" fill="currentColor" stroke="none"/>
+  <path d="M21.5 43.5L39.5 25"/>
+  <circle cx="51" cy="13" r="7.5"/>
+  <path d="M10.2 12.5A33 33 0 0 1 23.2 10.5"/>
+  <path fill="currentColor" d="M28.5 11.1L22.1 14.9L23 6Z"/>
+</svg>

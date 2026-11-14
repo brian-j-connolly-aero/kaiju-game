@@ -21,6 +21,7 @@ import type {
   TimeOfDay,
   UnitTypeId,
   WeaponId,
+  WeaponPickupId,
 } from './ids';
 
 // ---------------------------------------------------------------------------------------------
@@ -59,7 +60,6 @@ export const MOD_MULT_KEYS = [
   'weaponCooldown',
   'weaponRange',
   'chargeTime',
-  'callInCooldown',
   'actionCooldown',
   'rageGain',
   'heal',
@@ -355,6 +355,25 @@ export interface MoltActionDef extends KaijuActionBase {
   id: 'molt';
 }
 
+/**
+ * Strike with a fast-food sign in the hand (DESIGN.md section 4, "The city as a weapon"): a big
+ * swing over a wide arc instead of a throw. The sign breaks after `swings` swings.
+ */
+export interface ClubActionDef extends KaijuActionBase {
+  id: 'club';
+  /** Full opening angle of the arc, centered on where the head looks. */
+  arc: number;
+  /** Reach, in body radii. */
+  reach: number;
+  unitDamage: number;
+  unitNerve: number;
+  /** How far a unit is knocked outward, in body radii, at the body (half that at the end of the reach). */
+  knockback: number;
+  structureDamage: PerStage<number>;
+  /** Swings one sign lasts. */
+  swings: number;
+}
+
 export type KaijuActionDef =
   | SwipeActionDef
   | StompActionDef
@@ -366,7 +385,8 @@ export type KaijuActionDef =
   | KaijuSpecialDef
   | MoltActionDef
   | ChargeActionDef
-  | TailSweepActionDef;
+  | TailSweepActionDef
+  | ClubActionDef;
 
 /** One entry per verb, each with its own precise type. */
 export interface KaijuActionSet {
@@ -381,6 +401,122 @@ export interface KaijuActionSet {
   molt: MoltActionDef;
   charge: ChargeActionDef;
   tailSweep: TailSweepActionDef;
+  club: ClubActionDef;
+}
+
+// ---------------------------------------------------------------------------------------------
+// The city as a weapon, and the special buildings' rewards (docs/ROADMAP.md phase 2)
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * A burst round a point: a propane tank going off, a water tank bursting, the gas station's
+ * fireball. Units inside take damage and nerve falling linearly from the center to the rim
+ * (measured to their near edge) and are pushed outward; structures inside take damage.
+ */
+export interface BurstDef {
+  radius: number;
+  unitDamageCenter: number;
+  unitDamageEdge: number;
+  unitNerveCenter: number;
+  unitNerveEdge: number;
+  /** Meters a unit is thrown outward at the center, and at the rim. */
+  pushCenter: number;
+  pushEdge: number;
+  /** Seconds a unit inside lies knocked over (it cannot move or fire, as stunned); 0 for none. */
+  knockdown: number;
+  /** Damage to every standing structure the burst reaches; 0 for none. */
+  structureDamage: number;
+  /** Whether the props it reaches are destroyed (a fire does it, water does not). */
+  props: boolean;
+  /** Raw damage to a kaiju inside (through the usual multipliers; a thrown one never hurts its thrower); 0 for none. */
+  kaijuDamage: number;
+}
+
+/** A thrown object that bursts where it lands (the propane tank, the water tank). */
+export interface ThrownBurstDef extends BurstDef {
+  /** Launch speed: it flies the throw's arc at this speed, aimed like any throw. */
+  speed: number;
+}
+
+/** The propane tank: thrown, set off on the ground or in the hand by a shot or explosion, or crushed. */
+export interface PropaneDef extends ThrownBurstDef {
+  /** Going off in the kaiju's hand: hp it loses (exactly, no multiplier), and seconds it flinches (rooted, its action cut short). */
+  handDamage: number;
+  flinch: number;
+  /** Crushed underfoot or struck rather than set off by fire: a small bang. */
+  small: BurstDef;
+}
+
+/** A thrown javelin (the antenna, the mast): straight and fast, through units, into the first wall. */
+export interface JavelinDef {
+  speed: number;
+  /** Downward acceleration while it flies (almost none: it flies straight). */
+  gravity: number;
+  /** It gives out after this many meters. */
+  range: number;
+  /** Units it goes through, each hit once; then it flies on past the rest. */
+  pierce: number;
+  unitDamage: number;
+  unitNerve: number;
+  /** A unit it goes through is thrown this far along its flight (meters). */
+  push: number;
+  /** Damage to the structure it stops in, and to a kaiju it stops in (raw). */
+  structureDamage: number;
+  kaijuDamage: number;
+}
+
+/** The garage door: a shield in the hand, a frisbee when thrown. */
+export interface ShieldDef {
+  /** Hp of the door: what it takes (raw hit damage) before it breaks. */
+  hp: number;
+  /** Hits arriving within this angle of the body's facing hit the door instead of the kaiju. */
+  halfArc: number;
+  /** Thrown (Strike): flat and spinning, knocking over what it hits. */
+  throw: ThrownBurstDef & {
+    /** Downward acceleration while it flies (a frisbee floats), and how far it flies. */
+    gravity: number;
+    range: number;
+  };
+}
+
+/** What the hand can do with the city (DESIGN.md section 4, "The city as a weapon"). */
+export interface KaijuCityWeapons {
+  /** City weapons can be picked up at this stage and below; at later stages they are crushed underfoot like any small prop. */
+  grabStage: StageId;
+  /** A shot or explosion landing within this distance of a propane tank (on the ground or in the hand) sets it off. */
+  detonateRadius: number;
+  propane: PropaneDef;
+  watertank: ThrownBurstDef;
+  antenna: JavelinDef;
+  mast: JavelinDef;
+  garagedoor: ShieldDef;
+}
+
+/** What wrecking each special building pays (DESIGN.md section 7, "Special buildings"), once. */
+export interface KaijuSpecialRewards {
+  /** The power substation: a power surge for the kaiju. */
+  surge: {
+    /** Seconds it lasts. */
+    duration: number;
+    /** Every cooldown is cleared when it starts, and they recover this many times as fast while it lasts. */
+    cooldownRate: number;
+    /** Its attacks do this many times the damage to units and structures while it lasts. */
+    damageMult: number;
+    /** Rage it gains at once. */
+    rage: number;
+  };
+  /** The gas station: a fireball sized to the building (it never hurts the kaiju). */
+  fireball: BurstDef;
+  /**
+   * The radio mast: it falls over away from the kaiju (the army's falling buildings,
+   * `startStructureFall`, crush what it lands on), and the army's map turns to static.
+   */
+  radiomast: {
+    /** Seconds the humans' map shows static. */
+    staticTime: number;
+    /** Its top section, this long, comes to lie at the far end as a `mast` the hand can pick up. */
+    topLength: number;
+  };
 }
 
 export interface KaijuKindDef {
@@ -411,6 +547,10 @@ export interface KaijuKindDef {
   cards: { first: readonly KaijuMove[]; second: readonly KaijuMove[] };
   /** Swimming, the hide-and-travel mode in deep water; absent for a kind that cannot swim. */
   swim?: KaijuSwimDef;
+  /** The city as a weapon: what each object the hand can pick up does (phase 2). */
+  cityWeapons: KaijuCityWeapons;
+  /** What wrecking a special building pays (phase 2). */
+  rewards: KaijuSpecialRewards;
 }
 
 /**
@@ -537,6 +677,44 @@ export interface WeaponDef {
   /** One-sigma aim error of sub-units and bots, radians. The player-driven unit has none. */
   aimErrorAtWill: number;
   aimErrorVolley: number;
+  /** One-sigma spread on every shot, a person's own included (the machine gun pick-up), radians. Absent: none. */
+  spread?: number;
+  /**
+   * A guided salvo (the missile pod pick-up): the projectiles leave fanned out over `fan`
+   * radians of heading and `loft` radians above the line to the aim point, and curve onto it.
+   * Absent: shots go straight.
+   */
+  fan?: number;
+  loft?: number;
+}
+
+/**
+ * An army pick-up that replaces the driven unit's own weapon until the stage ends (docs/ROADMAP.md,
+ * phase 2; defs/pickups.ts). It is a change to the weapon the unit already has, so it scales with
+ * the stage the way that weapon does (`pickupWeaponDef`).
+ */
+export interface PickupWeaponDef {
+  id: WeaponPickupId;
+  projectile: ProjectileTypeId;
+  /** The weapon's reload times this; or, when `reload` is given, that many seconds whatever the weapon. */
+  cooldownMult: number;
+  reload?: number;
+  /** Per projectile, times the weapon's own. */
+  damageMult: number;
+  nerveMult: number;
+  structureMult: number;
+  splashMult: number;
+  /**
+   * Projectiles per trigger pull at full strength; 0 keeps the weapon's own. When set (the
+   * missile pod), damage, nerve and structure damage per projectile are the multipliers times the
+   * weapon's whole trigger pull (all its projectiles), and a unit that has lost members fires
+   * fewer of them in the same proportion as it would its own weapon.
+   */
+  salvo: number;
+  /** See WeaponDef: `spread` on every shot; `fan` and `loft` make a guided salvo. */
+  spread: number;
+  fan: number;
+  loft: number;
 }
 
 export interface ProjectileTypeDef {
@@ -567,8 +745,6 @@ export interface CallInDef {
   nerve: number;
   splashRadius: number;
   structureDamage: number;
-  /** Per player. */
-  cooldown: number;
   projectile: ProjectileTypeId;
   /** Height above the ground at which the falling shells appear. */
   spawnHeight: number;

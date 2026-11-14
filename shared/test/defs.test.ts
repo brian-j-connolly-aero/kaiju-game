@@ -75,7 +75,7 @@ describe('stages (DESIGN.md section 2)', () => {
     expect(MATCH_RULES.blastShoveRadius).toBe(7);
     expect(MATCH_RULES.redeployMinKaijuDist).toBe(250);
     // The three fractions are tuned with the balance harness (docs/BALANCE.md).
-    expect(MATCH_RULES.bar).toMatchObject({ p1: 0.18, p2: 0.125, p3: 0.29, growth: 1.6, display: [0.21, 0.57, 1] });
+    expect(MATCH_RULES.bar).toMatchObject({ p1: 0.18, p2: 0.11, p3: 0.3, growth: 1.6, display: [0.21, 0.57, 1] });
     expect(MATCH_RULES.maxPlayers).toBe(5);
     expect(SNAPSHOT_EVERY_TICKS).toBe(2);
   });
@@ -180,6 +180,8 @@ describe('the Lizard (DESIGN.md sections 2 and 4)', () => {
       brace: 'slot',
       charge: 'slot',
       tailSweep: 'slot',
+      // Phase 2: Strike with a fast-food sign in the hand swings it.
+      club: 'strike',
     });
     expect(Object.values(a).filter((v) => v.whileHeld).map((v) => v.id)).toEqual(['brace']);
     expect(a.swipe).toMatchObject({
@@ -384,7 +386,6 @@ describe('the Army (DESIGN.md section 5)', () => {
       nerve: 5,
       splashRadius: 14,
       structureDamage: 300,
-      cooldown: 35,
       projectile: 'arty',
     });
     expect(PROJECTILE_TYPES.arty.flight).toBe('arc');

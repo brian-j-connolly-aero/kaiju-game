@@ -18,13 +18,24 @@ export * from './createWorld';
 export { applyInput, inputSystem } from './systems/inputs';
 export { kaijuActionSystem } from './systems/kaijuActions';
 export * from './beam';
-export { findEdible, findGrabTarget, shoveUnit, throwAngle, type ReachTarget } from './kaijuEffects';
+export { attackMult, findEdible, findGrabTarget, shoveUnit, surgeMult, throwAngle, type ReachTarget } from './kaijuEffects';
+export {
+  armHeld,
+  canPickUp,
+  HAND_FORWARD,
+  heldCityWeapon,
+  heldEdible,
+  kaijuHandPoint,
+  strikeVerb,
+} from './cityWeapons';
+export { mapStatic, specialCollapsed } from './systems/specials';
 export { unitOrderSystem, volleyHeld } from './systems/unitOrders';
 export { botSystem } from './systems/bots';
 export { movementSystem } from './systems/movement';
-export { callInFallTime, startCallIn, weaponSystem } from './systems/weapons';
+export { callInFallTime, startCallIn, unitWeapon, weaponSystem } from './systems/weapons';
 export { projectileSystem, spawnProjectile, stepProjectile, type ProjectileBody } from './systems/projectiles';
 export { applyHit, damageSystem, healKaiju, hitFacing } from './systems/damage';
-export { applyStructureDamage, checkBarMarks, cityDamageSystem, takeProp, takePropWreck } from './systems/cityDamage';
+export { applyStructureDamage, checkBarMarks, cityDamageSystem, startStructureFall, takeProp, takePropWreck } from './systems/cityDamage';
+export { dropCrate, pickupSystem } from './systems/pickups';
 export { beginStage, endMatch, matchFlowSystem } from './systems/matchFlow';
 export { say, voiceSystem } from './systems/voice';

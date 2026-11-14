@@ -4,7 +4,8 @@
  * path on either side. It plays sensibly, not well:
  *
  *   kaiju   walks to the nearest standing building and swipes and stomps it down (one button
- *           each), grabs a car now and then and throws it at a unit, or eats it when hurt, molts
+ *           each), grabs a car (or, as a hatchling, a city weapon) now and then and throws it at
+ *           a unit (a sign is swung once a unit is in its reach), or eats it when hurt, molts
  *           with one press and picks one of the three cards at random. With the moves the cards
  *           gave it: roars when soldiers are near, beams them when the rage is full, charges a
  *           unit straight ahead, sweeps its tail at one behind, braces against charged volleys.
@@ -26,6 +27,7 @@ import {
   clamp,
   distToStructure,
   findRoadPath,
+  heldEdible,
   kaijuKindDef,
   kaijuMoveSlot,
   kaijuStageDef,
@@ -35,6 +37,7 @@ import {
   propsInCircle,
   roadAdjacency,
   setTankMove,
+  strikeVerb,
   unitTypeDef,
   volleyMeter,
   weaponDef,
@@ -325,10 +328,14 @@ export class Autopilot {
     this.grabRest -= dt;
     const busyHands = this.taps.has('grab') || this.taps.has('strike');
     if (k.held && idle && !busyHands && this.grabRest <= 0) {
-      const hurt = k.hp < k.maxHp * 0.75 && k.cooldowns.eat <= 0;
+      // A city weapon is never eaten (Grab would drop it); a fast-food sign is swung, so only
+      // at a unit within its reach.
+      const hurt = k.hp < k.maxHp * 0.75 && k.cooldowns.eat <= 0 && heldEdible(k.held);
+      const club = strikeVerb(k.held) === 'club';
+      const inReach = !!threat && (!club || threat.dist < def.actions.club.reach * st.bodyRadius * 0.9);
       if (hurt) this.tap('grab');
-      else if (threat) this.tap('strike');
-      this.grabRest = hurt || threat ? 8 + this.rand() * 6 : 1;
+      else if (threat && inReach) this.tap('strike');
+      this.grabRest = hurt || (threat && inReach) ? (club ? 1.2 : 8 + this.rand() * 6) : 1;
     } else if (!k.held && this.grabRest <= 0 && idle && !busyHands) {
       const reach = def.actions.grab.reach * st.bodyRadius;
       propsInCircle(session.mirror.query, k.x, k.z, reach, propIds);
@@ -500,7 +507,8 @@ export class Autopilot {
       to.x = k.x;
       to.y = st.height * 0.6;
       to.z = k.z;
-      clear = lineOfSight(session.mirror.query, from, to);
+      // As the shots fly (and the squad bots look): past bridge decks, not through rubble.
+      clear = lineOfSight(session.mirror.query, from, to, true, true);
     }
     // In position: at the goal, or anywhere in the firing band with a line of fire. Once parked
     // the squad stays (its charge builds only while it holds still) until the kaiju walks out of

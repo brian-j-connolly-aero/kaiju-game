@@ -153,13 +153,14 @@ describe('createWorld', () => {
     expect(() => createWorld({ seed: 1, config: { ...config, players: humansOnly } })).toThrow();
   });
 
-  it('runs the eleven systems in the documented order', () => {
+  it('runs the twelve systems in the documented order', () => {
     expect(SYSTEM_ORDER).toEqual([
       'inputs',
       'kaijuActions',
       'unitOrders',
       'bots',
       'movement',
+      'pickups',
       'weapons',
       'projectiles',
       'damage',

@@ -14,6 +14,7 @@
  */
 
 import { kaijuStageDef, unitTypeDef, weaponDef, type SimEvent } from '@mb/shared';
+import { iconImage, pickupIcon } from '../../assets/iconRaster';
 import { GunReticle } from '../../ui/gunReticle';
 import { Hud } from '../../ui/hud';
 import { el } from '../../ui/icons';
@@ -44,6 +45,8 @@ export class MatchScreen implements Screen {
   /** Set by the input manager when the browser took the pointer away. */
   private lockLost = false;
   private lockLostAt = -1;
+  /** When the map's static crackles next (local seconds). */
+  private crackleAt = 0;
 
   enter(ctx: AppContext): void {
     const runtime = ctx.runtime;
@@ -56,6 +59,7 @@ export class MatchScreen implements Screen {
     this.map.setCity(runtime.session.mirror.city);
     const renderer = ctx.renderer;
     if (renderer) this.map.setLandmarkPictures(() => renderer.landmarkPictures());
+    this.map.setPickupPictures((kind) => iconImage(ctx.assets, pickupIcon(kind), '#ffffff', 64));
     // The molt cards: a pick goes to the server with the next input; a picked card flies to its
     // slot on the HUD and lands there. A click on a card is the gesture a browser wants before
     // it hands the pointer back.
@@ -128,6 +132,8 @@ export class MatchScreen implements Screen {
       this.threats?.volley(e.squad, now);
     }
     else if (e.type === 'callin' && e.phase !== 'done') hud.flash('callin', now, 2);
+    // The squad took a supply crate: what it holds pops up over the crosshair.
+    else if (e.type === 'crate' && e.phase === 'take' && e.squad === ctx.runtime?.session.role.squadId && e.squad >= 0) hud.pickupTaken(e.kind);
   }
 
   /**
@@ -199,6 +205,11 @@ export class MatchScreen implements Screen {
       if (!runtime.menuOpen) ctx.input.lockPointer();
     }
     map.update(frame, runtime.session);
+    // The map's static crackles while it is open and shows nothing but static.
+    if (map.open && map.staticShown && now >= this.crackleAt) {
+      this.crackleAt = now + 0.35 + Math.random() * 0.5;
+      ctx.audio.play(Math.random() < 0.5 ? 'radio_open' : 'radio_close', { gain: 0.45, rate: 0.8 + Math.random() * 0.5 });
+    }
 
     // The molt cards. While they wait for a pick the pointer is free, so a click on a card picks
     // it (mouse movement under pointer lock plays no part); a pick by a key, or the server's own

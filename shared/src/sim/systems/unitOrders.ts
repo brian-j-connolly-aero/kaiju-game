@@ -1,5 +1,5 @@
 /**
- * System 3 of 11: squad-mates (DESIGN.md section 5, "The humans").
+ * System 3 of 12: squad-mates (DESIGN.md section 5, "The humans").
  *
  * The player drives one unit of the squad; the input system has already copied their stick, aim
  * and trigger onto it. The other living units are its squad-mates. Nobody gives them orders:
@@ -10,6 +10,7 @@
  * - Lives: when the driven unit is dead and others live, the player takes over the nearest
  *   survivor (`takeOver`). (The damage system marks the squad eliminated when the last one dies.)
  * - Every living squad-mate then gets its `control` for this tick:
+ *     coming down     (reinforcements by parachute) nothing until it lands;
  *     stunned         (a roar) it stands frozen: no moving, no firing, no charge;
  *     shaken          it cannot fire or charge, and backs away from a kaiju that is near;
  *     volley held     (Btn.volley is down, or was let go on this very tick: the weapon system
@@ -131,7 +132,10 @@ function holdAndCharge(squad: Squad, u: Unit, aimAt: Vec3 | null): void {
 // Lives
 // ---------------------------------------------------------------------------------------------
 
-/** Hands the player the surviving unit nearest to the one they just lost. */
+/**
+ * Hands the player the surviving unit nearest to the one they just lost (one on the ground
+ * before one still coming down by parachute).
+ */
 function takeOver(world: World, squad: Squad): void {
   const lost = world.units[squad.driven];
   if (lost.alive) return;
@@ -140,7 +144,7 @@ function takeOver(world: World, squad: Squad): void {
   for (const id of squad.units) {
     const u = world.units[id];
     if (!u.alive) continue;
-    const d = (u.x - lost.x) * (u.x - lost.x) + (u.z - lost.z) * (u.z - lost.z);
+    const d = (u.x - lost.x) * (u.x - lost.x) + (u.z - lost.z) * (u.z - lost.z) + (u.drop > 0 ? 1e12 : 0);
     if (d < best) {
       best = d;
       next = u;
@@ -323,7 +327,8 @@ function findShot(world: World, squad: Squad, u: Unit): boolean {
       mark.z = k.z + k.vz * t;
       for (let h = 0; h < SQUAD_RULES.aimHeights.length; h++) {
         mark.y = kaijuShownHeight(k) * SQUAD_RULES.aimHeights[h];
-        if (castSegment(world.cityQuery, muzzle, mark, undefined, -1, true)) continue;
+        // Rubble and fallen buildings are in the way up to their height.
+        if (castSegment(world.cityQuery, muzzle, mark, undefined, -1, true, true)) continue;
         nav.shotAt = k.id;
         nav.shotHeight = h;
         best = d;
@@ -385,6 +390,15 @@ function backOff(world: World, u: Unit): void {
 function orderSubUnit(world: World, squad: Squad, leader: Unit, u: Unit, rank: number, width: number, held: boolean, aimAt: Vec3 | null): void {
   const c = u.control;
   c.fire = false;
+  // Reinforcements still coming down by parachute (sim/systems/pickups.ts) do nothing until they land.
+  if (u.drop > 0) {
+    c.moveX = 0;
+    c.moveZ = 0;
+    u.rooted = false;
+    u.charge = 0;
+    u.state = 'idle';
+    return;
+  }
   // roar stun: frozen where it stands; it neither moves, nor fires, nor charges.
   if (u.stun > 0) {
     c.moveX = 0;

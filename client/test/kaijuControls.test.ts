@@ -50,6 +50,9 @@ function kaiju(over: Partial<SnapKaiju> = {}): SnapKaiju {
     cooldowns,
     moves: ['none', 'none'],
     offer: [],
+    surge: 0,
+    clubSwings: 0,
+    shieldHp: 0,
     ...over,
   };
 }

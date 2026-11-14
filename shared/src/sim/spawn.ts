@@ -211,6 +211,9 @@ export function createKaiju(id: number, slot: PlayerSlot, x: number, z: number, 
     actionYaw: yaw,
     act: createActionMemory(),
     held: null,
+    clubSwings: 0,
+    shieldHp: 0,
+    surge: 0,
     cooldowns: zeroCooldowns(),
     moltAvailable: false,
     moves: ['none', 'none'],
@@ -264,6 +267,7 @@ function createUnit(id: number, squad: number, slot: number): Unit {
     nav: createUnitNav(),
     inWater: false,
     wreck: false,
+    drop: 0,
     control: { moveX: 0, moveZ: 0, aimYaw: 0, aimPitch: 0, fire: false },
   };
 }
@@ -294,6 +298,8 @@ export function createSquad(world: World, slot: PlayerSlot): Squad {
     trailBase: 0,
     formed: false,
     volleyReady: false,
+    pickup: 'none',
+    barrages: 0,
   };
   world.squads.push(squad);
   return squad;
@@ -315,6 +321,9 @@ export function refillSquad(world: World, squad: Squad, stage: StageId): void {
   squad.trail.length = 0;
   squad.formed = false;
   squad.volleyReady = false;
+  // Pick-ups last until the stage ends.
+  squad.pickup = 'none';
+  squad.barrages = 0;
   for (let s = 0; s < squad.units.length; s++) {
     const u = world.units[squad.units[s]];
     u.type = def.id;
@@ -337,6 +346,7 @@ export function refillSquad(world: World, squad: Squad, stage: StageId): void {
     resetNav(u.nav);
     u.inWater = false;
     u.wreck = false;
+    u.drop = 0;
     u.control.moveX = 0;
     u.control.moveZ = 0;
     u.control.fire = false;

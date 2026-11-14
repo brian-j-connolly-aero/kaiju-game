@@ -1,7 +1,8 @@
 /**
  * Where an aim ray lands. Used for the volley aim point ("where the player's aim ray lands"),
- * for markers placed with the crosshair (`resolveMarkerPoint`), and for the kaiju's throw and
- * beam targets.
+ * for the artillery radio's barrages (`resolveMarkerPoint`), and for the kaiju's throw and
+ * beam targets. An aim ray stops at standing structures and at the mounds of collapsed and
+ * fallen ones (docs/ROADMAP.md, phase 2: rubble blocks shots and sight up to its height).
  */
 
 import { castRay, createCityCastHit, type CityQuery } from '../city/spatialIndex';
@@ -89,8 +90,9 @@ export function unitCapsule(u: Unit, out: VerticalCapsule): VerticalCapsule {
 /**
  * Casts a ray from (ox, oy, oz) along (yaw, pitch) and returns the first thing it meets within
  * `maxDist`: a standing structure (bridge decks do not count: whoever aims may be standing on
- * one), a living kaiju's hit volume (when `kaijus` is given: its body, head or tail), or the
- * ground.
+ * one) or a mound of rubble or a fallen structure ('structure', with its id), a living kaiju's
+ * hit volume (when `kaijus` is given: its body, head or tail), or the ground. It works from
+ * snapshot data and a client's mirrored city alike.
  */
 export function resolveAimPoint(
   city: CityQuery,
@@ -123,7 +125,8 @@ export function resolveAimPoint(
     }
   }
   // Bridge decks are road surface, not walls: the ray carries on to the ground on or under them.
-  if (castRay(city, origin, dir, best, cityHit, -1, true) && cityHit.t < best) {
+  // Rubble and fallen buildings stop it up to their height.
+  if (castRay(city, origin, dir, best, cityHit, -1, true, true) && cityHit.t < best) {
     best = cityHit.t;
     out.on = 'structure';
     out.id = cityHit.structure;
@@ -147,8 +150,8 @@ export function resolveAimPoint(
 }
 
 // ---------------------------------------------------------------------------------------------
-// Ground markers placed with the crosshair (no button places one in phase 1; the artillery
-// radio of phase 2 is meant to: startCallIn in sim/systems/weapons.ts)
+// Ground points marked with the crosshair: where the artillery radio's barrage comes down
+// (startCallIn in sim/systems/weapons.ts)
 // ---------------------------------------------------------------------------------------------
 
 /** What marker placement needs to know about a kaiju. `Kaiju` satisfies it; a client can fill it from a snapshot and the stage definition. */
@@ -165,22 +168,23 @@ export interface MarkerTarget {
 const markerAim = createAimPoint();
 
 /**
- * The ground point a crosshair marks (DESIGN.md section 5, "Move to" and "Artillery"). From a
- * unit's eye, two or three meters up, nearly all of a kaiju is above the horizon, so the ground
- * is the last thing a player who points at it is pointing at. In order:
+ * The ground point a crosshair marks (DESIGN.md section 5, "The artillery radio"): where a
+ * barrage the radio calls comes down. From a unit's eye, two or three meters up, nearly all of a
+ * kaiju is above the horizon, so the ground is the last thing a player who points at it is
+ * pointing at. In order:
  *
  * 1. The ray meets a kaiju's body before anything else: the ground under the body, at the point
  *    of the ray nearest to its middle (the crosshair on its chest marks its feet). The body is
  *    its full width from the ground to a little over its head, wider at the feet than the hit
  *    capsule that projectiles use.
- * 2. It meets the ground or a standing structure within `maxDist`: that point.
+ * 2. It meets the ground, a standing structure or a mound within `maxDist`: that point.
  * 3. It meets nothing (the sky, or ground too far off to mean anything): a kaiju on the humans'
  *    map that the crosshair is just beside or above, within SQUAD_RULES.markerSnapRadii body
  *    radii of the line of the crosshair, is what was meant.
- * 4. Otherwise `skyReach` meters ahead along the heading; with `skyReach` 0 there is no marker
- *    and the answer is false (a call-in is not spent on the empty sky).
+ * 4. Otherwise there is no point and the answer is false (a barrage is not spent on the empty sky).
  *
- * Whoever uses the point clamps it into the playable bounds.
+ * Whoever uses the point clamps it into the playable bounds. It needs only snapshot data, so a
+ * client can show where a barrage would come down.
  */
 export function resolveMarkerPoint(
   city: CityQuery,
@@ -191,7 +195,6 @@ export function resolveMarkerPoint(
   yaw: number,
   pitch: number,
   maxDist: number,
-  skyReach: number,
   out: Vec2,
 ): boolean {
   resolveAimPoint(city, ox, oy, oz, yaw, pitch, maxDist, markerAim);
@@ -246,8 +249,5 @@ export function resolveMarkerPoint(
     out.z = near.z;
     return true;
   }
-  if (!(skyReach > 0)) return false;
-  out.x = ox + hx * skyReach;
-  out.z = oz + hz * skyReach;
-  return true;
+  return false;
 }

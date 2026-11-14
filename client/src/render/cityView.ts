@@ -3,6 +3,19 @@
  * visual state, every prop as an instance of its kind, and the collapse of a structure as a
  * shower of tumbling chunks (ARCHITECTURE.md section 5). Draw calls stay flat no matter how
  * many buildings stand: one instanced mesh per archetype, state and material.
+ *
+ * Phase 2 (docs/ROADMAP.md, "rubble stays", "monster weight"):
+ * - the rubble state is a mound half the building's height, piled from its own pieces
+ *   (structureGeometry.ts `moundGeometry`), the shape the simulation's shots and sight meet;
+ * - a building that falls over (the `structureFall` event, or the city state of a late joiner)
+ *   tips over the edge of its footprint for two seconds and then lies on its side where the
+ *   simulation's `fallenBox` is, half sunk into the ground, with the art's low rubble left on its
+ *   footprint; these batches are made the first time an archetype falls;
+ * - a radio mast's lattice falls without its top section, which tumbles on its own and is then
+ *   the loose `mast` city weapon;
+ * - standing buildings sway when the monster stomps near them (`wobble`), props hop at its
+ *   footsteps (`hop`), and city weapons lying loose (dropped, or a mast's top) are drawn with the
+ *   props (`setLoose`).
  */
 
 import * as THREE from 'three';
@@ -10,6 +23,7 @@ import {
   archetypeDef,
   archetypeModelId,
   ARCHETYPES,
+  CITY_WEAPON_KINDS,
   hash32,
   PROP_KIND_IDS,
   PROP_KINDS,
@@ -24,11 +38,14 @@ import type { CityMirror } from '../net/cityMirror';
 import { propAlive, propWrecked } from '../net/cityMirror';
 import type { LandmarkModel } from './landmarkPictures';
 import { INSTANCE_SHADE, type Materials } from './materials';
-import { archetypeGeometry, type ArchetypeGeometry, type ChunkBox } from './structureGeometry';
+import { archetypeGeometry, type ArchetypeGeometry, type ChunkBox, type StatePart } from './structureGeometry';
 
-/** How dark a structure is drawn at a damage stage (the damaged model is darkened further as it nears collapse). */
+/**
+ * How dark a structure is drawn at a damage stage (the damaged model is darkened further as it
+ * nears collapse). Rubble is a little dusty: its mound is the building's own walls (phase 2).
+ */
 export function shadeOf(stage: number): number {
-  return stage === 1 ? 0.86 : stage === 2 ? 0.6 : 1;
+  return stage === 1 ? 0.86 : stage === 2 ? 0.6 : stage >= 3 ? 0.8 : 1;
 }
 
 /** Even-odd test of a point against a simple polygon. */
@@ -65,10 +82,29 @@ export function wallPaint(tint: ModelTint | null, id: number, district: number):
   return { tone, paint };
 }
 
-/** Visual state index for a structure stage: 0 intact, 1 damaged (stages 1 and 2), 2 rubble. */
+/** Visual state index for a structure stage: 0 intact, 1 damaged (stages 1 and 2), 2 rubble. 3 is fallen over (set apart from the stage). */
 function stateOf(stage: number): number {
   return stage <= 0 ? 0 : stage >= 3 ? 2 : 1;
 }
+const FALLEN = 3;
+
+/**
+ * The world matrix of a structure that is falling (or lies fallen) toward the side whose outward
+ * direction is (dirX, dirZ): turned `angle` radians (pi / 2 lying) about the edge of its footprint
+ * on that side, whose middle is (pivotX, pivotZ), and lowered `sink` meters. `structure` is its
+ * standing matrix. Exported for tests.
+ */
+export function fallMatrix(structure: THREE.Matrix4, pivotX: number, pivotZ: number, dirX: number, dirZ: number, angle: number, sink: number, out: THREE.Matrix4): THREE.Matrix4 {
+  // Turning the up axis toward the fall: about the horizontal axis (dirZ, 0, -dirX).
+  fallAxis.set(dirZ, 0, -dirX).normalize();
+  fallTurn.makeRotationAxis(fallAxis, angle);
+  out.makeTranslation(-pivotX, 0, -pivotZ).premultiply(fallTurn);
+  out.premultiply(fallMove.makeTranslation(pivotX, -sink, pivotZ));
+  return out.multiply(structure);
+}
+const fallAxis = new THREE.Vector3();
+const fallTurn = new THREE.Matrix4();
+const fallMove = new THREE.Matrix4();
 
 // A dozen saturated-but-light plaster tones (ASSETS.md section 2), grouped by what suits a class.
 const TONES = {
@@ -103,11 +139,15 @@ const CLASS_TONES: Record<StructureClass, number[]> = {
  */
 type PaintMode = 'tint' | 'tone' | 'shade';
 
+/** Where a mesh of a state batch is drawn: on the structure (`body`), or lying where it fell (`lying`). */
+type MeshRole = 'body' | 'lying';
+
 interface StateMesh {
   mesh: THREE.InstancedMesh;
   mode: PaintMode;
   /** `tint` meshes: one shade per instance. */
   shade: THREE.InstancedBufferAttribute | null;
+  role: MeshRole;
 }
 
 interface StateBatch {
@@ -119,7 +159,13 @@ interface StateBatch {
 interface ArchetypeBatch {
   def: ArchetypeDef;
   geometry: ArchetypeGeometry;
+  /** How many structures of this archetype the city has (every batch's capacity). */
+  count: number;
   states: [StateBatch, StateBatch, StateBatch];
+  /** Fallen over: what lies on its side and the low rubble on its footprint. Made at the first fall. */
+  fallen: StateBatch | null;
+  /** A radio mast's top section while it tumbles (made with `fallen` when the art has one). */
+  tops: StateMesh[] | null;
 }
 
 interface Chunk {
@@ -157,20 +203,86 @@ interface Chunk {
   landed: boolean;
 }
 
+/** A structure tipping over (or lying): which way, and how far through its fall it is. */
+interface Fall {
+  id: number;
+  dirX: number;
+  dirZ: number;
+  pivotX: number;
+  pivotZ: number;
+  /** How far it sinks into the ground once it lies (meters): half its thickness, or a mast's lattice down to its legs. */
+  sink: number;
+  /** Seconds since it began to fall, and how long the fall takes. */
+  t: number;
+  duration: number;
+  landed: boolean;
+}
+
+/** A standing building swaying after a stomp: a short damped sway about its base. */
+interface Wobble {
+  id: number;
+  /** Seconds since it was pushed (negative: the shock has not reached it yet). */
+  t: number;
+  /** Largest lean, radians. */
+  amp: number;
+  /** Sways per second. */
+  freq: number;
+  /** The push's direction on the ground (unit). */
+  dirX: number;
+  dirZ: number;
+}
+
+/** A prop jolted by a footstep or a stomp: it hops (cars, small things) or sways (trees, poles). */
+interface Hop {
+  id: number;
+  /** Its wreck hops, not the prop. */
+  wreck: boolean;
+  t: number;
+  duration: number;
+  /** Highest point of the hop (meters); 0 for a sway. */
+  height: number;
+  /** Largest tilt (radians) and its axis on the ground (unit). */
+  tilt: number;
+  axisX: number;
+  axisZ: number;
+  sway: boolean;
+}
+
+/** A city weapon lying loose (dropped from the hand, or a fallen mast's top): drawn with the props. */
+export interface LooseShown {
+  id: number;
+  prop: PropKindId;
+  x: number;
+  z: number;
+  yaw: number;
+}
+
 const MAX_CHUNKS = 480;
 /** Triangles the falling art pieces may use together (the art keeps a piece to 30 or fewer). */
 const MAX_PIECE_TRIANGLES = MAX_CHUNKS * 30;
 /** Side of a prop grid cell, meters. */
 const PROP_CELL = 110;
 const GRAVITY = 26;
+/** Room for loose city weapons in each city weapon kind's prop batch. */
+const LOOSE_ROOM = 12;
+/** Gravity of a hopping prop (stiffer than real: a hop must read in a few frames). */
+const HOP_GRAVITY = 24;
+/** Props hopping or swaying at once (the oldest stops first). */
+const MAX_HOPS = 260;
+/** Buildings swaying at once. */
+const MAX_WOBBLES = 160;
 
 const tmpMatrix = new THREE.Matrix4();
+const tmpMatrix2 = new THREE.Matrix4();
 const tmpQuat = new THREE.Quaternion();
+const tmpQuat2 = new THREE.Quaternion();
 const tmpEuler = new THREE.Euler();
 const tmpPos = new THREE.Vector3();
 const tmpScale = new THREE.Vector3();
+const tmpAxis = new THREE.Vector3();
 const tmpColor = new THREE.Color();
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
+const ONE = new THREE.Vector3(1, 1, 1);
 
 export interface CollapseInfo {
   x: number;
@@ -183,6 +295,7 @@ export interface CollapseInfo {
 export class CityView {
   readonly group = new THREE.Group();
   private readonly city: CityData;
+  private readonly materials: Materials;
   private readonly batches = new Map<string, ArchetypeBatch>();
   /** Per structure: its batch, the state it is drawn in, its instance index there, and its tone. */
   private readonly slotBatch: ArchetypeBatch[] = [];
@@ -193,6 +306,9 @@ export class CityView {
   private readonly tone: THREE.Color[] = [];
   /** Per structure: the instance color of a real model's masked walls (paint / the model's base). */
   private readonly paint: THREE.Color[] = [];
+  /** Structures falling or lying fallen, by id. */
+  private readonly falls = new Map<number, Fall>();
+  private readonly wobbles = new Map<number, Wobble>();
 
   private readonly propMeshes = new Map<PropKindId, THREE.InstancedMesh[]>();
   private readonly propMatrix: THREE.Matrix4[] = [];
@@ -202,6 +318,10 @@ export class CityView {
   /** Per prop: 1 while its wreck lies there. */
   private readonly wreckShown: Uint8Array;
   private readonly wreckMeshes: THREE.InstancedMesh[] = [];
+  /** Per prop: its instance in its kind's (or the wrecks') buffers since the last repack, or -1. */
+  private readonly propSlot: Int32Array;
+  private readonly hops = new Map<number, Hop>();
+  private readonly loose = new Map<number, LooseShown>();
 
   private readonly chunkMesh: THREE.InstancedMesh;
   /** All falling art pieces in one buffer, rebuilt every frame: one draw call. */
@@ -212,11 +332,13 @@ export class CityView {
 
   constructor(city: CityData, assets: AssetStore, materials: Materials) {
     this.city = city;
+    this.materials = materials;
     this.slotState = new Int8Array(city.structures.length).fill(-1);
     this.slotIndex = new Int32Array(city.structures.length).fill(-1);
     this.stage = new Uint8Array(city.structures.length);
     this.propShown = new Uint8Array(city.props.length);
     this.wreckShown = new Uint8Array(city.props.length);
+    this.propSlot = new Int32Array(city.props.length).fill(-1);
 
     this.buildStructures(assets, materials);
     this.buildProps(assets, materials);
@@ -245,6 +367,28 @@ export class CityView {
 
   // --- structures ------------------------------------------------------------------------------
 
+  /** One instanced mesh of a state batch for `count` structures. */
+  private stateMesh(part: StatePart, count: number, role: MeshRole): StateMesh {
+    const materials = this.materials;
+    const mode: PaintMode = part.material === 'building' ? 'tone' : part.material === 'city_atlas' ? 'tint' : 'shade';
+    const material = part.material === 'building' ? materials.building : mode === 'tint' ? materials.cityTint : materials.byKind(part.material);
+    // Each batch owns its geometry: a state may reuse another's (no damaged node), and the
+    // per-instance shade lives on the geometry.
+    const mesh = new THREE.InstancedMesh(mode === 'tint' ? part.geometry.clone() : part.geometry, material, Math.max(1, count));
+    mesh.count = 0;
+    mesh.visible = false;
+    mesh.frustumCulled = false;
+    // Allocate the color buffer up front so every instance always has a color.
+    mesh.setColorAt(0, tmpColor.set(0xffffff));
+    let shade: THREE.InstancedBufferAttribute | null = null;
+    if (mode === 'tint') {
+      shade = new THREE.InstancedBufferAttribute(new Float32Array(Math.max(1, count)).fill(1), 1);
+      mesh.geometry.setAttribute(INSTANCE_SHADE, shade);
+    }
+    this.group.add(mesh);
+    return { mesh, mode, shade, role };
+  }
+
   private buildStructures(assets: AssetStore, materials: Materials): void {
     const counts = new Map<string, number>();
     for (const s of this.city.structures) counts.set(s.archetype, (counts.get(s.archetype) ?? 0) + 1);
@@ -257,29 +401,12 @@ export class CityView {
       const def = archetypeDef(id);
       const modelId = archetypeModelId(def);
       const geometry = archetypeGeometry(def, assets.hasModel(modelId) ? assets.model(modelId) : null);
-      const states = geometry.states.map((parts) => {
-        const meshes = parts.map((part): StateMesh => {
-          const mode: PaintMode = part.material === 'building' ? 'tone' : part.material === 'city_atlas' ? 'tint' : 'shade';
-          const material = part.material === 'building' ? materials.building : mode === 'tint' ? materials.cityTint : materials.byKind(part.material);
-          // Each batch owns its geometry: a state may reuse another's (no damaged node), and the
-          // per-instance shade lives on the geometry.
-          const mesh = new THREE.InstancedMesh(mode === 'tint' ? part.geometry.clone() : part.geometry, material, count);
-          mesh.count = 0;
-          mesh.visible = false;
-          mesh.frustumCulled = false;
-          // Allocate the color buffer up front so every instance always has a color.
-          mesh.setColorAt(0, tmpColor.set(0xffffff));
-          let shade: THREE.InstancedBufferAttribute | null = null;
-          if (mode === 'tint') {
-            shade = new THREE.InstancedBufferAttribute(new Float32Array(count).fill(1), 1);
-            mesh.geometry.setAttribute(INSTANCE_SHADE, shade);
-          }
-          this.group.add(mesh);
-          return { mesh, mode, shade };
-        });
-        return { meshes, ids: [] } as StateBatch;
-      }) as [StateBatch, StateBatch, StateBatch];
-      this.batches.set(id, { def, geometry, states });
+      const states = geometry.states.map((parts) => ({ meshes: parts.map((part) => this.stateMesh(part, count, 'body')), ids: [] }) as StateBatch) as [
+        StateBatch,
+        StateBatch,
+        StateBatch,
+      ];
+      this.batches.set(id, { def, geometry, count, states, fallen: null, tops: null });
     }
     const districtTint = (x: number, z: number): number => {
       for (const d of this.city.districts) if (d.tint !== undefined && insidePolygon(x, z, d.polygon)) return d.tint;
@@ -305,11 +432,39 @@ export class CityView {
     this.flush();
   }
 
+  /** The fallen batch of an archetype, made the first time one of its structures falls over. */
+  private fallenBatch(batch: ArchetypeBatch): StateBatch {
+    if (!batch.fallen) {
+      const lying = batch.geometry.fall.map((part) => this.stateMesh(part, batch.count, 'lying'));
+      const base = batch.geometry.base.map((part) => this.stateMesh(part, batch.count, 'body'));
+      batch.fallen = { meshes: [...lying, ...base], ids: [] };
+      if (batch.geometry.top) batch.tops = batch.geometry.top.parts.map((part) => this.stateMesh(part, batch.count, 'lying'));
+    }
+    return batch.fallen;
+  }
+
+  private stateBatch(batch: ArchetypeBatch, state: number): StateBatch {
+    return state === FALLEN ? this.fallenBatch(batch) : batch.states[state];
+  }
+
   private matrixFor(s: Structure, def: ArchetypeDef): THREE.Matrix4 {
+    return this.standingMatrix(s, def, tmpMatrix);
+  }
+
+  private standingMatrix(s: Structure, def: ArchetypeDef, out: THREE.Matrix4): THREE.Matrix4 {
     tmpQuat.setFromAxisAngle(Y_AXIS, s.yaw);
     // A structure normally has exactly its archetype's size; scale covers a generator that varies it.
     tmpScale.set((s.hx * 2) / def.footprint[0], s.height / def.height, (s.hz * 2) / def.footprint[1]);
-    return tmpMatrix.compose(tmpPos.set(s.x, 0, s.z), tmpQuat, tmpScale);
+    return out.compose(tmpPos.set(s.x, 0, s.z), tmpQuat, tmpScale);
+  }
+
+  /** Where a falling (or fallen) structure's lying meshes are drawn now. */
+  private lyingMatrix(s: Structure, def: ArchetypeDef, fall: Fall, out: THREE.Matrix4): THREE.Matrix4 {
+    const u = fall.landed ? 1 : Math.min(1, fall.t / Math.max(0.01, fall.duration));
+    // It topples: slow to start, fastest as it meets the ground.
+    const angle = (Math.PI / 2) * u * u;
+    const standing = this.standingMatrix(s, def, tmpMatrix2);
+    return fallMatrix(standing, fall.pivotX, fall.pivotZ, fall.dirX, fall.dirZ, angle, fall.sink * (1 - Math.cos(angle)), out);
   }
 
   /** Writes structure `id`'s color for `stage` into instance `index` of a state mesh. */
@@ -329,16 +484,18 @@ export class CityView {
     }
   }
 
-  /** Adds structure `s` to the batch of the state for `stage`. */
+  /** Adds structure `s` to the batch of the state for `stage` (fallen over, if it lies fallen). */
   private place(s: Structure, stage: number): void {
     const batch = this.slotBatch[s.id];
-    const state = stateOf(stage);
-    const target = batch.states[state];
+    const fall = this.falls.get(s.id);
+    const state = fall && stage >= 3 ? FALLEN : stateOf(stage);
+    const target = this.stateBatch(batch, state);
     const index = target.ids.length;
     target.ids.push(s.id);
     const matrix = this.matrixFor(s, batch.def);
+    const lying = fall && state === FALLEN ? this.lyingMatrix(s, batch.def, fall, new THREE.Matrix4()) : null;
     for (const m of target.meshes) {
-      m.mesh.setMatrixAt(index, matrix);
+      m.mesh.setMatrixAt(index, lying && m.role === 'lying' ? lying : matrix);
       this.paintInstance(m, index, s.id, stage);
       this.dirty.add(m.mesh);
     }
@@ -352,7 +509,7 @@ export class CityView {
     const batch = this.slotBatch[id];
     const state = this.slotState[id];
     if (!batch || state < 0) return;
-    const from = batch.states[state];
+    const from = this.stateBatch(batch, state);
     const index = this.slotIndex[id];
     const last = from.ids.length - 1;
     if (index !== last) {
@@ -383,7 +540,8 @@ export class CityView {
   /** Uploads what changed. Call once after a batch of setStage calls. */
   flush(): void {
     for (const batch of this.batches.values()) {
-      for (const state of batch.states) {
+      const all = batch.fallen ? [...batch.states, batch.fallen] : batch.states;
+      for (const state of all) {
         for (const { mesh } of state.meshes) {
           if (!this.dirty.has(mesh)) continue;
           mesh.count = state.ids.length;
@@ -406,10 +564,15 @@ export class CityView {
     if (!s || !batch) return null;
     const before = this.stage[id];
     if (before === stage) return null;
-    if (stateOf(before) === stateOf(stage)) {
+    if (stage < 3 && this.falls.has(id)) {
+      // Standing again (a new match from the same view): it no longer lies anywhere.
+      this.remove(id);
+      this.falls.delete(id);
+      this.place(s, stage);
+    } else if (stateOf(before) === stateOf(stage)) {
       // Same mesh, deeper damage: only the shade changes.
       const index = this.slotIndex[id];
-      for (const m of batch.states[this.slotState[id]].meshes) {
+      for (const m of this.stateBatch(batch, this.slotState[id]).meshes) {
         this.paintInstance(m, index, id, stage);
         this.dirty.add(m.mesh);
       }
@@ -418,33 +581,71 @@ export class CityView {
       this.remove(id);
       this.place(s, stage);
     }
+    if (stage >= 3) this.wobbles.delete(id);
     if (!effects || stage <= before) return null;
-    const info: CollapseInfo = { x: s.x, z: s.z, radius: Math.max(s.hx, s.hz), height: s.height };
     if (stage >= 3) this.shed(s, batch, 1);
     else this.shed(s, batch, stage === 2 ? 0.3 : 0.15);
-    return info;
+    return this.infoOf(id);
+  }
+
+  /**
+   * Sheds a structure's collapse pieces where it stands (it went to rubble and did not fall
+   * over: the renderer waits for the end of the tick's events to know). Returns where, for dust.
+   */
+  collapse(id: number): CollapseInfo | null {
+    const s = this.city.structures[id];
+    const batch = this.slotBatch[id];
+    if (!s || !batch || this.falls.has(id)) return null;
+    this.shed(s, batch, 1);
+    return this.infoOf(id);
+  }
+
+  /** Where a structure stands and how big it is, for dust and sound. */
+  infoOf(id: number): CollapseInfo | null {
+    const s = this.city.structures[id];
+    return s ? { x: s.x, z: s.z, radius: Math.max(s.hx, s.hz), height: s.height } : null;
   }
 
   /** Redraws every structure and prop from the mirrored city (match start, reconnection). */
   syncFrom(mirror: CityMirror): void {
-    for (const s of this.city.structures) this.setStage(s.id, mirror.structureStage[s.id], false);
+    const fell = mirror.query.structureFall;
+    for (const s of this.city.structures) {
+      const side = fell[s.id];
+      if (side > 0 && mirror.structureStage[s.id] >= 3) {
+        this.setStage(s.id, 3, false);
+        this.setFallen(s.id, side - 1, 0);
+      } else {
+        if (this.falls.has(s.id)) this.unfall(s.id);
+        this.setStage(s.id, mirror.structureStage[s.id], false);
+      }
+    }
+    this.wobbles.clear();
     this.flush();
     for (const p of this.city.props) {
       this.setPropAlive(p.id, propAlive(mirror, p.id));
       this.setWreck(p.id, propWrecked(mirror, p.id));
     }
+    this.loose.clear();
+    for (const o of mirror.loose.values()) this.loose.set(o.id, { ...o });
+    this.hops.clear();
+    this.propsDirty = true;
     this.flushProps();
     this.chunks.length = 0;
   }
 
   /** Puts the city back to pristine (the menu backdrop, a new match). */
   reset(): void {
+    for (const id of [...this.falls.keys()]) this.unfall(id);
     for (const s of this.city.structures) this.setStage(s.id, 0, false);
+    this.wobbles.clear();
     this.flush();
     for (const p of this.city.props) {
       this.setPropAlive(p.id, true);
       this.setWreck(p.id, false);
     }
+    this.loose.clear();
+    this.hops.clear();
+    this.propsDirty = true;
     this.flushProps();
     this.chunks.length = 0;
   }
@@ -459,9 +660,211 @@ export class CityView {
     return out;
   }
 
+  /** The visual stage a structure is drawn at (0 intact to 3 rubble; a fallen one is rubble). */
+  stageOf(id: number): number {
+    return this.stage[id] ?? 0;
+  }
+
   /** The color a structure's walls show (for chunks, the map). */
   toneOf(id: number): THREE.Color {
     return this.tone[id] ?? tmpColor.set(0xffffff);
+  }
+
+  /** The archetype geometry a structure is drawn with (its effect anchors, its top), or null. */
+  geometryOf(id: number): ArchetypeGeometry | null {
+    return this.slotBatch[id]?.geometry ?? null;
+  }
+
+  // --- falling over ----------------------------------------------------------------------------
+
+  /**
+   * Lays structure `id` over toward `side` (FallSide: 0 its own +X, 1 +Z, 2 -X, 3 -Z), turning
+   * about the edge of its footprint on that side. `duration` > 0 shows the fall (seconds, the
+   * `structureFall` event's); 0 puts it straight down where it lies (a late joiner, a backlog).
+   * It must be rubble (stage 3) already or become it: until then it is drawn standing.
+   */
+  setFallen(id: number, side: number, duration: number): void {
+    const s = this.city.structures[id];
+    const batch = this.slotBatch[id];
+    if (!s || !batch) return;
+    const existing = this.falls.get(id);
+    if (existing && (duration > 0 || existing.landed)) {
+      if (duration <= 0) existing.landed = true;
+      this.refreshFall(id);
+      return;
+    }
+    const c = Math.cos(s.yaw);
+    const sn = Math.sin(s.yaw);
+    const k = side & 3;
+    // The structure's own +X in the world is (cos, -sin), its +Z (sin, cos) (city/spatialIndex.ts fallSideDir).
+    const dirX = k === 0 ? c : k === 1 ? sn : k === 2 ? -c : -sn;
+    const dirZ = k === 0 ? -sn : k === 1 ? c : k === 2 ? sn : -c;
+    const along = (k & 1) === 0 ? s.hx : s.hz;
+    const top = batch.geometry.top;
+    // Half sunk: what shows is half its thickness, the height of the simulation's mound. A mast's
+    // lattice is thin: it comes down onto its legs instead.
+    let sink = along;
+    if (top) {
+      let reach = 0;
+      for (const part of top.parts) {
+        part.geometry.computeBoundingBox();
+        const b = part.geometry.boundingBox;
+        if (b) reach = Math.max(reach, -b.min.x, b.max.x, -b.min.z, b.max.z);
+      }
+      sink = Math.max(0, along - reach * (s.height / batch.def.height));
+    }
+    const fall: Fall = { id, dirX, dirZ, pivotX: s.x + dirX * along, pivotZ: s.z + dirZ * along, sink, t: 0, duration, landed: duration <= 0 };
+    this.remove(id);
+    this.falls.set(id, fall);
+    this.wobbles.delete(id);
+    this.place(s, Math.max(3, this.stage[id]));
+    this.flush();
+  }
+
+  /** The fall has landed (the `structureFall` event 'landed'): it lies where it lies. */
+  land(id: number): void {
+    const fall = this.falls.get(id);
+    if (!fall || fall.landed) return;
+    fall.landed = true;
+    this.refreshFall(id);
+  }
+
+  /** Whether structure `id` is falling or lies fallen. */
+  fallen(id: number): boolean {
+    return this.falls.has(id);
+  }
+
+  /** How many structures are falling or lie fallen (the debug view, the playtests). */
+  get lying(): number {
+    return this.falls.size;
+  }
+
+  /**
+   * The point of a falling structure's top section (a radio mast's break) and of its far end, in
+   * the world, for effects; false when it is not falling.
+   */
+  fallPoint(id: number, height: number, out: THREE.Vector3): boolean {
+    const fall = this.falls.get(id);
+    const s = this.city.structures[id];
+    const batch = this.slotBatch[id];
+    if (!fall || !s || !batch) return false;
+    this.lyingMatrix(s, batch.def, fall, tmpMatrix);
+    out.set(0, (height * batch.def.height) / Math.max(0.01, s.height), 0).applyMatrix4(tmpMatrix);
+    return true;
+  }
+
+  private unfall(id: number): void {
+    const s = this.city.structures[id];
+    if (!s || !this.falls.has(id)) return;
+    this.remove(id);
+    this.falls.delete(id);
+    this.place(s, this.stage[id]);
+  }
+
+  /** Rewrites a falling structure's lying meshes (and a mast's top) for where it is in its fall. */
+  private refreshFall(id: number): void {
+    const fall = this.falls.get(id);
+    const s = this.city.structures[id];
+    const batch = this.slotBatch[id];
+    if (!fall || !s || !batch || this.slotState[id] !== FALLEN) return;
+    const target = this.fallenBatch(batch);
+    const index = this.slotIndex[id];
+    this.lyingMatrix(s, batch.def, fall, tmpMatrix);
+    for (const m of target.meshes) {
+      if (m.role !== 'lying') continue;
+      m.mesh.setMatrixAt(index, tmpMatrix);
+      m.mesh.instanceMatrix.needsUpdate = true;
+    }
+  }
+
+  /** Draws the radio masts' tops tumbling from the masts falling now. */
+  private updateTops(): void {
+    for (const batch of this.batches.values()) {
+      if (!batch.tops || !batch.geometry.top) continue;
+      let n = 0;
+      const top = batch.geometry.top;
+      for (const fall of this.falls.values()) {
+        if (fall.landed || this.slotBatch[fall.id] !== batch) continue;
+        const s = this.city.structures[fall.id];
+        const u = Math.min(1, fall.t / Math.max(0.01, fall.duration));
+        // The section rides on the falling lattice, then whips over ahead of it as it snaps off
+        // and comes down flat with it.
+        const angle = (Math.PI / 2) * u * u;
+        const whip = u > 0.55 ? Math.sin((Math.PI * (u - 0.55)) / 0.45) * 0.3 : 0;
+        this.lyingMatrix(s, batch.def, fall, tmpMatrix);
+        tmpPos.copy(top.at).applyMatrix4(tmpMatrix);
+        tmpAxis.set(fall.dirZ, 0, -fall.dirX).normalize();
+        tmpQuat.setFromAxisAngle(tmpAxis, angle + whip);
+        tmpQuat2.setFromAxisAngle(Y_AXIS, s.yaw);
+        tmpQuat.multiply(tmpQuat2);
+        tmpScale.set((s.hx * 2) / batch.def.footprint[0], s.height / batch.def.height, (s.hz * 2) / batch.def.footprint[1]);
+        tmpMatrix.compose(tmpPos, tmpQuat, tmpScale);
+        for (const m of batch.tops) {
+          m.mesh.setMatrixAt(n, tmpMatrix);
+          this.paintInstance(m, n, fall.id, 3);
+        }
+        n++;
+      }
+      for (const m of batch.tops) {
+        m.mesh.count = n;
+        m.mesh.visible = n > 0;
+        if (n > 0) {
+          m.mesh.instanceMatrix.needsUpdate = true;
+          if (m.mesh.instanceColor) m.mesh.instanceColor.needsUpdate = true;
+          if (m.shade) m.shade.needsUpdate = true;
+        }
+      }
+    }
+  }
+
+  // --- swaying -----------------------------------------------------------------------------------
+
+  /**
+   * A stomp's shock reaches a standing building: it sways about its base, `amp` radians at most,
+   * away from (dirX, dirZ) first, starting `delay` seconds from now. A building already swaying
+   * harder keeps its sway.
+   */
+  wobble(id: number, amp: number, dirX: number, dirZ: number, delay = 0): void {
+    const s = this.city.structures[id];
+    if (!s || this.stage[id] >= 3 || this.falls.has(id) || !(amp > 0)) return;
+    const current = this.wobbles.get(id);
+    if (current && current.t < 0.6 && current.amp >= amp) return;
+    if (!current && this.wobbles.size >= MAX_WOBBLES) return;
+    const len = Math.hypot(dirX, dirZ) || 1;
+    // Tall buildings sway slower.
+    const freq = Math.min(2.6, Math.max(1, 2.8 - s.height / 50));
+    this.wobbles.set(id, { id, t: -delay, amp, freq, dirX: dirX / len, dirZ: dirZ / len });
+  }
+
+  /** How many buildings are swaying now (tests, the debug view). */
+  get swaying(): number {
+    return this.wobbles.size;
+  }
+
+  private updateWobbles(dt: number): void {
+    if (this.wobbles.size === 0) return;
+    for (const w of this.wobbles.values()) {
+      w.t += dt;
+      const s = this.city.structures[w.id];
+      const batch = this.slotBatch[w.id];
+      const state = this.slotState[w.id];
+      if (w.t < 0) continue;
+      const done = w.t > 2.2 || !s || !batch || state < 0 || state >= 2;
+      // A damped sway: a quick lean away from the shock, then back and forth, dying out.
+      const lean = done ? 0 : w.amp * Math.exp(-w.t * 2.6) * Math.sin(w.t * w.freq * Math.PI * 2);
+      if (s && batch && state >= 0 && state < 2) {
+        const standing = this.standingMatrix(s, batch.def, tmpMatrix2);
+        tmpAxis.set(w.dirZ, 0, -w.dirX);
+        tmpMatrix.makeTranslation(-s.x, 0, -s.z).premultiply(fallTurn.makeRotationAxis(tmpAxis, lean));
+        tmpMatrix.premultiply(fallMove.makeTranslation(s.x, 0, s.z)).multiply(standing);
+        const index = this.slotIndex[w.id];
+        for (const m of batch.states[state].meshes) {
+          m.mesh.setMatrixAt(index, tmpMatrix);
+          m.mesh.instanceMatrix.needsUpdate = true;
+        }
+      }
+      if (done) this.wobbles.delete(w.id);
+    }
   }
 
   // --- collapse chunks -------------------------------------------------------------------------
@@ -529,8 +932,19 @@ export class CityView {
     });
   }
 
-  /** Advances the falling chunks. Returns how many are still in the air or settling. */
+  /**
+   * Advances the falling chunks, the buildings falling over and swaying, and the masts' tops.
+   * Returns how many chunks are still in the air or settling.
+   */
   update(dt: number): number {
+    for (const fall of this.falls.values()) {
+      if (fall.landed) continue;
+      fall.t += dt;
+      // The event says when it lands; the picture never goes past lying flat meanwhile.
+      this.refreshFall(fall.id);
+    }
+    this.updateTops();
+    this.updateWobbles(dt);
     const chunks = this.chunks;
     let n = 0;
     let vertices = 0;
@@ -640,9 +1054,11 @@ export class CityView {
       counts.set(p.kind, (counts.get(p.kind) ?? 0) + 1);
       if (PROP_KINDS[p.kind]?.leavesWreck) wrecks++;
     }
+    const weapons: readonly string[] = CITY_WEAPON_KINDS;
     const tints = new Map<PropKindId, THREE.Color[]>();
     for (const kind of PROP_KIND_IDS) {
-      const count = counts.get(kind) ?? 0;
+      // City weapons may also lie loose where the city never placed one (a fallen mast's top).
+      const count = (counts.get(kind) ?? 0) + (weapons.includes(kind) ? LOOSE_ROOM : 0);
       if (count === 0) continue;
       const modelId = `prop_${kind}`;
       const model = assets.model(modelId);
@@ -652,6 +1068,7 @@ export class CityView {
       }
       tints.set(kind, palette);
       const meshes: THREE.InstancedMesh[] = [];
+      // (A city weapon's `grip` node is an empty: it has no parts.)
       for (const node of model.nodes) {
         for (const part of node.parts) {
           const material = part.material === 'vcol' ? materials.paint : materials.byKind(part.material);
@@ -709,6 +1126,21 @@ export class CityView {
     }
   }
 
+  /**
+   * A city weapon lying loose (`looseProp` 'down': dropped, or a fallen mast's top) or no longer
+   * (`looseProp` 'gone', picked up: `kaijuHeld` with source 'loose'). `o` null removes `id`.
+   */
+  setLoose(id: number, o: LooseShown | null): void {
+    if (o) this.loose.set(id, { ...o });
+    else if (!this.loose.delete(id)) return;
+    this.propsDirty = true;
+  }
+
+  /** The city weapons lying loose now. */
+  looseShown(): IterableIterator<LooseShown> {
+    return this.loose.values();
+  }
+
   private propsDirty = false;
   private propCols = 0;
   private propCells: number[][] = [];
@@ -720,10 +1152,10 @@ export class CityView {
   }
 
   /**
-   * Repacks the prop instances around the camera when needed. `radius` is how far props are
-   * drawn; the caller grows it with the camera's height.
+   * Repacks the prop instances around the camera when needed, then moves the props that hop or
+   * sway. `radius` is how far props are drawn; the caller grows it with the camera's height.
    */
-  updateProps(cameraX: number, cameraZ: number, radius: number): number {
+  updateProps(cameraX: number, cameraZ: number, radius: number, dt = 0): number {
     const cols = this.propCols;
     if (cols === 0) return 0;
     const half = this.city.half;
@@ -731,15 +1163,23 @@ export class CityView {
     const cz = Math.floor((cameraZ + half) / PROP_CELL);
     const reach = Math.ceil(radius / PROP_CELL);
     const key = `${cx},${cz},${reach}`;
-    if (key === this.propViewKey && !this.propsDirty) return this.propsDrawn;
-    this.propViewKey = key;
-    this.propsDirty = false;
+    if (key !== this.propViewKey || this.propsDirty) {
+      this.propViewKey = key;
+      this.propsDirty = false;
+      this.repack(cx, cz, reach);
+    }
+    this.updateHops(dt);
+    return this.propsDrawn;
+  }
 
+  private repack(cx: number, cz: number, reach: number): void {
+    const cols = this.propCols;
     const fill = new Map<THREE.InstancedMesh[], number>();
     for (const meshes of this.propMeshes.values()) fill.set(meshes, 0);
     let wreckCount = 0;
     let drawn = 0;
     const props = this.city.props;
+    this.propSlot.fill(-1);
     for (let z = Math.max(0, cz - reach); z <= Math.min(cols - 1, cz + reach); z++) {
       for (let x = Math.max(0, cx - reach); x <= Math.min(cols - 1, cx + reach); x++) {
         // Skip the corners of the square so the drawn area is roughly round.
@@ -756,14 +1196,31 @@ export class CityView {
               mesh.setColorAt(index, this.propColor[id]);
             }
             fill.set(meshes, index + 1);
+            this.propSlot[id] = index;
             drawn++;
           } else if (this.wreckShown[id] === 1) {
             for (const mesh of this.wreckMeshes) mesh.setMatrixAt(wreckCount, this.propMatrix[id]);
+            this.propSlot[id] = wreckCount;
             wreckCount++;
             drawn++;
           }
         }
       }
+    }
+    // Loose city weapons: few, so always drawn.
+    const white = tmpColor.set(0xffffff);
+    for (const o of this.loose.values()) {
+      const meshes = this.propMeshes.get(o.prop);
+      if (!meshes) continue;
+      const index = fill.get(meshes) ?? 0;
+      if (index >= (meshes[0]?.instanceMatrix.count ?? 0)) continue;
+      tmpMatrix.compose(tmpPos.set(o.x, 0, o.z), tmpQuat.setFromAxisAngle(Y_AXIS, o.yaw), ONE);
+      for (const mesh of meshes) {
+        mesh.setMatrixAt(index, tmpMatrix);
+        mesh.setColorAt(index, white);
+      }
+      fill.set(meshes, index + 1);
+      drawn++;
     }
     for (const [meshes, count] of fill) {
       for (const mesh of meshes) {
@@ -779,8 +1236,104 @@ export class CityView {
       mesh.instanceMatrix.needsUpdate = true;
     }
     this.propsDrawn = drawn;
-    return drawn;
   }
 
   private propsDrawn = 0;
+
+  // --- props jolted by the monster's weight ------------------------------------------------------
+
+  /**
+   * A footstep or a stomp at (x, z): the props within `radius` meters hop (cars, small things)
+   * up to `height` meters at the middle, or sway (trees, lamps, poles), less the farther out.
+   * Returns how many were jolted.
+   */
+  hop(x: number, z: number, radius: number, height: number): number {
+    const cols = this.propCols;
+    if (cols === 0 || !(radius > 0) || !(height > 0)) return 0;
+    const half = this.city.half;
+    const props = this.city.props;
+    const x0 = Math.max(0, Math.floor((x - radius + half) / PROP_CELL));
+    const x1 = Math.min(cols - 1, Math.floor((x + radius + half) / PROP_CELL));
+    const z0 = Math.max(0, Math.floor((z - radius + half) / PROP_CELL));
+    const z1 = Math.min(cols - 1, Math.floor((z + radius + half) / PROP_CELL));
+    let n = 0;
+    for (let cz = z0; cz <= z1; cz++) {
+      for (let cx = x0; cx <= x1; cx++) {
+        for (const id of this.propCells[cz * cols + cx]) {
+          const shown = this.propShown[id] === 1;
+          const wreck = !shown && this.wreckShown[id] === 1;
+          if (!shown && !wreck) continue;
+          const p = props[id];
+          const dx = p.x - x;
+          const dz = p.z - z;
+          const d = Math.hypot(dx, dz);
+          if (d > radius) continue;
+          const falloff = Math.pow(1 - d / radius, 1.5);
+          const def = PROP_KINDS[p.kind];
+          const sway = !wreck && def.tally !== 'car' && def.height > 3;
+          const h = height * falloff * (0.75 + this.rand() * 0.5);
+          if (h < 0.02) continue;
+          const current = this.hops.get(id);
+          if (current && current.t < current.duration * 0.5 && (sway ? current.tilt : current.height) >= (sway ? 0.12 * falloff : h)) continue;
+          // Enough is moving already: the ones in the air land first.
+          if (!current && this.hops.size >= MAX_HOPS) continue;
+          const len = d || 1;
+          // Tilted away from the footfall: about the horizontal axis across the push.
+          const axisX = dz / len;
+          const axisZ = -dx / len;
+          const v0 = Math.sqrt(2 * HOP_GRAVITY * h);
+          this.hops.set(id, {
+            id,
+            wreck,
+            t: 0,
+            duration: sway ? 1.4 : (2 * v0) / HOP_GRAVITY,
+            height: sway ? 0 : h,
+            tilt: sway ? Math.min(0.14, 0.05 + height * 0.04) * falloff : Math.min(0.5, h * 0.25) * (this.rand() < 0.5 ? -1 : 1),
+            axisX,
+            axisZ,
+            sway,
+          });
+          n++;
+        }
+      }
+    }
+    return n;
+  }
+
+  /** How many props are hopping or swaying now (tests, the debug view). */
+  get hopping(): number {
+    return this.hops.size;
+  }
+
+  private updateHops(dt: number): void {
+    if (this.hops.size === 0) return;
+    const props = this.city.props;
+    const touched = new Set<THREE.InstancedMesh[]>();
+    for (const hop of this.hops.values()) {
+      hop.t += dt;
+      const p = props[hop.id];
+      const done = hop.t >= hop.duration;
+      const slot = this.propSlot[hop.id];
+      const meshes = hop.wreck ? this.wreckMeshes : this.propMeshes.get(p.kind);
+      if (done) this.hops.delete(hop.id);
+      if (slot < 0 || !meshes || (hop.wreck ? this.wreckShown[hop.id] !== 1 : this.propShown[hop.id] !== 1)) continue;
+      let y = 0;
+      let tilt = 0;
+      if (!done) {
+        const u = hop.t / hop.duration;
+        if (hop.sway) {
+          tilt = hop.tilt * Math.exp(-hop.t * 3) * Math.sin(hop.t * Math.PI * 2 * 1.8);
+        } else {
+          y = hop.height * 4 * u * (1 - u);
+          tilt = hop.tilt * Math.sin(Math.PI * u);
+        }
+      }
+      tmpQuat.setFromAxisAngle(tmpAxis.set(hop.axisX, 0, hop.axisZ), tilt);
+      tmpQuat.multiply(tmpQuat2.setFromAxisAngle(Y_AXIS, p.yaw));
+      tmpMatrix.compose(tmpPos.set(p.x, y, p.z), tmpQuat, ONE);
+      for (const mesh of meshes) mesh.setMatrixAt(slot, tmpMatrix);
+      touched.add(meshes);
+    }
+    for (const meshes of touched) for (const mesh of meshes) mesh.instanceMatrix.needsUpdate = true;
+  }
 }

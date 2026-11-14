@@ -1,5 +1,5 @@
 /**
- * System 5 of 11: movement and collision.
+ * System 5 of 12: movement and collision.
  *
  * Moves every kaiju from its player's input and every unit from its control, through the shared
  * `stepMovement`, and turns what the bodies walked through into city damage:
@@ -7,6 +7,8 @@
  * - a wading kaiju (the titan) deals contact damage to the taller structures it pushes through;
  * - vehicles crush props; infantry walks around them;
  * - a swimming kaiju (sim/swim.ts) wrecks nothing at all;
+ * - units cross mounds of rubble and fallen buildings at half speed; the kaiju walks over them
+ *   (`moundSpeedMult`, sim/movement.ts); a unit still coming down by parachute stays put;
  * - a charging kaiju runs straight ahead (`kaijuMoveInput`), smashes what is low enough for
  *   the charge (cause 'charge'), and is stopped dead by anything else: its stumble starts on
  *   the next tick (`act.chargeBlocked`, read by the kaiju action system).
@@ -35,6 +37,7 @@ import {
   type MoveParams,
   type UnitMoveState,
 } from '../movement';
+import { sparedByKaiju } from '../cityWeapons';
 import { kaijuSwimming } from '../swim';
 import type { World } from '../types';
 
@@ -43,7 +46,7 @@ const result = createMoveResult();
 const propIds: number[] = [];
 const shake: BeamShake = { yaw: 0, pitch: 0 };
 const driveInput: MoveInput = { moveX: 0, moveZ: 0, aimYaw: 0 };
-const unitState: UnitMoveState = { alive: false, rooted: false, stun: 0, driven: false };
+const unitState: UnitMoveState = { alive: false, rooted: false, stun: 0, driven: false, y: 0 };
 
 export function movementSystem(world: World): void {
   if (world.match.phase !== 'playing') return;
@@ -111,7 +114,11 @@ export function movementSystem(world: World): void {
       }
     }
     propsInCircle(city, k.x, k.z, k.radius, propIds);
-    for (const id of propIds) world.propHits.push({ id, by: k.player, cause: charging ? 'charge' : 'trample' });
+    for (const id of propIds) {
+      // The hatchling's feet spare the city weapons it can pick up (sim/cityWeapons.ts); a charge does not.
+      if (!charging && sparedByKaiju(world, k, id)) continue;
+      world.propHits.push({ id, by: k.player, cause: charging ? 'charge' : 'trample' });
+    }
   }
 
   for (const u of world.units) {
@@ -123,6 +130,8 @@ export function movementSystem(world: World): void {
     unitState.stun = u.stun;
     // The driven unit of a vehicle level drives like a tank (sim/movement.ts).
     unitState.driven = squad.driven === u.id;
+    // Coming down by parachute (reinforcements, sim/systems/pickups.ts) it cannot move yet.
+    unitState.y = u.y;
     unitMoveParams(def, unitState, bounds, squad.mods, params);
     // A squad-mate that has dropped behind its place in the swarm closes up a little faster
     // than the leader goes (the orders system says when). Never the driven unit.

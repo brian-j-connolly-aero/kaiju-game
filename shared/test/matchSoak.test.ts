@@ -139,9 +139,8 @@ describe('full bot matches (soak)', () => {
     expect(reports.filter((r) => r.stages[2].reached).length).toBeGreaterThanOrEqual(3);
     const seen = new Set<string>();
     for (const r of reports) for (const type of Object.keys(r.eventCounts)) seen.add(type);
-    const wanted = ['projectileSpawn', 'projectileHit', 'structureStage', 'propsDestroyed', 'kaijuAction', 'kaijuHit', 'volley', 'moltAvailable', 'cocoon', 'moltOffer', 'moltPick', 'moltBlast', 'stageChange', 'barMark', 'matchPhase', 'voice', 'matchEnd', 'unitHit'];
-    // Nothing calls artillery in phase 1 (the button is gone; phase 2's radio will start missions).
-    expect(seen.has('callin')).toBe(false);
+    // Phase 2: supply crates, the artillery radio's barrages and buildings falling over too.
+    const wanted = ['projectileSpawn', 'projectileHit', 'structureStage', 'propsDestroyed', 'kaijuAction', 'kaijuHit', 'volley', 'moltAvailable', 'cocoon', 'moltOffer', 'moltPick', 'moltBlast', 'stageChange', 'barMark', 'matchPhase', 'voice', 'matchEnd', 'unitHit', 'crate', 'callin', 'structureFall'];
     expect(wanted.filter((type) => !seen.has(type))).toEqual([]);
   });
 });

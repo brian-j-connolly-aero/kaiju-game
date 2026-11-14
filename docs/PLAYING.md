@@ -62,8 +62,8 @@ glows for the first 20 seconds of a match.
 
 | What | Keyboard and mouse | Controller |
 | --- | --- | --- |
-| Swipe; with something in your hand, throw it where you aim | Left button | Right trigger |
-| Grab; with something in your hand, eat it and heal (one meal every 10 seconds); with nothing to grab but a kiosk or a wreck in reach, eat that | Right button | Left trigger |
+| Swipe; with something in your hand, throw it where you aim (a fast-food sign is swung instead) | Left button | Right trigger |
+| Grab; with something in your hand, eat it and heal (one meal every 10 seconds), or drop it if it is one of the city's weapons (below); with nothing to grab but a kiosk or a wreck in reach, eat that | Right button | Left trigger |
 | Stomp | Space | Left bumper |
 | The move you picked at your first molt (nothing until then) | Q | Y |
 | The move you picked at your second molt (nothing until then) | E | Right bumper |
@@ -94,6 +94,26 @@ you have; if you do not pick in time, one is picked for you.
 **If every squad is wiped out**, the buildings around you start falling by themselves and you
 shed your skin straight away. At stage 3 that fills the skyline: you win.
 
+**The city as a weapon (while you are small).** Around the houses and shops where you hatch
+stand things you can pick up with the right button and use with the left one. You can only lift
+them at the first size; later you just tread on them. They are never eaten: the right button
+drops one again, and it lies there to be picked up later. The pictures over your buttons change
+to show what the left and right buttons will do with what you hold.
+
+| You hold | The left button | What happens |
+| --- | --- | --- |
+| Propane tank | throws it | It blows up where it lands. Careful: if a shot lands right by your hand while you hold it, it goes off in your claw, hurts you and makes you flinch. Your left button's picture throbs red while you hold one. |
+| Water tank | throws it | It bursts in a big splash that knocks the soldiers in it flat for a moment. |
+| Television antenna | throws it like a javelin | It flies straight and fast to your crosshair, through up to three groups of soldiers, and sticks in whatever stops it. A light line shows where it will go. |
+| Fast-food sign | swings it like a club | Three big swings, each a wide sweep in front of you with a trail of light. Three dots under the button show the swings left; after the third the sign breaks. |
+| Garage door | throws it like a frisbee | While you hold it, it is a shield: shots from in front of you hit the door instead of you (sparks fly off it). A bar by your buttons shows how much it can still take; when it runs out the door breaks apart. |
+| The top of a radio mast (left lying when a mast falls) | throws it like a heavy javelin | Like the antenna, but heavier: it goes through up to five groups of soldiers. |
+
+**The power surge.** Wreck a power substation and for eight seconds lightning crackles over
+your back and tail, every move button flashes full, and a lightning bolt in a ring by your
+buttons runs down until the surge is over. Meanwhile your moves come back three times as fast
+and every hit lands harder.
+
 ![The cards at a molt: the beam, the roar and the charge, each over the key that picks it](progress/monster-molt-cards.png)
 
 **Squad**
@@ -110,7 +130,8 @@ shed your skin straight away. At stage 3 that fills the skyline: you win.
 
 Your squad has two buttons and nothing else: no orders to give, nothing to switch. Your three
 other units follow you around as a loose group and shoot at the monster by themselves whenever
-they can. Your own gun is rockets at first, then a tank gun, then a troop of three tanks.
+they can. Your own gun is rockets at first, then a tank gun, then a troop of three tanks, until
+a supply crate gives you something better (below).
 
 **The volley.** Hold the right button: your three other units stop where they are, point
 yellow laser lines at your crosshair and start to charge. A big yellow diamond fills around your
@@ -137,6 +158,33 @@ shell would hit (the camera is higher than the gun and sees over it). The cyan s
 fills as the gun reloads.
 
 ![A tank from behind: the white crosshair where you look, the cyan sight where the gun points while the turret swings round](progress/squad-tank-reticles.png)
+
+**Supply crates.** When a stage starts, and about every half minute after that, army crates
+come down by parachute onto the streets near the squads. You can see them from far off: a crate
+on the ground sends up a cyan column of light and cyan smoke, and the picture of what is inside
+floats over it. They show on your map too. Drive any of your units onto a crate to take it for
+your squad (anyone's squad may take any crate). Its picture pops up over your crosshair.
+
+| Crate | What it gives your squad, until the stage ends or your squad is wiped out |
+| --- | --- |
+| Machine gun | Your own gun fires five times as fast: streams of bright tracers. Each shot does less, but more in all. |
+| Big cannon | Slow, very heavy shots: a big flash, a puff of smoke, your tank rocks back, and a big blast where it lands. |
+| Missile pod | One press fires six missiles that fan out, trailing smoke, and curve in onto your crosshair. |
+| Artillery radio | Your next three charged volleys each call an artillery barrage where they land (see below). |
+| Reinforcements | Your lost units come back at once by parachute beside you, and everyone is healed. |
+
+The machine gun, big cannon and missile pod replace your own gun only; your other units keep
+theirs. While you have one, the picture on your left button is that weapon.
+
+**Artillery.** With the radio, let go of a charged volley (past the notch) and the radio
+crackles: red smoke rises where your volley landed and a red ring closes in on the spot. When the
+ring has closed, the shells land: you can see them falling and hear them whistle in, and eight
+big explosions cover the ring over two seconds. The radio picture by your right button has a dot
+for each barrage left. A volley fired at the empty sky calls nothing and keeps the barrage.
+
+**The radio mast's static.** When the monster knocks over a radio mast, your map shows nothing
+but crackling static for twenty seconds: you know where the monster is only from what you can
+see.
 
 ![The squad's controls card](progress/controls-squad.png)
 
@@ -170,13 +218,63 @@ fills as the gun reloads.
 - **Pictures with a button, bottom right:** what you can do right now and which button does it.
   The monster's two move buttons (Q and E) start as faint eggs and fill at the molts; a ring
   round a move fills as it comes ready again. Yellow stars spinning over soldiers mean the roar
-  has frozen them.
+  has frozen them. With something from the city in its hand the monster's left button shows a
+  throw, a javelin or a club (with three dots for the club's swings left), and its right button
+  a hand letting go; a garage door adds a door with a bar for what it can still take, and a
+  power surge a lightning bolt in a ring that runs down. The squad's left button shows the
+  weapon a crate gave (machine gun, big cannon, missile pod); the artillery radio sits by the
+  right button with a dot per barrage left.
+- **A cyan column of light with a picture over it:** a supply crate, and what is in it.
+- **Grey snow on the map (army):** a radio mast has fallen; the map comes back after twenty
+  seconds.
 - **Subtitles:** what the radio (army) and the television news (monster) say out loud, with
   the speaker's name. The radio calls out what is happening in the fight; the news only breaks
   in for the big moments (the start, a landmark falling, the monster growing, the last minute,
   the end).
 
-## Seven tips for the monster
+## The city
+
+**Special buildings.** Every place a match can start has three buildings that are worth more
+than their size, a short walk from where the monster hatches. You can tell them from far off:
+
+- a **power substation** (a fenced yard with transformers) crackles with blue sparks and glows
+  blue. Wreck it and lightning leaps from it into the monster: for eight seconds every move
+  comes back three times as fast, every hit lands harder and its stripes crackle;
+- a **gas station** (a red canopy over pumps) has lights that flicker over its pumps. Wreck it
+  and it goes up in a ball of fire that burns the houses round it and throws back any soldiers
+  near it (never the monster), then burns for a while under a column of black smoke;
+- a **radio mast** (red and white, with red lamps that blink) falls over away from the monster
+  when it is wrecked, crushing whatever it lands on. Its top section lies at the end of it: the
+  small monster can pick it up and throw it. For twenty seconds the army's map shows only static.
+
+**Rubble stays.** A building that comes down leaves a heap of its own walls and roof, half as
+high as it was. Heaps stop shots and hide whatever is behind them, from both sides: a pile of
+house rubble can hide the small monster. Soldiers and tanks climb over heaps at half speed; the
+monster walks over them. Tall towers sometimes fall over on their side instead and lie across
+the street as a long wall of rubble.
+
+**The monster is heavy.** Every footstep shakes the view of anyone near it, a little when it is
+small and a lot when it is a titan, kicks up dust, makes the cars nearby jump and, once it is
+bigger than the houses, breaks their windows. A stomp makes the buildings round it sway and
+throws cars into the air. Through the monster's own eyes the view widens a little while it
+walks and more when it charges.
+
+**The army is fast.** Your view widens as you speed up, a little on foot and a lot in a tank
+at full speed, when streaks of air rush past. A tank throws up dust from its tracks, its
+engine climbs as it speeds up, and its camera leans into the turns. In the view from behind
+your soldier, your own squad-mates fade out when they are right by the camera, so they never
+hide what you are aiming at.
+
+Tips:
+
+- Monster: wreck the substation just before a big fight, when your moves are cooling down, and
+  the gas station when soldiers stand by it. Knock the mast over when the army is closing in:
+  for twenty seconds their map shows nothing.
+- Army: a heap of rubble is cover. Fight from on top of one (you see and shoot over it), and
+  remember that the monster can hide behind one too. Keep away from the gas station while the
+  monster is near it.
+
+## Eight tips for the monster
 
 1. Wreck buildings, not soldiers. Only the skyline wins; chasing tanks wastes the clock.
 2. Watch for yellow laser lines, and the yellow diamonds at the edge of your screen: a squad is
@@ -199,8 +297,12 @@ fills as the gun reloads.
    from the water, and you wreck nothing there, so it is for getting away and getting about:
    the clock keeps running for the army. Press any monster button to come up (it takes about
    half a second, then that button does its thing).
+8. While you are small, pick things up. A garage door held in front of you soaks up the shots
+   of a squad you walk at; a fast-food sign clears a street corner in three swings; an antenna
+   thrown down a straight street goes through three groups of soldiers in a row. Do not carry a propane tank into
+   gunfire: throw it. (For the special buildings, see the tips under "The city".)
 
-## Six tips for the army
+## Eight tips for the army
 
 1. Pair up. Hold the right button until the yellow diamond is full, then let go at the same
    moment as another squad (say "volley now" on voice chat). Or watch for the ring round your
@@ -216,3 +318,7 @@ fills as the gun reloads.
 6. A monster in the water shows only a few spines and slips off the map unless someone is
    close. Wait for it on the bank and shoot at the spines. It cannot fight from under the
    water, and every second it hides there is a second off the clock for you.
+7. Go for the crates, but not under the monster's nose. The picture over a crate tells you if
+   it is worth the detour; reinforcements are worth most to a squad that has lost units.
+8. A small monster carrying a propane tank is a target: shoot near its hand and the tank goes
+   off in its claw. A garage door only stops shots from the front: go round it.

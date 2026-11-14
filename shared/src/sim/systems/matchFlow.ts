@@ -1,5 +1,5 @@
 /**
- * System 10 of 11: molt and match flow (DESIGN.md section 2).
+ * System 11 of 12: molt and match flow (DESIGN.md section 2).
  *
  * Phases: 'briefing' (timed) -> 'playing' -> 'intermission' (timed) -> 'playing' -> ... ->
  * 'ended'. The clock runs only while the phase is 'playing', the cocoon included.

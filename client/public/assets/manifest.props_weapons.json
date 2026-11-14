@@ -1,0 +1,52 @@
+{
+  "models": {
+    "prop_antenna": {
+      "file": "models/prop_antenna.glb",
+      "kind": "prop",
+      "nodes": ["prop_antenna", "grip"],
+      "size": [1.48, 7.0, 1.32],
+      "tris": 72,
+      "grip": {"at": [0.0, 2.8, 0.0], "tip": [0.0, 1.0, 0.0], "hold": "javelin"}
+    },
+    "prop_foodsign": {
+      "file": "models/prop_foodsign.glb",
+      "kind": "prop",
+      "nodes": ["prop_foodsign", "grip"],
+      "size": [3.04, 7.5, 2.633],
+      "tris": 80,
+      "grip": {"at": [0.0, 0.7, 0.0], "tip": [0.0, 1.0, 0.0], "hold": "club"}
+    },
+    "prop_garagedoor": {
+      "file": "models/prop_garagedoor.glb",
+      "kind": "prop",
+      "nodes": ["prop_garagedoor", "grip"],
+      "size": [3.6, 3.0, 0.3],
+      "tris": 78,
+      "grip": {"at": [0.0, 1.4, -0.08], "tip": [0.0, 0.0, 1.0], "hold": "shield"}
+    },
+    "prop_mast": {
+      "file": "models/prop_mast.glb",
+      "kind": "prop",
+      "nodes": ["prop_mast", "grip"],
+      "size": [1.773, 1.536, 8.0],
+      "tris": 72,
+      "grip": {"at": [0.0, 1.323, -0.8], "tip": [0.0, -0.022, 1.0], "hold": "javelin"}
+    },
+    "prop_propane": {
+      "file": "models/prop_propane.glb",
+      "kind": "prop",
+      "nodes": ["prop_propane", "grip"],
+      "size": [2.4, 1.3, 0.946],
+      "tris": 80,
+      "grip": {"at": [0.0, 1.3, 0.0], "tip": [0.0, -1.0, 0.0], "hold": "carry"}
+    },
+    "prop_watertank": {
+      "file": "models/prop_watertank.glb",
+      "kind": "prop",
+      "nodes": ["prop_watertank", "grip"],
+      "size": [3.03, 4.518, 3.03],
+      "tris": 80,
+      "grip": {"at": [0.0, 4.5, 0.0], "tip": [0.0, -1.0, 0.0], "hold": "carry"}
+    }
+  }
+}

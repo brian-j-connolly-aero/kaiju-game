@@ -37,6 +37,11 @@
  *           practice bot kaiju molts within a minute of a fast match, and every molt redeploys the
  *           squads, which undid the human checks half way through: an idle kaiju keeps the
  *           match at stage 1.)
+ *   weapons phase 2's city weapons and pick-ups, in the sandbox with real inputs (scriptedWeapons.mjs):
+ *           every city weapon picked up, dropped, picked up again and used (thrown, swung, held up
+ *           as a shield), a propane tank set off in the hand, a crate of each kind driven onto and
+ *           taken, each weapon pick-up fired, the artillery radio's volley calling a barrage, and
+ *           reinforcements coming down by parachute. Runs alone with --only weapons.
  *   tank    stage 2 in the sandbox (`?sandbox=2`: the page runs the simulation behind the same
  *           messages as a room, so its snapshots and events stand in for the server's), the
  *           kaiju and the other squads told to stand still: A and D turn the hull on the spot,
@@ -65,6 +70,7 @@
  * Options
  *   --only kaiju|human   play the kaiju session, or the human and tank sessions
  *   --only tank          play the tank session alone
+ *   --only weapons       play the two phase 2 sessions alone (the city weapons, the pick-ups)
  *   --out DIR            screenshots and report.json (default /tmp/mb-scratch/playtest/scripted)
  *   --width W --height H page size (default 640 x 360)
  *   --no-build           fail instead of building when client/dist or server/dist is missing
@@ -80,6 +86,7 @@ import { createServer } from 'node:net';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { disablePointerLock, Driver, MOUSE_SENSITIVITY, sleep, wrapAngle } from './driver.mjs';
+import { playWeaponsKaiju, playWeaponsSquad } from './scriptedWeapons.mjs';
 import { CHROMIUM_ARGS } from './smoke.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -92,7 +99,7 @@ function parseArgs(argv) {
     const next = () => argv[++i];
     if (a === '--only') {
       const v = next();
-      opts.only = v === 'human' || v === 'tank' ? v : 'kaiju';
+      opts.only = v === 'human' || v === 'tank' || v === 'weapons' ? v : 'kaiju';
     }
     else if (a === '--out') opts.out = resolve(next());
     else if (a === '--width') opts.width = Number(next()) || 640;
@@ -1165,8 +1172,15 @@ async function playHumanChecks(page, driver, report, opts, shot) {
           report.fail('volley: the squad-mates charge to full', `still ${fmt(charge(p), 2)} after 20 s of holding (charges: ${planted(p).map((u) => fmt(u.charge, 2)).join(', ')})`);
         } else {
           report.pass('volley: the squad-mates charge to full', `charges in the snapshot: ${planted(full).map((u) => fmt(u.charge, 2)).join(', ')}`);
-          await sleep(300);
-          const log = await page.evaluate(() => window.__mbMeterLog.join(' | '));
+          // The snapshot says 0.99 a moment before the meter's full look (0.995) and the page,
+          // drawing a few frames a second, may not draw one at once: give it up to 3 s (the button
+          // stays held, the charge stays full).
+          let log = '';
+          const until = Date.now() + 3000;
+          do {
+            await sleep(300);
+            log = await page.evaluate(() => window.__mbMeterLog.join(' | '));
+          } while (!/\bfull\b/.test(log) && Date.now() < until);
           if (/\bcharged\b/.test(log) && /\bfull\b/.test(log)) report.pass('volley meter: past the notch, then full', 'the meter lit up past its 60% notch and then showed full (client-side)');
           else report.fail('volley meter: past the notch, then full', `the meter's looks while it filled: ${log.slice(0, 300)}`);
         }
@@ -1544,7 +1558,11 @@ async function main() {
     console.log(`scripted: server ${origin} (MB_FAST), real inputs, no autopilot`);
     if (opts.only === '' || opts.only === 'kaiju') reports.push(await playKaiju(origin, opts, errors));
     if (opts.only === '' || opts.only === 'human') reports.push(await playHuman(origin, opts, errors));
-    if (opts.only !== 'kaiju') reports.push(await playTank(opts, origin, errors));
+    if (opts.only === '' || opts.only === 'human' || opts.only === 'tank') reports.push(await playTank(opts, origin, errors));
+    if (opts.only === '' || opts.only === 'weapons') {
+      reports.push(await playWeaponsKaiju(opts, origin, errors, Report));
+      reports.push(await playWeaponsSquad(opts, origin, errors, Report));
+    }
   } catch (err) {
     crash = err instanceof Error ? (err.stack ?? err.message) : String(err);
   } finally {

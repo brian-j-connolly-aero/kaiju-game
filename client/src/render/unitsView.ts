@@ -4,6 +4,10 @@
  * as that many soldier sprites (one instanced batch for every sprite in the game). Also the
  * yellow targeting lasers of charging units, blob shadows, and the shape-coded markers that
  * keep small units readable from a titan's height.
+ *
+ * Phase 2: units knocked over (a thrown water tank's splash, a garage door) lie flat until they
+ * get up; reinforcements come down under parachutes (`y` above the ground); a tank firing the
+ * big cannon pick-up rocks back on its tracks.
  */
 
 import * as THREE from 'three';
@@ -17,11 +21,30 @@ import type { Materials } from './materials';
 import type { QuadBatch } from './quadBatch';
 
 const MAX_VEHICLES = 64;
+/** The parachute under which a soldier comes down is this much of the model's size; a tank hangs under three bigger ones. */
+const CHUTE_SOLDIER = 0.7;
+const CHUTE_TANK = 1.5;
+/** Seconds a tank rocks back on its tracks after the big cannon fires. */
+const RECOIL = 0.35;
 /** A unit's marker is hidden this close to the camera (meters) and fades in over the next stretch. */
 const MARKER_HIDE_NEAR = 16;
 const MARKER_FADE = 16;
 /** A soldier this close to the camera (meters) is not drawn. */
 const SPRITE_HIDE_NEAR = 3.5;
+/**
+ * Third person: the player's own squad-mates (and the rest of the player's own section) closer
+ * to the camera than this fade (meters), down to a ghost of themselves at SQUAD_FADE_NEAR, so a
+ * squad standing together does not fill the bottom of the view. The player's own soldier stays.
+ */
+const SQUAD_FADE_FAR = 14;
+const SQUAD_FADE_NEAR = 4;
+const SQUAD_GHOST = 0.3;
+
+/** How much of a soldier of the player's own squad shows at `distance` meters from a third-person camera (0..1). */
+export function squadFade(distance: number): number {
+  const t = Math.min(1, Math.max(0, (distance - SQUAD_FADE_NEAR) / (SQUAD_FADE_FAR - SQUAD_FADE_NEAR)));
+  return SQUAD_GHOST + (1 - SQUAD_GHOST) * t * t * (3 - 2 * t);
+}
 
 export interface UnitsViewContext {
   camera: THREE.Camera;
@@ -33,6 +56,8 @@ export interface UnitsViewContext {
   localSquad: number;
   /** First person: the local unit's own members are not drawn (the camera is among them). */
   hideLocalLead: boolean;
+  /** Third person from a unit: the player's own squad fades near the camera (`squadFade`). */
+  fadeSquadNear?: boolean;
   city: CityQuery | null;
   kaijus: SnapKaiju[];
 }
@@ -89,6 +114,14 @@ export class UnitsView {
   private readonly rigs = new Map<string, InstancedRig>();
   private readonly materials: Materials;
   private readonly fireUntil = new Float32Array(256);
+  /** Units knocked over: until when (local seconds), and since when. */
+  private readonly knockUntil = new Float32Array(256);
+  private readonly knockFrom = new Float32Array(256);
+  /** When each unit last fired the big cannon (local seconds). */
+  private readonly recoilAt = new Float32Array(256).fill(-1e9);
+  /** Each unit's height above the ground last frame (a unit landing from a parachute raises dust). */
+  private readonly lastY = new Float32Array(256);
+  private time = 0;
   private readonly fallen: Fallen[] = [];
   private readonly shadowUv = [0, 0, 0, 0];
   private readonly circleUv = [0, 0, 0, 0];
@@ -123,9 +156,24 @@ export class UnitsView {
     return rig;
   }
 
-  /** A unit fired: its soldiers show their firing frame for a moment. */
-  noteFired(unitId: number, time: number): void {
-    if (unitId >= 0 && unitId < this.fireUntil.length) this.fireUntil[unitId] = time + 0.3;
+  /** A unit fired: its soldiers show their firing frame for a moment. A big cannon's shot rocks a tank back. */
+  noteFired(unitId: number, time: number, heavy = false): void {
+    if (unitId >= 0 && unitId < this.fireUntil.length) {
+      this.fireUntil[unitId] = time + 0.3;
+      if (heavy) this.recoilAt[unitId] = time;
+    }
+  }
+
+  /** A unit was knocked over (phase 2: a water tank's splash, a thrown garage door): it lies flat for `seconds`. */
+  knockDown(unitId: number, seconds: number): void {
+    if (unitId < 0 || unitId >= this.knockUntil.length) return;
+    this.knockFrom[unitId] = this.time;
+    this.knockUntil[unitId] = this.time + seconds;
+  }
+
+  /** Whether a unit is lying knocked over right now. */
+  knockedDown(unitId: number): boolean {
+    return unitId >= 0 && unitId < this.knockUntil.length && this.knockUntil[unitId] > this.time;
   }
 
   /** Soldiers of a unit fell: show them going down where they stood. */
@@ -159,6 +207,7 @@ export class UnitsView {
   update(units: SnapUnit[], ctx: UnitsViewContext, lines: LineBatch, effects: Effects): void {
     for (const rig of this.rigs.values()) rig.begin();
     const { camera, time } = ctx;
+    this.time = time;
 
     for (const u of units) {
       const def = unitTypeDef(u.type);
@@ -178,6 +227,11 @@ export class UnitsView {
       }
       const shaken = u.shaken > 0;
       const moving = Math.hypot(u.vx, u.vz) > 0.5;
+      // Down from a parachute: a puff of dust where it lands.
+      if (u.id < this.lastY.length) {
+        if (this.lastY[u.id] > 0.3 && u.y <= 0.3) effects.dust(u.x, 0.3, u.z, def.radius * 1.2, 5);
+        this.lastY[u.id] = u.y;
+      }
 
       if (def.visual.kind === 'model') {
         const rig = this.rig(def.visual.model);
@@ -186,14 +240,20 @@ export class UnitsView {
         // unit's center, where the server aims from, and a troop's tanks stand around it 5 to 6
         // meters away: drawn, they would fill the lower third of the view.
         const hidden = local && ctx.hideLocalLead;
+        // The big cannon's kick: the hull rocks back, nose up, and settles.
+        const kick = Math.max(0, 1 - (time - this.recoilAt[u.id]) / RECOIL);
+        const rock = kick > 0 ? Math.sin(kick * Math.PI) * kick : 0;
+        // Knocked over: tipped up on one side until it rights itself.
+        const tipped = this.knockedDown(u.id) ? 0.5 : 0;
         for (let i = 0; i < u.members && !hidden; i++) {
           memberOffset(def, u.id, i, u.members, this.offset);
-          const x = u.x + this.offset.x * cos + this.offset.z * sin;
-          const z = u.z - this.offset.x * sin + this.offset.z * cos;
+          const x = u.x + this.offset.x * cos + this.offset.z * sin - Math.sin(u.yaw) * rock * 0.8;
+          const z = u.z - this.offset.x * sin + this.offset.z * cos - Math.cos(u.yaw) * rock * 0.8;
           this.decals.push(x, 0.12, z, 7, 9, this.shadowUv, 0, 0, 0, 0, 0.55, u.yaw);
           rig.pose('turret', 0, u.aimYaw - u.yaw, 0);
           rig.pose('barrel', -Math.max(-0.2, Math.min(0.6, u.aimPitch)), 0, 0);
-          rig.add(x, 0, z, u.yaw, 1, tint);
+          rig.add(x, u.y, z, u.yaw, 1, tint, -0.12 * rock, tipped);
+          if (u.y > 0.5) this.chutes(x, u.y + def.height, z, CHUTE_TANK, 3, u.id + i, time);
         }
       } else {
         const primary = this.assets.sprite(def.visual.primary);
@@ -201,6 +261,7 @@ export class UnitsView {
         const firing = this.fireUntil[u.id] > time;
         const heading = moving ? Math.atan2(u.vx, u.vz) : u.aimYaw;
         const shade = shaken ? 0.75 + Math.sin(time * 30) * 0.25 : 1;
+        const knocked = this.knockedDown(u.id);
         this.decals.push(u.x, 0.1, u.z, def.radius * 2.2, def.radius * 2.2, this.shadowUv, 0, 0, 0, 0, 0.35);
         // First person: the player's own section stands all around the camera and would fill
         // the view with backs of heads, so it is not drawn.
@@ -211,14 +272,26 @@ export class UnitsView {
           const z = u.z - this.offset.x * sin + this.offset.z * cos;
           // A soldier right at the camera (a squad-mate riding past a third-person camera) would
           // be a wall of pixels across the view: not drawn.
-          if (Math.hypot(x - camera.position.x, u.y + 1 - camera.position.y, z - camera.position.z) < SPRITE_HIDE_NEAR) continue;
+          const near = Math.hypot(x - camera.position.x, u.y + 1 - camera.position.y, z - camera.position.z);
+          if (near < SPRITE_HIDE_NEAR) continue;
+          // The player's own squad near a third-person camera fades (not the player's own soldier).
+          const show = own && ctx.fadeSquadNear && !(local && i === 0) ? squadFade(near) : 1;
           const sprite = i < def.visual.primaryCount ? primary : secondary;
+          const h = sprite.worldHeight;
+          const fallen = knocked ? sprite.anims.get('die') : undefined;
+          if (fallen) {
+            // Knocked flat: the fall, then lying there until the unit gets up.
+            frameRect(fallen, 0, Math.min(fallen.frames - 1, Math.floor((time - this.knockFrom[u.id]) * fallen.fps * 1.5)), uv, 0);
+            this.sprites.push(x, u.y, z, h * sprite.aspect, h, uv, 0, shade, shade, shade, show);
+            continue;
+          }
           const name = firing ? 'fire' : moving ? 'walk' : 'idle';
           const anim = (sprite.anims.get(name) ?? sprite.anims.get('idle') ?? [...sprite.anims.values()][0]) as SpriteAnimInfo;
           const frame = Math.floor((time + i * 0.13) * anim.fps);
           frameRect(anim, this.facingFor(heading, x, z, camera), frame, uv, 0);
-          const h = sprite.worldHeight;
-          this.sprites.push(x, u.y, z, h * sprite.aspect, h, uv, 0, shade, shade, shade, 1);
+          this.sprites.push(x, u.y, z, h * sprite.aspect, h, uv, 0, shade, shade, shade, show);
+          // (One canopy for every two soldiers: one each would make a single dark mass of them.)
+          if (u.y > 0.5 && i % 2 === 0) this.chutes(x, u.y + h, z, CHUTE_SOLDIER, 1, u.id * 16 + i, time);
         }
       }
 
@@ -279,9 +352,33 @@ export class UnitsView {
     for (const rig of this.rigs.values()) rig.end();
   }
 
+  /**
+   * `count` parachutes over a point coming down (the hook, where the lines meet, at x, hookY, z),
+   * swaying a little each its own way.
+   */
+  private chutes(x: number, hookY: number, z: number, scale: number, count: number, seed: number, time: number): void {
+    const rig = this.rig('prop_parachute');
+    for (let c = 0; c < count; c++) {
+      const s = seed * 1.7 + c * 2.1;
+      const swayX = Math.sin(time * 1.3 + s) * 0.08;
+      const swayZ = Math.cos(time * 1.1 + s) * 0.08;
+      if (count === 1) {
+        rig.add(x, hookY, z, s, scale, undefined, swayX, swayZ);
+        continue;
+      }
+      // Several over one load: spread round it, each canopy leaning out.
+      const a = (c / count) * Math.PI * 2 + seed;
+      const spread = scale * 1.6;
+      rig.add(x + Math.sin(a) * spread, hookY, z + Math.cos(a) * spread, a, scale, undefined, 0.22 + swayX, swayZ);
+    }
+  }
+
   clear(): void {
     this.fallen.length = 0;
     this.fireUntil.fill(0);
+    this.knockUntil.fill(0);
+    this.recoilAt.fill(-1e9);
+    this.lastY.fill(0);
     for (const rig of this.rigs.values()) {
       rig.begin();
       rig.end();

@@ -4,13 +4,16 @@ Living status file. Keep it short and true: when you finish a task, update what 
 the stubs you filled in, and add any decision the docs left open. Contracts live in
 `ARCHITECTURE.md`; numbers live in `DESIGN.md` and `shared/src/defs/`.
 
-Last updated by: the phase 1 integration (the last section: both sides' phase 1 work run
-together, the leftovers of the old controls removed, matches cut by about a fifth, the game
-played end to end in the browser), after the phase 1 tasks that came out of the first
-multiplayer playtest (`docs/ROADMAP.md`: the monster's new controls and moves and the army's
-two buttons, swarm and tank driving, each in the simulation and on screen; the on-foot stutter
-fix and third person by default; natural voices, started early) and the polish passes before
-them. Earlier: the game server task (everything about `server/`), simulation parts 1 to 3 (the
+Last updated by: the phase 2 integration (the last section: the four phase 2 builders' work and
+the art run together, the squad bot's volleys behind rubble fixed, the pace held where phase 1
+left it, the "something every 20 seconds" check, the game played end to end in the browser),
+after the phase 2 tasks of `docs/ROADMAP.md` ("something happening every 20 seconds": the
+special buildings and the city as a weapon, the army's supply crates and pick-ups, rubble and
+falls, each in the simulation and on screen, the monster's weight, and their art), the phase 1
+integration and the phase 1 tasks that came out of the first multiplayer playtest (the
+monster's new controls and moves and the army's two buttons, swarm and tank driving; the
+on-foot stutter fix and third person by default; natural voices, started early) and the polish
+passes before them. Earlier: the game server task (everything about `server/`), simulation parts 1 to 3 (the
 kaiju, damage and nerve, the city, projectiles; the squads; match flow, bots, voice lines, the
 balance harness: `docs/BALANCE.md`), the city switch (section 10: the game plays in Port
 Meridian), the client core task (section 7), the integration task (section 8), the client's
@@ -25,8 +28,8 @@ last fixes before the first playtest (section 14); the rest is from the scaffold
 | --- | --- |
 | `npm install` | Installs the pinned toolchain and the server's dependencies (Express, the room library). |
 | `npm run check` | Type checks all three workspaces, runs `scripts/lint.mjs`, runs every test. The gate. |
-| `npm test` | `vitest run`: every test in `shared/test`, `server/test` and `client/test`, about 40 seconds (the server's integration tests and the whole-match simulation tests take most of it). |
-| `npm run sim` | The balance harness: full bot-versus-bot matches, headless, a few hundred times real speed, one table row per match plus a summary. Options after `--`: `--seeds N` (default 5), `--seed N`, `--unopposed` (no squads), `--kaiju-handicap H`, `--human-handicap H` (0 best, 1 stands still), `--trigger-happy` (squads hold the trigger instead of charging volleys), `--fast`, `--anchor N`, `--every-anchor` (every start in turn), `--bar P1,P2,P3` (other bar fractions for one run), `--clock S` (another match clock for one run), `--nav` (how the bots got about), `--city placeholder` (the old grid city), `--max-minutes N`, `--events`, `--json`. 20 matches take 25 to 50 s depending on what else the machine is doing. How to read it: `docs/BALANCE.md`. |
+| `npm test` | `vitest run`: every test in `shared/test`, `server/test` and `client/test`, about a minute (the server's integration tests and the whole-match simulation tests take most of it). |
+| `npm run sim` | The balance harness: full bot-versus-bot matches, headless, a few hundred times real speed, one table row per match plus a summary. Options after `--`: `--seeds N` (default 5), `--seed N`, `--unopposed` (no squads), `--kaiju-handicap H`, `--human-handicap H` (0 best, 1 stands still), `--trigger-happy` (squads hold the trigger instead of charging volleys), `--no-crates` (no army supply crates), `--fast`, `--anchor N`, `--every-anchor` (every start in turn), `--bar P1,P2,P3` (other bar fractions for one run), `--clock S` (another match clock for one run), `--nav` (how the bots got about), `--city placeholder` (the old grid city), `--max-minutes N`, `--events`, `--json`. 20 matches take 25 to 50 s depending on what else the machine is doing. How to read it: `docs/BALANCE.md`. |
 | `npx vitest run server/test` | Only the server tests: 115 tests, about 18 seconds (four files start a real server on a free port and connect real clients; `process.test.ts` starts the entry point as a process of its own). `MB_TEST_SPEED=1 npx vitest run server/test/lifecycle.test.ts` plays the full five-client match in real time (about 3 minutes). |
 | `npm run dev` | Starts the server (`tsx watch`, port 2567) and the client (Vite, port 5173) side by side with hot reload; open the Vite address. Vite forwards matchmaking and the WebSocket to the server, so the page talks to its own origin exactly as in production. |
 | `npm run build`, `npm start` | Bundles the server to `server/dist/index.js`, builds the client to `client/dist` (and writes a gzip copy, `<file>.gz`, of every model, script, style sheet, data file and vector icon there: `scripts/precompress.mjs`; the server sends it to browsers that accept gzip); `npm start` runs the bundle, which serves the built client and the game on one port (`PORT`, default 2567). Environment variables: `ARCHITECTURE.md` section 4.4. |
@@ -36,8 +39,8 @@ last fixes before the first playtest (section 14); the rest is from the scaffold
 | `npm run assets:manifest` | `tools/build-manifest.mjs`: merges `client/public/assets/manifest.*.json` into `manifest.json`, lists the files in `ui/`, and leaves out (and reports) entries whose files are missing. `-- --check` only says whether the file is stale. The client build runs it first. |
 | `npx vitest run client/test` | Only the client tests: 20 tests, about 1 second (prediction against a real simulation through latency, the mirrored city, interpolation, the clock, the action map, the animator, the manifest tool). |
 | `node tools/playtest/smoke.mjs` | The browser smoke playtest: starts the server with `MB_FAST=1` on a free port against the production build, opens 5 headless Chromium pages on autoplay (one creates a room, four join by code), plays one match to its end, fails on any console error or page crash, saves screenshots to `/tmp/mb-scratch/playtest/` and prints, per page, draw calls and triangles (peak, and peak at stage 3), bytes over the WebSocket, snapshot size, a smoothness probe, and the server's own timing from `/healthz`. About 4 minutes on this machine. Options in the file header (`--url URL` plays against a server that is already running, such as the game container started with `MB_FAST=1`, and starts nothing; `--players N`, `--role human`, `--no-assets`, `--reconnect`, `--debug`, `--idle-humans`, `--expect kaiju\|humans`, `--expect-stage N`). Five software-rendered pages take the whole machine: the server then runs at about 21 ticks a second, so this run's timing and bandwidth figures describe the test rig, not the game (section 8.3). |
-| `node tools/playtest/scripted.mjs` | The scripted playtest with real inputs: no autopilot. One headless page plays the kaiju, then another plays a squad in a practice match, then a third drives a tank at stage 2 in the sandbox, with real key presses, mouse buttons, mouse movement and clicks on the real lobby buttons (`tools/playtest/driver.mjs`). Each action is judged only by what the server (for the tank, the sandbox's own simulation) sent back (its newest snapshot and its events) and ends as pass, FAIL or not attempted; the run passes only if everything was attempted and confirmed. Screenshots and `report.json` in `/tmp/mb-scratch/playtest/scripted/`. About 5 to 10 minutes. `--only kaiju\|human\|tank` (human runs the squad and the tank; tank the tank alone), `--out DIR`. It switches pointer lock off (headless Chromium reports garbage mouse movement under it), so mouse look under pointer lock is NOT covered by it. |
-| `node tools/playtest/shots.mjs` | Stage screenshots with no server: opens the built client in sandbox mode (`?sandbox=<stage>`, the simulation runs in the page) for stages 1 to 3 on both sides, plus scripted extras (the squad's volley meter from empty to full and its countdown ring, the tank's third-person view with both reticles, the monster's kit, molt cards and moves, the beam, a stagger, swimming). Pictures in `/tmp/mb-scratch/playtest/shots/`; fails on console errors. |
+| `node tools/playtest/scripted.mjs` | The scripted playtest with real inputs: no autopilot. One headless page plays the kaiju, then another plays a squad in a practice match, then a third drives a tank at stage 2 in the sandbox, with real key presses, mouse buttons, mouse movement and clicks on the real lobby buttons (`tools/playtest/driver.mjs`). Each action is judged only by what the server (for the tank, the sandbox's own simulation) sent back (its newest snapshot and its events) and ends as pass, FAIL or not attempted; the run passes only if everything was attempted and confirmed. Screenshots and `report.json` in `/tmp/mb-scratch/playtest/scripted/`. About 5 to 10 minutes, plus about 6 for the phase 2 sessions (every city weapon picked up, dropped and used; a crate of each kind taken; each weapon pick-up fired; an artillery barrage called; reinforcements), which run in the sandbox. `--only kaiju\|human\|tank\|weapons` (human runs the squad and the tank; tank the tank alone; weapons the two phase 2 sessions alone), `--out DIR`. It switches pointer lock off (headless Chromium reports garbage mouse movement under it), so mouse look under pointer lock is NOT covered by it. |
+| `node tools/playtest/shots.mjs` | Stage screenshots with no server: opens the built client in sandbox mode (`?sandbox=<stage>`, the simulation runs in the page) for stages 1 to 3 on both sides, plus scripted extras (the squad's volley meter from empty to full and its countdown ring, the tank's third-person view with both reticles, the monster's kit, molt cards and moves, the beam, a stagger, swimming; phase 2's city weapons, power surge, crates, pick-up weapons, artillery and reinforcements: `--only x-weapons,x-pickups`). Pictures in `/tmp/mb-scratch/playtest/shots/`; fails on console errors. |
 
 ## 2. What exists
 
@@ -54,11 +57,14 @@ Everything below is in `shared/` (`@mb/shared`) unless it says otherwise, is cov
   with height, segment and ray against upright capsules, ground segments against circles, arcs
   (point, circle, box) and 3D cones.
 - **`defs/`:** id lists (`ids.ts`), schemas (`schema.ts`), `MATCH_RULES` and `COMBAT_RULES`
-  (`rules.ts`), the three stages, the Lizard with all nine verbs, the Army at levels 1 to 3 with
-  its weapons and projectile types, the artillery call-in, the mods and upgrades schema with an
-  empty pool, and the voice cue list with a typed, validating loader for `voiceLines.json`.
-- **`city/`:** `CityData` types, 22 starter archetypes, 14 prop kinds, the spatial index and its
-  queries (`CityIndex` / `CityQuery`), stage bounds, road graph helpers (`findRoadPath`),
+  (`rules.ts`), the three stages, the Lizard with its twelve verbs (the club since phase 2), its
+  city weapons and special-building rewards, the Army at levels 1 to 3 with its weapons and
+  projectile types, the artillery call-in, the supply crates and pick-ups (`pickups.ts`), rubble
+  and falls (`rubble.ts`), the mods and upgrades schema with an empty pool, and the voice cue
+  list with a typed, validating loader for `voiceLines.json`.
+- **`city/`:** `CityData` types, 43 archetypes (the three special buildings among them), 20 prop
+  kinds (the six city weapons among them), the spatial index and its queries (`CityIndex` /
+  `CityQuery`, rubble mounds and fallen buildings included), stage bounds, road graph helpers (`findRoadPath`),
   `validateCity`, `cityChecksum`, a cached `getCity()` that builds **Port Meridian**
   (`city/meridian/`, `docs/CITY.md`), and the old placeholder `generateCity` (tests and
   `getCity(seed, 'placeholder')` only).
@@ -67,7 +73,7 @@ Everything below is in `shared/` (`@mb/shared`) unless it says otherwise, is cov
   (`lobby.ts`), the binary snapshot codec (`snapshot.ts`, `worldSnapshot.ts`), the city state
   codec (`cityState.ts`), `welcomeFor`, byte and base64 helpers.
 - **`sim/`:** the full Tier 1 `World` shape (`types.ts`), the `SimEvent` union (`events.ts`),
-  `MatchConfig` (`config.ts`), `createWorld`, `world.step`, the eleven-system pipeline
+  `MatchConfig` (`config.ts`), `createWorld`, `world.step`, the twelve-system pipeline
   (`pipeline.ts`, one file per system in `systems/`), and these real parts:
   - input intake: edges, hold timers, bot inputs, driven unit control (the squad commands, the
     wheel and the map orders are gone since phase 1);
@@ -104,7 +110,7 @@ Everything below is in `shared/` (`@mb/shared`) unless it says otherwise, is cov
       the scatter multipliers (stage, spotted, slowed, veteran), the volley with charge
       multipliers, `volley`, tallies;
     - the artillery call-in machinery (marker, delay, eight real shells, scatter, `callin`),
-      with no button: `startCallIn` is the entry point for phase 2's radio;
+      with no button: only the artillery radio pick-up starts one;
     - shaken squad-mates backing off; takeover of the nearest survivor; elimination until the
       next stage; `markVeterans`;
   - city damage: structure hp, the four visual stages, bar points with partial credit, tallies
@@ -129,6 +135,10 @@ Everything below is in `shared/` (`@mb/shared`) unless it says otherwise, is cov
   - voice (`systems/voice.ts`, `defs/voice.ts`): every cue of `DESIGN.md` section 8, each with a
     minimum gap and a priority, routine chatter on a budget, and the concrete line ids for
     both sides chosen in the simulation from whatever `voiceLines.json` holds;
+  - phase 2 (`DESIGN.md` sections 4, 5 and 7): the special buildings and their rewards
+    (`systems/specials.ts`), the city weapons (`sim/cityWeapons.ts`), the supply crates and
+    pick-ups (`systems/pickups.ts`), rubble that stays and buildings that fall over
+    (`city/spatialIndex.ts`, `systems/cityDamage.ts`), and both bots playing with all of it;
   - `resolveAimPoint` (where an aim ray lands), `computeBarMarks`, `barDisplayFraction`.
 - **`server/` (`@mb/server`):** the complete game server (`ARCHITECTURE.md` section 4). One
   process, one port: Express 5 (`/healthz`, the built client, the page fallback) and the room
@@ -535,16 +545,24 @@ Server
 - The balance was tuned for bot against bot in Port Meridian before phase 1 (`docs/BALANCE.md`
   section 8). Phase 1 changed both sides' controls and only the pace was cut since (section 9):
   with the 9:36 clock and `p3` 0.29 the kaiju bot wins 20 of 40, stages of about 2:02 / 2:27 /
-  3:01, matches of about 7:30, 16 kills in 40. Balance waits for the owner's next playtest; real
-  players will move it. Numbers nobody has tuned yet: action move multipliers, wade damage, rage
-  per bar segment, prop values, archetype hp and value, and everything new in phase 1.
+  3:01, matches of about 7:30, 16 kills in 40. Phase 2 added the special buildings, city
+  weapons, crates and rubble; `p2` 0.11 and `p3` 0.30 hold the pace (section 10): the kaiju bot
+  wins 16 of 40, stages of about 2:01 / 2:35 / 3:06, matches of about 7:56, 9 of 40 on the
+  clock. Balance waits for the owner's next playtest; real players will move it. Numbers nobody
+  has tuned yet: action move multipliers, wade damage, rage per bar segment, prop values,
+  archetype hp and value, and everything new in phases 1 and 2.
 - Nerve breaks only when charged volleys (60% charge or more) from two different squads land
   within 5 s of each other (`DESIGN.md` sections 3 and 5). A bot kaiju is staggered about 1.6 /
   3 / 3.5 times a stage. Four idle people, or the client's autopilot squad (which holds the
   trigger), no longer stagger anything, so browser smoke runs see fewer staggers and kills.
-- Alone, a titan needs about 3:02 for its segment (target 100 to 130 s): it starts some 720 m
+- Alone, a titan needs about 2:28 for its segment (target 100 to 130 s): it starts some 720 m
   from the towers. Lowering `p3` hands the kaiju the contested match; the bots' stage 3 plan is
   the next lever.
+- Rubble hides a hatchling well: from street level a heap of house rubble covers most of it,
+  and since phase 2 the squad bots fire half as many charged volleys at stage 1 as in phase 1
+  (and break its nerve a third as often). The squad bot moves on when its squad-mates have no
+  line and tries other sides (the phase 2 integration), but it still only parks on road nodes
+  and street midpoints, never on top of a heap.
 - The bots have played Port Meridian from every start (`docs/BALANCE.md` section 8 lists what
   was wrong and fixed). In 60 matches nobody was stuck longer than 3.1 s (the kaiju 9.7 s),
   nobody left the bounds, units spent 0.1 to 0.4% of their time out in open water. The squad
@@ -631,6 +649,7 @@ client/src/net/
   localLink.ts      sandbox: runs the shared simulation in the page behind the same RoomLink
 client/src/assets/
   assetStore.ts     loads manifest.json; models, textures, sprite atlas, ui art, audio addresses; fallbacks
+  iconRaster.ts     an SVG icon decoded as a picture in a chosen color (over the crates, on the map)
   manifest.ts, rigModel.ts (a model as named nodes + parts), spriteAtlas.ts (all sheets in one texture)
   procedural/       geo.ts, models.ts (box stand-in for every model id), textures.ts, sprites.ts
 client/src/render/
@@ -649,6 +668,14 @@ client/src/render/
   projectilesView.ts, effects.ts projectiles flown from events; explosions, dust, rings, flashes (four
                     batches: added light, alpha-blended bursts, smoke, ground)
   quadBatch.ts, lineBatch.ts, boundary.ts   instanced sprite quads; glowing lines; the quarantine line
+  specialsView.ts   the special buildings' lights from afar and their rewards (surge arcs, fireball, mast)
+  kaijuWeapons.ts, heldProps.ts   a city weapon in the monster's hand by its grip (club trail, javelin aim
+                    line, the door's dents) and the power surge's arcs on its body
+  weaponsFx.ts      the city weapons' and the surge's events: blasts, splash, sparks, pieces, knock-downs
+  cratesView.ts     supply crates under their parachutes, their beacons and the pictures of what they hold
+  artilleryView.ts  an artillery barrage: red smoke, the closing ring, big explosions
+  weight.ts         the monster's weight in the street: footsteps and landings (hops, sways, glass)
+  motionFx.ts       the army's sense of speed in the picture: tank dust, speed streaks
 client/src/game/
   input/actions.ts, inputManager.ts   the bindable action map, glyph lookup; keyboard, mouse (and when it is
                     captured), gamepad;   inputTicker.ts  frame time -> 30 Hz input ticks
@@ -671,10 +698,15 @@ client/test/        net.test.ts, game.test.ts, manifestTool.test.ts, audioEngine
                     view.test.ts (pose targets, the chase camera's rise, cloud rings, pixel cap, icons),
                     city.test.ts (building paint and shade, the city view's batches and collapse
                     pieces, landmark pictures, the night ground, sleeping lobby seats, the
-                    autopilot's volleys, the thrown object leaving the hand)
+                    autopilot's volleys, the thrown object leaving the hand), cityWeight.test.ts
+                    (phase 2: mounds, falls, the mirror, sway and hops, the thumps and lenses),
+                    weapons.test.ts (phase 2: grips, the kit's pictures, missiles, crates, static)
 tools/build-manifest.mjs            the assets:manifest script
 tools/playtest/smoke.mjs, shots.mjs the multi-client smoke playtest; stage screenshots from the sandbox
 tools/playtest/scripted.mjs, driver.mjs   two sessions played with real inputs; the hands and eyes it uses
+tools/playtest/scriptedWeapons.mjs, shotsWeapons.mjs   phase 2's weapons and pick-ups: real-input sessions and
+                    picture extras in the sandbox
+tools/playtest/shotsCity.mjs        phase 2's city picture extras: special buildings, rubble and falls, weight, speed
 ```
 
 How a frame flows: `App.tick` picks the screen, calls its `frame`, then `MatchRuntime.update`:
@@ -708,16 +740,16 @@ rigs are posed, so the kaiju camera sits exactly on `cam_fp`) -> audio -> `rende
 
 | Where | What is there now | What it should become |
 | --- | --- | --- |
-| `render/structureGeometry.ts`, `render/cityView.ts` | All 40 archetypes come from their art files (states, chunk meshes, atlas, night atlas, wall tint). The painted boxes remain only as the fallback for a missing file. One instanced mesh per archetype, state and material, never culled (the whole city is 360,000 triangles); props are repacked around the camera. | Nothing needed for the budget. District roof colors (`docs/art/client-notes-city.md` section 6) if the art adds a second mask. |
+| `render/structureGeometry.ts`, `render/cityView.ts` | All 43 archetypes come from their art files (states, chunk meshes, atlas, night atlas, wall tint). The painted boxes remain only as the fallback for a missing file. One instanced mesh per archetype, state and material, never culled (the whole city is 360,000 triangles); props are repacked around the camera. | Nothing needed for the budget. District roof colors (`docs/art/client-notes-city.md` section 6) if the art adds a second mask. |
 | `render/kaijuAnimator.ts` | One pose function for the lizard node list; the arms blend toward the art's pose targets (`poses` in the manifest; the box stand-in has the old numbers as its fallback). Swipe wind-up, stomp, roar, beam and death arms are still built-in numbers. | Per-kind animation sets for the Tier 2 kaiju; footfall timing against the art. |
-| `render/effects.ts`, `projectilesView.ts` | Sparkler bursts, dust, rings and flashes from `fx.png`; capped at 520 particles, and a bright particle is never drawn wider than 0.6 of its distance from the camera. `fx_debris_1..4` and lingering fire are drawn by nothing yet. No searchlights or tracers at night. | The effects pass (night fires, tracers, searchlights, water splashes, beam scorch, debris). |
+| `render/effects.ts`, `projectilesView.ts` | Sparkler bursts, dust, rings and flashes from `fx.png`; capped at 520 particles, and a bright particle is never drawn wider than 0.6 of its distance from the camera. Phase 2 added glass, sparks, tumbling bits (`fx_debris_4`), flames, smoke columns and lingering fire (the gas station's). `fx_debris_1..3` are drawn by nothing yet. No searchlights or tracers at night. | The effects pass (night fires, tracers, searchlights, water splashes, beam scorch, debris). |
 | `render/sky.ts`, `render/ground.ts` | Three presets, the two cloud panoramas on horizon rings (sun gap at the sunset sun), a sun or moon disc; windows light up at sunset and night through the city's night atlas; the ground goes to dim warm greys at night (paving under blue moonlight read as water) and to warm stone at sunset (it read lavender under the violet sky light). The afternoon's light from below is a pale paving grey (it was olive, and turned cream walls in shade olive). | Per-stage polish. |
 | `render/crowd.ts` | 260 civilians near the kaiju who run from it and wander otherwise; they do not follow streets. | Street-following crowds, panic sound. |
 | `ui/hud.ts`, `styles.css` | Functional HUD: skyline bar with three marks, sun-and-moon arc, meters, squad pips, verb hints with glyphs, crosshair, status pictures. Cramped below about 700 px wide. | The designed HUD (skyline that crumbles, portraits, stat bars). |
-| `ui/iconArt.ts` | Stand-in drawings for every icon id; the 69 real SVG files in `assets/ui/` already replace them at run time. | Delete entries once the art list is complete. |
+| `ui/iconArt.ts` | Stand-in drawings for every icon id, shown for the moment an icon's file takes to load (and with `?assets=none`); since phase 2 every one of them has its real SVG file in `assets/ui/` (110 files, the pick-up pictures and the squad's controls-card pictures among them). | Nothing, unless the instant stand-in is no longer wanted: then this file can go. |
 | `app/screens/*` | Plain panels: home (callsign, create, join by code), lobby (seats, role, ready, practice, start), briefing (portrait, names), end (winner, pictogram tally, front page with a photo). | Kaiju and faction select with stat bars, the playable tutorial, the hearing, the draft. |
-| `ui/mapView.ts` | 2D canvas map of Port Meridian: district ground in map tints with names, streets, river and bay, bridges, buildings by state, landmark pictures, friendly units, the kaiju when known; click or confirm places move-to, right click or the call-in button places artillery. | Zoom and pan; rubble drawn as heaps. |
-| `audio/matchAudio.ts` | Every event has a sound, and the audio directors' notes for the client are applied (7.6); combat stem follows a simple "shots or lasers recently" heat. No tank engine, march or crowd loops; none of the Tier 2 unit sounds (their units do not exist yet). Nobody has listened to any of it: all checks are counts and measured levels. | A listening pass, unit loops, per-stage ambience balance, the Tier 2 wiring in `docs/audio/client-notes-sfx.md` section 4. |
+| `ui/mapView.ts` | 2D canvas map of Port Meridian (a view only): district ground in map tints with names, streets, river and bay, bridges, buildings by state, landmark pictures, friendly units, the kaiju when known, the supply crates (phase 2); animated static while a radio mast's static lasts. | Zoom and pan; rubble drawn as heaps. |
+| `audio/matchAudio.ts` | Every event has a sound, and the audio directors' notes for the client are applied (7.6); combat stem follows a simple "shots or lasers recently" heat. No march or crowd loops (the player's own tank has its engine since phase 2, a substation near the player hums); none of the Tier 2 unit sounds (their units do not exist yet). Nobody has listened to any of it: all checks are counts and measured levels. | A listening pass, unit loops, per-stage ambience balance, the Tier 2 wiring in `docs/audio/client-notes-sfx.md` section 4. |
 | `game/autoplay.ts` | Plays both sides well enough to finish a match; no pathfinding for the kaiju, street routing for humans; the squad parks and fires charged volleys together with the others as the squad bots do (`volleyVerdict`). | Nothing: it is a test tool. |
 | `game/input/actions.ts` | Default bindings only; bindings are data and are stored, but there is no rebinding screen (the settings panel has volume, mouse speed, inverted look and fullscreen). Gamepad: standard mapping, never tried on real hardware; the menus cannot be worked with a gamepad (Tab, Space and Enter do work on their buttons). | Key rebinding; gamepad focus in the menus; controller tuning. |
 | `ui/settingsPanel.ts`, `ui/iconArt.ts` | The settings and drone icons now have art files (art polish round). The controls card's picture, `ui_controls`, is still drawn in code. | One icon from the art team, under that name. |
@@ -2586,3 +2618,793 @@ the monster at the other end; `/tmp/mb-scratch/integrate/slides/`.)
 - Everything the four phase 1 sections above list as not yet felt by a person (the charge's
   turn and stumble, the 2.5 s stun, the 4.5 s volley charge, tank turn rates, the chase cameras)
   is still untried by people.
+
+## Phase 2 art: the three special buildings (14 November 2026)
+
+Three new buildings the monster can wreck for a reward. Each is a finished model with all its
+states (whole, damaged, rubble, flying pieces), made by one script, `tools/art/city_special.py`,
+in the same painted-model look as the rest of the city. Scale picture beside a house and a shop:
+`docs/art/concept/city_special_lineup.png`. One review sheet each in `docs/art/previews/`.
+
+| Building | File (`client/public/assets/models/`) | Size | What you see |
+| --- | --- | --- | --- |
+| Power substation | `bld_substation_a.glb` | 22 by 16 m, 9 m tall | A fenced gravel yard, two grey-green transformers with brown insulators, two tall steel frames with wires, a small hut, yellow warning signs with a lightning bolt. |
+| Gas station | `bld_gasstation_a.glb` | 26 by 20 m, 7 m tall | A red canopy on four pillars over four pumps, a shop behind, a cage of gas bottles, a pole sign with a flame. |
+| Radio mast | `bld_radiomast_a.glb` | 8 by 8 m, 24 m tall | A red and white lattice mast on a concrete pad with a small hut; three red lamps. |
+
+- Marked spots for effects are built in: six spark points on the substation's insulators, four
+  light points over the pumps, three lamp points up the mast. The mast's top 8 m also exists as
+  a separate piece for the moment it breaks off.
+- Damaged versions: the substation loses a corner of one steel frame, the gas station a corner
+  of its canopy and shop roof, the mast's top section kinks over. Rubble keeps something
+  recognizable: a burst transformer, a slab of red canopy, the mast's stump.
+- No words or numbers anywhere: the signs are pictures (a flame, a bolt in a triangle).
+- The shared building picture sheet (the atlas) gained seven small pictures in a block nothing
+  else used; every older pixel was compared before and after and is unchanged.
+- Checks: the art contract check, the city check, the art pipeline's own tests and the
+  manifest check all pass for the three files.
+
+Missing or worth knowing:
+
+- The gas station's pole sign stops at 7 m, not 10 m: every building has to stay inside its
+  7 m collision box, and the art checks refuse a taller model. It still stands clear above the
+  canopy.
+- The mast is drawn with few triangles (118 of the 120 allowed for a building of its size), so
+  its lattice is three legs with one zig-zag brace per side and bay; the damaged mast sits
+  exactly at the limit.
+- Nothing has been seen in the running game yet: the sparks, flicker, blinking lamps and the
+  falling top section are for the client builders, and the thrown mast piece (`prop_mast`) is
+  another art job that has to match the top section (measurements in `docs/ASSETS.md`).
+- The city's triangle count table (`tools/art/city/budgets.py`) does not yet count these
+  buildings, because the city count has not been re-run since they were placed.
+
+
+## Art: the six city weapons (roadmap phase 2, "the city as a weapon")
+
+Six street props the small monster can grab with one hand and use. All are new files; nothing
+older was changed. Pictures: `docs/art/concept/props_weapons_lineup.png` (all six on a street
+beside the older props and the hatchling), `docs/art/concept/props_weapons_held.png` (each one
+in the hatchling's claw), and one sheet and one beauty shot per prop in `docs/art/previews/`
+and `docs/art/concept/`.
+
+| Prop | File (in `client/public/assets/models/`) | Size | How it is held |
+| --- | --- | --- | --- |
+| Propane tank | `prop_propane.glb` | 2.4 m long, 1.3 m high | By the valve cover on top; it hangs level under the claw, then is thrown. |
+| Water tank | `prop_watertank.glb` | 3 m across, 4.5 m high | By the point of its roof; lifted and thrown. |
+| Television antenna | `prop_antenna.glb` | 7 m high | 2.8 m up the pole; thrown like a javelin, the red spike at the top goes first. |
+| Fast-food sign | `prop_foodsign.glb` | 7.5 m high, burger 3 m across | Low on the pole; swung like a club, the burger is the head. |
+| Garage door | `prop_garagedoor.glb` | door 3.2 by 2.8 m, 3.6 by 3.0 m with its frame | By a bar on the back, in the middle; held in front of the body as a shield. |
+| Radio mast top | `prop_mast.glb` | 8 m long, 1.5 m high lying down | By the upper leg, 3.2 m from the broken end; thrown like a heavy javelin, the red lamp goes first. |
+
+- Each file has a marked spot named `grip` where the claw closes, and the asset list
+  (`manifest.props_weapons.json`) says which way each one points in the hand, so the client
+  builders do not have to guess.
+- No words anywhere: the propane tank carries a red diamond with a flame, the sign is a burger.
+- The mast piece uses the same measurements and colors as the top of the radio mast building.
+- Made by `tools/art/props_weapons.py`. The art checker now accepts a `grip` spot on a prop
+  (and demands one on these six); four small tests were added for that.
+- Checks: the art contract check passes for all six, the art pipeline's own tests pass, the
+  asset list check passes.
+
+Missing or worth knowing:
+
+- The mast piece lying down is 1.5 m high; the game's own number for it is 1.2 m. The checker
+  prints a warning, not a failure. Either number can move: the model is as tall as the real
+  top of the mast building.
+- Nothing has been seen in the running game yet: holding, throwing, swinging and the breaking
+  of these props are for the client builders. The held picture uses the monster's resting
+  pose, not its real carrying pose.
+- There are no broken or burnt versions of these props; when one explodes or breaks, the
+  game's existing effects have to cover it.
+- All six sit at or just under the 80-triangle limit for props, so the antenna's crossbars
+  and the mast's lattice are as simple as they can be.
+
+## Phase 2: the army's supply crates and pick-ups, rubble that stays, buildings that fall over (14 November, the army-simulation task)
+
+`docs/ROADMAP.md`, phase 2 ("something happening every 20 seconds"), the army's part in the
+simulation and the squad bot. The rules as built are in `DESIGN.md` section 5 ("Supply crates
+and pick-ups") and section 7 ("Rubble and falls"); the contracts in `ARCHITECTURE.md` sections 3
+and 4.2. Drawing all of it is the next two tasks' (the weapons and pick-ups client, the city and
+weight client): the handoff list at the end of this section is for them.
+
+**What changed**
+
+- **Supply crates** (`shared/src/sim/systems/pickups.ts`, a new system between movement and
+  the weapons; numbers in `shared/src/defs/pickups.ts`): one per squad when a stage starts, on
+  a street 25 to 90 m from its leader, then one every 30 s for the squads in turn while fewer
+  than 3 / 4 / 5 are down; never within a third of the bounds' half-size of the kaiju; 4 s down
+  by parachute from 90 m; taken by any unit that touches a landed one; gone when the stage ends.
+  What a crate holds is drawn with the match's random numbers, reinforcements likelier the
+  more units the squad has lost. `MatchConfig.crates` false turns them off (the test helpers
+  do by default, like the idle bots; `npm run sim -- --no-crates`).
+- **The five pick-ups.** Machine gun, big cannon and missile pod change the driven unit's own
+  weapon (`pickupWeaponDef`: made from the unit's weapon, so they scale with the stage); the
+  missile pod's missiles are a new flight model, 'guided' (a constant acceleration for a whole
+  number of ticks brings each onto the aim point, then it flies straight on; `stepProjectile`
+  flies it exactly). The artillery radio turns the squad's next 3 charged volleys into
+  barrages, using what phase 1 kept for it: `startCallIn`, `CallInDef`, `resolveMarkerPoint`
+  with `markerRange` and `markerSnapRadii`, and the `callin.inbound` lines (cued again through
+  the `callin` 'marked' event). Reinforcements heal the squad and bring its dead back by
+  parachute (`unit.drop`, `unit.y`). New projectile types 'tracer', 'missile', 'heavyShell'.
+- **Rubble that stays** (`shared/src/city/spatialIndex.ts`): a collapsed structure is a mound
+  half its height (40 m at most, none for a bridge deck; `index.srubble`, nothing stored per
+  match). The casts take a `mounds` flag: projectiles, aim rays, spotting, squad-mates' and the
+  squad bot's lines of fire count mounds; corridors, navigation, the client's camera and the
+  beam do not. A cast that starts inside a mound ignores it. Units cross mounds at half speed
+  (`MoveParams.moundSpeedMult`, `moundHeightAt`); the kaiju at its own.
+- **Buildings that fall over** (`shared/src/sim/systems/cityDamage.ts`): a structure at least
+  2.9 times taller than its longer footprint side falls over half the time it collapses, over
+  its side facing along the last projectile that hit it or away from the kaiju; it lands 2 s
+  later on what lies under its length (units 80% of their hp, structures half the falling
+  one's hp, at most two falls in a row) and lies as a long mound (`fallenBox`). The city state
+  carries every fallen structure's side (`world.structureFall`, the `welcome`'s city state).
+  `startStructureFall(world, id, dirX, dirZ, by, cause)` makes one fall and returns where its
+  top lands; the city's radio mast uses it.
+- **The squad bot** (`shared/src/sim/bots/squadBot.ts`): fetches a crate within 60 m when the
+  kaiju is not close (a new mode, 'crate'); parks in a band of range that suits its weapon
+  pick-up; keeps volleying with the radio; its lines of fire count rubble and fallen buildings.
+- **Contracts.** `SNAPSHOT_VERSION` 4 (one bump with the city's work): the squad record adds
+  `pickup` and `barrages`, the snapshot ends with `crates`. New events `structureFall`, `crate`,
+  `reinforce`; `projectileSpawn` adds `ax`, `ay`, `az`, `steer` for guided flight. The city
+  state ends with the fallen list. Ids appended: `PICKUP_IDS`, `WEAPON_PICKUP_IDS`, three
+  projectile types, the flight model 'guided', damage kinds 'tracer', 'missile', 'heavyShell',
+  'fall'. `StructureHit` adds `dirX`, `dirZ`, `fallDepth`; `CityState` adds `structureFall`
+  and `fallen`. `PROTOCOL_VERSION` unchanged. The pipeline is twelve systems.
+- **Removed as unused** now that the radio exists: `CallInDef.cooldown`, the mod key
+  `callInCooldown`, and `resolveMarkerPoint`'s `skyReach` argument (only the radio marks the
+  ground now, and it never wants a point in the empty sky).
+- **Client** (only to keep it compiling): `client/src/render/projectilesView.ts` has glow
+  sizes for the three new projectile types.
+- **Tests.** New: `shared/test/pickups.test.ts` (crates coming down, landing and being taken;
+  the drop rhythm, the cap and the end of a stage; the draw; each pick-up's effect; the squad
+  bot fetching a crate) and `shared/test/rubble.test.ts` (a mound stopping sight and a shell,
+  slowing a unit and not the kaiju; a fall: its side, its timing, crushing a unit and a house,
+  blocking a line, the city state a late joiner gets; the chance, the squat ones, the chain's
+  bound). Changed to the new rules: four tests in which a wall "came down and the line was
+  open again" (`spotting`, `flow`, `squads`, `bots`) now check that the rubble still hides a
+  hatchling and that the line opens from on top of it, over a low wall's rubble, or when the
+  kaiju steps out; `net.test.ts` (pick-ups and crates in the snapshot, the fallen list in the
+  city state), `callins.test.ts`, `defs.test.ts`, `world.test.ts` (twelve systems), and
+  `matchSoak.test.ts` (the six fast matches must now see crates, the radio's barrages and falls,
+  where phase 1 checked that nothing called artillery).
+
+**Measured** (ten bot matches each, seeds 1 to 10, every start in turn; the city's phase 2 work
+was in the same tree and still changing, so these are this tree's numbers, not the army's
+alone)
+
+| | Stage 1 | Stage 2 | Stage 3 | Match | Kaiju wins |
+| --- | --- | --- | --- | --- | --- |
+| Phase 1, 40 matches (the integration section) | 2:02 | 2:27 | 3:01 | 7:31 | 20 of 40 |
+| Phase 2 tree, `--no-crates` | 2:18 | 2:56 | 3:04 | 8:19 | 5 of 10 |
+| Phase 2 tree, with crates | 2:10 | 2:27 | 2:22 | 7:09 | 4 of 10 |
+
+(Stage times are for stages the kaiju completed.) Every match finished without an error.
+With crates the humans killed the kaiju in 5 matches of 10 (3 without), and stages 2 and 3
+went faster. Over those ten matches (76 minutes of play): 226 crates came down, 150 were taken,
+about two a minute (machine guns 43, missile pods 41, big cannons 28, artillery radios 24,
+reinforcements 14), 35 were still lying there when their stage ended; the radios called 51
+barrages; reinforcements brought 5 units back. Of 300 collapses of slender buildings 157 were
+falls; they brought down 109 more structures and landed on a unit 7 times (none died). Ten
+matches is a small sample (the first run of the same seeds, earlier in the day, gave 4 of 10
+and 1:48 / 3:26 / 2:36): balance waits for the owner's playtest, as the roadmap says.
+
+**For the two client builders**
+
+- Crates: the snapshot's `crates` (id, kind, x, z, `fall`: seconds until it lands, 0 on the
+  ground); while it falls it is `CRATE_RULES.dropHeight * fall / CRATE_RULES.fallTime` up
+  (90 m over 4 s, a steady speed: draw `prop_parachute` over `prop_crate`, lines to its
+  `hook`). Events `crate`: 'drop' (with `duration`, `height` and the squad it is meant for),
+  'land', 'take' (unit, squad, what it held), 'gone'. The kind is meant to be visible (the
+  pick-up pictures over the crate).
+- HUD: the snapshot squad's `pickup` (the weapon pick-up, 'none') and `barrages` (0 to 3, the
+  radio); flash on your squad's `crate` 'take'. Reinforcements: `reinforce` (units coming down,
+  units healed, 60 m over 4 s); a unit coming down has the snapshot `y` of its height.
+- Shots: 'tracer' (machine gun: five times the rate, a small splash), 'heavyShell' (big cannon:
+  its `projectileHit` splash is 1.6 times the shell's), 'missile' (six on one tick, flight
+  'guided': fly each with `stepProjectile` and the event's `ax`, `ay`, `az`, `steer`). The
+  radio's barrage: `volley`, then on the same tick `callin` 'marked' at the ground the
+  crosshair marked (the existing call-in picture), the `callin.inbound` voice cue, 'inbound'
+  and 'done' as before; four seconds from the volley to the first shell.
+- Rubble: a structure at stage 3 is a mound `index.srubble[id]` high over its footprint, unless
+  `structureFall[id]` is not 0: then it lies on its side (`fallenBox(index, id, side)`: center,
+  half extents in its own frame, height half its depth; `fallTop` gives the pivot and where the
+  top lands). `structureFall` 'falling' comes right after the `structureStage` 3 of the same
+  tick: tip the building over the pivot edge toward `yaw` over `duration` (2 s), then 'landed'
+  (dust, shake; the crush's hits follow). Mirror the fall in the client's city with
+  `setStructureFallen(mirror.query, id, side)` on 'landed', and copy `structureFall` and
+  `fallen` in `resyncCityMirror` too (it copies only hp and props today), or the client's
+  prediction of its own unit will not slow down on a fallen building.
+
+**Still open**
+
+- Nothing is drawn yet: crates, parachutes, the pick-up pictures, the new shots, mounds and
+  falls are for the two client tasks. Until then a missile flies straight on screen (the client
+  ignores its acceleration) and rubble looks flat though it blocks shots.
+- The kaiju bot's own sight checks (`kaijuBot.ts`, the city's file) and the client's autoplay
+  still see through rubble; harmless, but they misjudge who can see the kaiju.
+- Rubble is a big change at stage 1: a pile of house rubble (2.5 to 4.5 m) hides a hatchling
+  (4.5 m tall) from squads on the ground, so spotting and lines of fire there are harder. Not
+  felt by a person yet; levers: `RUBBLE_RULES.heightShare` and `maxHeight`.
+- The beam and the third-person camera pass over rubble (a choice, so the monster's favorite
+  move is not blunted by its own wreckage; `beamPath` and the client's camera do not pass the
+  `mounds` flag).
+- When this section was written, `npm run check` type checked and linted clean, and 1 of 857
+  tests failed, from the city's work still in progress: the monster's new `club` verb has no
+  tile yet in the client's `controlsCard.test.ts`. The last section of this file says whether
+  `npm run check` passes.
+
+## Art: the supply crate, its parachute and the pick-up pictures (phase 2)
+
+Written 14 November 2026 by the art builder for the army pick-ups.
+
+**What was made**
+
+- **The supply crate**, `client/public/assets/models/prop_crate.glb`: an olive army crate
+  1.6 m on a side (1.63 m high with its straps) on two wooden skids, with a lighter lid, two
+  dark straps, a pale chevron pointing down stenciled on the front and back (a picture, no
+  letters, no country's mark) and the army's cyan stripe on the sides and the lid. 78
+  triangles. It has a marker named `beacon` in the middle of the lid, 1.63 m up, for the light
+  and the smoke; the crate also hangs from that point.
+- **The parachute**, `client/public/assets/models/prop_parachute.glb`: a round canopy 6.1 m
+  across in olive and khaki panels with a cyan cap, dark inside, 6.7 m from the top down to
+  the point where its eight lines meet. 80 triangles. That point is a marker named `hook` and
+  is the model's own zero point, so the game only has to put the parachute where the crate's
+  `beacon` is (or at a soldier's shoulders). For a soldier it may want shrinking in code.
+- **Five pick-up pictures** in `client/public/assets/ui/`: `pk_machinegun`, `pk_bigcannon`,
+  `pk_missilepod`, `pk_artilleryradio`, `pk_reinforcements` (the name is `pk_` and the
+  pick-up's id in lower case). One color, no text, in the style of the other icons.
+- **The eight pictures of the squad's controls card** as real files, also in
+  `client/public/assets/ui/`: `sq_foot`, `sq_charge`, `sq_meter`, `sq_meter_low`, `sq_burst`,
+  `sq_drive`, `sq_turn`, `sq_turret`. The game picks up any picture file in that folder by its
+  name, so these replace the stand-ins drawn in code without a code change.
+- **Pictures to look at**: `docs/art/concept/props_supply_drop.png` (a crate coming down and
+  one landed, beside the tank, a car and a street lamp), `docs/art/previews/prop_crate.png`,
+  `docs/art/previews/prop_parachute.png`, `docs/art/previews/ui_icons_pickups.png`,
+  `docs/art/previews/ui_icons_squad.png`. All the icon sheets in `docs/art/previews/` were made
+  again and now show today's set; the sheet of real sizes ends with the pick-ups at 48 and 128
+  pixels over the three skies.
+- The art contract (`docs/ASSETS.md` sections 3 and 5), the icon guide (`docs/art/UI_ICONS.md`)
+  and the art tools' checks know the new pieces. The build script is
+  `tools/art/props_supply.py`.
+
+**Checks**: the two models pass the art checker, the art tools' own tests pass, all 103 icon
+files pass the icon check, and the asset list is up to date.
+The project's full check (`npm run check`) stopped at that moment on three type errors in
+`shared/src/city/meridian/specials.ts`, a file of the city simulation work in progress; no
+art file is involved.
+
+**Missing or worth knowing**
+
+- Nothing draws these yet: showing the crate, the parachute and the pictures in the game is
+  the client builders' work.
+- Seen from straight below, the open bottom ends of the crate's two straps show as slivers
+  3 cm wide. There were no triangles left in the budget of 80 to close them.
+- The parachute's lines are flat ribbons 15 cm wide at the canopy. From far away they thin out
+  to nothing, which is fine for a rope, but the canopy is what will be seen.
+- The pick-up pictures were judged by eye on the sheets only, not yet in the game over a real
+  crate or by the owner. The machine gun is the least obvious of the five at small sizes.
+- No lit beauty picture of a soldier under the parachute was made; the scene shows a crate.
+
+## Phase 2: special buildings and the city as a weapon (14 November, the city-simulation task)
+
+`docs/ROADMAP.md`, phase 2: the special buildings in every starting neighborhood and their
+rewards, and the city as a weapon for the small monster, in the city generator, the simulation
+and the monster bot. The rules as built are in `DESIGN.md` section 4 ("The city as a weapon")
+and section 7 ("Special buildings", "City weapons"); the contracts in `ARCHITECTURE.md` sections
+3 and 4.2; the city's numbers in `CITY.md` section 12. Drawing it is the next two tasks' (the
+city and weight client, the weapons and pick-ups client).
+
+**Is the tree green? Yes.** `npm run check` passes with the army's phase 2 work in the same
+tree: type checks, lint (263 files clean, one `STUB(server)`), 858 tests in 67 files.
+
+**What changed**
+
+- **The city.** Three archetypes appended (`substation_a`, `gasstation_a`, `radiomast_a`, with a
+  `special` kind; the cap raised from 40 to 48, the client's batching needs nothing for it). Every
+  one of the ten starts has one of each wholly inside its stage 1 square, 58 to 95 m from the
+  anchor, on street fronts in three directions (`city/meridian/specials.ts`); the yard opener
+  never removes one. Six prop kinds appended (`propane`, `watertank`, `antenna`, `foodsign`,
+  `garagedoor`, `mast`, with `cityWeapon` set): 21 of the first five by the houses and shops of
+  every start, 230 in all; `mast` is never placed. `validateCity` checks both (its `specials`
+  option is off for the placeholder grid). The city's checksums changed (3115597894 and
+  3365977326); nothing else in it moved.
+- **The rewards** (`sim/systems/specials.ts`, called by the city damage system when a structure
+  turns to rubble): the substation's power surge (8 s: cooldowns cleared and recovering three
+  times as fast, attacks 1.5 times as hard, rage +50), the gas station's fireball (30 m across,
+  spares the monster), the radio mast falling away from the monster through the army's
+  `startStructureFall`, its top landing as a loose `mast` 2 s later, and the humans' map showing
+  static for 20 s (`match.staticUntil`; `spotting.ts` keeps `known` to what units see).
+- **The city as a weapon** (`sim/cityWeapons.ts`, with `kaijuEffects.ts` and the action system):
+  stage 1 only; spared by the hatchling's feet, claws and stomp; never eaten (Grab drops one, and
+  it lies loose: `world.loose`). Propane explodes thrown, set off by a shot or explosion within
+  2 m on the ground or in the hand (60 hp exactly and a 0.8 s flinch, a new phase), small bang
+  when crushed; the water tank knocks units over (the roar's stun, 1.5 s, drawn lying down); the
+  antenna and the mast are javelins through 3 and 5 units; the fast-food sign is a club (a new
+  verb, `club`, three swings); the garage door a shield against hits from the front (250 hp) and
+  a frisbee when thrown.
+- **The monster bot** (`sim/bots/kaijuBot.ts`, `BOT_RULES.kaiju`): special buildings as
+  milestones (more when no squad is close; the substation when its moves are cooling; the gas
+  station whenever units stand in its fireball), and the city weapon that suits the moment
+  picked up within 50 m and used (`DESIGN.md` section 5). Its hiding places and javelin lines
+  count rubble now (the army builder's note).
+- **Shared files touched with small edits** (the army builder edited them too): `defs/ids.ts`
+  (verb 'club', phase 'flinch', damage kinds 'propane', 'fireball', 'splash', 'javelin',
+  'club'), `defs/schema.ts` (`ClubActionDef`, `KaijuCityWeapons`, `KaijuSpecialRewards`),
+  `sim/types.ts` (kaiju `surge`, `clubSwings`, `shieldHp`; `world.loose`; `match.staticUntil`;
+  `Projectile.city`; `Hit.knockdown` and `exact`), `sim/events.ts` (twelve events, `knockdown` on
+  `unitStunned`, source 'loose'), `net/snapshot.ts` and `worldSnapshot.ts` (the kaiju's three
+  fields and the match's `staticUntil`; version 4, the one bump shared with the army),
+  `net/cityState.ts` and `welcome.ts` (the loose list), `systems/cityDamage.ts` (two hooks: the
+  reward on a collapse, a propane tank among the destroyed props), `systems/projectiles.ts`
+  (javelins, a city weapon's landing, the blast check where shots land), `systems/damage.ts`
+  (the shield, exact hits, the knock-down), `systems/movement.ts` and `sim/movement.ts` (the
+  spared props, the flinch roots), `spotting.ts` (static), `spawn.ts` and `createWorld.ts`.
+  Client, only to keep it compiling and its tests passing: stand-in models for the six props
+  (`assets/procedural/models.ts`), a stand-in club tile on the controls card, the three new
+  fields in two test fixtures.
+- **Tests.** New: `cityWeapons.test.ts` (picking up at stage 1 only and spared underfoot, the
+  drop and pick-up again, propane set off in the hand by a shot and not by one 2 m off, on the
+  ground by a shot, thrown; the water tank's knock-down; a javelin through three units into a
+  building; the club's three swings; the door from the front only, broken, thrown),
+  `specials.test.ts` (the surge's cooldowns, rage, damage and end, once only, in the snapshot;
+  the fireball sparing the monster and felling the house behind; the mast falling away, its
+  top landing and taken, the static in the snapshot and on the map), `kaijuBotCity.test.ts` (the
+  bot wrecking a special before nearer houses, the gas station first with squads by it, and
+  picking up and using a propane tank, a sign, a door and an antenna); in `meridian.test.ts` the
+  placement at every start and `validateCity` reporting a missing one; in `net.test.ts` the loose
+  list on the wire. Changed: the checksums and the cap (`meridian.test.ts`), the club in
+  `defs.test.ts`, and the swarm test in `squads.test.ts` (its target point now stood inside
+  Alder Row's substation: it is moved onto open ground).
+
+**Measured** (`npm run sim -- --seeds 10 --every-anchor`, seeds 1 to 10, every start; the army's
+phase 2 work is in the same tree, so these are the tree's numbers): every match finished
+without an error; the monster won 4 of 10 (5 of 10 in a run an hour earlier with the bot's
+hiding not yet counting rubble); stages took 2:09 / 2:51 / 2:54 when completed (phase 1: 2:02 /
+2:27 / 3:01; the earlier run 2:11 / 2:36 / 2:31), the match 7:53 (7:31). The navigation report:
+the monster never stuck (longest 0 s). In those ten matches:
+
+| | Stage 1 (the ten starts) | Later stages |
+| --- | --- | --- |
+| Substations wrecked | 7 by the monster, 2 by the squads' fire | 3 |
+| Gas stations wrecked | 5 by the monster, 2 by the squads' fire | 4 |
+| Radio masts felled | 5 by the monster | 8 (2 by the squads) |
+
+City weapons picked up by the bot: 25 (garage doors 8, antennas 5, water tanks 5, fast-food signs
+3, masts 2, propane tanks 2). 21 were thrown, the 3 signs swung (9 swings, 5 units hit) and one
+door went into the cocoon with the monster; the doors took 146 hits for it, javelins ran through
+10 units, water knocked 6 over. Propane tanks went off 14 times set off by the squads' own fire
+and 6 times crushed.
+
+**Still open**
+
+- Nothing is drawn yet (the two client tasks): the special buildings' rewards, the props in
+  place and in the hand, the loose objects, the club's swing, the flinch, the knock-down.
+  Until then the client shows a city weapon in the hand as a plain prop and swings nothing.
+- The client's own wind-up hint (`hintVerb` in `client/src/net/matchSession.ts`) still says
+  'throw' for Strike with a sign in the hand and 'eat' for Grab with a city weapon; it should
+  ask `strikeVerb(held)` and `heldEdible(held)` (both exported from `@mb/shared`).
+- A unit knocked over looks like a stunned one in the snapshot (`stunned`); only the
+  `unitStunned` event says `knockdown`, so a page that joins during those 1.5 s draws a stun.
+- Not felt by a person yet: whether 2 m is the right distance for a shot to set off a tank in the
+  hand (a hatchling holding one under fire loses it quickly), the door's 250 hp, the surge's
+  strength. Levers: `cityWeapons` and `rewards` in `defs/kaiju/lizard.ts`, `BOT_RULES.kaiju`.
+- The Chromium run of the city checksum was not repeated (the generator's new code passes the
+  same exact-arithmetic scan as the rest).
+
+## Phase 2: the city and the monster's weight on screen (14 November, the city-and-weight client task)
+
+`docs/ROADMAP.md`, phase 2, the client's half for the city: the special buildings and their
+rewards, the new props in place, rubble, buildings falling over, the monster's weight, and the
+army's sense of speed. The rules are the two simulation sections above; what is on screen is
+written up in `DESIGN.md` section 7 ("Special buildings", "Rubble and falls", each "On screen")
+and section 8 ("Weight and speed"), for players in `PLAYING.md` ("The city"). The weapons and
+pick-ups client builder worked in the same tree at the same time (the held weapons, the surge on
+the monster's body, crates, pick-ups, artillery, static on the map).
+
+**Is the tree green? Yes, at the time of writing.** `npm run check` passes with both client
+builders' work in the tree: type checks, lint (274 files, one `STUB(server)`), 877 tests in 69
+files.
+
+**What changed**
+
+- **Rubble that stays** (`client/src/render/structureGeometry.ts`, `cityView.ts`). A collapsed
+  building's rubble state is now a mound made from its own collapse pieces, piled up, pulled in
+  the higher they stood, tilted, and scaled to exactly the height the simulation counts (half
+  the building's height, 40 m at most), on the art's low rubble, in its own wall paint a little
+  dusty. Still one batch per archetype and state, merged into one draw call.
+- **Buildings that fall over.** A `structureFall` 'falling' turns the building (its damaged
+  model) about the edge of its footprint for the event's 2 s, slow at first and fastest at the
+  ground; 'landed' throws a wall of dust along it, debris and a thump of the view; it then lies
+  half sunk where the simulation's `fallenBox` is (what shows is the mound the shots meet), with
+  the art's low rubble left on its footprint. These sit in a fourth batch per archetype, made the
+  first time one of its kind falls. The collapse in place now waits for the end of the frame's
+  events, so a building that falls over never also crumbles where it stood.
+- **The radio mast** falls without its top: the client cuts the art's whole mast below the
+  break (`latticeBelow`: only the lattice falls, the pad and hut become the art's stump), and the
+  `top` node rides on it, whips over ahead of it and comes down flat, where the loose `mast` city
+  weapon then lies (`looseProp`), so the top is never drawn twice.
+- **Late joiners and reconnections.** The client's city mirror (`client/src/net/cityMirror.ts`)
+  now records a fall when it lands (`setStructureFallen`: prediction and the client's casts meet
+  a fallen building as the server does), keeps the city weapons lying loose (from the welcome,
+  `looseProp` and `kaijuHeld` 'loose'), and takes both over on a resync; the city view redraws
+  fallen buildings lying the right way and the loose weapons where they lie.
+- **The special buildings** (`client/src/render/specialsView.ts`, new). Lights at the effect
+  points the models mark, a bright core anyone sees by day and a halo for the night, growing with
+  distance: the substation's blue hum and its sparks jumping between insulators, the gas
+  station's flickering pump lights, the mast's blinking red lamps (a damaged one falters). The
+  rewards: the substation's blue-white flash, ring and lightning leaping to the monster for 1.5 s;
+  the gas station's ball of flame (a low-poly ball swelling to the blast's 30 m with flames rolling
+  out of it), shock rings, debris, then 9 s of fire and a black smoke column; sparks where the mast
+  breaks.
+- **The monster's weight** (`client/src/render/weight.ts`, new; `cityView.ts` `hop` and
+  `wobble`; `CameraShake.thump` in `client/src/game/controllers/types.ts`; `matchRuntime.ts`). A
+  footstep thumps the view of everyone near (a damped drop and spring back that moves the camera
+  and turns it by under a degree), by stage and distance; cars and small props jump and trees and
+  poles sway; from stage 2 windows burst (glass bits and the glass sound). A stomp, the charge's
+  stumble and the molt's new body sway the buildings within three times the stomp's radius (a
+  damped lean, as the shock reaches each), burst windows and throw cars higher. The monster's own
+  lens widens up to 5 degrees walking (12 in a charge, as before) and the camera sways in step.
+- **The army's speed** (`humanController.ts`, `client/src/render/motionFx.ts` new). The lens
+  widens with speed (3 degrees on foot, 9 in a tank at top speed), a step bob on foot, the tank's
+  camera trailing its speed and leaning into turns, dust off every moving tank's tracks, faint
+  streaks of air past the player's own camera near top speed, the engine's pitch climbing with
+  speed.
+- **The squad by a third-person camera** (phase 1's leftover): the player's own squad-mates
+  near the camera fade to a sparse screen door of pixels (`squadFade` in `unitsView.ts`, a
+  `dither` option of the sprite batch in `quadBatch.ts`), never the player's own soldier.
+- **The ground** (`client/src/render/ground.ts`): the city's paving and the plain round it are
+  grids of smaller quads (below, "Found and fixed").
+- **Shared effects** (`client/src/render/effects.ts`, the city's part): `propaneBlast` (one
+  effect for every propane tank: this task's on the ground and crushed, the weapons builder's
+  thrown and in the hand), `sparks`, `debris`, `glass`, `flame`, `plume`.
+- **Sounds** (`client/src/audio/matchAudio.ts`, from what the library has): a fall (crumble, then
+  the large crumble and a titan's footstep pitched down for a tall one), the fireball (two
+  explosions, then the fire loop for as long as it burns), a tank set off on the ground or crushed,
+  the mast's top landing (a structure hit pitched down), glass from the monster's feet, the
+  player's own tank engine, and a substation's hum near the player (the dish truck's transformer
+  hum pitched down). The surge's `generator_overload` is the weapons builder's.
+- **Tests**: `client/test/cityWeight.test.ts` (new, 8 tests: the mound's height against the
+  simulation's for every archetype; the mast's lattice cut at its break; a fallen tower lying
+  where the simulation says and a late joiner seeing it the same; the fall's turn; the mirror
+  following a mast's fall and its loose top through events, a welcome and a resync; a stomp
+  swaying exactly the buildings in reach and props hopping and settling; the thump's depth,
+  nod and settling; the lenses and the squad fade). `client/test/city.test.ts`: rubble is now
+  shaded a little.
+- **Playtest** (`tools/playtest/shotsCity.mjs`, new, wired into `shots.mjs`; `shots.mjs` also
+  takes `--dist DIR`): `x-city-specials`, `x-city-rubble` (with frame rates), `x-city-weight`,
+  `x-city-speed`, `x-city-squad`, `x-city-propane`. Run alone with
+  `node tools/playtest/shots.mjs --only x-city`.
+- **Pictures for the slides** (`docs/progress/`, 1920 by 1080): `phase2-substation-surge.jpg`
+  (lightning leaps from the wrecked substation into the monster), `phase2-gas-station-fireball.jpg`
+  (the gas station goes up in a ball of fire), `phase2-fallen-tower-and-rubble.jpg` (a tower lies
+  across a street among heaps of the buildings round it). (The phase 2 integration retook the
+  fireball with a squad beside it, under the same name: the last section.)
+
+**Measured** (headless Chromium drawing in software on a machine shared with the other client
+builder's browsers: load average 4 to 9 on 4 cores, so pages drew 2 to 6 frames a second)
+
+- `npm run build`, then `node tools/playtest/shots.mjs --only x-city` against it (and, while the
+  other builder was taking pictures from `client/dist`, the same against a Vite build in a
+  scratch folder): passed, no console errors. The three special
+  buildings paid their rewards on screen (`powerSurge`, `fireball`, `mastFall`, two
+  `structureFall`, the `mast` lying loose); 15 buildings wrecked into mounds and a tower fallen
+  across a street (10 to 15 towers lying fallen by the end), the same after a redraw from the
+  mirror; a stomp at stage 2 swayed 22 buildings at once and hopped 38 to 44 props, 2 footfall
+  thumps, 1 window burst, the monster's lens 60 to 65 degrees while walking; a tank at top speed: lens 58 to 67 degrees, up to 16 streaks, a lean of
+  2.6 degrees in a turn. Looked at frame by frame; the sway shows on an apartment block across
+  the street, the squad fade keeps the leader and the street in view.
+- Frame rate with many mounds and falls (stage 3, a titan's height over the starting district,
+  before and after 294 buildings were wrecked, 2 of them falling over): 3.0 and 2.9 frames a
+  second, 126 and 145 draw calls, 672,000 and 715,000 triangles. The committed client in the same
+  scene: 2.5 and 2.2 frames a second, 119 and 134 draw calls, 671,000 and 668,000 triangles. So
+  the mounds cost about 45,000 triangles and the falls a couple of draw calls each archetype,
+  well inside the budget (350 draw calls, 1.5 million triangles), and no drop in frame rate that
+  this machine can measure. In `x-city-rubble` (15 lying fallen): 120 to 140 draw calls.
+- `npm run check`: passes (above).
+
+**Still open**
+
+- Sounds that are really missing (stand-ins in use): an electrical hum and crackle for the
+  substation (the dish truck's hum pitched down), a groan of steel and concrete for a swaying or
+  falling building (crumbles), the fireball's deep whoomp (two explosions), tank tracks and a rush
+  of wind at speed (none).
+- Found and fixed on the way (it was there before this task, in the committed client too): for
+  a frame now and then during a big effect, the city's paving vanished and the grey-green plain
+  under it showed through. The paving and the plain were each one quad thousands of meters across,
+  which the software renderer sometimes dropped whole; `client/src/render/ground.ts` now builds
+  each as a 24 by 24 grid of smaller quads (1,152 triangles more), and the frames of the fireball
+  and the mast's fall no longer show it. Not seen on a real graphics card, which may never have
+  had it.
+- By day the gas station's pump lights are under its canopy: from above it reads by its red
+  canopy and a faint warm glow; its flicker shows best at sunset and night.
+- Not felt by a person: how hard the thumps are, the sway, the lens widening, the squad fade.
+  Levers: `STEP_THUMP` in `matchRuntime.ts`, `THUMP_*` in `controllers/types.ts`, the tables at
+  the top of `render/weight.ts`, `WALK_FOV` and `SWAY_*` in `kaijuController.ts`,
+  `speedLensWidening`, `TANK_LAG`, `TANK_LEAN` and `BOB_*` in `humanController.ts`, `SQUAD_FADE_*`
+  in `unitsView.ts`.
+- Hops, sways and glass are drawn by each page on its own (they change nothing in the game), so
+  two players see the same footstep, but not the same cars jumping the same height.
+
+## Phase 2: weapons and pick-ups on screen (14 November, the weapons-client task)
+
+The client side of `docs/ROADMAP.md` phase 2's weapons: the monster's city weapons and power
+surge, and the army's supply crates, pick-up weapons, artillery and reinforcements. The rules are
+the two phase 2 simulation sections above; what is on screen is written up in `DESIGN.md`
+section 8 (the kit, "The city weapons and the surge in the world", "The squad's pick-ups on
+screen") and section 5 (the map), and for players in `PLAYING.md`.
+
+**What changed**
+
+- **City weapons in the hand** (`render/heldProps.ts`, `render/kaijuWeapons.ts`, wired into
+  `kaijuView.ts`): each weapon hangs on the `hold` node by its art's `grip` node and is turned
+  the way its manifest entry says (the reference is `held()` in `tools/art/props_weapons.py`; a
+  model without the entry uses the same numbers). The propane and water tanks hang from the
+  claw, tipped forward when longer than the hand is high (the water tank is); the antenna and the
+  mast's top point along the aim, and the monster's own player sees a line of light from the
+  point to the crosshair; the fast-food sign is held up and follows the club's arc, leaving a
+  trail of light along the swing (worked out from the swing itself, so it shows at any frame
+  rate); the door is held up in front of the chest. The door darkens as its hp goes and jolts at
+  every hit; the sign darkens as its swings are used; a propane tank glows red now and then.
+- **Throws and impacts** (`render/projectilesView.ts`, `render/weaponsFx.ts`): a javelin flies
+  point first and stays stuck where it stops for 12 s; the door flies flat and spinning and lies
+  where it lands for 8 s; the tanks tumble. The propane blast (thrown or in the hand) uses the
+  city client's shared `Effects.propaneBlast`; in the hand it adds smoke and burning bits, and the
+  monster recoils (a new `flinch` pose in `kaijuAnimator.ts`). The water tank's splash: a column of
+  water, a wave, spray and its pieces; the soldiers it knocks over lie flat for the knock-down
+  (`UnitsView.knockDown`, the soldiers' fallen frames). A javelin through a unit: sparks and dust.
+  The club: dust and glints along the arc, a ring when it hits; the sign flies apart on its last
+  swing; shots on the door throw sparks; a broken door bursts into slabs. A thrown city weapon's
+  own `projectileHit` no longer draws the generic beige impact.
+- **The club's pose** (`kaijuAnimator.ts`): cocked back over the right shoulder with the body
+  wound up (the throw's wind-up target), swung across the front (the swipe's), brought back.
+- **The power surge** (`SurgeArcs` in `kaijuWeapons.ts`): while the snapshot's `surge` lasts, arcs
+  of blue-white lightning jump along the spines and tail, leap off the claws and the spines and
+  strike the ground, the glowing facets burn blue-white (a material of their own for those
+  seconds), patches of light flicker over the hide and it flashes with each burst; the arcs gutter
+  out over the last 2 s. A flash of the same light when the surge starts. The kit shows a bolt in a
+  ring that runs down over the 8 s, and the move slots, Strike and Stomp flash.
+- **The kit** (`ui/kaijuKit.ts`, `kaiju.css`; `strikeIcon`, `grabIcon`): Strike shows a javelin, a
+  club (with three pips for the swings left) or a throw, its frame throbbing red with a propane
+  tank; Grab shows the drop with any city weapon; a door adds a door tile with the front it covers
+  and a bar of its hp. Five new icons, drawn by hand in the icon set's style and passing the icon
+  checker: `k_club`, `k_javelin`, `k_shield`, `k_drop`, `k_surge` (stand-ins in `ui/iconArt.ts`,
+  listed in `ASSETS.md` section 5, `docs/art/UI_ICONS.md` and `tools/art/ui/preview.cjs`).
+- **The wind-up shown ahead of the server** (`hintVerb` in `net/matchSession.ts`, the city
+  builder's note): Strike with a sign shows the club, Grab with a city weapon shows nothing (a drop
+  has no wind-up), using the shared `strikeVerb` and `heldEdible`. The autopilot no longer tries
+  to "eat" a city weapon (it would drop it), and swings a sign only at a unit within its reach.
+- **The controls card** (`ui/controlsCard.ts`): the club tile has the sign's own picture, and three
+  tiles were added for the hatchling: an antenna thrown as a javelin, the door as a shield (no
+  button), and Grab dropping a city weapon.
+- **Supply crates** (`render/cratesView.ts`; `FrameState.crates` added in `net/matchSession.ts`):
+  the crate under its swaying parachute with a white smoke trail, coming down smoothly between
+  snapshots (its landing tick is estimated from them); on the ground a pulsing cyan column of light
+  that shows over the roofs, a blinking lid light and cyan smoke, the canopy folding over beside
+  it; over every crate the picture of what it holds (the `pk_*` icons, drawn once onto one strip
+  texture: one draw call; `assets/iconRaster.ts`), growing with distance. Taken: a cyan flash,
+  ring and sparks, the picture leaping up; for the squad that took it, the picture pops up over
+  the crosshair (`Hud.pickupTaken`). The map shows the crates (`ui/mapView.ts`).
+- **The squad's HUD** (`ui/hud.ts`, `styles.css`): Fire's picture is the weapon pick-up (glowing
+  cyan) and its reload ring follows that weapon's reload (`pickupWeaponDef`); the artillery radio
+  sits beside Volley with a pip per barrage left.
+- **The new weapons** (`projectilesView.ts`, the muzzle flashes in `gameRenderer.ts`): tracers are
+  short bright streaks with quick small flashes; the big cannon's shell is big, glowing and
+  trailed by smoke, with a great flash, a ring of blast and the tank rocking back
+  (`UnitsView.noteFired`); missiles fly the guided path exactly (`flightAt`, checked against
+  `stepProjectile`), fanned out and curving in, with thick smoke trails.
+- **Artillery** (`render/artilleryView.ts`, which replaces the call-in marks that lived in
+  `gameRenderer.ts`): a red flare and red smoke rising at the target from the moment it is marked,
+  a red ring closing onto the scatter circle as the first shell lands, the shells big with a long
+  streak each, big explosions with a shockwave ring and a column of dust. For the squads the radio
+  crackles when the barrage is called; each shell's whistle (`arty_incoming`) is timed to end as it
+  lands (`fallTime` in `audio/matchAudio.ts`).
+- **Reinforcements**: units coming down (snapshot `y` above 0) hang under parachutes (one canopy
+  for every two soldiers, three over each tank) and raise dust where they land.
+- **The map's static** (`ui/mapView.ts`, `mapShowsStatic`): for the squads only, while
+  `match.staticUntil` lasts, the map is nothing but animated grey snow with rolling bands and a dark
+  edge, and crackles while it is open (`app/screens/match.ts`); the squads also hear a burst of
+  static when a mast falls.
+- **Sounds** (`audio/matchAudio.ts`), all from `assets/audio/sfx`: the surge `generator_overload`
+  and, while it lasts, a wavering `dish_beam_loop` hum; propane `explosion_l`; the splash `splash`;
+  javelins `shell_whoosh` and `structure_hit`; the club a slower `kaiju_swipe` and a `car_crush`
+  whack; the door's hits `car_crush` clangs (at most one every 0.1 s) and its break `car_crush`
+  and `glass`; the sign `prop_break` and `glass`; the flinch `kaiju_hurt`; a crate's drop
+  `jet_flyby`, its landing a light `kaiju_step_s1`, its taking `takeover` (and `volley_ready` for
+  the squad that took it); the machine gun a fast high `tank_fire` (once per salvo) and its rounds a
+  quick `structure_hit`; the big cannon a deep `tank_fire` and `explosion_s`; the missile pod two
+  `rocket_launch`; artillery impacts `explosion_l`.
+- **The sandbox's hooks** (`net/localLink.ts`, for playtests): `apply(change)` sets a scene between
+  two steps and sends the events it raised; `pause(on)` holds the simulation still while a slow page
+  takes a picture (`ARCHITECTURE.md` section 5).
+- **Playtests**: `tools/playtest/scriptedWeapons.mjs` (two sessions in `scripted.mjs`, `--only
+  weapons`) and `tools/playtest/shotsWeapons.mjs` (three extras in `shots.mjs`: `x-weapons-kit`,
+  `x-weapons-army`, `x-pickups`). `driver.mjs`'s probe reports the crates and units' heights.
+- **Tests**: `client/test/weapons.test.ts` (11): a weapon turned by its grip, the carried tank's
+  tilt, the club's arc, the kit's pictures, the wind-up hints, a missile flown exactly as the
+  simulation flies it, the shell whistle's timing, a crate's height, the pick-up pictures, the
+  closing ring, the map's static. `matchAudio.test.ts`'s frame gained `crates`.
+
+**Measured** (with the city and weight client's work in the same tree)
+
+- `npm run check`: passes. Type checks, lint (274 files clean, one `STUB(server)`), 877 tests in
+  69 files.
+- The scripted playtest's older sessions still pass with the script's changes: `--only kaiju` 32
+  of 32 confirmed by the real server (grab, throw and eat included), `--only tank` 9 of 9.
+- `node tools/playtest/scripted.mjs --only weapons`: 47 of 47 confirmed by what the sandbox sent
+  back, nothing failed or left unattempted, no console errors. For each of the six city weapons:
+  the right button picks it up from where it lies (`kaijuHeld` 'grab' from the loose object), the
+  kit shows its pictures (client-side), the right button drops it (`kaijuHeld` 'drop' and
+  `looseProp` 'down'), it is picked up again, and the left button uses it: the propane tank thrown
+  (`propaneBlast` 'thrown'), the water tank (`waterSplash`), the antenna and the mast as javelins
+  (70 and 60 m/s, stopped by a structure), the sign swung three times (swings left 2, 1, 0, then
+  `signBroken`), the door taking six shots from the squads it faced (218 of 250 hp left) and then
+  thrown flat at 32 m/s; a propane tank in the hand set off by the squads' fire (`propaneBlast`
+  'hand' and a 0.8 s `kaijuFlinch`). For the squad: a crate of each kind driven onto with W and
+  taken, the HUD's pictures for the three weapons and the radio (client-side), the machine gun
+  firing tracers, the big cannon heavy shells, the missile pod six guided missiles, a charged volley
+  with the radio calling a barrage (marked, 4 shells landed in the check's window, 2 barrages
+  left), and reinforcements bringing a lost squad-mate down by parachute.
+- `node tools/playtest/shots.mjs --only x-weapons,x-pickups`: no console errors; every picture
+  looked at. Three for the slides are in `docs/progress/` (below).
+- Not measured: the frame cost. By construction the crates are instanced (one batch for the
+  crates, one for the parachutes, one quad batch for all the pictures over them), and the held
+  weapon, a stuck javelin or a broken piece is one small model each.
+
+**Pictures for the slides** (`docs/progress/`, 960 by 540)
+
+| File | One sentence |
+| --- | --- |
+| `phase2-club-swing.jpg` | The small monster swings a fast-food sign like a club; a trail of light follows the burger. |
+| `phase2-crate-taken.jpg` | A supply crate glows cyan under its beacon; the squad that took one sees what was in it pop up over the crosshair. |
+| `phase2-artillery-falling.jpg` | Artillery you cannot miss: red smoke, then shells streaking down and big explosions. |
+
+(The phase 2 integration replaced these three with pictures at 1920 by 1080:
+`phase2-club-swing.jpg` retaken, `phase2-crate-landed.jpg` and `phase2-artillery-barrage.jpg`
+instead of the other two; the last section lists them.)
+
+**Still open**
+
+- Sounds that are really missing (reused stand-ins today): a machine-gun burst, an electric crackle
+  for the surge, a metal clang for the shield, a fire roar for the propane blast, a flare pop for
+  the artillery marker, a parachute or supply plane for the crates. Nobody has listened to any of it.
+- Not felt by a person yet: the size of the aim line, the club's trail, the knock-down, the surge's
+  arcs (they read well from the side, less so from straight behind), the crate's beacon at night.
+- A unit knocked over is drawn lying flat only from the `unitStunned` event; a page that joins in
+  those 1.5 s draws it stunned (the city builder's note: the snapshot does not say).
+- The tank's knock-down tips the whole troop; vehicles are only knocked over by thrown city
+  weapons, which only the hatchling has, so it is not seen in a match today.
+- The surge's flash on the hide uses the kaiju material's emissive, shared by every kaiju view
+  (one kaiju per match today).
+- On this machine (load 5 on 4 cores) a headless page draws 3 to 8 frames a second and takes 2 to 3
+  seconds per picture, so the extras catch fast moments by pausing the sandbox or recording frames
+  from inside the page; the pictures were judged at 960 by 540 only.
+
+## Phase 2 integration: everything together, the squads firing past rubble, the pace held (14 November, the integration task)
+
+The art for phase 2 (the three special buildings, the six city weapons, the crate, the
+parachute, the pick-up pictures, the squad's controls-card pictures) and the four phase 2
+builders' work (the city and the army, each in the simulation and on screen) were run together,
+played end to end in the browser and measured.
+
+**Is the tree green? Yes.** `npm run check` passes: type checks, lint (274 files, one
+`STUB(server)`), 879 tests in 69 files. It already passed when this task started (877 tests);
+the builders had reconciled the files they shared. The two new tests are below.
+
+**What changed**
+
+- **The squads fire past rubble again** (`shared/src/sim/bots/squadBot.ts`, `BOT_RULES.squad`
+  `blockedRadius`, `blockedTime`, `lookAgain`; `BotState` gained `matesBlind`, `blockedX`,
+  `blockedZ`, `blockedFor`). The scripted squad session never saw another squad's charged volley
+  hit the kaiju. The squad bot parked where its leader saw a hatchling's head over a heap of
+  rubble while most of its planted squad-mates did not; it let go, saw the kaiju again with
+  nobody planted, planted again, and so on for the whole stage, and where no spot near its bearing
+  had a line at all it waited at the best one for ever. At a hatchling standing still, 24 squads of
+  40 (ten starts, one seed) fired no charged volley in a whole fast stage 1. Now a squad whose
+  squad-mates had no line does not plant there again, moves on and passes over that spot for 20 s,
+  and one that reaches its spot with no line tries another side: 1 squad of 40 fires none (phase
+  1's code: 2). Two tests in `shared/test/bots.test.ts`. (`docs/BALANCE.md` section 10.)
+- **The pace held where phase 1 left it** (`MATCH_RULES.bar` `p2` 0.125 to 0.11, `p3` 0.29 to
+  0.30; `docs/BALANCE.md` section 10, `DESIGN.md` section 2). Phase 2 had made stage 2 a fifth
+  longer and a lone titan's last segment a fifth shorter.
+- **A fireball warning gone**: the gas station's ball of fire converted an already unindexed
+  shape again, which printed a three.js warning on every page (`render/specialsView.ts`).
+- **The autopilot's line of fire counts rubble** as the shots and the squad bots do
+  (`client/src/game/autoplay.ts`).
+- **Playtest checks made steady**: the scripted squad session gives the volley meter up to 3 s
+  to show "full" after the server's charge reaches 0.99 (the page draws a few frames a second);
+  the late-input prediction test (`client/test/net.test.ts`) runs with the squads standing still,
+  since a barrage from a radio crate could land on its walking kaiju and slow it.
+- **Leftovers**: the call-in event's note that "phase 2's radio will" start missions
+  (`shared/src/sim/events.ts`), the same note in `DESIGN.md` section 5 and this file; the
+  duplicated substation tip in `PLAYING.md`; the counts in this file's sections 2, 6 and 7.
+- **Art**: every model and picture of the art stream is drawn (the special buildings and their
+  effect points by prefix, the six weapons by their `grip`, the crate and parachute, the five
+  pick-up pictures, the eight `sq_*` pictures); no code stand-in is left where a file exists (the
+  icon drawings in `ui/iconArt.ts` show only for the moment a file takes to load).
+  `npm run export:defs` was run again (no change), the art checker (76 models, 0 failed; 5 old
+  warnings), the icon checker (108 of 108) and `npm run assets:manifest -- --check` pass. The icon
+  preview sheets in `docs/art/previews/` were drawn again with the five new kit icons.
+- **Docs**: `DESIGN.md` (sections 2 and 5), `BALANCE.md` (section 10), `ARCHITECTURE.md` (the
+  snapshot's size), `PLAYING.md`, `ROADMAP.md` (phase 2 marked built), `CITY.md` (an old "now"
+  about the bar), this file.
+
+**Measured**
+
+- Pace (`npm run sim -- --seeds 20 --every-anchor`, seeds 1 to 20 and 21 to 40, and
+  `--unopposed`):
+
+  | | Stage 1 | Stage 2 | Stage 3 | Match | Kaiju wins |
+  | --- | --- | --- | --- | --- | --- |
+  | Phase 1 | 2:02 | 2:27 | 3:01 | 7:31 | 20 of 40 |
+  | Phase 2 as the builders left it | 2:01 | 2:57 | 2:51 | 8:03 | 15 of 40 |
+  | Phase 2 as shipped | 2:01 | 2:35 | 3:06 | 7:56 | 16 of 40 (40%) |
+  | Alone, phase 1 / as shipped | 2:03 / 2:13 | 1:57 / 1:47 | 2:44 / 2:28 | 7:06 / 6:49 | |
+
+  Every stage within about a tenth of phase 1. The monster wins 40%: not lopsided, so balance was
+  left alone. 9 matches of 40 ended on the clock (phase 1: 4).
+- **Something happening every 20 seconds** (the same 40 matches; what counts is in
+  `docs/BALANCE.md` section 10): at stage 1 something new happens to the monster every 10 s and
+  to a squad every 15 s (86% and 73% of 20-second stretches): the goal is met. At stage 2 only
+  every 30 s and 58 s (47% and 27%): not met. At stage 3 every 11 s for the monster, though
+  falls come in bunches (64%), and every 33 s for a squad (34%): not met for the squads.
+- `npm run build`: passes. `node tools/playtest/smoke.mjs` (five headless pages on the
+  autopilot against the real server with `MB_FAST=1`): PASSED. The match reached stage 3 and the
+  humans won on the clock after 150 s of play; no console errors and, since the fireball fix, no
+  warnings on any page; snapshots of 862 to 864 bytes, about 50 kbit/s down per page; the server
+  kept 18.6 ticks a second on the overloaded machine. Again with `--reconnect --players 3`:
+  PASSED, the page whose connection was dropped came back and saw the end.
+- `node tools/playtest/scripted.mjs` (every session, real key presses and clicks, every check
+  judged by what the server or the sandbox sent back): PASSED, 112 of 112 confirmed, nothing
+  failed or left unattempted, no console errors. The monster 32, the squad 24, the tank 9, the
+  phase 2 weapons and pick-ups 47 (32 for the monster's six city weapons and the propane tank
+  set off in its hand, 15 for the five crates, the three weapon pick-ups, the radio's barrage
+  and reinforcements). The first full run, on the tree as the builders left it, confirmed 110:
+  the squad never saw another squad's charged volley hit the kaiju (the bot fix above) and the
+  volley meter's "full" look came a moment after its check looked (the steadier check above).
+  After a last change to the bot that changed no match (its bearing kept between -180 and 180
+  degrees; the 40 harness matches came out the same), the squad and tank sessions ran again:
+  33 of 33.
+- `node tools/playtest/shots.mjs` (every stage from both sides and every extra, 254 pictures):
+  PASSED, no console errors. Looked at: the stage views (a radio mast had fallen in the stage 1
+  squad visit, and its map was all static), the monster's controls card with the four city
+  weapon tiles, the volley meter, the tank's reticles, the molt cards, the weapons and pick-ups
+  extras (the sign's swing and trail, the door taking rockets, the water tank's knock-down, the
+  propane blast, crates coming down and landed, the three weapon pick-ups, the barrage) and the
+  city extras (the three special buildings' rewards, mounds and fallen towers, the stomp's sway,
+  the tank at speed). In `x-city-rubble`, 15 buildings wrecked into mounds and 14 lying fallen
+  drew at 139 draw calls and 539,000 triangles.
+- `npm run export:defs` (no change), the art checker, the icon checker and the manifest check:
+  pass (above).
+
+**Pictures for the slides** (`docs/progress/`, JPEG, 1920 by 1080, 250 to 470 KB each; taken in the
+sandbox with a free camera by a scratch script, `/tmp/mb-scratch/integrate2/slides.mjs`, except
+the two marked as the city client's):
+
+| File | One sentence |
+| --- | --- |
+| `phase2-substation-surge.jpg` (the city client's) | The monster wrecks a power substation and lightning leaps from it into the monster. |
+| `phase2-gas-station-fireball.jpg` | A wrecked gas station goes up in a ball of fire beside a squad; the monster is never hurt by it. |
+| `phase2-club-swing.jpg` | The small monster swings a fast-food sign like a club and knocks a squad flat. |
+| `phase2-door-shield.jpg` | Rockets fly at a garage door the small monster holds up as a shield. |
+| `phase2-crate-landed.jpg` | A supply crate on the street sends up a cyan column of light, the picture of what it holds floating over it. |
+| `phase2-artillery-barrage.jpg` | A squad's artillery radio brings a barrage down in the street beside the monster. |
+| `phase2-fallen-tower-and-rubble.jpg` (the city client's) | After a fight: a tower lies across a street among heaps made from the buildings' own walls. |
+
+(`phase2-crate-taken.jpg` and `phase2-artillery-falling.jpg`, 960 by 540, were replaced by the
+crate and barrage pictures above; `phase2-club-swing.jpg` and `phase2-gas-station-fireball.jpg`
+were retaken under their names.)
+
+**Still open**
+
+- Stages 2 and 3 do not meet the "every 20 seconds" goal (above); levers in `docs/BALANCE.md`
+  section 10. The owner's call.
+- Nobody has played phase 2 yet. Everything the six phase 2 sections above list as untried by a
+  person still is, and the sounds they list as stand-ins still are.
+- At stage 1 the squads fire half as many charged volleys as in phase 1 and break the
+  hatchling's nerve a third as often: rubble hides it well (section 6, known risks). The squad
+  bot now moves round a heap instead of planting behind it again and again, but it still never
+  climbs one to shoot from the top, as a person can.
+- 9 bot matches of 40 ended on the clock (phase 1: 4): more third stages run out of time. With
+  the monster winning 40% that is not lopsided; the final pacing pass is phase 3's.
+- The slide pictures were taken with a free camera in the sandbox, not from a match people
+  played; the door and the artillery are from the army's side, with its heads-up display.

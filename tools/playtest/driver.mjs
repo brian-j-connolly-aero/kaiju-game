@@ -75,6 +75,7 @@ function probeInPage(since) {
     squad: null,
     squadUnits: [],
     units: [],
+    crates: [],
     threatsShown: document.querySelectorAll('.threats:not(.hidden) .threat:not(.hidden)').length,
     threatsAtEdge: document.querySelectorAll('.threats:not(.hidden) .threat.edge:not(.hidden)').length,
     view: null,
@@ -117,7 +118,8 @@ function probeInPage(since) {
   if (latest) {
     const k = latest.kaijus[0];
     if (k) out.kaiju = { ...k, cooldowns: { ...k.cooldowns }, held: k.held ? { ...k.held } : null };
-    out.units = latest.units.map((u) => ({ id: u.id, squad: u.squad, x: u.x, z: u.z, alive: u.alive, hp: u.hp, laser: u.laser, rooted: u.rooted, charge: u.charge, shaken: u.shaken, stun: u.stun, members: u.members, type: u.type, cooldown: u.cooldown, veteran: u.veteran, yaw: u.yaw, aimYaw: u.aimYaw, vx: u.vx, vz: u.vz, driven: u.driven }));
+    out.units = latest.units.map((u) => ({ id: u.id, squad: u.squad, x: u.x, z: u.z, y: u.y, alive: u.alive, hp: u.hp, laser: u.laser, rooted: u.rooted, charge: u.charge, shaken: u.shaken, stun: u.stun, members: u.members, type: u.type, cooldown: u.cooldown, veteran: u.veteran, yaw: u.yaw, aimYaw: u.aimYaw, vx: u.vx, vz: u.vz, driven: u.driven }));
+    out.crates = (latest.crates ?? []).map((c) => ({ ...c }));
     if (session.role.squadId >= 0) {
       const sq = latest.squads[session.role.squadId];
       if (sq) {

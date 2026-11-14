@@ -54,6 +54,22 @@ const SWIM_EYE = 0.1;
 /** The chase camera's lens, and how much wider it opens during a charge's run (degrees). */
 const CHASE_FOV = 60;
 const CHARGE_FOV = 12;
+/** How much wider the lens opens while the monster walks at its top speed (degrees; docs/ROADMAP.md phase 2). */
+const WALK_FOV = 5;
+/**
+ * The sway in step while it walks: how far the chase camera swings sideways (a share of its
+ * distance from the body) and how far the view rolls (radians), at top speed.
+ */
+const SWAY_SIDE = 0.0035;
+const SWAY_ROLL = 0.006;
+
+/**
+ * How much wider the monster's lens is (degrees) for a walk at `speedShare` of its top speed and
+ * a charge's run `rush` (0..1, eased): a few degrees walking, more in a charge.
+ */
+export function kaijuLensWidening(speedShare: number, rush: number): number {
+  return Math.min(1, Math.max(0, speedShare)) * WALK_FOV * (1 - rush) + rush * CHARGE_FOV;
+}
 
 /**
  * The lift (body heights) that takes a chase camera at `wanted`, hanging from `pivot` above
@@ -109,6 +125,10 @@ export class KaijuController implements Controller {
   private card = 0;
   /** How far the lens has opened for a charge's run, 0..1 (eased). */
   private rush = 0;
+  /** The walk as the lens feels it: the share of top speed (eased, so it widens and eases back). */
+  private stride = 0;
+  /** Where the sway is in its swing: one swing every two steps, as the animator steps. */
+  private swayPhase = 0;
 
   constructor(thirdPerson = false) {
     this.thirdPerson = thirdPerson;
@@ -252,12 +272,42 @@ export class KaijuController implements Controller {
     this.chaseFrom.z = k.z;
   }
 
-  /** The lens opens a little while the kaiju runs in a charge (a sense of its speed), and eases back. */
+  /**
+   * The lens opens a few degrees while the kaiju walks and more while it runs in a charge (a
+   * sense of its size and speed), and eases back when it stops. Also moves the sway on.
+   */
   private rushLens(k: SnapKaiju, dt: number): number {
     const running = k.action === 'charge' && k.phase === 'charge';
     this.rush += ((running ? 1 : 0) - this.rush) * (1 - Math.exp(-dt * (running ? 5 : 2.5)));
     if (this.rush < 0.002) this.rush = 0;
-    return this.rush * CHARGE_FOV;
+    const st = kaijuStageDef(k.kind, k.stage);
+    const speed = Math.hypot(k.vx, k.vz);
+    const share = k.phase === 'cocoon' || k.submerge > 0.3 ? 0 : speed / Math.max(0.1, st.topSpeed);
+    // Opens over about a second, closes over a little more.
+    this.stride += (Math.min(1, share) - this.stride) * (1 - Math.exp(-dt * (share > this.stride ? 1.6 : 1.2)));
+    if (this.stride < 0.002) this.stride = 0;
+    // One step per half turn, as the animator steps (kaijuView.ts: a stride of 0.9 body heights).
+    this.swayPhase += (speed * dt * Math.PI) / Math.max(0.1, st.height * 0.9);
+    return kaijuLensWidening(this.stride, this.rush);
+  }
+
+  /**
+   * The sway in step: the camera swings a little to the side of the foot that bears the weight
+   * and rolls with it. Small (a fraction of a degree), and only while walking.
+   */
+  private sway(camera: THREE.PerspectiveCamera, k: SnapKaiju, thirdPerson: boolean): void {
+    const amount = this.stride * (1 - this.rush * 0.5);
+    if (amount <= 0) return;
+    const swing = Math.sin(this.swayPhase);
+    if (thirdPerson) {
+      const st = kaijuStageDef(k.kind, k.stage);
+      const back = st.height * 2.3 + st.bodyRadius * 2;
+      const side = swing * amount * back * SWAY_SIDE;
+      // The view's right on the ground.
+      camera.position.x -= Math.cos(this.viewYaw) * side;
+      camera.position.z += Math.sin(this.viewYaw) * side;
+    }
+    camera.rotateZ(swing * amount * SWAY_ROLL * (thirdPerson ? 1 : 0.7));
   }
 
   /** Third person: aim from the kaiju's eye at what the crosshair is on. */
@@ -344,6 +394,7 @@ export class KaijuController implements Controller {
       setLens(camera, 72 + wider, near, 9000);
       this.placeView(k);
       aimCamera(camera, this.viewYaw, this.viewPitch);
+      this.sway(camera, k, false);
     } else {
       // Placed in `update` from the body as it was then; the frame's input steps have moved the
       // drawn body since (MatchSession.refreshLocal), so the camera moves with it, and never
@@ -352,6 +403,7 @@ export class KaijuController implements Controller {
       camera.position.set(p.x + (k.x - this.chaseFrom.x), p.y, p.z + (k.z - this.chaseFrom.z));
       setLens(camera, CHASE_FOV + wider, Math.max(0.3, st.height * 0.05), 9000);
       aimCamera(camera, this.viewYaw, this.viewPitch);
+      this.sway(camera, k, true);
     }
   }
 }

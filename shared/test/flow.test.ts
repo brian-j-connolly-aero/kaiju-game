@@ -391,8 +391,12 @@ describe('spotting', () => {
     expect(voiceCues(events)).toEqual(['kaiju.lost']);
     expect(unitSeesKaiju(world, world.units[squad.driven], k, 150)).toBe(false);
 
-    // With the wall down, the line is open again.
+    // With the wall down, its rubble (half as high) still hides a hatchling; from on top of it
+    // the line is open again.
     world.structureHp[0] = 0;
+    world.step();
+    expect(k.spotted).toBe(false);
+    place(world, squad.driven, 0, 50);
     world.step();
     expect(k.spotted).toBe(true);
     expect(k.known).toBe(true);

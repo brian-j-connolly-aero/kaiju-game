@@ -1,8 +1,8 @@
 /**
- * Off-map call-ins (DESIGN.md section 5). No button calls one any more (docs/ROADMAP.md, phase
- * 1); the mission itself is kept for the artillery radio pick-up of phase 2, which starts one
- * with `startCallIn` (sim/systems/weapons.ts). `cooldown` is what the old button waited between
- * two calls of one squad; nothing reads it until then.
+ * Off-map call-ins (DESIGN.md section 5). No button calls one: the artillery radio pick-up
+ * (docs/ROADMAP.md, phase 2; defs/pickups.ts) turns a squad's next charged volleys into
+ * barrages, each a mission started with `startCallIn` (sim/systems/weapons.ts) on the ground
+ * where the volley's crosshair is.
  */
 
 import type { CallInId } from './ids';
@@ -20,7 +20,6 @@ export const CALLINS: Readonly<Record<CallInId, CallInDef>> = {
     nerve: 5,
     splashRadius: 14,
     structureDamage: 300,
-    cooldown: 35,
     projectile: 'arty',
     spawnHeight: 400,
   },

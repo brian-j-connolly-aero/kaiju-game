@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Squad controls: turn. A tank from above with two curved arrows swinging away from its nose, one to each side: turn left and right. -->
+  <rect x="24" y="36" width="16" height="22" rx="3" fill="currentColor" stroke="none"/>
+  <path d="M32 36V27.5"/>
+  <path d="M18 37V57.5M46 37V57.5"/>
+  <path d="M25 15.9A29 29 0 0 0 10.8 24.2"/>
+  <path fill="currentColor" d="M7.1 28.6L7.4 19.7L15.8 26.7Z"/>
+  <path d="M39 15.9A29 29 0 0 1 53.2 24.2"/>
+  <path fill="currentColor" d="M56.9 28.6L48.2 26.7L56.6 19.7Z"/>
+</svg>

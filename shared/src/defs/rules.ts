@@ -49,12 +49,15 @@ export const MATCH_RULES = {
    * Tuned with the balance harness on Port Meridian so that a kaiju left alone fills the first
    * two segments in about two minutes and contested matches come out about even (docs/BALANCE.md
    * section 8); p3 was lowered from 0.31 after the first multiplayer playtest to cut stage 3 by
-   * about a fifth (section 9).
+   * about a fifth (section 9). Phase 2 (special buildings, city weapons, crates, rubble, falls)
+   * made stage 2 a fifth longer and a lone titan's last segment a fifth shorter: p2 went from
+   * 0.125 to 0.11 and p3 from 0.29 to 0.30 to put the stages back near where phase 1 left them
+   * (section 10).
    */
   bar: {
     p1: 0.18,
-    p2: 0.125,
-    p3: 0.29,
+    p2: 0.11,
+    p3: 0.3,
     growth: 1.6,
     /** Where the three marks sit along the skyline display, 0..1. */
     display: [0.21, 0.57, 1] as PerStage<number>,
@@ -186,10 +189,9 @@ export const SQUAD_RULES = {
   /** How far the driven unit's aim ray reaches when it lands on nothing. */
   aimRayRange: 1500,
   /**
-   * Ground markers placed with the crosshair (`resolveMarkerPoint`, sim/aim.ts; nothing places
-   * one in phase 1, the artillery radio of phase 2 will): ground or a wall further off than this
-   * is not what the player meant, and a crosshair on the sky within this many body radii of a
-   * kaiju on the map means that kaiju.
+   * Where the artillery radio's barrage comes down (`resolveMarkerPoint`, sim/aim.ts): ground or
+   * a wall further off than this is not what the player meant, and a crosshair on the sky within
+   * this many body radii of a kaiju on the map means that kaiju.
    */
   markerRange: 1500,
   markerSnapRadii: 2,

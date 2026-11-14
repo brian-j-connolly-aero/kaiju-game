@@ -10,18 +10,22 @@
  *            one: the low 24 bits the input sequence played or dropped up to, the top 8 bits the
  *            inputs after it the server will drop; see `Snapshot.ackSeq`)
  *   match    u8 phase, u8 stage, u16 clock (0.1 s), u16 phaseTime (0.01 s), f32 barPoints,
- *            f32 x 3 marks, u8 marksReached, u8 winner, u8 endReason
+ *            f32 x 3 marks, u8 marksReached, u8 winner, u8 endReason, u32 staticUntil (tick)
  *   counts   u8 kaijus, u8 squads, u8 units
  *   kaiju    u8 id, u8 player, u8 kind, u8 stage, u8 flags, u8 action, u8 phase, u8 heldKind,
  *            u16 heldRef, f32 x, z, vx, vz, yaw, aimYaw, aimPitch, hp, maxHp, nerve, rage,
- *            phaseTime, phaseDuration, u16 nerveImmune (0.01 s), u16 x 11 cooldowns (0.01 s,
+ *            phaseTime, phaseDuration, u16 nerveImmune (0.01 s), u16 x 12 cooldowns (0.01 s,
  *            one per verb in KAIJU_ACTION_IDS order), u8 submerge (1 / 255), u8 x 2 moves,
- *            u8 x 3 offer (KAIJU_MOVE_IDS codes; 'none' for an empty slot or card)
- *   squad    u8 id, u8 player, u8 faction, u8 level, u8 flags, u8 driven (255 = none)
+ *            u8 x 3 offer (KAIJU_MOVE_IDS codes; 'none' for an empty slot or card),
+ *            u16 surge (0.01 s), u8 clubSwings, u16 shieldHp (0.1)
+ *   squad    u8 id, u8 player, u8 faction, u8 level, u8 flags, u8 driven (255 = none),
+ *            u8 pickup (PICKUP_IDS code of its weapon pick-up; 'none'), u8 barrages
  *   unit     u8 id, u8 squad, u8 type, u8 state, u8 flags, f32 x, z, vx, vz, u16 y (0.1 m),
  *            f32 yaw, i16 aimYaw, i16 aimPitch (pi / 32768), u16 hp, u16 maxHp (0.1),
  *            u8 members, u8 nerve (0.5), u8 shaken (0.05 s), u8 charge (1 / 255),
  *            u8 cooldown (0.05 s), u8 stun (0.05 s)
+ *   crates   u8 count, then per crate: u16 id, u8 kind (PICKUP_IDS code), u8 fall (0.05 s; 0 on
+ *            the ground), f32 x, z
  *
  * Positions, velocities and a unit's hull heading are full 32-bit floats so a client can replay
  * its own inputs from a snapshot without drift (a tank drives along its hull, and its speed
@@ -44,6 +48,7 @@ import {
   KAIJU_MOVE_IDS,
   KAIJU_PHASES,
   MATCH_PHASES,
+  PICKUP_IDS,
   UNIT_STATES,
   UNIT_TYPE_IDS,
   WINNERS,
@@ -58,6 +63,8 @@ import {
   type Level,
   type MatchPhase,
   type PerStage,
+  type PickupId,
+  type PickupKind,
   type StageId,
   type UnitState,
   type UnitTypeId,
@@ -86,7 +93,11 @@ import {
 } from './bytes';
 
 export const SNAPSHOT_MAGIC = 0x4d;
-export const SNAPSHOT_VERSION = 3;
+/**
+ * 4 since phase 2 (the squads' pick-ups, the crates, one more kaiju verb: the club; the kaiju's
+ * power surge, club swings and shield hp; the map's static).
+ */
+export const SNAPSHOT_VERSION = 4;
 /** Byte offset of the u32 ackSeq in an encoded snapshot. */
 const ACK_OFFSET = 6;
 
@@ -108,6 +119,8 @@ export interface SnapMatch {
   marksReached: number;
   winner: Winner;
   endReason: EndReason;
+  /** The humans' map shows static until this tick (a radio mast fell; 0: never). Static while `tick < staticUntil`. */
+  staticUntil: number;
 }
 
 export interface SnapKaiju {
@@ -151,6 +164,12 @@ export interface SnapKaiju {
   moves: [KaijuMoveId, KaijuMoveId];
   /** The molt cards on offer (cards 1 to 3 in order), from the start of the cocoon until one is picked; empty otherwise. */
   offer: KaijuMoveId[];
+  /** Seconds left of a power surge (a power substation wrecked), 0.01 s steps; 0 for none. */
+  surge: number;
+  /** A fast-food sign in the hand: swings left before it breaks (0 otherwise). */
+  clubSwings: number;
+  /** A garage door in the hand: the hp it has left as a shield (0.1 steps; 0 otherwise). */
+  shieldHp: number;
 }
 
 export interface SnapSquad {
@@ -163,6 +182,23 @@ export interface SnapSquad {
   bot: boolean;
   /** Unit id the player drives, or -1. */
   driven: number;
+  /** The weapon pick-up its driven unit fires (machine gun, big cannon, missile pod), or 'none'. */
+  pickup: PickupId;
+  /** The artillery radio: how many of its next charged volleys still call a barrage (0: no radio). */
+  barrages: number;
+}
+
+/** An army supply crate (docs/ROADMAP.md, phase 2): coming down by parachute, or on the ground. */
+export interface SnapCrate {
+  id: number;
+  kind: PickupKind;
+  x: number;
+  z: number;
+  /**
+   * Seconds until it lands (0.05 s steps); 0 once it is on the ground and can be taken. While it
+   * comes down it is CRATE_RULES.dropHeight * fall / CRATE_RULES.fallTime meters up.
+   */
+  fall: number;
 }
 
 export interface SnapUnit {
@@ -223,6 +259,8 @@ export interface Snapshot {
   kaijus: SnapKaiju[];
   squads: SnapSquad[];
   units: SnapUnit[];
+  /** Supply crates coming down or on the ground (at most 255). */
+  crates: SnapCrate[];
 }
 
 const K_ALIVE = 1;
@@ -315,6 +353,9 @@ function writeKaiju(w: ByteWriter, k: SnapKaiju): void {
   writeU8(w, Math.max(0, KAIJU_MOVE_IDS.indexOf(k.moves[0])));
   writeU8(w, Math.max(0, KAIJU_MOVE_IDS.indexOf(k.moves[1])));
   for (let i = 0; i < OFFER_SLOTS; i++) writeU8(w, Math.max(0, KAIJU_MOVE_IDS.indexOf(k.offer[i] ?? 'none')));
+  writeU16(w, quantize(k.surge, 100, 65535));
+  writeU8(w, quantize(k.clubSwings, 1, 255));
+  writeU16(w, quantize(k.shieldHp, 10, 65535));
 }
 
 function readKaiju(r: ByteReader): SnapKaiju {
@@ -350,6 +391,9 @@ function readKaiju(r: ByteReader): SnapKaiju {
     const card = idOf(KAIJU_MOVE_IDS, readU8(r));
     if (card !== 'none') offer.push(card);
   }
+  const surge = readU16(r) / 100;
+  const clubSwings = readU8(r);
+  const shieldHp = readU16(r) / 10;
   return {
     id,
     player,
@@ -382,6 +426,9 @@ function readKaiju(r: ByteReader): SnapKaiju {
     submerge,
     moves,
     offer,
+    surge,
+    clubSwings,
+    shieldHp,
   };
 }
 
@@ -396,6 +443,8 @@ function writeSquad(w: ByteWriter, s: SnapSquad): void {
   writeU8(w, s.level);
   writeU8(w, (s.eliminated ? S_ELIMINATED : 0) | (s.bot ? S_BOT : 0));
   writeU8(w, s.driven < 0 ? NO_UNIT : s.driven);
+  writeU8(w, Math.max(0, PICKUP_IDS.indexOf(s.pickup)));
+  writeU8(w, quantize(s.barrages, 1, 255));
 }
 
 function readSquad(r: ByteReader): SnapSquad {
@@ -405,6 +454,8 @@ function readSquad(r: ByteReader): SnapSquad {
   const level = clampStage(readU8(r));
   const flags = readU8(r);
   const driven = readU8(r);
+  const pickup = idOf(PICKUP_IDS, readU8(r));
+  const barrages = readU8(r);
   return {
     id,
     player,
@@ -413,7 +464,28 @@ function readSquad(r: ByteReader): SnapSquad {
     eliminated: (flags & S_ELIMINATED) !== 0,
     bot: (flags & S_BOT) !== 0,
     driven: driven === NO_UNIT ? -1 : driven,
+    pickup,
+    barrages,
   };
+}
+
+function writeCrate(w: ByteWriter, c: SnapCrate): void {
+  writeU16(w, c.id & 0xffff);
+  writeU8(w, Math.max(0, PICKUP_IDS.indexOf(c.kind)));
+  // A crate still coming down never reads as landed, however little of its fall is left.
+  writeU8(w, c.fall > 0 ? Math.max(1, quantize(c.fall, 20, 255)) : 0);
+  writeF32(w, c.x);
+  writeF32(w, c.z);
+}
+
+function readCrate(r: ByteReader): SnapCrate {
+  const id = readU16(r);
+  const code = readU8(r);
+  const fall = readU8(r) / 20;
+  const x = readF32(r);
+  const z = readF32(r);
+  const kind = idOf(PICKUP_IDS, code);
+  return { id, kind: kind === 'none' ? 'machineGun' : kind, x, z, fall };
 }
 
 function writeUnit(w: ByteWriter, u: SnapUnit): void {
@@ -505,10 +577,10 @@ function readUnit(r: ByteReader): SnapUnit {
 }
 
 export function encodeSnapshot(s: Snapshot): Uint8Array {
-  if (s.kaijus.length > 255 || s.squads.length > 255 || s.units.length > 255) {
+  if (s.kaijus.length > 255 || s.squads.length > 255 || s.units.length > 255 || s.crates.length > 255) {
     throw new Error('snapshot has too many entities for the wire format');
   }
-  const w = createWriter(64 + s.kaijus.length * 100 + s.squads.length * 8 + s.units.length * 46);
+  const w = createWriter(64 + s.kaijus.length * 110 + s.squads.length * 8 + s.units.length * 46 + s.crates.length * 12);
   writeU8(w, SNAPSHOT_MAGIC);
   writeU8(w, SNAPSHOT_VERSION);
   writeU32(w, s.tick >>> 0);
@@ -526,6 +598,7 @@ export function encodeSnapshot(s: Snapshot): Uint8Array {
   writeU8(w, m.marksReached);
   writeU8(w, WINNERS.indexOf(m.winner));
   writeU8(w, END_REASONS.indexOf(m.endReason));
+  writeU32(w, Math.max(0, m.staticUntil) >>> 0);
 
   writeU8(w, s.kaijus.length);
   writeU8(w, s.squads.length);
@@ -533,6 +606,8 @@ export function encodeSnapshot(s: Snapshot): Uint8Array {
   for (const k of s.kaijus) writeKaiju(w, k);
   for (const q of s.squads) writeSquad(w, q);
   for (const u of s.units) writeUnit(w, u);
+  writeU8(w, s.crates.length);
+  for (const c of s.crates) writeCrate(w, c);
   return finishWriter(w);
 }
 
@@ -554,6 +629,7 @@ export function decodeSnapshot(bytes: Uint8Array): Snapshot {
   const marksReached = readU8(r);
   const winner = idOf(WINNERS, readU8(r));
   const endReason = idOf(END_REASONS, readU8(r));
+  const staticUntil = readU32(r);
 
   const kaijuCount = readU8(r);
   const squadCount = readU8(r);
@@ -564,14 +640,18 @@ export function decodeSnapshot(bytes: Uint8Array): Snapshot {
   for (let i = 0; i < kaijuCount; i++) kaijus.push(readKaiju(r));
   for (let i = 0; i < squadCount; i++) squads.push(readSquad(r));
   for (let i = 0; i < unitCount; i++) units.push(readUnit(r));
+  const crateCount = readU8(r);
+  const crates: SnapCrate[] = [];
+  for (let i = 0; i < crateCount; i++) crates.push(readCrate(r));
 
   return {
     tick,
     ackSeq,
-    match: { phase, stage, clock, phaseTime, barPoints, marks, marksReached, winner, endReason },
+    match: { phase, stage, clock, phaseTime, barPoints, marks, marksReached, winner, endReason, staticUntil },
     kaijus,
     squads,
     units,
+    crates,
   };
 }
 

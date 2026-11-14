@@ -67,21 +67,50 @@ export function setLens(camera: THREE.PerspectiveCamera, fov: number, near: numb
   }
 }
 
-/** A decaying camera shake: `add` kicks it, `apply` nudges the camera after it has been placed. */
+/** How fast a thump's spring rings (radians a second: about 4 swings a second) and how soon it settles (a third of a second). */
+const THUMP_RATE = 24;
+const THUMP_DAMPING = 0.45;
+/** How far the view dips (radians) per unit of a thump's drop: the picture nods with the weight. */
+const THUMP_NOD = 0.02;
+
+/**
+ * A decaying camera shake: `add` kicks a rattle (explosions, hits), `thump` a drop that springs
+ * back (the monster's weight: a footfall, a landing), and `apply` nudges the camera after it has
+ * been placed. Both move the camera, never where it points, beyond a nod of a fraction of a
+ * degree: aiming stays possible through them.
+ */
 export class CameraShake {
   private amount = 0;
   private phase = 0;
+  /** The thump's spring: how far the view has dropped (units of `scale`) and how fast it moves. */
+  private drop = 0;
+  private dropSpeed = 0;
 
   add(strength: number): void {
     this.amount = Math.min(1.5, this.amount + strength);
   }
 
+  /** A weight landing: the view drops about `amount` (units of the `scale` given to `apply`) and springs back. */
+  thump(amount: number): void {
+    if (!(amount > 0)) return;
+    // A kick of the spring's speed that peaks near `amount` below rest.
+    this.dropSpeed = Math.max(-THUMP_RATE * 3, this.dropSpeed - Math.min(1.5, amount) * THUMP_RATE * 1.45);
+  }
+
+  /** How far the view is dropped by a thump right now (tests). */
+  get thumped(): number {
+    return this.drop;
+  }
+
   /** Stops the shake at once (the moment that caused it is long past). */
   reset(): void {
     this.amount = 0;
+    this.drop = 0;
+    this.dropSpeed = 0;
   }
 
   apply(camera: THREE.PerspectiveCamera, dt: number, scale: number): void {
+    this.applyThump(camera, dt, scale);
     if (this.amount < 0.002) {
       this.amount = 0;
       return;
@@ -92,5 +121,24 @@ export class CameraShake {
     camera.position.y += Math.sin(this.phase * 1.7 + 1) * a * scale;
     camera.rotation.z += Math.sin(this.phase) * a * 0.03;
     this.amount *= Math.exp(-dt * 6);
+  }
+
+  private applyThump(camera: THREE.PerspectiveCamera, dt: number, scale: number): void {
+    if (this.drop === 0 && this.dropSpeed === 0) return;
+    // A damped spring, in small steps so a slow frame cannot blow it up.
+    const steps = Math.min(30, Math.ceil(dt / 0.008));
+    const h = dt / Math.max(1, steps);
+    for (let i = 0; i < steps; i++) {
+      const pull = -THUMP_RATE * THUMP_RATE * this.drop - 2 * THUMP_DAMPING * THUMP_RATE * this.dropSpeed;
+      this.dropSpeed += pull * h;
+      this.drop += this.dropSpeed * h;
+    }
+    if (Math.abs(this.drop) < 1e-4 && Math.abs(this.dropSpeed) < 1e-3) {
+      this.drop = 0;
+      this.dropSpeed = 0;
+      return;
+    }
+    camera.position.y += this.drop * scale;
+    camera.rotateX(this.drop * THUMP_NOD);
   }
 }

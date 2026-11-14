@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Pick-up: reinforcements. A soldier (round head = human) coming down under a parachute, arms up on the lines. -->
+  <path fill="currentColor" stroke="none" d="M5 27A27 23 0 0 1 59 27Q50 20.5 41 27Q32 20.5 23 27Q14 20.5 5 27Z"/>
+  <path d="M8 29L25 52M56 29L39 52"/>
+  <circle cx="32" cy="40" r="5.5" fill="currentColor" stroke="none"/>
+  <path fill="currentColor" stroke="none" d="M24.5 60V55.5Q24.5 49.5 32 49.5Q39.5 49.5 39.5 55.5V60Z"/>
+</svg>

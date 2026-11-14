@@ -1,21 +1,26 @@
 /**
- * System 7 of 11: projectiles.
+ * System 8 of 12: projectiles.
  *
  * Projectiles are real objects (DESIGN.md section 5, "Backstop"): each one flies until it meets
  * something, and a miss damages whatever is behind the target. This system flies every
  * projectile in `world.projectiles`, whoever launched it, and resolves what it hits.
  *
- * Kinematics, the same for the three flight models (flat has gravity 0). Clients fly their own
- * copies from `projectileSpawn` with exactly this, so it must stay this simple:
+ * Kinematics, the same for the flat, arc and thrown flight models (flat has gravity 0). Clients
+ * fly their own copies from `projectileSpawn` with exactly this, so it must stay this simple:
  *
  *   position(t) = p0 + v0 * t - (0, 1/2 * gravity * t^2, 0),   t = seconds since the spawn tick
  *
- * `stepProjectile` advances one tick of that exactly (no integration drift). The kaiju action
- * and weapon systems run before this one, so a projectile has already flown one step by the end
- * of the tick that spawned it: at the end of tick T it is at position((T - spawnTick + 1) / 30).
+ * A 'guided' projectile (the missile pod's missiles) also has a constant acceleration a for its
+ * first `steer` seconds (a whole number of ticks): position(t) = p0 + v0 t + a t^2 / 2 until
+ * then, and straight on at v0 + a * steer after. `stepProjectile` advances one tick of either
+ * exactly (no integration drift). The kaiju action and weapon systems run before this one, so a
+ * projectile has already flown one step by the end of the tick that spawned it: at the end of
+ * tick T it is at position((T - spawnTick + 1) / 30).
  *
  * Each tick the step segment is swept against, nearest first:
- * - standing structures (box prisms up to their height), bridge decks excepted;
+ * - standing structures (box prisms up to their height), bridge decks excepted, and the mounds
+ *   of collapsed and fallen structures (up to the mound's height; a mound the step starts inside
+ *   does not count: whoever fired from on top of it shoots over it);
  * - living kaiju (their hit volume: body, head and neck, tail; sim/kaijuBody.ts), except the
  *   kaiju that threw it;
  * - units, only for projectiles thrown by a kaiju: there is no friendly fire between human
@@ -50,6 +55,7 @@ import { createCastHit, segmentVsCapsule, type VerticalCapsule } from '../../mat
 import type { Vec2, Vec3 } from '../../math/vec';
 import { unitCapsule } from '../aim';
 import type { ProjectileTarget } from '../events';
+import { cityBlastAt, cityWeaponImpact, javelinPierce } from '../cityWeapons';
 import { castKaijuBody, kaijuBodyDistance } from '../kaijuBody';
 import type { Projectile, World } from '../types';
 import { emit } from '../worldOps';
@@ -58,6 +64,8 @@ import { emit } from '../worldOps';
 const CITY_MARGIN = 200;
 /** Props are low: an explosion this far above the splash radius leaves them alone. */
 const PROP_REACH_HEIGHT = 10;
+/** A projectile this close above the ground at the end of a step has reached it. */
+const GROUND_SLACK = 1e-6;
 
 const segA: Vec3 = { x: 0, y: 0, z: 0 };
 const segB: Vec3 = { x: 0, y: 0, z: 0 };
@@ -75,10 +83,32 @@ export interface ProjectileBody {
   vy: number;
   vz: number;
   gravity: number;
+  /** Flight 'guided': the acceleration, and the seconds of it left (see the header). */
+  ax?: number;
+  ay?: number;
+  az?: number;
+  steer?: number;
 }
 
-/** Advances a projectile by `dt` seconds, exactly along its parabola. */
+/**
+ * Advances a projectile by `dt` seconds, exactly along its parabola. A guided one accelerates
+ * while it has `steer` left (the caller steps whole ticks, and `steer` is a whole number of
+ * them), then flies straight on.
+ */
 export function stepProjectile(p: ProjectileBody, dt: number): void {
+  if (p.steer !== undefined && p.steer > 1e-9) {
+    const ax = p.ax ?? 0;
+    const ay = p.ay ?? 0;
+    const az = p.az ?? 0;
+    p.x += p.vx * dt + 0.5 * ax * dt * dt;
+    p.y += p.vy * dt + 0.5 * ay * dt * dt;
+    p.z += p.vz * dt + 0.5 * az * dt * dt;
+    p.vx += ax * dt;
+    p.vy += ay * dt;
+    p.vz += az * dt;
+    p.steer -= dt;
+    return;
+  }
   p.x += p.vx * dt;
   p.z += p.vz * dt;
   p.y += p.vy * dt - 0.5 * p.gravity * dt * dt;
@@ -89,6 +119,7 @@ export function stepProjectile(p: ProjectileBody, dt: number): void {
 export function spawnProjectile(world: World, init: Omit<Projectile, 'id'>): Projectile {
   const p: Projectile = { ...init, id: world.nextProjectileId++ };
   world.projectiles.push(p);
+  const guided = p.steer !== undefined && p.steer > 0;
   emit(world, {
     type: 'projectileSpawn',
     id: p.id,
@@ -107,6 +138,7 @@ export function spawnProjectile(world: World, init: Omit<Projectile, 'id'>): Pro
     ttl: p.ttl,
     volley: p.volley,
     ...(p.payload ? { payload: p.payload } : {}),
+    ...(guided ? { ax: p.ax ?? 0, ay: p.ay ?? 0, az: p.az ?? 0, steer: p.steer } : {}),
   });
   return p;
 }
@@ -125,19 +157,27 @@ function fromDirFor(p: Projectile, ix: number, iz: number, tx: number, tz: numbe
 }
 
 function impact(world: World, p: Projectile, x: number, y: number, z: number, target: ProjectileTarget, targetId: number): void {
+  // A thrown city weapon does its own thing where it lands (sim/cityWeapons.ts).
+  if (p.city) {
+    cityWeaponImpact(world, p, x, y, z, target, targetId);
+    return;
+  }
   const q = world.cityQuery;
   const splash = p.splash;
 
   if (p.structureDamage > 0) {
+    // A tall building this brings down falls the way the shot was going (sim/systems/cityDamage.ts).
+    const dirX = p.vx;
+    const dirZ = p.vz;
     if (target === 'structure') {
-      world.structureHits.push({ id: targetId, damage: p.structureDamage, by: p.player, cause: p.cause });
+      world.structureHits.push({ id: targetId, damage: p.structureDamage, by: p.player, cause: p.cause, dirX, dirZ });
     }
     if (splash > 0) {
       structuresInCircle(q, x, z, splash, ids);
       for (const id of ids) {
         if (target === 'structure' && id === targetId) continue;
         if (y > world.cityIndex.sheight[id] + splash) continue;
-        world.structureHits.push({ id, damage: p.structureDamage, by: p.player, cause: p.cause });
+        world.structureHits.push({ id, damage: p.structureDamage, by: p.player, cause: p.cause, dirX, dirZ });
       }
     }
   }
@@ -199,6 +239,9 @@ function impact(world: World, p: Projectile, x: number, y: number, z: number, ta
     for (const id of ids) world.propHits.push({ id, by: p.player, cause: p.cause });
   }
 
+  // A propane tank near where it landed goes off, in a kaiju's hand too (sim/cityWeapons.ts).
+  cityBlastAt(world, x, y, z, splash, p.player, p.cause);
+
   const shown: ProjectileTarget = target === 'ground' && inWater(q, x, z) ? 'water' : target;
   emit(world, { type: 'projectileHit', id: p.id, projectile: p.type, x, y, z, target: shown, targetId, splash });
 }
@@ -219,7 +262,8 @@ function fly(world: World, p: Projectile): boolean {
   let target: ProjectileTarget = 'none';
   let targetId = -1;
 
-  if (castSegment(world.cityQuery, segA, segB, cityHit, -1, true)) {
+  // Rubble and fallen buildings stop it too (up to their height).
+  if (castSegment(world.cityQuery, segA, segB, cityHit, -1, true, true)) {
     best = cityHit.t;
     target = 'structure';
     targetId = cityHit.structure;
@@ -233,7 +277,9 @@ function fly(world: World, p: Projectile): boolean {
       targetId = k.id;
     }
   }
-  if (p.owner === 'kaiju') {
+  // A javelin (a thrown antenna or mast) goes through units rather than stopping on them.
+  const javelin = p.city !== undefined && p.city.javelin;
+  if (p.owner === 'kaiju' && !javelin) {
     for (const u of world.units) {
       if (!u.alive) continue;
       unitCapsule(u, capsule).r += radius;
@@ -244,14 +290,18 @@ function fly(world: World, p: Projectile): boolean {
       }
     }
   }
-  if (segB.y <= 0) {
-    const t = segA.y <= 0 ? 0 : segA.y / (segA.y - segB.y);
+  // Within a hair of the ground is on it: a guided missile brought onto a point on the ground
+  // arrives at exactly its height, give or take the rounding.
+  if (segB.y <= GROUND_SLACK) {
+    const t = segA.y <= GROUND_SLACK ? 0 : Math.min(1, segA.y / (segA.y - segB.y));
     if (t < best) {
       best = t;
       target = 'ground';
       targetId = -1;
     }
   }
+  // The units a javelin goes through on this step, short of whatever stops it.
+  if (javelin) javelinPierce(world, p, segA, segB, Math.min(best, 1));
 
   if (best <= 1) {
     const x = segA.x + (segB.x - segA.x) * best;

@@ -208,11 +208,35 @@ describe('the squad bot', () => {
     // They went looking (toward the middle of the bounds first, then around).
     leaders(world).forEach((u, i) => expect(Math.hypot(u.x - start[i].x, u.z - start[i].z)).toBeGreaterThan(40));
 
-    // A wall comes down: now they see it, and they engage.
-    world.structureHp[0] = 0;
+    // It steps out of its pen: now they see it, and they engage. (Bringing a wall down would not
+    // do: its rubble, half as high, still hides a hatchling.)
+    placeKaiju(world, 0, 60, 0);
     const later = run(world, 40 * SEC);
     expect(k.known).toBe(true);
     expect(eventsOf(later, 'volley').length).toBeGreaterThan(0);
+  });
+
+  it('finds a line round a wall or a heap that hides the kaiju from its side, and gets its volleys off from there', () => {
+    // A long wall just north of the kaiju: from the north there is no line of fire at all, so
+    // the squads that would park there have to go round to another side.
+    const world = squadWorld({ structures: [{ x: 0, z: 22, w: 160, d: 6, height: 30, hp: 1e9 }] });
+    const events = run(world, 90 * SEC);
+    const volleys = eventsOf(events, 'volley');
+    for (const squad of world.squads) expect(volleys.filter((v) => v.squad === squad.id).length).toBeGreaterThan(0);
+  });
+
+  it('gets its volleys off at a hatchling standing among the rubble of its start (Port Meridian)', () => {
+    // Rubble hides a hatchling's legs (phase 2), and from where a leader still sees its head the
+    // planted squad-mates often do not: the bots used to plant there again and again without a
+    // charged volley ever going off, or to wait where nobody had a line at all. At this start, with
+    // this seed, three squads of four fired no charged volley in a whole fast stage 1.
+    const config = createMatchConfig({ anchor: 5, fast: true, bots: { kaijuHandicap: 1, humanHandicap: 0 } });
+    const world = createWorld({ seed: 2496319090, config });
+    const volleys = world.squads.map(() => 0);
+    for (let t = 0; t < 150 * SEC && world.match.stage === 1 && world.match.phase !== 'ended'; t++) {
+      for (const e of world.step()) if (e.type === 'volley') volleys[e.squad]++;
+    }
+    for (const n of volleys) expect(n).toBeGreaterThan(0);
   });
 
   it('pours fire into a cocoon as fast as the guns load', () => {

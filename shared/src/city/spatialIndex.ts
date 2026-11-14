@@ -5,13 +5,24 @@
  * - CityIndex: built once from CityData. Uniform grids of structures and props, cached
  *   per-structure trigonometry, and a ground raster (water, park, plaza). Immutable apart from
  *   a visit-stamp scratch array, so one index can serve every World in a process.
- * - CityQuery: an index plus the live state of one match (structure hp, live props). All
- *   queries take a CityQuery; "standing" means hp > 0. The server builds one over the World's
- *   arrays, the client builds one over its mirrored copy for movement prediction.
+ * - CityQuery: an index plus the live state of one match (structure hp, live props, which
+ *   structures fell over and which way). All queries take a CityQuery; "standing" means
+ *   hp > 0. The server builds one over the World's arrays, the client builds one over its
+ *   mirrored copy for movement prediction.
+ *
+ * Mounds (docs/ROADMAP.md, phase 2: rubble that stays). A structure that collapsed where it
+ * stands is a mound over its own footprint, `index.srubble` high (half its height, from its
+ * archetype; bridge decks leave none). One that fell over is a long mound where it lies
+ * (`fallenBox`): as long as it was tall, as wide as its footprint across the fall, half its
+ * depth high. Mounds never block a body (units cross them slowly: `moundHeightAt`; the kaiju
+ * walks over them); they block shots and sight up to their height, but only for the casts that
+ * ask (`mounds` true: projectiles, aim rays, spotting, lines of fire). A cast that starts inside
+ * a mound passes through that one: whoever stands on rubble sees and shoots over it.
  *
  * Queries do not allocate: results go into caller-supplied arrays or result objects.
  */
 
+import { FALL_RULES, RUBBLE_RULES } from '../defs/rubble';
 import { bitGet, createBitset } from '../math/bits';
 import {
   castBoxCS,
@@ -52,6 +63,8 @@ export interface CityIndex {
   ssin: Float64Array;
   sheight: Float64Array;
   spassable: Uint8Array;
+  /** Height of the mound a structure leaves when it collapses where it stands (0: none, a bridge deck). */
+  srubble: Float64Array;
   /** Prop ids per cell, same layout. */
   propCellStart: Uint32Array;
   propCellItems: Uint32Array;
@@ -72,11 +85,26 @@ export interface CityState {
   structureHp: Float32Array;
   /** Bitset of props that are still standing. */
   propAlive: Uint8Array;
+  /**
+   * Per structure id: 0 unless it lies fallen over, else 1 + the side it fell toward (`FallSide`).
+   * Set when a fall lands (`setStructureFallen`); a fallen structure is rubble (hp 0) whose
+   * mound is the long one where it lies, not the one over its footprint.
+   */
+  structureFall: Uint8Array;
+  /** The ids of the structures lying fallen (the queries look at each), in the order they landed. */
+  fallen: number[];
 }
 
 export interface CityQuery extends CityState {
   index: CityIndex;
 }
+
+/**
+ * The sides a structure can fall toward, in its own frame: 0 its local +X, 1 local +Z (the
+ * front), 2 local -X, 3 local -Z. In the world, local +X is (cos yaw, -sin yaw) and local +Z is
+ * (sin yaw, cos yaw), the structure's forward.
+ */
+export type FallSide = 0 | 1 | 2 | 3;
 
 /** A cast result against the city: the usual hit plus which structure was hit. */
 export interface CityCastHit extends CastHit {
@@ -111,6 +139,7 @@ export function buildCityIndex(city: CityData): CityIndex {
   const ssin = new Float64Array(n);
   const sheight = new Float64Array(n);
   const spassable = new Uint8Array(n);
+  const srubble = new Float64Array(n);
   // Cell ranges per structure: [c0, r0, c1, r1].
   const ranges = new Int32Array(n * 4);
   const counts = new Uint32Array(cellCount + 1);
@@ -128,6 +157,7 @@ export function buildCityIndex(city: CityData): CityIndex {
     ssin[i] = sn;
     sheight[i] = s.height;
     spassable[i] = s.passable ? 1 : 0;
+    srubble[i] = s.passable ? 0 : Math.min(RUBBLE_RULES.maxHeight, s.height * RUBBLE_RULES.heightShare);
     const ex = s.hx * Math.abs(c) + s.hz * Math.abs(sn);
     const ez = s.hx * Math.abs(sn) + s.hz * Math.abs(c);
     const c0 = cellOf(grid, s.x - ex);
@@ -202,6 +232,7 @@ export function buildCityIndex(city: CityData): CityIndex {
     ssin,
     sheight,
     spassable,
+    srubble,
     propCellStart,
     propCellItems,
     px,
@@ -246,15 +277,188 @@ function rasterizePolygon(ground: Uint8Array, cols: number, half: number, polygo
   }
 }
 
-/** Fresh live state for a city: every structure at full hp, every prop alive. */
+/** Fresh live state for a city: every structure at full hp, every prop alive, nothing fallen. */
 export function createCityState(city: CityData): CityState {
   const structureHp = new Float32Array(city.structures.length);
   for (let i = 0; i < structureHp.length; i++) structureHp[i] = city.structures[i].hp;
-  return { structureHp, propAlive: createBitset(city.props.length, true) };
+  return {
+    structureHp,
+    propAlive: createBitset(city.props.length, true),
+    structureFall: new Uint8Array(city.structures.length),
+    fallen: [],
+  };
 }
 
+/** A query over an index and a live state. It shares the state's arrays: changes to one are changes to the other. */
 export function createCityQuery(index: CityIndex, state: CityState): CityQuery {
-  return { index, structureHp: state.structureHp, propAlive: state.propAlive };
+  return { index, structureHp: state.structureHp, propAlive: state.propAlive, structureFall: state.structureFall, fallen: state.fallen };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Fallen structures (docs/ROADMAP.md, phase 2: some tall buildings fall over on their side)
+// ---------------------------------------------------------------------------------------------
+
+/** True for a structure slender enough to fall over when it collapses (FALL_RULES.slenderness). Bridge decks never do. */
+export function canFallOver(index: CityIndex, id: number): boolean {
+  if (index.spassable[id] === 1) return false;
+  return index.sheight[id] >= FALL_RULES.slenderness * 2 * Math.max(index.shx[id], index.shz[id]);
+}
+
+/** World direction (a unit ground vector) of a fall toward `side` of a structure. */
+export function fallSideDir(index: CityIndex, id: number, side: number, out: Vec2): Vec2 {
+  const c = index.scos[id];
+  const s = index.ssin[id];
+  switch (side & 3) {
+    case 0:
+      out.x = c;
+      out.z = -s;
+      break;
+    case 1:
+      out.x = s;
+      out.z = c;
+      break;
+    case 2:
+      out.x = -c;
+      out.z = s;
+      break;
+    default:
+      out.x = -s;
+      out.z = -c;
+  }
+  return out;
+}
+
+/** The side of a structure that faces most nearly along the ground direction (dirX, dirZ): the way it falls when pushed that way. */
+export function fallSideToward(index: CityIndex, id: number, dirX: number, dirZ: number): FallSide {
+  const c = index.scos[id];
+  const s = index.ssin[id];
+  // The direction in the structure's own frame (see castBoxCS).
+  const lx = dirX * c - dirZ * s;
+  const lz = dirX * s + dirZ * c;
+  if (Math.abs(lx) >= Math.abs(lz)) return lx >= 0 ? 0 : 2;
+  return lz >= 0 ? 1 : 3;
+}
+
+/** A mound as a box prism from the ground up to `height`, in the frame of the structure it came from. */
+export interface MoundBox {
+  /** Center on the ground. */
+  x: number;
+  z: number;
+  /** Half extents along the structure's own X and Z. */
+  hx: number;
+  hz: number;
+  cos: number;
+  sin: number;
+  height: number;
+}
+
+export function createMoundBox(): MoundBox {
+  return { x: 0, z: 0, hx: 0, hz: 0, cos: 1, sin: 0, height: 0 };
+}
+
+/** Half the footprint's depth along a fall toward `side` (sides 0 and 2 run along its own X). */
+function halfDepthAlong(index: CityIndex, id: number, side: number): number {
+  return (side & 1) === 0 ? index.shx[id] : index.shz[id];
+}
+
+/**
+ * Where a structure lies once it has fallen toward `side`: it tipped over the edge of its
+ * footprint on that side, so it reaches from that edge out as far as it was tall, as wide as
+ * its footprint across the fall, FALL_RULES.lyingHeightShare of its depth along the fall high.
+ * Its own footprint is left clear. The box keeps the structure's own frame (its yaw).
+ */
+export function fallenBox(index: CityIndex, id: number, side: number, out: MoundBox): MoundBox {
+  const along = halfDepthAlong(index, id, side);
+  const h = index.sheight[id];
+  const dir = fallSideDir(index, id, side, scratchDir);
+  out.x = index.sx[id] + dir.x * (along + h / 2);
+  out.z = index.sz[id] + dir.z * (along + h / 2);
+  if ((side & 1) === 0) {
+    out.hx = h / 2;
+    out.hz = index.shz[id];
+  } else {
+    out.hx = index.shx[id];
+    out.hz = h / 2;
+  }
+  out.cos = index.scos[id];
+  out.sin = index.ssin[id];
+  out.height = 2 * along * FALL_RULES.lyingHeightShare;
+  return out;
+}
+
+/**
+ * Where the top of a structure lands when it falls toward `side` (`out`), and where its base
+ * pivots (the middle of the footprint's edge on that side, `pivot`, optional).
+ */
+export function fallTop(index: CityIndex, id: number, side: number, out: Vec2, pivot?: Vec2): Vec2 {
+  const along = halfDepthAlong(index, id, side);
+  const dir = fallSideDir(index, id, side, scratchDir);
+  const h = index.sheight[id];
+  if (pivot) {
+    pivot.x = index.sx[id] + dir.x * along;
+    pivot.z = index.sz[id] + dir.z * along;
+  }
+  out.x = index.sx[id] + dir.x * (along + h);
+  out.z = index.sz[id] + dir.z * (along + h);
+  return out;
+}
+
+/** Records that a structure now lies fallen toward `side` (the server when a fall lands; a client from the `structureFall` event). */
+export function setStructureFallen(state: CityState, id: number, side: number): void {
+  if (state.structureFall[id] !== 0) return;
+  state.structureFall[id] = (side & 3) + 1;
+  state.fallen.push(id);
+}
+
+/** The mound a collapsed structure is, wherever it lies: false when it is standing or left none. */
+export function moundBox(q: CityQuery, id: number, out: MoundBox): boolean {
+  if (q.structureHp[id] > 0) return false;
+  const fall = q.structureFall[id];
+  if (fall !== 0) {
+    fallenBox(q.index, id, fall - 1, out);
+    return true;
+  }
+  const idx = q.index;
+  if (!(idx.srubble[id] > 0)) return false;
+  out.x = idx.sx[id];
+  out.z = idx.sz[id];
+  out.hx = idx.shx[id];
+  out.hz = idx.shz[id];
+  out.cos = idx.scos[id];
+  out.sin = idx.ssin[id];
+  out.height = idx.srubble[id];
+  return true;
+}
+
+const scratchDir: Vec2 = { x: 0, z: 0 };
+const scratchBox: MoundBox = createMoundBox();
+
+function insideMound(b: MoundBox, x: number, y: number, z: number): boolean {
+  return y < b.height && distSqPointBoxCS(x, z, b.x, b.z, b.hx, b.hz, b.cos, b.sin) === 0;
+}
+
+/**
+ * Height of the mound (rubble, or a fallen structure) under a ground point; 0 when there is
+ * none. Units cross mounds at RUBBLE_RULES.unitSpeedMult of their speed (sim/movement.ts).
+ */
+export function moundHeightAt(q: CityQuery, x: number, z: number): number {
+  const idx = q.index;
+  let best = 0;
+  if (x >= -idx.half && x <= idx.half && z >= -idx.half && z <= idx.half) {
+    const cell = cellOf(idx, z) * idx.cols + cellOf(idx, x);
+    for (let k = idx.cellStart[cell]; k < idx.cellStart[cell + 1]; k++) {
+      const id = idx.cellItems[k];
+      if (q.structureHp[id] > 0 || q.structureFall[id] !== 0 || !(idx.srubble[id] > best)) continue;
+      if (distSqPointBoxCS(x, z, idx.sx[id], idx.sz[id], idx.shx[id], idx.shz[id], idx.scos[id], idx.ssin[id]) === 0) best = idx.srubble[id];
+    }
+  }
+  for (const id of q.fallen) {
+    fallenBox(idx, id, q.structureFall[id] - 1, scratchBox);
+    if (scratchBox.height > best && distSqPointBoxCS(x, z, scratchBox.x, scratchBox.z, scratchBox.hx, scratchBox.hz, scratchBox.cos, scratchBox.sin) === 0) {
+      best = scratchBox.height;
+    }
+  }
+  return best;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -427,6 +631,8 @@ const scratchHit: CastHit = createCastHit();
  * the ground to its height) and reports the nearest hit. `ignore` skips one structure id.
  * `skipPassable` leaves out bridge decks: for everything that moves, shoots or looks along the
  * ground a deck is road surface, not a wall (bodies on it stand at ground level, inside its box).
+ * `mounds` adds the mounds of collapsed and fallen structures (box prisms up to the mound's
+ * height), except any mound the path starts inside.
  */
 function castPath(
   q: CityQuery,
@@ -440,15 +646,53 @@ function castPath(
   out: CityCastHit | undefined,
   ignore: number,
   skipPassable = false,
+  mounds = false,
 ): boolean {
   const idx = q.index;
   const half = idx.half;
 
-  // Clip the path to the city square: there is nothing to hit outside it.
+  let best = Infinity;
+  let bestId = -1;
+  let bnx = 0;
+  let bny = 0;
+  let bnz = 0;
+
+  // Fallen structures first: they lie outside the cells of their own footprint, so the grid does
+  // not list them where they are. There are only ever a few dozen.
+  if (mounds && q.fallen.length > 0) {
+    const ex = ox + dx * tMax;
+    const ey = oy + dy * tMax;
+    const ez = oz + dz * tMax;
+    const minX = Math.min(ox, ex);
+    const maxX = Math.max(ox, ex);
+    const minZ = Math.min(oz, ez);
+    const maxZ = Math.max(oz, ez);
+    const minY = Math.min(oy, ey);
+    for (let i = 0; i < q.fallen.length; i++) {
+      const id = q.fallen[i];
+      if (id === ignore) continue;
+      const b = fallenBox(idx, id, q.structureFall[id] - 1, scratchBox);
+      if (minY >= b.height) continue;
+      const rx = b.hx * Math.abs(b.cos) + b.hz * Math.abs(b.sin);
+      const rz = b.hx * Math.abs(b.sin) + b.hz * Math.abs(b.cos);
+      if (maxX < b.x - rx || minX > b.x + rx || maxZ < b.z - rz || minZ > b.z + rz) continue;
+      if (insideMound(b, ox, oy, oz)) continue;
+      if (castBoxCS(ox, oy, oz, dx, dy, dz, tMax, b.x, b.z, b.hx, b.hz, b.cos, b.sin, 0, b.height, scratchHit) && scratchHit.t < best) {
+        best = scratchHit.t;
+        bestId = id;
+        bnx = scratchHit.nx;
+        bny = scratchHit.ny;
+        bnz = scratchHit.nz;
+      }
+    }
+  }
+
+  // Clip the path to the city square: there is nothing else to hit outside it.
   let t0 = 0;
   let t1 = tMax;
+  let inSquare = true;
   if (dx === 0) {
-    if (ox < -half || ox > half) return false;
+    if (ox < -half || ox > half) inSquare = false;
   } else {
     const a = (-half - ox) / dx;
     const b = (half - ox) / dx;
@@ -456,14 +700,14 @@ function castPath(
     t1 = Math.min(t1, Math.max(a, b));
   }
   if (dz === 0) {
-    if (oz < -half || oz > half) return false;
+    if (oz < -half || oz > half) inSquare = false;
   } else {
     const a = (-half - oz) / dz;
     const b = (half - oz) / dz;
     t0 = Math.max(t0, Math.min(a, b));
     t1 = Math.min(t1, Math.max(a, b));
   }
-  if (t0 > t1) return false;
+  if (t0 > t1) inSquare = false;
 
   let cx = cellOf(idx, ox + dx * t0);
   let cz = cellOf(idx, oz + dz * t0);
@@ -475,20 +719,25 @@ function castPath(
   let tNextZ = stepZ > 0 ? ((cz + 1) * INDEX_CELL - half - oz) / dz : stepZ < 0 ? (cz * INDEX_CELL - half - oz) / dz : Infinity;
 
   const now = nextStamp(idx);
-  let best = Infinity;
-  let bestId = -1;
-  let bnx = 0;
-  let bny = 0;
-  let bnz = 0;
 
-  for (;;) {
+  while (inSquare) {
     const cell = cz * idx.cols + cx;
     for (let k = idx.cellStart[cell]; k < idx.cellStart[cell + 1]; k++) {
       const id = idx.cellItems[k];
       if (idx.stamp[id] === now) continue;
       idx.stamp[id] = now;
-      if (id === ignore || q.structureHp[id] <= 0) continue;
-      if (skipPassable && idx.spassable[id] === 1) continue;
+      if (id === ignore) continue;
+      // What a structure is to a cast: its whole box while it stands; once down, the mound over
+      // its footprint (when the cast counts mounds, it did not fall over, and the cast does not
+      // start on top of it).
+      let top = idx.sheight[id];
+      if (q.structureHp[id] <= 0) {
+        if (!mounds || q.structureFall[id] !== 0 || !(idx.srubble[id] > 0)) continue;
+        top = idx.srubble[id];
+        if (oy < top && distSqPointBoxCS(ox, oz, idx.sx[id], idx.sz[id], idx.shx[id], idx.shz[id], idx.scos[id], idx.ssin[id]) === 0) continue;
+      } else if (skipPassable && idx.spassable[id] === 1) {
+        continue;
+      }
       const hit = castBoxCS(
         ox,
         oy,
@@ -504,7 +753,7 @@ function castPath(
         idx.scos[id],
         idx.ssin[id],
         0,
-        idx.sheight[id],
+        top,
         scratchHit,
       );
       if (hit && scratchHit.t < best) {
@@ -542,15 +791,18 @@ function castPath(
 /**
  * Segment a..b against standing structures. On a hit, `out.t` is the fraction along the segment
  * and `out.structure` the structure id. `ignore` skips one structure id (-1 for none);
- * `skipPassable` skips every bridge deck (projectiles, sight lines and aim rays pass it).
+ * `skipPassable` skips every bridge deck (projectiles, sight lines and aim rays pass it);
+ * `mounds` counts the mounds of collapsed and fallen structures too (shots and sight: rubble
+ * blocks them up to its height; bodies cross it, so movement leaves it out).
  */
-export function castSegment(q: CityQuery, a: Vec3, b: Vec3, out?: CityCastHit, ignore = -1, skipPassable = false): boolean {
-  return castPath(q, a.x, a.y, a.z, b.x - a.x, b.y - a.y, b.z - a.z, 1, out, ignore, skipPassable);
+export function castSegment(q: CityQuery, a: Vec3, b: Vec3, out?: CityCastHit, ignore = -1, skipPassable = false, mounds = false): boolean {
+  return castPath(q, a.x, a.y, a.z, b.x - a.x, b.y - a.y, b.z - a.z, 1, out, ignore, skipPassable, mounds);
 }
 
 /**
- * Ray against standing structures. `dir` must be a unit vector. On a hit, `out.t` is the distance
- * along the ray and `out.structure` the structure id.
+ * Ray against standing structures (and, with `mounds`, rubble and fallen structures). `dir`
+ * must be a unit vector. On a hit, `out.t` is the distance along the ray and `out.structure`
+ * the structure id.
  */
 export function castRay(
   q: CityQuery,
@@ -560,16 +812,18 @@ export function castRay(
   out?: CityCastHit,
   ignore = -1,
   skipPassable = false,
+  mounds = false,
 ): boolean {
-  return castPath(q, origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, maxDist, out, ignore, skipPassable);
+  return castPath(q, origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, maxDist, out, ignore, skipPassable, mounds);
 }
 
 /**
  * True when no standing structure blocks the straight line between two points. With
- * `skipPassable` bridge decks do not count (a unit on a bridge can see and be seen).
+ * `skipPassable` bridge decks do not count (a unit on a bridge can see and be seen); with
+ * `mounds` rubble and fallen structures do (spotting, lines of fire).
  */
-export function lineOfSight(q: CityQuery, a: Vec3, b: Vec3, skipPassable = false): boolean {
-  return !castPath(q, a.x, a.y, a.z, b.x - a.x, b.y - a.y, b.z - a.z, 1, undefined, -1, skipPassable);
+export function lineOfSight(q: CityQuery, a: Vec3, b: Vec3, skipPassable = false, mounds = false): boolean {
+  return !castPath(q, a.x, a.y, a.z, b.x - a.x, b.y - a.y, b.z - a.z, 1, undefined, -1, skipPassable, mounds);
 }
 
 /** Raw ground code (GROUND_*) at a point; land outside the city. */

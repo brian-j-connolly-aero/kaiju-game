@@ -7,6 +7,8 @@ export * from './factions';
 export * from './units';
 export * from './weapons';
 export * from './callins';
+export * from './pickups';
+export * from './rubble';
 export * from './upgrades';
 export * from './voice';
 export * from './bots';

@@ -101,3 +101,22 @@ neighbors at a distance, where they are a pixel or two anyway.
 - Bridges (class `bridge`, passable): with a model the client draws it like any building. The
   deck must sit at ground level in the file (units drive on the ground plane) and everything
   above it stays at the outer edges; nothing in the client changes.
+
+## 7. The special buildings (phase 2)
+
+`bld_substation_a`, `bld_gasstation_a` and `bld_radiomast_a` are ordinary building files and
+draw correctly with no client change. On top of the usual nodes they carry anchors for effects
+(`docs/ASSETS.md` section 3, "Special buildings"):
+
+- `spark_00`..`spark_05` (substation), `light_00`..`light_03` (gas station), `lamp_00`..`lamp_02`
+  (radio mast) are **empties**: read their positions (building frame, meters) and put the
+  crackle, the flicker or the blinking red glow there. They are numbered, so match by prefix.
+  The manifest entry's `nodes` lists them. The lamps and the flame sign already glow a little
+  through the emissive atlas at night; the anchors are for the moving part.
+- `top` (radio mast) is a mesh on the same `city_atlas` material: a spare copy of the mast's
+  top 8 m with its origin at the break (0, 16, 0). `intact` holds the whole mast, so the
+  instanced batch needs nothing new; show `top` only for the fall, in place of `intact`'s
+  upper part, never beside it.
+- Their collapse chunks are hand-made parts (pumps, canopy slabs, transformer tanks, gantry
+  posts, mast bays), not grid cuts, and all use the atlas like every other chunk.
+

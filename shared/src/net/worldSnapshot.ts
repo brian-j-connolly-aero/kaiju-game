@@ -1,7 +1,7 @@
 /** Builds the snapshot of a World (server side). */
 
 import type { World } from '../sim/types';
-import type { SnapKaiju, SnapSquad, SnapUnit, Snapshot } from './snapshot';
+import type { SnapCrate, SnapKaiju, SnapSquad, SnapUnit, Snapshot } from './snapshot';
 
 /**
  * Captures the world as a Snapshot. `ackSeq` is per client: pass the receiving player's
@@ -41,6 +41,9 @@ export function snapshotOfWorld(world: World, ackSeq = 0): Snapshot {
     submerge: k.submerge,
     moves: [k.moves[0], k.moves[1]],
     offer: k.offer.slice(),
+    surge: k.surge,
+    clubSwings: k.clubSwings,
+    shieldHp: k.shieldHp,
   }));
   const squads: SnapSquad[] = world.squads.map((s) => ({
     id: s.id,
@@ -50,7 +53,10 @@ export function snapshotOfWorld(world: World, ackSeq = 0): Snapshot {
     eliminated: s.eliminated,
     bot: world.players[s.player].bot,
     driven: s.driven,
+    pickup: s.pickup,
+    barrages: s.barrages,
   }));
+  const crates: SnapCrate[] = world.crates.map((c) => ({ id: c.id, kind: c.kind, x: c.x, z: c.z, fall: c.fall }));
   const units: SnapUnit[] = world.units.map((u) => {
     const squad = world.squads[u.squad];
     return {
@@ -97,9 +103,11 @@ export function snapshotOfWorld(world: World, ackSeq = 0): Snapshot {
       marksReached: m.marksReached,
       winner: m.winner,
       endReason: m.endReason,
+      staticUntil: m.staticUntil,
     },
     kaijus,
     squads,
     units,
+    crates,
   };
 }

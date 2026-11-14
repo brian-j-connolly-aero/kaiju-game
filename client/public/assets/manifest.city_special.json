@@ -1,0 +1,34 @@
+{
+  "models": {
+    "bld_gasstation_a": {
+      "file": "models/bld_gasstation_a.glb",
+      "kind": "structure",
+      "nodes": ["chunk_00", "chunk_01", "chunk_02", "chunk_03", "chunk_04", "chunk_05", "chunk_06", "chunk_07", "chunk_08", "chunk_09", "chunk_10", "chunk_11", "chunk_12", "damaged", "intact", "light_00", "light_01", "light_02", "light_03", "rubble"],
+      "size": [26.0, 7.0, 20.0],
+      "tris": 160,
+      "chunks": 13,
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint", "blend": "multiply", "base": "#f5f2ea", "colors": ["#f3e3b3", "#f2a48b", "#a8d4f0", "#a9e5c5", "#f6c9a0", "#cfe8a0", "#f5f2ea", "#c9b5e8"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "suburb"
+    },
+    "bld_radiomast_a": {
+      "file": "models/bld_radiomast_a.glb",
+      "kind": "structure",
+      "nodes": ["chunk_00", "chunk_01", "chunk_02", "chunk_03", "chunk_04", "chunk_05", "chunk_06", "chunk_07", "damaged", "intact", "lamp_00", "lamp_01", "lamp_02", "rubble", "top"],
+      "size": [8.0, 24.0, 8.0],
+      "tris": 118,
+      "chunks": 8,
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint", "blend": "multiply", "base": "#bdb9b0", "colors": ["#bdb9b0", "#8fa0b5", "#ead2a0", "#e3c04f"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "industry"
+    },
+    "bld_substation_a": {
+      "file": "models/bld_substation_a.glb",
+      "kind": "structure",
+      "nodes": ["chunk_00", "chunk_01", "chunk_02", "chunk_03", "chunk_04", "chunk_05", "chunk_06", "chunk_07", "chunk_08", "chunk_09", "chunk_10", "damaged", "intact", "rubble", "spark_00", "spark_01", "spark_02", "spark_03", "spark_04", "spark_05"],
+      "size": [22.0, 9.0, 16.07],
+      "tris": 184,
+      "chunks": 11,
+      "tint": {"part": "wall plaster", "mask": "COLOR_0 alpha: 1 = wall that takes the building's color, 0 = never tint", "blend": "multiply", "base": "#bdb9b0", "colors": ["#bdb9b0", "#8fa0b5", "#ead2a0", "#e3c04f"], "hint": "multiply masked faces by color / base (per channel): the wall then shows the color"},
+      "district": "industry"
+    }
+  }
+}

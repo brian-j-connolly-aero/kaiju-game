@@ -15,6 +15,11 @@ export interface ModelEntry {
   tint?: { colors?: string[]; base?: string };
   /** Kaiju: pose targets, degrees per node relative to the rest pose (ASSETS.md section 7). */
   poses?: Record<string, Record<string, [number, number, number]>>;
+  /**
+   * City weapons (phase 2): where the claw closes (`at`, the model's `grip` node), which way the
+   * weapon points from there (`tip`) and how it is held (ASSETS.md section 3; render/heldProps.ts).
+   */
+  grip?: { at: [number, number, number]; tip: [number, number, number]; hold: string };
 }
 
 export interface SpriteAnim {

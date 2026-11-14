@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Squad controls: the volley charging. Three squad-mates planted (circles = humans), their lasers meeting at one point (diamond = volley). -->
+  <path fill="currentColor" stroke="none" d="M32 3L40.5 11.5L32 20L23.5 11.5Z"/>
+  <path d="M13 43L23 25.5M32 44V28M51 43L41 25.5"/>
+  <circle cx="10" cy="54" r="6" fill="currentColor" stroke="none"/>
+  <circle cx="32" cy="55.5" r="6" fill="currentColor" stroke="none"/>
+  <circle cx="54" cy="54" r="6" fill="currentColor" stroke="none"/>
+</svg>

@@ -67,6 +67,11 @@ export interface MatchConfig {
   tuning: MatchTuning;
   /** Bot handicaps; absent means every bot plays at its best. */
   bots?: BotTuning;
+  /**
+   * Army supply crates (docs/ROADMAP.md, phase 2; sim/systems/pickups.ts): absent or true they
+   * come down; false, none do (tests of a single rule, and the balance harness's `--no-crates`).
+   */
+  crates?: boolean;
 }
 
 export function defaultTuning(): MatchTuning {

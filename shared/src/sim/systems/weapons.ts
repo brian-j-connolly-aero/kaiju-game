@@ -1,11 +1,22 @@
 /**
- * System 6 of 11: weapons, volleys and call-in missions (DESIGN.md section 5).
+ * System 7 of 12: weapons, volleys and call-in missions (DESIGN.md section 5).
  *
  * Arcade handling: no ammunition, only cooldowns. A unit whose weapon is ready fires one salvo:
  * `shotsForMembers(weapon, members)` projectiles (a section's launchers, a troop's tanks) that
  * leave from points spread across its width. Every projectile is a real object launched with
  * `spawnProjectile`; the projectile system flies it and resolves what it hits. A unit that is
- * shaken or stunned (a roar) does not fire.
+ * shaken or stunned (a roar), or still coming down by parachute, does not fire.
+ *
+ * Pick-ups (docs/ROADMAP.md, phase 2; defs/pickups.ts): a squad's weapon pick-up
+ * (`squad.pickup`) replaces the driven unit's own weapon for all its shots, the Fire button's
+ * and the one that goes with a volley (`pickupWeaponDef`): the machine gun's tracers (with a
+ * spread on every shot, a person's own too), the big cannon's heavy shells, the missile pod's
+ * salvo of missiles that fan out and curve onto the aim point (flight 'guided': a constant
+ * acceleration that brings each one exactly onto the point after the time a straight shot would
+ * take, then straight on). Squad-mates keep their own weapons. The artillery radio
+ * (`squad.barrages`): each charged volley the squad fires while it has barrages left calls one
+ * (`startCallIn`) on the ground the volley's crosshair marks (`resolveMarkerPoint`); one at the
+ * empty sky is not spent.
  *
  * - The driven unit fires while its player holds Fire. Its shots go to the point where its
  *   weapon's aim ray lands: from the unit's eye along the unit's own `aimYaw` and `aimPitch`,
@@ -36,8 +47,8 @@
  * - Aim error is one sigma, in radians, applied to heading and elevation of every projectile
  *   separately, multiplied by the scatter multipliers (`scatterMult`: stage, spotted, slowed)
  *   of the kaiju being shot at, by 0.7 for veterans, and by the squad's `aimError` modifier.
- * - Call-in missions: `startCallIn` starts one for a squad at a ground point. No button does in
- *   phase 1; the artillery radio pick-up of phase 2 will (docs/ROADMAP.md). A mission waits out
+ * - Call-in missions: `startCallIn` starts one for a squad at a ground point; the artillery
+ *   radio pick-up does, with a charged volley (above). A mission waits out
  *   its delay, then drops its shells over its duration within the scatter radius (times the
  *   scatter multipliers of the kaiju nearest the marker). The shells are 'arty' projectiles
  *   owned by the call-in (never crossfire) that fall steeply from `spawnHeight`, timed so the
@@ -50,7 +61,8 @@
 
 import { callInDef } from '../../defs/callins';
 import type { CallInId } from '../../defs/ids';
-import type { CallInDef } from '../../defs/schema';
+import { pickupWeaponDef } from '../../defs/pickups';
+import type { CallInDef, WeaponDef } from '../../defs/schema';
 import { COMBAT_RULES, DT, SQUAD_RULES } from '../../defs/rules';
 import { unitTypeDef } from '../../defs/units';
 import { modMult } from '../../defs/upgrades';
@@ -58,9 +70,9 @@ import { projectileTypeDef, shotsForMembers, weaponDef } from '../../defs/weapon
 import { yawOf } from '../../math/angle';
 import { rngGauss, rngInDisc } from '../../math/rng';
 import { clamp } from '../../math/scalar';
-import type { Vec3 } from '../../math/vec';
+import type { Vec2, Vec3 } from '../../math/vec';
 import { Btn, MAX_AIM_PITCH } from '../../net/input';
-import { createAimPoint, resolveAimPoint } from '../aim';
+import { createAimPoint, resolveAimPoint, resolveMarkerPoint } from '../aim';
 import { isChargedVolley, nearestKaiju, scatterMult, unitAimErrorMult, volleyAim, volleyStrength } from '../squads';
 import type { CallInMission, Squad, Unit, World } from '../types';
 import { emit } from '../worldOps';
@@ -68,11 +80,14 @@ import { spawnProjectile } from './projectiles';
 
 /** Slack for comparing counted-down timers against zero. */
 const TIME_EPS = 1e-6;
+/** A guided missile curves onto its point over at least this many ticks. */
+const MIN_STEER_TICKS = 3;
 
 /** Where the volley goes (the crosshair), and where a leader's own shot goes (its weapon's aim). */
 const aim = createAimPoint();
 const shot = createAimPoint();
 const mates: Vec3 = { x: 0, y: 0, z: 0 };
+const marker: Vec2 = { x: 0, z: 0 };
 const disc = { x: 0, z: 0 };
 const volleyUnits: Unit[] = [];
 
@@ -93,26 +108,35 @@ interface Salvo {
 
 const salvo: Salvo = { atPoint: false, x: 0, y: 0, z: 0, error: 0, damageMult: 1, nerveMult: 1, volley: false, atWill: false };
 
-/** A unit that can fire this tick: alive, steady, not stunned, its weapon loaded. */
+/** A unit that can fire this tick: alive, on the ground, steady, not stunned, its weapon loaded. */
 function ready(u: Unit): boolean {
   // roar stun: a stunned unit does not fire.
-  return u.alive && u.shaken <= 0 && u.stun <= 0 && u.cooldown <= 0;
+  return u.alive && u.drop <= 0 && u.shaken <= 0 && u.stun <= 0 && u.cooldown <= 0;
 }
 
-/** Fires one salvo of a unit's weapon and starts its cooldown. */
-function fireSalvo(world: World, squad: Squad, u: Unit, s: Salvo): void {
+/** The weapon a unit fires: its own, or for the driven unit the squad's weapon pick-up. */
+export function unitWeapon(squad: Squad, u: Unit): WeaponDef {
+  const own = weaponDef(unitTypeDef(u.type).weapon);
+  return squad.driven === u.id ? pickupWeaponDef(own, squad.pickup) : own;
+}
+
+/** Fires one salvo of a weapon from a unit and starts its cooldown. */
+function fireSalvo(world: World, squad: Squad, u: Unit, weapon: WeaponDef, s: Salvo): void {
   const type = unitTypeDef(u.type);
-  const weapon = weaponDef(type.weapon);
   const proj = projectileTypeDef(weapon.projectile);
   const shots = shotsForMembers(weapon, u.members);
   const my = u.y + type.muzzleHeight;
+  const fan = weapon.fan ?? 0;
+  const loft = weapon.loft ?? 0;
+  const guided = proj.flight === 'guided';
 
-  // The muzzles sit in a row across the unit, square to the line of fire.
+  // The muzzles sit in a row across the unit, square to the line of fire (a missile pod's are
+  // close together).
   let facing = u.aimYaw;
   if (s.atPoint && Math.hypot(s.x - u.x, s.z - u.z) > 1e-3) facing = yawOf(s.x - u.x, s.z - u.z);
   const rx = -Math.cos(facing);
   const rz = Math.sin(facing);
-  const spread = u.radius * SQUAD_RULES.muzzleSpread;
+  const spread = guided ? (shots > 1 ? u.radius / (shots - 1) : 0) : u.radius * SQUAD_RULES.muzzleSpread;
 
   // Range is the weapon's reach: the projectile gives out a little beyond it, whoever aimed it.
   const reach = weapon.range * modMult(squad.mods, 'weaponRange') * SQUAD_RULES.rangeSlack;
@@ -128,6 +152,8 @@ function fireSalvo(world: World, squad: Squad, u: Unit, s: Salvo): void {
     const mz = u.z + rz * off;
     let yaw = u.aimYaw;
     let pitch = u.aimPitch;
+    // How far away the point is: a guided missile is brought onto it (no further than it reaches).
+    let dist = reach;
     if (s.atPoint) {
       const dx = s.x - mx;
       const dy = s.y - my;
@@ -137,13 +163,39 @@ function fireSalvo(world: World, squad: Squad, u: Unit, s: Salvo): void {
         if (ground > 1e-3) yaw = yawOf(dx, dz);
         pitch = Math.atan2(dy, ground);
       }
+      dist = Math.min(reach, Math.hypot(ground, dy));
     }
     if (s.error > 0) {
       yaw += rngGauss(world.rng) * s.error;
       pitch += rngGauss(world.rng) * s.error;
     }
     pitch = clamp(pitch, -MAX_AIM_PITCH, MAX_AIM_PITCH);
-    const cp = Math.cos(pitch);
+    let cp = Math.cos(pitch);
+    let ax = 0;
+    let ay = 0;
+    let az = 0;
+    let steer = 0;
+    let life = ttl;
+    if (guided) {
+      // Where it is brought: the point along the aim (with its error), at the point's distance.
+      const tx = mx + Math.sin(yaw) * cp * dist;
+      const ty = my + Math.sin(pitch) * dist;
+      const tz = mz + Math.cos(yaw) * cp * dist;
+      // It leaves fanned out across the salvo and lofted, and a steady pull brings it onto the
+      // point in the time a straight shot would take (a whole number of ticks), then it flies on.
+      const ticks = Math.max(MIN_STEER_TICKS, Math.ceil(dist / proj.speed / DT - 1e-9));
+      steer = ticks * DT;
+      yaw += shots > 1 ? (j / (shots - 1) - 0.5) * fan : 0;
+      pitch = clamp(pitch + loft, -MAX_AIM_PITCH, MAX_AIM_PITCH);
+      cp = Math.cos(pitch);
+      const vx = Math.sin(yaw) * cp * proj.speed;
+      const vy = Math.sin(pitch) * proj.speed;
+      const vz = Math.cos(yaw) * cp * proj.speed;
+      ax = (2 * (tx - mx - vx * steer)) / (steer * steer);
+      ay = (2 * (ty - my - vy * steer)) / (steer * steer);
+      az = (2 * (tz - mz - vz * steer)) / (steer * steer);
+      life = Math.max(ttl, steer + DT);
+    }
     spawnProjectile(world, {
       type: weapon.projectile,
       flight: proj.flight,
@@ -157,7 +209,7 @@ function fireSalvo(world: World, squad: Squad, u: Unit, s: Salvo): void {
       vy: Math.sin(pitch) * proj.speed,
       vz: Math.cos(yaw) * cp * proj.speed,
       gravity: proj.gravity,
-      ttl,
+      ttl: life,
       damage,
       nerve,
       splash: weapon.splashRadius,
@@ -166,6 +218,7 @@ function fireSalvo(world: World, squad: Squad, u: Unit, s: Salvo): void {
       volley: s.volley,
       atWill: s.atWill,
       payload: null,
+      ...(guided ? { ax, ay, az, steer } : {}),
     });
   }
   u.cooldown = weapon.cooldown * modMult(squad.mods, 'weaponCooldown');
@@ -173,12 +226,13 @@ function fireSalvo(world: World, squad: Squad, u: Unit, s: Salvo): void {
 
 /**
  * The driven unit's own shot: to where its weapon's aim ray lands (the view for infantry, the
- * turret for a tank). `volley` when it goes with a charged volley.
+ * turret for a tank), with the squad's weapon pick-up if it has one. `volley` when it goes with
+ * a charged volley.
  */
 function fireLeader(world: World, squad: Squad, leader: Unit, volley: boolean): void {
   const player = world.players[squad.player];
   const type = unitTypeDef(leader.type);
-  const weapon = weaponDef(type.weapon);
+  const weapon = unitWeapon(squad, leader);
   resolveAimPoint(
     world.cityQuery,
     leader.x,
@@ -200,10 +254,12 @@ function fireLeader(world: World, squad: Squad, leader: Unit, volley: boolean): 
   salvo.volley = volley;
   // A bot at the controls is no better a shot than a sub-unit, and its plinking is fire at will.
   salvo.atWill = player.bot && !volley;
-  salvo.error = player.bot
+  const error = player.bot
     ? (volley ? weapon.aimErrorVolley : weapon.aimErrorAtWill) * unitAimErrorMult(squad, leader) * scatterMult(world.match.stage, target)
     : 0;
-  fireSalvo(world, squad, leader, salvo);
+  // The machine gun's spread is on every shot, a person's own too.
+  salvo.error = Math.hypot(error, weapon.spread ?? 0);
+  fireSalvo(world, squad, leader, weapon, salvo);
 }
 
 /** The volley button was let go: the planted squad-mates fire together, the leader with them, and all are let go. */
@@ -241,7 +297,7 @@ function fireVolley(world: World, squad: Squad, leader: Unit): void {
     salvo.volley = isChargedVolley(u.charge);
     salvo.atWill = false;
     salvo.error = (w.aimErrorAtWill + (w.aimErrorVolley - w.aimErrorAtWill) * strength) * unitAimErrorMult(squad, u) * scatter;
-    fireSalvo(world, squad, u, salvo);
+    fireSalvo(world, squad, u, w, salvo);
     charge += u.charge;
     ids.push(u.id);
   }
@@ -267,6 +323,21 @@ function fireVolley(world: World, squad: Squad, leader: Unit): void {
     z: aim.z,
     charge: charge / ids.length,
   });
+  // The artillery radio: this charged volley calls a barrage where it lands.
+  if (squad.barrages > 0) callBarrage(world, squad, leader);
+}
+
+/**
+ * The artillery radio's barrage, with a charged volley: a fire mission on the ground the
+ * volley's crosshair marks (the feet of a kaiju it is on). The empty sky marks nothing, and
+ * the barrage is kept for the next volley.
+ */
+function callBarrage(world: World, squad: Squad, leader: Unit): void {
+  const c = leader.control;
+  const eye = leader.y + unitTypeDef(leader.type).eyeHeight;
+  if (!resolveMarkerPoint(world.cityQuery, world.kaijus, leader.x, eye, leader.z, c.aimYaw, c.aimPitch, SQUAD_RULES.markerRange, marker)) return;
+  squad.barrages--;
+  startCallIn(world, squad, 'artillery', marker.x, marker.z);
 }
 
 /** A squad-mate shoots on its own, along its own aim. */
@@ -279,7 +350,7 @@ function fireAtWill(world: World, squad: Squad, u: Unit): void {
   salvo.atWill = true;
   salvo.error =
     weapon.aimErrorAtWill * unitAimErrorMult(squad, u) * scatterMult(world.match.stage, nearestKaiju(world, u.x, u.z));
-  fireSalvo(world, squad, u, salvo);
+  fireSalvo(world, squad, u, weapon, salvo);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -288,11 +359,11 @@ function fireAtWill(world: World, squad: Squad, u: Unit): void {
 
 /**
  * Starts a call-in mission (artillery) for a squad at a ground point, pulled inside the
- * playable bounds: the marker is down at once (`callin` 'marked'), and the first shell lands
- * `delay` seconds later. The shells come over the shoulder of the squad's leader, from behind it
- * toward the marker. Nothing is checked or spent here: whoever calls it (phase 2's artillery
- * radio) decides when a squad may. The mission outlives its squad and is dropped at the end of
- * the stage.
+ * playable bounds: the marker is down at once (`callin` 'marked', which the radio announces:
+ * `callin.inbound`), and the first shell lands `delay` seconds later. The shells come over the
+ * shoulder of the squad's leader, from behind it toward the marker. Nothing is checked or spent
+ * here: the artillery radio (`callBarrage`) decides when a squad may. The mission outlives its
+ * squad and is dropped at the end of the stage.
  */
 export function startCallIn(world: World, squad: Squad, callIn: CallInId, x: number, z: number): CallInMission {
   const def = callInDef(callIn);

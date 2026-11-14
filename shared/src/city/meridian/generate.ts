@@ -19,6 +19,7 @@ import { buildDecks, buildFronts, buildLandmarks, buildYards, createBuilder, ope
 import { furnish } from './furnish';
 import { buildGround } from './ground';
 import { ANCHORS, DISTRICT_TINTS, DISTRICTS, DOWNTOWN } from './layout';
+import { buildSpecials } from './specials';
 import { planStreets } from './streets';
 
 export function generatePortMeridian(seed: number = CITY_SEED): CityData {
@@ -49,6 +50,8 @@ export function generatePortMeridian(seed: number = CITY_SEED): CityData {
   const builder = createBuilder(ground, streets);
   buildDecks(builder);
   buildLandmarks(builder);
+  // The special buildings of every start, before the street fronts fill in around them.
+  buildSpecials(builder, seed);
   buildFronts(builder, seed);
   buildYards(builder, seed);
   openPockets(builder);

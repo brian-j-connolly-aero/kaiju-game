@@ -1,0 +1,18 @@
+{
+  "models": {
+    "prop_crate": {
+      "file": "models/prop_crate.glb",
+      "kind": "prop",
+      "nodes": ["prop_crate", "beacon"],
+      "size": [1.6, 1.63, 1.66],
+      "tris": 78
+    },
+    "prop_parachute": {
+      "file": "models/prop_parachute.glb",
+      "kind": "prop",
+      "nodes": ["prop_parachute", "hook"],
+      "size": [6.116, 6.703, 6.116],
+      "tris": 80
+    }
+  }
+}

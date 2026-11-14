@@ -13,8 +13,8 @@
  * Times are seconds unless a name ends in `Ticks`. Angles are radians.
  */
 
-import type { CityIndex, CityQuery } from '../city/spatialIndex';
-import type { CityData } from '../city/types';
+import type { CityIndex, CityQuery, FallSide } from '../city/spatialIndex';
+import type { CityData, PropKindId } from '../city/types';
 import type {
   CallInId,
   DamageKind,
@@ -29,11 +29,13 @@ import type {
   Level,
   MatchPhase,
   PerStage,
+  PickupKind,
   ProjectileTypeId,
   Role,
   StageId,
   UnitState,
   UnitTypeId,
+  WeaponPickupId,
   Winner,
 } from '../defs/ids';
 import type { Mods } from '../defs/schema';
@@ -219,6 +221,15 @@ export interface Kaiju {
   act: KaijuActionMemory;
 
   held: HeldObject | null;
+  /**
+   * The city as a weapon (DESIGN.md section 4): what is left of what the hand holds. A fast-food
+   * sign: swings left before it breaks (`clubSwings`). A garage door: the hp the door has left
+   * as a shield (`shieldHp`). Both 0 for anything else, and with nothing in the hand.
+   */
+  clubSwings: number;
+  shieldHp: number;
+  /** Seconds left of a power surge (a power substation wrecked, sim/systems/specials.ts); 0 for none. */
+  surge: number;
   /** Seconds until each verb can be used again. */
   cooldowns: Record<KaijuVerb, number>;
   /** True from the moment the bar passes a mark until the kaiju cocoons. */
@@ -293,6 +304,13 @@ export interface Squad {
   formed: boolean;
   /** Every planted squad-mate has a full charge (the edge of this is the `volley.ready` cue). */
   volleyReady: boolean;
+  /**
+   * The weapon pick-up the driven unit fires instead of its own weapon (defs/pickups.ts), or
+   * 'none'. It lasts until the stage ends or the squad is wiped out; a new one replaces it.
+   */
+  pickup: WeaponPickupId | 'none';
+  /** The artillery radio: how many of the squad's next charged volleys still call a barrage (0: none). */
+  barrages: number;
 }
 
 /** What a unit is trying to do this tick; same meaning as the matching PlayerInput fields. */
@@ -354,6 +372,11 @@ export interface Unit {
   inWater: boolean;
   /** Dead vehicles only: its wreck is still lying where it died (a kaiju can grab or eat it). */
   wreck: boolean;
+  /**
+   * Seconds left of coming down by parachute (reinforcements, sim/systems/pickups.ts); 0 on the
+   * ground. Until it lands its `y` is its height and it cannot move, fire or charge.
+   */
+  drop: number;
   /** Filled by the input system for the driven unit and by the orders system for sub-units. */
   control: UnitControl;
 }
@@ -386,6 +409,53 @@ export interface Projectile {
   /** Fired at will by a sub-unit or bot (halves nerve damage). */
   atWill: boolean;
   payload: HeldObject | null;
+  /** A thrown city weapon (phase 2): how it lands; absent for everything else. */
+  city?: ThrownCityWeapon;
+  /**
+   * Flight 'guided' (the missile pod): a constant acceleration, m/s², for `steer` more seconds
+   * (a whole number of ticks), after which it flies straight on (`stepProjectile`). Absent or 0
+   * for everything else.
+   */
+  ax?: number;
+  ay?: number;
+  az?: number;
+  steer?: number;
+}
+
+/** An army supply crate (docs/ROADMAP.md, phase 2): coming down by parachute, or lying on a street until a unit takes it. */
+export interface Crate {
+  /** Unique per match. */
+  id: number;
+  kind: PickupKind;
+  x: number;
+  z: number;
+  /** Seconds until it lands; 0 once it is on the ground (and anybody's to take). */
+  fall: number;
+}
+
+/** When and where the crates come down (sim/systems/pickups.ts). Server-side only. */
+export interface SupplyState {
+  /** The stage the crates down and the squads' pick-ups belong to (0 before play has begun). */
+  stage: number;
+  /** Seconds until the next timed drop. */
+  timer: number;
+  /** The squad the next timed drop is meant for (they take turns). */
+  turn: number;
+}
+
+/**
+ * A structure falling over (docs/ROADMAP.md, phase 2; sim/systems/cityDamage.ts): it collapsed
+ * and is on its way down onto its side. Server-side only; clients get `structureFall`.
+ */
+export interface FallingStructure {
+  id: number;
+  side: FallSide;
+  /** Seconds until it lands. */
+  timer: number;
+  by: PlayerId;
+  cause: DamageKind;
+  /** Falls in a row before this one (0: nothing fell on it). */
+  depth: number;
 }
 
 /** An artillery mission on its way (started with `startCallIn`, sim/systems/weapons.ts). */
@@ -404,6 +474,45 @@ export interface CallInMission {
   /** Ground direction the shells travel along (unit vector): from behind the caller toward the marker. */
   dirX: number;
   dirZ: number;
+}
+
+/**
+ * A city weapon lying loose on the ground (DESIGN.md section 4, "The city as a weapon"): dropped
+ * from the kaiju's hand, or the top of a radio mast that fell. It behaves like the generator's
+ * props of its kind (the hatchling can pick it up; at later stages feet and tracks crush it; a
+ * propane tank goes off), but it is not part of the city data: clients learn of it from the
+ * `looseProp` event and from the city state in the welcome.
+ */
+export interface LooseObject {
+  /** Index in `world.loose`, unique per match. */
+  id: number;
+  kind: PropKindId;
+  x: number;
+  z: number;
+  yaw: number;
+  /**
+   * 'falling' until tick `landsAt` (a radio mast's top on its way down), 'down' while it lies
+   * there to be picked up, 'gone' once it is picked up, crushed or gone off.
+   */
+  state: 'falling' | 'down' | 'gone';
+  landsAt: number;
+}
+
+/**
+ * A city weapon in flight (thrown by a kaiju, sim/cityWeapons.ts): what it is, and what it does
+ * where it lands (the kind's `cityWeapons` numbers, times `mult`). Server-side only.
+ */
+export interface ThrownCityWeapon {
+  prop: PropKindId;
+  /** A javelin (the antenna, the mast): it goes through units instead of stopping on them. */
+  javelin: boolean;
+  /** Javelins: how many more units it can go through, and the ones it has gone through. */
+  pierce: number;
+  pierced: number[];
+  /** What its damage is multiplied by (the kaiju's mods, and the power surge's when it was thrown): to units, their nerve, structures. */
+  unitMult: number;
+  nerveMult: number;
+  structureMult: number;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -442,6 +551,10 @@ export interface Hit {
   resetsCharge?: boolean;
   /** Seconds it stuns a unit it reaches (the roar). */
   stun?: number;
+  /** The stun is a knock-down (a water tank's splash, a garage door): the unit lies flat rather than reels (`unitStunned.knockdown`). */
+  knockdown?: boolean;
+  /** A kaiju loses exactly `damage` (its own propane tank going off in its hand): no state or facing multiplier, no nerve, no brace. */
+  exact?: boolean;
 }
 
 export interface PendingHit {
@@ -456,6 +569,14 @@ export interface StructureHit {
   damage: number;
   by: PlayerId;
   cause: DamageKind;
+  /**
+   * The way what hit it was travelling (a ground direction, any length): a tall structure that
+   * this brings down falls over that way. Absent: away from the nearest kaiju.
+   */
+  dirX?: number;
+  dirZ?: number;
+  /** A building that fell over is landing on it: how many falls in a row led here (it bounds the chain). */
+  fallDepth?: number;
 }
 
 /** A prop to destroy, waiting for the city damage system. */
@@ -510,6 +631,11 @@ export interface MatchState {
   stageTime: [number, number, number];
   breaks: number;
   kills: number;
+  /**
+   * The radio mast's reward (sim/systems/specials.ts): the humans' map shows static until this
+   * tick (0: it never has). While it does, `kaiju.known` comes only from what units see.
+   */
+  staticUntil: number;
 }
 
 /** What keeps the radio lively but never spammy: per-cue timers, a chatter budget, and what was said last. */
@@ -553,10 +679,27 @@ export interface World {
   propAlive: Uint8Array;
   /** Bitset of destroyed props that left a wreck on the ground which nobody has taken yet. */
   propWreck: Uint8Array;
+  /**
+   * Per structure id: 0, or 1 + the side (`FallSide`) it lies fallen toward; shared with
+   * `cityQuery` (whose `fallen` lists them). Set when a fall lands.
+   */
+  structureFall: Uint8Array;
+  /** Structures falling over right now (they land after FALL_RULES.time). */
+  falls: FallingStructure[];
+  /** Army supply crates coming down or lying on the ground, and when the next one comes. */
+  crates: Crate[];
+  nextCrateId: number;
+  supply: SupplyState;
   /** Zones that reduce structure damage (Tier 2 sanctuaries); empty in Tier 1. */
   shields: StructureShield[];
   /** Landmarks covered by an 'insuranceRider' upgrade: damage to them adds nothing to the bar. */
   insuredStructures: number[];
+  /**
+   * City weapons lying loose (sim/cityWeapons.ts): ones the kaiju dropped, and the top sections of
+   * fallen radio masts. Indexed by their `id`; one that is taken or destroyed stays in the list
+   * with state 'gone'. Static props of the generated city are not in here.
+   */
+  loose: LooseObject[];
 
   match: MatchState;
   players: PlayerState[];

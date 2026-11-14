@@ -100,11 +100,12 @@ describe('building paint', () => {
     expect(none.paint.getHex()).toBe(0xffffff);
   });
 
-  it('darkens damaged buildings, the deeper the damage the darker, and not the rubble', () => {
+  it('darkens damaged buildings, the deeper the damage the darker, and the rubble a little (its mound is the building\'s own walls)', () => {
     expect(shadeOf(0)).toBe(1);
     expect(shadeOf(1)).toBeLessThan(1);
     expect(shadeOf(2)).toBeLessThan(shadeOf(1));
-    expect(shadeOf(3)).toBe(1);
+    expect(shadeOf(3)).toBeLessThan(1);
+    expect(shadeOf(3)).toBeGreaterThan(shadeOf(2));
   });
 
   it('finds the district a point is in', () => {

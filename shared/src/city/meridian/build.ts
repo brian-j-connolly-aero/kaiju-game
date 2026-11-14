@@ -8,7 +8,7 @@
  */
 
 import type { ArchetypeDef } from '../archetypes';
-import { archetypeDef } from '../archetypes';
+import { archetypeDef, archetypeSpecial } from '../archetypes';
 import { createRng, hash32, rngFloat, rngRange, type Rng } from '../../math/rng';
 import type { Vec2 } from '../../math/vec';
 import type { Structure } from '../types';
@@ -39,7 +39,7 @@ const DRIVE_HALF = 12;
 /** ...and never closer to its edge than this. */
 const SIDEWALK = 3;
 /** Buildings keep this far from water, parks and plazas. */
-const SHORE = 2.5;
+export const SHORE = 2.5;
 
 const HASH_CELL = 40;
 
@@ -329,8 +329,8 @@ function pick(items: readonly PaletteItem[], c: number, rng: Rng, maxWidth: numb
 const scratchBox: Box = { x: 0, z: 0, hx: 0, hz: 0, dir: 0 };
 
 /** Buildings a juvenile cannot trample stand this much further back, so the street stays wide enough for it to walk. */
-const TALL = 12;
-const TALL_SETBACK = 2.5;
+export const TALL = 12;
+export const TALL_SETBACK = 2.5;
 /** ...and, placed in a yard, keep this far from each other (a juvenile is 18 m wide). */
 const TALL_APART = 19.5;
 
@@ -649,7 +649,8 @@ function pocketProbe(job: PocketJob, seed: number, fits: number, open: number, f
           for (let i = 0; i < list.length; i++) {
             const id = list[i];
             const st = b.structures[id];
-            if (gone[id] || st.passable || st.landmark !== null) continue;
+            // Bridge decks, landmarks and the special buildings (every start must keep its three) stay.
+            if (gone[id] || st.passable || st.landmark !== null || archetypeSpecial(st.archetype) !== null) continue;
             if (id === best || distSqPointBox(x, z, b.boxes[id]) > near * near) continue;
             const through = job.through && pocketBehind(job, id);
             if (best >= 0 && bestThrough && !through) continue;
@@ -868,7 +869,8 @@ function runPockets(b: Builder, gone: Uint8Array, raster: Uint8Array, queue: Int
  * that a hole made for the infantry is no new trap for a tank. Along the edge of the city, where
  * the last stage deploys its troops of tanks, the same is then done for a troop: there the wall
  * taken out is one with open ground behind it, since a troop needs a gap two houses wide.
- * Returns how many buildings were removed. Bridge decks and landmarks are never removed.
+ * Returns how many buildings were removed. Bridge decks, landmarks and the special buildings are
+ * never removed.
  */
 export function openPockets(b: Builder): number {
   const gone = new Uint8Array(b.structures.length);

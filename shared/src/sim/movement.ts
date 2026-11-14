@@ -11,7 +11,9 @@
  *   slow it to `wadeSpeedMult` while it touches them.
  * - Bridge decks (passable structures) never block anybody. They are trampled like any other
  *   structure when they are not taller than the trample height.
- * - Rubble (hp 0) is flat and passable. Props never block.
+ * - Rubble never blocks: a collapsed structure is a mound (over its footprint, or where it lies
+ *   when it fell over; city/spatialIndex.ts), and a body whose middle is on one moves at
+ *   `moundSpeedMult` (units at half speed; the kaiju walks over them). Props never block.
  * - Water slows the body to `waterSpeedMult` unless it stands on a bridge deck.
  * - Nobody can leave the playable bounds.
  *
@@ -25,10 +27,11 @@
  * exactly: hull speed is worked out from the velocity, the turret from the body's `aimYaw`.
  */
 
-import { bridgeAt, groundCodeAt, GROUND_WATER, structureContact, structuresInCircle, type CityQuery } from '../city/spatialIndex';
+import { bridgeAt, groundCodeAt, GROUND_WATER, moundHeightAt, structureContact, structuresInCircle, type CityQuery } from '../city/spatialIndex';
 import { kaijuKindDef } from '../defs/kaiju/index';
 import type { KaijuActionId, KaijuKindId, KaijuPhase, StageId } from '../defs/ids';
 import { perStage } from '../defs/ids';
+import { RUBBLE_RULES } from '../defs/rubble';
 import { COMBAT_RULES } from '../defs/rules';
 import type { Mods, SteerModel, UnitTypeDef } from '../defs/schema';
 import { modMult } from '../defs/upgrades';
@@ -79,6 +82,8 @@ export interface MoveParams {
   wades: boolean;
   wadeSpeedMult: number;
   waterSpeedMult: number;
+  /** Speed multiplier while the body's middle is on a mound of rubble or a fallen structure (1: it walks over them). */
+  moundSpeedMult: number;
   bounds: Bounds;
 }
 
@@ -93,10 +98,12 @@ export interface MoveResult {
   inWater: boolean;
   /** The body was slowed by wading this step. */
   wading: boolean;
+  /** The body started the step on a mound (rubble or a fallen structure) and was slowed by it. */
+  onMound: boolean;
 }
 
 export function createMoveResult(): MoveResult {
-  return { trampled: [], waded: [], blocked: false, inWater: false, wading: false };
+  return { trampled: [], waded: [], blocked: false, inWater: false, wading: false, onMound: false };
 }
 
 /** Inputs smaller than this are treated as "not moving" for steering. */
@@ -128,6 +135,7 @@ export function stepMovement(
   result.waded.length = 0;
   result.blocked = false;
   result.wading = false;
+  result.onMound = false;
   const index = city.index;
   const r = body.radius;
   const tank = params.steer === 'tank';
@@ -150,6 +158,10 @@ export function stepMovement(
   // --- Terrain at the start of the step ------------------------------------------------------
   let terrain = 1;
   if (params.waterSpeedMult !== 1 && wet(city, body.x, body.z)) terrain *= params.waterSpeedMult;
+  if (params.moundSpeedMult !== 1 && moundHeightAt(city, body.x, body.z) > 0) {
+    terrain *= params.moundSpeedMult;
+    result.onMound = true;
+  }
   if (params.wades && params.wadeSpeedMult !== 1) {
     structuresInCircle(city, body.x, body.z, r, ids);
     for (let i = 0; i < ids.length; i++) {
@@ -379,7 +391,8 @@ export function kaijuMoveParams(k: KaijuMoveState, bounds: Bounds, mods?: Mods, 
   let turnMult = 1;
   let accel = st.accel;
   let trampleHeight = st.trampleHeight;
-  if (k.phase === 'stagger' || k.phase === 'cocoon' || k.phase === 'dead') {
+  // A flinch (a propane tank went off in its hand, sim/cityWeapons.ts) roots it as well.
+  if (k.phase === 'stagger' || k.phase === 'cocoon' || k.phase === 'dead' || k.phase === 'flinch') {
     moveMult = 0;
     turnMult = 0;
   } else if (k.action === 'charge' && k.phase === 'windup') {
@@ -411,6 +424,8 @@ export function kaijuMoveParams(k: KaijuMoveState, bounds: Bounds, mods?: Mods, 
   p.wades = st.wadesTall;
   p.wadeSpeedMult = st.wadeSpeedMult;
   p.waterSpeedMult = st.waterSpeedMult;
+  // It walks over rubble and fallen buildings.
+  p.moundSpeedMult = 1;
   p.bounds = bounds;
   // Swimming: from wading toward its swimming speed as it goes under, with no water slowdown.
   const sub = k.submerge ?? 0;
@@ -456,12 +471,16 @@ export interface UnitMoveState {
    * it). A vehicle with a `drive` then handles like a tank ('tank' steering). Absent: a sub-unit.
    */
   driven?: boolean;
+  /** Height above the ground: a ground unit up in the air is coming down by parachute (reinforcements) and cannot move. Absent counts as 0. */
+  y?: number;
 }
 
 /**
  * Movement parameters for a unit this tick. Planted (charging) and dead units do not move: they
- * brake to a stop, a tank at its `drive.brake`. The driven unit of a vehicle level drives like a
- * tank ('tank' steering with the numbers of `def.drive`); everybody else steers by `def.steer`.
+ * brake to a stop, a tank at its `drive.brake`; nor does a ground unit still coming down by
+ * parachute. The driven unit of a vehicle level drives like a tank ('tank' steering with the
+ * numbers of `def.drive`); everybody else steers by `def.steer`. Units cross mounds of rubble
+ * and fallen buildings at RUBBLE_RULES.unitSpeedMult.
  */
 export function unitMoveParams(
   def: UnitTypeDef,
@@ -471,7 +490,8 @@ export function unitMoveParams(
   out?: MoveParams,
 ): MoveParams {
   // roar stun: a stunned unit does not move.
-  const still = !u.alive || u.rooted || (u.stun ?? 0) > 0;
+  const airborne = def.body !== 'aircraft' && (u.y ?? 0) > 0;
+  const still = !u.alive || u.rooted || (u.stun ?? 0) > 0 || airborne;
   const speedMod = mods ? modMult(mods, 'speed') : 1;
   const p: MoveParams = out ?? ({} as MoveParams);
   const drive = u.driven ? def.drive : undefined;
@@ -488,6 +508,7 @@ export function unitMoveParams(
   p.wades = false;
   p.wadeSpeedMult = 1;
   p.waterSpeedMult = def.body === 'aircraft' ? 1 : UNIT_WATER_SPEED_MULT;
+  p.moundSpeedMult = def.body === 'aircraft' ? 1 : RUBBLE_RULES.unitSpeedMult;
   p.bounds = bounds;
   return p;
 }

@@ -6,8 +6,10 @@
  * actual moving and all collision). It decides in three layers:
  *
  * 1. The straight line. When nothing stands in the way of the unit's whole width between it and
- *    the goal, it simply goes there. Rubble is flat, so a line across a wrecked block is clear;
- *    so is a line across the river (units wade) and across a bridge deck.
+ *    the goal, it simply goes there. Rubble never blocks a body (a unit crosses a mound of
+ *    rubble, or a fallen building, at half speed: sim/movement.ts), so a line across a wrecked
+ *    block is clear; so is a line across the river (units wade) and across a bridge deck. The
+ *    casts here leave mounds out; the ones for shots and sight count them.
  * 2. The road graph. Otherwise it routes along the streets: it steps out onto the nearest street
  *    it can reach in a straight line, follows the shortest way through the crossroads
  *    (Dijkstra over the road graph), and leaves the street at the point nearest the goal. It
@@ -243,7 +245,8 @@ export function solidInCircle(q: CityQuery, x: number, z: number, r: number): bo
 
 /**
  * True when a body of radius `r` can go straight from a to b: no standing structure (bridge
- * decks aside) touches the strip of that width between them or the circle at b.
+ * decks aside) touches the strip of that width between them or the circle at b. Mounds of
+ * rubble and fallen buildings do not count: bodies cross them.
  */
 export function corridorClear(q: CityQuery, ax: number, az: number, bx: number, bz: number, r: number): boolean {
   const dx = bx - ax;

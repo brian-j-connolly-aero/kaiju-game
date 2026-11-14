@@ -24,8 +24,17 @@ import { cleanRoomCode, memoryStore, roomCodeFromHash, sessionToken } from '../s
 import { createSnapshotBuffer, newestSnapshot, pushSnapshot, sampleSnapshots } from '../src/net/snapshotBuffer';
 
 /** A match with a person as the kaiju (slot 0), advanced past the briefing. */
-function playingWorld(seed: number): World {
+/**
+ * A fast match at Bellhaven with a person as the kaiju, past its briefing. `quiet`: the squads'
+ * bots stand still and no crates come down, so nothing the client cannot foresee (a barrage, a
+ * hit that slows the kaiju) happens to the body a test predicts.
+ */
+function playingWorld(seed: number, quiet = false): World {
   const config = createMatchConfig({ humans: [{ name: 'Tester', role: 'kaiju' }], fast: true, anchor: 1 });
+  if (quiet) {
+    config.bots = { kaijuHandicap: 0, humanHandicap: 1 };
+    config.crates = false;
+  }
   const world = createWorld({ seed, config });
   for (let i = 0; i < 400 && world.match.phase !== 'playing'; i++) world.step([]);
   expect(world.match.phase).toBe('playing');
@@ -180,7 +189,9 @@ describe('prediction when inputs reach the server late', () => {
   const walk = (seq: number): PlayerInput => ({ seq, moveX: 0, moveZ: 1, aimYaw: 0.4, aimPitch: 0, buttons: 0 });
 
   it('makes no correction when the server played late inputs on guesses and says it will drop them', () => {
-    const world = playingWorld(35);
+    // Quiet: with the squads' bots playing, a barrage from a radio crate can land on the kaiju
+    // in these 13 s and slow it, a correction this test is not about.
+    const world = playingWorld(35, true);
     const welcome = welcomeFor(world, 0);
     const mirror = createCityMirror(welcome.config.citySeed, welcome.cityChecksum, welcome.cityState);
     const predictor = createPredictor();

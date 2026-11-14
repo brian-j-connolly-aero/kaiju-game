@@ -75,19 +75,21 @@ squares clamped to the city, drawn as a thin glowing quarantine line; nobody can
   points, whoever caused it. At 0 hp it is rubble: flat, passable, worth nothing more, and shots
   that land on it cost nothing.
 - Marks are computed per match from the value actually present, so every neighborhood is fair:
-  `P1 = 0.18 × V(stage 1 bounds)`, `P2 = max(1.6 × P1, 0.125 × V(stage 2 bounds))`,
-  `P3 = max(1.6 × P2, 0.29 × V(whole city))`. The three fractions are the pace knob; they were
-  tuned with the balance harness in Port Meridian (`docs/BALANCE.md` sections 8 and 9).
+  `P1 = 0.18 × V(stage 1 bounds)`, `P2 = max(1.6 × P1, 0.11 × V(stage 2 bounds))`,
+  `P3 = max(1.6 × P2, 0.30 × V(whole city))`. The three fractions are the pace knob; they were
+  tuned with the balance harness in Port Meridian (`docs/BALANCE.md` sections 8 to 10).
 - Display: a skyline with three towers. Points 0..P1 map to the first 21% of its width, P1..P2 to
   21..57%, P2..P3 to 57..100% (these are the doc's 15 / 40 / 70 marks, rescaled so the third
   tower is the end of the bar).
 - Tuning target (since phase 1: every stage about a fifth shorter than before, the owner's word
   after the first multiplayer playtest): contested stages of about 2:35 / 2:30 / 3:05 and a
   match of about 8:15; a kaiju left alone fills a stage's segment in about two minutes. Measured
-  with `npm run sim` (bot against bot, Port Meridian, every start in turn, 40 matches):
-  contested stages of about 2:02 / 2:27 / 3:01 and 7:31 on average (stage 1 is shorter than the
-  aim because the squad-mates' stray fire fills the bar too); alone 123 / 117 / 164 s for the
-  three segments; the kaiju winning 20 of 40. `docs/BALANCE.md` section 9 has the tables.
+  with `npm run sim` (bot against bot, Port Meridian, every start in turn, 40 matches) after
+  phase 2 (the second fraction lowered from 0.125 and the third raised from 0.29 to hold the
+  stages where phase 1 left them): contested stages of about 2:01 / 2:35 / 3:06 and 7:56 on
+  average (stage 1 is shorter than the aim because the squad-mates' stray fire fills the bar
+  too); alone 133 / 107 / 148 s for the three segments; the kaiju winning 16 of 40.
+  `docs/BALANCE.md` sections 9 and 10 have the tables.
 
 ### The molt
 
@@ -229,8 +231,8 @@ the molt; each molt adds one move, picked from three cards, on one of two move b
 
 | Button (keys) | What it does |
 | --- | --- |
-| Strike (left mouse) | Swipe. With something in the hand: throw it at the crosshair. |
-| Grab (right mouse) | Grab what is in reach. With something in the hand: eat it. With nothing to pick up in reach but something to eat (a kiosk, a wreck): eat that. With neither: the hand closes on nothing. |
+| Strike (left mouse) | Swipe. With something in the hand: throw it at the crosshair; a fast-food sign is swung instead (the club, phase 2). |
+| Grab (right mouse) | Grab what is in reach (a city weapon only while it is a hatchling, phase 2). With something in the hand: eat it; a city weapon is never eaten: Grab drops it, and it lies on the ground to be picked up again. With nothing to pick up in reach but something to eat (a kiosk, a wreck): eat that. With neither: the hand closes on nothing. |
 | Stomp (Space) | Stomp. |
 | First move (Q) | The move picked at the first molt; nothing before it. |
 | Second move (E) | The move picked at the second molt; nothing before it. |
@@ -246,6 +248,7 @@ Action timings are the tells. `r` = body radius for the stage.
 | Grab | Grab | 0.4 s | Grabs the nearest car, wreck, live vehicle (stage 2+) or building chunk (stage 2+) in a 100° arc within 2.5 r. |
 | Throw | Strike, holding something | 0.3 / 0 / 0.2 s | At the aim point: 25 / 45 / 70 m/s ballistic. Impact: units 120 in radius 4 / 10 / 22 m; structures 60 / 350 / 1500. |
 | Eat | Grab, holding something (or nothing to grab but something edible in reach) | 2.0 s, rooted | Heals 80 hp. 10 s cooldown. The meal is consumed. |
+| Club | Strike, holding a fast-food sign (phase 2) | 0.5 / 0.15 / 0.55 s | 200° arc in front of the head, reach 4 r (1.6 times the swipe's). Units: 140 damage, 60 nerve, thrown back 2.5 r at the body, half that at the tip. Structures: 80 / 600 / 4000, twice a swipe. Three swings, then the sign breaks. |
 | Molt | Molt, one press | 10 s cocoon | Only when a molt is available. The molt cards are offered (below). |
 
 The moves a molt can add (each on the move button of the slot it was put in):
@@ -399,6 +402,57 @@ As built (`shared/src/sim/swim.ts`, numbers in the kind's `swim` definition):
 - **No stalling.** Nothing it does in the water earns anything and the clock runs on: time
   spent hiding is time the humans win by.
 
+### The city as a weapon (phase 2, as built)
+
+`docs/ROADMAP.md`, phase 2: "the city as a weapon, small monster first". Every starting
+neighborhood has a handful each of propane tanks, water tanks, television antennas, fast-food
+pole signs and garage doors standing beside its houses and shops (section 7), and a radio mast
+that falls leaves its top lying about. Rules in `shared/src/sim/cityWeapons.ts`, numbers in the
+kind's `cityWeapons` (`shared/src/defs/kaiju/lizard.ts`); all starting values.
+
+- **Picking them up.** Grab picks them up like a car (the nearest thing in the arc wins), but
+  only while the monster is a hatchling (stage 1). The hatchling's feet step round them and its
+  claws, tail and stomp push them aside rather than wreck them (they are there to be picked up);
+  a charge, fire and explosions still wreck them. From stage 2 they cannot be picked up and feet
+  and tank tracks crush them like any small prop. They are worth nothing to the bar.
+- **Never eaten.** Grab with one in the hand lets go of it: it lies on the ground below the hand
+  (a loose object, `world.loose`) and can be picked up again. The cocoon drops whatever is held,
+  as before. Strike uses it: a throw, except the fast-food sign, which is swung (the club).
+- **Propane tank.** Thrown (on the throw's arc, 25 m/s), it explodes where it lands: units
+  within 8 m take 110 damage at the middle falling to 40 at the rim and 40 to 20 nerve, and are
+  thrown out 7 m (2 m at the rim); structures within it take 120; props within it are destroyed
+  and other propane tanks go off with it. The thrower is never hurt. A shot or an explosion that
+  lands within 2 m of a tank sets it off: on the ground (a full blast, which hurts a monster
+  standing in it too: 110 raw, about 13 hp in the open), or in the monster's hand, where the blast
+  goes off at the hand, the hand is empty, the monster loses exactly 60 hp (whatever its state or
+  facing) and flinches for 0.8 s (rooted, whatever it was doing cut short). Fire (shots,
+  explosions, the beam, a fireball) sets a tank off; crushed underfoot or under tracks, struck,
+  or under a falling building it goes off with a small bang (3.5 m: 35 to 15 damage, 30 to
+  structures).
+- **Water tank.** Thrown (22 m/s), it bursts into a splash 10 m across: units in it take 30
+  damage and 20 to 10 nerve, are pushed out 6 m (4 m at the rim) and knocked over: they lie flat
+  for 1.5 s, unable to move or fire, exactly like the roar's stun but shorter (their charge is
+  lost too). Nothing burns.
+- **Antenna.** Thrown, it is a javelin: it flies straight at the crosshair at 70 m/s with almost
+  no drop (1.5 m/s² of gravity) and gives out after 120 m. It goes through up to three units
+  (110 damage and 40 nerve each, each pushed 3 m along its flight) and flies on past any more,
+  stopping in the first structure (150 damage) or the ground; a monster it hits stops it (110
+  raw).
+- **Mast.** The radio mast's 8 m top section (section 7). A heavier javelin: 60 m/s, up to 110 m,
+  through up to five units at 200 damage and 60 nerve each, 400 to the structure it stops in.
+- **Fast-food sign.** A club: Strike swings it (the Club row above) instead of throwing it. It
+  breaks after its third swing and the hand is empty; Strike swipes again.
+- **Garage door.** A shield: a hit that arrives within 70° of the body's facing hits the door
+  instead of the monster (no damage, no nerve, and a charged volley that hits the door does not
+  count toward breaking the monster's nerve). The door soaks up 250 of raw hit damage (about 80
+  rockets) and breaks. It does not cover a blast with no direction, nor a monster that is
+  staggered or in its cocoon. Strike throws it like a frisbee: flat (32 m/s, 3 m/s² of gravity,
+  70 m at most), 80 damage and 30 nerve to the units within 3.5 m of where it lands, knocked over
+  for 1.5 s and pushed out 4 m, 60 to structures.
+- **What the snapshot carries.** The held object as before (a 'prop' of its kind); a sign's
+  swings left (`clubSwings`) and a door's hp left (`shieldHp`). Events for every new impact
+  (`ARCHITECTURE.md` section 4.2).
+
 **Tier 2 kaiju (same verbs, different numbers and one special each):**
 
 - **Krabulon (Crab):** front 150° arc takes ×0.25 damage and nerve; rear takes ×2.2. Sidesteps at
@@ -456,15 +510,65 @@ speed), A and D turn the hull (on the spot when it stands still), and the turret
 where the player looks at its own pace (the numbers above). The gun's elevation follows the
 mouse at once. The tank's shots leave along its turret, not along the view.
 
-**Artillery:** no button calls it any more (docs/ROADMAP.md, phase 1); phase 2 brings it back
-as an artillery radio picked up on the ground. The fire mission itself is kept as it was: a
-marker on the ground, and after 4 s, 8 arcing shells land over 2 s within a 28 m scatter
-radius: each 9 damage, 5 nerve, 14 m splash, 300 structure damage. A whole barrage on target is
-half a stagger's worth of nerve: it sets up a volley, it does not replace one (artillery never
-counts toward the two squads it takes to break the kaiju).
+**Artillery:** no button calls it (docs/ROADMAP.md, phase 1); the artillery radio, a pick-up
+(below), turns a squad's next charged volleys into barrages. The fire mission: a marker on the
+ground, and after 4 s, 8 arcing shells land over 2 s within a 28 m scatter radius: each 9
+damage, 5 nerve, 14 m splash, 300 structure damage. A whole barrage on target is half a
+stagger's worth of nerve: it sets up a volley, it does not replace one (artillery never counts
+toward the two squads it takes to break the kaiju).
 
 Smoke and marking (polish pass 2) were removed after the first multiplayer playtest ("too much
 already"; docs/ROADMAP.md).
+
+### Supply crates and pick-ups (phase 2, as built)
+
+`docs/ROADMAP.md`, phase 2: something happening every 20 seconds. Rules in
+`shared/src/sim/systems/pickups.ts`, numbers in `shared/src/defs/pickups.ts` (`CRATE_RULES`,
+`PICKUP_WEAPONS`).
+
+- **Crates come down by parachute.** When a stage starts, one crate comes down for every squad,
+  on a street 25 to 90 m from its leader. Then one every 30 s, for the squads still in the fight
+  in turn, while fewer than 3 (stage 1), 4 (stage 2) or 5 (stage 3) are down (the first ones of
+  a stage come down whatever the count). A crate always lands on a street inside the bounds (not on a
+  bridge, in water, on rubble or in a building), at least a third of the bounds' half-size from
+  the kaiju (60 / 153 / 367 m), and at least 12 m from another crate; when there is no street at
+  that distance from the squad, anywhere on a street inside the bounds will do. It comes straight
+  down at a steady speed from 90 m over 4 s, then lies there until a unit takes it or the stage
+  ends (the molt). Anybody's squad may take a crate, whichever squad it was meant for.
+- **What it holds** is drawn with the match's random numbers, weights machine gun 3, big cannon
+  3, missile pod 3, artillery radio 2, reinforcements 1, and reinforcements 2 more for every unit
+  the squad it is meant for has lost (so a squad down to its leader draws reinforcements 7 times
+  in 18). The kind is visible on the snapshot: a player can see which crate is worth the detour.
+- **Taking one:** any living unit on the ground (a leader or a squad-mate) that comes within its
+  own radius plus 1.5 m of a landed crate takes it for its squad.
+- **The pick-ups.** Each lasts until the stage ends or the squad is wiped out; a new weapon
+  pick-up replaces the old one. The weapons change only the driven unit's own weapon (its Fire
+  button, and its own shot when it goes with a volley); squad-mates keep theirs. Each is the
+  unit's own weapon changed, so it scales with the stage (rocket infantry, a tank, a troop of
+  three) the way the weapon does:
+  - **Machine gun:** tracers, 5 times the rate of fire at a third of the damage, nerve and
+    structure damage per shot (1.67 times as much over time), a third of the splash, and a
+    spread of 1.5° (one sigma) on every shot, a person's own too.
+  - **Big cannon:** heavy shells, 2.5 times the reload for 3.5 times the damage and structure
+    damage, twice the nerve and 1.6 times the splash.
+  - **Missile pod:** the Fire button launches a salvo of 6 missiles (fewer as a unit loses
+    members, the way its own weapon fires fewer shots) that leave fanned out over 50° and lofted
+    12°, and curve onto the point the crosshair is on, arriving in the time a straight shot
+    would take. Each is worth 0.6 of a whole trigger pull of the unit's own weapon (about 5.7
+    damage at every stage); 6 s to reload.
+  - **Artillery radio:** the squad's next 3 charged volleys (60% charge or more) each call an
+    artillery barrage onto the ground the volley's crosshair marks (the feet of a kaiju it is
+    on). A volley at the empty sky calls none and keeps its barrage; a ragged volley calls none.
+    The radio says "strike inbound" (the `callin.inbound` lines). The HUD shows how many are left.
+  - **Reinforcements:** at once, every living unit of the squad is healed to full (hp and
+    members), and every dead one comes back at full strength (not a veteran) by parachute
+    beside the leader: from 60 m up, straight down over 4 s, unable to move, fire or charge until
+    it lands. A dead tank's wreck goes when its unit comes back.
+- **Measured** (ten bot matches, the seeds and starts of `npm run sim -- --seeds 10
+  --every-anchor`, with the city's phase 2 work in the same tree): 226 crates came down in 76
+  minutes of play and two thirds were taken, about two a minute (machine guns 43, missile pods
+  41, big cannons 28, artillery radios 24, reinforcements 14); 35 were still lying there when
+  their stage ended. The radios called 51 barrages; reinforcements brought 5 units back.
 
 ### The two buttons, and the swarm
 
@@ -560,8 +664,8 @@ four are gone the player is out until the next molt and gets a free-flying news 
 - **Shaken** units cannot fire or charge and back away from a kaiju within 10 of its body radii
   (at least 60 m). When they steady they go back to the swarm. **Stunned** units (the kaiju's
   roar, section 4) stand frozen: no moving, no firing, no charge.
-- **Artillery missions** (`startCallIn` in `systems/weapons.ts`, the entry point for phase 2's
-  radio): the marker goes down at once; the shells are real projectiles that fall from 400 m at
+- **Artillery missions** (`startCallIn` in `systems/weapons.ts`, started only by the artillery
+  radio pick-up, below): the marker goes down at once; the shells are real projectiles that fall from 400 m at
   75° above the horizon, coming over the caller's shoulder, timed so the first lands 4 s after
   the marker and the last 2 s later. Each lands inside the scatter radius times the scatter
   multipliers of the kaiju nearest the marker. They can hit a tall building or the kaiju's head
@@ -581,7 +685,10 @@ four are gone the player is out until the next molt and gets a free-flying news 
 unit idles. Shows bounds, rubble, friendly units, and the kaiju when it is known (always at
 stages 2 and 3 unless it is swimming under water, section 4; at stage 1 only while a human unit
 has line of sight within 250 m, or for 3 s after it roars, stomps or wrecks something). Nothing
-is placed on the map any more.
+is placed on the map any more. Phase 2 (`client/src/ui/mapView.ts`): the squads' map shows the
+supply crates as the picture of what each holds in a dark disc with a cyan ring (faint while it
+is still coming down); while a fallen radio mast's static lasts (`match.staticUntil`, section 7)
+it shows nothing but animated grey static, with a crackle of radio static while it is open.
 
 ### Bots
 
@@ -609,7 +716,20 @@ and plays any slot it is handed at any moment.
   around) while a hatchling, or a kaiju under water, is off the map; when the last known
   position is out in the water it goes to the near bank instead and waits there. Its line of
   fire and its crosshair go to what shows of a swimming kaiju (the spines). Into a staggered or
-  cocooned kaiju it does not charge: everybody fires as fast as the guns load.
+  cocooned kaiju it does not charge: everybody fires as fast as the guns load. Its lines of fire
+  count rubble and fallen buildings up to their height, so it parks where it can shoot past
+  them. Where its leader sees the kaiju over a heap but most of its planted squad-mates do not,
+  it lets go, does not plant there again, and moves on, passing over that spot (15 m round it)
+  for 20 s; and when it reaches its firing spot with no line of fire at all (a hatchling among
+  heaps of rubble), it tries another side (its bearing turns 70°). (Before the phase 2
+  integration it planted and let go there over and over: at some starts not one squad fired a
+  charged volley at a hatchling standing still.) Phase 2: while the kaiju is not close (off the map, or farther than 1.5 times the
+  distance it backs off at, and not helpless) and it is not charging, it fetches a supply crate
+  coming down or lying within 60 m of its leader that no other bot squad is already going for
+  (giving up after 20 s). With a weapon pick-up it parks in that weapon's band of range: the
+  machine gun at 35 to 60% of range, the big cannon and the missile pod at 55 to 92%. With the
+  artillery radio it keeps volleying, even into a staggered or cocooned kaiju and even in the
+  lazy harness profile, since every charged volley calls a barrage.
 - **Kaiju bot.** It goes for whatever standing structure (or car) pays best for the time it
   takes to reach and bring down, walks through what it tramples, swipes what it must, stomps
   when several things stand around it, and smashes what is in its way. It fights units that
@@ -636,6 +756,21 @@ and plays any slot it is handed at any moment.
   away again for 30 s. Water farther away cost it more than it gave back in the balance runs
   (it turned its back on the guns to get there): with 45 and 28 radii it won 20% of matches
   instead of about half.
+  Phase 2 (`BOT_RULES.kaiju`): the special buildings are milestones between fights. One within
+  140 m (220 m at stage 2) is worth six times as much to wreck while no unit is within 60 m
+  (110 m) of it; the substation ten times while a move it has picked is cooling down or its
+  beam waits for rage; the gas station fourteen times whenever units stand within its fireball,
+  squads about or not. While it is a hatchling, with units within 110 m and none within its
+  swipe, it walks to the city weapon within 50 m that suits the moment and picks it up (giving
+  up after 6 s, and not trying again for 6): a propane or water tank for units within throwing
+  range (better a group of two or more within 9 m of each other), an antenna or the mast for a
+  squad beyond its melee range, the fast-food sign for units within 45 m, the garage door when
+  guns can see it and it has ground to cover. Then it uses it: the tanks thrown at the group, a
+  javelin at the squad it lines up best (the most units close to the line), the club swung at
+  the units in reach (and at buildings when no unit is near), the door carried toward the guns,
+  facing them, and thrown once a unit is within 22 m or the door is down to 30% of its hp. A
+  house in the way is smashed (with the club, or a stomp when the hand holds something else).
+  With nobody about to use it on, it lets the thing drop (the club it keeps).
 - **Handicap.** `MatchConfig.bots` handicaps either side from 0 (its best) to 1 (stands still):
   in between, the bot idles that share of the time. For the balance harness, tests and
   practice options. `MatchConfig.bots.triggerHappy` makes the squad bots play the lazy way
@@ -680,6 +815,113 @@ server and every client build the identical city from code. No building list goe
   for it; it took the place of the tree belt outside the beltway (docs/CITY.md section 11).
 - Civilians are client-only fleeing sprites with no effect on play.
 
+### Special buildings (phase 2, as built)
+
+`docs/ROADMAP.md`, phase 2: special buildings in every starting neighborhood, each with a reward
+you can see, so the monster has a milestone to chase between fights. Placement in
+`shared/src/city/meridian/specials.ts`, rewards in `shared/src/sim/systems/specials.ts`, numbers
+in the kind's `rewards` (`shared/src/defs/kaiju/lizard.ts`); all starting values.
+
+- **Three of them per start.** A power substation (`substation_a`, 22 by 16 m, 9 m high), a gas
+  station (`gasstation_a`, 26 by 20 m, 7 m) and a lattice radio mast (`radiomast_a`, 8 by 8 m,
+  24 m). Every neighborhood anchor (every place a match can start) has one of each wholly inside
+  its stage 1 square, 40 to 120 m from the anchor (about 60 to 95 m as generated), on a street
+  front, in three directions about a third of a turn apart (turned by the city's seed); they
+  stand before the street fronts are filled in, and the yard opener never takes one out.
+  `validateCity` reports a start that lacks one. A hatchling wrecks each in three to five swipes
+  (hp 150, 160 and 120 against its 40); each is worth 15 bar points, what a shop is. The juvenile
+  tramples the substation and the gas station (12 m) and needs a swipe for the mast.
+- **The reward, once per building, when it collapses** (whoever wrecked it: the squads' stray
+  fire pays the monster too; the reward is the monster's that wrecked it, else the nearest one):
+  - **Power substation: a power surge** for 8 s. Every cooldown is cleared at once (the moves,
+    and the meal's) and they recover three times as fast while it lasts; its attacks (swipe,
+    stomp, tail sweep, club, charge, beam, throws, a chunk torn out) do 1.5 times the damage to
+    units and structures; its rage jumps by 50 of 100. The snapshot's kaiju record carries the
+    seconds left (`surge`).
+  - **Gas station: a fireball** 30 m across round the middle of the station (sized to the
+    building, not the monster: it fills the lot and reaches the houses behind and beside it).
+    Units in it take 90 damage at the middle falling to 25 at the rim and 60 to 20 nerve, and are
+    thrown out 8 m (3 m at the rim); structures in it take 150 (houses and small shops go with
+    it); props in it burn, and propane tanks in it go off. It never hurts the monster.
+  - **Radio mast: it falls over**, always away from the monster (from the monster to the mast,
+    onto the side of its footprint that faces that way most nearly), whatever chance the other
+    slender buildings have; it lands 2 s later and crushes what lies under it like any building
+    that falls over (below). Its top 8 m section then lies at the far end as a `mast` the
+    hatchling can pick up and throw as a heavy javelin (section 4). And the army's map turns to
+    static for 20 s (`match.staticUntil`, the tick it ends, in the snapshot): while it lasts the
+    map shows nothing, so the squads know where the monster is only from what their units see
+    within 250 m, at every stage (noise does not put it on the map either).
+- **Measured** (ten bot matches, seeds 1 to 10, every start in turn): the hatchling's monster
+  bot wrecked 19 of the 30 special buildings of the starting neighborhoods itself and the squads'
+  fire 4 more (substation 9, gas station 8, radio mast 6 of 10); 10 more went at stage 2 and 3.
+- **On screen** (`client/src/render/specialsView.ts`; the rest of the city's picture is
+  `cityView.ts`). Each reads as special from across the neighborhood by a light that grows with
+  distance like the markers: the substation hums under a blue glow and sparks jump between its
+  insulators (more often once it is damaged), the gas station's lights flicker over its pumps
+  under a warm glow, the mast's red lamps blink (a damaged one falters), all at the effect points
+  the models mark. The surge: a blue-white flash over the yard, a ring, sparks from every
+  insulator and lightning leaping from them to the monster for a second and a half (the crackle
+  on the monster's body for the eight seconds is the weapons' picture). The fireball: a low-poly
+  ball of flame swelling to the blast's 30 m and rolling upward as it burns down, a white flash,
+  two shock rings, burning debris, then fire on the ruin and a column of black smoke for 9 s, and
+  a shake for squads nearby. The mast tips over like any falling building, without its top 8 m:
+  that section rides on it, whips over ahead of it as it lands, and is then the loose city weapon
+  lying where the simulation puts it (a crash of steel, dust).
+
+### City weapons (phase 2, as built)
+
+Beside the houses and shops of every start (`shared/src/city/meridian/furnish.ts`): 5 propane
+tanks and 4 each of water tanks, antennas, fast-food signs (by the shops first) and garage doors,
+all inside the stage 1 square; about one house or shop in 45 elsewhere has one too (230 in all).
+`validateCity` reports a start with fewer than 3 of a kind. The radio mast's top (`mast`) is never
+placed: it only comes from a mast that falls. What they do in the hand: section 4.
+
+### Rubble and falls (phase 2, as built)
+
+`docs/ROADMAP.md`, phase 2: rubble stays as half-height mounds that still block shots and sight,
+and some tall buildings fall over on their side. Geometry in `shared/src/city/spatialIndex.ts`,
+falls in `shared/src/sim/systems/cityDamage.ts`, numbers in `shared/src/defs/rubble.ts`.
+
+- **Rubble that stays.** A structure that collapses where it stands leaves a mound over its own
+  footprint, half its height (40 m at most: a pile any taller would stand like a tower of its
+  own; only towers and the tallest landmarks reach that). Bridge decks leave none: they fall into
+  the river. Nothing about a mound is stored: its height follows from the building's archetype.
+- **What a mound does.** It blocks shots and sight up to its height: projectiles (the kaiju's
+  thrown objects too), the aim ray of the crosshair (so a volley or a missile salvo aimed at it
+  lands on it), spotting and the map's line of sight, and the lines of fire of squad-mates and
+  bots. Whoever stands on a mound sees and shoots over it (a line that starts inside a mound
+  ignores that one). It never blocks a body: units cross mounds at half speed (their middle on
+  the mound), and the kaiju walks over them at its own pace. The beam and the third-person camera
+  pass over rubble, as before. Rubble from a house (2.5 to 4.5 m) is enough to hide a hatchling's
+  legs, and a pile of it can hide the whole hatchling: squads have to find a line round it.
+- **Buildings that fall over.** A slender structure, at least 2.9 times taller than its longer
+  footprint side (the towers, the tall offices, the slender landmarks and the radio masts: a
+  radio mast always falls, away from the monster, as its reward above), falls
+  over on its side half the time it collapses (the match's random numbers), instead of straight
+  down. It tips over the side of its footprint that faces along whatever hit it last (a shell's
+  flight), or away from the kaiju for everything else, over 2 s. When it lands, every unit under
+  its length takes 80% of its full hp and is shaken, every structure under it takes half the
+  falling building's full hp (so a big tower can bring a neighbor down, and that one may fall in
+  turn, but never more than two falls in a row), and the props under it are crushed; what it
+  brings down counts for the bar like any wrecking, credited to whoever brought down the first.
+  From then on it lies there as a long mound: as long as it was tall, as wide as its footprint
+  across the fall, half its depth along the fall high, with its own footprint clear. Its top
+  lands as far out as it was tall. While it falls it is rubble where it stood.
+- **Measured** (the same ten matches): 157 of 300 collapses of slender buildings were falls
+  (the radio masts' own reward makes some fall too), they brought down 109 more structures, and
+  they landed on a unit 7 times (none died of it).
+- **On screen** (`client/src/render/cityView.ts`, `structureGeometry.ts`). A mound is the
+  building's own collapse pieces piled up and tilted over its footprint, pulled in the higher
+  they stood, on the art's low rubble, in the building's own wall paint a little dusty, scaled
+  to exactly the height the simulation counts: a heap of that building, not a grey box (one
+  batch per archetype, as before). A building that falls over turns about the edge of its
+  footprint, slowly at first and fastest as it meets the ground, over the event's 2 s, with dust
+  bursting from its foot; it lands with a wall of dust along its length, debris at its top and a
+  thump of the view, and then lies on its side (its damaged model) half sunk into the ground, so
+  that what shows is the mound the simulation counts, with the art's low rubble left on its
+  footprint. A player who joins later, or comes back after a dropped connection, sees it lying the
+  same way (the welcome's city state carries the side it fell to).
+
 ## 8. Presentation rules
 
 - **No reading to play.** On-screen text is only names (kaiju, faction, callsigns, the room code)
@@ -692,6 +934,42 @@ server and every client build the identical city from code. No building list goe
 - End screen: mock hearing (voiced), pictogram tally of what each player flattened, newspaper
   front page with a photo over squiggle text.
 
+### Weight and speed (phase 2, as built)
+
+`docs/ROADMAP.md`, phase 2: footsteps shake the screen, cars bounce, windows shatter, buildings
+wobble when the monster stomps, the view widens while it walks; the army gets a sense of speed
+too. All picture: nothing here changes the game. Starting values, tuned by eye on frames of a
+software-drawn page, not yet felt by a person.
+
+- **A footstep** (from the animation's gait): the view of everyone near the monster drops and
+  springs back (a quick thump that settles in about a third of a second, never a rattle that
+  would spoil aim: it moves the camera, and turns it by under a degree), strongest by the foot and
+  gone at six body heights and 40 m: a nudge at stage 1 (a few centimeters), a jolt at stage 3
+  (most of a meter). The monster's own view takes it more gently, and pounds in a charge. Dust at
+  the foot (and a low ring at stages 2 and 3); the cars and small props within two and a half to
+  three body radii jump (a hand's breadth at stage 1, a meter at stage 3) and trees and poles sway;
+  from stage 2 the windows of the nearest two or three buildings burst out of the wall that faces
+  the foot (glass and its sound; one burst a building every 2.5 s at most).
+- **A landing** (a stomp, the charge's stumble, the new body coming out of the cocoon, a little
+  harder): the standing buildings within three times the stomp's radius sway, a damped lean away
+  from the foot and back (up to 4 to 5 degrees nearby, less farther out, starting as the shock
+  reaches them, over about two seconds), their windows burst, and cars are thrown higher (up to
+  0.8 m at stage 1, 3.6 m at stage 3), with a deeper thump of the view. A building landing after a
+  fall and the gas station's fireball thump the view of whoever is near as well.
+- **The monster's lens.** Its view widens up to 5 degrees as it walks (over about a second) and
+  12 in a charge, and eases back when it stops; the chase camera swings a little to the side of
+  the foot that bears its weight and rolls a fraction of a degree with each step.
+- **The army's speed.** The lens widens with speed: 3 degrees on foot at a run, 9 in a tank at top
+  speed (rising with the square of the speed). On foot the view bobs in step (7 cm, a roll of a
+  third of a degree). A tank's camera trails its speed a tenth of a second (it hangs back as the
+  tank speeds up and catches up as it slows), leans into the hull's turn (up to 2.6 degrees), and
+  the player's own tank's engine climbs with its speed (pitch 0.95 to 1.4). Every tank on the move
+  throws up dust from its tracks; near top speed, faint streaks of air rush past the player's
+  own camera, off to the sides and never across the crosshair.
+- **The squad by a third-person camera.** On foot, the player's own squad-mates closer to the
+  camera than 14 m fade, down to a sparse ghost of themselves at 4 m (a screen door of pixels, so
+  they still hide nothing and still show where they are); the player's own soldier never fades.
+
 ### Controls (as built: `client/src/game/input/actions.ts`)
 
 Bindings are by key position, so WASD is the same four keys on any keyboard layout, and the
@@ -703,8 +981,8 @@ shortcut that a page cannot cancel).
 | --- | --- | --- |
 | Move | W A S D (or the arrows) | Left stick |
 | Look | Mouse (captured by a click on the view) | Right stick |
-| Kaiju: swipe; with something in the hand, throw it at the crosshair | Left button | RT |
-| Kaiju: grab; with something in the hand, eat it (heals; 10 s between meals); nothing to grab but a kiosk or a wreck in reach: eat that | Right button | LT |
+| Kaiju: swipe; with something in the hand, throw it at the crosshair; with a fast-food sign, swing it (phase 2) | Left button | RT |
+| Kaiju: grab; with something in the hand, eat it (heals; 10 s between meals), or drop it if it is a city weapon (phase 2); nothing to grab but a kiosk or a wreck in reach: eat that | Right button | LT |
 | Kaiju: stomp | Space | LB |
 | Kaiju: the move picked at the first molt (nothing before it; the brace is held) | Q | Y |
 | Kaiju: the move picked at the second molt (nothing before it) | E | RB |
@@ -738,6 +1016,31 @@ click picks: the pointer is let go while the cards wait (mouse movement under po
 no part) and the click takes it back. The picked card flies into its slot. Nobody picked by the
 end of the intermission: the card the server drew at random is shown landing there.
 
+With a city weapon in the hand (phase 2, section 4; `client/src/ui/kaijuKit.ts`, `strikeIcon`
+and `grabIcon`): Strike shows what it does with it (`k_javelin` for an antenna or a mast's
+top, `k_club` for the fast-food sign with three pips for the swings left, `k_throw` for anything
+else, its frame throbbing red while a propane tank is in the hand) and Grab shows the drop
+(`k_drop`, never the jaws). A garage door adds a tile of its own beside the kit: the door
+(`k_shield`) under a wedge for the front it covers (70 degrees each side) and over a bar for the
+hp it has left, red when low. A power surge adds a lightning bolt (`k_surge`) in a blue-white
+ring that runs down over its 8 s, popping in when the surge starts, while the move slots and
+Strike and Stomp flash blue-white.
+
+**The city weapons and the surge in the world** (`client/src/render/kaijuWeapons.ts`,
+`weaponsFx.ts`, `heldProps.ts`): each weapon is held by its art's `grip` node the way its
+manifest entry says (a tank hangs from the claw, tipped forward when it is longer than the hand
+is high; a javelin points along the aim; the sign follows the club's arc; the door is held in
+front of the chest), thrown the way it flies (tumbling, point first, flat and spinning), and a
+javelin stays stuck where it stops for 12 s. The local player's javelin shows a line of light from
+its point to where the crosshair is. The club leaves a trail of light along its arc and dust
+under it; the sign flies apart on its third swing; shots that hit the door throw sparks off it,
+jolt it and darken it as its hp goes, and it bursts into slabs when it breaks; a propane tank
+going off in the hand leaves the monster recoiling (the flinch) with smoke streaming off the
+claw; a water tank's splash knocks the soldiers it reaches flat (the soldiers lie down for the
+knock-down). The surge: arcs of blue-white lightning jump along the spines and tail, off the claws
+and down to the ground, the glowing facets burn blue-white and the hide flashes with each burst,
+with a crackling hum (`generator_overload` when it starts, then `dish_beam_loop`).
+
 **What a squad player can do** (docs/ROADMAP.md phase 1, after the first multiplayer playtest:
 two buttons). Fire is the driven unit's own weapon (rockets, a tank gun, a troop's guns; one
 per level, nothing to switch). Volley is the squad's: held, the three squad-mates stop, plant,
@@ -747,6 +1050,26 @@ map, no smoke, no mark and no artillery button any more (artillery comes back in
 radio picked up on the ground). The right button sends Volley as it is at that moment (and a
 press too short to be seen between two inputs once), so letting go reaches the server in the
 next input.
+
+**The squad's pick-ups on screen** (phase 2, section 5; `client/src/ui/hud.ts`,
+`client/src/render/cratesView.ts`, `projectilesView.ts`, `artilleryView.ts`). A crate comes
+down under its parachute (`prop_parachute` over `prop_crate`, swaying, a white smoke trail);
+on the ground it sends up a pulsing cyan column of light and cyan smoke, its lid light blinks,
+and the canopy folds over beside it. Over every crate floats the picture of what it holds
+(`pk_*` in a dark disc with a cyan ring), bigger the farther it is. Taken: a cyan flash, a ring
+and sparks, the picture leaps up and fades, and for the squad that took it the picture pops up
+over its crosshair. Fire's picture on the HUD is the weapon pick-up while the squad has one
+(glowing cyan), and its reload ring follows that weapon's reload; the artillery radio sits beside
+Volley with a pip per barrage left. Each shot reads apart: the machine gun's tracers are short
+bright streaks with small quick muzzle flashes, the big cannon's shell is big and trailed by
+smoke, with a great muzzle flash, a ring of blast on the ground and the tank rocking back; the
+missile pod's six missiles fly the guided path the server flies (they fan out and curve in) with
+thick smoke trails. An artillery barrage, seen by both sides: on the volley that calls it a red
+flare and red smoke rising at the target and a red ring that closes onto the scatter circle,
+reaching it as the first shell lands (the radio crackles for the squads); the shells fall big and
+glowing with a long streak behind each, their whistle timed to end as each lands; each impact is
+a big explosion with a shockwave ring and a column of dust. Reinforcements come down under
+parachutes (three over each tank) and raise dust where they land.
 
 **The volley meter** (`client/src/ui/volleyMeter.ts`): a big yellow diamond round the crosshair
 while Volley is held, filling from its bottom point as the squad-mates charge (from the newest
@@ -786,7 +1109,9 @@ Swimming has no button: its tile is the movement keys, an arrow, and the spines-
 picture; the HUD shows the same picture, in water blue, while the kaiju is under. The kaiju's
 card: the starting kit (Strike's swipe, and its throw with something in the hand; Grab's grab, its
 meal with something in the hand, and a kiosk eaten when nothing is in reach to pick up; Stomp),
-the molt with its three cards over the buttons that pick them, the two move buttons as empty
+the city weapons at stage 1 (the sign swung with Strike, an antenna thrown as a javelin with
+Strike, the door held up as a shield with no button, and Grab dropping a city weapon), the molt
+with its three cards over the buttons that pick them, the two move buttons as empty
 slots with the stages they are filled from, then the five moves a card can give, each beside both
 move buttons in a slot frame (the beam after the rage it needs, the roar then a dizzy spiral for
 its stun, the brace with a hold ring), swimming, the map, the camera, the settings and the card

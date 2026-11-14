@@ -134,6 +134,33 @@ def huge(path):
     mb.export_glb(path)
 
 
+@case("prop_gripped", None)
+def gripped(path):
+    a = mb.node("prop_gripped", crate())                               # a city weapon: one mesh plus its grip anchor
+    mb.empty("grip", at=(0, 0, 1.0), parent=a)
+    mb.export_glb(path)
+
+
+@case("prop_strayempty", "single-mesh")
+def strayempty(path):
+    a = mb.node("prop_strayempty", crate())
+    mb.empty("handle", at=(0, 0, 1.0), parent=a)                       # only `grip` is allowed beside the mesh
+    mb.export_glb(path)
+
+
+@case("prop_gripmesh", "anchors")
+def gripmesh(path):
+    a = mb.node("prop_gripmesh", crate())
+    mb.node("grip", mb.box((0.1, 0.1, 0.1), at=(0, 0, 1.05)), pivot=(0, 0, 1.0), parent=a)   # a grip must be an empty
+    mb.export_glb(path)
+
+
+@case("prop_propane", "required-nodes")
+def nogrip(path):
+    mb.node("prop_propane", crate())                                   # the six city weapons must carry a grip
+    mb.export_glb(path)
+
+
 @case("prop_twomesh", "single-mesh")
 def twomesh(path):
     a = mb.node("prop_twomesh", crate())
