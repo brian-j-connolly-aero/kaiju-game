@@ -212,6 +212,14 @@ export function cityDamageSystem(world: World): void {
     }
   }
 
+  checkBarMarks(world);
+}
+
+/**
+ * Whether the bar has passed a mark (`barMark`), and the molt prompt. Run every tick by this
+ * system; the match flow system runs it too when it fills the bar itself (never alone).
+ */
+export function checkBarMarks(world: World): void {
   const m = world.match;
   while (m.marksReached < 3 && m.barPoints >= m.marks[m.marksReached]) {
     m.marksReached++;

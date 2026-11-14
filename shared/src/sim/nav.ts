@@ -1,5 +1,5 @@
 /**
- * Navigation for sub-units: how a unit that is under orders gets to a ground point.
+ * Navigation for sub-units (and the squad bot's leader): how a unit gets to a ground point.
  *
  * `steerToward` is called once a tick for a unit and a goal and answers with a direction and a
  * throttle (the orders system turns them into the unit's control; the movement system does the
@@ -32,13 +32,9 @@ import type { Unit, World } from './types';
 
 /** What a sub-unit remembers about where it is going. Plain data; lives in `unit.nav`. */
 export interface UnitNav {
-  /** The ground point this unit holds at (by a move-to marker, or where a hold command parked it); meaningful while `hasHold`. */
-  holdX: number;
-  holdZ: number;
-  hasHold: boolean;
-  /** It reached its place (a formation slot or a hold point) and is staying there. */
+  /** It reached its place in the swarm and is staying there. */
   settled: boolean;
-  /** Multiplier on its top speed this tick: above 1 while it is catching up with its place in the formation. */
+  /** Multiplier on its top speed this tick: above 1 while it is catching up with its place in the swarm. */
   hurry: number;
   /** The goal of the last `steerToward` call. */
   goalX: number;
@@ -98,9 +94,6 @@ export interface UnitNav {
 
 export function createUnitNav(): UnitNav {
   return {
-    holdX: 0,
-    holdZ: 0,
-    hasHold: false,
     settled: true,
     hurry: 1,
     goalX: 0,
@@ -134,7 +127,7 @@ export function createUnitNav(): UnitNav {
   };
 }
 
-/** Forgets the route (not the hold point): the next `steerToward` starts from scratch. */
+/** Forgets the route: the next `steerToward` starts from scratch. */
 export function resetRoute(nav: UnitNav): void {
   nav.direct = true;
   nav.fresh = true;
@@ -160,7 +153,6 @@ export function resetNav(nav: UnitNav): void {
   nav.feel = 0;
   nav.feelX = NaN;
   nav.feelZ = NaN;
-  nav.hasHold = false;
   nav.settled = true;
   nav.hurry = 1;
   nav.shotAt = -1;
@@ -469,8 +461,8 @@ function roadAccess(world: World, x: number, z: number, r: number, out: RoadAcce
 
 /**
  * True when a body of radius `r` standing at (x, z) can step straight out onto a street (or the
- * city has no streets in play to step onto). Hold points are chosen where this is true, so
- * units are sent to ground they can drive to rather than into a back yard.
+ * city has no streets in play to step onto). Squads deploy where this is true (sim/spawn.ts),
+ * so that nobody starts in a back yard.
  */
 export function standsByRoad(world: World, x: number, z: number, r: number): boolean {
   return !roadAccess(world, x, z, r + LEG_MARGIN, accessTo) || accessTo.clear;

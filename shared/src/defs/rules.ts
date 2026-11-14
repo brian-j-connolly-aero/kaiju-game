@@ -33,6 +33,12 @@ export const MATCH_RULES = {
   blastShoveRadius: 7,
   /** Squads redeploy at least this far from the kaiju. */
   redeployMinKaijuDist: 250,
+  /**
+   * Never alone (docs/ROADMAP.md, phase 1): when every squad has been wiped out, the structures
+   * nearest the kaiju collapse one after another over this many seconds until the bar reaches
+   * the stage's mark; then the cocoon starts by itself (at stage 3 the bar fills to the end).
+   */
+  neverAloneTime: 2.5,
 
   /**
    * Destruction bar marks: P1 = p1 * V(stage 1), P2 = max(growth * P1, p2 * V(stage 2)), ...
@@ -94,16 +100,17 @@ export const COMBAT_RULES = {
   /** Continuous damage (beam, trample) reports `unitHit` / `kaijuHit` only every this many ticks. */
   continuousHitEventTicks: 6,
 
-  /** Volleys: sub-units on hold build charge 0..1 over chargeTime and lock to this firing arc. */
-  chargeTime: 6,
-  chargeHalfArc: 35 * DEG,
+  /**
+   * Volleys: while the squad's player holds the volley button, the sub-units stand planted and
+   * build charge from 0 to 1 over chargeTime seconds; letting go fires them.
+   */
+  chargeTime: 4.5,
   /**
    * Volley damage is multiplied by (1 + volleyDamagePerCharge * charge). Nerve only rewards a
    * charge that is nearly complete: below volleyMinCharge a sub-unit's shot is ragged (it goes
-   * with the trigger, but with the fire-at-will nerve multiplier and aim error); from there
-   * to a full charge the nerve multiplier rises evenly to (1 + volleyNervePerCharge) and the aim
-   * error falls to the weapon's volley error. volleyMinCharge must stay above the longest
-   * weapon cooldown / chargeTime, or holding Fire would charge volleys by itself.
+   * with the others, but with the fire-at-will nerve multiplier and aim error); from there to a
+   * full charge the nerve multiplier rises evenly to (1 + volleyNervePerCharge) and the aim
+   * error falls to the weapon's volley error.
    */
   volleyDamagePerCharge: 1,
   volleyNervePerCharge: 2,
@@ -142,18 +149,20 @@ export const COMBAT_RULES = {
  * to the build. All starting values.
  */
 export const SQUAD_RULES = {
-  /** Formation: sub-units trail the leader in a staggered column, this far apart beyond two unit radii. */
+  /** The swarm: squad-mates keep this far apart beyond two unit radii (one spacing). */
   formationGap: 2,
-  /** Formation: how far each sub-unit sits to the side of the leader's trail, in column spacings. */
-  formationStagger: 0.45,
+  /**
+   * The swarm: the first two squad-mates ride one spacing behind the leader, this many spacings
+   * out to either side of its track; the third rides two spacings straight behind. Where a
+   * street is too narrow they close up into single file on the leader's track.
+   */
+  swarmSide: 0.9,
   /** The leader's trail is sampled every this many meters of travel. */
   trailStep: 2,
-  /** A sub-unit is in its formation slot within this many of its radii, plus one meter. */
+  /** A sub-unit is in its place in the swarm within this many of its radii, plus one meter. */
   slotTolerance: 0.5,
-  /** A sub-unit that has fallen behind its formation slot moves this much faster until it is back in it. */
+  /** A sub-unit that has fallen behind its place in the swarm moves this much faster until it is back in it. */
   catchUpSpeed: 1.3,
-  /** Move-to: a sub-unit holds once it is this close to its hold point. */
-  arriveRadius: 1.2,
   /** Sub-units ease off the throttle inside this many seconds of travel from where they are going. */
   arriveSlowTime: 0.6,
   /** Navigation: a blocked sub-unit plans again at most this often, seconds. */
@@ -171,12 +180,14 @@ export const SQUAD_RULES = {
   aimFireTolerance: 3 * DEG,
   /** How far the driven unit's aim ray reaches when it lands on nothing. */
   aimRayRange: 1500,
-  /** Markers placed with the crosshair: ground or a wall further off than this is not what the player meant. */
+  /**
+   * Ground markers placed with the crosshair (`resolveMarkerPoint`, sim/aim.ts; nothing places
+   * one in phase 1, the artillery radio of phase 2 will): ground or a wall further off than this
+   * is not what the player meant, and a crosshair on the sky within this many body radii of a
+   * kaiju on the map means that kaiju.
+   */
   markerRange: 1500,
-  /** ...a crosshair on the sky within this many body radii of a kaiju on the map means that kaiju... */
   markerSnapRadii: 2,
-  /** ...and otherwise a move-to goes this far ahead along the heading (a call-in is not placed at all). */
-  markerSkyReach: 100,
   /** Sub-units aim at these fractions of the kaiju's height, taking the first with a clear line of fire. */
   aimHeights: [0.5, 0.8, 0.25],
   /**
@@ -187,46 +198,10 @@ export const SQUAD_RULES = {
   /** Several projectiles of one unit leave from points spread this far apart, in unit radii. */
   muzzleSpread: 0.6,
   /**
-   * Wheel orders (follow, move to, fire at will, hold and charge) cost the simulation planning
-   * work, so a squad carries them out from a budget: up to orderBurst at once, refilled at
-   * ordersPerSecond. Orders beyond it wait their turn, and a newer order of the same kind
-   * replaces one still waiting. No person and no bot gives orders this fast; a flooding
-   * client gets the same few a second as everyone else.
+   * A charging unit's laser is on a kaiju when its weapon points within this many body radii of
+   * the kaiju's middle (and the kaiju is in range and in sight): what the kaiju bot reacts to.
    */
-  orderBurst: 6,
-  ordersPerSecond: 3,
+  laserSlackRadii: 1.5,
   /** Call-in shells fall at this angle above the horizon, toward the marker from behind the caller. */
   callInElevation: 75 * DEG,
-} as const;
-
-/**
- * The two things every squad leader can do besides firing (DESIGN.md section 5, "Smoke and
- * marking"; polish pass 2, after the owner asked for them): throw smoke, and mark the kaiju for
- * the whole army. Per stage where the size of things changes. All starting values, kept modest
- * and checked with the balance harness (docs/BALANCE.md section 8).
- */
-export const SQUAD_ABILITIES = {
-  smoke: {
-    /** Seconds between two smokes of one squad. */
-    cooldown: 30,
-    /** Seconds a cloud stands. */
-    duration: 14,
-    /** Radius of the cloud on the ground, and how high it stands, meters. */
-    radius: [12, 30, 60] as PerStage<number>,
-    height: [10, 28, 55] as PerStage<number>,
-    /** The furthest the leader can throw (or call) it from where the leader stands, meters. */
-    range: [45, 130, 260] as PerStage<number>,
-    /** Clouds standing in the whole match at most (the oldest gives way). */
-    maxClouds: 12,
-  },
-  mark: {
-    /** Seconds between two marks of one squad. */
-    cooldown: 30,
-    /** Seconds the kaiju stays marked. */
-    duration: 10,
-    /** The leader must see the kaiju within this range to mark it, meters. */
-    range: [260, 650, 1300] as PerStage<number>,
-    /** The crosshair counts as on the kaiju within this many body radii of its body's axis. */
-    aimSlackRadii: 1.5,
-  },
 } as const;

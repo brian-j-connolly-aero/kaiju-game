@@ -16,7 +16,7 @@ import type { DamageKind } from '../defs/ids';
 import { perStage } from '../defs/ids';
 import { kaijuStageDef } from '../defs/kaiju/index';
 import { DT } from '../defs/rules';
-import type { BeamSpecialDef, KaijuKindDef } from '../defs/schema';
+import type { BeamSpecialDef, ChargeActionDef, KaijuKindDef } from '../defs/schema';
 import { unitTypeDef } from '../defs/units';
 import { hasModFlag, modMult } from '../defs/upgrades';
 import { projectileTypeDef } from '../defs/weapons';
@@ -84,36 +84,74 @@ function inReachOfBody(k: Kaiju, u: Unit): boolean {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Swipe, stomp, roar
+// Swipe, tail sweep, stomp, roar
 // ---------------------------------------------------------------------------------------------
 
-function swipeArc(world: World, k: Kaiju, def: KaijuKindDef, yaw: number): void {
-  const a = def.actions.swipe;
-  const range = a.reach * k.radius;
-  const half = a.arc / 2;
-  const unitDamage = a.unitDamage * modMult(k.mods, 'unitDamage');
-  const unitNerve = a.unitNerve * modMult(k.mods, 'nerveDamage');
-  const structureDamage = perStage(a.structureDamage, k.stage) * modMult(k.mods, 'structureDamage');
+/** One blow over an arc around the body: what it does to whatever touches the arc. Raw numbers; the kaiju's mods are applied here. */
+interface ArcBlow {
+  /** Heading the arc is centered on, half its opening, and its reach from the body's axis. */
+  yaw: number;
+  half: number;
+  range: number;
+  unitDamage: number;
+  unitNerve: number;
+  structureDamage: number;
+  cause: DamageKind;
+  /** Units are knocked outward this far at the body, in body radii, half that at the end of the reach (0: not at all). */
+  knockback: number;
+}
+
+const blow: ArcBlow = { yaw: 0, half: 0, range: 0, unitDamage: 0, unitNerve: 0, structureDamage: 0, cause: 'swipe', knockback: 0 };
+
+/** Everything touching the arc takes the blow once: units (knocked back if the blow says so), other kaiju, structures, props. */
+function arcStrike(world: World, k: Kaiju, b: ArcBlow): void {
+  const { yaw, half, range } = b;
+  const unitDamage = b.unitDamage * modMult(k.mods, 'unitDamage');
+  const unitNerve = b.unitNerve * modMult(k.mods, 'nerveDamage');
+  const structureDamage = b.structureDamage * modMult(k.mods, 'structureDamage');
 
   for (const u of world.units) {
     if (!inReachOfBody(k, u) || !circleInArc(u.x, u.z, u.radius, k.x, k.z, yaw, half, range)) continue;
-    world.hits.push({ target: { entity: 'unit', id: u.id }, hit: kaijuHit(k, u.x, u.z, unitDamage, unitNerve, 'swipe') });
+    world.hits.push({ target: { entity: 'unit', id: u.id }, hit: kaijuHit(k, u.x, u.z, unitDamage, unitNerve, b.cause) });
+    if (b.knockback > 0) {
+      const dx = u.x - k.x;
+      const dz = u.z - k.z;
+      const d = Math.hypot(dx, dz);
+      const t = Math.min(1, Math.max(0, d - u.radius) / range);
+      const shove = b.knockback * k.radius * (1 - 0.5 * t);
+      if (d > 1e-6) shoveUnit(u, dx / d, dz / d, shove);
+      else shoveUnit(u, Math.sin(yaw), Math.cos(yaw), shove);
+    }
   }
   for (const other of world.kaijus) {
     if (other === k || !other.alive || !circleInArc(other.x, other.z, other.radius, k.x, k.z, yaw, half, range)) continue;
-    world.hits.push({ target: { entity: 'kaiju', id: other.id }, hit: kaijuHit(k, other.x, other.z, unitDamage, unitNerve, 'swipe') });
+    world.hits.push({ target: { entity: 'kaiju', id: other.id }, hit: kaijuHit(k, other.x, other.z, unitDamage, unitNerve, b.cause) });
   }
   structuresInCircle(world.cityQuery, k.x, k.z, range, ids);
   for (const id of ids) {
     if (!obbInArc(world.city.structures[id], k.x, k.z, yaw, half, range)) continue;
-    world.structureHits.push({ id, damage: structureDamage, by: k.player, cause: 'swipe' });
+    world.structureHits.push({ id, damage: structureDamage, by: k.player, cause: b.cause });
   }
   const index = world.cityIndex;
   propsInCircle(world.cityQuery, k.x, k.z, range, ids);
   for (const id of ids) {
     if (!circleInArc(index.px[id], index.pz[id], index.pradius[id], k.x, k.z, yaw, half, range)) continue;
-    world.propHits.push({ id, by: k.player, cause: 'swipe' });
+    world.propHits.push({ id, by: k.player, cause: b.cause });
   }
+}
+
+/** The swipe's own arc, along `yaw`. */
+function swipeArc(world: World, k: Kaiju, def: KaijuKindDef, yaw: number): void {
+  const a = def.actions.swipe;
+  blow.yaw = yaw;
+  blow.half = a.arc / 2;
+  blow.range = a.reach * k.radius;
+  blow.unitDamage = a.unitDamage;
+  blow.unitNerve = a.unitNerve;
+  blow.structureDamage = perStage(a.structureDamage, k.stage);
+  blow.cause = 'swipe';
+  blow.knockback = 0;
+  arcStrike(world, k, blow);
 }
 
 /** Swipe: everything in the arc in front of the head takes the claws once. */
@@ -121,6 +159,24 @@ export function swipeEffect(world: World, k: Kaiju, def: KaijuKindDef): void {
   swipeArc(world, k, def, k.actionYaw);
   // Tier 2 mutation: the tail sweeps the same arc behind.
   if (hasModFlag(k.mods, 'tailClub')) swipeArc(world, k, def, k.actionYaw + PI);
+}
+
+/**
+ * Tail sweep: the rear half, as far as the tail reaches. `k.actionYaw` points behind the body
+ * (the action system aims it so). Units are knocked outward; buildings take what a swipe does.
+ */
+export function tailSweepEffect(world: World, k: Kaiju, def: KaijuKindDef): void {
+  const a = def.actions.tailSweep;
+  blow.yaw = k.actionYaw;
+  blow.half = a.arc / 2;
+  blow.range = a.reach * k.radius;
+  blow.unitDamage = a.unitDamage;
+  blow.unitNerve = a.unitNerve;
+  blow.structureDamage = perStage(a.structureDamage, k.stage);
+  blow.cause = 'tailSweep';
+  blow.knockback = a.knockback;
+  arcStrike(world, k, blow);
+  noteKaijuNoise(k);
 }
 
 /** Stomp: a shockwave around the body, strongest at the center, that also shoves units outward. */
@@ -169,7 +225,10 @@ export function stompEffect(world: World, k: Kaiju, def: KaijuKindDef): void {
   noteKaijuNoise(k);
 }
 
-/** Roar: nerve damage to every unit in the radius, and their volley charge is gone. */
+/**
+ * Roar: every unit in the radius is stunned (it cannot move or fire for a moment), loses its
+ * volley charge, and takes the nerve damage that shakes it once the stun is over.
+ */
 export function roarEffect(world: World, k: Kaiju, def: KaijuKindDef): void {
   const a = def.actions.roar;
   const radius = perStage(a.radius, k.stage) * modMult(k.mods, 'roarRadius');
@@ -181,10 +240,49 @@ export function roarEffect(world: World, k: Kaiju, def: KaijuKindDef): void {
     if (dx * dx + dz * dz > radius * radius) continue;
     const hit = kaijuHit(k, u.x, u.z, 0, nerve, 'roar');
     hit.resetsCharge = a.resetsCharge;
+    hit.stun = a.stunTime;
     world.hits.push({ target: { entity: 'unit', id: u.id }, hit });
   }
   emit(world, { type: 'roar', kaiju: k.id, x: k.x, z: k.z, radius });
   noteKaijuNoise(k);
+}
+
+// ---------------------------------------------------------------------------------------------
+// The charge
+// ---------------------------------------------------------------------------------------------
+
+/** A unit counts as run into within this many meters of the body's edge (a tick of running is well under a meter at stage 1). */
+const CHARGE_CONTACT_SLACK = 1;
+/** Units it runs into are thrown aside, and a little forward, by this mix. */
+const CHARGE_THROW_FORWARD = 0.5;
+
+/**
+ * One tick of a charge's run: every unit the body runs into takes the charge's hit, once per
+ * charge, and is thrown aside (to whichever side of the kaiju's path it stood, and a little
+ * forward). The buildings it smashes are the movement system's (a raised trample height).
+ */
+export function chargeTick(world: World, k: Kaiju, a: ChargeActionDef): void {
+  const hits = k.act.chargeHits;
+  const fx = Math.sin(k.yaw);
+  const fz = Math.cos(k.yaw);
+  for (const u of world.units) {
+    if (!inReachOfBody(k, u) || hits.includes(u.id)) continue;
+    const dx = u.x - k.x;
+    const dz = u.z - k.z;
+    const reach = k.radius + u.radius + CHARGE_CONTACT_SLACK;
+    if (dx * dx + dz * dz > reach * reach) continue;
+    hits.push(u.id);
+    world.hits.push({
+      target: { entity: 'unit', id: u.id },
+      hit: kaijuHit(k, u.x, u.z, a.unitDamage * modMult(k.mods, 'unitDamage'), a.unitNerve * modMult(k.mods, 'nerveDamage'), 'charge'),
+    });
+    // Aside: along the right vector (-cos, sin) of the heading, on the unit's side of the path.
+    const side = dx * -fz + dz * fx >= 0 ? 1 : -1;
+    const ax = -fz * side + fx * CHARGE_THROW_FORWARD;
+    const az = fx * side + fz * CHARGE_THROW_FORWARD;
+    const len = Math.hypot(ax, az);
+    shoveUnit(u, ax / len, az / len, a.throwAside * k.radius);
+  }
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -50,6 +50,8 @@ function kaiju(over: Partial<SnapKaiju> = {}): SnapKaiju {
     phaseDuration: 0,
     held: null,
     cooldowns: {} as SnapKaiju['cooldowns'],
+    moves: ['none', 'none'],
+    offer: [],
     ...over,
   };
 }
@@ -82,6 +84,8 @@ function unit(over: Partial<SnapUnit> = {}): SnapUnit {
     shaken: 0,
     charge: 0,
     cooldown: 0,
+    stunned: false,
+    stun: 0,
     ...over,
   };
 }

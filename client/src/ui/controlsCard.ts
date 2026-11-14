@@ -64,7 +64,37 @@ const VERB_ICONS: Record<keyof KaijuActionSet, string> = {
   roar: 'k_roar',
   special: 'k_special',
   molt: 'k_molt',
+  charge: 'k_charge',
+  tailSweep: 'k_tailsweep',
 };
+
+/**
+ * The control whose glyph the card shows for a kaiju verb, and whether it is held.
+ * STUB(client): the simulation's monster controls changed (net/input.ts: Stomp has its own
+ * button, the moves picked at the molts sit on two move buttons, one press each); until the
+ * client binds Btn.stomp, Btn.move1 and Btn.move2 and redraws this card, it shows the old keys.
+ */
+export function cardButton(verb: keyof KaijuActionSet): { action: ButtonAction; hold: boolean } {
+  switch (verb) {
+    case 'swipe':
+    case 'throw':
+      return { action: 'strike', hold: false };
+    case 'grab':
+    case 'eat':
+      return { action: 'grab', hold: false };
+    case 'molt':
+      return { action: 'molt', hold: false };
+    case 'stomp':
+      return { action: 'block', hold: false };
+    case 'brace':
+      return { action: 'block', hold: true };
+    case 'roar':
+    case 'charge':
+      return { action: 'roar', hold: false };
+    default:
+      return { action: 'special', hold: false };
+  }
+}
 
 const ALL_STAGES: StageId[] = [1, 2, 3];
 
@@ -91,9 +121,8 @@ export function kaijuTiles(kind: KaijuKindId): CardTile[] {
   ];
   const actions = def.actions;
   for (const verb of Object.keys(actions) as Array<keyof KaijuActionSet>) {
-    const a = actions[verb];
-    const hold = a.gesture === 'hold' || a.gesture === 'level';
-    const press = button(a.button, hold);
+    const key = cardButton(verb);
+    const press = button(key.action, key.hold);
     const icon = picture(VERB_ICONS[verb], 'kaiju');
     if (verb === 'grab') {
       // A car at every stage; from the stage the definition names, tanks and pieces of buildings too.

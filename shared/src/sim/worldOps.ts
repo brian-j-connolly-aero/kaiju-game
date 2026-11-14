@@ -1,4 +1,4 @@
-/** Small helpers every system uses: emitting events, looking entities up, queueing commands. */
+/** Small helpers every system uses: emitting events, looking entities up, handing slots to bots. */
 
 import { TALLY_CLASSES, type TallyClass } from '../defs/ids';
 import { VOICE_RULES, VOICE_SIDE_RULES } from '../defs/voice';
@@ -31,6 +31,7 @@ export function createInputState(): InputState {
     heldTicks: new Array<number>(BUTTON_COUNT).fill(0),
     lastHeldTicks: new Array<number>(BUTTON_COUNT).fill(0),
     sincePressTicks: new Array<number>(BUTTON_COUNT).fill(NEVER_PRESSED_TICKS),
+    card: 0,
   };
 }
 
@@ -50,8 +51,6 @@ export function createPlayerState(slot: PlayerSlot): PlayerState {
     kaijuId: -1,
     squadId: -1,
     input: createInputState(),
-    commands: [],
-    queuedCommands: [],
     botInput: neutralInput(),
     botState: createBotState(),
     handBack: false,
@@ -94,16 +93,12 @@ export function isDriven(world: World, unit: Unit): boolean {
 }
 
 /**
- * Hands a command to the simulation between ticks (the server calls this for `command`
- * messages). It takes effect on the next step, exactly like a wheel pick sent in an input.
+ * The squads take no orders any more (docs/ROADMAP.md, phase 1: the command wheel, map orders
+ * and the artillery button are gone). The server still accepts a `command` message from a
+ * client of the moment and hands it here, where it is dropped. Remove this, `SquadCommand` and
+ * the `command` message together once no client sends one.
  */
-export function queueCommand(world: World, player: PlayerId, command: SquadCommand): void {
-  const p = world.players[player];
-  if (!p || p.role !== 'human') return;
-  // A flood of commands is a broken or hostile client; the newest few are all that matter.
-  if (p.queuedCommands.length >= 8) p.queuedCommands.shift();
-  p.queuedCommands.push(command);
-}
+export function queueCommand(_world: World, _player: PlayerId, _command: SquadCommand): void {}
 
 /**
  * The server's hook for people coming and going. `bot: true` gives a slot to a bot (its player

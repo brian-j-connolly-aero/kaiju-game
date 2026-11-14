@@ -16,12 +16,13 @@ import {
   PROP_KINDS,
   TICK_RATE,
   type KaijuActionEvent,
+  type KaijuMoveId,
   type PlayerInput,
   type SimEvent,
   type StageId,
   type World,
 } from '../src/index';
-import { breakNerve, eventsOf, holdFire, input, KAIJU_PLAYER, makeTestWorld, parkUnits, placeKaiju, placeUnit, run, type TestWorldOptions } from './helpers';
+import { breakNerve, eventsOf, holdFire, HUMAN_PLAYER, input, KAIJU_PLAYER, makeTestWorld, parkUnits, placeKaiju, placeUnit, run, type TestWorldOptions } from './helpers';
 
 const A = LIZARD.actions;
 
@@ -80,6 +81,32 @@ function toughen(world: World, id: number, hp = 10000): void {
   world.units[id].hp = hp;
   world.units[id].maxHp = hp;
 }
+
+/** Puts moves in the kaiju's two slots, as if it had picked them at its molts. */
+function equip(world: World, first: KaijuMoveId, second: KaijuMoveId = 'none'): void {
+  world.kaijus[0].moves = [first, second];
+}
+
+describe('one move per button', () => {
+  it('a move button does the move in its slot, and nothing while the slot is empty; the old buttons do nothing', () => {
+    const world = arena();
+    const k = world.kaijus[0];
+    k.rage = COMBAT_RULES.rageMax;
+    // Nothing picked yet: the move buttons, and the old brace, roar and beam buttons, do nothing.
+    for (const button of [Btn.move1, Btn.move2, Btn.block, Btn.roar, Btn.special]) {
+      expect(actions(tap(world, button))).toEqual([]);
+    }
+    expect(k.phase).toBe('idle');
+
+    equip(world, 'roar', 'tailSweep');
+    expect(actions(tap(world, Btn.move2))).toEqual([['tailSweep', 'windup']]);
+    untilIdle(world);
+    expect(actions(tap(world, Btn.move1))).toEqual([['roar', 'roar']]);
+    untilIdle(world);
+    // The beam is a move like the others: with rage but not picked, nothing.
+    expect(actions(tap(world, Btn.special))).toEqual([]);
+  });
+});
 
 describe('swipe', () => {
   it('telegraphs with a wind-up, hits the arc once, recovers, in the times from the definition', () => {
@@ -161,8 +188,9 @@ describe('swipe', () => {
   it('is committed: other buttons during the wind-up do not cancel or replace it', () => {
     const world = arena();
     const k = world.kaijus[0];
+    equip(world, 'roar');
     play(world, 2, { buttons: Btn.strike });
-    const events = [...play(world, 3, { buttons: Btn.roar | Btn.block | Btn.grab }), ...untilIdle(world)];
+    const events = [...play(world, 3, { buttons: Btn.move1 | Btn.stomp | Btn.grab }), ...untilIdle(world)];
     expect(actions(events)).toEqual([
       ['swipe', 'active'],
       ['swipe', 'recover'],
@@ -197,76 +225,68 @@ describe('swipe', () => {
 });
 
 describe('buttons held through another action', () => {
-  it('start their action as soon as the kaiju is free, however long ago the press was', () => {
+  it('start their action as soon as the kaiju is free, however long ago the press was, once per press', () => {
     const world = arena({ props: [{ kind: 'car_sedan', x: 0, z: clearOf('car_sedan') }] });
     const k = world.kaijus[0];
     k.hp = 500;
+    equip(world, 'roar');
     // Roar, then press and keep holding Grab while the roar is still going.
-    play(world, 2, { buttons: Btn.roar });
+    play(world, 2, { buttons: Btn.move1 });
     const roarLeft = ticksFor(A.roar.timing.active) - 1;
     expect(roarLeft).toBeGreaterThan(INPUT_BUFFER_TICKS + 5);
     let events = play(world, roarLeft - 1, { buttons: Btn.grab });
     expect(actions(events)).toEqual([]);
-    // The roar ends: the hand reaches at once, and since Grab is still down it goes on to eat.
+    // The roar ends: the hand reaches at once.
     events = play(world, 1, { buttons: Btn.grab });
     expect(actions(events)).toEqual([
       ['roar', 'idle'],
       ['grab', 'windup'],
     ]);
-    events = [...play(world, ticksFor(A.grab.timing.windup) + 2, { buttons: Btn.grab }), ...untilIdle(world)];
+    // Holding the button down does not do it again: one press, one move. The car stays in the hand.
+    events = [...play(world, ticksFor(A.grab.timing.windup) + 30, { buttons: Btn.grab }), ...untilIdle(world)];
     expect(actions(events)).toEqual([
       ['grab', 'active'],
       ['grab', 'idle'],
-      ['eat', 'eat'],
-      ['eat', 'idle'],
     ]);
-    expect(k.hp).toBe(500 + A.eat.heal);
+    expect(k.held).toEqual({ kind: 'prop', prop: 'car_sedan' });
+    expect(k.hp).toBe(500);
 
     // A button that was let go again long before the kaiju was free is forgotten.
     k.cooldowns.roar = 0;
     play(world, 2, { buttons: Btn.strike });
-    play(world, 3, { buttons: Btn.roar });
+    play(world, 3, { buttons: Btn.move1 });
     events = untilIdle(world);
     events = [...events, ...play(world, 10)];
     expect(actions(events).map((a) => a[0])).not.toContain('roar');
   });
 });
 
-describe('stomp: strike held', () => {
-  it('turns the swipe into a stomp when strike is still down at the hold time, keeping the elapsed time', () => {
-    const hold = ticksFor(A.stomp.holdTime);
-
-    // Released one tick too early: it stays a swipe.
+describe('stomp: its own button', () => {
+  it('starts on the press, and lands at the end of its wind-up; holding Strike is a swipe and nothing more', () => {
+    // Strike held as long as a stomp's wind-up: one swipe, no stomp.
     let world = arena();
-    let events = [...play(world, hold, { buttons: Btn.strike }), ...untilIdle(world)];
+    let events = [...play(world, ticksFor(A.stomp.timing.windup) + 5, { buttons: Btn.strike }), ...untilIdle(world)];
     expect(actions(events).map((a) => a[0])).not.toContain('stomp');
     expect(actions(events)[0]).toEqual(['swipe', 'windup']);
 
-    // Still down on the tick the hold time has passed: a stomp.
     world = arena();
     const u = placeUnit(world, 0, 0, 4);
     toughen(world, 0);
-    const timeline: Array<{ step: number; action: string; phase: string; elapsed: number | undefined }> = [];
+    const timeline: Array<[number, string, string]> = [];
     let hitStep = -1;
     for (let step = 1; step <= 90; step++) {
-      const stepEvents = play(world, 1, { buttons: step <= hold + 1 ? Btn.strike : 0 });
-      for (const e of eventsOf(stepEvents, 'kaijuAction')) timeline.push({ step, action: e.action, phase: e.phase, elapsed: e.elapsed });
+      const stepEvents = play(world, 1, { buttons: step <= 2 ? Btn.stomp : 0 });
+      for (const e of eventsOf(stepEvents, 'kaijuAction')) timeline.push([step, e.action, e.phase]);
       if (hitStep < 0 && u.hp < u.maxHp) hitStep = step;
     }
     const windup = ticksFor(A.stomp.timing.windup);
-    expect(timeline.map((t) => [t.step, t.action, t.phase])).toEqual([
-      [1, 'swipe', 'windup'],
-      [1 + hold, 'stomp', 'windup'],
-      // The stomp's wind-up counts from the press, not from the moment it became a stomp.
+    expect(timeline).toEqual([
+      [1, 'stomp', 'windup'],
       [1 + windup, 'stomp', 'active'],
       [1 + windup + ticksFor(A.stomp.timing.active), 'stomp', 'recover'],
       [1 + windup + ticksFor(A.stomp.timing.active) + ticksFor(A.stomp.timing.recover), 'stomp', 'idle'],
     ]);
-    expect(timeline[1].elapsed).toBeCloseTo(hold * DT, 6);
     expect(hitStep).toBe(1 + windup);
-    // The state machine relies on the hold deciding before the swipe would land.
-    expect(A.stomp.holdTime).toBeLessThan(A.swipe.timing.windup);
-    expect(A.stomp.timing.windup).toBeGreaterThan(A.stomp.holdTime);
   });
 
   it('sends out a shockwave that falls off with distance and shoves units away', () => {
@@ -287,7 +307,7 @@ describe('stomp: strike held', () => {
     for (const id of [0, 1, 2]) toughen(world, id);
     const farStart = Math.hypot(far.x, far.z);
 
-    const events = [...play(world, ticksFor(A.stomp.timing.windup) + 1, { buttons: Btn.strike }), ...untilIdle(world)];
+    const events = [...tap(world, Btn.stomp), ...untilIdle(world)];
     expect(actions(events)).toContainEqual(['stomp', 'active']);
 
     // Units: full damage inside the body's reach, the edge value at the rim, nothing beyond.
@@ -325,7 +345,7 @@ describe('stomp: strike held', () => {
   it('roots the kaiju while it stomps', () => {
     const world = arena();
     const k = world.kaijus[0];
-    play(world, ticksFor(A.stomp.holdTime) + 2, { buttons: Btn.strike, moveZ: 1 });
+    play(world, 2, { buttons: Btn.stomp, moveZ: 1 });
     expect(k.action).toBe('stomp');
     const z = k.z;
     play(world, 10, { moveZ: 1 });
@@ -395,8 +415,8 @@ describe('grab and throw', () => {
     expect(world.match.barPoints).toBe(PROP_KINDS.car_taxi.value);
   });
 
-  it('throws what it holds at the aim point: tap grab again, or strike', () => {
-    for (const button of [Btn.grab, Btn.strike]) {
+  it('throws what it holds at the aim point with strike', () => {
+    for (const button of [Btn.strike]) {
       const world = arena({
         props: [{ kind: 'car_sedan', x: 0, z: clearOf('car_sedan') }],
         structures: [{ x: 30, z: 0, w: 8, d: 8, height: 6, hp: 1000 }],
@@ -457,7 +477,7 @@ describe('grab and throw', () => {
 
     // The crosshair is on the building's front wall, near its foot.
     const aim = { aimPitch: -Math.atan2(LIZARD.stages[0].eyeHeight - 1, 24 - LIZARD.stages[0].eyeForward) };
-    const events = [...tap(world, Btn.grab, aim), ...play(world, 90, aim)];
+    const events = [...tap(world, Btn.strike, aim), ...play(world, 90, aim)];
     expect(eventsOf(events, 'projectileHit')).toMatchObject([{ target: 'structure', targetId: 0 }]);
     expect(1000 - world.structureHp[0]).toBe(A.throw.structureDamage[0]);
     expect(close.maxHp - close.hp).toBe(A.throw.unitDamage);
@@ -539,81 +559,77 @@ describe('grab and throw', () => {
   });
 });
 
-describe('eat: grab held', () => {
-  it('goes on from the grab to eat what it grabbed, healing when the meal is finished', () => {
+describe('eat: grab with something in the hand, or something to eat in reach', () => {
+  it('eats what it grabbed when grab is pressed again, healing when the meal is finished', () => {
     const world = arena({ props: [{ kind: 'car_sedan', x: 0, z: clearOf('car_sedan') }] });
     const k = world.kaijus[0];
     k.hp = 500;
+    tap(world, Btn.grab);
+    untilIdle(world);
+    expect(k.held).toEqual({ kind: 'prop', prop: 'car_sedan' });
+
     const timeline: Array<[number, string, string]> = [];
     const held: SimEvent[] = [];
     let healStep = -1;
-    const grab = ticksFor(A.grab.timing.windup);
-    const hold = ticksFor(A.eat.holdTime);
     const chew = ticksFor(A.eat.timing.active);
-    for (let step = 1; step <= 1 + hold + chew; step++) {
+    for (let step = 1; step <= 1 + chew; step++) {
       // The stick is pushed forward once the meal has begun: the kaiju must stay where it is.
-      const events = play(world, 1, { buttons: step <= hold + 1 ? Btn.grab : 0, moveZ: step > hold + 1 && step < hold + chew ? 1 : 0 });
+      const events = play(world, 1, { buttons: step <= 2 ? Btn.grab : 0, moveZ: step > 1 && step < chew ? 1 : 0 });
       for (const e of eventsOf(events, 'kaijuAction')) timeline.push([step, e.action, e.phase]);
       held.push(...eventsOf(events, 'kaijuHeld'));
       if (healStep < 0 && k.hp > 500) healStep = step;
     }
     expect(timeline).toEqual([
-      [1, 'grab', 'windup'],
-      [1 + grab, 'grab', 'active'],
-      [1 + grab, 'grab', 'idle'],
-      [1 + hold, 'eat', 'eat'],
-      [1 + hold + chew, 'eat', 'idle'],
+      [1, 'eat', 'eat'],
+      [1 + chew, 'eat', 'idle'],
     ]);
-    expect(held).toMatchObject([
-      { reason: 'grab', source: 'prop', held: { kind: 'prop' } },
-      { reason: 'eat', source: 'none', held: null },
-    ]);
-    expect(healStep).toBe(1 + hold + chew);
+    expect(held).toMatchObject([{ reason: 'eat', source: 'none', held: null }]);
+    expect(healStep).toBe(1 + chew);
     expect(k.hp).toBe(500 + A.eat.heal);
     expect(k.held).toBeNull();
-    // Rooted for the whole meal.
+    // Rooted for the whole meal, and nothing was thrown.
     expect(k.z).toBe(0);
     expect(A.eat.moveMult).toBe(0);
     expect(k.cooldowns.eat).toBeGreaterThan(0);
+    expect(world.projectiles).toEqual([]);
   });
 
-  it('eats what it already holds when grab is held, and respects the cooldown', () => {
+  it('respects the cooldown: with something in the hand, grab does nothing until the last meal is far enough behind', () => {
     const world = arena({ props: [{ kind: 'car_sedan', x: 0, z: clearOf('car_sedan') }, { kind: 'car_taxi', x: 3, z: clearOf('car_taxi', 0.6) }] });
     const k = world.kaijus[0];
     k.hp = 500;
     tap(world, Btn.grab);
     untilIdle(world);
-    expect(k.held).not.toBeNull();
-
-    // Hold grab: after the hold time it eats; letting go afterwards throws nothing.
-    let events = play(world, ticksFor(A.eat.holdTime) + 3, { buttons: Btn.grab });
-    expect(actions(events)).toEqual([['eat', 'eat']]);
-    events = untilIdle(world);
-    expect(eventsOf(events, 'projectileSpawn')).toEqual([]);
+    tap(world, Btn.grab);
+    untilIdle(world);
     expect(k.hp).toBe(500 + A.eat.heal);
 
-    // Straight away again: the second car is grabbed, but the cooldown stops the meal, and
-    // releasing the long hold does not throw it either.
-    events = [...play(world, ticksFor(A.eat.holdTime) + 10, { buttons: Btn.grab }), ...play(world, 20)];
+    // Straight away again: the second car is grabbed, but the cooldown stops the meal.
+    tap(world, Btn.grab);
+    untilIdle(world);
     expect(k.held).not.toBeNull();
-    expect(actions(events).map((a) => a[0])).not.toContain('eat');
-    expect(actions(events).map((a) => a[0])).not.toContain('throw');
-    expect(k.hp).toBe(500 + A.eat.heal);
+    const events = [...tap(world, Btn.grab), ...play(world, 20)];
+    expect(actions(events)).toEqual([]);
+    expect(k.held).not.toBeNull();
 
     // Once the cooldown (counted from the start of the first meal) is over, it can eat again.
     play(world, ticksFor(A.eat.cooldown));
     expect(k.cooldowns.eat).toBe(0);
-    play(world, ticksFor(A.eat.holdTime) + 3, { buttons: Btn.grab });
+    tap(world, Btn.grab);
     untilIdle(world);
     expect(k.held).toBeNull();
     expect(k.hp).toBe(500 + 2 * A.eat.heal);
   });
 
-  it('eats an edible off the ground when the grab finds nothing to pick up', () => {
+  it('eats an edible off the ground when there is nothing to pick up', () => {
     const world = arena({ props: [{ kind: 'kiosk', x: 0, z: clearOf('kiosk', 0.6) }] });
     const k = world.kaijus[0];
     k.hp = k.maxHp - 10;
-    const events = [...play(world, ticksFor(A.eat.holdTime) + 3, { buttons: Btn.grab }), ...untilIdle(world)];
+    const events = [...tap(world, Btn.grab), ...untilIdle(world)];
+    expect(actions(events)).toEqual([
+      ['eat', 'eat'],
+      ['eat', 'idle'],
+    ]);
     expect(eventsOf(events, 'kaijuHeld')).toMatchObject([{ held: null, reason: 'eat', source: 'prop', sourceId: 0 }]);
     expect(bitGet(world.propAlive, 0)).toBe(false);
     expect(world.match.barPoints).toBe(PROP_KINDS.kiosk.value);
@@ -622,18 +638,23 @@ describe('eat: grab held', () => {
     expect(k.hp).toBe(k.maxHp);
   });
 
-  it('does nothing when there is nothing to eat', () => {
+  it('grabs at nothing when there is nothing to pick up or eat', () => {
     const world = arena();
-    const events = play(world, 60, { buttons: Btn.grab });
-    expect(actions(events).map((a) => a[0])).toEqual(['grab', 'grab', 'grab']);
+    const events = [...tap(world, Btn.grab), ...untilIdle(world)];
+    expect(actions(events)).toEqual([
+      ['grab', 'windup'],
+      ['grab', 'active'],
+      ['grab', 'idle'],
+    ]);
+    expect(world.kaijus[0].held).toBeNull();
     expect(world.kaijus[0].cooldowns.eat).toBe(0);
   });
 
   it('loses the meal and the heal when its nerve breaks mid-bite', () => {
-    const world = arena({ props: [{ kind: 'car_sedan', x: 0, z: clearOf('car_sedan') }] });
+    const world = arena({ props: [{ kind: 'kiosk', x: 0, z: clearOf('kiosk', 0.6) }] });
     const k = world.kaijus[0];
     k.hp = 500;
-    play(world, ticksFor(A.eat.holdTime) + 10, { buttons: Btn.grab });
+    play(world, 10, { buttons: Btn.grab });
     expect(k.phase).toBe('eat');
     breakNerve(world);
     expect(k.phase).toBe('stagger');

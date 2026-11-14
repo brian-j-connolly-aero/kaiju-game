@@ -16,6 +16,7 @@ import type {
   DamageKind,
   EndReason,
   FlightModel,
+  KaijuMoveId,
   KaijuPhase,
   KaijuVerb,
   MatchPhase,
@@ -285,6 +286,18 @@ export interface UnitShakenEvent extends EventBase {
   duration: number;
 }
 
+/**
+ * A roar stunned a unit: for `duration` seconds it cannot move or fire and does not answer its
+ * controls (a player's camera still looks around); it lost its charge. Its shaking, if the
+ * roar shook it (`unitShaken` on the same tick), starts when the stun is over. The snapshot's
+ * unit record carries `stunned` and the seconds left (`stun`).
+ */
+export interface UnitStunnedEvent extends EventBase {
+  type: 'unitStunned';
+  unit: number;
+  duration: number;
+}
+
 /** A player's driven unit died and they took over a surviving sub-unit. */
 export interface TakeoverEvent extends EventBase {
   type: 'takeover';
@@ -295,18 +308,18 @@ export interface TakeoverEvent extends EventBase {
 }
 
 /**
- * A squad fired a charged volley: its player's shot took with it at least one sub-unit charged
- * to COMBAT_RULES.volleyMinCharge or more. (A trigger pulled on less charge than that also
- * fires the sub-units, but raggedly: no `volley` event.) The projectiles themselves arrive as
- * `projectileSpawn` events of the same tick.
+ * A squad fired a charged volley: its player let go of the volley button and at least one
+ * planted squad-mate fired with a charge of COMBAT_RULES.volleyMinCharge or more. (Letting go
+ * on less charge than that also fires them, but raggedly: no `volley` event.) The projectiles
+ * themselves arrive as `projectileSpawn` events of the same tick.
  */
 export interface VolleyEvent extends EventBase {
   type: 'volley';
   squad: number;
   player: PlayerId;
-  /** The sub-units that fired with the trigger, ragged ones included (the driven unit, whose shot was the trigger, is not listed). */
+  /** The squad-mates that fired, ragged ones included (the driven unit, whose own shot may have gone with them, is not listed). */
   units: number[];
-  /** The aim point: where the player's aim ray landed. */
+  /** The aim point: where the view's aim ray from the leader's eye (the crosshair) landed. */
   x: number;
   y: number;
   z: number;
@@ -323,10 +336,11 @@ export interface RoarEvent extends EventBase {
 }
 
 /**
- * A call-in was requested and its marker is on the ground ('marked'), its first shell has been
- * released and is falling ('inbound'), or its last shell has landed ('done': take the marker
- * away). The shells are `projectileSpawn` events with owner 'callin' and this mission's id.
- * A mission that is still running when a stage ends is dropped without a 'done'.
+ * A call-in mission (`startCallIn`) has its marker on the ground ('marked'), its first shell has
+ * been released and is falling ('inbound'), or its last shell has landed ('done': take the
+ * marker away). The shells are `projectileSpawn` events with owner 'callin' and this mission's
+ * id. A mission that is still running when a stage ends is dropped without a 'done'. Nothing
+ * starts one in phase 1 (the artillery button is gone); phase 2's artillery radio will.
  */
 export interface CallInEvent extends EventBase {
   type: 'callin';
@@ -344,34 +358,6 @@ export interface CallInEvent extends EventBase {
   radius: number;
 }
 
-/**
- * A squad threw smoke (sim/abilities.ts): a cloud of `radius` standing `height` high at (x, z)
- * for `duration` seconds. The clouds standing now are also in every snapshot.
- */
-export interface SmokeEvent extends EventBase {
-  type: 'smoke';
-  /** Cloud id, unique per match. */
-  id: number;
-  squad: number;
-  player: PlayerId;
-  x: number;
-  z: number;
-  radius: number;
-  height: number;
-  duration: number;
-}
-
-/** A squad marked a kaiju for the whole army for `duration` seconds (it was at (x, z)). */
-export interface MarkEvent extends EventBase {
-  type: 'mark';
-  kaiju: number;
-  squad: number;
-  player: PlayerId;
-  x: number;
-  z: number;
-  duration: number;
-}
-
 /** The bar passed a mark and the kaiju may now cocoon. */
 export interface MoltAvailableEvent extends EventBase {
   type: 'moltAvailable';
@@ -385,6 +371,45 @@ export interface CocoonEvent extends EventBase {
   kaiju: number;
   x: number;
   z: number;
+  duration: number;
+}
+
+/**
+ * Molt cards (DESIGN.md section 4): the cocoon has started and the kaiju is offered three moves
+ * (in card order: card 1 is `offer[0]`). The one it picks goes in `slot` (0: the first move
+ * button, 1: the second). The offer stands until a pick lands (`moltPick`), at the latest at the
+ * end of the intermission. The snapshot's kaiju record carries the offer as well.
+ */
+export interface MoltOfferEvent extends EventBase {
+  type: 'moltOffer';
+  kaiju: number;
+  offer: KaijuMoveId[];
+  slot: 0 | 1;
+}
+
+/** A molt card was picked: `move` is in `slot` from now on. `random` when nobody picked and it was drawn at the end of the intermission. */
+export interface MoltPickEvent extends EventBase {
+  type: 'moltPick';
+  kaiju: number;
+  move: KaijuMoveId;
+  slot: 0 | 1;
+  /** Which card it was, 1 to 3. */
+  card: number;
+  random: boolean;
+}
+
+/**
+ * Never alone (DESIGN.md section 2): every squad has been wiped out, so the city gives way
+ * around the kaiju. Over `duration` seconds `count` structures nearest it collapse (each a
+ * `structureStage` with cause 'collapse'), the bar fills to the stage's mark, and then the
+ * cocoon starts by itself (`cocoon`); at stage 3 the bar fills to the end and the kaiju wins.
+ */
+export interface CityCollapseEvent extends EventBase {
+  type: 'cityCollapse';
+  kaiju: number;
+  x: number;
+  z: number;
+  count: number;
   duration: number;
 }
 
@@ -472,14 +497,16 @@ export type SimEvent =
   | MemberLostEvent
   | UnitDestroyedEvent
   | UnitShakenEvent
+  | UnitStunnedEvent
   | TakeoverEvent
   | VolleyEvent
   | RoarEvent
   | CallInEvent
-  | SmokeEvent
-  | MarkEvent
   | MoltAvailableEvent
   | CocoonEvent
+  | MoltOfferEvent
+  | MoltPickEvent
+  | CityCollapseEvent
   | MoltBlastEvent
   | StageChangeEvent
   | BarMarkEvent
@@ -515,8 +542,6 @@ export const SIM_EVENT_TYPES: readonly SimEventType[] = [
   'volley',
   'roar',
   'callin',
-  'smoke',
-  'mark',
   'moltAvailable',
   'cocoon',
   'moltBlast',
@@ -525,4 +550,8 @@ export const SIM_EVENT_TYPES: readonly SimEventType[] = [
   'matchPhase',
   'voice',
   'matchEnd',
+  'unitStunned',
+  'moltOffer',
+  'moltPick',
+  'cityCollapse',
 ];

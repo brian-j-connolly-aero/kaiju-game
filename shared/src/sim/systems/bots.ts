@@ -3,8 +3,8 @@
  *
  * Bots play through the same interface as people: for every player with `player.bot === true`
  * this system writes the input the bot wants for the NEXT tick into `player.botInput` (a
- * PlayerInput: movement relative to its aim, aim, button bits, and `wheel` / `marker` for squad
- * commands). The input system picks it up next tick, so a bot obeys every rule a person does
+ * PlayerInput: the stick, the aim and the button bits). The input system picks it up next
+ * tick, so a bot obeys every rule a person does
  * and is always one tick behind what it saw, like a person with very good reflexes.
  *
  * The behavior is in sim/bots/ (`kaijuBot`, `squadBot`; DESIGN.md section 5, "Bots"), its

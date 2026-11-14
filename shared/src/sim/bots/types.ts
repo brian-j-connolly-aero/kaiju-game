@@ -41,20 +41,17 @@ export interface BotState {
   lastX: number;
   lastZ: number;
   lastChecked: boolean;
-  /** The squad is parked on hold-and-charge. */
-  parked: boolean;
+  /** It holds the volley button: its squad-mates are planted and charging. */
+  charging: boolean;
+  /** Seconds the parked squad has waited for its squad-mates to come up before charging. */
+  gather: number;
   /** Seconds the parked squad has had no line of fire. */
   blind: number;
   /** Seconds the squad has been ready and waiting for the others. */
   waited: number;
-  /** Wheel commands waiting to be given, in order, and seconds until the next may go. */
-  wheel: Array<'follow' | 'moveTo' | 'fireAtWill' | 'holdCharge'>;
-  wheelTimer: number;
   /** The leader has a line of fire to the kaiju (as of the last look), and to which height on its body (a fraction; -1: none). */
   los: boolean;
   aimHeight: number;
-  /** Seconds until the artillery button may be tried again. */
-  callInTimer: number;
 
   // --- Kaiju bot ---------------------------------------------------------------------------
   goal: KaijuBotGoal;
@@ -97,6 +94,12 @@ export interface BotState {
   swimRest: number;
   swimX: number;
   swimZ: number;
+  /** Molt cards: seconds it looks at the offer before it picks (-1: no offer seen yet). */
+  cardWait: number;
+  /** The charge: the unit it is running at (-1: none, it runs at `chargeX`, `chargeZ`), and where. */
+  chargeUnit: number;
+  chargeX: number;
+  chargeZ: number;
 }
 
 export function createBotState(): BotState {
@@ -120,14 +123,12 @@ export function createBotState(): BotState {
     lastX: 0,
     lastZ: 0,
     lastChecked: false,
-    parked: false,
+    charging: false,
+    gather: 0,
     blind: 0,
     waited: 0,
-    wheel: [],
-    wheelTimer: 0,
     los: false,
     aimHeight: -1,
-    callInTimer: 0,
 
     goal: 'none',
     goalId: -1,
@@ -155,5 +156,9 @@ export function createBotState(): BotState {
     swimRest: 0,
     swimX: 0,
     swimZ: 0,
+    cardWait: -1,
+    chargeUnit: -1,
+    chargeX: 0,
+    chargeZ: 0,
   };
 }

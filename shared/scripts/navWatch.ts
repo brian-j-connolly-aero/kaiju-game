@@ -4,7 +4,7 @@
  * only reads the World after each tick.
  */
 
-import { bridgeAt, DT, inWater, unitTypeDef, weaponDef, type CityData, type SimEvent, type World } from '../src/index';
+import { bridgeAt, DT, formationSpacing, inWater, unitTypeDef, weaponDef, type CityData, type SimEvent, type World } from '../src/index';
 
 /** The open sea (as opposed to a river): a water area named like one. Only Port Meridian has it. */
 function seaAreas(city: CityData): Array<Array<{ x: number; z: number }>> {
@@ -28,6 +28,8 @@ const SWAY_PATH = 40;
 const SWAY_NET = 6;
 /** Meters of water all round that make it open water. */
 const OPEN_SEA = 50;
+/** A squad-mate (not planted) further than this many spacings from its leader has fallen behind the swarm. */
+const STRAGGLE_SPACINGS = 6;
 
 export interface NavWatch {
   onTick: (world: World, events: SimEvent[]) => void;
@@ -68,6 +70,10 @@ export interface NavWatch {
   longestFarAt: string;
   /** Seconds the kaiju bot had nothing to wreck (it wandered toward the middle of the bounds). */
   kaijuAimless: number;
+  /** Unit-seconds a squad-mate that is not planted spent more than 6 spacings from its leader; the longest such spell. */
+  straggleSeconds: number;
+  longestStraggle: number;
+  longestStraggleAt: string;
 }
 
 export function createNavWatch(): NavWatch {
@@ -80,6 +86,7 @@ export function createNavWatch(): NavWatch {
   const trail = new Map<number, number[]>();
   const swayedAt = new Map<number, number>();
   const far: number[] = [];
+  const straggle: number[] = [];
   let tick = 0;
   const sway = (id: number, x: number, z: number, moving: boolean): boolean => {
     let t = trail.get(id);
@@ -123,10 +130,14 @@ export function createNavWatch(): NavWatch {
     longestFar: 0,
     longestFarAt: '',
     kaijuAimless: 0,
+    straggleSeconds: 0,
+    longestStraggle: 0,
+    longestStraggleAt: '',
     onTick(world: World): void {
       if (world.match.phase !== 'playing') {
         trail.clear();
         far.length = 0;
+        straggle.length = 0;
         return;
       }
       sea ??= seaAreas(world.city);
@@ -137,11 +148,17 @@ export function createNavWatch(): NavWatch {
       let outside = false;
       for (const u of world.units) {
         if (!u || !u.alive) {
-          if (u) still[u.id] = 0;
+          if (u) {
+            still[u.id] = 0;
+            straggle[u.id] = 0;
+          }
           continue;
         }
         w.unitSeconds += DT;
-        const pushing = Math.hypot(u.control.moveX, u.control.moveZ) > 0.3 && !u.rooted && u.shaken <= 0;
+        // A driven tank's stick is throttle and turn: turning on the spot is not pushing to go anywhere.
+        const tank = world.squads[u.squad].driven === u.id && unitTypeDef(u.type).drive !== undefined;
+        const push = tank ? Math.abs(u.control.moveZ) : Math.hypot(u.control.moveX, u.control.moveZ);
+        const pushing = push > 0.3 && !u.rooted && u.shaken <= 0 && u.stun <= 0;
         const speed = Math.hypot(u.vx, u.vz);
         if (pushing && speed < 0.4) {
           still[u.id] = (still[u.id] ?? 0) + DT;
@@ -152,6 +169,19 @@ export function createNavWatch(): NavWatch {
           }
         } else {
           still[u.id] = 0;
+        }
+        // Squad-mates that have fallen out of the swarm (planted ones stay where they are on purpose).
+        const squad = world.squads[u.squad];
+        const leader = squad.driven >= 0 ? world.units[squad.driven] : null;
+        if (leader && leader.alive && leader !== u && !u.rooted && Math.hypot(u.x - leader.x, u.z - leader.z) > STRAGGLE_SPACINGS * formationSpacing(u)) {
+          straggle[u.id] = (straggle[u.id] ?? 0) + DT;
+          w.straggleSeconds += DT;
+          if (straggle[u.id] > w.longestStraggle) {
+            w.longestStraggle = straggle[u.id];
+            w.longestStraggleAt = `stage ${world.match.stage}, unit ${u.id} ${Math.round(Math.hypot(u.x - leader.x, u.z - leader.z))} m from its leader at (${Math.round(-leader.x)}, ${Math.round(leader.z)})`;
+          }
+        } else {
+          straggle[u.id] = 0;
         }
         const gaveUp = u.nav.wait > 0;
         if (gaveUp && !waiting[u.id]) w.giveUps++;
@@ -247,6 +277,7 @@ export function navSummary(watches: readonly NavWatch[]): string {
     `\n  in the bay ${pct(sum((w) => w.seaSeconds), unit)} of unit time (out in open water ${pct(sum((w) => w.openSeaSeconds), unit)}); outside the bounds on ${sum((w) => w.outsideTicks)} ticks` +
     `; back and forth: units ${sum((w) => w.sways)} times, kaiju ${sum((w) => w.kaijuSways)} times` +
     `; squads beyond 1.5 ranges of a kaiju on the map ${pct(sum((w) => w.farSeconds), play * 4)} of squad time (longest ${worst((w) => w.longestFar, (w) => w.longestFarAt)})` +
-    `; kaiju with nothing to wreck ${pct(sum((w) => w.kaijuAimless), play)} of play`
+    `; kaiju with nothing to wreck ${pct(sum((w) => w.kaijuAimless), play)} of play` +
+    `\n  squad-mates out of the swarm (more than ${STRAGGLE_SPACINGS} spacings from the leader, not planted) ${pct(sum((w) => w.straggleSeconds), unit)} of unit time (longest ${worst((w) => w.longestStraggle, (w) => w.longestStraggleAt)})`
   );
 }

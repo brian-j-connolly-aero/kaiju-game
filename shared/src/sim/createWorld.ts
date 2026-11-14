@@ -83,8 +83,6 @@ export function createWorld(options: WorldOptions): World {
     units: [],
     projectiles: [],
     callIns: [],
-    smokes: [],
-    nextSmokeId: 1,
     nextProjectileId: 1,
     nextCallInId: 1,
     hits: [],

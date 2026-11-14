@@ -8,12 +8,17 @@
  *   things stand around it. That is "roams toward the densest standing value" without a map:
  *   rich blocks win, and so does the tower three streets away when the street it is on is flat.
  * - Squads. It fights units that come close, takes revenge on the nearest squad for a while
- *   after its nerve breaks, roars when units stand inside the roar radius, braces when enough
- *   charged lasers are on it, throws what is at hand at a squad in range, and turns its beam on
- *   units when it has one and they are in reach (else on something big).
- * - Eating when hurt, from the hand, from within reach, or after a short walk to a car.
+ *   after its nerve breaks, and throws what is at hand at a squad in range.
+ * - The moves it picked at its molts (one press per move, on its two move buttons): the beam
+ *   on units in reach (else on something big) when the rage is there; the roar when guns
+ *   charge close by (it stuns them); the charge at a unit in the open, or through a row of
+ *   buildings it can smash on the way to what it is wrecking; the tail sweep at units behind
+ *   it; the brace when enough charged lasers are on it.
+ * - Eating when hurt: what is in the hand, what lies in reach (a grab and then a bite, or a
+ *   bite straight off the ground), or after a short walk to a car.
  * - The molt: when it may, it looks for a place where fewer guns can see it, for a few seconds
- *   at most, and cocoons there.
+ *   at most, and cocoons there with one press. In the cocoon it looks at the molt cards for a
+ *   moment and picks one (`BOT_RULES.kaiju.cardWeights`, with some randomness).
  * - Swimming (sim/swim.ts): in trouble (its nerve near breaking, badly hurt) with deep water
  *   close by, it slips into the water and swims away from the squads for a few seconds, then
  *   goes back to work (it earns nothing in the water).
@@ -27,20 +32,20 @@
 import { PROP_KINDS } from '../../city/props';
 import { castSegment, distToStructure, lineOfSight, propsInCircle, structuresInCircle } from '../../city/spatialIndex';
 import { BOT_RULES } from '../../defs/bots';
-import { perStage, type StageId } from '../../defs/ids';
-import { kaijuKindDef, kaijuStageDef } from '../../defs/kaiju/index';
-import { DT, TICK_RATE } from '../../defs/rules';
+import { perStage, type KaijuVerb, type StageId } from '../../defs/ids';
+import { kaijuKindDef, kaijuMoveSlot, kaijuStageDef } from '../../defs/kaiju/index';
+import { DT } from '../../defs/rules';
 import type { KaijuKindDef, KaijuStageDef } from '../../defs/schema';
 import { LAST_STAGE } from '../../defs/stages';
 import { unitTypeDef } from '../../defs/units';
 import { modMult } from '../../defs/upgrades';
 import { projectileTypeDef, weaponDef } from '../../defs/weapons';
-import { angleDist, yawFromTo, yawOf } from '../../math/angle';
+import { angleDist, wrapAngle, yawFromTo, yawOf } from '../../math/angle';
 import { boundsContains, circleInArc, obbInArc } from '../../math/geom';
+import { rngRange, rngWeightedIndex } from '../../math/rng';
 import { clamp, lerp } from '../../math/scalar';
 import type { Vec3 } from '../../math/vec';
-import { Btn, MAX_AIM_PITCH } from '../../net/input';
-import { hiddenFromKaiju } from '../abilities';
+import { Btn, MAX_AIM_PITCH, type PlayerInput } from '../../net/input';
 import { findEdible, findGrabTarget } from '../kaijuEffects';
 import { laserOnKaiju } from '../squads';
 import { unitSeesKaiju } from '../spotting';
@@ -51,9 +56,8 @@ import type { BotState } from './types';
 
 const R = BOT_RULES.kaiju;
 
-/** Ticks a tap lasts, and ticks a hold needs beyond the action's hold time to be safe. */
+/** Ticks a press lasts (one move per button: every press is a tap). */
 const TAP_TICKS = 2;
-const HOLD_SLACK_TICKS = 3;
 /** Turns tried to get round something it cannot break, smallest first (radians). */
 const DEFLECTIONS = [Math.PI / 6, Math.PI / 3, Math.PI / 2, (2 * Math.PI) / 3];
 /** It presses the next strike this long before the last one's recovery ends (inside the input buffer). */
@@ -68,6 +72,7 @@ const PROP_SEARCH = 45;
 
 const ids: number[] = [];
 const propIds: number[] = [];
+const seen: number[] = [];
 const eye: Vec3 = { x: 0, y: 0, z: 0 };
 const mark: Vec3 = { x: 0, y: 0, z: 0 };
 
@@ -99,8 +104,7 @@ function lookAtSquads(world: World, k: Kaiju, bs: BotState): void {
   for (const u of world.units) {
     if (!u.alive) continue;
     if (!exposed && unitSeesKaiju(world, u, k, weaponRangeOf(world, u))) exposed = true;
-    // A gun in smoke is not there as far as the kaiju can tell, laser and all.
-    if (!laserOnKaiju(world, u, k) || hiddenFromKaiju(world, u)) continue;
+    if (!laserOnKaiju(world, u, k)) continue;
     lasers++;
     if (u.charge > charge) charge = u.charge;
     const d = Math.hypot(u.x - k.x, u.z - k.z) || 1;
@@ -481,20 +485,81 @@ function canAct(k: Kaiju): boolean {
   return k.phase === 'recover' && k.phaseDuration - k.phaseTime <= CHAIN_LEAD;
 }
 
-/** Swipes or stomps when either is worth something; returns whether it struck. */
+/** Swipes or stomps (each its own button) when either is worth something; returns whether it struck. */
 function strike(world: World, k: Kaiju, bs: BotState, def: KaijuKindDef, st: KaijuStageDef, yaw: number): boolean {
-  if (!canAct(k) || busyWith(bs, 'strike')) return false;
+  if (!canAct(k) || busyWith(bs, 'strike') || busyWith(bs, 'stomp')) return false;
   const w = strikeWorth(world, k, def, st, yaw);
   if (w.swipe <= 0 && w.stomp <= 0) return false;
   const swipeTime = def.actions.swipe.timing.windup + def.actions.swipe.timing.active + def.actions.swipe.timing.recover;
   const stompTime = def.actions.stomp.timing.windup + def.actions.stomp.timing.active + def.actions.stomp.timing.recover;
-  if (w.stomp / stompTime > (w.swipe / swipeTime) * R.stompBias) {
-    press(bs, 'strike', Math.ceil(def.actions.stomp.holdTime * TICK_RATE) + HOLD_SLACK_TICKS);
-  } else {
-    press(bs, 'strike', TAP_TICKS);
-  }
+  press(bs, w.stomp / stompTime > (w.swipe / swipeTime) * R.stompBias ? 'stomp' : 'strike', TAP_TICKS);
   return true;
 }
+
+// ---------------------------------------------------------------------------------------------
+// The moves picked at the molts
+// ---------------------------------------------------------------------------------------------
+
+/** The move button a verb is on, or null when the kaiju has not picked that move. */
+function moveButton(k: Kaiju, verb: KaijuVerb): 'move1' | 'move2' | null {
+  const slot = kaijuMoveSlot(k.moves, verb);
+  return slot === 0 ? 'move1' : slot === 1 ? 'move2' : null;
+}
+
+/** The move button of a move it has picked and can use now (off cooldown), or null. */
+function readyMove(k: Kaiju, bs: BotState, verb: KaijuVerb): 'move1' | 'move2' | null {
+  const button = moveButton(k, verb);
+  if (!button || k.cooldowns[verb] > 0 || busyWith(bs, button)) return null;
+  return button;
+}
+
+/** The molt cards: a moment to look at them, then a pick by preference, with some randomness. */
+function chooseCard(world: World, k: Kaiju, bs: BotState, input: PlayerInput): void {
+  if (bs.cardWait < 0) bs.cardWait = rngRange(world.rng, R.cardThink[0], R.cardThink[1]);
+  bs.cardWait -= DT;
+  if (bs.cardWait > 0) return;
+  const weights = k.offer.map((m) => (m === 'none' ? 0 : R.cardWeights[m]));
+  input.card = rngWeightedIndex(world.rng, weights) + 1;
+  // Should the pick not land, it looks again a little later.
+  bs.cardWait = R.cardThink[1];
+}
+
+/**
+ * How far a charge along a heading could run before something it cannot smash stops it (up to
+ * `length`), and what it would smash on the way (bar points of the buildings taller than it
+ * walks through, each counted once).
+ */
+function chargeLine(world: World, k: Kaiju, def: KaijuKindDef, st: KaijuStageDef, yaw: number, length: number, out: { clear: number; worth: number }): void {
+  const index = world.cityIndex;
+  const smash = perStage(def.actions.charge.smashHeight, k.stage);
+  const step = Math.max(1, k.radius * 0.75);
+  const dx = Math.sin(yaw);
+  const dz = Math.cos(yaw);
+  const b = world.match.bounds;
+  seen.length = 0;
+  out.clear = length;
+  out.worth = 0;
+  for (let d = step; d <= length + 1e-6; d += step) {
+    const x = k.x + dx * d;
+    const z = k.z + dz * d;
+    if (!boundsContains(b, x, z, k.radius)) {
+      out.clear = d - step;
+      return;
+    }
+    structuresInCircle(world.cityQuery, x, z, k.radius * 0.9, ids);
+    for (const id of ids) {
+      if (index.spassable[id] === 1 || index.sheight[id] <= st.trampleHeight || seen.includes(id)) continue;
+      if (index.sheight[id] > smash && !st.wadesTall) {
+        out.clear = d - step;
+        return;
+      }
+      seen.push(id);
+      const s = world.city.structures[id];
+      out.worth += (s.value * world.structureHp[id]) / s.hp;
+    }
+  }
+}
+const line = { clear: 0, worth: 0 };
 
 // ---------------------------------------------------------------------------------------------
 // The bot
@@ -506,8 +571,6 @@ function nearestUnit(world: World, k: Kaiju): { unit: Unit | null; dist: number 
   for (const u of world.units) {
     if (!u.alive) continue;
     const d = Math.hypot(u.x - k.x, u.z - k.z) - u.radius;
-    // In smoke it is only found by bumping into it.
-    if (d > k.radius * R.smokeFeelRadii && hiddenFromKaiju(world, u)) continue;
     if (d < dist) {
       dist = d;
       unit = u;
@@ -530,7 +593,7 @@ function beamUnit(world: World, k: Kaiju, st: KaijuStageDef, range: number, nx: 
     if (!u.alive) continue;
     const away = Math.hypot(u.x - k.x, u.z - k.z);
     // The beam starts at the mouth, ahead of the body: what stands under its chin is out of it.
-    if (away > range || away <= st.mouthForward + u.radius || hiddenFromKaiju(world, u)) continue;
+    if (away > range || away <= st.mouthForward + u.radius) continue;
     const d = Math.hypot(u.x - nx, u.z - nz);
     if (d >= bestD) continue;
     // The mouth, with the head turned toward this unit.
@@ -549,11 +612,15 @@ function beamUnit(world: World, k: Kaiju, st: KaijuStageDef, range: number, nx: 
 export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
   const input = beginBotInput(world, p);
   const bs = p.botState;
+  const handicap = botHandicap(world, p);
+  // The molt cards are on offer from the start of the cocoon to the end of the intermission.
+  if (k.alive && k.offer.length > 0 && handicap < 1) chooseCard(world, k, bs, input);
+  else bs.cardWait = -1;
   if (world.match.phase !== 'playing' || !k.alive) {
     releaseAll(bs);
     return;
   }
-  if (hesitates(world, bs, botHandicap(world, p))) {
+  if (hesitates(world, bs, handicap)) {
     releaseAll(bs);
     return;
   }
@@ -620,6 +687,24 @@ export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
   const special = a.special;
   const beamRange = special.special === 'beam' ? perStage(special.range, k.stage) : 0;
 
+  // --- The charge is winding up or running: keep it pointed at what it is for -------------------
+  if (k.action === 'charge') {
+    const u = bs.chargeUnit >= 0 ? world.units[bs.chargeUnit] : null;
+    if (u && u.alive) {
+      bs.chargeX = u.x;
+      bs.chargeZ = u.z;
+    }
+    input.aimYaw = yawFromTo(k.x, k.z, bs.chargeX, bs.chargeZ);
+    input.aimPitch = 0;
+    // Run past the unit it was after (or it is gone): no point running on.
+    const button = moveButton(k, 'charge');
+    if (k.phase === 'charge' && button && bs.chargeUnit >= 0 && (!u || !u.alive || angleDist(input.aimYaw, k.yaw) > Math.PI / 2)) {
+      press(bs, button, TAP_TICKS, 10);
+    }
+    input.buttons = heldButtons(bs);
+    return;
+  }
+
   // --- The beam is on (or winding up): walk it across whatever it was started for -------------
   if (k.action === 'special') {
     const u = beamUnit(world, k, st, beamRange, bs.beamX, bs.beamZ);
@@ -642,8 +727,9 @@ export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
     if (thinking && bs.hideFor < R.hideTime && bs.exposed) hiding = chooseHidingPlace(world, k, bs);
     const arrived = hiding && Math.hypot(bs.goalX - k.x, bs.goalZ - k.z) < Math.max(2, k.radius * 0.5);
     if (!hiding || arrived || !bs.exposed || bs.hideFor >= R.hideTime) {
-      // Here will do: stand still and hold Molt until the cocoon closes.
-      input.buttons = heldButtons(bs) | Btn.molt;
+      // Here will do: stand still and press Molt.
+      if (canAct(k)) press(bs, 'molt', TAP_TICKS, 15);
+      input.buttons = heldButtons(bs);
       input.aimPitch = 0;
       return;
     }
@@ -677,8 +763,10 @@ export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
     return;
   }
 
-  // --- Bracing against a charged volley ---------------------------------------------------------
-  if (bs.bracing > 0 || (bs.lasers >= R.braceLasers && bs.laserCharge >= R.braceCharge && bs.braceRest <= 0 && k.phase === 'idle')) {
+  // --- Bracing against a charged volley (when it has the brace) ---------------------------------
+  const braceButton = moveButton(k, 'brace');
+  if (!braceButton) bs.bracing = 0;
+  else if (bs.bracing > 0 || (bs.lasers >= R.braceLasers && bs.laserCharge >= R.braceCharge && bs.braceRest <= 0 && k.phase === 'idle')) {
     bs.bracing += DT;
     const over = bs.bracing >= R.braceMax || (bs.bracing > 0.5 && bs.lasers < R.braceLasers);
     if (over) {
@@ -687,22 +775,35 @@ export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
     } else {
       input.aimYaw = bs.laserYaw;
       input.aimPitch = 0;
-      input.buttons = heldButtons(bs) | Btn.block;
+      input.buttons = heldButtons(bs) | Btn[braceButton];
       return;
     }
   }
 
-  // --- Roar: units inside the radius, charging or simply too many ------------------------------
-  if (k.cooldowns.roar <= 0 && canAct(k) && !busyWith(bs, 'roar')) {
+  // --- Roar (when it has it): guns charging close by (it stuns them), or simply too many ----------
+  const roarButton = canAct(k) ? readyMove(k, bs, 'roar') : null;
+  if (roarButton) {
     const radius = perStage(a.roar.radius, k.stage) * modMult(k.mods, 'roarRadius');
     let inside = 0;
     let charging = 0;
     for (const u of world.units) {
-      if (!u.alive || Math.hypot(u.x - k.x, u.z - k.z) > radius || hiddenFromKaiju(world, u)) continue;
+      if (!u.alive || Math.hypot(u.x - k.x, u.z - k.z) > radius) continue;
       inside++;
       if (u.rooted && u.charge > 0.3) charging++;
     }
-    if (charging >= 1 || inside >= R.roarUnits + 1 || (inside >= R.roarUnits && bs.revenge > 0)) press(bs, 'roar', TAP_TICKS, 10);
+    if (charging >= 1 || inside >= R.roarUnits + 1 || (inside >= R.roarUnits && bs.revenge > 0)) press(bs, roarButton, TAP_TICKS, 10);
+  }
+
+  // --- Tail sweep (when it has it): units behind it, within the tail's reach ---------------------
+  const sweepButton = canAct(k) ? readyMove(k, bs, 'tailSweep') : null;
+  if (sweepButton) {
+    const reach = a.tailSweep.reach * k.radius * R.sweepReach;
+    let behind = 0;
+    for (const u of world.units) {
+      if (!u.alive || u.y > k.height || !circleInArc(u.x, u.z, u.radius, k.x, k.z, wrapAngle(k.yaw + Math.PI), a.tailSweep.arc / 2, reach)) continue;
+      behind++;
+    }
+    if (behind >= R.sweepUnits) press(bs, sweepButton, TAP_TICKS, 10);
   }
 
   // --- Something in the hand: throw it at a squad, or eat it when hurt ------------------------
@@ -711,7 +812,8 @@ export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
   const throwReach = ((throwSpeed * throwSpeed) / projectileTypeDef('thrown').gravity) * R.throwRange;
   if (k.held) {
     if (hurt && k.cooldowns.eat <= 0) {
-      if (canAct(k)) press(bs, 'grab', Math.ceil(a.eat.holdTime * TICK_RATE) + HOLD_SLACK_TICKS, 6);
+      // Grab with something in the hand eats it.
+      if (canAct(k)) press(bs, 'grab', TAP_TICKS, 6);
     } else if (near.unit && near.dist <= throwReach) {
       const u = near.unit;
       aimYaw = yawFromTo(k.x, k.z, u.x, u.z);
@@ -724,8 +826,9 @@ export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
     }
   }
 
-  // --- The beam: on units in reach, else on something big ----------------------------------------
-  if (special.special === 'beam' && k.rage >= special.rageCost && k.cooldowns.special <= 0 && !k.held) {
+  // --- The beam (when it has it): on units in reach, else on something big -----------------------
+  const beamButton = readyMove(k, bs, 'special');
+  if (beamButton && special.special === 'beam' && k.rage >= special.rageCost && !k.held) {
     let tx = 0;
     let ty = 0;
     let tz = 0;
@@ -750,7 +853,7 @@ export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
       aimYaw = yawFromTo(k.x, k.z, tx, tz);
       aimPitch = pitchTo(st.mouthHeight, ty, Math.hypot(tx - k.x, tz - k.z) - st.mouthForward);
       facing = true;
-      if (canAct(k) && angleDist(aimYaw, k.yaw) <= FACE_ANGLE && press(bs, 'special', TAP_TICKS, 10)) {
+      if (canAct(k) && angleDist(aimYaw, k.yaw) <= FACE_ANGLE && press(bs, beamButton, TAP_TICKS, 10)) {
         bs.beamX = tx;
         bs.beamY = ty;
         bs.beamZ = tz;
@@ -760,6 +863,20 @@ export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
       input.buttons = heldButtons(bs);
       return;
     }
+  }
+
+  // --- The charge (when it has it): at a unit within a run's reach, or through buildings it can
+  // smash on the way to what it is wrecking --------------------------------------------------------
+  const chargeButton = !k.held && canAct(k) && !(hurt && k.cooldowns.eat <= 0) ? readyMove(k, bs, 'charge') : null;
+  if (chargeButton && chargeTarget(world, k, bs, def, st)) {
+    aimYaw = yawFromTo(k.x, k.z, bs.chargeX, bs.chargeZ);
+    // The wind-up still turns the body: it presses once the rest of the turn fits in it.
+    const turnReach = st.turnRate * a.charge.windupTurnMult * a.charge.timing.windup * 0.8;
+    if (angleDist(aimYaw, k.yaw) <= turnReach) press(bs, chargeButton, TAP_TICKS, 10);
+    input.aimYaw = aimYaw;
+    input.aimPitch = 0;
+    input.buttons = heldButtons(bs);
+    return;
   }
 
   // --- Units close by, the squad that just broke its nerve, or guns charging within a dash: fight them ---
@@ -780,7 +897,7 @@ export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
     const range = perStage(R.rushRange, k.stage);
     let best = range;
     for (const u of world.units) {
-      if (!u.alive || !u.rooted || hiddenFromKaiju(world, u)) continue;
+      if (!u.alive || !u.rooted) continue;
       const d = Math.hypot(u.x - k.x, u.z - k.z);
       if (d < best) {
         best = d;
@@ -812,8 +929,9 @@ export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
       const inReach = findEdible(world, k, def);
       if (inReach) {
         eating = true;
-        // Grab held down goes on to eat what the hand finds, or what lies in reach.
-        if (canAct(k)) press(bs, 'grab', Math.ceil(a.eat.holdTime * TICK_RATE) + HOLD_SLACK_TICKS + Math.ceil(a.grab.timing.windup * TICK_RATE), 6);
+        // A grab when something can be picked up (and then a bite: what is in the hand is
+        // eaten), else a bite straight off the ground.
+        if (canAct(k)) press(bs, 'grab', TAP_TICKS, 6);
       } else {
         const food = nearestFood(world, k, R.foodRadii * k.radius);
         if (food >= 0) {
@@ -886,6 +1004,44 @@ export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
   }
   input.buttons = heldButtons(bs);
   watchProgress(k, bs, throttle > 0 && k.phase === 'idle');
+}
+
+const chargeCandidates: Unit[] = [];
+
+/**
+ * Something worth a charge (bs.chargeUnit, chargeX, chargeZ): the nearest unit within a run's
+ * reach (not one at its feet) with nothing it cannot smash in between; failing that, the goal
+ * it is wrecking when the way there is lined with buildings the run would smash.
+ */
+function chargeTarget(world: World, k: Kaiju, bs: BotState, def: KaijuKindDef, st: KaijuStageDef): boolean {
+  const c = def.actions.charge;
+  const reach = st.topSpeed * c.speedMult * Math.max(0, c.timing.active - c.rampTime / 2) * R.chargeReach;
+  const minD = k.radius * 2.5;
+  chargeCandidates.length = 0;
+  for (const u of world.units) {
+    if (!u.alive || u.y > k.height) continue;
+    const d = Math.hypot(u.x - k.x, u.z - k.z);
+    if (d >= minD && d <= reach) chargeCandidates.push(u);
+  }
+  chargeCandidates.sort((p, q) => Math.hypot(p.x - k.x, p.z - k.z) - Math.hypot(q.x - k.x, q.z - k.z) || p.id - q.id);
+  for (const u of chargeCandidates) {
+    const d = Math.hypot(u.x - k.x, u.z - k.z);
+    chargeLine(world, k, def, st, yawFromTo(k.x, k.z, u.x, u.z), d, line);
+    if (line.clear < d - k.radius - u.radius) continue;
+    bs.chargeUnit = u.id;
+    bs.chargeX = u.x;
+    bs.chargeZ = u.z;
+    return true;
+  }
+  if (bs.goal !== 'structure' && bs.goal !== 'prop') return false;
+  const d = Math.hypot(bs.goalX - k.x, bs.goalZ - k.z);
+  if (d < minD) return false;
+  chargeLine(world, k, def, st, yawFromTo(k.x, k.z, bs.goalX, bs.goalZ), Math.min(reach, d + k.radius), line);
+  if (line.worth < perStage(R.chargeWorth, k.stage) || line.clear < Math.min(reach, d) * 0.6) return false;
+  bs.chargeUnit = -1;
+  bs.chargeX = bs.goalX;
+  bs.chargeZ = bs.goalZ;
+  return true;
 }
 
 function propGone(world: World, id: number): boolean {

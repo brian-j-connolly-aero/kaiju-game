@@ -1,7 +1,7 @@
 /**
  * The input contract: what a client sends 30 times a second, and what every button means.
  *
- * The client sends RAW state (which buttons are down right now). Taps, holds and edges are
+ * The client sends RAW state (which buttons are down right now). Presses, releases and edges are
  * worked out by the simulation's input system from that state, on the server, so there is one
  * authority and bots can drive the exact same interface. The client runs the same rules locally
  * only to start wind-up animations at once.
@@ -9,79 +9,96 @@
  * ---------------------------------------------------------------------------------------------
  * Movement and aim (both roles)
  *
- *   moveX, moveZ   Stick or keys, each in [-1, 1], length at most 1, RELATIVE TO THE VIEW:
- *                  moveZ +1 is forward along aimYaw, moveX +1 is to the right of the view.
+ *   moveX, moveZ   Stick or keys, each in [-1, 1], length at most 1. For the kaiju and for
+ *                  rocket infantry they are RELATIVE TO THE VIEW: moveZ +1 is forward along
+ *                  aimYaw, moveX +1 is to the right of the view. A tank reads them differently
+ *                  (below).
  *   aimYaw         Heading of the view (yaw 0 faces +Z, grows toward +X).
  *   aimPitch       Elevation of the view, positive up.
  *
  *   Kaiju: aimYaw is the desired heading. The body turns toward it at the stage turn rate; the
  *   head (camera, throw and beam direction) follows aimYaw but can lead the body by at most
  *   `headLeadMax` (50 degrees).
- *   Human: the unit moves relative to the view and its weapon aims along (aimYaw, aimPitch)
- *   from the unit's eye. In third person the client converts its camera ray to that direction.
+ *   Human, stage 1 (rocket infantry): the unit moves relative to the view, at once in any
+ *   direction, and its weapon aims along (aimYaw, aimPitch) from the unit's eye. In third
+ *   person the client converts its camera ray to that direction.
+ *   Human, stages 2 and 3 (the driven tank, or troop of three): real tank driving
+ *   ('tank' steering in sim/movement.ts, numbers in `UnitTypeDef.drive`):
+ *     moveZ        throttle along the hull: +1 full ahead, -1 full reverse (reverse tops out at
+ *                  `drive.reverseMult` of the top speed). Speeding up takes `drive.accel`,
+ *                  slowing down and stopping to reverse `drive.brake` (meters per second
+ *                  squared). With no throttle the tank brakes to a stop.
+ *     moveX        turns the hull, +1 to the right at `drive.turnRate`; it turns on the spot
+ *                  when it is not moving. The pair is read as a square, not a disc: a diagonal
+ *                  of length 1 (W and D together) is full throttle AND full turn.
+ *     aimYaw       where the player looks. The turret (the unit's `aimYaw` in snapshots) swings
+ *                  toward it at `drive.turretRate`; it is not tied to the hull.
+ *     aimPitch     the gun's elevation follows it at once (the unit's `aimPitch`).
+ *   The driven tank's own shots leave along the turret, not along the view. Sub-units steer
+ *   themselves and are not affected. The client predicts all of this with `stepMovement` and
+ *   `unitMoveParams` (pass the snapshot unit: its `driven` flag picks tank steering), with the
+ *   turret in the predicted body's `aimYaw`.
  *
  * ---------------------------------------------------------------------------------------------
- * Kaiju buttons
+ * Kaiju buttons: one move per button, no tap-versus-hold anywhere (docs/ROADMAP.md, phase 1)
  *
- *   Btn.strike   Swipe / Stomp. Pressing starts the Swipe wind-up at once. If the button is
- *                still down `stomp.holdTime` (0.35 s) after the press, the action becomes a
- *                Stomp and keeps the time already spent (the stomp's 0.9 s wind-up counts from
- *                the press). Releasing earlier leaves it a Swipe.
- *                While holding an object, pressing Strike throws it instead.
- *   Btn.grab     Grab / Throw / Eat.
- *                Empty hands: pressing starts the Grab (0.4 s). If the button is still down
- *                `eat.holdTime` (0.5 s) after the press, the kaiju goes on to Eat what it just
- *                grabbed, or an edible in reach if the grab found nothing.
- *                Holding an object: releasing before 0.5 s throws it at the aim point; keeping
- *                the button down for 0.5 s eats it.
- *   Btn.block    Brace for as long as the button is down.
- *   Btn.roar     Roar on the press, if it is off cooldown.
- *   Btn.special  The kind's special on the press, if rage is full.
- *   Btn.molt     Only when a molt is available: holding for `molt.holdTime` (1 s) starts the
- *                cocoon; letting go earlier cancels.
+ *   Btn.strike   Swipe. With something in the hand: Throw it at the aim point.
+ *   Btn.grab     Grab the nearest thing in reach that can be picked up. With something in the
+ *                hand: Eat it (when the meal is off cooldown). With nothing to pick up in reach
+ *                but something to eat (a kiosk, say): Eat that. With neither: the hand grabs
+ *                at nothing (a whiff).
+ *   Btn.stomp    Stomp.
+ *   Btn.move1    The move put in the first slot at the first molt (`Kaiju.moves[0]`), and
+ *   Btn.move2    the one put in the second slot at the second molt. Nothing while a slot is
+ *                empty. The moves: beam (when rage is full), roar, charge (a second press
+ *                during the run ends it early), tail sweep (each when off cooldown), and the
+ *                brace, which lasts for as long as its button is down.
+ *   Btn.molt     Starts the cocoon, on the press, when a molt is offered.
+ *   Btn.block, Btn.roar, Btn.special: the old controls. Still defined (and let through by
+ *                sanitizeInput) but the simulation reads none of them.
+ *
+ *   card         One-shot: the molt card picked since the last input, 1 to 3 (the first,
+ *                second or third move on offer). It counts from the moment the cocoon starts
+ *                until the intermission after it is over; a card that is not picked by then is
+ *                drawn at random. Anything else is ignored.
  *
  *   A press that arrives while another action is still running is remembered for
  *   INPUT_BUFFER_TICKS, and for as long as the button stays down, and starts as soon as the
- *   kaiju is free.
+ *   kaiju is free. Holding a button down does not repeat its action.
  *
- *   Nothing cancels an action once it has begun. Bracing is exclusive: while Block is down no
+ *   Nothing cancels an action once it has begun, except a second press of the charge's button
+ *   during its run (it stumbles at once). Bracing is exclusive: while its button is down no
  *   other button starts anything. When several things are wanted on the same tick the order is
- *   molt, brace, special, roar, strike, throw, grab, eat. Each hold of Grab is judged once: if
- *   nothing can be eaten when it reaches the hold time, nothing happens, and letting go after
- *   that does not throw.
+ *   molt, brace, the first move, the second move, stomp, strike, grab.
+ *
+ *   Swimming has no button: any kaiju button (strike, grab, stomp, either move, molt) brings a
+ *   swimming kaiju up, and the press is carried out once it is up.
  *
  * ---------------------------------------------------------------------------------------------
- * Human buttons
+ * Human buttons: two (docs/ROADMAP.md, phase 1). The squad's other three units are not
+ * ordered about: they ride with the leader as a loose swarm and shoot at will on their own.
  *
- *   Btn.fire     Fires the driven unit's weapon whenever it is off cooldown: on the press and
- *                again for as long as the button stays down. The shots go to the point where
- *                the aim ray from the unit's eye lands. Every shot the player fires is the
- *                volley trigger: each sub-unit with charge (and whose firing arc covers that
- *                point) fires at it.
- *   Btn.callIn   On the press, requests the squad's call-in at `marker` if this input carries
- *                one, otherwise at the point where the aim ray meets the ground. Nothing happens
- *                while the call-in is cooling down.
+ *   Btn.fire     (left mouse) Fires the driven unit's weapon whenever it is off cooldown: on
+ *                the press and again for as long as the button stays down. The shots go to the
+ *                point where the weapon's aim ray from the unit's eye lands (for a tank, along
+ *                the turret). A person's own shots have no aim error.
+ *   Btn.volley   (right mouse) While it is down, the squad-mates stop where they are and plant:
+ *                rooted, lasers on, their weapons swinging toward the point the view's aim ray
+ *                from the leader's eye lands on (the crosshair; on a kaiju, the middle of its
+ *                body at that height), charging from 0 to 1 over COMBAT_RULES.chargeTime. The
+ *                leader is never planted and drives on. When it is let go, every planted
+ *                squad-mate with charge whose weapon is ready fires at that point (ragged below
+ *                COMBAT_RULES.volleyMinCharge, a charged volley from there up), the leader's
+ *                own shot joins if its weapon is ready, and the squad-mates follow again. A
+ *                stunned or shaken squad-mate neither charges nor fires.
  *
- *   Btn.smoke    On the press, throws the squad's smoke at `marker` if this input carries one,
- *                otherwise where the aim ray meets the ground, no further than the stage's
- *                throw range (straight ahead at that range when the crosshair is on the sky).
- *                Nothing happens while the smoke is cooling down. (sim/abilities.ts)
- *   Btn.mark     On the press, marks the kaiju for the whole army when the driven unit has it
- *                in sight within the stage's mark range and the crosshair is on or beside it.
- *                Nothing happens (and nothing is spent) otherwise, or while it cools down.
- *
- *   wheel        One-shot: the command picked on the wheel since the last input. 'follow' and
- *                'moveTo' set the movement order, 'fireAtWill' and 'holdCharge' the fire mode;
- *                picking the entry that is already set gives the order again (hold-and-charge
- *                then plants the squad afresh). What each does: sim/systems/unitOrders.ts.
- *   marker       One-shot ground point that goes with `wheel: 'moveTo'`, Btn.callIn or
- *                Btn.smoke. When 'moveTo' has no marker the server uses the point where the
- *                aim ray lands.
- *                Markers are pulled back inside the playable bounds.
+ *   Btn.callIn, Btn.smoke, Btn.mark, and the `wheel` and `marker` fields: the old squad
+ *                controls (artillery, smoke, marking, the command wheel and its markers). Still
+ *                defined (and let through by sanitizeInput) for the client of the moment, but
+ *                the simulation reads none of them.
  *
  *   The map view and the camera toggle are client-only. While the map is open the client sends
- *   zero movement and no buttons (the unit idles); markers placed on the map are sent either as
- *   `wheel` + `marker` on the next input or as a `command` message. Both do the same thing.
+ *   zero movement and no buttons (the unit idles).
  */
 
 import { COMMAND_IDS, type CommandId } from '../defs/ids';
@@ -92,14 +109,25 @@ import { clamp } from '../math/scalar';
 export const Btn = {
   strike: 1 << 0,
   grab: 1 << 1,
+  /** Unused by the simulation since the monster's new controls (the client still sends it). */
   block: 1 << 2,
+  /** Unused by the simulation since the monster's new controls (the client still sends it). */
   roar: 1 << 3,
+  /** Unused by the simulation since the monster's new controls (the client still sends it). */
   special: 1 << 4,
   molt: 1 << 5,
   fire: 1 << 6,
+  /** Unused by the simulation since the army's new controls (the client still sends it). */
   callIn: 1 << 7,
+  /** Unused by the simulation since the army's new controls (the client still sends it). */
   smoke: 1 << 8,
+  /** Unused by the simulation since the army's new controls (the client still sends it). */
   mark: 1 << 9,
+  stomp: 1 << 10,
+  move1: 1 << 11,
+  move2: 1 << 12,
+  /** The squad's volley: hold to plant and charge the squad-mates, let go to fire (see the header). */
+  volley: 1 << 13,
 } as const;
 
 export type ButtonName = keyof typeof Btn;
@@ -116,6 +144,10 @@ export const BUTTON_NAMES: readonly ButtonName[] = [
   'callIn',
   'smoke',
   'mark',
+  'stomp',
+  'move1',
+  'move2',
+  'volley',
 ];
 export const BUTTON_COUNT = BUTTON_NAMES.length;
 export const BUTTON_MASK = (1 << BUTTON_COUNT) - 1;
@@ -132,6 +164,10 @@ export const BtnIndex: Readonly<Record<ButtonName, number>> = {
   callIn: 7,
   smoke: 8,
   mark: 9,
+  stomp: 10,
+  move1: 11,
+  move2: 12,
+  volley: 13,
 };
 
 /** Ticks a kaiju button press is remembered while another action finishes (0.2 s). */
@@ -155,8 +191,12 @@ export interface PlayerInput {
   aimPitch: number;
   /** Bitwise OR of the Btn bits that are down right now. */
   buttons: number;
+  /** The old command wheel pick: let through, read by nothing in the simulation (see the header). */
   wheel?: CommandId;
+  /** The old ground marker: let through, read by nothing in the simulation (see the header). */
   marker?: GroundMarker;
+  /** Kaiju: the molt card picked since the last input, 1 to 3 (one-shot; see the header). */
+  card?: number;
 }
 
 export function neutralInput(seq = 0): PlayerInput {
@@ -196,6 +236,7 @@ export function sanitizeInput(raw: unknown, cityHalf = 1100): PlayerInput | null
   }
   const marker = sanitizeMarker(r.marker, cityHalf);
   if (marker) out.marker = marker;
+  if (r.card === 1 || r.card === 2 || r.card === 3) out.card = r.card;
   return out;
 }
 

@@ -1,29 +1,30 @@
 /**
  * The human squad bot (DESIGN.md section 5, "Bots"). It leads a squad the way a person does:
- * it drives the leader with a stick and an aim, gives the four wheel commands, pulls the
- * trigger and (at level 3) marks artillery. The loop:
+ * it drives the leader with a stick and an aim, and has the same two buttons, Fire and the
+ * volley. Its squad-mates follow it as a swarm and shoot on their own (the orders system); the
+ * bot only decides when they plant and charge. The loop:
  *
- * - approach: order 'follow' and 'fire at will', drive to a firing position: a spot on a
- *   street at its own bearing around the kaiju, 60 to 80% of weapon range out, with a line of
- *   fire. Each squad keeps its bearing apart from the others', so their fire crosses.
- * - hold: stop, order 'hold fire and charge' (the sub-units plant where they stand), keep the
- *   crosshair on the kaiju, and fire the volley when the charge is full, waiting a moment for
- *   another squad that is nearly charged so the volleys land together. Against a kaiju that is
- *   staggered or in its cocoon it fires as fast as the guns load. (With the harness profile
- *   `MatchConfig.bots.triggerHappy` it always does: the lazy way to lead a squad.)
- * - retreat: when the kaiju comes close it un-parks and drives away, then starts over.
+ * - approach: drive to a firing position: a spot on a street at its own bearing around the
+ *   kaiju, 50 to 90% of weapon range out, with a line of fire. Each squad keeps its bearing
+ *   apart from the others', so their fire crosses. A tank is driven like a person drives one:
+ *   the way it wants to go becomes throttle and hull turn (`setTankMove`).
+ * - hold: stop there, hold the volley button (the squad-mates plant where they stand and
+ *   charge), keep the crosshair on the kaiju, and let go at a full charge, waiting a moment for
+ *   another squad that is nearly charged so the volleys land together. Then it holds again.
+ *   Against a kaiju that is staggered or in its cocoon it does not charge: everybody fires as
+ *   fast as the guns load. (With the harness profile `MatchConfig.bots.triggerHappy` it never
+ *   charges: the lazy way to lead a squad.)
+ * - retreat: when the kaiju comes close it lets go of the volley at once (whatever the charge
+ *   is worth) and drives away, then starts over.
  * - search (kaiju not on the map: stage 1, or swimming): go to where it was last known (to the
  *   near bank when that was out in the water), then look around.
  * - a cocoon on the map is a target like any other, only better: the squad closes in on it.
- * - artillery: marked a little ahead of the kaiju whenever it is ready and the kaiju is near.
- * - marking: with the kaiju in sight and nobody's mark on it, the leader marks it when a volley
- *   is coming (or, at stage 1, to keep it on the map).
- * - smoke: thrown on the squad when the kaiju comes too close (to cover the retreat), or when it
- *   is coming for the planted guns.
+ * - fire at will: whenever it is not charging a volley, the leader shoots when it has the
+ *   kaiju in range and a clear line of fire.
  *
  * It only knows what the humans' map shows (`kaiju.known`) and what it reads off its own
- * squad. It is deliberately beatable: it parks in plain sight, it is slow to notice that the
- * kaiju has walked out of its arcs, and it never guards a place the kaiju is going to.
+ * squad. It is deliberately beatable: it parks in plain sight and never guards a place the
+ * kaiju is going to.
  *
  * Everything it does goes into `player.botInput`.
  */
@@ -31,9 +32,8 @@
 import { castSegment, inWater } from '../../city/spatialIndex';
 import type { CityData } from '../../city/types';
 import { BOT_RULES } from '../../defs/bots';
-import { factionLevelDef } from '../../defs/factions';
 import { kaijuStageDef } from '../../defs/kaiju/index';
-import { DT, SQUAD_ABILITIES, SQUAD_RULES } from '../../defs/rules';
+import { DT, SQUAD_RULES } from '../../defs/rules';
 import { unitTypeDef } from '../../defs/units';
 import { modMult } from '../../defs/upgrades';
 import { projectileTypeDef, weaponDef } from '../../defs/weapons';
@@ -42,14 +42,13 @@ import { boundsContains } from '../../math/geom';
 import { rngInt } from '../../math/rng';
 import { clamp } from '../../math/scalar';
 import type { Vec3 } from '../../math/vec';
-import { MAX_AIM_PITCH } from '../../net/input';
-import { markableKaiju } from '../abilities';
-import { setWorldMove } from '../movement';
+import { BtnIndex, MAX_AIM_PITCH } from '../../net/input';
+import { setTankMove, setWorldMove } from '../movement';
 import { createSteer, steerToward } from '../nav';
-import { arcCovers, nearestKaiju, squadCharge } from '../squads';
+import { formationSpacing, nearestKaiju, squadCharge } from '../squads';
 import { kaijuShownHeight } from '../swim';
 import type { Kaiju, PlayerState, Squad, Unit, World } from '../types';
-import { beginBotInput, botHandicap, busyWith, heldButtons, hesitates, press, releaseAll } from './common';
+import { beginBotInput, botHandicap, heldButtons, hesitates, press, releaseAll } from './common';
 import type { BotState, SquadBotMode } from './types';
 
 const S = BOT_RULES.squad;
@@ -60,6 +59,7 @@ const TAP_TICKS = 2;
 const ARRIVE = 3;
 /** A firing position this close to where another squad stands or is going is crowded. */
 const CROWD = 30;
+const VOLLEY = BtnIndex.volley;
 
 const steer = createSteer();
 const muzzle: Vec3 = { x: 0, y: 0, z: 0 };
@@ -229,21 +229,24 @@ function pickFiringSpot(
 
 function setMode(bs: BotState, mode: SquadBotMode): void {
   if (bs.mode === mode) return;
-  const wasHold = bs.mode === 'hold';
   bs.mode = mode;
   bs.blind = 0;
   bs.waited = 0;
-  if (mode === 'hold') {
-    bs.wheel.length = 0;
-    bs.wheel.push('holdCharge');
-    bs.parked = true;
-  } else if (wasHold || bs.parked) {
-    // Un-park: the sub-units fall in behind, still holding their fire (stray shots are the
-    // kaiju's gain; the squad shoots when it is parked and has a line).
-    bs.wheel.length = 0;
-    bs.wheel.push('follow');
-    bs.parked = false;
-  }
+  bs.gather = 0;
+}
+
+/** Keeps the volley button down this tick (the squad-mates plant, or stay planted, and charge). */
+function holdVolley(bs: BotState): void {
+  bs.hold[VOLLEY] = 1;
+  bs.rest[VOLLEY] = 0;
+  bs.charging = true;
+}
+
+/** Lets go of the volley button (the squad fires with whatever charge it has). */
+function letGoVolley(bs: BotState): void {
+  bs.hold[VOLLEY] = 0;
+  bs.charging = false;
+  bs.waited = 0;
 }
 
 export function squadBot(world: World, p: PlayerState, squad: Squad): void {
@@ -251,13 +254,14 @@ export function squadBot(world: World, p: PlayerState, squad: Squad): void {
   const bs = p.botState;
   if (world.match.phase !== 'playing' || squad.eliminated || squad.driven < 0) {
     releaseAll(bs);
-    bs.wheel.length = 0;
+    bs.charging = false;
     return;
   }
   const leader = world.units[squad.driven];
   if (!leader.alive) return;
   if (hesitates(world, bs, botHandicap(world, p))) {
     releaseAll(bs);
+    bs.charging = false;
     return;
   }
   const k = nearestKaiju(world, leader.x, leader.z);
@@ -269,11 +273,7 @@ export function squadBot(world: World, p: PlayerState, squad: Squad): void {
     // (or from the middle of the bounds while nobody knows where the kaiju is).
     bs.stage = world.match.stage;
     bs.mode = 'approach';
-    bs.parked = false;
-    // Hold fire from the start: 'hold and charge' sets the fire mode, 'follow' gets them moving.
-    bs.wheel.length = 0;
-    bs.wheel.push('holdCharge', 'follow');
-    bs.wheelTimer = 0;
+    bs.charging = false;
     bs.lastX = k.known ? k.x : (b.minX + b.maxX) / 2;
     bs.lastZ = k.known ? k.z : (b.minZ + b.maxZ) / 2;
     bs.lastChecked = false;
@@ -285,7 +285,6 @@ export function squadBot(world: World, p: PlayerState, squad: Squad): void {
     bs.blind = 0;
     bs.waited = 0;
     bs.los = false;
-    bs.callInTimer = 2 + squad.id;
     releaseAll(bs);
   }
 
@@ -372,13 +371,6 @@ export function squadBot(world: World, p: PlayerState, squad: Squad): void {
     }
   }
 
-  // --- Wheel commands, one at a time -------------------------------------------------------------
-  if (bs.wheelTimer > 0) bs.wheelTimer -= DT;
-  else if (bs.wheel.length > 0) {
-    input.wheel = bs.wheel.shift();
-    bs.wheelTimer = S.commandGap;
-  }
-
   // --- Aim: at the kaiju when it is on the map, else where it is going ---------------------------
   const eyeY = leader.y + type.eyeHeight;
   let aimYaw = input.aimYaw;
@@ -415,97 +407,48 @@ export function squadBot(world: World, p: PlayerState, squad: Squad): void {
   }
   input.aimYaw = aimYaw;
   input.aimPitch = clamp(aimPitch, -MAX_AIM_PITCH, MAX_AIM_PITCH);
-  if (moving) setWorldMove(input, steer.dirX, steer.dirZ, steer.throttle);
+  if (moving) {
+    // A tank is driven by throttle and hull turn; infantry goes where the stick points.
+    if (type.drive) setTankMove(input, leader.yaw, steer.dirX, steer.dirZ, steer.throttle);
+    else setWorldMove(input, steer.dirX, steer.dirZ, steer.throttle);
+  }
 
-  // --- Trigger ------------------------------------------------------------------------------------
-  const canShoot = known && bs.los && leader.cooldown <= 0.05 && leader.shaken <= 0;
-  if (canShoot) {
-    let subs = 0;
-    let planted = 0;
-    let covering = 0;
-    for (const id of squad.units) {
-      const u = world.units[id];
-      if (!u.alive || id === squad.driven) continue;
-      subs++;
-      if (!u.rooted) continue;
-      planted++;
-      if (arcCovers(u, k.x, k.z)) covering++;
-    }
-    if (subs === 0 || helpless) {
-      // Alone, or with the kaiju helpless: every shot counts, take it.
-      press(bs, 'fire', TAP_TICKS);
-    } else if (bs.mode !== 'hold') {
-      // On the move it holds its fire: a leader plinking from the saddle mostly hits houses.
-    } else if (planted === 0) {
-      // The order to hold has only just gone out: nobody has planted yet.
-    } else if (covering < planted * S.replantUncovered) {
-      // It has walked out of the arcs: plant the squad again, facing it.
-      if (bs.wheel.length === 0) bs.wheel.push('holdCharge');
-    } else if (world.config.bots?.triggerHappy) {
-      // The lazy way (a harness profile): never mind the charge, shoot whenever the gun has loaded.
-      press(bs, 'fire', TAP_TICKS);
-    } else if (squadCharge(world, squad) >= S.volleyCharge) {
+  // --- The volley, and fire at will -----------------------------------------------------------------
+  let mates = 0;
+  let straggling = false;
+  for (const id of squad.units) {
+    const u = world.units[id];
+    if (!u.alive || id === squad.driven) continue;
+    mates++;
+    if (!u.rooted && Math.hypot(u.x - leader.x, u.z - leader.z) > S.gatherSpacings * formationSpacing(u)) straggling = true;
+  }
+  // Parked, it lets the squad-mates come up before they plant (for a while: not for ever).
+  if (bs.mode === 'hold' && !bs.charging && straggling && bs.gather < S.gatherWait) bs.gather += DT;
+  const gathered = !straggling || bs.gather >= S.gatherWait;
+  const volleying = known && bs.los && bs.mode === 'hold' && mates > 0 && (bs.charging || gathered) && !helpless && !world.config.bots?.triggerHappy;
+  if (bs.charging && !volleying) {
+    // Moving off (the kaiju came close, the line of fire went), or it is helpless: let go now.
+    letGoVolley(bs);
+  } else if (volleying) {
+    if (squadCharge(world, squad) >= S.volleyCharge && bs.charging) {
       // Charged. Wait a moment for a neighbor that is nearly there, so the volleys land together.
       let waitFor = false;
       for (const other of world.squads) {
         if (other.id === squad.id || other.eliminated) continue;
         const ob = botOf(world, other);
-        if (!ob || !ob.parked || !ob.los) continue;
+        if (!ob || !ob.charging || !ob.los) continue;
         const c = squadCharge(world, other);
         if (c >= S.syncCharge && c < S.volleyCharge) waitFor = true;
       }
       bs.waited += DT;
-      if (!waitFor || bs.waited >= S.syncWait) {
-        if (press(bs, 'fire', TAP_TICKS)) bs.waited = 0;
-      }
+      if (!waitFor || bs.waited >= S.syncWait) letGoVolley(bs);
+      else holdVolley(bs);
+    } else {
+      holdVolley(bs);
     }
   }
-
-  // --- Mark the kaiju for everybody, with a volley coming or to keep it on the map -------------
-  if (known && k.marked <= 0 && squad.markCooldown <= 0 && bs.los && !busyWith(bs, 'mark')) {
-    const worth = world.match.stage === 1 || squadCharge(world, squad) >= S.markCharge || helpless;
-    if (worth && markableKaiju(world, leader, input.aimYaw, input.aimPitch) === k) press(bs, 'mark', TAP_TICKS, 15);
-  }
-
-  // --- Smoke: cover a retreat, or hide the planted guns from a kaiju that is coming for them ----
-  let smoked = false;
-  if (known && !helpless && squad.smokeCooldown <= 0 && !busyWith(bs, 'smoke')) {
-    let at: Unit | null = null;
-    if (dist < S.smokeRetreatAt * range) {
-      at = leader;
-    } else if (bs.mode === 'hold' && dist < S.smokeRushAt * range) {
-      // Coming this way, and most of the squad charging where it stands.
-      const closing = (k.vx * (leader.x - k.x) + k.vz * (leader.z - k.z)) / Math.max(dist, 1);
-      let subs = 0;
-      let charging = 0;
-      for (const id of squad.units) {
-        const u = world.units[id];
-        if (!u.alive || id === squad.driven) continue;
-        subs++;
-        if (u.rooted) charging++;
-      }
-      if (closing > kaijuStageDef(k.kind, k.stage).topSpeed * 0.4 && subs > 0 && charging >= subs * S.smokeCharging) at = leader;
-    }
-    if (at && press(bs, 'smoke', TAP_TICKS, 15)) {
-      // On the squad, a little toward the kaiju: the guns stand inside it and the kaiju looks into it.
-      const cloud = SQUAD_ABILITIES.smoke.radius[world.match.stage - 1];
-      const toward = Math.min(cloud * 0.4, dist * 0.3);
-      input.marker = { x: at.x + ((tx - at.x) / Math.max(dist, 1)) * toward, z: at.z + ((tz - at.z) / Math.max(dist, 1)) * toward };
-      smoked = true;
-    }
-  }
-
-  // --- Artillery, when the squad has it ---------------------------------------------------------
-  if (bs.callInTimer > 0) bs.callInTimer -= DT;
-  else if (!smoked && known && dist < S.callInRange * range && factionLevelDef(squad.faction, world.match.stage).callIns.length > 0 && (squad.callInCooldowns[0] ?? 1) <= 0) {
-    if (press(bs, 'callIn', TAP_TICKS, 15)) {
-      input.marker = {
-        x: clamp(k.x + k.vx * S.callInLead, b.minX, b.maxX),
-        z: clamp(k.z + k.vz * S.callInLead, b.minZ, b.maxZ),
-      };
-      bs.callInTimer = 2;
-    }
-  }
+  // Not charging a volley: the leader shoots whenever it has the kaiju in range and in its line of fire.
+  if (!bs.charging && known && bs.los && leader.cooldown <= 0.05 && leader.shaken <= 0) press(bs, 'fire', TAP_TICKS);
 
   input.buttons = heldButtons(bs);
 }

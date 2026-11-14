@@ -1,52 +1,55 @@
 /**
- * System 6 of 11: weapons, volleys and call-ins (DESIGN.md section 5).
+ * System 6 of 11: weapons, volleys and call-in missions (DESIGN.md section 5).
  *
  * Arcade handling: no ammunition, only cooldowns. A unit whose weapon is ready fires one salvo:
  * `shotsForMembers(weapon, members)` projectiles (a section's launchers, a troop's tanks) that
  * leave from points spread across its width. Every projectile is a real object launched with
- * `spawnProjectile`; the projectile system flies it and resolves what it hits.
+ * `spawnProjectile`; the projectile system flies it and resolves what it hits. A unit that is
+ * shaken or stunned (a roar) does not fire.
  *
- * - The driven unit fires while its player holds Fire. Its shots go to the point where the
- *   player's aim ray (from the unit's eye, along the view) lands: on a kaiju, a structure, the
- *   ground, or far away along the ray when it meets nothing. A person's shots have no aim
- *   error. A bot's do (the weapon's at-will error) and count as fire at will.
+ * - The driven unit fires while its player holds Fire. Its shots go to the point where its
+ *   weapon's aim ray lands: from the unit's eye along the unit's own `aimYaw` and `aimPitch`,
+ *   which is the view for rocket infantry and the turret for a tank (the turret swings toward
+ *   the view at its own rate, sim/movement.ts): on a kaiju, a structure, the ground, or far
+ *   away along the ray when it meets nothing. A person's shots have no aim error. A bot's do
+ *   (the weapon's at-will error) and count as fire at will.
  * - Range: every projectile a unit fires, whoever aimed it, gives out in the air once it has
  *   flown SQUAD_RULES.rangeSlack times the weapon's range (its `ttl`). Nothing else checks
  *   range for the driven unit or for a volley.
- * - The volley: each shot of the driven unit is the trigger. Every sub-unit that has charge,
- *   is not shaken, has its weapon ready, and whose firing arc covers the aim point fires at it
- *   with damage x(1 + charge), then loses its charge and its hold (the orders system plants it
- *   again on its spot the next tick, with a fresh arc). Nerve is what a volley is for, and it
+ * - The volley: on the tick the player lets go of the volley button, every planted squad-mate
+ *   that has charge, is ready (not shaken, not stunned, weapon off cooldown) fires at the point
+ *   the view's aim ray from the leader's eye lands on at that moment (`volleyAim`; with the
+ *   crosshair on a kaiju they aim for the middle of its body at that height, so that a shot
+ *   from any side connects), with damage x(1 + charge). Nerve is what a volley is for, and it
  *   only rewards a charge that is nearly complete (`volleyStrength`): below
  *   COMBAT_RULES.volleyMinCharge the shot is ragged, worth the fire-at-will nerve multiplier
  *   and aimed with the at-will error; from there to a full charge the multiplier rises to
- *   x(1 + 2) and the error falls to the weapon's volley error. So holding Fire (the guns
- *   reload faster than the charge counts) is fire at will with the squad's shots on one
- *   target, and waiting for the charge is what breaks nerve.
- *   When the aim ray is on a kaiju the sub-units aim for the middle of its body at the height
- *   the player picked, so a shot from any side connects. A sub-unit whose arc does not reach
- *   the aim point keeps charging and does not fire: the kaiju can walk out of an arc, and the
- *   player answers by planting the squad again.
- *   A charged volley (at least one sub-unit at volleyMinCharge or more) emits `volley` and
- *   counts in the player's tally; its charged shots and the trigger shot are flagged `volley`
- *   (a bot's trigger shot then counts as volley fire), and only those count toward breaking
- *   the kaiju's nerve (systems/damage.ts).
- * - Fire at will: a sub-unit whose orders set `control.fire` shoots along its own aim with the
+ *   x(1 + 2) and the error falls to the weapon's volley error. The leader's own shot joins when
+ *   its weapon is ready (along its own aim, as a Fire shot would go). Then every planted
+ *   squad-mate is let go, fired or not: its charge is spent and it follows again.
+ *   A charged volley (at least one squad-mate at volleyMinCharge or more) emits `volley` and
+ *   counts in the player's tally; its charged shots and the leader's shot are flagged `volley`
+ *   (a bot leader's shot then counts as volley fire), and only those count toward breaking the
+ *   kaiju's nerve (systems/damage.ts).
+ * - Fire at will: a squad-mate whose orders set `control.fire` shoots along its own aim with the
  *   weapon's at-will aim error; these projectiles are flagged `atWill` (half nerve damage).
  * - Aim error is one sigma, in radians, applied to heading and elevation of every projectile
  *   separately, multiplied by the scatter multipliers (`scatterMult`: stage, spotted, slowed)
  *   of the kaiju being shot at, by 0.7 for veterans, and by the squad's `aimError` modifier.
- * - Call-ins: a mission (started by the orders system) waits out its delay, then drops its
- *   shells over its duration within the scatter radius (times the scatter multipliers of the
- *   kaiju nearest the marker). The shells are 'arty' projectiles owned by the call-in (never
- *   crossfire) that fall steeply from `spawnHeight`, timed so the first one lands exactly
- *   `delay` seconds after the marker was placed. `callin` reports 'inbound' when the first
- *   shell is on its way and 'done' when the last one has landed.
+ * - Call-in missions: `startCallIn` starts one for a squad at a ground point. No button does in
+ *   phase 1; the artillery radio pick-up of phase 2 will (docs/ROADMAP.md). A mission waits out
+ *   its delay, then drops its shells over its duration within the scatter radius (times the
+ *   scatter multipliers of the kaiju nearest the marker). The shells are 'arty' projectiles
+ *   owned by the call-in (never crossfire) that fall steeply from `spawnHeight`, timed so the
+ *   first one lands exactly `delay` seconds after the marker was placed. `callin` reports
+ *   'marked' at the start, 'inbound' when the first shell is on its way and 'done' when the last
+ *   one has landed.
  *
- * Cooldowns (`unit.cooldown`, `squad.callInCooldowns`) are counted down here.
+ * Weapon cooldowns (`unit.cooldown`) are counted down here.
  */
 
 import { callInDef } from '../../defs/callins';
+import type { CallInId } from '../../defs/ids';
 import type { CallInDef } from '../../defs/schema';
 import { COMBAT_RULES, DT, SQUAD_RULES } from '../../defs/rules';
 import { unitTypeDef } from '../../defs/units';
@@ -55,10 +58,10 @@ import { projectileTypeDef, shotsForMembers, weaponDef } from '../../defs/weapon
 import { yawOf } from '../../math/angle';
 import { rngGauss, rngInDisc } from '../../math/rng';
 import { clamp } from '../../math/scalar';
-import { MAX_AIM_PITCH } from '../../net/input';
+import type { Vec3 } from '../../math/vec';
+import { Btn, MAX_AIM_PITCH } from '../../net/input';
 import { createAimPoint, resolveAimPoint } from '../aim';
-import { arcCovers, isChargedVolley, nearestKaiju, scatterMult, unitAimErrorMult, volleyStrength } from '../squads';
-import { kaijuShownHeight } from '../swim';
+import { isChargedVolley, nearestKaiju, scatterMult, unitAimErrorMult, volleyAim, volleyStrength } from '../squads';
 import type { CallInMission, Squad, Unit, World } from '../types';
 import { emit } from '../worldOps';
 import { spawnProjectile } from './projectiles';
@@ -67,6 +70,7 @@ import { spawnProjectile } from './projectiles';
 const TIME_EPS = 1e-6;
 
 const aim = createAimPoint();
+const mates: Vec3 = { x: 0, y: 0, z: 0 };
 const disc = { x: 0, z: 0 };
 const volleyUnits: Unit[] = [];
 
@@ -87,8 +91,10 @@ interface Salvo {
 
 const salvo: Salvo = { atPoint: false, x: 0, y: 0, z: 0, error: 0, damageMult: 1, nerveMult: 1, volley: false, atWill: false };
 
+/** A unit that can fire this tick: alive, steady, not stunned, its weapon loaded. */
 function ready(u: Unit): boolean {
-  return u.alive && u.shaken <= 0 && u.cooldown <= 0;
+  // roar stun: a stunned unit does not fire.
+  return u.alive && u.shaken <= 0 && u.stun <= 0 && u.cooldown <= 0;
 }
 
 /** Fires one salvo of a unit's weapon and starts its cooldown. */
@@ -163,8 +169,11 @@ function fireSalvo(world: World, squad: Squad, u: Unit, s: Salvo): void {
   u.cooldown = weapon.cooldown * modMult(squad.mods, 'weaponCooldown');
 }
 
-/** The driven unit fires, and takes every charged sub-unit that can bear with it. */
-function fireLeader(world: World, squad: Squad, leader: Unit): void {
+/**
+ * The driven unit's own shot: to where its weapon's aim ray lands (the view for infantry, the
+ * turret for a tank). `volley` when it goes with a charged volley.
+ */
+function fireLeader(world: World, squad: Squad, leader: Unit, volley: boolean): void {
   const player = world.players[squad.player];
   const type = unitTypeDef(leader.type);
   const weapon = weaponDef(type.weapon);
@@ -179,46 +188,37 @@ function fireLeader(world: World, squad: Squad, leader: Unit): void {
     aim,
     world.kaijus,
   );
-  const ax = aim.x;
-  const ay = aim.y;
-  const az = aim.z;
-  const target = aim.on === 'kaiju' ? world.kaijus[aim.id] : nearestKaiju(world, ax, az);
+  const target = aim.on === 'kaiju' ? world.kaijus[aim.id] : nearestKaiju(world, aim.x, aim.z);
+  salvo.atPoint = true;
+  salvo.x = aim.x;
+  salvo.y = aim.y;
+  salvo.z = aim.z;
+  salvo.damageMult = 1;
+  salvo.nerveMult = 1;
+  salvo.volley = volley;
+  // A bot at the controls is no better a shot than a sub-unit, and its plinking is fire at will.
+  salvo.atWill = player.bot && !volley;
+  salvo.error = player.bot
+    ? (volley ? weapon.aimErrorVolley : weapon.aimErrorAtWill) * unitAimErrorMult(squad, leader) * scatterMult(world.match.stage, target)
+    : 0;
+  fireSalvo(world, squad, leader, salvo);
+}
+
+/** The volley button was let go: the planted squad-mates fire together, the leader with them, and all are let go. */
+function fireVolley(world: World, squad: Squad, leader: Unit): void {
+  const player = world.players[squad.player];
+  const target = volleyAim(world, leader, aim, mates);
   const scatter = scatterMult(world.match.stage, target);
 
-  // What the sub-units shoot at: the aim point, or the middle of the kaiju the player is aiming at.
-  let sx = ax;
-  let sy = ay;
-  let sz = az;
-  if (aim.on === 'kaiju' && target) {
-    sx = target.x;
-    sy = clamp(ay, 0, kaijuShownHeight(target));
-    sz = target.z;
-  }
-
-  // Who fires with the trigger, and whether any of them makes it a charged volley.
+  // Who fires, and whether any of them makes it a charged volley.
   volleyUnits.length = 0;
   let volley = false;
   for (const id of squad.units) {
     const u = world.units[id];
-    if (id === squad.driven || !ready(u) || !(u.charge > 0) || !arcCovers(u, sx, sz)) continue;
+    if (id === squad.driven || !u.rooted || !ready(u) || !(u.charge > 0)) continue;
     volleyUnits.push(u);
     if (isChargedVolley(u.charge)) volley = true;
   }
-
-  salvo.atPoint = true;
-  salvo.x = ax;
-  salvo.y = ay;
-  salvo.z = az;
-  salvo.damageMult = 1;
-  salvo.nerveMult = 1;
-  salvo.volley = volley;
-  // A bot at the trigger is no better a shot than a sub-unit, and its plinking is fire at will.
-  salvo.atWill = player.bot && !volley;
-  salvo.error = player.bot
-    ? (volley ? weapon.aimErrorVolley : weapon.aimErrorAtWill) * unitAimErrorMult(squad, leader) * scatter
-    : 0;
-  fireSalvo(world, squad, leader, salvo);
-  if (volleyUnits.length === 0) return;
 
   let charge = 0;
   const ids: number[] = [];
@@ -227,9 +227,10 @@ function fireLeader(world: World, squad: Squad, leader: Unit): void {
     const w = weaponDef(unitTypeDef(u.type).weapon);
     // 0 for a ragged shot (worth what fire at will is worth) up to 1 at a full charge.
     const strength = volleyStrength(u.charge);
-    salvo.x = sx;
-    salvo.y = sy;
-    salvo.z = sz;
+    salvo.atPoint = true;
+    salvo.x = mates.x;
+    salvo.y = mates.y;
+    salvo.z = mates.z;
     salvo.damageMult = 1 + COMBAT_RULES.volleyDamagePerCharge * u.charge;
     salvo.nerveMult = COMBAT_RULES.atWillNerveMult + (fullNerve - COMBAT_RULES.atWillNerveMult) * strength;
     salvo.volley = isChargedVolley(u.charge);
@@ -238,10 +239,17 @@ function fireLeader(world: World, squad: Squad, leader: Unit): void {
     fireSalvo(world, squad, u, salvo);
     charge += u.charge;
     ids.push(u.id);
-    // Firing ends this hold: the orders system plants it again on its spot, with a fresh arc.
-    u.charge = 0;
+  }
+  // The leader's own shot goes with them when its weapon is ready.
+  if (ready(leader)) fireLeader(world, squad, leader, volley);
+
+  // Fired or not, every planted squad-mate is let go: the charge is spent and it follows again.
+  for (const id of squad.units) {
+    const u = world.units[id];
+    if (id === squad.driven || !u.rooted) continue;
     u.rooted = false;
-    u.state = 'idle';
+    u.charge = 0;
+    if (u.state === 'charging') u.state = 'idle';
   }
   // Ragged shots alone are not a volley: nothing to announce, nothing for the tally.
   if (!volley) return;
@@ -251,14 +259,14 @@ function fireLeader(world: World, squad: Squad, leader: Unit): void {
     squad: squad.id,
     player: squad.player,
     units: ids,
-    x: ax,
-    y: ay,
-    z: az,
+    x: aim.x,
+    y: aim.y,
+    z: aim.z,
     charge: charge / ids.length,
   });
 }
 
-/** A sub-unit shoots on its own, along its own aim. */
+/** A squad-mate shoots on its own, along its own aim. */
 function fireAtWill(world: World, squad: Squad, u: Unit): void {
   const weapon = weaponDef(unitTypeDef(u.type).weapon);
   salvo.atPoint = false;
@@ -272,8 +280,63 @@ function fireAtWill(world: World, squad: Squad, u: Unit): void {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Call-ins
+// Call-in missions
 // ---------------------------------------------------------------------------------------------
+
+/**
+ * Starts a call-in mission (artillery) for a squad at a ground point, pulled inside the
+ * playable bounds: the marker is down at once (`callin` 'marked'), and the first shell lands
+ * `delay` seconds later. The shells come over the shoulder of the squad's leader, from behind it
+ * toward the marker. Nothing is checked or spent here: whoever calls it (phase 2's artillery
+ * radio) decides when a squad may. The mission outlives its squad and is dropped at the end of
+ * the stage.
+ */
+export function startCallIn(world: World, squad: Squad, callIn: CallInId, x: number, z: number): CallInMission {
+  const def = callInDef(callIn);
+  const b = world.match.bounds;
+  const mx = clamp(x, b.minX, b.maxX);
+  const mz = clamp(z, b.minZ, b.maxZ);
+  const leader = squad.driven >= 0 ? world.units[squad.driven] : null;
+  let dirX = 0;
+  let dirZ = 1;
+  if (leader && leader.alive) {
+    const d = Math.hypot(mx - leader.x, mz - leader.z);
+    if (d > 1) {
+      dirX = (mx - leader.x) / d;
+      dirZ = (mz - leader.z) / d;
+    } else {
+      dirX = Math.sin(leader.control.aimYaw);
+      dirZ = Math.cos(leader.control.aimYaw);
+    }
+  }
+  const mission: CallInMission = {
+    id: world.nextCallInId++,
+    callIn,
+    squad: squad.id,
+    player: squad.player,
+    x: mx,
+    z: mz,
+    timer: def.delay,
+    shellsLeft: def.shells,
+    nextShell: 0,
+    dirX,
+    dirZ,
+  };
+  world.callIns.push(mission);
+  emit(world, {
+    type: 'callin',
+    id: mission.id,
+    callIn,
+    squad: squad.id,
+    player: squad.player,
+    x: mx,
+    z: mz,
+    phase: 'marked',
+    delay: def.delay,
+    radius: def.scatterRadius * scatterMult(world.match.stage, nearestKaiju(world, mx, mz)),
+  });
+  return mission;
+}
 
 /**
  * Seconds a call-in shell takes from its release at `spawnHeight` to the ground: it leaves at
@@ -377,16 +440,12 @@ export function weaponSystem(world: World): void {
   }
 
   for (const squad of world.squads) {
-    const cd = squad.callInCooldowns;
-    for (let i = 0; i < cd.length; i++) {
-      if (cd[i] <= 0) continue;
-      cd[i] -= DT;
-      if (cd[i] < TIME_EPS) cd[i] = 0;
-    }
     if (squad.eliminated || squad.driven < 0) continue;
-
     const leader = world.units[squad.driven];
-    if (leader.control.fire && ready(leader)) fireLeader(world, squad, leader);
+    if (!leader.alive) continue;
+    // The volley goes on the tick the button is let go (the orders system kept the squad planted until now).
+    if (world.players[squad.player].input.released & Btn.volley) fireVolley(world, squad, leader);
+    if (leader.control.fire && ready(leader)) fireLeader(world, squad, leader, false);
     for (const id of squad.units) {
       const u = world.units[id];
       if (id === squad.driven || !u.control.fire || u.rooted || !ready(u)) continue;

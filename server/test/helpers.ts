@@ -6,6 +6,7 @@
 
 import {
   decodeSnapshot,
+  PROTOCOL_VERSION,
   TICK_RATE,
   type LobbyMessage,
   type PlayerInput,
@@ -143,7 +144,7 @@ export function seatPlayers(room: GameRoom, count: number): FakePeer[] {
   const peers: FakePeer[] = [];
   for (let i = 0; i < count; i++) {
     const peer = new FakePeer(`p${i}`);
-    room.join(peer, { name: `Player ${String.fromCharCode(65 + i)}`, token: tokenOf(i), protocol: 1 });
+    room.join(peer, { name: `Player ${String.fromCharCode(65 + i)}`, token: tokenOf(i), protocol: PROTOCOL_VERSION });
     peers.push(peer);
   }
   return peers;

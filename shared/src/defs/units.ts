@@ -2,8 +2,23 @@
 
 import { DEG } from '../math/angle';
 import type { UnitTypeId } from './ids';
-import type { UnitTypeDef } from './schema';
+import type { TankDriveDef, UnitTypeDef } from './schema';
 
+/**
+ * How the player's own tank handles at stages 2 and 3 (docs/ROADMAP.md, phase 1): W and S are
+ * the throttle along the hull, A and D turn the hull (on the spot when it stands still), and the
+ * turret swings toward the mouse at its own pace. A troop of three is the heavier of the two.
+ * Sub-units keep their own steering (`steer: 'heading'`, `turnRate`, `accel`).
+ */
+const TANK_DRIVE: TankDriveDef = { turnRate: 75 * DEG, turretRate: 140 * DEG, accel: 10, brake: 16, reverseMult: 0.5 };
+const TROOP_DRIVE: TankDriveDef = { turnRate: 55 * DEG, turretRate: 110 * DEG, accel: 10, brake: 16, reverseMult: 0.5 };
+
+/**
+ * Top speeds follow the owner's rule (docs/ROADMAP.md): the army is 10 to 20% faster than the
+ * kaiju at every stage, so that a squad can always get away while the kaiju can still throw
+ * things at it. Each level is about 1.15 times the kaiju's top speed at its stage (8.5, 14 and
+ * 22 m/s); `shared/test/defs.test.ts` holds every level between 1.1 and 1.2 times.
+ */
 export const UNIT_TYPES: Readonly<Record<UnitTypeId, UnitTypeDef>> = {
   army_rocket_infantry: {
     id: 'army_rocket_infantry',
@@ -13,7 +28,7 @@ export const UNIT_TYPES: Readonly<Record<UnitTypeId, UnitTypeDef>> = {
     body: 'infantry',
     members: 10,
     hp: 100,
-    speed: 6.5,
+    speed: 9.8,
     accel: 40,
     radius: 3,
     height: 2,
@@ -33,12 +48,13 @@ export const UNIT_TYPES: Readonly<Record<UnitTypeId, UnitTypeDef>> = {
     body: 'vehicle',
     members: 1,
     hp: 100,
-    speed: 15,
+    speed: 16.1,
     accel: 12,
     radius: 4,
     height: 3,
     steer: 'heading',
     turnRate: 110 * DEG,
+    drive: TANK_DRIVE,
     eyeHeight: 2.8,
     muzzleHeight: 2.3,
     weapon: 'army_tank_gun',
@@ -53,12 +69,13 @@ export const UNIT_TYPES: Readonly<Record<UnitTypeId, UnitTypeDef>> = {
     body: 'vehicle',
     members: 3,
     hp: 300,
-    speed: 15,
+    speed: 25.3,
     accel: 12,
     radius: 9,
     height: 3,
     steer: 'heading',
     turnRate: 110 * DEG,
+    drive: TROOP_DRIVE,
     eyeHeight: 2.8,
     muzzleHeight: 2.3,
     weapon: 'army_troop_guns',

@@ -54,6 +54,8 @@ function unit(over: Partial<SnapUnit> = {}): SnapUnit {
     shaken: 0,
     charge: 0,
     cooldown: 0,
+    stunned: false,
+    stun: 0,
     ...over,
   };
 }

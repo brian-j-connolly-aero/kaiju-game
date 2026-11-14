@@ -1,8 +1,9 @@
 /**
- * Squad commands: the four command wheel orders plus call-ins, smoke and marking. They reach the simulation either
- * inside an input (`wheel` / `marker`, or the call-in button) or as a `command` message that the
- * server passes to `queueCommand`. Either way the orders system sees them in
- * `player.commands` on the next tick.
+ * The old squad commands: the four command wheel orders plus call-ins, smoke and marking. The
+ * squads take no orders any more (docs/ROADMAP.md, phase 1), and nothing in the simulation acts
+ * on these: a `command` message is still validated here and handed to `queueCommand`, which
+ * drops it, because the client of the moment still sends them from the map. Remove this file,
+ * `queueCommand` and the `command` message together once no client sends one.
  */
 
 import { CALLIN_IDS, type CallInId } from '../defs/ids';

@@ -17,7 +17,7 @@ import type { PlayerInput } from './input';
 import type { LobbyState } from './lobby';
 
 /** Bump when a message or the snapshot layout changes incompatibly. Sent in `welcome`. */
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 /** Default port for the one process that serves both the page and the WebSocket. */
 export const DEFAULT_PORT = 2567;
@@ -95,7 +95,11 @@ export interface ClientMessages {
   toLobby: Record<string, never>;
   /** Match: one input sample, 30 per second. */
   input: PlayerInput;
-  /** Match: a squad command placed outside the input stream (for example on the map view). */
+  /**
+   * Match: one of the old squad commands (the map's orders). The squads take no orders any more
+   * (docs/ROADMAP.md, phase 1): it is accepted and dropped (`queueCommand`) until no client
+   * sends it, then it goes.
+   */
   command: SquadCommand;
   /** Tier 2: pick one of the three offered upgrade cards (0..2). */
   draftPick: { card: number };

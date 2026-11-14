@@ -1,4 +1,9 @@
-/** Off-map call-ins (DESIGN.md section 5). */
+/**
+ * Off-map call-ins (DESIGN.md section 5). No button calls one any more (docs/ROADMAP.md, phase
+ * 1); the mission itself is kept for the artillery radio pick-up of phase 2, which starts one
+ * with `startCallIn` (sim/systems/weapons.ts). `cooldown` is what the old button waited between
+ * two calls of one squad; nothing reads it until then.
+ */
 
 import type { CallInId } from './ids';
 import type { CallInDef } from './schema';

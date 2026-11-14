@@ -270,7 +270,6 @@ export function worldHash(world: World): number {
   for (const s of world.squads) {
     mix(s.driven);
     mix(s.eliminated ? 1 : 0);
-    for (const c of s.callInCooldowns) mix(c);
   }
   for (const p of world.projectiles) for (const v of [p.id, p.x, p.y, p.z, p.vx, p.vy, p.vz, p.ttl]) mix(v);
   for (const c of world.callIns) for (const v of [c.id, c.x, c.z, c.timer, c.shellsLeft]) mix(v);

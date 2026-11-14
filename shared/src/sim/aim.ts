@@ -11,8 +11,8 @@ import { kaijuStageDef } from '../defs/kaiju/index';
 import { SQUAD_RULES } from '../defs/rules';
 import { unitTypeDef } from '../defs/units';
 import type { Vec2, Vec3 } from '../math/vec';
-import { kaijuShownHeight, kaijuShownRadius } from './swim';
-import type { Kaiju, Unit } from './types';
+import { castKaijuBody, type KaijuBodySource } from './kaijuBody';
+import type { Unit } from './types';
 
 export interface AimPoint {
   x: number;
@@ -68,23 +68,12 @@ export function kaijuMouthPoint(k: KaijuHeadSource, out: Vec3): Vec3 {
 }
 
 /**
- * Hit volume of a kaiju: an upright capsule of its body radius and height. Swimming, it is only
- * what shows above the water (sim/swim.ts): the spines, a capsule whose rounded top is their
- * height and which reaches on down into the water.
+ * A kaiju an aim ray can land on. Kaiju and snapshot kaiju both satisfy it. Its hit volume is
+ * the body, the head and neck, and the tail (sim/kaijuBody.ts).
  */
-export function kaijuCapsule(k: Kaiju, out: VerticalCapsule): VerticalCapsule {
-  out.x = k.x;
-  out.z = k.z;
-  if (k.submerge > 0) {
-    out.r = kaijuShownRadius(k);
-    out.y1 = kaijuShownHeight(k);
-    out.y0 = Math.min(0, out.y1 - 2 * out.r);
-    return out;
-  }
-  out.r = k.radius;
-  out.y0 = 0;
-  out.y1 = k.height;
-  return out;
+export interface AimKaiju extends KaijuBodySource {
+  id: number;
+  alive: boolean;
 }
 
 /** Hit volume of a unit: an upright capsule of its radius, from its altitude up to its type's height. */
@@ -100,7 +89,8 @@ export function unitCapsule(u: Unit, out: VerticalCapsule): VerticalCapsule {
 /**
  * Casts a ray from (ox, oy, oz) along (yaw, pitch) and returns the first thing it meets within
  * `maxDist`: a standing structure (bridge decks do not count: whoever aims may be standing on
- * one), a living kaiju (when `kaijus` is given), or the ground.
+ * one), a living kaiju's hit volume (when `kaijus` is given: its body, head or tail), or the
+ * ground.
  */
 export function resolveAimPoint(
   city: CityQuery,
@@ -111,7 +101,7 @@ export function resolveAimPoint(
   pitch: number,
   maxDist: number,
   out: AimPoint,
-  kaijus?: readonly Kaiju[],
+  kaijus?: readonly AimKaiju[],
 ): AimPoint {
   const cp = Math.cos(pitch);
   origin.x = ox;
@@ -141,7 +131,7 @@ export function resolveAimPoint(
   if (kaijus) {
     for (const k of kaijus) {
       if (!k.alive) continue;
-      if (rayVsCapsule(origin, dir, best, kaijuCapsule(k, capsule), capHit) && capHit.t < best) {
+      if (castKaijuBody(k, origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, best, 0, capHit) && capHit.t < best) {
         best = capHit.t;
         out.on = 'kaiju';
         out.id = k.id;

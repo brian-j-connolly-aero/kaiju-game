@@ -3,24 +3,15 @@
  *
  * Takes one input per player for this tick (bots supply their own), and turns raw button state
  * into what the action systems need: press and release edges and how long each button has been
- * down. It also collects this tick's squad commands (wheel picks, the call-in, smoke and mark
- * buttons, and commands queued from `command` messages) into `player.commands`, and copies the player's
- * movement, aim and trigger onto the unit they drive.
+ * down. It copies a squad player's stick, aim and trigger onto the unit they drive (the volley
+ * button is read from the input state by the orders and weapon systems).
  *
  * The meaning of every button is specified in net/input.ts.
  */
 
-import { factionLevelDef } from '../../defs/factions';
-import { unitTypeDef } from '../../defs/units';
 import { Btn, BUTTON_COUNT, neutralInput, type PlayerInput } from '../../net/input';
-import { SQUAD_RULES } from '../../defs/rules';
-import { smokeReach } from '../abilities';
-import { resolveMarkerPoint } from '../aim';
-import type { SquadCommand } from '../commands';
-import type { InputsByPlayer, InputState, PlayerState, Squad, World } from '../types';
+import type { InputsByPlayer, InputState, World } from '../types';
 import { drivenUnit, NEVER_PRESSED_TICKS } from '../worldOps';
-
-const marker = { x: 0, z: 0 };
 
 /** Applies one input sample to a player's input state and derives edges and hold timers. */
 export function applyInput(state: InputState, input: PlayerInput | null | undefined): void {
@@ -33,6 +24,8 @@ export function applyInput(state: InputState, input: PlayerInput | null | undefi
     state.aimPitch = input.aimPitch;
     state.buttons = input.buttons;
   }
+  // A molt card is a one-shot, like a wheel pick: a repeated input does not pick again.
+  state.card = input?.card ?? 0;
   // With no new sample the last one repeats: sticks stay where they were, held buttons stay held.
   const now = state.buttons;
   state.pressed = now & ~prev;
@@ -51,67 +44,6 @@ export function applyInput(state: InputState, input: PlayerInput | null | undefi
   }
 }
 
-/**
- * The ground point a squad leader's crosshair marks (`resolveMarkerPoint`): under the kaiju it
- * is on, else where the aim ray lands, else a kaiju on the map it is just beside. With the
- * crosshair on nothing at all the marker goes `skyReach` meters ahead, or nowhere (null) when
- * that is 0.
- */
-function aimGround(world: World, squad: Squad, state: InputState, skyReach: number): { x: number; z: number } | null {
-  const unit = drivenUnit(world, squad);
-  if (!unit || !unit.alive) return null;
-  const eye = unit.y + unitTypeDef(unit.type).eyeHeight;
-  const found = resolveMarkerPoint(
-    world.cityQuery,
-    world.kaijus,
-    unit.x,
-    eye,
-    unit.z,
-    state.aimYaw,
-    state.aimPitch,
-    SQUAD_RULES.markerRange,
-    skyReach,
-    marker,
-  );
-  return found ? { x: marker.x, z: marker.z } : null;
-}
-
-function collectCommands(world: World, p: PlayerState, input: PlayerInput | null | undefined): void {
-  p.commands.length = 0;
-  if (p.role !== 'human' || p.squadId < 0) {
-    p.queuedCommands.length = 0;
-    return;
-  }
-  for (const c of p.queuedCommands) p.commands.push(c);
-  p.queuedCommands.length = 0;
-
-  const squad = world.squads[p.squadId];
-  if (input?.wheel) {
-    let command: SquadCommand | null = null;
-    if (input.wheel === 'moveTo') {
-      const at = input.marker ?? aimGround(world, squad, p.input, SQUAD_RULES.markerSkyReach);
-      if (at) command = { type: 'moveTo', x: at.x, z: at.z };
-    } else {
-      command = { type: input.wheel };
-    }
-    if (command) p.commands.push(command);
-  }
-  if (p.input.pressed & Btn.callIn) {
-    const callIns = factionLevelDef(squad.faction, world.match.stage).callIns;
-    if (callIns.length > 0) {
-      // The crosshair on the empty sky marks nothing: the battery is not spent on it.
-      const at = input?.marker ?? aimGround(world, squad, p.input, 0);
-      if (at) p.commands.push({ type: 'callIn', callIn: callIns[0], x: at.x, z: at.z });
-    }
-  }
-  // Smoke goes where the crosshair is, no further than the throw (straight ahead with it on the sky).
-  if (p.input.pressed & Btn.smoke) {
-    const at = input?.marker ?? aimGround(world, squad, p.input, smokeReach(world));
-    if (at) p.commands.push({ type: 'smoke', x: at.x, z: at.z });
-  }
-  if (p.input.pressed & Btn.mark) p.commands.push({ type: 'mark' });
-}
-
 export function inputSystem(world: World, inputs: InputsByPlayer | undefined): void {
   for (const p of world.players) {
     let input = p.bot ? p.botInput : inputs?.[p.id];
@@ -126,11 +58,15 @@ export function inputSystem(world: World, inputs: InputsByPlayer | undefined): v
       p.handBack = false;
     }
     applyInput(p.input, input);
-    collectCommands(world, p, input);
 
     if (p.role === 'human' && p.squadId >= 0) {
       const unit = drivenUnit(world, world.squads[p.squadId]);
-      if (unit && unit.alive) {
+      // roar stun: the unit does not answer its player's controls (the camera still looks round).
+      if (unit && unit.alive && unit.stun > 0) {
+        unit.control.moveX = 0;
+        unit.control.moveZ = 0;
+        unit.control.fire = false;
+      } else if (unit && unit.alive) {
         unit.control.moveX = p.input.moveX;
         unit.control.moveZ = p.input.moveZ;
         unit.control.aimYaw = p.input.aimYaw;

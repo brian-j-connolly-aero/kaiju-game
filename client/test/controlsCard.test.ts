@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import { kaijuKindDef, PLAYABLE_KAIJU_KINDS } from '@mb/shared';
 import { ACTION_USERS, BUTTON_ACTIONS, browserShortcutRisk, defaultBindings, type ButtonAction } from '../src/game/input/actions';
-import { cardActions, cardTiles, kaijuTiles, partGlyph, squadTiles, type CardTile } from '../src/ui/controlsCard';
+import { cardActions, cardButton, cardTiles, kaijuTiles, partGlyph, squadTiles, type CardTile } from '../src/ui/controlsCard';
 
 function buttonParts(tiles: CardTile[]) {
   return tiles.flatMap((t) => t.parts.filter((p): p is Extract<typeof p, { kind: 'button' }> => p.kind === 'button'));
@@ -42,9 +42,10 @@ describe('the controls card', () => {
       for (const [verb, action] of Object.entries(def.actions)) {
         const tile = tiles.find((t) => t.verb === verb);
         expect(tile, `${kind} ${verb}`).toBeDefined();
-        const press = buttonParts([tile as CardTile]).find((p) => p.action === action.button);
-        expect(press, `${kind} ${verb} shows ${action.button}`).toBeDefined();
-        expect(press?.hold === true, `${kind} ${verb} hold ring`).toBe(action.gesture === 'hold' || action.gesture === 'level');
+        const key = cardButton(verb as keyof typeof def.actions);
+        const press = buttonParts([tile as CardTile]).find((p) => p.action === key.action);
+        expect(press, `${kind} ${verb} shows ${key.action}`).toBeDefined();
+        expect(press?.hold === true, `${kind} ${verb} hold ring`).toBe(action.held);
       }
       // Grabbing tanks and pieces of buildings, and the molt, are limited to their stages.
       expect(tiles.find((t) => t.id === 'grab-big')?.stages).toEqual([2, 3]);

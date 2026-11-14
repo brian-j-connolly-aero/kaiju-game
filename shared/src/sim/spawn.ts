@@ -8,7 +8,7 @@ import { factionLevelDef } from '../defs/factions';
 import type { KaijuVerb, StageId } from '../defs/ids';
 import { KAIJU_ACTION_IDS } from '../defs/ids';
 import { kaijuKindDef, kaijuStageDef } from '../defs/kaiju/index';
-import { MATCH_RULES, SQUAD_RULES } from '../defs/rules';
+import { MATCH_RULES } from '../defs/rules';
 import { stageDef } from '../defs/stages';
 import { unitTypeDef } from '../defs/units';
 import { emptyMods, modMult } from '../defs/upgrades';
@@ -153,9 +153,6 @@ function zeroCooldowns(): Record<KaijuVerb, number> {
 export function createActionMemory(): KaijuActionMemory {
   return {
     usedPress: 0,
-    usedHold: 0,
-    holdLive: false,
-    throwBuffer: 0,
     meal: false,
     beamLength: 0,
     beamBlocker: -1,
@@ -165,6 +162,9 @@ export function createActionMemory(): KaijuActionMemory {
     beamSeed: 0,
     crossfireTick: -1e9,
     swimPress: 0,
+    actionButton: 0,
+    chargeHits: [],
+    chargeBlocked: false,
   };
 }
 
@@ -213,6 +213,10 @@ export function createKaiju(id: number, slot: PlayerSlot, x: number, z: number, 
     held: null,
     cooldowns: zeroCooldowns(),
     moltAvailable: false,
+    moves: ['none', 'none'],
+    offer: [],
+    forceMolt: false,
+    collapse: null,
     mods,
     upgrades: [],
     wading: false,
@@ -222,7 +226,6 @@ export function createKaiju(id: number, slot: PlayerSlot, x: number, z: number, 
     known: false,
     knownTimer: 0,
     spotted: false,
-    marked: 0,
     recentHits: [],
     volleyHits: [],
   };
@@ -252,12 +255,12 @@ function createUnit(id: number, squad: number, slot: number): Unit {
     members: 0,
     nerve: 0,
     shaken: 0,
+    stun: 0,
     charge: 0,
     cooldown: 0,
     veteran: false,
     state: 'dead',
     rooted: false,
-    arcYaw: 0,
     nav: createUnitNav(),
     inWater: false,
     wreck: false,
@@ -283,12 +286,6 @@ export function createSquad(world: World, slot: PlayerSlot): Squad {
     callsign: slot.callsign,
     units,
     driven: units[0],
-    moveOrder: 'follow',
-    moveTarget: { x: 0, z: 0 },
-    fireMode: 'atWill',
-    callInCooldowns: [],
-    smokeCooldown: 0,
-    markCooldown: 0,
     upgrades: [],
     mods: emptyMods(),
     eliminated: false,
@@ -296,8 +293,6 @@ export function createSquad(world: World, slot: PlayerSlot): Squad {
     trail: [],
     formed: false,
     volleyReady: false,
-    orderBudget: SQUAD_RULES.orderBurst,
-    pendingOrders: [],
   };
   world.squads.push(squad);
   return squad;
@@ -305,7 +300,7 @@ export function createSquad(world: World, slot: PlayerSlot): Squad {
 
 /**
  * Brings a squad back fresh at the level of the given stage: four full-strength units of the
- * faction's unit type, default orders, call-ins ready. Positions are left to deploySquads.
+ * faction's unit type, nobody planted. Positions are left to deploySquads.
  * Veteran marks come from `squad.veteranSlots`.
  */
 export function refillSquad(world: World, squad: Squad, stage: StageId): void {
@@ -315,14 +310,6 @@ export function refillSquad(world: World, squad: Squad, stage: StageId): void {
   squad.level = stageDef(stage).humanLevel;
   squad.driven = squad.units[0];
   squad.eliminated = false;
-  squad.moveOrder = 'follow';
-  squad.fireMode = 'atWill';
-  // Orders that were still waiting were for the squad that is gone.
-  squad.orderBudget = SQUAD_RULES.orderBurst;
-  squad.pendingOrders.length = 0;
-  squad.callInCooldowns = levelDef.callIns.map(() => 0);
-  squad.smokeCooldown = 0;
-  squad.markCooldown = 0;
   squad.trail.length = 0;
   squad.formed = false;
   squad.volleyReady = false;
@@ -339,12 +326,12 @@ export function refillSquad(world: World, squad: Squad, stage: StageId): void {
     u.members = def.members;
     u.nerve = 0;
     u.shaken = 0;
+    u.stun = 0;
     u.charge = 0;
     u.cooldown = 0;
     u.veteran = squad.veteranSlots[s];
     u.state = 'idle';
     u.rooted = false;
-    u.arcYaw = 0;
     resetNav(u.nav);
     u.inWater = false;
     u.wreck = false;
@@ -497,7 +484,5 @@ export function deploySquads(world: World): void {
       u.inWater = inWater(world.cityQuery, u.x, u.z);
       placed.push({ x: u.x, z: u.z, radius: u.radius });
     }
-    squad.moveTarget.x = world.units[squad.units[0]].x;
-    squad.moveTarget.z = world.units[squad.units[0]].z;
   }
 }

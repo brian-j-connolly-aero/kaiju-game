@@ -4,7 +4,7 @@
  * fallback page). One server on a free port for the whole file.
  */
 
-import { buildStamp, CLOSE_REPLACED, JOIN_ERROR, rulesStamp, SNAPSHOT_RATE, TICK_RATE } from '@mb/shared';
+import { buildStamp, CLOSE_REPLACED, JOIN_ERROR, PROTOCOL_VERSION, rulesStamp, SNAPSHOT_RATE, TICK_RATE } from '@mb/shared';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { connect, createServer, type AddressInfo, type Server, type Socket } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -71,7 +71,7 @@ describe('http', () => {
     const res = await fetch(`${ts.url}/healthz`);
     expect(res.status).toBe(200);
     expect(res.headers.get('cache-control')).toBe('no-store');
-    expect(await res.json()).toMatchObject({ ok: true, game: 'monster-battle-9001', protocol: 1, fast: true });
+    expect(await res.json()).toMatchObject({ ok: true, game: 'monster-battle-9001', protocol: PROTOCOL_VERSION, fast: true });
   });
 
   it('says which build it is: the shared rules and the page it serves', async () => {
