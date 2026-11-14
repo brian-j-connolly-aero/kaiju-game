@@ -26,7 +26,7 @@ last fixes before the first playtest (section 14); the rest is from the scaffold
 | `npm install` | Installs the pinned toolchain and the server's dependencies (Express, the room library). |
 | `npm run check` | Type checks all three workspaces, runs `scripts/lint.mjs`, runs every test. The gate. |
 | `npm test` | `vitest run`: every test in `shared/test`, `server/test` and `client/test`, about 40 seconds (the server's integration tests and the whole-match simulation tests take most of it). |
-| `npm run sim` | The balance harness: full bot-versus-bot matches, headless, a few hundred times real speed, one table row per match plus a summary. Options after `--`: `--seeds N` (default 5), `--seed N`, `--unopposed` (no squads), `--kaiju-handicap H`, `--human-handicap H` (0 best, 1 stands still), `--trigger-happy` (squads hold the trigger instead of charging volleys), `--fast`, `--anchor N`, `--every-anchor` (every start in turn), `--bar P1,P2,P3` (other bar fractions for one run), `--clock S` (another match clock for one run), `--nav` (how the bots got about), `--city placeholder` (the old grid city), `--max-minutes N`, `--events`, `--json`. 20 matches take 25 to 50 s depending on what else the machine is doing. How to read it: `docs/BALANCE.md`. |
+| `npm run sim` | The balance harness: full bot-versus-bot matches, headless, a few hundred times real speed, one table row per match plus a summary. Options after `--`: `--seeds N` (default 5), `--seed N`, `--unopposed` (no squads), `--kaiju-handicap H`, `--human-handicap H` (0 best, 1 stands still), `--trigger-happy` (squads hold the trigger instead of charging volleys), `--no-crates` (no army supply crates), `--fast`, `--anchor N`, `--every-anchor` (every start in turn), `--bar P1,P2,P3` (other bar fractions for one run), `--clock S` (another match clock for one run), `--nav` (how the bots got about), `--city placeholder` (the old grid city), `--max-minutes N`, `--events`, `--json`. 20 matches take 25 to 50 s depending on what else the machine is doing. How to read it: `docs/BALANCE.md`. |
 | `npx vitest run server/test` | Only the server tests: 115 tests, about 18 seconds (four files start a real server on a free port and connect real clients; `process.test.ts` starts the entry point as a process of its own). `MB_TEST_SPEED=1 npx vitest run server/test/lifecycle.test.ts` plays the full five-client match in real time (about 3 minutes). |
 | `npm run dev` | Starts the server (`tsx watch`, port 2567) and the client (Vite, port 5173) side by side with hot reload; open the Vite address. Vite forwards matchmaking and the WebSocket to the server, so the page talks to its own origin exactly as in production. |
 | `npm run build`, `npm start` | Bundles the server to `server/dist/index.js`, builds the client to `client/dist` (and writes a gzip copy, `<file>.gz`, of every model, script, style sheet, data file and vector icon there: `scripts/precompress.mjs`; the server sends it to browsers that accept gzip); `npm start` runs the bundle, which serves the built client and the game on one port (`PORT`, default 2567). Environment variables: `ARCHITECTURE.md` section 4.4. |
@@ -2586,3 +2586,268 @@ the monster at the other end; `/tmp/mb-scratch/integrate/slides/`.)
 - Everything the four phase 1 sections above list as not yet felt by a person (the charge's
   turn and stumble, the 2.5 s stun, the 4.5 s volley charge, tank turn rates, the chase cameras)
   is still untried by people.
+
+## Phase 2 art: the three special buildings (14 November 2026)
+
+Three new buildings the monster can wreck for a reward. Each is a finished model with all its
+states (whole, damaged, rubble, flying pieces), made by one script, `tools/art/city_special.py`,
+in the same painted-model look as the rest of the city. Scale picture beside a house and a shop:
+`docs/art/concept/city_special_lineup.png`. One review sheet each in `docs/art/previews/`.
+
+| Building | File (`client/public/assets/models/`) | Size | What you see |
+| --- | --- | --- | --- |
+| Power substation | `bld_substation_a.glb` | 22 by 16 m, 9 m tall | A fenced gravel yard, two grey-green transformers with brown insulators, two tall steel frames with wires, a small hut, yellow warning signs with a lightning bolt. |
+| Gas station | `bld_gasstation_a.glb` | 26 by 20 m, 7 m tall | A red canopy on four pillars over four pumps, a shop behind, a cage of gas bottles, a pole sign with a flame. |
+| Radio mast | `bld_radiomast_a.glb` | 8 by 8 m, 24 m tall | A red and white lattice mast on a concrete pad with a small hut; three red lamps. |
+
+- Marked spots for effects are built in: six spark points on the substation's insulators, four
+  light points over the pumps, three lamp points up the mast. The mast's top 8 m also exists as
+  a separate piece for the moment it breaks off.
+- Damaged versions: the substation loses a corner of one steel frame, the gas station a corner
+  of its canopy and shop roof, the mast's top section kinks over. Rubble keeps something
+  recognizable: a burst transformer, a slab of red canopy, the mast's stump.
+- No words or numbers anywhere: the signs are pictures (a flame, a bolt in a triangle).
+- The shared building picture sheet (the atlas) gained seven small pictures in a block nothing
+  else used; every older pixel was compared before and after and is unchanged.
+- Checks: the art contract check, the city check, the art pipeline's own tests and the
+  manifest check all pass for the three files.
+
+Missing or worth knowing:
+
+- The gas station's pole sign stops at 7 m, not 10 m: every building has to stay inside its
+  7 m collision box, and the art checks refuse a taller model. It still stands clear above the
+  canopy.
+- The mast is drawn with few triangles (118 of the 120 allowed for a building of its size), so
+  its lattice is three legs with one zig-zag brace per side and bay; the damaged mast sits
+  exactly at the limit.
+- Nothing has been seen in the running game yet: the sparks, flicker, blinking lamps and the
+  falling top section are for the client builders, and the thrown mast piece (`prop_mast`) is
+  another art job that has to match the top section (measurements in `docs/ASSETS.md`).
+- The city's triangle count table (`tools/art/city/budgets.py`) does not yet count these
+  buildings, because the city count has not been re-run since they were placed.
+
+
+## Art: the six city weapons (roadmap phase 2, "the city as a weapon")
+
+Six street props the small monster can grab with one hand and use. All are new files; nothing
+older was changed. Pictures: `docs/art/concept/props_weapons_lineup.png` (all six on a street
+beside the older props and the hatchling), `docs/art/concept/props_weapons_held.png` (each one
+in the hatchling's claw), and one sheet and one beauty shot per prop in `docs/art/previews/`
+and `docs/art/concept/`.
+
+| Prop | File (in `client/public/assets/models/`) | Size | How it is held |
+| --- | --- | --- | --- |
+| Propane tank | `prop_propane.glb` | 2.4 m long, 1.3 m high | By the valve cover on top; it hangs level under the claw, then is thrown. |
+| Water tank | `prop_watertank.glb` | 3 m across, 4.5 m high | By the point of its roof; lifted and thrown. |
+| Television antenna | `prop_antenna.glb` | 7 m high | 2.8 m up the pole; thrown like a javelin, the red spike at the top goes first. |
+| Fast-food sign | `prop_foodsign.glb` | 7.5 m high, burger 3 m across | Low on the pole; swung like a club, the burger is the head. |
+| Garage door | `prop_garagedoor.glb` | door 3.2 by 2.8 m, 3.6 by 3.0 m with its frame | By a bar on the back, in the middle; held in front of the body as a shield. |
+| Radio mast top | `prop_mast.glb` | 8 m long, 1.5 m high lying down | By the upper leg, 3.2 m from the broken end; thrown like a heavy javelin, the red lamp goes first. |
+
+- Each file has a marked spot named `grip` where the claw closes, and the asset list
+  (`manifest.props_weapons.json`) says which way each one points in the hand, so the client
+  builders do not have to guess.
+- No words anywhere: the propane tank carries a red diamond with a flame, the sign is a burger.
+- The mast piece uses the same measurements and colors as the top of the radio mast building.
+- Made by `tools/art/props_weapons.py`. The art checker now accepts a `grip` spot on a prop
+  (and demands one on these six); four small tests were added for that.
+- Checks: the art contract check passes for all six, the art pipeline's own tests pass, the
+  asset list check passes.
+
+Missing or worth knowing:
+
+- The mast piece lying down is 1.5 m high; the game's own number for it is 1.2 m. The checker
+  prints a warning, not a failure. Either number can move: the model is as tall as the real
+  top of the mast building.
+- Nothing has been seen in the running game yet: holding, throwing, swinging and the breaking
+  of these props are for the client builders. The held picture uses the monster's resting
+  pose, not its real carrying pose.
+- There are no broken or burnt versions of these props; when one explodes or breaks, the
+  game's existing effects have to cover it.
+- All six sit at or just under the 80-triangle limit for props, so the antenna's crossbars
+  and the mast's lattice are as simple as they can be.
+
+## Phase 2: the army's supply crates and pick-ups, rubble that stays, buildings that fall over (14 November, the army-simulation task)
+
+`docs/ROADMAP.md`, phase 2 ("something happening every 20 seconds"), the army's part in the
+simulation and the squad bot. The rules as built are in `DESIGN.md` section 5 ("Supply crates
+and pick-ups") and section 7 ("Rubble and falls"); the contracts in `ARCHITECTURE.md` sections 3
+and 4.2. Drawing all of it is the next two tasks' (the weapons and pick-ups client, the city and
+weight client): the handoff list at the end of this section is for them.
+
+**What changed**
+
+- **Supply crates** (`shared/src/sim/systems/pickups.ts`, a new system between movement and
+  the weapons; numbers in `shared/src/defs/pickups.ts`): one per squad when a stage starts, on
+  a street 25 to 90 m from its leader, then one every 30 s for the squads in turn while fewer
+  than 3 / 4 / 5 are down; never within a third of the bounds' half-size of the kaiju; 4 s down
+  by parachute from 90 m; taken by any unit that touches a landed one; gone when the stage ends.
+  What a crate holds is drawn with the match's random numbers, reinforcements likelier the
+  more units the squad has lost. `MatchConfig.crates` false turns them off (the test helpers
+  do by default, like the idle bots; `npm run sim -- --no-crates`).
+- **The five pick-ups.** Machine gun, big cannon and missile pod change the driven unit's own
+  weapon (`pickupWeaponDef`: made from the unit's weapon, so they scale with the stage); the
+  missile pod's missiles are a new flight model, 'guided' (a constant acceleration for a whole
+  number of ticks brings each onto the aim point, then it flies straight on; `stepProjectile`
+  flies it exactly). The artillery radio turns the squad's next 3 charged volleys into
+  barrages, using what phase 1 kept for it: `startCallIn`, `CallInDef`, `resolveMarkerPoint`
+  with `markerRange` and `markerSnapRadii`, and the `callin.inbound` lines (cued again through
+  the `callin` 'marked' event). Reinforcements heal the squad and bring its dead back by
+  parachute (`unit.drop`, `unit.y`). New projectile types 'tracer', 'missile', 'heavyShell'.
+- **Rubble that stays** (`shared/src/city/spatialIndex.ts`): a collapsed structure is a mound
+  half its height (40 m at most, none for a bridge deck; `index.srubble`, nothing stored per
+  match). The casts take a `mounds` flag: projectiles, aim rays, spotting, squad-mates' and the
+  squad bot's lines of fire count mounds; corridors, navigation, the client's camera and the
+  beam do not. A cast that starts inside a mound ignores it. Units cross mounds at half speed
+  (`MoveParams.moundSpeedMult`, `moundHeightAt`); the kaiju at its own.
+- **Buildings that fall over** (`shared/src/sim/systems/cityDamage.ts`): a structure at least
+  2.9 times taller than its longer footprint side falls over half the time it collapses, over
+  its side facing along the last projectile that hit it or away from the kaiju; it lands 2 s
+  later on what lies under its length (units 80% of their hp, structures half the falling
+  one's hp, at most two falls in a row) and lies as a long mound (`fallenBox`). The city state
+  carries every fallen structure's side (`world.structureFall`, the `welcome`'s city state).
+  `startStructureFall(world, id, dirX, dirZ, by, cause)` makes one fall and returns where its
+  top lands; the city's radio mast uses it.
+- **The squad bot** (`shared/src/sim/bots/squadBot.ts`): fetches a crate within 60 m when the
+  kaiju is not close (a new mode, 'crate'); parks in a band of range that suits its weapon
+  pick-up; keeps volleying with the radio; its lines of fire count rubble and fallen buildings.
+- **Contracts.** `SNAPSHOT_VERSION` 4 (one bump with the city's work): the squad record adds
+  `pickup` and `barrages`, the snapshot ends with `crates`. New events `structureFall`, `crate`,
+  `reinforce`; `projectileSpawn` adds `ax`, `ay`, `az`, `steer` for guided flight. The city
+  state ends with the fallen list. Ids appended: `PICKUP_IDS`, `WEAPON_PICKUP_IDS`, three
+  projectile types, the flight model 'guided', damage kinds 'tracer', 'missile', 'heavyShell',
+  'fall'. `StructureHit` adds `dirX`, `dirZ`, `fallDepth`; `CityState` adds `structureFall`
+  and `fallen`. `PROTOCOL_VERSION` unchanged. The pipeline is twelve systems.
+- **Removed as unused** now that the radio exists: `CallInDef.cooldown`, the mod key
+  `callInCooldown`, and `resolveMarkerPoint`'s `skyReach` argument (only the radio marks the
+  ground now, and it never wants a point in the empty sky).
+- **Client** (only to keep it compiling): `client/src/render/projectilesView.ts` has glow
+  sizes for the three new projectile types.
+- **Tests.** New: `shared/test/pickups.test.ts` (crates coming down, landing and being taken;
+  the drop rhythm, the cap and the end of a stage; the draw; each pick-up's effect; the squad
+  bot fetching a crate) and `shared/test/rubble.test.ts` (a mound stopping sight and a shell,
+  slowing a unit and not the kaiju; a fall: its side, its timing, crushing a unit and a house,
+  blocking a line, the city state a late joiner gets; the chance, the squat ones, the chain's
+  bound). Changed to the new rules: four tests in which a wall "came down and the line was
+  open again" (`spotting`, `flow`, `squads`, `bots`) now check that the rubble still hides a
+  hatchling and that the line opens from on top of it, over a low wall's rubble, or when the
+  kaiju steps out; `net.test.ts` (pick-ups and crates in the snapshot, the fallen list in the
+  city state), `callins.test.ts`, `defs.test.ts`, `world.test.ts` (twelve systems).
+
+**Measured** (ten bot matches each, seeds 1 to 10, every start in turn; the city's phase 2 work
+was in the same tree and still changing, so these are this tree's numbers, not the army's
+alone)
+
+| | Stage 1 | Stage 2 | Stage 3 | Match | Kaiju wins |
+| --- | --- | --- | --- | --- | --- |
+| Phase 1, 40 matches (the integration section) | 2:02 | 2:27 | 3:01 | 7:31 | 20 of 40 |
+| Phase 2 tree, `--no-crates` | 2:18 | 2:56 | 3:04 | 8:19 | 5 of 10 |
+| Phase 2 tree, with crates | 2:10 | 2:27 | 2:22 | 7:09 | 4 of 10 |
+
+(Stage times are for stages the kaiju completed.) Every match finished without an error.
+With crates the humans killed the kaiju in 5 matches of 10 (3 without), and stages 2 and 3
+went faster. Over those ten matches (76 minutes of play): 226 crates came down, 150 were taken,
+about two a minute (machine guns 43, missile pods 41, big cannons 28, artillery radios 24,
+reinforcements 14), 35 were still lying there when their stage ended; the radios called 51
+barrages; reinforcements brought 5 units back. Of 300 collapses of slender buildings 157 were
+falls; they brought down 109 more structures and landed on a unit 7 times (none died). Ten
+matches is a small sample (the first run of the same seeds, earlier in the day, gave 4 of 10
+and 1:48 / 3:26 / 2:36): balance waits for the owner's playtest, as the roadmap says.
+
+**For the two client builders**
+
+- Crates: the snapshot's `crates` (id, kind, x, z, `fall`: seconds until it lands, 0 on the
+  ground); while it falls it is `CRATE_RULES.dropHeight * fall / CRATE_RULES.fallTime` up
+  (90 m over 4 s, a steady speed: draw `prop_parachute` over `prop_crate`, lines to its
+  `hook`). Events `crate`: 'drop' (with `duration`, `height` and the squad it is meant for),
+  'land', 'take' (unit, squad, what it held), 'gone'. The kind is meant to be visible (the
+  pick-up pictures over the crate).
+- HUD: the snapshot squad's `pickup` (the weapon pick-up, 'none') and `barrages` (0 to 3, the
+  radio); flash on your squad's `crate` 'take'. Reinforcements: `reinforce` (units coming down,
+  units healed, 60 m over 4 s); a unit coming down has the snapshot `y` of its height.
+- Shots: 'tracer' (machine gun: five times the rate, a small splash), 'heavyShell' (big cannon:
+  its `projectileHit` splash is 1.6 times the shell's), 'missile' (six on one tick, flight
+  'guided': fly each with `stepProjectile` and the event's `ax`, `ay`, `az`, `steer`). The
+  radio's barrage: `volley`, then on the same tick `callin` 'marked' at the ground the
+  crosshair marked (the existing call-in picture), the `callin.inbound` voice cue, 'inbound'
+  and 'done' as before; four seconds from the volley to the first shell.
+- Rubble: a structure at stage 3 is a mound `index.srubble[id]` high over its footprint, unless
+  `structureFall[id]` is not 0: then it lies on its side (`fallenBox(index, id, side)`: center,
+  half extents in its own frame, height half its depth; `fallTop` gives the pivot and where the
+  top lands). `structureFall` 'falling' comes right after the `structureStage` 3 of the same
+  tick: tip the building over the pivot edge toward `yaw` over `duration` (2 s), then 'landed'
+  (dust, shake; the crush's hits follow). Mirror the fall in the client's city with
+  `setStructureFallen(mirror.query, id, side)` on 'landed', and copy `structureFall` and
+  `fallen` in `resyncCityMirror` too (it copies only hp and props today), or the client's
+  prediction of its own unit will not slow down on a fallen building.
+
+**Still open**
+
+- Nothing is drawn yet: crates, parachutes, the pick-up pictures, the new shots, mounds and
+  falls are for the two client tasks. Until then a missile flies straight on screen (the client
+  ignores its acceleration) and rubble looks flat though it blocks shots.
+- The kaiju bot's own sight checks (`kaijuBot.ts`, the city's file) and the client's autoplay
+  still see through rubble; harmless, but they misjudge who can see the kaiju.
+- Rubble is a big change at stage 1: a pile of house rubble (2.5 to 4.5 m) hides a hatchling
+  (4.5 m tall) from squads on the ground, so spotting and lines of fire there are harder. Not
+  felt by a person yet; levers: `RUBBLE_RULES.heightShare` and `maxHeight`.
+- The beam and the third-person camera pass over rubble (a choice, so the monster's favorite
+  move is not blunted by its own wreckage; `beamPath` and the client's camera do not pass the
+  `mounds` flag).
+- When this section was written, five tests failed that belong to the city's work in progress
+  (the new `club` verb in `defs.test.ts`, `net.test.ts` and the client's `controlsCard.test.ts`;
+  the substation now standing on the target point of the swarm test in `squads.test.ts`; propane
+  blasts left in the damage queues at the end of a tick in `matchSoak.test.ts`). The last
+  section of this file says whether `npm run check` passes.
+
+## Art: the supply crate, its parachute and the pick-up pictures (phase 2)
+
+Written 14 November 2026 by the art builder for the army pick-ups.
+
+**What was made**
+
+- **The supply crate**, `client/public/assets/models/prop_crate.glb`: an olive army crate
+  1.6 m on a side (1.63 m high with its straps) on two wooden skids, with a lighter lid, two
+  dark straps, a pale chevron pointing down stenciled on the front and back (a picture, no
+  letters, no country's mark) and the army's cyan stripe on the sides and the lid. 78
+  triangles. It has a marker named `beacon` in the middle of the lid, 1.63 m up, for the light
+  and the smoke; the crate also hangs from that point.
+- **The parachute**, `client/public/assets/models/prop_parachute.glb`: a round canopy 6.1 m
+  across in olive and khaki panels with a cyan cap, dark inside, 6.7 m from the top down to
+  the point where its eight lines meet. 80 triangles. That point is a marker named `hook` and
+  is the model's own zero point, so the game only has to put the parachute where the crate's
+  `beacon` is (or at a soldier's shoulders). For a soldier it may want shrinking in code.
+- **Five pick-up pictures** in `client/public/assets/ui/`: `pk_machinegun`, `pk_bigcannon`,
+  `pk_missilepod`, `pk_artilleryradio`, `pk_reinforcements` (the name is `pk_` and the
+  pick-up's id in lower case). One color, no text, in the style of the other icons.
+- **The eight pictures of the squad's controls card** as real files, also in
+  `client/public/assets/ui/`: `sq_foot`, `sq_charge`, `sq_meter`, `sq_meter_low`, `sq_burst`,
+  `sq_drive`, `sq_turn`, `sq_turret`. The game picks up any picture file in that folder by its
+  name, so these replace the stand-ins drawn in code without a code change.
+- **Pictures to look at**: `docs/art/concept/props_supply_drop.png` (a crate coming down and
+  one landed, beside the tank, a car and a street lamp), `docs/art/previews/prop_crate.png`,
+  `docs/art/previews/prop_parachute.png`, `docs/art/previews/ui_icons_pickups.png`,
+  `docs/art/previews/ui_icons_squad.png`. All the icon sheets in `docs/art/previews/` were made
+  again and now show today's set; the sheet of real sizes ends with the pick-ups at 48 and 128
+  pixels over the three skies.
+- The art contract (`docs/ASSETS.md` sections 3 and 5), the icon guide (`docs/art/UI_ICONS.md`)
+  and the art tools' checks know the new pieces. The build script is
+  `tools/art/props_supply.py`.
+
+**Checks**: the two models pass the art checker, the art tools' own tests pass, all 103 icon
+files pass the icon check, and the asset list is up to date.
+The project's full check (`npm run check`) stopped at that moment on three type errors in
+`shared/src/city/meridian/specials.ts`, a file of the city simulation work in progress; no
+art file is involved.
+
+**Missing or worth knowing**
+
+- Nothing draws these yet: showing the crate, the parachute and the pictures in the game is
+  the client builders' work.
+- Seen from straight below, the open bottom ends of the crate's two straps show as slivers
+  3 cm wide. There were no triangles left in the budget of 80 to close them.
+- The parachute's lines are flat ribbons 15 cm wide at the canopy. From far away they thin out
+  to nothing, which is fine for a rope, but the canopy is what will be seen.
+- The pick-up pictures were judged by eye on the sheets only, not yet in the game over a real
+  crate or by the owner. The machine gun is the least obvious of the five at small sizes.
+- No lit beauty picture of a soldier under the parachute was made; the scene shows a crate.

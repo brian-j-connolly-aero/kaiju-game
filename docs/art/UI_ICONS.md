@@ -4,7 +4,7 @@ Monster Battle 9001 has a no-reading rule: apart from names and subtitles, nothi
 text. These user interface (UI) pictograms are therefore the game's whole language. Each one has
 to be understood in under a second by someone who has never played.
 
-- **Files:** `client/public/assets/ui/<name>.svg`, 95 icons and `skyline.svg`. The names are the
+- **Files:** `client/public/assets/ui/<name>.svg`, 102 icons and `skyline.svg`. The names are the
   contract in `docs/ASSETS.md` section 5.
 - **Format:** hand-written SVG (Scalable Vector Graphics, a drawing written as text). No drawing
   program is involved: to change an icon, edit its file.
@@ -44,6 +44,8 @@ at its own size here, not at 32:
 | Clock | 26 and 20 | `st_sun`, `st_moon` |
 | End screen tally | 22 | `tl_*` |
 | Lobby seats, flags, buttons, notices | 22 to 44 | `lb_*`, `fac_*`, `ui_offline`, `ui_warning`, `ui_copy` |
+| The squad's controls card | 21 to 44 | `sq_*` |
+| Army pick-ups: over a crate, in the HUD, when one is taken | 48 to 128 | `pk_*` |
 | Verb hints | 32 (26 on small screens) | `k_*`, `st_map`, `st_camera` |
 | Status pictures | 52 (spotted 30, eliminated 34) | `st_crossfire`, `st_shaken`, `st_nerve`, `st_charge`, `st_callin`, `st_spotted`, `ui_offline`, `ui_skull` |
 | End banner | 26 to 67 | `lb_kaiju`, `lb_human`, `ui_trophy`, `tl_tower`, `ui_skull`, `ui_clock` |
@@ -78,6 +80,37 @@ lowered in `k_charge`) and its clawed hand (`k_grab` closing, `k_throw` open).
 
 (The command wheel's four order icons, `cmd_*`, and the smoke and mark icons were deleted in
 phase 1 with those controls: the squad has two buttons now, `docs/ROADMAP.md`.)
+
+### The squad's controls (the controls card)
+
+Drawn in phase 2; until then the client drew stand-ins in code (`client/src/ui/iconArt.ts`),
+which remain the fallback. The three tank pictures share one tank seen from above: a solid hull,
+two tracks, the gun forward.
+
+| File | Meaning | What is drawn |
+| --- | --- | --- |
+| `sq_foot` | The squad on foot (stage 1) | A soldier with a rocket launcher on the shoulder: flared tube behind, pointed rocket in front |
+| `sq_charge` | The volley charging | Three squad-mates (circles) planted in a row, their three lasers meeting at one diamond |
+| `sq_meter` | The volley meter past its notch: a full shot | The meter's diamond, outlined, filled to well above the two ears that mark the notch |
+| `sq_meter_low` | Short of the notch: a weak shot | The same diamond with only its bottom corner filled, below the ears |
+| `sq_burst` | The volley fired | Three shots meeting in one eight-pointed burst |
+| `sq_drive` | Drive forward and back | The tank, and beside it an arrow with a head at each end, ahead and behind |
+| `sq_turn` | Turn left and right | The tank with two curved arrows swinging away from its nose, one to each side |
+| `sq_turret` | The turret follows the mouse | The tank with its hull drawn open so the turret shows, the gun swung round (a curved arrow) toward a ring |
+
+### Army pick-ups
+
+What a supply crate holds: shown floating over the crate, in the squad's HUD while the squad
+has it, and large for a moment when it is taken. Solid silhouettes, like the tally pictograms.
+They wear human cyan. The shell that means "a shot" elsewhere in the set is in two of them.
+
+| File | Meaning | What is drawn |
+| --- | --- | --- |
+| `pk_machinegun` | Machine gun | A belt-fed gun on a tripod, side view: grip, receiver, thin barrel, three rounds of the belt hanging |
+| `pk_bigcannon` | Big cannon | A tank turret with one fat gun (fume extractor, slotted muzzle brake) and the big shell it fires lying under it |
+| `pk_missilepod` | Missile pod | A launcher box with six round tubes and a finned missile leaving it |
+| `pk_artilleryradio` | Artillery radio | A field radio with two dials, its aerial sending three waves, and a falling shell cut out of its face |
+| `pk_reinforcements` | Reinforcements | A soldier (round head) coming down under a parachute, arms up on the lines |
 
 ### Kaiju verbs
 
@@ -301,6 +334,14 @@ four verbs must be told apart without comparing them.
 ## What was tried and dropped
 
 So the next artist does not repeat it:
+
+- `pk_bigcannon` as a bare barrel on a round breech read as a wrench or a dumbbell; the turret
+  behind the gun makes it a gun. `pk_missilepod` with four tubes read as a die; six tubes in a
+  wide box do not.
+- `sq_foot` with a plain bar across the shoulder read as a man pointing; the flared back end
+  and the pointed rocket make it a launcher.
+- `sq_drive` and `sq_turn` with the arrows in front of and behind a small tank left a tank too
+  squat to read, and an arch with two heads over the tank read as headphones.
 
 - `k_swipe` as three arcs with claw tips read as a wireless signal; tapered slashes read as claws.
 - `k_stomp` seen from the front read as a bell. In the side view, a flat-topped vertical leg read

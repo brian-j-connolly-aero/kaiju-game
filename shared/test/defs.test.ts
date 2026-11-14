@@ -180,6 +180,8 @@ describe('the Lizard (DESIGN.md sections 2 and 4)', () => {
       brace: 'slot',
       charge: 'slot',
       tailSweep: 'slot',
+      // Phase 2: Strike with a fast-food sign in the hand swings it.
+      club: 'strike',
     });
     expect(Object.values(a).filter((v) => v.whileHeld).map((v) => v.id)).toEqual(['brace']);
     expect(a.swipe).toMatchObject({
@@ -384,7 +386,6 @@ describe('the Army (DESIGN.md section 5)', () => {
       nerve: 5,
       splashRadius: 14,
       structureDamage: 300,
-      cooldown: 35,
       projectile: 'arty',
     });
     expect(PROJECTILE_TYPES.arty.flight).toBe('arc');

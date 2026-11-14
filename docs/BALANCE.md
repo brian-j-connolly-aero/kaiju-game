@@ -17,6 +17,7 @@ npm run sim -- --seeds 10 --unopposed          # no squads: how fast a kaiju fil
 npm run sim -- --seeds 10 --kaiju-handicap 0.3 # the kaiju bot hesitates 30% of the time
 npm run sim -- --seeds 10 --human-handicap 0.3 # the same for the squads
 npm run sim -- --seeds 20 --trigger-happy      # squads that hold the trigger instead of charging volleys
+npm run sim -- --seeds 20 --no-crates          # no army supply crates (phase 2): what the pick-ups are worth
 npm run sim -- --seeds 8 --fast                # the short MB_FAST timers and bar
 npm run sim -- --seeds 3 --events --json       # event counts; reports as JSON
 npm run sim -- --seeds 20 --every-anchor       # match i starts at anchor i mod 10: every start equally often

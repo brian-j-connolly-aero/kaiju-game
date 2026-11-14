@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Pick-up: big cannon. A tank turret with one fat gun: fume extractor, slotted muzzle brake, and the big shell it fires lying under it (shell = a shot). -->
+  <path fill="currentColor" stroke="none" fill-rule="evenodd" d="M3 31.5L6.5 14.5Q7 12 9.5 12H19.5Q22 12 23 14L24.5 17H30V15.5Q30 13.5 32 13.5H38Q40 13.5 40 15.5V17H46V14Q46 12 48 12H59Q61 12 61 14V32Q61 34 59 34H48Q46 34 46 32V29H40V30.5Q40 32.5 38 32.5H32Q30 32.5 30 30.5V29H27L28 31.5Q28.5 34 26 34H5Q2.5 34 3 31.5ZM51 16.5V29.5H55.5V16.5Z"/>
+  <g transform="translate(32 49) rotate(-90) scale(1.25 1.75)">
+    <path fill="currentColor" stroke="none" d="M0 13C3.5 9 4.5 6 4.5 2V-6L2 -9.5H5V-14H-5V-9.5H-2L-4.5 -6V2C-4.5 6 -3.5 9 0 13Z"/>
+  </g>
+</svg>

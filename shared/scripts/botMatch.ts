@@ -28,6 +28,8 @@ export interface BotMatchOptions {
   humanHandicap?: number;
   /** Squad bots hold the trigger instead of charging volleys (MatchConfig.bots.triggerHappy). */
   triggerHappy?: boolean;
+  /** False: no supply crates come down (MatchConfig.crates). */
+  crates?: boolean;
   /** Human squads in the match (default 4); 0 leaves the kaiju alone in the city. */
   squads?: number;
   /** Give up after this many simulated minutes (a match always ends by its clock well before). */
@@ -117,6 +119,7 @@ export function createBotWorld(o: BotMatchOptions): World {
     squads: o.squads,
     bots: { kaijuHandicap: o.kaijuHandicap ?? 0, humanHandicap: o.humanHandicap ?? 0, triggerHappy: o.triggerHappy ?? false },
   });
+  if (o.crates === false) config.crates = false;
   return createWorld({ seed: o.seed, config, city: o.city });
 }
 

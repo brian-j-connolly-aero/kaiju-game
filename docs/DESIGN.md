@@ -456,15 +456,65 @@ speed), A and D turn the hull (on the spot when it stands still), and the turret
 where the player looks at its own pace (the numbers above). The gun's elevation follows the
 mouse at once. The tank's shots leave along its turret, not along the view.
 
-**Artillery:** no button calls it any more (docs/ROADMAP.md, phase 1); phase 2 brings it back
-as an artillery radio picked up on the ground. The fire mission itself is kept as it was: a
-marker on the ground, and after 4 s, 8 arcing shells land over 2 s within a 28 m scatter
-radius: each 9 damage, 5 nerve, 14 m splash, 300 structure damage. A whole barrage on target is
-half a stagger's worth of nerve: it sets up a volley, it does not replace one (artillery never
-counts toward the two squads it takes to break the kaiju).
+**Artillery:** no button calls it (docs/ROADMAP.md, phase 1); the artillery radio, a pick-up
+(below), turns a squad's next charged volleys into barrages. The fire mission: a marker on the
+ground, and after 4 s, 8 arcing shells land over 2 s within a 28 m scatter radius: each 9
+damage, 5 nerve, 14 m splash, 300 structure damage. A whole barrage on target is half a
+stagger's worth of nerve: it sets up a volley, it does not replace one (artillery never counts
+toward the two squads it takes to break the kaiju).
 
 Smoke and marking (polish pass 2) were removed after the first multiplayer playtest ("too much
 already"; docs/ROADMAP.md).
+
+### Supply crates and pick-ups (phase 2, as built)
+
+`docs/ROADMAP.md`, phase 2: something happening every 20 seconds. Rules in
+`shared/src/sim/systems/pickups.ts`, numbers in `shared/src/defs/pickups.ts` (`CRATE_RULES`,
+`PICKUP_WEAPONS`).
+
+- **Crates come down by parachute.** When a stage starts, one crate comes down for every squad,
+  on a street 25 to 90 m from its leader. Then one every 30 s, for the squads still in the fight
+  in turn, while fewer than 3 (stage 1), 4 (stage 2) or 5 (stage 3) are down (the first ones of
+  a stage come down whatever the count). A crate always lands on a street inside the bounds (not on a
+  bridge, in water, on rubble or in a building), at least a third of the bounds' half-size from
+  the kaiju (60 / 153 / 367 m), and at least 12 m from another crate; when there is no street at
+  that distance from the squad, anywhere on a street inside the bounds will do. It comes straight
+  down at a steady speed from 90 m over 4 s, then lies there until a unit takes it or the stage
+  ends (the molt). Anybody's squad may take a crate, whichever squad it was meant for.
+- **What it holds** is drawn with the match's random numbers, weights machine gun 3, big cannon
+  3, missile pod 3, artillery radio 2, reinforcements 1, and reinforcements 2 more for every unit
+  the squad it is meant for has lost (so a squad down to its leader draws reinforcements 7 times
+  in 18). The kind is visible on the snapshot: a player can see which crate is worth the detour.
+- **Taking one:** any living unit on the ground (a leader or a squad-mate) that comes within its
+  own radius plus 1.5 m of a landed crate takes it for its squad.
+- **The pick-ups.** Each lasts until the stage ends or the squad is wiped out; a new weapon
+  pick-up replaces the old one. The weapons change only the driven unit's own weapon (its Fire
+  button, and its own shot when it goes with a volley); squad-mates keep theirs. Each is the
+  unit's own weapon changed, so it scales with the stage (rocket infantry, a tank, a troop of
+  three) the way the weapon does:
+  - **Machine gun:** tracers, 5 times the rate of fire at a third of the damage, nerve and
+    structure damage per shot (1.67 times as much over time), a third of the splash, and a
+    spread of 1.5° (one sigma) on every shot, a person's own too.
+  - **Big cannon:** heavy shells, 2.5 times the reload for 3.5 times the damage and structure
+    damage, twice the nerve and 1.6 times the splash.
+  - **Missile pod:** the Fire button launches a salvo of 6 missiles (fewer as a unit loses
+    members, the way its own weapon fires fewer shots) that leave fanned out over 50° and lofted
+    12°, and curve onto the point the crosshair is on, arriving in the time a straight shot
+    would take. Each is worth 0.6 of a whole trigger pull of the unit's own weapon (about 5.7
+    damage at every stage); 6 s to reload.
+  - **Artillery radio:** the squad's next 3 charged volleys (60% charge or more) each call an
+    artillery barrage onto the ground the volley's crosshair marks (the feet of a kaiju it is
+    on). A volley at the empty sky calls none and keeps its barrage; a ragged volley calls none.
+    The radio says "strike inbound" (the `callin.inbound` lines). The HUD shows how many are left.
+  - **Reinforcements:** at once, every living unit of the squad is healed to full (hp and
+    members), and every dead one comes back at full strength (not a veteran) by parachute
+    beside the leader: from 60 m up, straight down over 4 s, unable to move, fire or charge until
+    it lands. A dead tank's wreck goes when its unit comes back.
+- **Measured** (ten bot matches, the seeds and starts of `npm run sim -- --seeds 10
+  --every-anchor`, with the city's phase 2 work in the same tree): 226 crates came down in 76
+  minutes of play and two thirds were taken, about two a minute (machine guns 43, missile pods
+  41, big cannons 28, artillery radios 24, reinforcements 14); 35 were still lying there when
+  their stage ended. The radios called 51 barrages; reinforcements brought 5 units back.
 
 ### The two buttons, and the swarm
 
@@ -609,7 +659,15 @@ and plays any slot it is handed at any moment.
   around) while a hatchling, or a kaiju under water, is off the map; when the last known
   position is out in the water it goes to the near bank instead and waits there. Its line of
   fire and its crosshair go to what shows of a swimming kaiju (the spines). Into a staggered or
-  cocooned kaiju it does not charge: everybody fires as fast as the guns load.
+  cocooned kaiju it does not charge: everybody fires as fast as the guns load. Its lines of fire
+  count rubble and fallen buildings up to their height, so it parks where it can shoot past
+  them. Phase 2: while the kaiju is not close (off the map, or farther than 1.5 times the
+  distance it backs off at, and not helpless) and it is not charging, it fetches a supply crate
+  coming down or lying within 60 m of its leader that no other bot squad is already going for
+  (giving up after 20 s). With a weapon pick-up it parks in that weapon's band of range: the
+  machine gun at 35 to 60% of range, the big cannon and the missile pod at 55 to 92%. With the
+  artillery radio it keeps volleying, even into a staggered or cocooned kaiju and even in the
+  lazy harness profile, since every charged volley calls a barrage.
 - **Kaiju bot.** It goes for whatever standing structure (or car) pays best for the time it
   takes to reach and bring down, walks through what it tramples, swipes what it must, stomps
   when several things stand around it, and smashes what is in its way. It fights units that
@@ -679,6 +737,40 @@ server and every client build the identical city from code. No building list goe
   starts, reachable along the streets without breaking anything. No street or building moved
   for it; it took the place of the tree belt outside the beltway (docs/CITY.md section 11).
 - Civilians are client-only fleeing sprites with no effect on play.
+
+### Rubble and falls (phase 2, as built)
+
+`docs/ROADMAP.md`, phase 2: rubble stays as half-height mounds that still block shots and sight,
+and some tall buildings fall over on their side. Geometry in `shared/src/city/spatialIndex.ts`,
+falls in `shared/src/sim/systems/cityDamage.ts`, numbers in `shared/src/defs/rubble.ts`.
+
+- **Rubble that stays.** A structure that collapses where it stands leaves a mound over its own
+  footprint, half its height (40 m at most: a pile any taller would stand like a tower of its
+  own; only towers and the tallest landmarks reach that). Bridge decks leave none: they fall into
+  the river. Nothing about a mound is stored: its height follows from the building's archetype.
+- **What a mound does.** It blocks shots and sight up to its height: projectiles (the kaiju's
+  thrown objects too), the aim ray of the crosshair (so a volley or a missile salvo aimed at it
+  lands on it), spotting and the map's line of sight, and the lines of fire of squad-mates and
+  bots. Whoever stands on a mound sees and shoots over it (a line that starts inside a mound
+  ignores that one). It never blocks a body: units cross mounds at half speed (their middle on
+  the mound), and the kaiju walks over them at its own pace. The beam and the third-person camera
+  pass over rubble, as before. Rubble from a house (2.5 to 4.5 m) is enough to hide a hatchling's
+  legs, and a pile of it can hide the whole hatchling: squads have to find a line round it.
+- **Buildings that fall over.** A slender structure, at least 2.9 times taller than its longer
+  footprint side (the towers, the tall offices, the slender landmarks and the radio masts), falls
+  over on its side half the time it collapses (the match's random numbers), instead of straight
+  down. It tips over the side of its footprint that faces along whatever hit it last (a shell's
+  flight), or away from the kaiju for everything else, over 2 s. When it lands, every unit under
+  its length takes 80% of its full hp and is shaken, every structure under it takes half the
+  falling building's full hp (so a big tower can bring a neighbor down, and that one may fall in
+  turn, but never more than two falls in a row), and the props under it are crushed; what it
+  brings down counts for the bar like any wrecking, credited to whoever brought down the first.
+  From then on it lies there as a long mound: as long as it was tall, as wide as its footprint
+  across the fall, half its depth along the fall high, with its own footprint clear. Its top
+  lands as far out as it was tall. While it falls it is rubble where it stood.
+- **Measured** (the same ten matches): 157 of 300 collapses of slender buildings were falls
+  (the radio masts' own reward makes some fall too), they brought down 109 more structures, and
+  they landed on a unit 7 times (none died of it).
 
 ## 8. Presentation rules
 

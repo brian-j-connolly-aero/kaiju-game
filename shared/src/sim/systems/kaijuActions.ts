@@ -1,5 +1,5 @@
 /**
- * System 2 of 11: kaiju actions. The action state machine of every kaiju (DESIGN.md section 4).
+ * System 2 of 12: kaiju actions. The action state machine of every kaiju (DESIGN.md section 4).
  *
  * Every verb runs through the same three timed phases taken from its definition: wind-up (the
  * tell), the effect (instant, or an active phase that lasts), recovery. A `kaijuAction` event
@@ -13,10 +13,12 @@
  *   idle -> cocoon (Molt pressed when a molt is available); the match flow system ends the cocoon
  *
  * Reading the buttons, one move per button (the full contract is the header of net/input.ts):
- * - Strike: Swipe; with something in the hand, Throw.
- * - Grab: with something in the hand, Eat it; else Grab when something can be picked up in
- *   reach, else Eat when something edible is in reach (and the meal is off cooldown), else a
- *   Grab that closes on nothing.
+ * - Strike: Swipe; with something in the hand, Throw; with a fast-food sign in the hand, the
+ *   Club (a big swing; sim/cityWeapons.ts `strikeVerb`).
+ * - Grab: with something edible in the hand, Eat it; with a city weapon in the hand (never
+ *   edible), drop it there and then (it lies loose on the ground); else Grab when something can
+ *   be picked up in reach, else Eat when something edible is in reach (and the meal is off
+ *   cooldown), else a Grab that closes on nothing.
  * - Stomp: Stomp.
  * - Move 1 and Move 2: the moves picked at the molts (`kaiju.moves`): the beam (the special:
  *   rage must cover its cost), roar, charge, tail sweep (each off cooldown), brace (for as long
@@ -41,6 +43,13 @@
  * match flow system), the cocoon starts by itself as soon as the kaiju is up out of the water
  * and not staggered, cutting short whatever it was doing.
  *
+ * Phase 2: a power surge (`kaiju.surge`, sim/systems/specials.ts) makes every cooldown recover
+ * `rewards.surge.cooldownRate` times as fast while it lasts, and this system counts it down. A
+ * propane tank going off in the hand makes the kaiju flinch (phase 'flinch', action 'none',
+ * sim/cityWeapons.ts): rooted, nothing starts, back to idle when its time is up. Loose city
+ * weapons are looked after here too (`updateLoose`: a fallen mast's top coming to rest, feet and
+ * tracks crushing them at the later stages).
+ *
  * Effects (who gets hit) live in sim/kaijuEffects.ts. Timings: a phase of d seconds ends on the
  * first tick at which d has fully passed (0.45 s is 14 ticks at 30 Hz).
  *
@@ -59,9 +68,11 @@ import { LAST_STAGE } from '../../defs/stages';
 import { modMult } from '../../defs/upgrades';
 import { PI, wrapAngle } from '../../math/angle';
 import { Btn, BtnIndex, INPUT_BUFFER_TICKS, type ButtonName } from '../../net/input';
+import { dropToGround, heldCityWeapon, heldEdible, strikeVerb, updateLoose } from '../cityWeapons';
 import {
   beamTick,
   chargeTick,
+  clubEffect,
   dropHeld,
   eatFinish,
   eatStart,
@@ -176,6 +187,9 @@ function enterActive(world: World, k: Kaiju, def: KaijuKindDef, verb: KaijuVerb)
       break;
     case 'tailSweep':
       tailSweepEffect(world, k, def);
+      break;
+    case 'club':
+      clubEffect(world, k, def);
       break;
     case 'charge':
       // The run begins: nobody has been run into yet.
@@ -338,11 +352,17 @@ function startFromInput(world: World, k: Kaiju, def: KaijuKindDef, input: InputS
     return;
   }
   if (freshPress(k, input, 'strike')) {
-    // With something in the hand, Strike throws it.
-    startAction(world, k, def, k.held ? 'throw' : 'swipe', 'strike');
+    // With something in the hand, Strike throws it; a fast-food sign is swung as a club.
+    startAction(world, k, def, strikeVerb(k.held), 'strike');
     return;
   }
   if (freshPress(k, input, 'grab')) {
+    if (k.held && heldCityWeapon(k.held) !== null && !heldEdible(k.held)) {
+      // A city weapon is never eaten: Grab lets go of it, and it lies on the ground.
+      k.act.usedPress |= Btn.grab;
+      dropToGround(world, k);
+      return;
+    }
     if (k.held) {
       // With something in the hand, Grab eats it (when the last meal is far enough behind).
       if (k.cooldowns.eat <= 0) startAction(world, k, def, 'eat', 'grab');
@@ -359,10 +379,13 @@ function updateKaiju(world: World, k: Kaiju): void {
   const input = world.players[k.player].input;
   const mem = k.act;
 
+  // A power surge: cooldowns recover faster while it lasts.
+  const recover = k.surge > 0 ? DT * def.rewards.surge.cooldownRate : DT;
+  if (k.surge > 0) k.surge = k.surge - DT > TIME_EPS ? k.surge - DT : 0;
   for (const verb of VERBS) {
     if (k.cooldowns[verb] > 0) {
       // Snap to 0 so that rounding never costs an extra tick of waiting.
-      const left = k.cooldowns[verb] - DT;
+      const left = k.cooldowns[verb] - recover;
       k.cooldowns[verb] = left > TIME_EPS ? left : 0;
     }
   }
@@ -382,6 +405,14 @@ function updateKaiju(world: World, k: Kaiju): void {
     return;
   }
 
+  // A flinch (a propane tank went off in the hand): rooted until its time is up, then idle.
+  if (k.phase === 'flinch') {
+    if (k.phaseTime < k.phaseDuration - TIME_EPS) return;
+    setPhase(k, 'idle', 0);
+    k.action = 'none';
+    k.actionTime = 0;
+  }
+
   if (k.phase !== 'idle') advance(world, k, def, input);
   // In the water nothing starts until it is all the way up; then the presses it kept get one go.
   if (k.phase === 'idle' && k.submerge <= 0) {
@@ -392,6 +423,7 @@ function updateKaiju(world: World, k: Kaiju): void {
 
 export function kaijuActionSystem(world: World): void {
   const playing = world.match.phase === 'playing';
+  if (playing) updateLoose(world);
   for (const k of world.kaijus) {
     const input = world.players[k.player].input;
     // A new press of a button makes it count again. Tracked in every phase, so a press made

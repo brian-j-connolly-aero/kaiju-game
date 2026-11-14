@@ -59,6 +59,10 @@ const GLOW: Record<ProjectileTypeId, [number, number, number, number]> = {
   shell: [1, 0.85, 0.4, 5],
   arty: [1, 0.7, 0.3, 9],
   thrown: [0, 0, 0, 0],
+  // Phase 2's pick-up weapons (stand-ins until the weapons client draws them).
+  tracer: [1, 0.95, 0.5, 2],
+  missile: [1, 0.55, 0.15, 4],
+  heavyShell: [1, 0.85, 0.4, 7],
 };
 
 function payloadModel(payload: HeldObject | undefined): string {

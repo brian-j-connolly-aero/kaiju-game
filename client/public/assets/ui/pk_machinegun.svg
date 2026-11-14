@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Pick-up: machine gun. A belt-fed gun on its tripod, side view: spade grip, receiver, long thin barrel with a muzzle block, three rounds of the belt hanging under the barrel. -->
+  <rect x="11" y="14" width="23" height="14" rx="2.5" fill="currentColor" stroke="none"/>
+  <path d="M5 16V26M5 21H12"/>
+  <path d="M34 20.5H56"/>
+  <rect x="52" y="15.5" width="8" height="10" rx="2" fill="currentColor" stroke="none"/>
+  <path d="M22 29L10 56M23 29L37 56"/>
+  <path d="M41 33.5V38M49 37V41.5M57 38.5V43"/>
+</svg>

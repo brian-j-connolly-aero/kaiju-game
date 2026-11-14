@@ -36,8 +36,8 @@ function lead(world: World, ticks: number, partial: Partial<PlayerInput> = {}): 
 }
 
 /**
- * Starts a mission for the first squad between two ticks (the artillery radio of phase 2 will
- * call `startCallIn` from inside a tick) and returns the events it emitted.
+ * Starts a mission for the first squad between two ticks (the artillery radio calls
+ * `startCallIn` from inside a tick, with a charged volley) and returns the events it emitted.
  */
 function callIn(world: World, x: number, z: number): SimEvent[] {
   const before = world.events.length;
@@ -200,17 +200,14 @@ describe('the artillery call-in', () => {
   });
 });
 
-/**
- * Where a crosshair marks the ground (`resolveMarkerPoint`, sim/aim.ts): no button uses it in
- * phase 1; the artillery radio of phase 2 is meant to.
- */
+/** Where a crosshair marks the ground (`resolveMarkerPoint`, sim/aim.ts): where the artillery radio's barrage comes down. */
 describe('a ground marker placed with the crosshair', () => {
   const eye = 2.8;
   const out = { x: 0, z: 0 };
 
   it('is where the aim ray meets the ground, or the ground under a kaiju the crosshair is on, anywhere on its body', () => {
     const world = field();
-    expect(resolveMarkerPoint(world.cityQuery, world.kaijus, 0, eye, 0, 0.5, -Math.atan2(eye, 200), SQUAD_RULES.markerRange, 0, out)).toBe(true);
+    expect(resolveMarkerPoint(world.cityQuery, world.kaijus, 0, eye, 0, 0.5, -Math.atan2(eye, 200), SQUAD_RULES.markerRange, out)).toBe(true);
     expect(out.x).toBeCloseTo(Math.sin(0.5) * 200, 3);
     expect(out.z).toBeCloseTo(Math.cos(0.5) * 200, 3);
 
@@ -220,7 +217,7 @@ describe('a ground marker placed with the crosshair', () => {
       // Knees, chest, head, and the chest again well off the center line.
       for (const [frac, side] of [[0.1, 0], [0.5, 0], [0.9, 0], [0.5, 0.7 * radius]]) {
         const k = placeKaiju(world, 0, dist, 0);
-        const hit = resolveMarkerPoint(world.cityQuery, world.kaijus, 0, eye, 0, Math.atan2(side, dist), Math.atan2(height * frac - eye, dist), SQUAD_RULES.markerRange, 0, out);
+        const hit = resolveMarkerPoint(world.cityQuery, world.kaijus, 0, eye, 0, Math.atan2(side, dist), Math.atan2(height * frac - eye, dist), SQUAD_RULES.markerRange, out);
         expect(hit, `at ${dist} m, height ${frac}, side ${side}`).toBe(true);
         expect(Math.hypot(out.x - k.x, out.z - k.z)).toBeLessThanOrEqual(radius + 1e-6);
       }
@@ -233,9 +230,9 @@ describe('a ground marker placed with the crosshair', () => {
     k.known = true;
     const radius = LIZARD.stages[2].bodyRadius;
     for (const [aimYaw, aimPitch] of [[0, 0.6], [Math.atan2(1.5 * radius, 400), 0.2]]) {
-      expect(resolveMarkerPoint(world.cityQuery, world.kaijus, 0, eye, 0, aimYaw, aimPitch, SQUAD_RULES.markerRange, 0, out)).toBe(true);
+      expect(resolveMarkerPoint(world.cityQuery, world.kaijus, 0, eye, 0, aimYaw, aimPitch, SQUAD_RULES.markerRange, out)).toBe(true);
       expect([out.x, out.z]).toEqual([k.x, k.z]);
     }
-    expect(resolveMarkerPoint(world.cityQuery, world.kaijus, 0, eye, 0, 2, 0.3, SQUAD_RULES.markerRange, 0, out)).toBe(false);
+    expect(resolveMarkerPoint(world.cityQuery, world.kaijus, 0, eye, 0, 2, 0.3, SQUAD_RULES.markerRange, out)).toBe(false);
   });
 });

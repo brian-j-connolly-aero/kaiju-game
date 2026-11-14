@@ -5,11 +5,26 @@
 
 import { obbBounds, obbVsObb } from '../math/geom';
 import { hash32 } from '../math/rng';
-import { archetypeDef } from './archetypes';
-import { PROP_KIND_IDS, type CityData } from './types';
+import { archetypeDef, archetypeSpecial } from './archetypes';
+import { stageBounds } from './bounds';
+import { CITY_WEAPON_KINDS, PROP_KIND_IDS, SPECIAL_KINDS, type CityData } from './types';
+
+/** The special buildings of a start stand this far from its anchor (DESIGN.md section 7). */
+export const SPECIAL_ANCHOR_DIST: readonly [number, number] = [40, 120];
+/** Every start has at least this many of each city weapon the generator places (the mast only comes from a fallen radio mast). */
+export const START_WEAPONS_MIN = 3;
+
+export interface ValidateOptions {
+  /**
+   * Check what every starting neighborhood must hold for phase 2 (default true): one of each
+   * special building, wholly inside its stage 1 square and 40 to 120 m from the anchor, and a
+   * handful of each city weapon. The old placeholder grid has neither (pass false for it).
+   */
+  specials?: boolean;
+}
 
 /** Returns a list of problems; empty when the city is well formed. */
-export function validateCity(city: CityData): string[] {
+export function validateCity(city: CityData, options: ValidateOptions = {}): string[] {
   const problems: string[] = [];
   const half = city.half;
 
@@ -71,7 +86,43 @@ export function validateCity(city: CityData): string[] {
     if (Math.abs(a.x) > half || Math.abs(a.z) > half) problems.push(`anchor ${i}: outside the city`);
   });
   if (city.anchors.length < 8) problems.push(`only ${city.anchors.length} neighborhood anchors (need at least 8)`);
+  if (options.specials ?? true) problems.push(...validateStarts(city));
 
+  return problems;
+}
+
+/**
+ * Phase 2's promise to every start (docs/ROADMAP.md): a power substation, a gas station and a
+ * radio mast inside its stage 1 square, each 40 to 120 m from the anchor and at a different spot,
+ * and a handful of each city weapon to pick up.
+ */
+function validateStarts(city: CityData): string[] {
+  const problems: string[] = [];
+  const weapons = CITY_WEAPON_KINDS.filter((k) => k !== 'mast');
+  for (const a of city.anchors) {
+    const b1 = stageBounds(city, a.id, 1);
+    const spots: Array<{ x: number; z: number }> = [];
+    for (const kind of SPECIAL_KINDS) {
+      const here = city.structures.find((s) => {
+        if (archetypeSpecial(s.archetype) !== kind) return false;
+        const b = obbBounds(s);
+        if (b.minX < b1.minX || b.maxX > b1.maxX || b.minZ < b1.minZ || b.maxZ > b1.maxZ) return false;
+        const d = Math.hypot(s.x - a.x, s.z - a.z);
+        return d >= SPECIAL_ANCHOR_DIST[0] && d <= SPECIAL_ANCHOR_DIST[1];
+      });
+      if (!here) {
+        problems.push(`anchor ${a.id} (${a.name}): no ${kind} 40 to 120 m from it inside its stage 1 square`);
+        continue;
+      }
+      if (spots.some((p) => p.x === here.x && p.z === here.z)) problems.push(`anchor ${a.id} (${a.name}): two special buildings on one spot`);
+      spots.push({ x: here.x, z: here.z });
+    }
+    for (const kind of weapons) {
+      let n = 0;
+      for (const p of city.props) if (p.kind === kind && p.x >= b1.minX && p.x <= b1.maxX && p.z >= b1.minZ && p.z <= b1.maxZ) n++;
+      if (n < START_WEAPONS_MIN) problems.push(`anchor ${a.id} (${a.name}): only ${n} ${kind} in its stage 1 square`);
+    }
+  }
   return problems;
 }
 

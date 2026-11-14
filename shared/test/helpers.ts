@@ -38,6 +38,8 @@ export interface TestStructure {
   cls?: StructureClass;
   passable?: boolean;
   landmark?: string;
+  /** Archetype id (default house_a, or bridge_a for a passable one): a special building is 'substation_a', 'gasstation_a' or 'radiomast_a'. */
+  archetype?: string;
 }
 
 export interface TestCityOptions {
@@ -53,7 +55,7 @@ export interface TestCityOptions {
 export function makeTestCity(options: TestCityOptions = {}): BuiltCity {
   const structures: Structure[] = (options.structures ?? []).map((s, id) => ({
     id,
-    archetype: s.passable ? 'bridge_a' : 'house_a',
+    archetype: s.archetype ?? (s.passable ? 'bridge_a' : 'house_a'),
     x: s.x,
     z: s.z,
     hx: s.w / 2,
@@ -111,6 +113,8 @@ export interface TestWorldOptions extends TestCityOptions {
    * (`idleBots()`), so that a test of one rule has nothing else moving around it.
    */
   bots?: boolean;
+  /** Let supply crates come down (phase 2). By default none do, for the same reason. */
+  crates?: boolean;
   config?: Partial<MatchConfig>;
 }
 
@@ -125,6 +129,7 @@ export function makeTestWorld(options: TestWorldOptions = {}): World {
   if (people === 'human' || people === 'both') humans.push({ name: 'Hugh', role: 'human' });
   const config: MatchConfig = { ...createMatchConfig({ humans, anchor: 0 }), ...options.config };
   if (!options.bots && !config.bots) config.bots = idleBots();
+  if (config.crates === undefined) config.crates = options.crates ?? false;
   if (options.skipBriefing ?? true) config.tuning = { ...config.tuning, briefing: 0 };
   const world = createWorld({
     seed: options.seed ?? 7,

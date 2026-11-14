@@ -47,7 +47,9 @@ export type KaijuKindId = (typeof KAIJU_KIND_IDS)[number];
 /**
  * The kaiju verbs. 'none' means no action is running. These match the icon names in ASSETS.md
  * (`k_swipe`, `k_stomp`, ...). 'special' is the kind's signature attack (the Lizard's beam).
- * 'charge' and 'tailSweep' are moves a kaiju can pick at a molt (KAIJU_MOVE_IDS).
+ * 'charge' and 'tailSweep' are moves a kaiju can pick at a molt (KAIJU_MOVE_IDS). 'club' is
+ * Strike with a fast-food sign in the hand (phase 2, the city as a weapon): a big swing instead
+ * of a throw.
  */
 export const KAIJU_ACTION_IDS = [
   'none',
@@ -62,6 +64,7 @@ export const KAIJU_ACTION_IDS = [
   'molt',
   'charge',
   'tailSweep',
+  'club',
 ] as const;
 export type KaijuActionId = (typeof KAIJU_ACTION_IDS)[number];
 /** An action that can actually be performed (everything except 'none'). */
@@ -83,6 +86,8 @@ export const KAIJU_PHASES = [
   // The charge's run, and the stumble it always ends in.
   'charge',
   'stumble',
+  // A propane tank went off in its hand (phase 2): a short recoil, rooted, no action ('none').
+  'flinch',
 ] as const;
 export type KaijuPhase = (typeof KAIJU_PHASES)[number];
 
@@ -119,12 +124,34 @@ export type UnitTypeId = (typeof UNIT_TYPE_IDS)[number];
 export const WEAPON_IDS = ['army_rocket_launchers', 'army_tank_gun', 'army_troop_guns'] as const;
 export type WeaponId = (typeof WEAPON_IDS)[number];
 
-export const PROJECTILE_TYPE_IDS = ['rocket', 'shell', 'arty', 'thrown'] as const;
+/**
+ * 'tracer', 'missile' and 'heavyShell' are what the machine gun, the missile pod and the big
+ * cannon pick-ups fire (docs/ROADMAP.md, phase 2; defs/pickups.ts).
+ */
+export const PROJECTILE_TYPE_IDS = ['rocket', 'shell', 'arty', 'thrown', 'tracer', 'missile', 'heavyShell'] as const;
 export type ProjectileTypeId = (typeof PROJECTILE_TYPE_IDS)[number];
 
-/** flat: straight line, no gravity. arc: shell falling from off the map. thrown: ballistic. */
-export const FLIGHT_MODELS = ['flat', 'arc', 'thrown'] as const;
+/**
+ * flat: straight line, no gravity. arc: shell falling from off the map. thrown: ballistic.
+ * guided: the missile pod's rockets, which curve onto the aim point (a constant acceleration for
+ * a set time, then straight on; `ProjectileSpawnEvent` has the formula).
+ */
+export const FLIGHT_MODELS = ['flat', 'arc', 'thrown', 'guided'] as const;
 export type FlightModel = (typeof FLIGHT_MODELS)[number];
+
+/**
+ * Army pick-ups (docs/ROADMAP.md, phase 2): what a supply crate holds. 'none' is no pick-up.
+ * The first three replace the driven unit's own weapon (`WeaponPickupId`); the artillery radio
+ * turns the squad's next charged volleys into barrages; reinforcements act at once. Their
+ * pictures are in client/public/assets/ui (docs/ASSETS.md, section 5).
+ */
+export const PICKUP_IDS = ['none', 'machineGun', 'bigCannon', 'missilePod', 'artilleryRadio', 'reinforcements'] as const;
+export type PickupId = (typeof PICKUP_IDS)[number];
+/** What a crate can hold (every pick-up except 'none'). */
+export type PickupKind = Exclude<PickupId, 'none'>;
+/** The pick-ups that replace the driven unit's own weapon until the stage ends. */
+export const WEAPON_PICKUP_IDS = ['machineGun', 'bigCannon', 'missilePod'] as const;
+export type WeaponPickupId = (typeof WEAPON_PICKUP_IDS)[number];
 
 export const CALLIN_IDS = ['artillery'] as const;
 export type CallInId = (typeof CALLIN_IDS)[number];
@@ -153,6 +180,20 @@ export const DAMAGE_KINDS = [
   'charge',
   'tailSweep',
   'collapse',
+  // Phase 2: the pick-up weapons' shots (machine gun, missile pod, big cannon), and a building
+  // that fell over landing on what lay under it.
+  'tracer',
+  'missile',
+  'heavyShell',
+  'fall',
+  // Phase 2, the city as a weapon and the special buildings: a propane tank going off, the gas
+  // station's fireball, a thrown water tank's splash, a thrown antenna or mast (a javelin), and
+  // the fast-food sign swung as a club.
+  'propane',
+  'fireball',
+  'splash',
+  'javelin',
+  'club',
 ] as const;
 export type DamageKind = (typeof DAMAGE_KINDS)[number];
 

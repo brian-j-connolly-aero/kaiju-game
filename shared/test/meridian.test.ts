@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ARCHETYPES,
   archetypeDef,
+  archetypeSpecial,
   bridgeAt,
   buildCityIndex,
   CITY_HALF,
@@ -83,7 +84,7 @@ function inBounds(b: Bounds, x: number, z: number): boolean {
 
 describe('the game plays in Port Meridian; the placeholder is untouched', () => {
   it('is what getCity returns, and the placeholder is still what generateCity returns, to the last bit', () => {
-    expect(cityChecksum(getCity().city)).toBe(3570529651);
+    expect(cityChecksum(getCity().city)).toBe(3115597894);
     expect(cityChecksum(getCity().city)).toBe(cityChecksum(city));
     // The checksum the placeholder had before Port Meridian's archetypes were appended.
     expect(cityChecksum(generateCity())).toBe(1340881825);
@@ -93,7 +94,8 @@ describe('the game plays in Port Meridian; the placeholder is untouched', () => 
   });
 
   it('keeps the archetype list within the draw budget, append-only', () => {
-    expect(ARCHETYPES.length).toBeLessThanOrEqual(40);
+    // 48: one instanced batch per archetype and damage state (docs/CITY.md section 8).
+    expect(ARCHETYPES.length).toBeLessThanOrEqual(48);
     // The first 22 are the starter set, in their original order.
     expect(ARCHETYPES.slice(0, 22).map((a) => a.id)).toEqual([
       'house_a',
@@ -150,7 +152,7 @@ describe('Port Meridian: the data', () => {
     expect(nodes.length).toBeGreaterThan(400);
     expect(nodes.length).toBeLessThan(900);
     const used = new Set(city.structures.map((s) => s.archetype));
-    expect(used.size).toBeLessThanOrEqual(40);
+    expect(used.size).toBeLessThanOrEqual(48);
     // Every archetype appended for this city is actually used.
     for (const a of ARCHETYPES.slice(22)) expect(used.has(a.id), a.id).toBe(true);
   });
@@ -240,7 +242,8 @@ describe('Port Meridian: the data', () => {
       const b1 = stageBounds(city, a.id, 1);
       const inside = city.structures.filter((s) => inBounds(b1, s.x, s.z));
       expect(inside.length, a.name).toBeGreaterThanOrEqual(90);
-      for (const s of inside) expect(s.cls === 'house' || s.cls === 'shop', `${a.name}: ${s.archetype}`).toBe(true);
+      // Houses and shops, and the three special buildings (a hatchling wrecks each in a few swipes).
+      for (const s of inside) expect(s.cls === 'house' || s.cls === 'shop' || archetypeSpecial(s.archetype) !== null, `${a.name}: ${s.archetype}`).toBe(true);
       const props = city.props.filter((p) => inBounds(b1, p.x, p.z));
       expect(props.filter((p) => PROP_KINDS[p.kind].tally === 'car').length, a.name).toBeGreaterThanOrEqual(70);
       expect(props.filter((p) => p.kind === 'kiosk').length, a.name).toBeGreaterThanOrEqual(4);
@@ -249,6 +252,37 @@ describe('Port Meridian: the data', () => {
       expect(structureAt(q, a.x, a.z), a.name).toBe(-1);
       expect(groundKindAt(index, a.x, a.z), a.name).not.toBe('water');
     }
+  });
+});
+
+describe('Port Meridian: the special buildings and the city weapons of every start (phase 2)', () => {
+  it('gives every start a substation, a gas station and a radio mast inside its stage 1 square, 40 to 120 m out, apart', () => {
+    const kinds = ['gasstation_a', 'radiomast_a', 'substation_a'];
+    for (const a of city.anchors) {
+      const b1 = stageBounds(city, a.id, 1);
+      const mine = city.structures.filter((s) => archetypeSpecial(s.archetype) !== null && inBounds(b1, s.x, s.z));
+      expect(mine.map((s) => s.archetype).sort(), a.name).toEqual(kinds);
+      for (const s of mine) {
+        const b = obbBounds(s);
+        expect(b.minX >= b1.minX && b.maxX <= b1.maxX && b.minZ >= b1.minZ && b.maxZ <= b1.maxZ, `${a.name}: ${s.archetype} sticks out`).toBe(true);
+        const d = Math.hypot(s.x - a.x, s.z - a.z);
+        expect(d, `${a.name}: ${s.archetype}`).toBeGreaterThanOrEqual(40);
+        expect(d, `${a.name}: ${s.archetype}`).toBeLessThanOrEqual(120);
+        for (const t of mine) if (t !== s) expect(Math.hypot(s.x - t.x, s.z - t.z), a.name).toBeGreaterThan(30);
+      }
+      // A handful of each city weapon the generator places (the mast only comes from a fallen radio mast).
+      for (const kind of ['propane', 'watertank', 'antenna', 'foodsign', 'garagedoor'] as const) {
+        expect(city.props.filter((p) => p.kind === kind && inBounds(b1, p.x, p.z)).length, `${a.name}: ${kind}`).toBeGreaterThanOrEqual(4);
+      }
+    }
+    // A few elsewhere too.
+    expect(city.props.filter((p) => PROP_KINDS[p.kind].cityWeapon).length).toBeGreaterThan(city.anchors.length * 21 + 10);
+    expect(city.props.some((p) => p.kind === 'mast')).toBe(false);
+  });
+
+  it('is checked by validateCity: a start without one of its specials is reported', () => {
+    const missing = { ...city, structures: city.structures.map((s) => (s.archetype === 'gasstation_a' && Math.hypot(s.x - city.anchors[0].x, s.z - city.anchors[0].z) < 130 ? { ...s, archetype: 'shop_b', cls: 'shop' as const } : s)) };
+    expect(validateCity(missing).some((p) => p.includes(city.anchors[0].name) && p.includes('gasstation'))).toBe(true);
   });
 });
 
@@ -468,8 +502,8 @@ describe('Port Meridian: identical on every machine', () => {
     const again = generatePortMeridian(CITY_SEED);
     // The city as delivered (docs/CITY.md). Chromium computes the same two numbers. When the city
     // is changed on purpose, these change: update them here and in docs/CITY.md.
-    expect(cityChecksum(city)).toBe(3570529651);
-    expect(meridianChecksum(city)).toBe(3898350366);
+    expect(cityChecksum(city)).toBe(3115597894);
+    expect(meridianChecksum(city)).toBe(3365977326);
     expect(cityChecksum(again)).toBe(cityChecksum(city));
     expect(meridianChecksum(again)).toBe(meridianChecksum(city));
     expect(JSON.stringify(again)).toBe(JSON.stringify(city));

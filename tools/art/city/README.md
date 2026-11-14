@@ -150,6 +150,11 @@ is shared by everyone, and the kit's regions never move.
   green dome shell, the round window frame...), and a `damage_hook` for the named damage
   (a snapped spire, a bent mast) on top of the generic one.
 - **Temple Hill**: invented motifs only (tiers, upturned corners, terracotta and gold bands).
+- **Special buildings** (`tools/art/city_special.py`: substation, gas station, radio mast): a
+  building function there may return extra nodes (anchor empties such as `spark_00`, a spare
+  mesh such as the mast's `top`) and its own chunk list, for open or very thin shapes whose
+  grid cells the kit would drop as nearly empty. Their atlas pictures (`sp_*`) are in
+  `atlas_extra/special.py`, in the industry block.
 - **Tall thin things** (crane, mast, wheel): beams, few of them; leave chunks and damage to
   the kit, and check the CHUNKS cell: a lattice is cut from its `solid` parts only.
 

@@ -186,10 +186,9 @@ export const SQUAD_RULES = {
   /** How far the driven unit's aim ray reaches when it lands on nothing. */
   aimRayRange: 1500,
   /**
-   * Ground markers placed with the crosshair (`resolveMarkerPoint`, sim/aim.ts; nothing places
-   * one in phase 1, the artillery radio of phase 2 will): ground or a wall further off than this
-   * is not what the player meant, and a crosshair on the sky within this many body radii of a
-   * kaiju on the map means that kaiju.
+   * Where the artillery radio's barrage comes down (`resolveMarkerPoint`, sim/aim.ts): ground or
+   * a wall further off than this is not what the player meant, and a crosshair on the sky within
+   * this many body radii of a kaiju on the map means that kaiju.
    */
   markerRange: 1500,
   markerSnapRadii: 2,

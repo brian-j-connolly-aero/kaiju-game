@@ -1,5 +1,5 @@
 /**
- * System 8 of 11: damage and nerve. One rule set for every combatant (DESIGN.md section 3).
+ * System 9 of 12: damage and nerve. One rule set for every combatant (DESIGN.md section 3).
  *
  * `applyHit` is the single door all damage goes through. Systems queue hits in `world.hits`
  * during the tick and this system drains them; code that needs the result at once (a grab
@@ -43,6 +43,7 @@ import { angleDist, yawOf } from '../../math/angle';
 import type { Vec2 } from '../../math/vec';
 import type { PlayerId } from '../config';
 import type { HitFacing } from '../events';
+import { shieldTakes } from '../cityWeapons';
 import { kaijuSwimming } from '../swim';
 import type { CombatantRef, Hit, Kaiju, Unit, World } from '../types';
 import { emit } from '../worldOps';
@@ -55,7 +56,25 @@ const ANGLE_EPS = 1e-9;
 const VALUE_EPS = 1e-9;
 
 /** Damage kinds that come from a kaiju's own body; everything else is weapon fire from a unit. */
-const KAIJU_DAMAGE_KINDS: readonly DamageKind[] = ['swipe', 'stomp', 'thrown', 'beam', 'trample', 'wade', 'roar', 'blast', 'charge', 'tailSweep', 'collapse'];
+const KAIJU_DAMAGE_KINDS: readonly DamageKind[] = [
+  'swipe',
+  'stomp',
+  'thrown',
+  'beam',
+  'trample',
+  'wade',
+  'roar',
+  'blast',
+  'charge',
+  'tailSweep',
+  'collapse',
+  // Phase 2: what the city does when the kaiju uses it (sim/cityWeapons.ts, systems/specials.ts).
+  'propane',
+  'fireball',
+  'splash',
+  'javelin',
+  'club',
+];
 /** Damage dealt a little every tick; its hit events are thinned out. */
 const CONTINUOUS_KINDS: readonly DamageKind[] = ['beam', 'trample', 'wade'];
 
@@ -201,6 +220,8 @@ function killKaiju(k: Kaiju): void {
 
 function hitKaiju(world: World, k: Kaiju, hit: Hit): void {
   if (!k.alive) return;
+  // A garage door held as a shield takes a hit from the front instead (sim/cityWeapons.ts).
+  if (shieldTakes(world, k, hit)) return;
   const def = kaijuKindDef(k.kind);
   const profile = def.damage;
   const directional = hasDirection(hit.fromDir);
@@ -233,7 +254,8 @@ function hitKaiju(world: World, k: Kaiju, hit: Hit): void {
     if (crossedWith >= 0) nerve *= COMBAT_RULES.crossfireNerveMult;
   }
 
-  const damage = Math.max(0, hit.damage) * stateMult * facingMult * modMult(k.mods, 'damageTaken');
+  // An exact hit (its own propane tank going off in its hand) is what it says, whatever the state or the side.
+  const damage = Math.max(0, hit.damage) * (hit.exact ? 1 : stateMult * facingMult) * modMult(k.mods, 'damageTaken');
   const lost = Math.min(k.hp, damage);
   if (lost > 0) {
     k.hp -= lost;
@@ -380,17 +402,18 @@ function hitUnit(world: World, u: Unit, hit: Hit): void {
   }
   if (hit.resetsCharge) u.charge = 0;
   // roar stun: frozen for a moment; the shaking the same roar brings waits until it is over.
-  if (hit.stun !== undefined && hit.stun > 0) stunUnit(world, u, hit.stun);
+  if (hit.stun !== undefined && hit.stun > 0) stunUnit(world, u, hit.stun, hit.knockdown === true);
   if (hit.nerve > 0) addUnitNerve(world, u, hit.nerve * modMult(mods, 'nerveTaken'), hit.player);
 }
 
 /** A roar's stun (DESIGN.md section 4): it cannot move or fire, and its charge is gone. A longer stun is not cut shorter. */
-function stunUnit(world: World, u: Unit, seconds: number): void {
+function stunUnit(world: World, u: Unit, seconds: number, knockdown: boolean): void {
   u.stun = Math.max(u.stun, seconds);
   u.charge = 0;
   // Its laser goes out with the charge (the orders system lets go of its plant).
   if (u.state === 'charging') u.state = 'idle';
-  emit(world, { type: 'unitStunned', unit: u.id, duration: seconds });
+  // Knocked over (a water tank's splash, a garage door) is the same freeze, drawn lying flat.
+  emit(world, { type: 'unitStunned', unit: u.id, duration: seconds, ...(knockdown ? { knockdown: true } : {}) });
 }
 
 // ---------------------------------------------------------------------------------------------

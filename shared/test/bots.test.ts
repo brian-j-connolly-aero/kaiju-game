@@ -208,8 +208,9 @@ describe('the squad bot', () => {
     // They went looking (toward the middle of the bounds first, then around).
     leaders(world).forEach((u, i) => expect(Math.hypot(u.x - start[i].x, u.z - start[i].z)).toBeGreaterThan(40));
 
-    // A wall comes down: now they see it, and they engage.
-    world.structureHp[0] = 0;
+    // It steps out of its pen: now they see it, and they engage. (Bringing a wall down would not
+    // do: its rubble, half as high, still hides a hatchling.)
+    placeKaiju(world, 0, 60, 0);
     const later = run(world, 40 * SEC);
     expect(k.known).toBe(true);
     expect(eventsOf(later, 'volley').length).toBeGreaterThan(0);

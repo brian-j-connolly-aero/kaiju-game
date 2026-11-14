@@ -29,8 +29,10 @@
  * Everything it knows it reads from the World; everything it does goes into `player.botInput`.
  */
 
+import { archetypeSpecial } from '../../city/archetypes';
 import { PROP_KINDS } from '../../city/props';
 import { castSegment, distToStructure, lineOfSight, propsInCircle, structuresInCircle } from '../../city/spatialIndex';
+import type { CityData, PropKindId, SpecialKind } from '../../city/types';
 import { BOT_RULES } from '../../defs/bots';
 import { perStage, type KaijuVerb, type StageId } from '../../defs/ids';
 import { kaijuKindDef, kaijuMoveSlot, kaijuStageDef } from '../../defs/kaiju/index';
@@ -46,6 +48,7 @@ import { rngRange, rngWeightedIndex } from '../../math/rng';
 import { clamp, lerp } from '../../math/scalar';
 import type { Vec3 } from '../../math/vec';
 import { Btn, MAX_AIM_PITCH, type PlayerInput } from '../../net/input';
+import { heldCityWeapon } from '../cityWeapons';
 import { findEdible, findGrabTarget } from '../kaijuEffects';
 import { laserOnKaiju } from '../squads';
 import { unitSeesKaiju } from '../spotting';
@@ -117,6 +120,46 @@ function lookAtSquads(world: World, k: Kaiju, bs: BotState): void {
   bs.exposed = exposed;
 }
 
+/** Which special building each structure is (null for the rest), worked out once per city. */
+const specialCache = new WeakMap<CityData, ReadonlyArray<SpecialKind | null>>();
+function specialsOf(city: CityData): ReadonlyArray<SpecialKind | null> {
+  let list = specialCache.get(city);
+  if (!list) {
+    list = city.structures.map((s) => archetypeSpecial(s.archetype));
+    specialCache.set(city, list);
+  }
+  return list;
+}
+
+/** Whether a move it has picked is cooling down (or its beam waits for rage): the moment for a power surge. */
+function movesCooling(k: Kaiju, def: KaijuKindDef): boolean {
+  for (const move of k.moves) {
+    if (move === 'none') continue;
+    const verb: KaijuVerb = move === 'beam' ? 'special' : move;
+    if (k.cooldowns[verb] > 0) return true;
+    if (verb === 'special' && k.rage < def.actions.special.rageCost) return true;
+  }
+  return false;
+}
+
+/**
+ * How much more a special building is worth to wreck right now (BOT_RULES.kaiju): the gas station
+ * a lot while units stand in its fireball, anything special a fair bit while no unit is close by,
+ * the substation the most then if its moves are cooling down.
+ */
+function specialGain(world: World, def: KaijuKindDef, x: number, z: number, special: SpecialKind, calm: boolean, cooling: boolean): number {
+  if (special === 'gasstation') {
+    const reach = def.rewards.fireball.radius;
+    for (const u of world.units) {
+      if (!u.alive) continue;
+      const d = Math.hypot(u.x - x, u.z - z) - u.radius;
+      if (d < reach) return R.gasGain;
+    }
+  }
+  if (!calm) return 1;
+  return special === 'substation' && cooling ? R.substationGain : R.specialGain;
+}
+
 /** Picks what to wreck next: the structure or prop with the best value for the time it costs. */
 function chooseWreckGoal(world: World, k: Kaiju, bs: BotState): void {
   const def = kaijuKindDef(k.kind);
@@ -129,6 +172,11 @@ function chooseWreckGoal(world: World, k: Kaiju, bs: BotState): void {
   let best = -1;
   let bestScore = 0;
   let currentScore = 0;
+  // The special buildings (phase 2): milestones between fights.
+  const specials = specialsOf(world.city);
+  const specialReach = perStage(R.specialReach, k.stage);
+  const calm = nearestUnit(world, k).dist >= perStage(R.specialCalm, k.stage);
+  const cooling = movesCooling(k, def);
   for (const s of world.city.structures) {
     const hp = world.structureHp[s.id];
     if (hp <= 0 || s.id === bs.avoidId) continue;
@@ -138,7 +186,9 @@ function chooseWreckGoal(world: World, k: Kaiju, bs: BotState): void {
     const dist = distToStructure(index, s.id, k.x, k.z);
     // What it tramples it must walk through; what it hits it only has to reach.
     const travel = (kill === 0 ? dist + Math.min(s.hx, s.hz) : Math.max(0, dist - k.radius)) / speed;
-    const score = (s.value * hp) / s.hp / (travel + kill + R.travelBias);
+    let score = (s.value * hp) / s.hp / (travel + kill + R.travelBias);
+    const special = specials[s.id];
+    if (special !== null && dist <= specialReach) score *= specialGain(world, def, s.x, s.z, special, calm, cooling);
     if (bs.goal === 'structure' && s.id === bs.goalId) currentScore = score;
     if (score > bestScore) {
       bestScore = score;
@@ -656,6 +706,296 @@ function beamUnit(world: World, k: Kaiju, st: KaijuStageDef, range: number, nx: 
   return best;
 }
 
+// ---------------------------------------------------------------------------------------------
+// The city as a weapon (phase 2, while it is small; sim/cityWeapons.ts)
+// ---------------------------------------------------------------------------------------------
+
+/** Whether Strike hits with the hand: it holds nothing, or a fast-food sign (the club, which wrecks like a swipe, harder). */
+function handFree(k: Kaiju): boolean {
+  return !k.held || heldCityWeapon(k.held) === 'foodsign';
+}
+
+/** Turns a heading to walk along and a throttle into the stick, relative to the view along `aimYaw`. */
+function drive(input: PlayerInput, aimYaw: number, moveYaw: number, throttle: number): void {
+  if (throttle <= 0) return;
+  const s = Math.sin(aimYaw);
+  const c = Math.cos(aimYaw);
+  const dx = Math.sin(moveYaw);
+  const dz = Math.cos(moveYaw);
+  input.moveZ = (dx * s + dz * c) * throttle;
+  input.moveX = (-dx * c + dz * s) * throttle;
+}
+
+const group = { unit: null as Unit | null, count: 0 };
+
+/**
+ * The unit to throw a burst at within `range`: the one with the most others standing round it
+ * (BOT_RULES.kaiju.groupRadius; a group), the nearest of those.
+ */
+function groupTarget(world: World, k: Kaiju, range: number): { unit: Unit | null; count: number } {
+  group.unit = null;
+  group.count = 0;
+  let bestD = Infinity;
+  for (const u of world.units) {
+    if (!u.alive || u.y > 0) continue;
+    const d = Math.hypot(u.x - k.x, u.z - k.z);
+    if (d > range) continue;
+    let count = 0;
+    for (const o of world.units) {
+      if (o !== u && o.alive && Math.hypot(o.x - u.x, o.z - u.z) <= R.groupRadius) count++;
+    }
+    if (count > group.count || (count === group.count && d < bestD)) {
+      group.unit = u;
+      group.count = count;
+      bestD = d;
+    }
+  }
+  return group;
+}
+
+/**
+ * A unit for a javelin within `range`, with nothing standing between the hand and it: the one with
+ * the most units close to the line to it (the javelin runs them through), the nearest of those.
+ */
+function javelinTarget(world: World, k: Kaiju, st: KaijuStageDef, range: number): Unit | null {
+  let best: Unit | null = null;
+  let bestCount = -1;
+  let bestD = Infinity;
+  eye.y = st.handHeight;
+  for (const u of world.units) {
+    if (!u.alive || u.y > 0) continue;
+    const dx = u.x - k.x;
+    const dz = u.z - k.z;
+    const d = Math.hypot(dx, dz);
+    if (d > range || d < k.radius * 2) continue;
+    eye.x = k.x + (dx / d) * k.radius;
+    eye.z = k.z + (dz / d) * k.radius;
+    mark.x = u.x;
+    mark.y = 1;
+    mark.z = u.z;
+    if (castSegment(world.cityQuery, eye, mark)) continue;
+    let count = 0;
+    for (const o of world.units) {
+      if (!o.alive || o === u) continue;
+      // Along the line, before the target or a little past it, and close to it.
+      const along = ((o.x - k.x) * dx + (o.z - k.z) * dz) / d;
+      if (along < k.radius || along > d + 10) continue;
+      const off = Math.abs((o.x - k.x) * dz - (o.z - k.z) * dx) / d;
+      if (off <= o.radius + 1.5) count++;
+    }
+    if (count > bestCount || (count === bestCount && d < bestD)) {
+      best = u;
+      bestCount = count;
+      bestD = d;
+    }
+  }
+  return best;
+}
+
+/** Where the city weapon it is going for stands (and how big it is), or null when it is gone. */
+function weaponSpot(world: World, bs: BotState): { x: number; z: number; r: number } | null {
+  if (bs.weaponId < 0) return null;
+  if (bs.weaponLoose) {
+    const o = world.loose[bs.weaponId];
+    return o && o.state === 'down' ? { x: o.x, z: o.z, r: PROP_KINDS[o.kind].radius } : null;
+  }
+  if (propGone(world, bs.weaponId)) return null;
+  const index = world.cityIndex;
+  return { x: index.px[bs.weaponId], z: index.pz[bs.weaponId], r: index.pradius[bs.weaponId] };
+}
+
+/**
+ * Picks the city weapon within reach of a short walk that suits the moment (BOT_RULES.kaiju):
+ * a propane or water tank for units in throwing range (better a group), an antenna or the mast
+ * for a squad farther off, the fast-food sign for units close by, the garage door when guns are
+ * on it and it has ground to cover. Returns whether it found one.
+ */
+function chooseCityWeapon(world: World, k: Kaiju, bs: BotState, def: KaijuKindDef, near: { unit: Unit | null; dist: number }): boolean {
+  const w = def.cityWeapons;
+  const g = projectileTypeDef('thrown').gravity;
+  const burstRange = ((w.propane.speed * w.propane.speed) / g) * R.throwRange;
+  const t = groupTarget(world, k, burstRange);
+  const groupThere = t.unit !== null && t.count + 1 >= R.groupUnits;
+  const melee = R.meleeRadii * k.radius + R.meleeMargin;
+  const far = near.dist > melee && near.dist <= w.antenna.range * 0.85;
+  const underFire = bs.lasers > 0 || bs.exposed;
+  let best = 0;
+  let bestId = -1;
+  let bestLoose = false;
+  const consider = (kind: PropKindId, x: number, z: number, r: number, id: number, loose: boolean): void => {
+    let want = 0;
+    if (kind === 'propane') want = t.unit ? (groupThere ? 6 : 3) : 0;
+    else if (kind === 'watertank') want = t.unit ? (groupThere ? 5 : 2.5) : 0;
+    else if (kind === 'antenna') want = far ? 4 : 0;
+    else if (kind === 'mast') want = far ? 7 : 0;
+    else if (kind === 'foodsign') want = near.dist < 45 ? 5 : 0;
+    else if (kind === 'garagedoor') want = underFire && near.dist > R.doorThrowAt ? 4 : 0;
+    if (want <= 0) return;
+    const d = Math.max(0, Math.hypot(x - k.x, z - k.z) - r);
+    if (d > R.weaponWalk) return;
+    const score = want / (1 + d / 10);
+    if (score > best) {
+      best = score;
+      bestId = id;
+      bestLoose = loose;
+    }
+  };
+  const index = world.cityIndex;
+  propsInCircle(world.cityQuery, k.x, k.z, R.weaponWalk + 5, propIds);
+  for (const id of propIds) {
+    const kind = world.city.props[id].kind;
+    if (PROP_KINDS[kind].cityWeapon) consider(kind, index.px[id], index.pz[id], index.pradius[id], id, false);
+  }
+  for (const o of world.loose) if (o.state === 'down') consider(o.kind, o.x, o.z, PROP_KINDS[o.kind].radius, o.id, true);
+  if (bestId < 0) return false;
+  bs.weaponId = bestId;
+  bs.weaponLoose = bestLoose;
+  bs.weaponFor = 0;
+  return true;
+}
+
+/**
+ * The city as a weapon, while it is small (BOT_RULES.kaiju; sim/cityWeapons.ts). With one in the
+ * hand it uses it (`useCityWeapon`); with an empty hand, squads about and none of them within its
+ * swipe, it walks to the one that suits the moment and picks it up. Returns whether it took the
+ * controls this tick (the rest of the bot then leaves them alone).
+ */
+function cityWeaponPlay(
+  world: World,
+  k: Kaiju,
+  bs: BotState,
+  def: KaijuKindDef,
+  st: KaijuStageDef,
+  near: { unit: Unit | null; dist: number },
+  input: PlayerInput,
+  hurt: boolean,
+): boolean {
+  if (bs.weaponRest > 0) bs.weaponRest -= DT;
+  const held = heldCityWeapon(k.held);
+  if (held !== null) {
+    bs.weaponId = -1;
+    return useCityWeapon(world, k, bs, def, st, near, input, held);
+  }
+  const swipeReach = def.actions.swipe.reach * k.radius;
+  const quiet = !near.unit || near.dist > R.weaponWant || near.dist <= swipeReach;
+  if (k.held || k.stage > def.cityWeapons.grabStage || quiet || (hurt && k.cooldowns.eat <= 0)) {
+    bs.weaponId = -1;
+    return false;
+  }
+  if (bs.weaponId < 0 && (bs.weaponRest > 0 || !chooseCityWeapon(world, k, bs, def, near))) return false;
+  const at = weaponSpot(world, bs);
+  bs.weaponFor += DT;
+  if (!at || bs.weaponFor > R.weaponGiveUp) {
+    // Gone, or it cannot get at it: back to work for a while.
+    if (at) bs.weaponRest = R.weaponRest;
+    bs.weaponId = -1;
+    return false;
+  }
+  const grab = def.actions.grab;
+  const reach = grab.reach * k.radius;
+  const d = Math.max(0, Math.hypot(at.x - k.x, at.z - k.z) - at.r);
+  const yaw = yawFromTo(k.x, k.z, at.x, at.z);
+  let moveYaw = yaw;
+  let throttle = 0;
+  if (d > reach * 0.6) {
+    moveYaw = steer(world, k, bs, at.x, at.z, -1);
+    throttle = 1;
+  }
+  if (d <= reach * 0.85 && canAct(k) && angleDist(k.aimYaw, yaw) < grab.arc * 0.3) press(bs, 'grab', TAP_TICKS, 8);
+  // A house in the way is smashed, as on the way to anything else (it stands in a yard).
+  else if (throttle > 0 && canAct(k) && wallAhead(world, k, st, moveYaw) >= 0) strike(world, k, bs, def, st, k.aimYaw);
+  input.aimYaw = yaw;
+  input.aimPitch = 0;
+  drive(input, yaw, moveYaw, throttle);
+  input.buttons = heldButtons(bs);
+  return true;
+}
+
+/**
+ * Uses the city weapon in the hand: a propane or water tank thrown at a group in range, a
+ * javelin at the squad it lines up best (run through), the club swung at the units in reach,
+ * the garage door carried into the guns and thrown once a unit is close or the door is nearly
+ * gone. Walks toward the squads while none is in range; with no squad about it lets the thing
+ * drop (the club it keeps: it wrecks with it). Returns whether it took the controls.
+ */
+function useCityWeapon(
+  world: World,
+  k: Kaiju,
+  bs: BotState,
+  def: KaijuKindDef,
+  st: KaijuStageDef,
+  near: { unit: Unit | null; dist: number },
+  input: PlayerInput,
+  kind: PropKindId,
+): boolean {
+  const w = def.cityWeapons;
+  const g = projectileTypeDef('thrown').gravity;
+  let aimYaw = k.aimYaw;
+  let aimPitch = 0;
+  let moveYaw = aimYaw;
+  let throttle = 0;
+  let throwAt: Unit | null = null;
+  let throwHeight = 0;
+  const approach = (u: Unit): void => {
+    aimYaw = yawFromTo(k.x, k.z, u.x, u.z);
+    moveYaw = steer(world, k, bs, u.x, u.z, -1);
+    throttle = 1;
+  };
+  if (kind === 'foodsign') {
+    // The club: on the units close by; with none, it wrecks with it (the wreck flow strikes with it).
+    if (!near.unit || near.dist > 60) return false;
+    const u = near.unit;
+    const club = def.actions.club;
+    const reach = club.reach * k.radius;
+    aimYaw = yawFromTo(k.x, k.z, u.x + u.vx * 0.3, u.z + u.vz * 0.3);
+    if (near.dist > reach * 0.6) {
+      moveYaw = steer(world, k, bs, u.x, u.z, -1);
+      throttle = 1;
+    }
+    if (near.dist <= reach * 0.95 && canAct(k) && angleDist(k.aimYaw, aimYaw) < club.arc * 0.4) press(bs, 'strike', TAP_TICKS, 6);
+  } else if (kind === 'propane' || kind === 'watertank') {
+    const b = kind === 'propane' ? w.propane : w.watertank;
+    const t = groupTarget(world, k, ((b.speed * b.speed) / g) * R.throwRange);
+    if (t.unit) throwAt = t.unit;
+    else if (near.unit && near.dist < 160) approach(near.unit);
+  } else if (kind === 'antenna' || kind === 'mast') {
+    const u = javelinTarget(world, k, st, (kind === 'mast' ? w.mast : w.antenna).range * 0.85);
+    if (u) {
+      throwAt = u;
+      throwHeight = 1;
+    } else if (near.unit && near.dist < 200) approach(near.unit);
+  } else if (kind === 'garagedoor') {
+    const frisbee = w.garagedoor.throw.range * 0.8;
+    const worn = k.shieldHp < w.garagedoor.hp * R.doorLow;
+    if (near.unit && near.dist <= frisbee && (near.dist <= R.doorThrowAt || worn)) throwAt = near.unit;
+    // Carried into the guns, facing them: it takes their fire.
+    else if (near.unit && near.dist < 200) approach(near.unit);
+  }
+  if (throwAt) {
+    const u = throwAt;
+    const d = Math.hypot(u.x - k.x, u.z - k.z);
+    // Where it will be when the throw gets there (roughly: the throw is fast and short).
+    const lead = Math.min(1.5, d / 30);
+    const tx = u.x + u.vx * lead;
+    const tz = u.z + u.vz * lead;
+    aimYaw = yawFromTo(k.x, k.z, tx, tz);
+    aimPitch = pitchTo(st.eyeHeight, throwHeight, Math.hypot(tx - k.x, tz - k.z) - st.eyeForward);
+    if (canAct(k) && angleDist(aimYaw, k.yaw) <= FACE_ANGLE && angleDist(k.aimYaw, aimYaw) < 0.1) press(bs, 'strike', TAP_TICKS, 6);
+  } else if (throttle === 0 && kind !== 'foodsign') {
+    // Nobody about to use it on: it lets go of it (it lies there for later) and goes back to work.
+    if (canAct(k)) press(bs, 'grab', TAP_TICKS, 8);
+  } else if (throttle > 0 && canAct(k) && wallAhead(world, k, st, moveYaw) >= 0) {
+    // A house in the way: the club smashes it; with anything else in the hand, a stomp does.
+    if (kind === 'foodsign') strike(world, k, bs, def, st, k.aimYaw);
+    else press(bs, 'stomp', TAP_TICKS);
+  }
+  input.aimYaw = aimYaw;
+  input.aimPitch = aimPitch;
+  drive(input, aimYaw, moveYaw, throttle);
+  input.buttons = heldButtons(bs);
+  return true;
+}
+
 export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
   const input = beginBotInput(world, p);
   const bs = p.botState;
@@ -786,7 +1126,7 @@ export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
     input.moveZ = 1;
     // On the way it smashes what it does not walk round (steer leaves that to it), as it does
     // when wrecking: a hatchling used to lean on a house for the whole search.
-    if (!k.held && !st.wadesTall && canAct(k) && wallAhead(world, k, st, moveYaw) >= 0) strike(world, k, bs, def, st, k.aimYaw);
+    if (handFree(k) && !st.wadesTall && canAct(k) && wallAhead(world, k, st, moveYaw) >= 0) strike(world, k, bs, def, st, k.aimYaw);
     input.buttons = heldButtons(bs);
     watchProgress(k, bs, true);
     return;
@@ -805,7 +1145,7 @@ export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
     // Short of deep water, keep going (the bank may stand between it and the point).
     if (input.moveZ === 0 && !canSwimAt(world.cityQuery, k, k.x, k.z)) input.moveZ = 1;
     // On the way to the water it smashes what it does not walk round, as when it hides.
-    if (k.submerge <= 0 && !k.held && !st.wadesTall && canAct(k) && wallAhead(world, k, st, moveYaw) >= 0) strike(world, k, bs, def, st, k.aimYaw);
+    if (k.submerge <= 0 && handFree(k) && !st.wadesTall && canAct(k) && wallAhead(world, k, st, moveYaw) >= 0) strike(world, k, bs, def, st, k.aimYaw);
     input.buttons = heldButtons(bs);
     return;
   }
@@ -853,11 +1193,15 @@ export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
     if (behind >= R.sweepUnits) press(bs, sweepButton, TAP_TICKS, 10);
   }
 
-  // --- Something in the hand: throw it at a squad, or eat it when hurt ------------------------
+  // --- The city as a weapon (while it is small): one picked up when squads are about, and used ---
   const hurt = k.hp < k.maxHp * R.eatBelow;
+  if (cityWeaponPlay(world, k, bs, def, st, near, input, hurt)) return;
+
+  // --- Something in the hand: throw it at a squad, or eat it when hurt ------------------------
+  // (Not a city weapon: those are never eaten, and are used above or swung as a club below.)
   const throwSpeed = perStage(a.throw.speed, k.stage);
   const throwReach = ((throwSpeed * throwSpeed) / projectileTypeDef('thrown').gravity) * R.throwRange;
-  if (k.held) {
+  if (k.held && heldCityWeapon(k.held) === null) {
     if (hurt && k.cooldowns.eat <= 0) {
       // Grab with something in the hand eats it.
       if (canAct(k)) press(bs, 'grab', TAP_TICKS, 6);
@@ -972,7 +1316,7 @@ export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
     moveYaw = steer(world, k, bs, u.x, u.z, -1);
     throttle = 1;
     if (!facing) aimYaw = foeDist < a.swipe.reach * k.radius ? yaw : moveYaw;
-    if (!k.held) strike(world, k, bs, def, st, k.aimYaw);
+    if (handFree(k)) strike(world, k, bs, def, st, k.aimYaw);
   } else {
     // --- Food, when hurt -----------------------------------------------------------------------
     let eating = false;
@@ -999,7 +1343,7 @@ export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
           facing = true;
           // A wall between it and the meal is smashed, as on the way to anything else (it
           // could otherwise lean on a house for the rest of the match, the meal beyond it).
-          if (throttle > 0 && !k.held && !st.wadesTall && canAct(k) && wallAhead(world, k, st, moveYaw) >= 0) strike(world, k, bs, def, st, k.aimYaw);
+          if (throttle > 0 && handFree(k) && !st.wadesTall && canAct(k) && wallAhead(world, k, st, moveYaw) >= 0) strike(world, k, bs, def, st, k.aimYaw);
         }
       }
     }
@@ -1023,7 +1367,7 @@ export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
           const inReach = dist <= reach;
           throttle = inReach && !st.wadesTall ? 0 : 1;
           if (!facing) aimYaw = inReach ? yaw : moveYaw;
-          if (inReach && !k.held) strike(world, k, bs, def, st, k.aimYaw);
+          if (inReach && handFree(k)) strike(world, k, bs, def, st, k.aimYaw);
         }
       } else {
         moveYaw = steer(world, k, bs, bs.goalX, bs.goalZ, -1);
@@ -1031,7 +1375,7 @@ export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
         if (!facing) aimYaw = moveYaw;
       }
       // Whatever stands in the way and can be smashed, is (a wading titan just pushes through).
-      if (throttle > 0 && !k.held && !st.wadesTall && canAct(k) && wallAhead(world, k, st, moveYaw) >= 0) {
+      if (throttle > 0 && handFree(k) && !st.wadesTall && canAct(k) && wallAhead(world, k, st, moveYaw) >= 0) {
         if (!facing) aimYaw = moveYaw;
         strike(world, k, bs, def, st, k.aimYaw);
       }

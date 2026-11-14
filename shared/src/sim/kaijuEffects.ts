@@ -8,6 +8,11 @@
  * or one vehicle of a unit (through `applyHit`).
  *
  * All reach numbers are in body radii of the current stage and come from the kind's definitions.
+ *
+ * Phase 2: a power surge (sim/systems/specials.ts) multiplies the damage of every attack here to
+ * units and structures (`attackMult`); the city weapons the hatchling picks up are in
+ * sim/cityWeapons.ts, and this file grabs them, throws them and swings the fast-food sign (the
+ * club).
  */
 
 import { PROP_KINDS } from '../city/props';
@@ -17,6 +22,7 @@ import { perStage } from '../defs/ids';
 import { kaijuStageDef } from '../defs/kaiju/index';
 import { DT } from '../defs/rules';
 import type { BeamSpecialDef, ChargeActionDef, KaijuKindDef } from '../defs/schema';
+import { kaijuKindDef } from '../defs/kaiju/index';
 import { unitTypeDef } from '../defs/units';
 import { hasModFlag, modMult } from '../defs/upgrades';
 import { projectileTypeDef } from '../defs/weapons';
@@ -26,6 +32,7 @@ import { circleInArc, obbInArc } from '../math/geom';
 import { lerp } from '../math/scalar';
 import { createAimPoint, kaijuEyePoint, resolveAimPoint } from './aim';
 import { beamPath, beamTouches, createBeamPath } from './beam';
+import { armHeld, canPickUp, cityThrow, emptyHand, HAND_FORWARD, heldCityWeapon, heldEdible, sparedByKaiju, takeLoose } from './cityWeapons';
 import type { HeldObject, HeldSource } from './events';
 import { noteKaijuNoise } from './spotting';
 import { takeProp, takePropWreck } from './systems/cityDamage';
@@ -35,8 +42,6 @@ import { kaijuShownHeight, kaijuShownRadius } from './swim';
 import type { Hit, Kaiju, Unit, World } from './types';
 import { emit } from './worldOps';
 
-/** How far in front of the body center the hand releases a thrown object, in body radii. */
-const HAND_FORWARD = 0.6;
 /** Props within this margin of the beam's end are burnt with whatever it hit, when it ends this low. */
 const BEAM_PROP_MARGIN = 1;
 const BEAM_PROP_HEIGHT = 10;
@@ -63,6 +68,19 @@ function kaijuHit(k: Kaiju, tx: number, tz: number, damage: number, nerve: numbe
     kind,
     atWill: false,
   };
+}
+
+/**
+ * What a kaiju's attacks are multiplied by, to units or to structures: its mods, times the power
+ * surge's `damageMult` while one lasts (a power substation wrecked, sim/systems/specials.ts).
+ */
+export function attackMult(k: Kaiju, key: 'unitDamage' | 'structureDamage'): number {
+  return modMult(k.mods, key) * surgeMult(k);
+}
+
+/** The power surge's damage multiplier while one lasts, else 1. */
+export function surgeMult(k: Kaiju): number {
+  return k.surge > 0 ? kaijuKindDef(k.kind).rewards.surge.damageMult : 1;
 }
 
 /**
@@ -103,15 +121,17 @@ interface ArcBlow {
 
 const blow: ArcBlow = { yaw: 0, half: 0, range: 0, unitDamage: 0, unitNerve: 0, structureDamage: 0, cause: 'swipe', knockback: 0 };
 
-/** Everything touching the arc takes the blow once: units (knocked back if the blow says so), other kaiju, structures, props. */
-function arcStrike(world: World, k: Kaiju, b: ArcBlow): void {
+/** Everything touching the arc takes the blow once: units (knocked back if the blow says so), other kaiju, structures, props. Returns how many units it hit. */
+function arcStrike(world: World, k: Kaiju, b: ArcBlow): number {
   const { yaw, half, range } = b;
-  const unitDamage = b.unitDamage * modMult(k.mods, 'unitDamage');
+  const unitDamage = b.unitDamage * attackMult(k, 'unitDamage');
   const unitNerve = b.unitNerve * modMult(k.mods, 'nerveDamage');
-  const structureDamage = b.structureDamage * modMult(k.mods, 'structureDamage');
+  const structureDamage = b.structureDamage * attackMult(k, 'structureDamage');
+  let units = 0;
 
   for (const u of world.units) {
     if (!inReachOfBody(k, u) || !circleInArc(u.x, u.z, u.radius, k.x, k.z, yaw, half, range)) continue;
+    units++;
     world.hits.push({ target: { entity: 'unit', id: u.id }, hit: kaijuHit(k, u.x, u.z, unitDamage, unitNerve, b.cause) });
     if (b.knockback > 0) {
       const dx = u.x - k.x;
@@ -136,8 +156,11 @@ function arcStrike(world: World, k: Kaiju, b: ArcBlow): void {
   propsInCircle(world.cityQuery, k.x, k.z, range, ids);
   for (const id of ids) {
     if (!circleInArc(index.px[id], index.pz[id], index.pradius[id], k.x, k.z, yaw, half, range)) continue;
+    // The city weapons it can still pick up are pushed aside, not wrecked (sim/cityWeapons.ts).
+    if (sparedByKaiju(world, k, id)) continue;
     world.propHits.push({ id, by: k.player, cause: b.cause });
   }
+  return units;
 }
 
 /** The swipe's own arc, along `yaw`. */
@@ -179,13 +202,39 @@ export function tailSweepEffect(world: World, k: Kaiju, def: KaijuKindDef): void
   noteKaijuNoise(k);
 }
 
+/**
+ * The club (Strike with a fast-food sign in the hand): a big swing over a wide arc in front of the
+ * head, units hit hard and thrown back, buildings taking twice a swipe. One swing less on the
+ * sign; after its last it breaks and the hand is empty.
+ */
+export function clubEffect(world: World, k: Kaiju, def: KaijuKindDef): void {
+  if (heldCityWeapon(k.held) !== 'foodsign') return;
+  const a = def.actions.club;
+  blow.yaw = k.actionYaw;
+  blow.half = a.arc / 2;
+  blow.range = a.reach * k.radius;
+  blow.unitDamage = a.unitDamage;
+  blow.unitNerve = a.unitNerve;
+  blow.structureDamage = perStage(a.structureDamage, k.stage);
+  blow.cause = 'club';
+  blow.knockback = a.knockback;
+  const units = arcStrike(world, k, blow);
+  k.clubSwings = Math.max(0, k.clubSwings - 1);
+  emit(world, { type: 'clubSwing', kaiju: k.id, x: k.x, z: k.z, yaw: k.actionYaw, arc: a.arc, reach: blow.range, units, swingsLeft: k.clubSwings });
+  noteKaijuNoise(k);
+  if (k.clubSwings > 0) return;
+  emptyHand(k);
+  emit(world, { type: 'kaijuHeld', kaiju: k.id, held: null, reason: 'drop', source: 'none', sourceId: -1 });
+  emit(world, { type: 'signBroken', kaiju: k.id, x: k.x + Math.sin(k.actionYaw) * k.radius, z: k.z + Math.cos(k.actionYaw) * k.radius });
+}
+
 /** Stomp: a shockwave around the body, strongest at the center, that also shoves units outward. */
 export function stompEffect(world: World, k: Kaiju, def: KaijuKindDef): void {
   const a = def.actions.stomp;
   const radius = a.radius * k.radius;
-  const unitMult = modMult(k.mods, 'unitDamage');
+  const unitMult = attackMult(k, 'unitDamage');
   const nerveMult = modMult(k.mods, 'nerveDamage');
-  const structureDamage = perStage(a.structureDamage, k.stage) * modMult(k.mods, 'structureDamage');
+  const structureDamage = perStage(a.structureDamage, k.stage) * attackMult(k, 'structureDamage');
 
   for (const u of world.units) {
     if (!inReachOfBody(k, u)) continue;
@@ -221,7 +270,7 @@ export function stompEffect(world: World, k: Kaiju, def: KaijuKindDef): void {
     world.structureHits.push({ id, damage: structureDamage * lerp(1, a.structureEdgeFraction, t), by: k.player, cause: 'stomp' });
   }
   propsInCircle(world.cityQuery, k.x, k.z, radius, ids);
-  for (const id of ids) world.propHits.push({ id, by: k.player, cause: 'stomp' });
+  for (const id of ids) if (!sparedByKaiju(world, k, id)) world.propHits.push({ id, by: k.player, cause: 'stomp' });
   noteKaijuNoise(k);
 }
 
@@ -274,7 +323,7 @@ export function chargeTick(world: World, k: Kaiju, a: ChargeActionDef): void {
     hits.push(u.id);
     world.hits.push({
       target: { entity: 'unit', id: u.id },
-      hit: kaijuHit(k, u.x, u.z, a.unitDamage * modMult(k.mods, 'unitDamage'), a.unitNerve * modMult(k.mods, 'nerveDamage'), 'charge'),
+      hit: kaijuHit(k, u.x, u.z, a.unitDamage * attackMult(k, 'unitDamage'), a.unitNerve * modMult(k.mods, 'nerveDamage'), 'charge'),
     });
     // Aside: along the right vector (-cos, sin) of the heading, on the unit's side of the path.
     const side = dx * -fz + dz * fx >= 0 ? 1 : -1;
@@ -304,9 +353,10 @@ function nearer(best: ReachTarget | null, source: ReachTarget['source'], id: num
 }
 
 /**
- * The nearest thing the kaiju can pick up in its grab arc: a car, a wreck, or (from the stage
- * the definition says) a live vehicle. Loose objects always win over buildings: only when none
- * is in reach, and the stage allows it, does the hand tear a chunk from the nearest structure.
+ * The nearest thing the kaiju can pick up in its grab arc: a car, a wreck, a city weapon (while
+ * the kaiju is small: sim/cityWeapons.ts), one lying loose, or (from the stage the definition
+ * says) a live vehicle. Loose objects always win over buildings: only when none is in reach, and
+ * the stage allows it, does the hand tear a chunk from the nearest structure.
  */
 export function findGrabTarget(world: World, k: Kaiju, def: KaijuKindDef): ReachTarget | null {
   const a = def.actions.grab;
@@ -319,12 +369,18 @@ export function findGrabTarget(world: World, k: Kaiju, def: KaijuKindDef): Reach
   propsInCircle(world.cityQuery, k.x, k.z, range, ids, false);
   for (const id of ids) {
     const alive = bitGet(world.propAlive, id);
-    const kind = PROP_KINDS[world.city.props[id].kind];
-    const source = alive ? (kind.grabbable ? 'prop' : null) : bitGet(world.propWreck, id) ? 'propWreck' : null;
+    const kind = world.city.props[id].kind;
+    const source = alive ? (canPickUp(k, kind) ? 'prop' : null) : bitGet(world.propWreck, id) ? 'propWreck' : null;
     if (!source) continue;
     const r = index.pradius[id];
     if (!circleInArc(index.px[id], index.pz[id], r, k.x, k.z, yaw, half, range)) continue;
     best = nearer(best, source, id, Math.max(0, Math.hypot(index.px[id] - k.x, index.pz[id] - k.z) - r));
+  }
+  for (const o of world.loose) {
+    if (o.state !== 'down' || !canPickUp(k, o.kind)) continue;
+    const r = PROP_KINDS[o.kind].radius;
+    if (!circleInArc(o.x, o.z, r, k.x, k.z, yaw, half, range)) continue;
+    best = nearer(best, 'loose', o.id, Math.max(0, Math.hypot(o.x - k.x, o.z - k.z) - r));
   }
   for (const u of world.units) {
     if (u.y > k.height || !unitTypeDef(u.type).grabbable) continue;
@@ -384,6 +440,10 @@ function takeFromWorld(world: World, k: Kaiju, def: KaijuKindDef, target: ReachT
     }
     case 'propWreck':
       return takePropWreck(world, target.id) ? { kind: 'wreck', wreck: 'car' } : null;
+    case 'loose': {
+      const kind = world.loose[target.id]?.kind;
+      return kind !== undefined && takeLoose(world, target.id) ? { kind: 'prop', prop: kind } : null;
+    }
     case 'unitWreck': {
       const u = world.units[target.id];
       if (u.alive || !u.wreck) return null;
@@ -406,7 +466,7 @@ function takeFromWorld(world: World, k: Kaiju, def: KaijuKindDef, target: ReachT
     }
     case 'structure': {
       const s = world.city.structures[target.id];
-      const damage = perStage(def.actions.grab.chunkStructureDamage, k.stage) * modMult(k.mods, 'structureDamage');
+      const damage = perStage(def.actions.grab.chunkStructureDamage, k.stage) * attackMult(k, 'structureDamage');
       world.structureHits.push({ id: target.id, damage, by: k.player, cause: 'swipe' });
       return { kind: 'chunk', archetype: s.archetype };
     }
@@ -421,6 +481,8 @@ export function grabEffect(world: World, k: Kaiju, def: KaijuKindDef): void {
   const held = takeFromWorld(world, k, def, target);
   if (!held) return;
   k.held = held;
+  // A fast-food sign comes with its swings, a garage door with its hp.
+  armHeld(k);
   emit(world, { type: 'kaijuHeld', kaiju: k.id, held, reason: 'grab', source: target.source, sourceId: target.id });
 }
 
@@ -435,22 +497,29 @@ export function throwAngle(d: number, dy: number, v: number, g: number): number 
   return Math.atan2(v2 - Math.sqrt(disc), g * d);
 }
 
-/** Throw: the held object leaves the hand toward the aim point as a ballistic projectile. */
+/**
+ * Throw: the held object leaves the hand toward the aim point as a ballistic projectile. A city
+ * weapon flies its own way (sim/cityWeapons.ts `cityThrow`): the propane and water tanks on the
+ * throw's arc at their own speed, a javelin (the antenna, the mast) fast and nearly straight, the
+ * garage door flat; each does its own thing where it lands.
+ */
 export function throwEffect(world: World, k: Kaiju, def: KaijuKindDef): void {
   const payload = k.held;
   if (!payload) return;
   const a = def.actions.throw;
   const st = kaijuStageDef(k.kind, k.stage);
   const type = projectileTypeDef('thrown');
-  const speed = perStage(a.speed, k.stage);
-  const g = type.gravity;
+  const city = cityThrow(k, heldCityWeapon(payload), surgeMult(k));
+  const speed = city ? city.speed : perStage(a.speed, k.stage);
+  const g = city ? city.gravity : type.gravity;
 
   const hx = k.x + Math.sin(k.aimYaw) * k.radius * HAND_FORWARD;
   const hy = st.handHeight;
   const hz = k.z + Math.cos(k.aimYaw) * k.radius * HAND_FORWARD;
 
-  // What the crosshair is on, out to well past the longest possible throw.
-  const reach = (speed * speed) / Math.max(g, 0.01) + st.eyeHeight * 2 + 50;
+  // What the crosshair is on, out to well past the longest possible throw (or the javelin's flight).
+  const flight = city ? city.speed * city.ttl : (speed * speed) / Math.max(g, 0.01);
+  const reach = flight + st.eyeHeight * 2 + 50;
   kaijuEyePoint(k, eyePoint);
   resolveAimPoint(world.cityQuery, eyePoint.x, eyePoint.y, eyePoint.z, k.aimYaw, k.aimPitch, reach, aim);
 
@@ -485,30 +554,31 @@ export function throwEffect(world: World, k: Kaiju, def: KaijuKindDef): void {
     vy: Math.sin(angle) * speed,
     vz: dirZ * horizontal,
     gravity: g,
-    ttl: type.ttl,
-    damage: a.unitDamage * modMult(k.mods, 'unitDamage'),
-    nerve: a.unitNerve * modMult(k.mods, 'nerveDamage'),
-    splash: perStage(a.impactRadius, k.stage),
-    structureDamage: perStage(a.structureDamage, k.stage) * modMult(k.mods, 'structureDamage'),
-    cause: 'thrown',
+    ttl: city ? city.ttl : type.ttl,
+    damage: city ? city.damage : a.unitDamage * attackMult(k, 'unitDamage'),
+    nerve: city ? city.nerve : a.unitNerve * modMult(k.mods, 'nerveDamage'),
+    splash: city ? city.splash : perStage(a.impactRadius, k.stage),
+    structureDamage: city ? city.structureDamage : perStage(a.structureDamage, k.stage) * attackMult(k, 'structureDamage'),
+    cause: city ? city.cause : 'thrown',
     volley: false,
     atWill: false,
     payload,
+    ...(city ? { city: city.city } : {}),
   });
-  k.held = null;
+  emptyHand(k);
   emit(world, { type: 'kaijuHeld', kaiju: k.id, held: null, reason: 'throw', source: 'none', sourceId: -1 });
 }
 
 /** Lets go of whatever is in the hand (the cocoon closes over it). */
 export function dropHeld(world: World, k: Kaiju): void {
   if (!k.held) return;
-  k.held = null;
+  emptyHand(k);
   emit(world, { type: 'kaijuHeld', kaiju: k.id, held: null, reason: 'drop', source: 'none', sourceId: -1 });
 }
 
 /** True when an Eat started now would find a meal: something in the hand or an edible in reach. */
 export function canEat(world: World, k: Kaiju, def: KaijuKindDef): boolean {
-  return k.held !== null || findEdible(world, k, def) !== null;
+  return heldEdible(k.held) || (k.held === null && findEdible(world, k, def) !== null);
 }
 
 /**
@@ -517,7 +587,9 @@ export function canEat(world: World, k: Kaiju, def: KaijuKindDef): boolean {
  */
 export function eatStart(world: World, k: Kaiju, def: KaijuKindDef): boolean {
   if (k.held) {
-    k.held = null;
+    // City weapons are never eaten (Grab drops them before an Eat can start).
+    if (!heldEdible(k.held)) return false;
+    emptyHand(k);
     emit(world, { type: 'kaijuHeld', kaiju: k.id, held: null, reason: 'eat', source: 'none', sourceId: -1 });
     return true;
   }
@@ -549,11 +621,11 @@ export function beamTick(world: World, k: Kaiju, a: BeamSpecialDef): void {
   const halfWidth = perStage(a.width, k.stage) / 2;
 
   if (beam.blocker >= 0) {
-    const damage = perStage(a.structureDps, k.stage) * modMult(k.mods, 'structureDamage') * DT;
+    const damage = perStage(a.structureDps, k.stage) * attackMult(k, 'structureDamage') * DT;
     world.structureHits.push({ id: beam.blocker, damage, by: k.player, cause: 'beam' });
   }
 
-  const damage = a.unitDps * modMult(k.mods, 'unitDamage') * DT;
+  const damage = a.unitDps * attackMult(k, 'unitDamage') * DT;
   const nerve = a.unitNervePerSecond * modMult(k.mods, 'nerveDamage') * DT;
   for (const u of world.units) {
     if (!u.alive) continue;

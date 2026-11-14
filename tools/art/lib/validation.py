@@ -303,8 +303,11 @@ def validate_file(path: str, kind: str | None = None, size_class: str | None = N
         rep.check(not wrong, "hierarchy", "lizard rig hierarchy matches the contract tree",
                   "; ".join(wrong[:6]) + (" ..." if len(wrong) > 6 else ""))
     if kind == "prop":
-        rep.check(len(mesh_nodes) == 1 and len(reach) == 1, "single-mesh", "one mesh node, as props must be",
-                  f"props are one mesh each; found {len(mesh_nodes)} mesh node(s) in {len(reach)} node(s)")
+        # one mesh node; the only other nodes allowed are anchors (empties) such as `grip`
+        extra = [n.name for n in reach if n.mesh is None and n.name not in contract.PROP_ANCHORS]
+        rep.check(len(mesh_nodes) == 1 and not extra, "single-mesh", "one mesh node, as props must be",
+                  f"props are one mesh each (plus anchors {sorted(contract.PROP_ANCHORS)}); found "
+                  f"{len(mesh_nodes)} mesh node(s) in {len(reach)} node(s)" + (f", extra nodes {extra}" if extra else ""))
 
     # -- left/right, facing ------------------------------------------------------------
     lr_bad, lr_pairs = [], 0

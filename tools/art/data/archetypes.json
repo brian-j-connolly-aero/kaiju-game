@@ -740,6 +740,64 @@
       "passable": false,
       "hp": 2000,
       "value": 400
+    },
+    {
+      "id": "substation_a",
+      "model": "bld_substation_a",
+      "class": "factory",
+      "footprint": [
+        22,
+        16
+      ],
+      "height": 9,
+      "sizeClass": "medium",
+      "landmark": null,
+      "zones": [
+        "suburb",
+        "industrial"
+      ],
+      "passable": false,
+      "hp": 150,
+      "value": 15
+    },
+    {
+      "id": "gasstation_a",
+      "model": "bld_gasstation_a",
+      "class": "shop",
+      "footprint": [
+        26,
+        20
+      ],
+      "height": 7,
+      "sizeClass": "medium",
+      "landmark": null,
+      "zones": [
+        "suburb",
+        "harbor",
+        "industrial"
+      ],
+      "passable": false,
+      "hp": 160,
+      "value": 15
+    },
+    {
+      "id": "radiomast_a",
+      "model": "bld_radiomast_a",
+      "class": "factory",
+      "footprint": [
+        8,
+        8
+      ],
+      "height": 24,
+      "sizeClass": "small",
+      "landmark": null,
+      "zones": [
+        "suburb",
+        "industrial"
+      ],
+      "passable": false,
+      "hp": 120,
+      "value": 15
     }
   ],
   "props": [
@@ -826,6 +884,42 @@
       "model": "prop_busstop",
       "radius": 2,
       "height": 2.8
+    },
+    {
+      "id": "propane",
+      "model": "prop_propane",
+      "radius": 1.3,
+      "height": 1.3
+    },
+    {
+      "id": "watertank",
+      "model": "prop_watertank",
+      "radius": 1.6,
+      "height": 4.5
+    },
+    {
+      "id": "antenna",
+      "model": "prop_antenna",
+      "radius": 0.5,
+      "height": 7
+    },
+    {
+      "id": "foodsign",
+      "model": "prop_foodsign",
+      "radius": 1.5,
+      "height": 7.5
+    },
+    {
+      "id": "garagedoor",
+      "model": "prop_garagedoor",
+      "radius": 1.8,
+      "height": 2.8
+    },
+    {
+      "id": "mast",
+      "model": "prop_mast",
+      "radius": 4,
+      "height": 1.2
     }
   ]
 }

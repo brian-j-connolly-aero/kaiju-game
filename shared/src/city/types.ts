@@ -64,9 +64,30 @@ export const PROP_KIND_IDS = [
   'hydrant',
   'billboard',
   'busstop',
+  // The city as a weapon (docs/ROADMAP.md phase 2; DESIGN.md section 4, "The city as a weapon"):
+  // things the hatchling's hand can pick up and use. The generator places all but the last; the
+  // mast is the radio mast's top section, which only appears when a radio mast falls.
+  'propane',
+  'watertank',
+  'antenna',
+  'foodsign',
+  'garagedoor',
+  'mast',
 ] as const;
 /** Prop kinds; the model is `prop_<kind>` (ASSETS.md section 3). */
 export type PropKindId = (typeof PROP_KIND_IDS)[number];
+
+/** The prop kinds that are city weapons (`PropKindDef.cityWeapon`), in PROP_KIND_IDS order. */
+export const CITY_WEAPON_KINDS = ['propane', 'watertank', 'antenna', 'foodsign', 'garagedoor', 'mast'] as const;
+export type CityWeaponKind = (typeof CITY_WEAPON_KINDS)[number];
+
+/**
+ * The special buildings (docs/ROADMAP.md phase 2; DESIGN.md section 7): every starting
+ * neighborhood has one of each, and wrecking one pays a reward once (sim/systems/specials.ts).
+ * An archetype says which it is (`ArchetypeDef.special`).
+ */
+export const SPECIAL_KINDS = ['substation', 'gasstation', 'radiomast'] as const;
+export type SpecialKind = (typeof SPECIAL_KINDS)[number];
 
 /** A small breakable. Props never block movement or shots; kaiju and vehicles crush them. */
 export interface Prop {
@@ -93,6 +114,12 @@ export interface PropKindDef {
   edible: boolean;
   /** Whether crushing it leaves a `prop_car_wreck` (which is grabbable). */
   leavesWreck: boolean;
+  /**
+   * A city weapon (CITY_WEAPON_KINDS): the hand can pick it up only while the kaiju is small
+   * (`KaijuCityWeapons.grabStage`), and then the kaiju's own feet spare it; at later stages it is
+   * crushed underfoot like any other small prop. Never edible.
+   */
+  cityWeapon: boolean;
 }
 
 export interface RoadNode {

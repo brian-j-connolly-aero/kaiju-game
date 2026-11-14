@@ -16,6 +16,7 @@
  *   --trigger-happy      the squads play the lazy way: parked, they fire every time the guns have
  *                        loaded instead of charging volleys (what undisciplined fire is worth)
  *   --unopposed          no squads at all: how fast does a kaiju fill the bar when left alone
+ *   --no-crates          no army supply crates come down (phase 2): what the pick-ups are worth
  *   --max-minutes N      give up on a match after this many simulated minutes (default 20)
  *   --city NAME          'meridian' (default: Port Meridian, the game's city, docs/CITY.md) or
  *                        'placeholder' (the old grid city, a development option)
@@ -47,6 +48,7 @@ interface Options {
   kaijuHandicap: number;
   humanHandicap: number;
   triggerHappy: boolean;
+  crates: boolean;
   squads: number;
   maxMinutes: number;
   events: boolean;
@@ -67,6 +69,7 @@ function parseArgs(argv: string[]): Options {
     kaijuHandicap: 0,
     humanHandicap: 0,
     triggerHappy: false,
+    crates: true,
     squads: 4,
     maxMinutes: 20,
     events: false,
@@ -110,6 +113,9 @@ function parseArgs(argv: string[]): Options {
         break;
       case '--unopposed':
         o.squads = 0;
+        break;
+      case '--no-crates':
+        o.crates = false;
         break;
       case '--fast':
         o.fast = true;
@@ -178,7 +184,7 @@ function printTable(reports: BotMatchReport[], o: Options): void {
     per(r, (s) => s.kaijuHpLost.toFixed(0)),
   ]);
   const widths = head.map((h, i) => Math.max(h.length, ...rows.map((c) => c[i].length)));
-  const tags = [o.city !== 'meridian' ? `city: ${o.city}` : '', o.bar ? `bar ${o.bar.join(' / ')}` : '', o.clock !== null ? `clock ${clock(o.clock)}` : '', o.fast ? 'fast tuning' : '', o.kaijuHandicap > 0 ? `kaiju handicap ${o.kaijuHandicap}` : '', o.humanHandicap > 0 ? `human handicap ${o.humanHandicap}` : '', o.triggerHappy ? 'trigger-happy squads' : '', o.squads === 0 ? 'unopposed' : '', o.everyAnchor ? 'every start in turn' : ''].filter(Boolean);
+  const tags = [o.city !== 'meridian' ? `city: ${o.city}` : '', o.bar ? `bar ${o.bar.join(' / ')}` : '', o.clock !== null ? `clock ${clock(o.clock)}` : '', o.fast ? 'fast tuning' : '', o.kaijuHandicap > 0 ? `kaiju handicap ${o.kaijuHandicap}` : '', o.humanHandicap > 0 ? `human handicap ${o.humanHandicap}` : '', o.triggerHappy ? 'trigger-happy squads' : '', o.crates ? '' : 'no crates', o.squads === 0 ? 'unopposed' : '', o.everyAnchor ? 'every start in turn' : ''].filter(Boolean);
   console.log(`${reports.length} bot matches${tags.length > 0 ? ` [${tags.join(', ')}]` : ''}`);
   console.log(row(head, widths));
   console.log(widths.map((w) => '-'.repeat(w)).join('  '));
@@ -250,6 +256,7 @@ for (let i = 0; i < options.seeds; i++) {
       kaijuHandicap: options.kaijuHandicap,
       humanHandicap: options.humanHandicap,
       triggerHappy: options.triggerHappy,
+      crates: options.crates,
       squads: options.squads,
       maxMinutes: options.maxMinutes,
       city,

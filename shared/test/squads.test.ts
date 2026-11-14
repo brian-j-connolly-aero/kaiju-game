@@ -424,8 +424,12 @@ describe('the swarm', () => {
       const b = world.match.bounds;
       const leader = world.units[squad.driven];
       // The leader drives itself (the way a bot would) to a point blocks away; the squad-mates follow on their own.
-      const tx = leader.x + (leader.x < (b.minX + b.maxX) / 2 ? 1 : -1) * Math.min(260, 0.6 * (b.maxX - b.minX));
+      const sx = leader.x < (b.minX + b.maxX) / 2 ? 1 : -1;
+      let tx = leader.x + sx * Math.min(260, 0.6 * (b.maxX - b.minX));
       const tz = leader.z + (leader.z < (b.minZ + b.maxZ) / 2 ? 1 : -1) * Math.min(230, 0.5 * (b.maxZ - b.minZ));
+      // A point on open ground (since phase 2 a special building may stand on the first try).
+      const around: number[] = [];
+      while (structuresInCircle(world.cityQuery, tx, tz, 8, around) > 0) tx -= sx * 4;
       const steer = createSteer();
       const tank = UNIT_TYPES[leader.type].drive !== undefined;
       const limit = 60 * TICK_RATE;
@@ -684,9 +688,16 @@ describe('fire at will', () => {
     lineUp(hidden, 0, 0);
     placeKaiju(hidden, 12, 100, 0);
     expect(untilShot(hidden, 90).ticks).toBe(-1);
-    // The wall comes down: now they see it.
+    // The wall comes down, and its rubble (half as high) still hides a hatchling.
     hidden.structureHp[0] = 0;
-    expect(untilShot(hidden, 90).ticks).toBeGreaterThan(0);
+    expect(untilShot(hidden, 90).ticks).toBe(-1);
+    // A low wall's rubble hides only its feet: over it they see the rest of it.
+    const low = field({ structures: [{ x: 20, z: 50, w: 120, d: 10, height: 4 }] });
+    lineUp(low, 0, 0);
+    placeKaiju(low, 12, 100, 0);
+    expect(untilShot(low, 90).ticks).toBe(-1);
+    low.structureHp[0] = 0;
+    expect(untilShot(low, 90).ticks).toBeGreaterThan(0);
 
     // Planted for a volley, nobody shoots until the button is let go.
     const planted = field();

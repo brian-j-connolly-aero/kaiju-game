@@ -19,6 +19,10 @@ export const PROJECTILE_TYPES: Readonly<Record<ProjectileTypeId, ProjectileTypeD
   },
   // Speed comes from the kaiju's throw action; the model is whatever was thrown.
   thrown: { id: 'thrown', flight: 'thrown', speed: 0, gravity: COMBAT_RULES.gravity, radius: 1, ttl: 20, model: null },
+  // The pick-up weapons (defs/pickups.ts). Tracers are drawn as glowing streaks (no model).
+  tracer: { id: 'tracer', flight: 'flat', speed: 140, gravity: 0, radius: 0.3, ttl: 6, model: null },
+  missile: { id: 'missile', flight: 'guided', speed: 75, gravity: 0, radius: 0.4, ttl: 9, model: 'proj_rocket' },
+  heavyShell: { id: 'heavyShell', flight: 'flat', speed: 120, gravity: 0, radius: 0.6, ttl: 9, model: 'proj_shell' },
 };
 
 /**

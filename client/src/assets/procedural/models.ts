@@ -274,6 +274,19 @@ function propModel(id: string, kind: PropKindId): RigModel {
       return single(id, [boxOn(0.3, h * 0.55, 0.3, 0x4a4f58, 2.2, 0, 0), boxOn(0.3, h * 0.55, 0.3, 0x4a4f58, -2.2, 0, 0), boxOn(6.6, h * 0.45, 0.3, 0xffd91a, 0, h * 0.55, 0), box(5.8, h * 0.3, 0.34, 0xe0372f, 0, h * 0.77, 0)]);
     case 'busstop':
       return single(id, [boxOn(4.4, 0.15, 1.5, 0x2f62c9, 0, h - 0.15, 0), boxOn(4.2, h - 0.3, 0.1, GLASS, 0, 0.15, -0.65), boxOn(0.12, h, 0.12, 0x4a4f58, 2.1, 0, 0.6), boxOn(0.12, h, 0.12, 0x4a4f58, -2.1, 0, 0.6)]);
+    // Stand-ins for the city weapons (phase 2) until their art files are in.
+    case 'propane':
+      return single(id, [boxOn(1.1, h - 0.2, 2.4, 0xf5f5f0, 0, 0.2, 0), box(1.0, 0.2, 0.2, 0x4a4f58, 0, 0.1, 0.8), box(1.0, 0.2, 0.2, 0x4a4f58, 0, 0.1, -0.8)]);
+    case 'watertank':
+      return single(id, [boxOn(0.2, h - 2.6, 0.2, 0x4a4f58, 1, 0, 1), boxOn(0.2, h - 2.6, 0.2, 0x4a4f58, -1, 0, -1), boxOn(2.8, 2.6, 2.8, 0x9ab3c4, 0, h - 2.6, 0)]);
+    case 'antenna':
+      return single(id, [boxOn(0.14, h, 0.14, 0x8a9099, 0, 0, 0), box(2.0, 0.08, 0.08, 0x8a9099, 0, h - 0.6, 0), box(1.4, 0.08, 0.08, 0x8a9099, 0, h - 1.3, 0)]);
+    case 'foodsign':
+      return single(id, [boxOn(0.3, h - 2.4, 0.3, 0x4a4f58, 0, 0, 0), boxOn(3.0, 2.4, 0.5, 0xd7263d, 0, h - 2.4, 0), box(2.4, 0.8, 0.54, 0xffd91a, 0, h - 1.2, 0)]);
+    case 'garagedoor':
+      return single(id, [boxOn(3.2, h, 0.3, 0xd9d2c0, 0, 0, 0), box(2.8, h - 0.3, 0.34, 0xaab2bc, 0, (h - 0.3) / 2, 0)]);
+    case 'mast':
+      return single(id, [boxOn(0.9, 0.9, 8, 0xd7263d, 0, 0, 0), box(0.95, 0.95, 1.4, 0xf5f5f0, 0, 0.45, 2), box(0.95, 0.95, 1.4, 0xf5f5f0, 0, 0.45, -2)]);
   }
 }
 

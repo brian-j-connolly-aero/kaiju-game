@@ -10,6 +10,7 @@
  * All events are plain JSON-safe objects. Positions are meters, angles radians, times seconds.
  */
 
+import type { FallSide } from '../city/spatialIndex';
 import type { PropKindId } from '../city/types';
 import type {
   CallInId,
@@ -20,6 +21,7 @@ import type {
   KaijuPhase,
   KaijuVerb,
   MatchPhase,
+  PickupKind,
   ProjectileTypeId,
   StageId,
   StructureStage,
@@ -105,6 +107,17 @@ export interface ProjectileSpawnEvent extends EventBase {
   volley: boolean;
   /** For thrown objects: what is flying. */
   payload?: HeldObject;
+  /**
+   * Flight 'guided' only (the missile pod's missiles, which fan out and curve onto the aim
+   * point): it also accelerates by (ax, ay, az) for its first `steer` seconds, so that
+   * position(t) = (x, y, z) + (vx, vy, vz) * t + (ax, ay, az) * t^2 / 2 while t <= steer, and
+   * from then on it flies straight on at the velocity it had then: (vx, vy, vz) + (ax, ay, az) *
+   * steer. `steer` is a whole number of ticks; `stepProjectile` flies it exactly.
+   */
+  ax?: number;
+  ay?: number;
+  az?: number;
+  steer?: number;
 }
 
 /** A projectile ended. */
@@ -128,6 +141,39 @@ export interface StructureStageEvent extends EventBase {
   id: number;
   stage: StructureStage;
   /** Player responsible, or -1. */
+  by: PlayerId;
+  cause: DamageKind;
+}
+
+/**
+ * A tall structure is falling over on its side (DESIGN.md section 7, "Rubble and falls").
+ *
+ * 'falling': it has just collapsed (its `structureStage` 3 came on this same tick, just before;
+ * draw this fall instead of a collapse in place) and is tipping over the edge of its footprint on
+ * `side` (0 its own +X, 1 its own +Z, its front, 2 its own -X, 3 its own -Z), toward the world
+ * heading `yaw`. It lies flat `duration` seconds later. Its base turns about (x, z), the middle
+ * of that edge; its top lands at (topX, topZ), as far out as it was tall.
+ *
+ * 'landed': it lies there now. Whatever lay under it has been hit on this tick (unit hits and
+ * structure stages with cause 'fall' follow), and from now on it is a long mound where it lies
+ * (`fallenBox`: as long as it was tall, as wide as its footprint across the fall, half its depth
+ * along the fall high) and its own footprint is clear. A client that joins later finds the side
+ * in the city state (`DecodedCityState.structureFall`); one that joins mid-fall sees rubble until
+ * this event.
+ */
+export interface StructureFallEvent extends EventBase {
+  type: 'structureFall';
+  id: number;
+  phase: 'falling' | 'landed';
+  side: FallSide;
+  yaw: number;
+  /** 'falling': seconds until it lands; 'landed': 0. */
+  duration: number;
+  x: number;
+  z: number;
+  topX: number;
+  topZ: number;
+  /** Player responsible for the collapse, or -1. */
   by: PlayerId;
   cause: DamageKind;
 }
@@ -204,6 +250,8 @@ export type HeldSource =
   | 'unitWreck'
   /** A chunk torn from a building (`sourceId` is the structure id). */
   | 'structure'
+  /** A loose city weapon (`sourceId` is its id in `world.loose`, as in its `looseProp` event). */
+  | 'loose'
   /** Nothing in the world changed (throwing or dropping what was already held). */
   | 'none';
 
@@ -293,6 +341,11 @@ export interface UnitStunnedEvent extends EventBase {
   type: 'unitStunned';
   unit: number;
   duration: number;
+  /**
+   * Knocked over rather than stunned (phase 2: a thrown water tank's splash, a thrown garage
+   * door): the same rules for `duration` seconds, but it lies flat instead of reeling.
+   */
+  knockdown?: boolean;
 }
 
 /** A player's driven unit died and they took over a surviving sub-unit. */
@@ -353,6 +406,54 @@ export interface CallInEvent extends EventBase {
   delay: number;
   /** Scatter radius to draw on the ground, with the scatter multipliers as they stand at this moment. */
   radius: number;
+}
+
+/**
+ * An army supply crate (docs/ROADMAP.md, phase 2; sim/systems/pickups.ts). The snapshot's
+ * `crates` list the ones there are; these say what happens to them:
+ *
+ * - 'drop': a crate has started down by parachute over (x, z), `height` meters up; it comes
+ *   straight down at a steady speed and lands `duration` seconds later. `squad` is the squad it
+ *   is meant for (it comes down near that squad's leader), but anybody may take it.
+ * - 'land': it is on the ground; a unit that touches it takes it.
+ * - 'take': `unit` of `squad` took it: what it held (`kind`) is that squad's now. A weapon
+ *   pick-up shows in the snapshot's squad record (`pickup`), the artillery radio as `barrages`;
+ *   reinforcements come with a `reinforce` event on the same tick.
+ * - 'gone': the stage ended with it still there (or still coming down).
+ */
+export interface CrateEvent extends EventBase {
+  type: 'crate';
+  id: number;
+  kind: PickupKind;
+  x: number;
+  z: number;
+  phase: 'drop' | 'land' | 'take' | 'gone';
+  /** 'drop': the squad it is meant for; 'take': the squad that took it; otherwise -1. */
+  squad: number;
+  /** 'take': the unit that touched it, and its squad's player; otherwise -1. */
+  unit: number;
+  player: PlayerId;
+  /** 'drop': seconds until it lands, and how high it starts; otherwise 0. */
+  duration: number;
+  height: number;
+}
+
+/**
+ * Reinforcements, the moment a squad takes them: every living unit of the squad (`healed`) is
+ * back to full hp and members, and its dead units (`units`) are back at full strength, coming
+ * down by parachute beside the leader: each starts `height` meters up over the point where it
+ * lands (the snapshot unit's x and z) and comes straight down at a steady speed for `duration`
+ * seconds; the snapshot unit's `y` is its height meanwhile. Until it is down it cannot move, fire
+ * or charge.
+ */
+export interface ReinforceEvent extends EventBase {
+  type: 'reinforce';
+  squad: number;
+  player: PlayerId;
+  units: number[];
+  healed: number[];
+  duration: number;
+  height: number;
 }
 
 /** The bar passed a mark and the kaiju may now cocoon. */
@@ -479,6 +580,190 @@ export interface MatchEndEvent extends EventBase {
   tallies: PlayerTally[];
 }
 
+// ---------------------------------------------------------------------------------------------
+// Phase 2: the special buildings' rewards and the city as a weapon (DESIGN.md sections 4 and 7;
+// sim/systems/specials.ts, sim/cityWeapons.ts). Every one carries a position for the effect.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * A power surge: a power substation (`structure`, standing at x, z) was wrecked and kaiju
+ * `kaiju` surges for `duration` seconds: every cooldown was cleared and they recover
+ * `cooldownRate` times as fast, its attacks do `damageMult` times the damage to units and
+ * structures, and its rage jumped by `rage`. The snapshot's kaiju record carries `surge`, the
+ * seconds left.
+ */
+export interface PowerSurgeEvent extends EventBase {
+  type: 'powerSurge';
+  kaiju: number;
+  structure: number;
+  x: number;
+  z: number;
+  duration: number;
+  cooldownRate: number;
+  damageMult: number;
+  rage: number;
+  /** Player who wrecked the substation, or -1. */
+  by: PlayerId;
+}
+
+/**
+ * A gas station (`structure`) went up in a fireball of `radius` round (x, z): units inside were
+ * hit (damage and nerve falling from the middle to the rim) and thrown outward, standing
+ * structures inside damaged, props inside destroyed. It never hurts a kaiju.
+ */
+export interface FireballEvent extends EventBase {
+  type: 'fireball';
+  structure: number;
+  x: number;
+  z: number;
+  radius: number;
+  /** Player who wrecked the gas station, or -1. */
+  by: PlayerId;
+}
+
+/**
+ * A radio mast (`structure`) fell over, away from the kaiju: from its base at (x, z) toward the
+ * world heading `yaw`, `length` meters long, flat `duration` seconds later (when the army's
+ * falling buildings are in, a `structureFall` for it says the same). Its top section lies at
+ * (topX, topZ) along `yaw` as the loose city weapon `topId` (a 'mast'; its `looseProp` event comes
+ * on the same tick). The humans' map shows static until tick `staticUntil` (`staticTime` seconds
+ * from now); the snapshot's match record carries `staticUntil` as well.
+ */
+export interface MastFallEvent extends EventBase {
+  type: 'mastFall';
+  structure: number;
+  x: number;
+  z: number;
+  yaw: number;
+  length: number;
+  duration: number;
+  topId: number;
+  topX: number;
+  topZ: number;
+  staticUntil: number;
+  staticTime: number;
+  /** Player who wrecked the mast, or -1. */
+  by: PlayerId;
+}
+
+/**
+ * A city weapon lying loose (sim/cityWeapons.ts): 'down' when it comes to lie at (x, z) (dropped
+ * from the kaiju's hand, `cause` 'drop', or a fallen radio mast's top, 'mast'), 'gone' when it is
+ * crushed or goes off. Picking one up is a `kaijuHeld` with source 'loose' and this `id` instead.
+ */
+export interface LoosePropEvent extends EventBase {
+  type: 'looseProp';
+  id: number;
+  prop: PropKindId;
+  x: number;
+  z: number;
+  yaw: number;
+  state: 'down' | 'gone';
+  cause: 'drop' | 'mast' | 'crushed' | 'blast';
+}
+
+/**
+ * A propane tank went off at (x, y, z) with a blast of `radius`: thrown and landed ('thrown'),
+ * set off where it stood by a shot or an explosion ('ground'), set off in a kaiju's hand ('hand':
+ * kaiju `kaiju` loses hp, flinches, and its hand is empty), or crushed or struck ('crushed', the
+ * small bang). `prop` is the generator's prop it was, or -1 (thrown, held or loose).
+ */
+export interface PropaneBlastEvent extends EventBase {
+  type: 'propaneBlast';
+  x: number;
+  y: number;
+  z: number;
+  radius: number;
+  how: 'thrown' | 'ground' | 'hand' | 'crushed';
+  kaiju: number;
+  prop: number;
+  by: PlayerId;
+}
+
+/** A thrown water tank burst at (x, z): units within `radius` were knocked over and pushed outward. */
+export interface WaterSplashEvent extends EventBase {
+  type: 'waterSplash';
+  x: number;
+  z: number;
+  radius: number;
+  by: PlayerId;
+}
+
+/**
+ * A thrown javelin (projectile `projectile`, an antenna or a mast) went through unit `unit` at
+ * (x, y, z) and flies on; its `projectileHit` comes where it stops (a structure, the ground).
+ */
+export interface JavelinHitEvent extends EventBase {
+  type: 'javelinHit';
+  projectile: number;
+  prop: PropKindId;
+  unit: number;
+  x: number;
+  y: number;
+  z: number;
+  damage: number;
+}
+
+/**
+ * The kaiju swung its fast-food sign (action 'club'): along `yaw`, over `arc` radians, `reach`
+ * meters from its body's axis, hitting `units` units; `swingsLeft` before the sign breaks (0: it
+ * broke on this swing, `signBroken` follows).
+ */
+export interface ClubSwingEvent extends EventBase {
+  type: 'clubSwing';
+  kaiju: number;
+  x: number;
+  z: number;
+  yaw: number;
+  arc: number;
+  reach: number;
+  units: number;
+  swingsLeft: number;
+}
+
+/** The fast-food sign broke on its last swing: the hand is empty (a `kaijuHeld` 'drop' comes with it). */
+export interface SignBrokenEvent extends EventBase {
+  type: 'signBroken';
+  kaiju: number;
+  x: number;
+  z: number;
+}
+
+/**
+ * A hit came at the kaiju from the front and the garage door it holds took it instead: `damage`
+ * (raw) off the door at (x, y, z), `hpLeft` on it (the snapshot's `shieldHp`).
+ */
+export interface ShieldHitEvent extends EventBase {
+  type: 'shieldHit';
+  kaiju: number;
+  x: number;
+  y: number;
+  z: number;
+  damage: number;
+  hpLeft: number;
+  cause: DamageKind;
+}
+
+/** The garage door's hp ran out: it broke and the hand is empty (a `kaijuHeld` 'drop' comes with it). */
+export interface ShieldBrokenEvent extends EventBase {
+  type: 'shieldBroken';
+  kaiju: number;
+  x: number;
+  z: number;
+}
+
+/**
+ * The kaiju flinched (a propane tank went off in its hand): rooted for `duration` seconds with
+ * whatever it was doing cut short. The snapshot's phase is 'flinch' (action 'none') meanwhile.
+ */
+export interface KaijuFlinchEvent extends EventBase {
+  type: 'kaijuFlinch';
+  kaiju: number;
+  duration: number;
+  x: number;
+  z: number;
+}
+
 export type SimEvent =
   | ProjectileSpawnEvent
   | ProjectileHitEvent
@@ -509,7 +794,22 @@ export type SimEvent =
   | BarMarkEvent
   | MatchPhaseEvent
   | VoiceEvent
-  | MatchEndEvent;
+  | MatchEndEvent
+  | StructureFallEvent
+  | CrateEvent
+  | ReinforceEvent
+  | PowerSurgeEvent
+  | FireballEvent
+  | MastFallEvent
+  | LoosePropEvent
+  | PropaneBlastEvent
+  | WaterSplashEvent
+  | JavelinHitEvent
+  | ClubSwingEvent
+  | SignBrokenEvent
+  | ShieldHitEvent
+  | ShieldBrokenEvent
+  | KaijuFlinchEvent;
 
 export type SimEventType = SimEvent['type'];
 
@@ -551,4 +851,19 @@ export const SIM_EVENT_TYPES: readonly SimEventType[] = [
   'moltOffer',
   'moltPick',
   'cityCollapse',
+  'structureFall',
+  'crate',
+  'reinforce',
+  'powerSurge',
+  'fireball',
+  'mastFall',
+  'looseProp',
+  'propaneBlast',
+  'waterSplash',
+  'javelinHit',
+  'clubSwing',
+  'signBroken',
+  'shieldHit',
+  'shieldBroken',
+  'kaijuFlinch',
 ];

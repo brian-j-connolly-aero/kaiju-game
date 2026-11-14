@@ -17,7 +17,7 @@
  *   ui_icons_32px.png       every icon at true 32 px in the game's colors, plus the same pixels
  *                           enlarged 3 times without smoothing: this is the legibility test
  *   ui_icons_32px_light.png the same test, dark on light
- *   ui_icons_real_sizes.png every icon at the sizes the client really draws it (18 to 52 px, from
+ *   ui_icons_real_sizes.png every icon at the sizes the client really draws it (18 to 52 px, pick-ups 48 and 128 px, from
  *                           client/src/styles.css) over afternoon, sunset and night skies: true
  *                           pixels and the same pixels enlarged. THE sheet to judge legibility on
  *   ui_icons_client_fixes.png  before and after, for the changes only the client can make
@@ -77,6 +77,18 @@ const GROUPS = [
     title: 'Lobby',
     tint: 'plain',
     icons: ['lb_kaiju', 'lb_human', 'lb_ready', 'lb_host', 'lb_bot', 'lb_link', 'lb_play', 'lb_back', 'lb_create', 'lb_join'],
+  },
+  {
+    id: 'squad',
+    title: "The squad's controls",
+    tint: 'human',
+    icons: ['sq_foot', 'sq_charge', 'sq_meter', 'sq_meter_low', 'sq_burst', 'sq_drive', 'sq_turn', 'sq_turret'],
+  },
+  {
+    id: 'pickups',
+    title: 'Army pick-ups',
+    tint: 'human',
+    icons: ['pk_machinegun', 'pk_bigcannon', 'pk_missilepod', 'pk_artilleryradio', 'pk_reinforcements'],
   },
   { id: 'factions', title: 'Factions', tint: 'human', icons: ['fac_army', 'fac_air', 'fac_science', 'fac_faith'] },
   {
@@ -138,6 +150,10 @@ const COLORS = {
 
 /** A few icons wear a color of their own in the game: the color language, doubled by the shape. */
 const OWN_TINT = {
+  sq_charge: 'volley',
+  sq_meter: 'volley',
+  sq_meter_low: 'rubble',
+  sq_burst: 'volley',
   st_charge: 'volley',
   st_reload: 'human',
   st_rage: 'kaiju',
@@ -527,6 +543,31 @@ async function sheetRealSizes(page, file) {
     ]
       .map(([n, c, px]) => `<span style="margin-right:10px">${ic(n, px, c)}</span>`)
       .join(''),
+  );
+
+  // The squad's controls card: pictures at 1.05 of the card's unit, which is 20 to 42 px (21, 32 and 44 px here).
+  const squad = GROUPS.find((g) => g.id === 'squad').icons;
+  for (const px of [21, 32, 44]) {
+    add(
+      `squad controls card pictures at ${px} px: ${squad.join(' ')}`,
+      C.darkPanel,
+      squad.map((n) => `<span style="margin-right:8px">${ic(n, px, C[OWN_TINT[n] || 'human'])}</span>`).join(''),
+    );
+  }
+
+  // Army pick-ups: 48 px in the HUD and floating over a crate, straight on the picture; 128 px when one is taken.
+  const pickups = GROUPS.find((g) => g.id === 'pickups').icons;
+  for (const sky of ['afternoon', 'sunset', 'night']) {
+    add(
+      `army pick-ups at 48 px on the ${sky} sky (over a crate, in the HUD): ${pickups.join(' ')}`,
+      sky,
+      pickups.map((n) => `<span style="margin-right:12px;filter:drop-shadow(0 2px 3px #000)">${ic(n, 48, C.human)}</span>`).join(''),
+    );
+  }
+  add(
+    'army pick-ups at 128 px (the moment one is taken): machine gun, big cannon, missile pod | artillery radio, reinforcements',
+    'afternoon',
+    pickups.map((n) => `<span style="margin-right:12px;filter:drop-shadow(0 2px 3px #000)">${ic(n, 128, C.ink)}</span>`).join(''),
   );
 
   // Paint each strip at true size (wrapped at 500 px, so the enlargement stays narrow enough to

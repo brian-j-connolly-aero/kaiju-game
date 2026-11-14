@@ -106,9 +106,78 @@ half-built), `faith_belltruck` (`hull`, `bell`), `faith_float`, `faith_ark` (`ba
   1024 x 512, 16 px = 3 m; texture coordinates follow glTF (v = 0 at the top of the image).
   Buildings are made with the city kit (`tools/art/city/README.md`): one material
   (`city_atlas`) per building, sizes and states as in `docs/art/CITY_ART.md`.
+- Special buildings (roadmap phase 2; `tools/art/city_special.py`, pictures in
+  `docs/art/previews/bld_<id>.png` and `docs/art/concept/city_special_lineup.png`). Ordinary
+  structure files (`intact`, `damaged`, `rubble`, `chunk_NN`, one `city_atlas` material) that
+  also carry **anchor nodes for the client's effects**: empties with no mesh, numbered like the
+  chunks, so find them by prefix (`/^spark_\d+$/` and so on). Positions are in the building's own
+  frame (meters, y up, front +Z).
+  - `bld_substation_a` (22 x 16 m, 9 m): fenced yard, two transformers, two steel gantries with
+    wires, a control hut. `spark_00`..`spark_05`: the tops of the six ceramic insulators (4.55 m
+    up), where sparks crackle.
+  - `bld_gasstation_a` (26 x 20 m, 7 m; the pole sign with the flame stays inside the 7 m of the
+    archetype, as every building must): red canopy on four pillars over two pump islands, a
+    shop, a cage of gas bottles. `light_00`..`light_03`: just above the four pumps (2.67 m up),
+    lights to flicker.
+  - `bld_radiomast_a` (8 x 8 m, 24 m): three-legged red and white lattice mast (six 4 m bands,
+    red on top), concrete pad, equipment hut. `lamp_00` (the top, 23.6 m), `lamp_01` (15.5 m),
+    `lamp_02` (8 m), all on the mast's axis: red lamps to blink. `top` is a **mesh** node: a
+    spare copy of the mast's top 8 m (16 to 24 m: one white and one red band, the top lamp),
+    with its origin on the mast's axis at 16 m where it breaks off. `intact` already contains
+    the whole mast, so never draw `top` together with `intact`; draw it when the mast falls
+    (the section tumbling away) until the thrown prop `prop_mast` takes over. `prop_mast` is
+    to match this node: 8 m long, three legs 0.17 m thick standing 0.85 m from the axis at the
+    break and 0.5 m at the tip, zig-zag braces in two 4 m bays, white `#f4f2ee` then red
+    `#d7263d`.
 - Props, one mesh each: `prop_car_sedan`, `prop_car_taxi`, `prop_car_van`, `prop_bus`,
   `prop_truck`, `prop_kiosk`, `prop_tree_a`, `prop_tree_b`, `prop_lamp`, `prop_trafficlight`,
   `prop_bench`, `prop_hydrant`, `prop_billboard`, `prop_busstop`, plus `prop_car_wreck`.
+- City weapons (roadmap phase 2, "the city as a weapon"; `tools/art/props_weapons.py`, pictures
+  in `docs/art/previews/prop_<kind>.png`, `docs/art/concept/props_weapons_lineup.png` and
+  `props_weapons_held.png`): six props the stage 1 kaiju grabs with one hand. Each is one mesh
+  as every prop (material `vcol`; `prop_mast` also has `glow` faces for its lamp), closed on
+  every side, at most 80 triangles, **plus one empty node `grip`** under the mesh: the point
+  the hand closes on. Nodes carry no rotation, so the manifest entry says how the thing sits in
+  the hand: `"grip": { "at": [x, y, z], "tip": [x, y, z], "hold": "carry" | "javelin" | "club"
+  | "shield" }`, both vectors in the model's own frame (meters, y up, front +Z). `at` is the
+  grip node's position. `tip` is a unit vector from the hand into the business end: for
+  `carry` turn it straight down (the thing hangs from the hand), for `javelin` along the throw,
+  for `club` it is the direction of the heavy end (swing it through the target), for `shield`
+  turn it away from the monster's chest.
+  - `prop_propane` (2.4 m long, 1.3 m high, 0.95 m deep): white propane tank lying along x on
+    two saddles, grey valve cover, a red diamond with a pale flame on both long sides. Grip on
+    the valve cover, top middle; `carry`.
+  - `prop_watertank` (3.0 m across, 4.5 m high): wooden tub with an iron hoop and a conical
+    slate roof on four steel legs. Grip on the roof's point; `carry`.
+  - `prop_antenna` (7 m high, crossbars up to 1.5 m): steel pole on a concrete foot with six
+    crossbars in its top third and a red spike. Grip 2.8 m up the pole; `javelin`, the spike
+    (the top) leads.
+  - `prop_foodsign` (7.5 m high, burger 3.0 m across): a giant burger on a red pole. Grip
+    0.7 m up the pole; `club`, the burger is the head.
+  - `prop_garagedoor` (panel 3.2 x 2.8 m; 3.6 x 3.0 x 0.3 m with its frame): striped roll-up
+    door in the plaster frame it was torn out with; the pull handle is on the front (+Z), a
+    grab bar on the back. Grip on the grab bar, back center, 1.4 m up; `shield`, the front
+    faces away from the monster.
+  - `prop_mast` (8.0 m long, 1.8 m wide, 1.5 m high, lying along z with the lamp at +Z): the
+    top section of `bld_radiomast_a` (same legs, braces and colors as its `top` node), resting
+    on two of its three legs. Grip on the upper leg, 3.2 m from the broken end (0.8 m behind
+    the origin); `javelin`, the lamp leads.
+- Supply drop (roadmap phase 2, "army pick-ups"; `tools/art/props_supply.py`, pictures in
+  `docs/art/previews/prop_crate.png`, `prop_parachute.png` and
+  `docs/art/concept/props_supply_drop.png`): two props, each one mesh (material `vcol`, at most
+  80 triangles, drawn right from every side and from below) **plus one empty node**.
+  - `prop_crate` (1.6 m wide, 1.63 m high, 1.66 m deep): an olive crate on two wooden skids
+    with a lighter lid, two dark straps over the lid, a pale stenciled chevron pointing down on
+    the front and back (a picture, no letters, no country's mark) and the army's cyan stripe on
+    both sides and across the lid. Origin on the ground under its middle. Empty node `beacon`
+    at (0, 1.63, 0), the middle of the lid's top: the light and the smoke go here, and it is
+    the point the crate hangs from.
+  - `prop_parachute` (canopy 6.1 m across, 6.7 m high in all): a round eight-panel canopy,
+    olive and khaki in turn with a cyan cap, dark inside, and eight lines that meet 4.7 m under
+    the rim. Empty node `hook` where the lines meet, which is the model's origin (0, 0, 0): the
+    canopy stands above it. To hang a crate, put the parachute at the crate's `beacon`; to bring
+    a soldier down, put it at the soldier's shoulders. Scale it in code for a soldier if 6 m
+    looks too big over one (about 0.6 suits the 1.8 m sprite).
 - Ground tiles (64 px, tiling): `textures/ground_asphalt.png`, `ground_sidewalk.png`,
   `ground_grass.png`, `ground_water.png`, `ground_rubble.png`, plus `ground_plaza.png` (the
   city's squares: big pale sandstone flags, 2 m each) and `ground_far.png` (the plain round the
@@ -157,6 +226,17 @@ marks). No text inside icons. No third-party icon sets.
   tank from above with arrows forward and back: W and S), `sq_turn` (a tank from above turning,
   curved arrows: A and D), `sq_turret` (a tank's turret swinging round toward a ring where the
   mouse looks).
+  All eight now exist as files in `ui/` (`sq_*.svg`, phase 2) and replace the placeholders the
+  same way the `k_*` files do: every file found in `ui/` is listed in the manifest's `"ui"`
+  section, and `icon(id)` swaps the placeholder for the file. `sq_drive` shows the arrow beside
+  the tank; `sq_turn` shows two curved arrows swinging away from the tank's nose.
+- Army pick-ups (phase 2; the HUD and the picture floating over a crate; drawn at 48 px and up):
+  `pk_machinegun` (a belt-fed gun on a tripod), `pk_bigcannon` (a tank turret with one fat gun
+  and its big shell), `pk_missilepod` (a box of six tubes and a missile leaving it),
+  `pk_artilleryradio` (a field radio sending waves, a falling shell cut out of its face),
+  `pk_reinforcements` (a soldier coming down under a parachute). The name is `pk_` plus the
+  pick-up's id in lower case (`machineGun`, `bigCannon`, `missilePod`, `artilleryRadio`,
+  `reinforcements` in `shared/src/defs/ids.ts`).
 - Kaiju verbs: `k_swipe`, `k_stomp`, `k_grab`, `k_throw`, `k_eat`, `k_brace`, `k_roar`,
   `k_special`, `k_molt`, `k_swim` (swimming: a row of spines over the waves; the HUD shows it
   while the kaiju is under water, and the controls card pairs it with deep water), `k_charge`
@@ -262,7 +342,8 @@ deep-merges every partial into `manifest.json`, which the client loads. Never ha
   | "structure" | "landmark" | "prop" | "misc", "nodes": [..], "size": [w, h, d], "tris": n,
   "rig"?: "lizard" | .., "chunks"?: n, "tint"?: { "part": "body paint", "mask": "..", "blend":
   "multiply", "colors": ["#rrggbb", ..], "hint"?: ".." }, "poses"?: { "<name>": { "<node>":
-  [x, y, z] } } } }` (`tint`: suggested paint colors for the vehicles with a paint mask, see
+  [x, y, z] } }, "grip"?: { "at": [x, y, z], "tip": [x, y, z], "hold": ".." } } }` (`grip`: how
+  the kaiju holds a city weapon, see section 3; `tint`: suggested paint colors for the vehicles with a paint mask, see
   section 3; `poses`: see below; buildings add `"base"` to `tint`, the authored wall color, so
   the client multiplies masked faces by color / base, and `"district"`, the archetype's home
   district: `docs/art/client-notes-city.md`)

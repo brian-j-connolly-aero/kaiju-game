@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Squad controls: the volley fired. Three shots meeting in one burst. -->
+  <path fill="currentColor" stroke="none" d="M32 2.5L35.1 12.1L44 7.5L39.4 16.4L49 19.5L39.4 22.6L44 31.5L35.1 26.9L32 36.5L28.9 26.9L20 31.5L24.6 22.6L15 19.5L24.6 16.4L20 7.5L28.9 12.1Z"/>
+  <path d="M10.5 57.5L21 41M32 59V44M53.5 57.5L43 41"/>
+</svg>

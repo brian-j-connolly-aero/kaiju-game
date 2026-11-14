@@ -38,6 +38,7 @@ import {
   MAX_AIM_PITCH,
   peekSnapshotTick,
   pickKaijuSeat,
+  PICKUP_IDS,
   PROP_KIND_IDS,
   PROTOCOL_VERSION,
   removeLobbyPlayer,
@@ -53,6 +54,7 @@ import {
   WINNERS,
   END_REASONS,
   type HeldObject,
+  type SnapCrate,
   type SnapKaiju,
   type Snapshot,
   type SnapSquad,
@@ -90,9 +92,12 @@ function sampleKaiju(overrides: Partial<SnapKaiju> = {}): SnapKaiju {
     phaseTime: 0.5,
     phaseDuration: 0.875,
     held: { kind: 'prop', prop: 'bus' },
-    cooldowns: { swipe: 0, stomp: 0, grab: 0, throw: 0, eat: 7.25, brace: 0, roar: 17.5, special: 0, molt: 0, charge: 14.5, tailSweep: 0 },
+    cooldowns: { swipe: 0, stomp: 0, grab: 0, throw: 0, eat: 7.25, brace: 0, roar: 17.5, special: 0, molt: 0, charge: 14.5, tailSweep: 0, club: 0 },
     moves: ['roar', 'none'],
     offer: ['beam', 'charge', 'tailSweep'],
+    surge: 6.25,
+    clubSwings: 2,
+    shieldHp: 187.5,
     ...overrides,
   };
 }
@@ -106,8 +111,14 @@ function sampleSquad(overrides: Partial<SnapSquad> = {}): SnapSquad {
     eliminated: false,
     bot: true,
     driven: 5,
+    pickup: 'missilePod',
+    barrages: 2,
     ...overrides,
   };
+}
+
+function sampleCrate(overrides: Partial<SnapCrate> = {}): SnapCrate {
+  return { id: 7, kind: 'reinforcements', x: 12.5, z: -40.25, fall: 2.5, ...overrides };
 }
 
 function sampleUnit(overrides: Partial<SnapUnit> = {}): SnapUnit {
@@ -158,10 +169,12 @@ function sampleSnapshot(): Snapshot {
       marksReached: 1,
       winner: 'none',
       endReason: 'none',
+      staticUntil: 4321,
     },
     kaijus: [sampleKaiju()],
     squads: [sampleSquad()],
     units: [sampleUnit()],
+    crates: [sampleCrate(), sampleCrate({ id: 65535, kind: 'artilleryRadio', x: -1, z: 0, fall: 0 })],
   };
 }
 
@@ -185,6 +198,9 @@ describe('snapshot codec', () => {
     for (const phase of KAIJU_PHASES) check({ ...base, kaijus: [sampleKaiju({ phase })] });
     for (const move of KAIJU_MOVE_IDS) check({ ...base, kaijus: [sampleKaiju({ moves: ['charge', move], offer: move === 'none' ? [] : [move] })] });
     for (const faction of FACTION_IDS) check({ ...base, squads: [sampleSquad({ faction })] });
+    for (const pickup of PICKUP_IDS) check({ ...base, squads: [sampleSquad({ pickup, barrages: pickup === 'none' ? 0 : 3 })] });
+    for (const kind of PICKUP_IDS) if (kind !== 'none') check({ ...base, crates: [sampleCrate({ kind })] });
+    check({ ...base, crates: [] });
     for (const type of UNIT_TYPE_IDS) check({ ...base, units: [sampleUnit({ type })] });
     for (const state of UNIT_STATES) check({ ...base, units: [sampleUnit({ state })] });
   });
@@ -299,7 +315,10 @@ describe('snapshot codec', () => {
     s.units[0].charge = 3;
     s.units[0].nerve = -5;
     s.units[0].aimPitch = 9;
+    // A crate with any of its fall left is still coming down; a long fall is clamped.
+    s.crates = [sampleCrate({ fall: 0.001 }), sampleCrate({ id: 8, fall: 100 })];
     const back = decodeSnapshot(encodeSnapshot(s));
+    expect(back.crates.map((c) => c.fall)).toEqual([0.05, 12.75]);
     expect(back.units[0].shaken).toBe(12.75);
     expect(back.units[0].hp).toBe(6553.5);
     expect(back.units[0].charge).toBe(1);
@@ -325,9 +344,17 @@ describe('city state on the wire', () => {
     for (let i = 0; i < n; i++) world.structureStage[i] = (i * 7) % 4;
     for (let i = 0; i < world.city.props.length; i += 3) bitClear(world.propAlive, i);
     for (let i = 0; i < world.city.props.length; i += 6) bitSet(world.propWreck, i);
-    const bytes = encodeCityState(world.structureStage, world.propAlive, world.propWreck, world.city.props.length);
-    expect(bytes.length).toBe(8 + Math.ceil(n / 4) + 2 * Math.ceil(world.city.props.length / 8));
+    // Two structures lie fallen over (only rubble can), on sides 3 and 0.
+    world.structureStage[5] = 3;
+    world.structureStage[9] = 3;
+    world.structureFall[5] = 4;
+    world.structureFall[9] = 1;
+    const bytes = encodeCityState(world.structureStage, world.propAlive, world.propWreck, world.city.props.length, world.structureFall);
+    // The fallen list (a count, then an id and a side each), and an empty list of loose city weapons.
+    const tail = 4 + 2 * 5 + 2;
+    expect(bytes.length).toBe(8 + Math.ceil(n / 4) + 2 * Math.ceil(world.city.props.length / 8) + tail);
     const back = decodeCityState(bytes);
+    expect(back.structureFall).toEqual(world.structureFall);
     expect(back.structureStage).toEqual(world.structureStage);
     expect(back.propAlive).toEqual(world.propAlive);
     expect(back.propWreck).toEqual(world.propWreck);
@@ -342,7 +369,12 @@ describe('city state on the wire', () => {
     }
     expect(bitGet(mirror.propAlive, 0)).toBe(false);
     expect(bitGet(mirror.propAlive, 1)).toBe(true);
+    expect(mirror.fallen).toEqual([5, 9]);
+    expect([mirror.structureFall[5], mirror.structureFall[9], mirror.structureFall[6]]).toEqual([4, 1, 0]);
     expect(() => cityStateFromWire(world.city, { ...back, propCount: 3 })).toThrow();
+    // Bytes from before the fallen list decode as nothing fallen.
+    const old = decodeCityState(bytes.subarray(0, bytes.length - tail));
+    expect(old.structureFall.every((v) => v === 0)).toBe(true);
     expect(hpForStage(100, 3)).toBe(0);
     expect(hpForStage(100, 0)).toBe(100);
   });

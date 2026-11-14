@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Squad controls: the volley meter's diamond filled past its notch (the two ears mark the notch): a full shot. -->
+  <path d="M32 8L56 32L32 56L8 32Z"/>
+  <path d="M4.5 27.2H10M54 27.2H59.5"/>
+  <path fill="currentColor" stroke="none" d="M26.3 21.5H37.7L48.2 32L32 48.2L15.8 32Z"/>
+</svg>

@@ -9,7 +9,7 @@
  */
 
 import { DEG } from '../math/angle';
-import type { PerStage } from './ids';
+import type { PerStage, WeaponPickupId } from './ids';
 
 export const BOT_RULES = {
   /** Handicap: a bot decides every this many seconds whether to hesitate (stand idle) until the next roll. */
@@ -57,6 +57,25 @@ export const BOT_RULES = {
     searchReach: 25,
     /** Candidate firing positions examined for a line of fire per look. */
     spotCandidates: 8,
+
+    /**
+     * Supply crates (phase 2): it fetches one coming down or lying within this many meters of
+     * its leader while the kaiju is not close (unknown, or farther than this many times the
+     * distance it backs off at), unless another bot squad is already on its way to it; it gives
+     * up after this many seconds.
+     */
+    crateRange: 60,
+    crateCalm: 1.5,
+    crateGiveUp: 20,
+    /**
+     * Where it parks with a weapon pick-up, of range (lo, want, hi): the machine gun closer in,
+     * the big cannon and the missile pod at range. Without one: standoffMin, standoff, standoffMax.
+     */
+    pickupBand: {
+      machineGun: [0.35, 0.45, 0.6],
+      bigCannon: [0.55, 0.75, 0.92],
+      missilePod: [0.55, 0.75, 0.92],
+    } as Readonly<Record<WeaponPickupId, readonly [number, number, number]>>,
   },
 
   kaiju: {
@@ -141,6 +160,37 @@ export const BOT_RULES = {
      */
     cardThink: [1, 3] as readonly [number, number],
     cardWeights: { beam: 4, roar: 3, charge: 3, tailSweep: 2, brace: 1.5 },
+
+    /**
+     * The special buildings (phase 2): a milestone between fights. One standing within
+     * `specialReach` meters (per stage) is worth `specialGain` times as much to wreck while no
+     * unit is within `specialCalm` meters of the kaiju; the substation `substationGain` times
+     * instead while a move it has picked is cooling down (or the beam waits for rage); the gas
+     * station `gasGain` times whenever units stand within its fireball, squads about or not.
+     */
+    specialReach: [140, 220, 0] as PerStage<number>,
+    specialCalm: [60, 110, 0] as PerStage<number>,
+    specialGain: 6,
+    substationGain: 10,
+    gasGain: 14,
+    /**
+     * The city as a weapon (phase 2, while it is small): with units within `weaponWant` meters
+     * (and none within its swipe) it walks to the city weapon within `weaponWalk` meters that
+     * suits the moment and picks it up, giving up after `weaponGiveUp` seconds (and not trying
+     * again for `weaponRest`): a propane or water tank for units in throwing range (better a
+     * group: `groupUnits` within `groupRadius` meters of the one it aims at), an antenna or the
+     * mast for a squad farther off, the fast-food sign for units close by, the garage door when
+     * guns are on it and it has ground to cover. It throws the door once a unit is within
+     * `doorThrowAt` meters or the door is down to `doorLow` of its hp.
+     */
+    weaponWant: 110,
+    weaponWalk: 50,
+    weaponGiveUp: 6,
+    weaponRest: 6,
+    groupUnits: 2,
+    groupRadius: 9,
+    doorThrowAt: 22,
+    doorLow: 0.3,
 
     /** The molt: it looks for a place out of sight for at most this long, then cocoons where it stands. */
     hideTime: 16,

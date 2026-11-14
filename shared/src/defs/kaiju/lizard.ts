@@ -338,6 +338,144 @@ export const LIZARD: KaijuKindDef = {
       // What a swipe does to a building.
       structureDamage: [40, 300, 2000],
     },
+    club: {
+      id: 'club',
+      // Strike with a fast-food sign in the hand (the city as a weapon, phase 2).
+      button: 'strike',
+      whileHeld: false,
+      timing: { windup: 0.5, active: 0.15, recover: 0.55 },
+      activePhase: 'active',
+      cooldown: 0,
+      rageCost: 0,
+      moveMult: 0.4,
+      turnMult: 0.5,
+      // A wide swing, 1.6 times the swipe's reach (9.6 m at stage 1).
+      arc: 200 * DEG,
+      reach: 4,
+      unitDamage: 140,
+      unitNerve: 60,
+      // Strong: 6 m at the body at stage 1, half that at the end of the reach.
+      knockback: 2.5,
+      // Twice what a swipe does to a building.
+      structureDamage: [80, 600, 4000],
+      swings: 3,
+    },
+  },
+
+  // The city as a weapon (docs/ROADMAP.md phase 2, "small monster first"): what the hatchling's
+  // hand can do with the things that stand about its starting neighborhood.
+  cityWeapons: {
+    grabStage: 1,
+    detonateRadius: 2,
+    propane: {
+      speed: 25,
+      radius: 8,
+      unitDamageCenter: 110,
+      unitDamageEdge: 40,
+      unitNerveCenter: 40,
+      unitNerveEdge: 20,
+      pushCenter: 7,
+      pushEdge: 2,
+      knockdown: 0,
+      structureDamage: 120,
+      props: true,
+      // Raw (about 13 hp to a kaiju in the open): set off beside it by the army, it stings.
+      kaijuDamage: 110,
+      handDamage: 60,
+      flinch: 0.8,
+      small: {
+        radius: 3.5,
+        unitDamageCenter: 35,
+        unitDamageEdge: 15,
+        unitNerveCenter: 20,
+        unitNerveEdge: 10,
+        pushCenter: 3,
+        pushEdge: 1,
+        knockdown: 0,
+        structureDamage: 30,
+        props: true,
+        kaijuDamage: 30,
+      },
+    },
+    watertank: {
+      speed: 22,
+      // About 10 m across: it knocks units over and pushes them out, a little like the roar.
+      radius: 5,
+      unitDamageCenter: 30,
+      unitDamageEdge: 30,
+      unitNerveCenter: 20,
+      unitNerveEdge: 10,
+      pushCenter: 6,
+      pushEdge: 4,
+      knockdown: 1.5,
+      structureDamage: 0,
+      props: false,
+      kaijuDamage: 0,
+    },
+    antenna: {
+      speed: 70,
+      gravity: 1.5,
+      range: 120,
+      pierce: 3,
+      unitDamage: 110,
+      unitNerve: 40,
+      push: 3,
+      structureDamage: 150,
+      kaijuDamage: 110,
+    },
+    mast: {
+      speed: 60,
+      gravity: 2,
+      range: 110,
+      pierce: 5,
+      unitDamage: 200,
+      unitNerve: 60,
+      push: 5,
+      structureDamage: 400,
+      kaijuDamage: 200,
+    },
+    garagedoor: {
+      // Raw hit damage it soaks up: about 80 rockets.
+      hp: 250,
+      halfArc: 70 * DEG,
+      throw: {
+        speed: 32,
+        gravity: 3,
+        range: 70,
+        radius: 3.5,
+        unitDamageCenter: 80,
+        unitDamageEdge: 80,
+        unitNerveCenter: 30,
+        unitNerveEdge: 30,
+        pushCenter: 4,
+        pushEdge: 3,
+        knockdown: 1.5,
+        structureDamage: 60,
+        props: true,
+        kaijuDamage: 80,
+      },
+    },
+  },
+
+  // The special buildings (docs/ROADMAP.md phase 2): what wrecking each pays, once.
+  rewards: {
+    surge: { duration: 8, cooldownRate: 3, damageMult: 1.5, rage: 50 },
+    fireball: {
+      // 30 m across round the middle of the gas station (26 by 20 m): it fills the lot and
+      // reaches the houses behind and beside it.
+      radius: 15,
+      unitDamageCenter: 90,
+      unitDamageEdge: 25,
+      unitNerveCenter: 60,
+      unitNerveEdge: 20,
+      pushCenter: 8,
+      pushEdge: 3,
+      knockdown: 0,
+      structureDamage: 150,
+      props: true,
+      kaijuDamage: 0,
+    },
+    radiomast: { staticTime: 20, topLength: 8 },
   },
 
   // Molt cards (docs/ROADMAP.md, phase 1): the beam, the roar or the charge at the first molt;

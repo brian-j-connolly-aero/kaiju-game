@@ -1,5 +1,5 @@
 /**
- * System 4 of 11: bots.
+ * System 4 of 12: bots.
  *
  * Bots play through the same interface as people: for every player with `player.bot === true`
  * this system writes the input the bot wants for the NEXT tick into `player.botInput` (a

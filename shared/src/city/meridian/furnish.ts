@@ -1,9 +1,13 @@
 /**
  * Small breakables for Port Meridian: parked and moving cars, buses at stops, kiosks, trees,
- * lamps, traffic lights, benches, hydrants and billboards. Vehicles stand on the roadway (or in
- * a driveway); everything else stands off it. Nothing is placed in water or inside a building.
+ * lamps, traffic lights, benches, hydrants and billboards, and the city weapons the hatchling can
+ * pick up (propane tanks, water tanks, antennas, fast-food signs, garage doors: a handful of each
+ * beside the houses and shops of every starting neighborhood, a few elsewhere). Vehicles stand on
+ * the roadway (or in a driveway); everything else stands off it. Nothing is placed in water or
+ * inside a building.
  */
 
+import { STAGES } from '../../defs/stages';
 import { createRng, hash32, rngChance, rngFloat, rngInt, rngRange, type Rng } from '../../math/rng';
 import type { Vec2 } from '../../math/vec';
 import type { Area, Prop, PropKindId } from '../types';
@@ -13,7 +17,7 @@ import { patchAt, type Builder, type Street } from './build';
 import { DIR_COS, DIR_SIN, DIR_YAW, nearestDir, turnDir } from './dirs';
 import { distSqPointBox, distSqPointSeg, len, pointInPolygon, quant } from './geo';
 import { dryAround, G_LAND, G_PARK, G_PLAZA, groundAt } from './ground';
-import { EDGE } from './layout';
+import { ANCHORS, EDGE } from './layout';
 import type { PaletteId } from './palettes';
 
 /** Props stay inside this distance from the center on both axes. */
@@ -364,6 +368,127 @@ function furnishBanks(f: Furnisher, river: River, seed: number): void {
   walk(river.bankEast, river.center);
 }
 
+/**
+ * The city weapons of every starting neighborhood (DESIGN.md section 4, "The city as a weapon"):
+ * how many of each stand beside its houses and shops. The fast-food signs go by the shops (by the
+ * houses where there are too few shops); everything else by the houses.
+ */
+const WEAPONS_PER_START: ReadonlyArray<readonly [PropKindId, number]> = [
+  ['propane', 5],
+  ['watertank', 4],
+  ['antenna', 4],
+  ['foodsign', 4],
+  ['garagedoor', 4],
+];
+/** Outside the starting neighborhoods, about one house or shop in this many has one beside it. */
+const WEAPON_SCATTER = 45;
+
+/**
+ * Spots tried for each weapon round its building, in the box's own frame: [local x, local z]
+ * as multiples of the half extents plus meters, i.e. [sideways in half widths, meters beyond,
+ * forward in half depths, meters beyond]. The front of the box (local +Z) faces the street.
+ */
+const WEAPON_SPOTS: Readonly<Record<string, ReadonlyArray<readonly [number, number, number, number]>>> = {
+  // A tank by the side wall, toward the back; else behind.
+  propane: [[1, 2.2, -0.5, 0], [-1, -2.2, -0.5, 0], [0.5, 0, -1, -2.2], [-0.5, 0, -1, -2.2]],
+  // On its legs in the back garden; else at the side.
+  watertank: [[0, 0, -1, -2.8], [0.6, 0, -1, -2.8], [-0.6, 0, -1, -2.8], [1, 2.6, -0.6, 0], [-1, -2.6, -0.6, 0]],
+  // The pole beside the house.
+  antenna: [[1, 1.3, 0, 0], [-1, -1.3, 0, 0], [1, 1.3, -0.7, 0], [-1, -1.3, -0.7, 0], [0, 0, -1, -1.3]],
+  // The pole sign out front, by the pavement, at one end of the shop.
+  foodsign: [[0.8, 0, 1, 2.6], [-0.8, 0, 1, 2.6], [1, 2.4, 0.8, 0], [-1, -2.4, 0.8, 0]],
+  // A garage door in its frame at the side, by the drive.
+  garagedoor: [[1, 2.4, 0.3, 0], [-1, -2.4, 0.3, 0], [1, 2.4, -0.5, 0], [-1, -2.4, -0.5, 0], [0.5, 0, -1, -2.6], [-0.5, 0, -1, -2.6]],
+};
+
+/** A square a weapon must stand in (with a 2 m margin), or null for anywhere. */
+interface WeaponArea {
+  cx: number;
+  cz: number;
+  h: number;
+}
+
+/** Puts a weapon of `kind` beside structure `id` (the first legal spot of its list, inside `area` when one is given). */
+function weaponBeside(f: Furnisher, kind: PropKindId, id: number, turn: number, area: WeaponArea | null): boolean {
+  const box = f.b.boxes[id];
+  const fx = DIR_SIN[box.dir];
+  const fz = DIR_COS[box.dir];
+  // Local +X of the box is (cos, -sin).
+  const sx = DIR_COS[box.dir];
+  const sz = -DIR_SIN[box.dir];
+  for (const [ax, mx, az, mz] of WEAPON_SPOTS[kind]) {
+    const lx = ax * box.hx + mx;
+    const lz = az * box.hz + mz;
+    // A sign faces the street; the rest stand at some angle to the house.
+    const dir = kind === 'foodsign' ? box.dir : turnDir(box.dir, turn);
+    const x = box.x + sx * lx + fx * lz;
+    const z = box.z + sz * lx + fz * lz;
+    if (area && (x < area.cx - area.h + 2 || x > area.cx + area.h - 2 || z < area.cz - area.h + 2 || z > area.cz + area.h - 2)) continue;
+    if (put(f, kind, x, z, dir)) return true;
+  }
+  return false;
+}
+
+/** Fisher-Yates with the seeded generator: the same order on every engine. */
+function shuffle(list: number[], rng: Rng): void {
+  for (let i = list.length - 1; i > 0; i--) {
+    const j = rngInt(rng, i + 1);
+    const t = list[i];
+    list[i] = list[j];
+    list[j] = t;
+  }
+}
+
+function furnishWeapons(f: Furnisher, seed: number): void {
+  const b = f.b;
+  const h = STAGES[0].boundsHalfSize;
+  const inStart = new Uint8Array(b.structures.length);
+  for (let ai = 0; ai < ANCHORS.length; ai++) {
+    // The stage 1 square, as stageBounds gives it.
+    const ax = -ANCHORS[ai].at[0];
+    const az = ANCHORS[ai].at[1];
+    const cx = ax < -b.half + h ? -b.half + h : ax > b.half - h ? b.half - h : ax;
+    const cz = az < -b.half + h ? -b.half + h : az > b.half - h ? b.half - h : az;
+    const square: WeaponArea = { cx, cz, h };
+    const homes: number[] = [];
+    const shops: number[] = [];
+    for (let id = 0; id < b.structures.length; id++) {
+      const s = b.structures[id];
+      if (s.x < cx - h || s.x > cx + h || s.z < cz - h || s.z > cz + h) continue;
+      inStart[id] = 1;
+      if (s.cls === 'house') homes.push(id);
+      else if (s.cls === 'shop' && s.archetype !== 'gasstation_a') shops.push(id);
+    }
+    // A seeded shuffle of each (no engine sort).
+    const rng = createRng(hash32(seed, 821, ai));
+    shuffle(homes, rng);
+    shuffle(shops, rng);
+    // Each kind goes round its pool (shops first for the signs, then houses) from where the last
+    // kind stopped, so the kinds spread over different buildings.
+    let next = 0;
+    for (const [kind, count] of WEAPONS_PER_START) {
+      const pool = kind === 'foodsign' ? [...shops, ...homes] : [...homes, ...shops];
+      let placed = 0;
+      for (let n = 0; n < pool.length && placed < count; n++) {
+        const id = pool[(next + n) % pool.length];
+        if (weaponBeside(f, kind, id, (hash32(seed, 823, id) % 9) * 4 - 16, square)) {
+          placed++;
+          if (kind !== 'foodsign') next = (next + n + 1) % pool.length;
+        }
+      }
+    }
+  }
+  // A few elsewhere, by the houses and shops of the rest of the town.
+  for (let id = 0; id < b.structures.length; id++) {
+    const s = b.structures[id];
+    if (inStart[id] || (s.cls !== 'house' && s.cls !== 'shop') || s.archetype === 'gasstation_a') continue;
+    const roll = hash32(seed, 827, id);
+    if (roll % WEAPON_SCATTER !== 0) continue;
+    const kind = WEAPONS_PER_START[(roll >>> 8) % WEAPONS_PER_START.length][0];
+    weaponBeside(f, kind, id, ((roll >>> 16) % 9) * 4 - 16, null);
+  }
+}
+
 export function furnish(b: Builder, nodes: readonly Vec2[], nodeStreets: number[][], areas: readonly Area[], river: River, seed: number): Prop[] {
   const occCols = Math.ceil((b.half * 2) / OCC_CELL);
   const f: Furnisher = { b, props: [], occ: new Uint8Array(occCols * occCols), occCols, nodeStreets };
@@ -372,5 +497,6 @@ export function furnish(b: Builder, nodes: readonly Vec2[], nodeStreets: number[
   furnishAreas(f, areas, seed);
   furnishGardens(f, seed);
   furnishBanks(f, river, seed);
+  furnishWeapons(f, seed);
   return f.props;
 }

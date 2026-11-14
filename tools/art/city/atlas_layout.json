@@ -1291,6 +1291,97 @@
    "twin": null,
    "owner": "kit",
    "note": "metal grille"
+  },
+  "sp_fence": {
+   "x": 256,
+   "y": 256,
+   "w": 128,
+   "h": 12,
+   "kind": "texture",
+   "bay_px": 16,
+   "storey_px": 16,
+   "tint": false,
+   "twin": null,
+   "owner": "industry",
+   "note": "chain-link fence, 24 x 2.25 m"
+  },
+  "sp_mast_bands": {
+   "x": 256,
+   "y": 272,
+   "w": 8,
+   "h": 48,
+   "kind": "picture",
+   "bay_px": 16,
+   "storey_px": 16,
+   "tint": false,
+   "twin": null,
+   "owner": "industry",
+   "note": "mast bands, red on top"
+  },
+  "sp_sign_flame": {
+   "x": 268,
+   "y": 272,
+   "w": 16,
+   "h": 16,
+   "kind": "picture",
+   "bay_px": 16,
+   "storey_px": 16,
+   "tint": false,
+   "twin": null,
+   "owner": "industry",
+   "note": "flame sign (gas station)"
+  },
+  "sp_sign_bolt": {
+   "x": 288,
+   "y": 272,
+   "w": 16,
+   "h": 16,
+   "kind": "picture",
+   "bay_px": 16,
+   "storey_px": 16,
+   "tint": false,
+   "twin": null,
+   "owner": "industry",
+   "note": "high-voltage warning sign"
+  },
+  "sp_pump": {
+   "x": 308,
+   "y": 272,
+   "w": 8,
+   "h": 12,
+   "kind": "picture",
+   "bay_px": 16,
+   "storey_px": 16,
+   "tint": false,
+   "twin": null,
+   "owner": "industry",
+   "note": "fuel pump front 1.5 x 2.25 m"
+  },
+  "sp_bottles": {
+   "x": 320,
+   "y": 272,
+   "w": 16,
+   "h": 10,
+   "kind": "picture",
+   "bay_px": 16,
+   "storey_px": 16,
+   "tint": false,
+   "twin": null,
+   "owner": "industry",
+   "note": "gas bottle cage 3 x 1.9 m"
+  },
+  "sp_insulator": {
+   "x": 340,
+   "y": 272,
+   "w": 4,
+   "h": 8,
+   "kind": "picture",
+   "bay_px": 16,
+   "storey_px": 16,
+   "tint": false,
+   "twin": null,
+   "owner": "industry",
+   "note": "ribbed ceramic insulator"
   }
  }
 }

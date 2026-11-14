@@ -152,20 +152,29 @@ State (plain objects and typed arrays, cheap to snapshot):
   the moves picked at the molts (`moves`, two slots) and the molt cards on offer (`offer`);
   server-side only: `forceMolt` and `collapse` (never alone, below).
 - `squads[]`: player or bot, faction, level, 4 unit ids, driven unit id (-1 when eliminated),
-  upgrades and mods, eliminated flag; server-side only: the leader's `trail` (with `trailBase`,
+  upgrades and mods, eliminated flag, its weapon pick-up (`pickup`) and the artillery radio's
+  barrages left (`barrages`); server-side only: the leader's `trail` (with `trailBase`,
   how many points have dropped off its front, so a point keeps its number), `formed` and
   `volleyReady`.
 - `units[]`: id, squad, type, pos (and altitude for aircraft), yaw, aim yaw and pitch (for the
   tank a person drives, the turret: it turns at its own rate, see `stepMovement` below), hp,
   members, nerve, shaken timer, the roar's stun timer (`stun`), charge, weapon cooldown, veteran
-  flag, `rooted` (a squad-mate planted for the volley); server-side only: `nav` (route,
+  flag, `rooted` (a squad-mate planted for the volley), `drop` (seconds left of coming down
+  by parachute, reinforcements; its `y` is its height meanwhile); server-side only: `nav` (route,
   steering memory of a squad-mate, the trail point it is driving for when it has fallen behind;
   `sim/nav.ts`).
-- `projectiles[]`: id, type, owner, pos, velocity, flight model (`flat | arc | thrown`), ttl.
+- `projectiles[]`: id, type, owner, pos, velocity, flight model (`flat | arc | thrown |
+  guided`), ttl; a guided one (the missile pod) also an acceleration and `steer`, the seconds
+  of it left.
 - `callIns[]`: artillery missions on their way (marker, timers, shells left, approach direction).
+- `crates[]`: the army's supply crates coming down or lying on the ground (id, kind, position,
+  `fall` seconds left), `nextCrateId`; server-side only: `supply` (the stage they belong to, the
+  timer of the next drop, whose turn it is).
 - City state: `Float32Array` hp per structure id (plus the visual stage per structure), bitset
-  of live props, bitset of prop wrecks still lying on the ground; `shields` (zones that reduce
-  structure damage, Tier 2) and `insuredStructures` (landmarks covered by the insurance rider).
+  of live props, bitset of prop wrecks still lying on the ground, `structureFall` (per
+  structure: 0, or 1 + the side it lies fallen toward; `cityQuery.fallen` lists those);
+  `shields` (zones that reduce structure damage, Tier 2) and `insuredStructures` (landmarks
+  covered by the insurance rider); server-side only: `falls` (structures on their way over).
 - Queues filled during a tick: `hits` (drained by the damage system through `applyHit`),
   `structureHits` and `propHits` (drained by the city damage system). Systems never change hp
   directly; they queue. Two things are immediate because the object must be gone at once: a
@@ -178,9 +187,9 @@ State (plain objects and typed arrays, cheap to snapshot):
   that it takes two squads to break its nerve).
 
 Systems run in a fixed order each tick: inputs → kaiju actions → unit orders and sub-unit AI →
-bots → movement and collision → weapons and volleys → projectiles → damage and nerve → city
-damage and bar → molt and match flow → voice cues. Each system is one file in `systems/`,
-operates on `World`, and is covered by tests.
+bots → movement and collision → supply crates and pick-ups → weapons and volleys → projectiles
+→ damage and nerve → city damage and bar → molt and match flow → voice cues. Each system is one
+file in `systems/`, operates on `World`, and is covered by tests.
 
 | # | File in `sim/systems/` | Reads | Writes |
 | --- | --- | --- | --- |
@@ -189,14 +198,16 @@ operates on `World`, and is covered by tests.
 | 3 | `unitOrders.ts` | `player.input` (the volley button, the leader's aim), the kaiju, the city | spotting, takeover, the leader's trail, every squad-mate's `control` (swarm, planting and charging, fire at will), `rooted`, charge, `state`, `nav` |
 | 4 | `bots.ts` | the world | `player.botInput` for the NEXT tick (bots use the same input interface as people); `player.botState` |
 | 5 | `movement.ts` | `player.input`, `unit.control` | positions, the kaiju's head aim; queues trample and wade damage to the city |
-| 6 | `weapons.ts` | `unit.control.fire`, the volley button's release, aim, charge, `callIns` | weapon cooldowns, projectiles (salvos, volleys, shells), `rooted` and charge back to nothing after a volley, `volley`, the `callin` phases |
-| 7 | `projectiles.ts` | projectiles | flight, impacts; queues hits, structure and prop damage |
-| 8 | `damage.ts` | `hits` | hp, nerve, stagger, shaken, deaths, squad elimination, rage; tramples units under a moving kaiju |
-| 9 | `cityDamage.ts` | `structureHits`, `propHits` | structure hp and stages, props and wrecks, the bar, tallies, rage, `barMark`, `moltAvailable` |
-| 10 | `matchFlow.ts` | the bar marks, hp, the clock, a cocoon that has run its time, squads all eliminated | phases, the clock, never alone (the city gives way, `forceMolt`), the end of the molt (blast wave, the kaiju's new body, intermission, a molt card drawn if none was picked, `beginStage`), the end of the match |
-| 11 | `voice.ts` | this tick's events, kaiju hp, the bar | `voice` events with the lines to play (rationed) |
+| 6 | `pickups.ts` | the stage, the clock of drops, unit positions | `crates` (drops, landings, takes, gone at the stage's end: `crate`), `squad.pickup` and `barrages`, reinforcements (`reinforce`, units' `drop` and `y`) |
+| 7 | `weapons.ts` | `unit.control.fire`, the volley button's release, aim, charge, `squad.pickup` and `barrages`, `callIns` | weapon cooldowns, projectiles (salvos, volleys, missile salvos, shells), `rooted` and charge back to nothing after a volley, `volley`, the radio's barrages and the `callin` phases |
+| 8 | `projectiles.ts` | projectiles | flight, impacts; queues hits, structure and prop damage |
+| 9 | `damage.ts` | `hits` | hp, nerve, stagger, shaken, deaths, squad elimination, rage; tramples units under a moving kaiju |
+| 10 | `cityDamage.ts` | `structureHits`, `propHits`, `falls` | structure hp and stages, buildings falling over (`structureFall`, what they land on), props and wrecks, the bar, tallies, rage, `barMark`, `moltAvailable` |
+| 11 | `matchFlow.ts` | the bar marks, hp, the clock, a cocoon that has run its time, squads all eliminated | phases, the clock, never alone (the city gives way, `forceMolt`), the end of the molt (blast wave, the kaiju's new body, intermission, a molt card drawn if none was picked, `beginStage`), the end of the match |
+| 12 | `voice.ts` | this tick's events, kaiju hp, the bar | `voice` events with the lines to play (rationed) |
 
-All eleven are implemented; `docs/STATUS.md` lists what is still a stub elsewhere.
+All twelve are implemented (the city's phase 2 systems are listed with its work); `docs/STATUS.md`
+lists what is still a stub elsewhere.
 
 How a match runs from start to end (`systems/matchFlow.ts`; rules in `DESIGN.md` section 2):
 
@@ -280,14 +291,24 @@ How the human side is put together (`DESIGN.md` section 5 has the rules):
   its charge (`volleyStrength`, `isChargedVolley` in `sim/squads.ts`): ragged below
   `COMBAT_RULES.volleyMinCharge`, a charged volley from there up. A unit's projectile lives
   for `SQUAD_RULES.rangeSlack` times its weapon's range (`ttl`), which is how range limits
-  every shot. Aim error is added per projectile from the world's generator. Call-in missions
-  live in `world.callIns` and release their shells here; no button starts one in phase 1, and
-  `startCallIn(world, squad, callIn, x, z)` is the one way in for the radio that will.
-- **Markers placed with the crosshair** (`resolveMarkerPoint` in `sim/aim.ts`; nothing calls it
-  in phase 1, it is kept for the radio's call-ins): the ground under a kaiju the crosshair is
-  on, else where the aim ray lands, else a kaiju on the map just beside the crosshair, else a
-  short way ahead (move-to) or nothing (call-in). It needs only snapshot data, so a client can
-  show where a marker would go.
+  every shot. Aim error is added per projectile from the world's generator. The driven unit
+  fires `unitWeapon(squad, unit)`: its own weapon, or the squad's weapon pick-up made from it
+  (`pickupWeaponDef` in `defs/pickups.ts`: the machine gun's tracers with a spread, the big
+  cannon's heavy shells, the missile pod's guided salvo); squad-mates always fire their own.
+  Call-in missions live in `world.callIns` and release their shells here; the artillery radio
+  starts one (`startCallIn(world, squad, callIn, x, z)`) with each charged volley while the
+  squad has barrages left.
+- **Supply crates and pick-ups** (`systems/pickups.ts`, numbers in `defs/pickups.ts`): a crate
+  for every squad when a stage starts and one every 30 s after, on a street near a squad
+  (`dropCrate`), taken by the nearest unit that touches it once it has landed; weapon pick-ups
+  and the radio are squad state (`pickup`, `barrages`) until the stage ends or the squad is
+  wiped out; reinforcements bring the dead back by parachute (`unit.drop`, `unit.y`: the
+  movement, orders and weapon systems leave such a unit be until it lands). `MatchConfig.crates`
+  false turns the crates off (tests of one rule, `npm run sim -- --no-crates`).
+- **Where the radio's barrage comes down** (`resolveMarkerPoint` in `sim/aim.ts`): the ground
+  under a kaiju the crosshair is on, else where the aim ray lands, else a kaiju on the map just
+  beside the crosshair, else nowhere (the barrage is kept). It needs only snapshot data, so a
+  client can show where a barrage would go.
 - **Breaking nerve** (`systems/damage.ts`). A hit carries `volleySquad` when it is part of a
   charged volley; the kaiju remembers each squad's latest one (`volleyHits`) and its nerve
   breaks only while `COMBAT_RULES.breakSquads` squads have landed one within
@@ -297,6 +318,19 @@ How the human side is put together (`DESIGN.md` section 5 has the rules):
   flight, spotting, lines of fire, corridors and `resolveAimPoint` all set it. A projectile that
   reaches the ground on a standing deck reports the deck as the structure it hit. (The beam is
   the exception: `beamPath` still stops at a deck.)
+- **Rubble and fallen buildings** (phase 2; `city/spatialIndex.ts`, `systems/cityDamage.ts`,
+  `defs/rubble.ts`). A collapsed structure is a mound: over its footprint, `index.srubble[id]`
+  high (half its height, at most 40 m; none for a deck), or, when it fell over
+  (`structureFall[id]` = 1 + side), the long box `fallenBox(index, id, side)` where it lies.
+  `moundBox(query, id)` gives either. The casts take a last flag, `mounds`: projectile flight,
+  `resolveAimPoint`, spotting, squad-mates' and the squad bot's lines of fire set it (a mound
+  blocks them up to its height, except one the cast starts inside); corridors, navigation, the
+  camera and the beam leave it out (bodies cross mounds; the beam burns over them).
+  `moundHeightAt(query, x, z)` is what movement reads (`MoveParams.moundSpeedMult`: half speed
+  for units, 1 for the kaiju). A tall structure's collapse may become a fall
+  (`startStructureFall(world, id, dirX, dirZ, by, cause)`, exported for the city's radio mast:
+  it returns where the top lands); `world.falls` counts it down and lands it at the start of
+  the city damage system, which queues what it crushes and applies it in the same pass.
 
 How the kaiju's action state machine, the damage rules and the molt hand over to each other:
 
@@ -344,8 +378,10 @@ How the kaiju's action state machine, the damage rules and the molt hand over to
   `aimYaw` / `aimPitch` are the true beam direction.
 - **Projectiles** fly along `p0 + v0 t - (0, g t² / 2, 0)` with t counted from the spawn tick
   (`stepProjectile`); a projectile has already flown one step at the end of the tick that
-  spawned it. `spawnProjectile(world, init)` is the one way to launch one. The kaiju's throw,
-  unit fire, volleys and artillery shells all use it.
+  spawned it. A guided one (the missile pod) flies `p0 + v0 t + a t² / 2` for its first `steer`
+  seconds (a whole number of ticks) and straight on after; the weapon system chooses `a` so it
+  arrives on the aim point exactly. `spawnProjectile(world, init)` is the one way to launch one.
+  The kaiju's throw, unit fire, volleys and artillery shells all use it.
 
 Movement uses one shared pure function,
 `stepMovement(body, input, dt, cityQuery, params, result?)`, for circle bodies against
@@ -360,15 +396,20 @@ stages 2 and 3: `unitMoveParams(def, { alive, rooted, stun, driven }, bounds)` p
 throttle and the hull's turn, and the body's `aimYaw` (`MoveBody.aimYaw`, the snapshot unit's
 `aimYaw`) is the turret, which `stepMovement` turns toward the input's aim at `turretRate`.
 `setTankMove` turns a wanted direction into throttle and turn, for bots and autoplay. The
-header of `shared/src/net/input.ts` has the rules.
+header of `shared/src/net/input.ts` has the rules. Since phase 2 `MoveParams` also carries
+`moundSpeedMult` (units cross rubble at half speed; the kaiju at its own pace) and
+`unitMoveParams` reads the unit's `y`: a ground unit up in the air is coming down by parachute
+and does not move. A client predicting its own unit needs its mirrored city's falls
+(`setStructureFallen`) for the slow-down to match.
 
 The city (`shared/src/city`): `generatePortMeridian(seed)` (`city/meridian/`, `docs/CITY.md`)
 builds Port Meridian as `CityData` (structures, props, road graph, water and park areas,
 districts, neighborhood anchors) identically on every machine; `cityChecksum` verifies it.
 `buildCityIndex` makes the static spatial index; a `CityQuery` is that index plus one match's
-live state (structure hp, live props) and is what every query takes: `structuresInCircle`,
+live state (structure hp, live props, which structures lie fallen and which way:
+`structureFall`, `fallen`) and is what every query takes: `structuresInCircle`,
 `circleHitsStructure`, `propsInCircle`, `castSegment`, `castRay`, `lineOfSight`, `structureAt`,
-`bridgeAt`, `inWater`. `getCity(seed)` builds both once per process and caches them; the server,
+`bridgeAt`, `inWater`, `moundHeightAt`, `moundBox`. `getCity(seed)` builds both once per process and caches them; the server,
 the welcome's city checksum, the build stamp, the client and the sandbox all get the city from
 it. The old placeholder grid (`generateCity(seed)`) is kept for tests and as a development
 option: `getCity(seed, 'placeholder')`, `npm run sim -- --city placeholder`. Building Port
@@ -529,6 +570,17 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
   level, flags and `driven` (the movement order, fire mode, move-to point, call-in cooldowns,
   smoke and mark cooldowns and the kaiju's `marked` flag are gone), and the smoke clouds list
   is gone.
+- Snapshot version 4 (phase 2; one bump for the army's and the city's work together;
+  `PROTOCOL_VERSION` unchanged): the squad record adds `pickup` (its weapon pick-up, a
+  `PICKUP_IDS` code, 'none' without one) and `barrages` (the artillery radio's barrages left);
+  the snapshot ends with the supply crates (`crates`: id, kind, x, z and `fall`, the seconds
+  until it lands, 0 once it is on the ground). A unit coming down by parachute shows as its
+  `y` (the city's own additions are listed with its work).
+- The city state of the `welcome` (`encodeCityState`, `shared/src/net/cityState.ts`) ends,
+  since phase 2, with the list of structures that lie fallen over and the side each fell
+  toward; `cityStateFromWire` turns it into the `structureFall` and `fallen` of a `CityState`,
+  so a client's queries count fallen buildings at once. Bytes that end before it decode as
+  nothing fallen.
 - Projectiles are **not** in snapshots. Clients spawn them from `projectileSpawn` events and fly
   them locally with the same kinematics; `projectileHit` ends them.
 - Structure changes are events (`structureStage { id, stage }` with stage 0 intact, 1 damaged,
@@ -699,8 +751,9 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
 `structureStage`, `propsDestroyed`, `kaijuAction`, `kaijuHit`, `kaijuStagger`, `kaijuHeld`,
 `nerveBreak`, `crossfire`, `unitHit`, `memberLost`, `unitDestroyed`, `unitShaken`, `takeover`,
 `volley`, `roar`, `callin`, `moltAvailable`, `cocoon`, `moltBlast`, `stageChange`, `barMark`,
-`matchPhase`, `voice`, `matchEnd`, `unitStunned`, `moltOffer`, `moltPick`, `cityCollapse`.
-Every event carries its `tick`; the payloads are defined and documented in
+`matchPhase`, `voice`, `matchEnd`, `unitStunned`, `moltOffer`, `moltPick`, `cityCollapse`,
+and since phase 2 `structureFall`, `crate` and `reinforce` (the city's own new events are listed
+with its work). Every event carries its `tick`; the payloads are defined and documented in
 `shared/src/sim/events.ts`.
 
 What clients can rely on from the squad events and the squad part of a snapshot:
@@ -723,8 +776,26 @@ What clients can rely on from the squad events and the squad part of a snapshot:
   to the first impact, `radius` the scatter to draw), 'inbound' (the first shell is falling)
   and 'done' (the last shell has landed, or the molt's blast called the mission off). Its
   shells are `projectileSpawn` events with `owner: 'callin'` and `ownerId` the mission id.
-  Nothing starts a mission in phase 1 (the button is gone; `startCallIn` is the way in for the
-  radio of phase 2).
+  The artillery radio starts one with each of a squad's next three charged volleys: its
+  'marked' comes on the volley's tick, right after the `volley` event, on the ground the
+  crosshair marks, and the radio says so (`voice` cue `callin.inbound`).
+- Supply crates: `crate` 'drop' (where, the squad it is meant for, `duration` of the fall and
+  the `height` it starts from), 'land', 'take' (the unit and squad that took it, and what it
+  held) and 'gone' (the stage ended). The snapshot's `crates` say where they are and how long
+  each still falls; its squad record says what a squad holds (`pickup`, `barrages`).
+  Reinforcements come with a `reinforce` event on the 'take' tick: the units healed and the
+  ones coming down by parachute (each falls straight down at a steady speed from `height` over
+  `duration` seconds; the snapshot unit's `y` is its height meanwhile).
+- The pick-up weapons' shots are ordinary `projectileSpawn` events of the leader: 'tracer'
+  (the machine gun: five times as many, with a spread), 'heavyShell' (the big cannon; its
+  `projectileHit` carries the wider `splash`) and 'missile' (the missile pod: six on one tick,
+  flight 'guided', each with an acceleration `ax`, `ay`, `az` for its first `steer` seconds:
+  fly it with `stepProjectile`, which `test/pickups.test.ts` checks lands where the server says).
+- `structureFall`: 'falling' (on the tick a slender structure collapses, right after its
+  `structureStage` 3: tip it over `side` about the pivot (x, z) toward heading `yaw` over
+  `duration` seconds, its top landing at (topX, topZ)) and 'landed' (it lies there now; the
+  hits of what it landed on follow, cause 'fall'). Mirror it with `setStructureFallen(query,
+  id, side)` on 'landed', so the client's casts and prediction see the long mound.
 - `takeover` comes the tick after the `unitDestroyed` of the driven unit; from that tick the
   squad's `driven` (and the unit flag) point at the new unit. An eliminated squad has
   `driven: -1`.
@@ -733,7 +804,9 @@ What clients can rely on from the squad events and the squad part of a snapshot:
 
 What clients can rely on from the kaiju and city events:
 
-- The live city can be mirrored from events alone: `structureStage` (stage per structure),
+- The live city can be mirrored from events alone: `structureStage` (stage per structure; at
+  stage 3 it is rubble, a mound half its height over its footprint: `moundBox`),
+  `structureFall` 'landed' (it lies fallen: `setStructureFallen`),
   `propsDestroyed` (the props are gone; cars leave a wreck) and `kaijuHeld` (`source: 'prop'`:
   that prop is gone with no wreck; `'propWreck'`: that wreck is gone; `'unitWreck'`: that dead
   vehicle's wreck is gone, which the snapshot's unit flags also show).
@@ -845,7 +918,8 @@ layout, requires bumping `SNAPSHOT_VERSION` / `PROTOCOL_VERSION`.
   per stage. These are the balance instrument; `docs/BALANCE.md` says how to read them and
   records every tuning pass. Options: `--seeds N`, `--seed N`, `--unopposed`,
   `--kaiju-handicap H`, `--human-handicap H`, `--trigger-happy` (squads that hold the trigger
-  instead of charging volleys), `--fast`, `--anchor N`, `--every-anchor`, `--bar P1,P2,P3` and
+  instead of charging volleys), `--no-crates` (no army supply crates), `--fast`, `--anchor N`,
+  `--every-anchor`, `--bar P1,P2,P3` and
   `--clock S` (other bar fractions or another clock for one run), `--nav`, `--events`, `--json`;
   the header of `shared/scripts/sim.ts` lists them all.
 - The simulation is deterministic and the tests hold it to that: `test/determinism.test.ts`

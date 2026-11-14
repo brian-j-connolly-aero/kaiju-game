@@ -8,7 +8,7 @@
 
 import { BUTTON_COUNT } from '../../net/input';
 
-export type SquadBotMode = 'approach' | 'hold' | 'retreat' | 'search';
+export type SquadBotMode = 'approach' | 'hold' | 'retreat' | 'search' | 'crate';
 export type KaijuBotGoal = 'none' | 'structure' | 'prop' | 'hide' | 'point';
 
 export interface BotState {
@@ -52,6 +52,9 @@ export interface BotState {
   /** The leader has a line of fire to the kaiju (as of the last look), and to which height on its body (a fraction; -1: none). */
   los: boolean;
   aimHeight: number;
+  /** The supply crate it is fetching (mode 'crate'; -1: none), and for how long it has been at it. */
+  crate: number;
+  crateTime: number;
 
   // --- Kaiju bot ---------------------------------------------------------------------------
   goal: KaijuBotGoal;
@@ -100,6 +103,14 @@ export interface BotState {
   chargeUnit: number;
   chargeX: number;
   chargeZ: number;
+  /**
+   * The city weapon it is going to pick up (phase 2): a prop id, or a loose object's id when
+   * `weaponLoose`; -1 for none. How long it has been at it, and how long before it tries again.
+   */
+  weaponId: number;
+  weaponLoose: boolean;
+  weaponFor: number;
+  weaponRest: number;
 }
 
 export function createBotState(): BotState {
@@ -129,6 +140,8 @@ export function createBotState(): BotState {
     waited: 0,
     los: false,
     aimHeight: -1,
+    crate: -1,
+    crateTime: 0,
 
     goal: 'none',
     goalId: -1,
@@ -160,5 +173,9 @@ export function createBotState(): BotState {
     chargeUnit: -1,
     chargeX: 0,
     chargeZ: 0,
+    weaponId: -1,
+    weaponLoose: false,
+    weaponFor: 0,
+    weaponRest: 0,
   };
 }
