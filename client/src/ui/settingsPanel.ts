@@ -5,6 +5,11 @@
  * half resolution (for weak graphics hardware), and the check mark closes the panel. Clicking
  * anywhere outside the panel closes it too.
  *
+ * In a match (or on its end screen) the room's host also gets a circular arrow: restart. The
+ * first press arms it (it turns red and pulses), a second press within RESTART_ARM_SECONDS
+ * starts the match over for everyone with the same people on the same sides; otherwise it
+ * disarms by itself.
+ *
  * It is opened from the gear button on the home screen and in the lobby, and with Escape (or
  * Start on a gamepad) anywhere, a match included. The panel only shows and edits values: the
  * host applies and stores them.
@@ -33,7 +38,14 @@ export interface SettingsHost {
   setFullscreen(on: boolean): void;
   /** A click sound, so a volume change can be heard. */
   click(): void;
+  /** Whether the restart button shows (this player is the host, and a match is on or just over). */
+  canRestart?(): boolean;
+  /** Restart the match for everyone (sent to the server; only the host's is obeyed). */
+  restart?(): void;
 }
+
+/** Seconds the restart button stays armed after its first press. */
+export const RESTART_ARM_SECONDS = 4;
 
 const STEPS = 100;
 
@@ -66,13 +78,15 @@ export class SettingsPanel {
   private readonly fullscreen = el('button', 'btn settings-toggle settings-fullscreen', [icon('ui_fullscreen')]);
   private readonly lowRes = el('button', 'btn settings-toggle settings-lowres', [icon('ui_lowres')]);
   private readonly done = el('button', 'btn settings-done', [icon('lb_ready')]);
+  private readonly restart = el('button', 'btn settings-toggle settings-restart hidden', [icon('ui_restart')]);
+  private armTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(host: SettingsHost) {
     this.host = host;
     const panel = el('div', 'settings-panel', [
       el('div', 'settings-row', [icon('ui_sound', 'settings-icon'), this.volume]),
       el('div', 'settings-row', [icon('ms_move', 'settings-icon'), this.mouse]),
-      el('div', 'settings-row settings-buttons', [this.invert, this.fullscreen, this.lowRes, this.done]),
+      el('div', 'settings-row settings-buttons', [this.invert, this.fullscreen, this.lowRes, this.restart, this.done]),
     ]);
     this.root.append(panel);
 
@@ -101,6 +115,7 @@ export class SettingsPanel {
       host.click();
     });
     this.done.addEventListener('click', () => this.closeByPlayer());
+    this.restart.addEventListener('click', () => this.pressRestart());
     this.root.addEventListener('mousedown', (e) => {
       if (e.target === this.root) this.closeByPlayer();
     });
@@ -108,6 +123,31 @@ export class SettingsPanel {
     this.root.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && e.target instanceof HTMLInputElement) this.closeByPlayer();
     });
+  }
+
+  /** True while the restart button waits for its second press. */
+  get restartArmed(): boolean {
+    return this.restart.classList.contains('armed');
+  }
+
+  private disarm(): void {
+    if (this.armTimer !== null) clearTimeout(this.armTimer);
+    this.armTimer = null;
+    this.restart.classList.remove('armed');
+  }
+
+  /** First press: arm. Second press while armed: restart and close. */
+  private pressRestart(): void {
+    if (!this.host.canRestart?.()) return;
+    if (!this.restartArmed) {
+      this.host.click();
+      this.restart.classList.add('armed');
+      this.armTimer = setTimeout(() => this.disarm(), RESTART_ARM_SECONDS * 1000);
+      return;
+    }
+    this.disarm();
+    this.host.restart?.();
+    this.closeByPlayer();
   }
 
   private closeByPlayer(): void {
@@ -121,6 +161,7 @@ export class SettingsPanel {
     if (this.open === open) return;
     this.open = open;
     this.root.classList.toggle('hidden', !open);
+    this.disarm();
     if (open) this.sync();
     else if (document.activeElement instanceof HTMLElement && this.root.contains(document.activeElement)) document.activeElement.blur();
   }
@@ -135,5 +176,6 @@ export class SettingsPanel {
     this.invert.classList.toggle('on', v.invertY);
     this.fullscreen.classList.toggle('on', v.fullscreen);
     this.lowRes.classList.toggle('on', v.lowRes);
+    this.restart.classList.toggle('hidden', !this.host.canRestart?.());
   }
 }

@@ -10,10 +10,16 @@
  * nothing the rules can take comes up with a handful of them, which the monster lifts to its
  * mouth and gulps down (its view poses the arm: render/kaijuView.ts). Either way they vanish in
  * a cartoon puff: no bodies, nothing gory.
+ *
+ * Round 4 (docs/ROADMAP.md: "civilians popped in and out every few seconds: they must not"): the
+ * crowd is kept around the action, but a newcomer is put where this screen's camera cannot see
+ * it (outside the view, far off in the haze, or behind a building), and only when no such spot
+ * is found does it fade in where it stands. One who has wandered far from the action is taken
+ * away only while out of sight. Nobody in view ever vanishes but by the monster's puff.
  */
 
-import { circleHitsStructure, type Bounds, type CityQuery, type SnapKaiju } from '@mb/shared';
-import type * as THREE from 'three';
+import { circleHitsStructure, inWater, lineOfSight, type Bounds, type CityQuery, type SnapKaiju, type Vec3 } from '@mb/shared';
+import * as THREE from 'three';
 import type { AssetStore } from '../assets/assetStore';
 import { frameRect, type SpriteAnimInfo, type SpriteInfo } from '../assets/spriteAtlas';
 import type { Effects } from './effects';
@@ -33,6 +39,10 @@ interface Civilian {
   pace: number;
   /** Seconds it still stands frozen in fright (0: running or strolling). */
   frozen: number;
+  /** How far it has faded in (1: fully there): one who had to appear in view fades in. */
+  fade: number;
+  /** Seconds until it is next asked whether it is out of sight (when it has wandered far off). */
+  check: number;
 }
 
 /** A handful of civilians in a monster's hand, on the way to its mouth. */
@@ -66,6 +76,20 @@ const FREEZE_CHANCE = 0.35;
 const AHEAD_SHARE = 0.45;
 /** At most this many puffs for one squash (a stomp in a dense crowd); the rest go with them. */
 const MAX_PUFFS = 6;
+/** Beyond this distance from the camera a civilian is a pixel or two in the haze: out of sight. */
+const SIGHT_FAR = 480;
+/** Seconds a civilian who has to appear in view takes to fade in. */
+const FADE_IN = 0.9;
+/** How often (seconds) one who has wandered far off is asked whether it is out of sight. */
+const FAR_CHECK = 0.5;
+/** Tries at a spot out of sight for a newcomer before it fades in where it stands. */
+const SPAWN_TRIES = 8;
+
+const frustum = new THREE.Frustum();
+const viewProj = new THREE.Matrix4();
+const sphere = new THREE.Sphere(new THREE.Vector3(), 1.5);
+const eye: Vec3 = { x: 0, y: 0, z: 0 };
+const head: Vec3 = { x: 0, y: 0, z: 0 };
 
 export class Crowd {
   private readonly people: Civilian[] = [];
@@ -76,6 +100,10 @@ export class Crowd {
   private readonly size: number;
   /** How many have been squashed and eaten (for the debug hooks and playtests). */
   readonly tally = { squashed: 0, eaten: 0 };
+  /** How many newcomers were put out of sight, and how many had to fade in (playtests). */
+  readonly arrivals = { hidden: 0, faded: 0 };
+  /** The camera of the frame (where this screen sees from), set by `update`. */
+  private seeing = false;
 
   constructor(assets: AssetStore, batch: QuadBatch, size = 260) {
     this.batch = batch;
@@ -99,27 +127,79 @@ export class Crowd {
     this.handfuls.length = 0;
   }
 
+  /**
+   * Whether this screen's camera may see a civilian at (x, z): in the view, not too far off in
+   * the haze, and no building between (the camera of the last `update`).
+   */
+  inSight(city: CityQuery, x: number, z: number): boolean {
+    if (!this.seeing) return false;
+    const d = Math.hypot(x - eye.x, z - eye.z);
+    if (d > SIGHT_FAR) return false;
+    sphere.center.set(x, 1, z);
+    if (!frustum.intersectsSphere(sphere)) return false;
+    if (d < 8) return true;
+    head.x = x;
+    head.y = 1.7;
+    head.z = z;
+    return lineOfSight(city, eye, head, true);
+  }
+
+  /** Points the sight test at this frame's camera (`update` does it first). */
+  look(camera: THREE.Camera): void {
+    viewProj.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    frustum.setFromProjectionMatrix(viewProj);
+    eye.x = camera.position.x;
+    eye.y = camera.position.y;
+    eye.z = camera.position.z;
+    this.seeing = true;
+  }
+
+  /**
+   * A newcomer around (cx, cz): on open ground (not in a building, not out in the water), out of
+   * this screen's sight if a spot can be found, else fading in where it stands.
+   */
   private spawnAt(city: CityQuery, bounds: Bounds, cx: number, cz: number, spread: number, inner: number): Civilian | null {
-    for (let attempt = 0; attempt < 6; attempt++) {
+    let fx = 0;
+    let fz = 0;
+    let found = false;
+    for (let attempt = 0; attempt < SPAWN_TRIES; attempt++) {
       const a = this.rand() * 6.283;
       const d = spread * (inner + this.rand() * (1 - inner));
       const x = Math.min(bounds.maxX - 2, Math.max(bounds.minX + 2, cx + Math.cos(a) * d));
       const z = Math.min(bounds.maxZ - 2, Math.max(bounds.minZ + 2, cz + Math.sin(a) * d));
-      if (circleHitsStructure(city, x, z, 1)) continue;
-      const dir = this.rand() * 6.283;
-      return {
-        x,
-        z,
-        dirX: Math.cos(dir),
-        dirZ: Math.sin(dir),
-        sprite: this.sprites[Math.floor(this.rand() * this.sprites.length)],
-        wander: this.rand() * 4,
-        panic: 0,
-        pace: 0.8 + this.rand() * 0.4,
-        frozen: 0,
-      };
+      if (circleHitsStructure(city, x, z, 1) || inWater(city, x, z)) continue;
+      if (this.inSight(city, x, z)) {
+        // Kept in case no spot out of sight turns up: it fades in.
+        if (!found) {
+          fx = x;
+          fz = z;
+          found = true;
+        }
+        continue;
+      }
+      this.arrivals.hidden++;
+      return this.civilian(x, z, 1);
     }
-    return null;
+    if (!found) return null;
+    this.arrivals.faded++;
+    return this.civilian(fx, fz, 0);
+  }
+
+  private civilian(x: number, z: number, fade: number): Civilian {
+    const dir = this.rand() * 6.283;
+    return {
+      x,
+      z,
+      dirX: Math.cos(dir),
+      dirZ: Math.sin(dir),
+      sprite: this.sprites[Math.floor(this.rand() * this.sprites.length)],
+      wander: this.rand() * 4,
+      panic: 0,
+      pace: 0.8 + this.rand() * 0.4,
+      frozen: 0,
+      fade,
+      check: this.rand() * FAR_CHECK,
+    };
   }
 
   /**
@@ -177,16 +257,27 @@ export class Crowd {
     aheadZ = 0,
   ): void {
     if (this.sprites.length === 0) return;
+    this.look(camera);
     // Top the crowd up a group at a time.
     for (let i = 0; i < 3 && this.people.length < this.size; i++) this.arrive(city, bounds, focusX, focusZ, spread, fear, aheadX, aheadZ);
     const people = this.people;
     for (let i = 0; i < people.length; i++) {
       const c = people[i];
-      const far = Math.hypot(c.x - focusX, c.z - focusZ) > spread * 1.3;
-      if (far) {
-        const fresh = this.spawnAt(city, bounds, focusX, focusZ, spread, 0.25);
-        if (fresh) people[i] = fresh;
-        continue;
+      c.fade = Math.min(1, c.fade + dt / FADE_IN);
+      // Wandered far from the action: brought back near it, but only while out of sight (it
+      // keeps strolling meanwhile).
+      if (Math.hypot(c.x - focusX, c.z - focusZ) > spread * 1.3) {
+        c.check -= dt;
+        if (c.check <= 0) {
+          c.check = FAR_CHECK;
+          if (!this.inSight(city, c.x, c.z)) {
+            const fresh = this.spawnAt(city, bounds, focusX, focusZ, spread, 0.25);
+            if (fresh) {
+              people[i] = fresh;
+              continue;
+            }
+          }
+        }
       }
       // Run from the nearest kaiju inside the fear radius.
       let threatX = 0;
@@ -226,7 +317,8 @@ export class Crowd {
         const speed = (STROLL + c.panic * RUN) * c.pace;
         const nx = c.x + c.dirX * speed * dt;
         const nz = c.z + c.dirZ * speed * dt;
-        const blocked = nx < bounds.minX + 1 || nx > bounds.maxX - 1 || nz < bounds.minZ + 1 || nz > bounds.maxZ - 1 || circleHitsStructure(city, nx, nz, 0.6);
+        const blocked =
+          nx < bounds.minX + 1 || nx > bounds.maxX - 1 || nz < bounds.minZ + 1 || nz > bounds.maxZ - 1 || circleHitsStructure(city, nx, nz, 0.6) || inWater(city, nx, nz);
         if (blocked) {
           // Turn along the wall instead of running on the spot.
           const turn = this.rand() < 0.5 ? 1 : -1;
@@ -252,7 +344,7 @@ export class Crowd {
       const frame = c.frozen > 0 ? Math.floor((time + i * 0.37) * 14) % 2 : c.panic > 0.1 ? Math.floor((time + i * 0.37) * anim.fps) : Math.floor((time + i * 0.37) * 3);
       frameRect(anim, facing, frame, uv, 0);
       const h = sprite.worldHeight;
-      this.batch.push(c.x, 0, c.z, h * sprite.aspect, h, uv, 0, 1, 1, 1, 1);
+      this.batch.push(c.x, 0, c.z, h * sprite.aspect, h, uv, 0, 1, 1, 1, c.fade);
     }
   }
 

@@ -299,7 +299,7 @@ marks). No text inside icons. No third-party icon sets.
   `reinforcements` in `shared/src/defs/ids.ts`).
 - Kaiju verbs: `k_swipe`, `k_stomp`, `k_grab`, `k_throw`, `k_eat`, `k_brace`, `k_roar`,
   `k_special`, `k_molt`, `k_swim` (swimming: a row of spines over the waves; the HUD shows it
-  while the kaiju is under water, and the controls card pairs it with deep water), `k_charge`
+  while the kaiju is under water), `k_charge`
   (the Lizard's head lowered like a ram with its spines laid back, speed lines behind it) and
   `k_tailsweep` (the spiked tail lashing round in an arc, two motion lines after it). The moves
   a molt card gives use `k_special` (the beam), `k_roar`, `k_charge`, `k_tailsweep` and
@@ -332,6 +332,17 @@ marks). No text inside icons. No third-party icon sets.
   up-down look around), `ui_fullscreen`, `ui_lowres` (lower resolution for slow computers),
   `ui_rise` and `ui_sink` (the news drone up and down), `ui_controls` (open the controls card:
   a card with a key and a directional cross).
+- The communication rose and restart (round 4): `ui_rose` (a ring of wedges round a dot: the
+  rose's key on the controls card), `ui_restart` (a circular arrow: the settings panel's restart
+  button, shown to the room's host). The rose's wedges, `ro_` plus the wedge's id in lower case
+  (`shared/src/net/rose.ts`): for the army `ro_panic` (a face with wide eyes and a round open
+  mouth), `ro_bravado` (a thumb up), `ro_orders` (a megaphone), `ro_science` (a bubbling flask:
+  call the professor), `ro_home` (a house with a heart in it), `ro_food` (a steaming pie),
+  `ro_retreat` (a soldier running off, an arrow pointing back), `ro_admire` (a face with hearts
+  for eyes); for the monster `ro_roar` (the roaring maw with three waves), `ro_roarshort` (a
+  smaller maw, one wave), `ro_snuffle` (a snout drawing in air), `ro_growl` (bared teeth, a
+  rattling line), `ro_chomp` (two jaws of teeth snapping), `ro_rumble` (a happy closed-eyed face
+  over purring waves), `ro_mating` (two musical notes and a little heart).
 - `skyline.svg`: the destruction-bar skyline with three taller towers at 21%, 57% and 100%.
   viewBox 400 × 64, drawn to be stretched into the bar (560 × 46 px; the root carries
   `preserveAspectRatio="none"`). Two paths: `sky-city` (clip it from the left as the bar fills)
@@ -344,18 +355,25 @@ marks). No text inside icons. No third-party icon sets.
 Every sound ships as both `.ogg` (Vorbis) and `.mp3`, 44.1 kHz. Manifest entries name the path
 without extension. Loops declare exact loop points in seconds so they are gapless either way.
 
-### Music (`audio/music/`): choir and orchestra that swell with each stage
+### Music (`audio/music/`): orchestra around the match, fast arcade tracks in it
 
-All in one key family and tempo grid so layers mix. Base and combat stems of a stage have the
-same length and start together; the client fades the combat stem in when the fight is on.
+All in one key (D minor). Around the match, choir and orchestra on one tempo grid (96 beats per
+minute). In the match (round 4), one loop per stage in late-1990s high-end arcade style, faster
+and bigger with each stage, and one for the last minute on the clock; each is a single file that
+plays at full level (the base and combat stems of earlier rounds are gone).
 
-`lobby` (brooding march, 60 to 90 s loop), `briefing` (tense bed, 20 s loop), `stage1_base` and
-`stage1_combat` (sparse: low strings, snare, pizzicato, a hint of choir), `stage2_base` and
-`stage2_combat` (full strings and brass, choir enters), `stage3_base` and `stage3_combat` (full
-choir, orchestra, timpani), `cocoon` (eerie choir, about 12 s; it carries no heartbeat of its
-own, because the heartbeat is the positional effect `kaiju_heartbeat_loop`), `intermission`
-(build, 20 s), `win_humans` (fanfare, 10 to 15 s), `win_kaiju` (ominous choir, 10 to 15 s),
-`hearing` (somber bureaucratic bed, 30 s loop).
+`lobby` (brooding march, 60 to 90 s loop), `briefing` (tense bed, 20 s loop), `stage1`
+(150 beats per minute, about 2.5 minutes: slap bass, rock drums, square and saw leads, synth
+brass, orchestra hits), `stage2` (160 per minute, about 2.5 minutes: distorted guitars, synth
+bass, saw lead with the brass section, violins, choir shouts, timpani), `stage3` (168 per
+minute, about 2.7 minutes: double kick, guitars, the whole choir, brass, timpani, taiko,
+orchestra hits), `final_minute` (168 per minute, exactly 60 s of music: alarm, countdown, the
+stage 3 hook climbing a key at a time, a ten-second build; its `mark` is the end of the build,
+which the client lands on the clock's zero), `cocoon` (eerie choir, about 12 s; it carries no
+heartbeat of its own, because the heartbeat is the positional effect `kaiju_heartbeat_loop`),
+`intermission` (build, 20 s), `win_humans` (fanfare, 10 to 15 s), `win_kaiju` (ominous choir,
+10 to 15 s), `hearing` (somber bureaucratic bed, 30 s loop). Match tracks are mastered to -17,
+-16.5, -16 and -16 LUFS (Loudness Units relative to Full Scale), the other full mixes to -16.
 
 ### Sound effects (`audio/sfx/`), synthesized, punchy, with 2 to 4 variants where marked *
 
@@ -368,6 +386,15 @@ two-claw swipe), `kaiju_hop_s1..s3` (the stomp onto both feet), `kaiju_tail_s1..
 `kaiju_charge_s1..s3` (the bellow as the run begins), `kaiju_stumble_s1..s3` (three variants
 that are not interchangeable: variant 1, 2 and 3 are the stumble looks 0, 1 and 2, forward onto
 a knee, spinning out, sitting down hard), and `kaiju_gulp` (one size, played at the stage's rate).
+The communication rose's noises (round 4; the monster has no words), each at the three sizes and
+in two versions that the server's pick chooses between (so every screen plays the same one):
+`kaiju_rose_roar_s1..s3` (the big roar: two swells and a long falling rumble),
+`kaiju_rose_roar_short_s1..s3` (one quick bark), `kaiju_rose_snuffle_s1..s3` (sniffs, a puff of
+breath and a snort), `kaiju_rose_growl_s1..s3`, `kaiju_rose_chomp_s1..s3` (a grunt and the jaws
+snapping shut twice), `kaiju_rose_rumble_s1..s3` (a contented giant purr) and
+`kaiju_rose_mating_s1..s3` (the mating call: a silly warbling tune in the creature's voice with a
+soft whistle doubling it). Made with the project's own sound tools
+(`tools/audio/sfx/mbsfx/rose.py`, the Lizard's own voice); nothing was downloaded.
 
 Humans: `rocket_launch*`, `tank_fire*`, `shell_whoosh`, `arty_incoming`, `arty_distant`,
 `laser_charge_loop`, `volley_ready`, `volley_fire`, `tank_engine_loop`, `march_loop`,
@@ -396,22 +423,31 @@ Tier 2: `kaiju_roar_crab_s1..s3`, `kaiju_roar_burrower_s1..s3`, `kaiju_roar_moth
 
 ### Voice (`audio/voice/<lineId>.ogg|.mp3`)
 
-Script: `shared/src/defs/voiceLines.json`, an array of
-`{ "id", "cue", "audience": "humans" | "kaiju" | "all", "speaker", "text" }`, covering every cue
-in `DESIGN.md` §8 with at least 3 variants for frequent cues (221 lines), and
-`client/src/audio/eventLines.json` in the same shape: the 16 lines the client says itself for
-moments of phases 2 and 3 that have no cue of the simulation's (their cues are listed in
-`client/src/audio/eventVoice.ts`; `DESIGN.md` §8, "Event lines"). The voice build reads,
-checks, builds and documents both together; a line id is unique across both. Lines are
-short (12 words or fewer; the hearing lines on the end screen may run to 20), deadly serious, and
-never acknowledge that anything is absurd. The writing rules, and how many lines each voice needs
-of its own, are in `docs/VOICE_SCRIPT.md`; the voice build checks them.
+Since round 4 (`docs/ROADMAP.md`) the game says almost nothing by itself: the automatic radio and
+news lines are gone. Two scripts are left:
 
-Cast: **Overlord** (command; stern), three or four squad callsigns with distinct voices, a
-**Channel 9 anchor** for the kaiju's news feed, and a **committee chair** for the end-screen
-hearing. Radio voices get a radio chain (band-pass, compression, light overdrive, static bed,
-squelch at both ends); the anchor gets a broadcast chain; the chair gets a large-room reverb.
-Verify intelligibility by round-tripping samples through speech recognition (pocketsphinx).
+- `shared/src/defs/voiceLines.json`, an array of
+  `{ "id", "cue", "audience": "humans" | "kaiju" | "all", "speaker", "text" }`: only the news
+  telling the monster's player that the creature can molt (`molt.available`, two lines,
+  `v_molt_available_3` and `_4`). The simulation still emits its other cues; they have no lines
+  and nobody hears them.
+- `client/src/audio/roseLines.json`: the communication rose's army lines,
+  `{ "voices": [the squad callsigns], "army": { "<wedge>": ["line", ...] } }`, with the wedges in
+  the order of `ROSE_ARMY` (`shared/src/net/rose.ts`). Every line is spoken in every squad voice,
+  as `rose_<voice in lower case>_<wedge>_<number>` (8 wedges of 5 lines in 4 voices: 160 files).
+  This data file is what a later voice pass (a commercial voice service) rebuilds from.
+
+The voice build reads, checks, builds and documents both together; a line id is unique across
+both. A rose line is one sentence of 12 words or fewer, shouted (it ends with "!"), inane 1950s
+monster-movie radio played straight: never mean, nothing gory, nothing about any real faith. The
+writing rules are in `docs/VOICE_SCRIPT.md`; the voice build checks them.
+
+Cast: four squad leaders (**Granite**, **Beacon**, **Tempest**, **Anvil**, one per squad, each a
+distinct voice) and the **Channel 9 anchor** for the molt line. The squad voices are pushed to
+shout: faster, pitched up a semitone or two, extra exclamation marks fed to the speech model,
+and a hotter radio chain (narrower band, more compression and overdrive, louder static, squelch
+at both ends). The anchor gets a broadcast chain. Intelligibility is checked by two speech
+recognizers on every finished file (`docs/audio/VOICE.md`).
 
 ## 7. Manifests
 
@@ -469,10 +505,11 @@ deep-merges every partial into `manifest.json`, which the client loads. Never ha
     the painting, in pixels, that the client turns toward the sunset sun (section 3).
 - `"music"`: `{ "<id>": { "base": "audio/music/<id>", "loop"?: [start, end], "bpm"?: n,
   "group"?: "stage1", "duration"?: seconds, "mark"?: seconds } }` (an entry without `loop` is a
-  one-shot and is never looped; `duration` is the file length; `mark` is the moment in a
-  one-shot that is written to land on a game event, so that a file started late still lands on
-  time: the hit of `intermission` at 20 s, the cut of `cocoon` at 10 s; see
-  `docs/audio/MUSIC.md` section 4)
+  one-shot and is never looped; `duration` is the file length; `bpm` is the cue's own tempo;
+  `group` is unused since round 4; `mark` is the moment in a cue that is written to land on a
+  game event, so that a file started late still lands on time: the hit of `intermission` at
+  20 s, the cut of `cocoon` at 10 s, the end of the build of the `final_minute` loop at 60.25 s;
+  see `docs/audio/MUSIC.md` section 4)
 - `"sfx"`: `{ "<id>": { "variants": ["audio/sfx/<id>_1", ..], "gain": 1, "loop"?: [start, end] } }`
 - `"voice"`: `{ "<lineId>": { "base": "audio/voice/<lineId>", "duration": seconds } }`
 - `"ui"`: `{ "<name>": { "file": "ui/<name>.svg" | "ui/<name>.png" } }`. Nobody writes this

@@ -122,7 +122,7 @@ export interface KaijuStageDef {
   wadeSpeedMult: number;
   /** Damage per second to each taller structure the body touches while wading. */
   wadeContactDps: number;
-  /** Speed multiplier while standing in water (the river is shallow; a titan ignores it). */
+  /** Speed multiplier while standing in water (not on a bridge deck): the hatchling and the juvenile swim instead when it is deep enough for them (sim/swim.ts). */
   waterSpeedMult: number;
   /**
    * The eye, where the aim ray starts and the first-person camera sits: its height, and how far
@@ -255,9 +255,32 @@ export interface GrabActionDef extends KaijuActionBase {
 }
 
 /** Throws the held object at the aim point on a ballistic path. */
+/**
+ * Throws fly real ballistic arcs (round 4; sim/throwArc.ts): from the hand along the aim's
+ * heading, at the aim's pitch plus `lift`, under the stage's `gravity`, each a little off by a
+ * seeded random error that grows with the flight (`spread`).
+ */
 export interface ThrowActionDef extends KaijuActionBase {
   id: 'throw';
+  /** Launch speed of a car or a car's wreck, m/s. */
   speed: PerStage<number>;
+  /**
+   * Downward acceleration of everything thrown, m/s². It grows with the monster so that its
+   * throws keep the shape of a real toss at its size and still land within a couple of seconds.
+   */
+  gravity: PerStage<number>;
+  /** The throw leaves this much above where the head looks (radians). */
+  lift: number;
+  /** Highest elevation anything is thrown at (radians above the horizon). */
+  maxElevation: number;
+  /**
+   * The throw's error: the launch velocity is off by a random vector, uniform in a ball of
+   * radius speed × tan(spread). After t seconds of flight the throw is within speed ×
+   * tan(spread) × t of the aimed arc: a cone round it (radians).
+   */
+  spread: PerStage<number>;
+  /** Launch speed of something heavy (a tank, a tank's wreck, a chunk of building), times `speed`. */
+  heavyMult: number;
   unitDamage: number;
   unitNerve: number;
   /** Radius within which units take the impact damage. */
@@ -434,7 +457,7 @@ export interface BurstDef {
 
 /** A thrown object that bursts where it lands (the propane tank, the water tank). */
 export interface ThrownBurstDef extends BurstDef {
-  /** Launch speed: it flies the throw's arc at this speed, aimed like any throw. */
+  /** Launch speed at stage 1 (later stages scale it as they scale a throw's `speed`): it flies a throw's arc, aimed like any throw. */
   speed: number;
 }
 
@@ -447,13 +470,16 @@ export interface PropaneDef extends ThrownBurstDef {
   small: BurstDef;
 }
 
-/** A thrown javelin (the antenna, the mast): straight and fast, through units, into the first wall. */
+/** A thrown javelin (the antenna, the mast): fast and nearly flat, through units, into the first wall. */
 export interface JavelinDef {
+  /** Launch speed at stage 1 (later stages scale it as they scale a throw's `speed`); it falls under the throw's gravity. */
   speed: number;
-  /** Downward acceleration while it flies (almost none: it flies straight). */
-  gravity: number;
-  /** It gives out after this many meters. */
+  /** The throw leaves this much above where the head looks (radians): a javelin is thrown nearly flat. */
+  lift: number;
+  /** It is thrown flat: never steeper than the angle that carries it this far over flat ground (meters, at stage 1). */
   range: number;
+  /** Its throw's error, times the throw's `spread` (thrown point first, it is steadier). */
+  spreadMult: number;
   /** Units it goes through, each hit once; then it flies on past the rest. */
   pierce: number;
   unitDamage: number;
@@ -473,9 +499,14 @@ export interface ShieldDef {
   halfArc: number;
   /** Thrown (Strike): flat and spinning, knocking over what it hits. */
   throw: ThrownBurstDef & {
-    /** Downward acceleration while it flies (a frisbee floats), and how far it flies. */
+    /** Downward acceleration while it flies, m/s² (a frisbee floats on the air: far less than the throw's gravity). */
     gravity: number;
+    /** The throw leaves this much above where the head looks (radians). */
+    lift: number;
+    /** It is thrown flat: never steeper than the angle that carries it this far over flat ground (meters). */
     range: number;
+    /** Its throw's error, times the throw's `spread` (thrown flat and spinning, it is steadier). */
+    spreadMult: number;
   };
 }
 
@@ -483,6 +514,11 @@ export interface ShieldDef {
 export interface KaijuCityWeapons {
   /** City weapons can be picked up at this stage and below; at later stages they are crushed underfoot like any small prop. */
   grabStage: StageId;
+  /**
+   * The same for the fallen radio mast's top (`mast`), which only lies about where a mast fell:
+   * round 4 lets every size of monster pick it up (the owner tried to throw one at stage 2).
+   */
+  topGrabStage: StageId;
   /** A shot or explosion landing within this distance of a propane tank (on the ground or in the hand) sets it off. */
   detonateRadius: number;
   propane: PropaneDef;
@@ -639,7 +675,18 @@ export interface UnitTypeDef {
   hp: number;
   speed: number;
   accel: number;
+  /**
+   * The unit's hit area (an upright capsule of this radius: what shots, blasts, claws and the
+   * beam reach), its room in the swarm, and how far apart its members are drawn.
+   */
   radius: number;
+  /**
+   * The body it moves with: what walls stop and the gaps it fits through (sim/movement.ts,
+   * `MoveParams.bodyRadius`; the squad-mates' way-finding, sim/nav.ts, uses it too). The same as
+   * `radius` for vehicles; a foot section moves as a body about as wide as the soldiers drawn,
+   * so it squeezes through the gaps between packed houses (round 4).
+   */
+  bodyRadius: number;
   /** Height of the hit volume. */
   height: number;
   /** How sub-units steer (and the driven unit too, when there is no `drive`). */
@@ -715,6 +762,12 @@ export interface PickupWeaponDef {
   spread: number;
   fan: number;
   loft: number;
+  /**
+   * In a charged volley every planted squad-mate fires the pick-up too (round 4), this many of
+   * its trigger pulls at once (the machine gun a burst of five, the missile pod half a salvo).
+   * Its reload afterwards is the pick-up's times this, never less than one reload.
+   */
+  volleyPulls: number;
 }
 
 export interface ProjectileTypeDef {

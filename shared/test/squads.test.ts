@@ -93,15 +93,16 @@ function subs(world: World, squad = 0): Unit[] {
   return s.units.filter((id) => id !== s.driven && world.units[id].alive).map((id) => world.units[id]);
 }
 
-/** No unit of the squad is sunk into a wall. */
+/** No unit of the squad is sunk into a wall (by the body it moves with: a foot section's is narrower than its hit area). */
 function expectClearOfWalls(world: World): void {
   const ids: number[] = [];
   for (const u of world.units) {
     if (!u.alive) continue;
-    structuresInCircle(world.cityQuery, u.x, u.z, u.radius - 0.3, ids);
+    const r = UNIT_TYPES[u.type].bodyRadius - 0.3;
+    structuresInCircle(world.cityQuery, u.x, u.z, r, ids);
     for (const id of ids) {
       if (world.cityIndex.spassable[id] === 1) continue;
-      expect(structureContact(world.cityIndex, id, u.x, u.z, u.radius - 0.3)).toBe(false);
+      expect(structureContact(world.cityIndex, id, u.x, u.z, r)).toBe(false);
     }
   }
 }
@@ -444,7 +445,7 @@ describe('the swarm', () => {
         run(world, 1, [null, inp]);
         if (t % 15 === 0) {
           expectClearOfWalls(world);
-          for (const u of world.units) expect(boundsContains(b, u.x, u.z, u.radius - 1e-6)).toBe(true);
+          for (const u of world.units) expect(boundsContains(b, u.x, u.z, UNIT_TYPES[u.type].bodyRadius - 1e-6)).toBe(true);
         }
         if (steer.arrived && Math.hypot(leader.vx, leader.vz) < 0.1 && t > 20 * TICK_RATE) break;
       }

@@ -9,6 +9,7 @@ import {
   TICK_RATE,
   type SimEvent,
   type World,
+  UNIT_TYPES,
 } from '../src/index';
 import { runBotMatch, type BotMatchReport } from '../scripts/botMatch';
 import { createNavWatch } from '../scripts/navWatch';
@@ -63,7 +64,8 @@ function checkWorld(world: World, events: SimEvent[], peak: { events: number }, 
   }
   for (const u of world.units) {
     finite(`unit ${u.id}`, [u.x, u.z, u.yaw, u.vx, u.vz, u.hp, u.aimYaw, u.aimPitch, u.charge, u.cooldown, u.nerve]);
-    if (!boundsContains(b, u.x, u.z, u.radius - 1e-6)) bad(`unit ${u.id} outside the bounds`);
+    // By the body it moves with (a foot section's is narrower than its hit area).
+    if (!boundsContains(b, u.x, u.z, UNIT_TYPES[u.type].bodyRadius - 1e-6)) bad(`unit ${u.id} outside the bounds`);
     if (u.charge < 0 || u.charge > 1) bad(`unit ${u.id} charge ${u.charge}`);
   }
   for (const p of world.projectiles) finite(`projectile ${p.id}`, [p.x, p.y, p.z, p.vx, p.vy, p.vz]);

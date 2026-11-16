@@ -15,15 +15,13 @@ from . import OUT_DIR, SCRATCH, SR, asr, dsp
 from .chains import apply_chain, chain_config
 from .models import FILES, files_for
 from .script import spoken_text
-from .scriptdoc import WINDOW_SECONDS
 from .synth import synthesize
 
 TARGET_LUFS = -16.0
 CEILING_DBTP = -1.5
-# Encoder settings. The audio review suggested lower ones to save space; measured on every line
-# (encode_test.py; table and reasoning in docs/audio/VOICE.md section 6) each step down costs the
-# radio voices words in the recognizer, Vorbis 0 overshoots the true-peak limit of the checks,
-# and MP3 below 5 leaves more and more of the anchor's upper band empty. So these stay.
+# Encoder settings. Measured on every line of the first cast (November 2026): each step down cost
+# the radio voices words in the recognizer, Vorbis 0 overshot the true-peak limit of the checks,
+# and MP3 below 5 left more and more of the anchor's upper band empty. So these stay.
 OGG_QUALITY = "3"          # libvorbis -q:a
 MP3_QUALITY = "5"          # libmp3lame -q:a (variable bit rate)
 
@@ -38,12 +36,6 @@ def code_fingerprint() -> str:
     return h.hexdigest()[:16]
 
 
-def is_order(line: dict) -> bool:
-    """The humans' lines for a short window (a nerve break, the signature attack): orders that
-    must be over before the window closes (scriptdoc.WINDOW_SECONDS)."""
-    return line.get("cue") in WINDOW_SECONDS and line.get("audience") == "humans"
-
-
 def line_plan(line: dict, cast: dict, pron: dict) -> dict:
     """Everything that decides how a line sounds. Its hash is the rebuild key."""
     if line["speaker"] not in cast["speakers"]:
@@ -51,11 +43,6 @@ def line_plan(line: dict, cast: dict, pron: dict) -> dict:
     sp = cast["speakers"][line["speaker"]]
     voice = dict(sp["voice"])
     max_pause = sp.get("max_pause_ms", 320)
-    # A speaker may deliver orders faster than everything else (cast.json "orders": "rate" and
-    # "max_pause_ms"): unhurried in the briefing, crisp when a window is closing.
-    if is_order(line) and sp.get("orders"):
-        voice["rate"] = sp["orders"].get("rate", voice.get("rate", 1.0))
-        max_pause = sp["orders"].get("max_pause_ms", max_pause)
     chain = sp["chain"]
     plan = {
         "text": spoken_text(line, voice, pron),

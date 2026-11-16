@@ -13,7 +13,9 @@
  * spread on every shot, a person's own too), the big cannon's heavy shells, the missile pod's
  * salvo of missiles that fan out and curve onto the aim point (flight 'guided': a constant
  * acceleration that brings each one exactly onto the point after the time a straight shot would
- * take, then straight on). Squad-mates keep their own weapons. The artillery radio
+ * take, then straight on). Since round 4 the planted squad-mates fire it in a volley too, each
+ * `volleyPulls` of its trigger pulls at once (a burst of tracers, a heavy shell, half a pod's
+ * salvo), with the volley's charge on top; firing on their own they keep their own weapons. The artillery radio
  * (`squad.barrages`): each charged volley the squad fires while it has barrages left calls one
  * (`startCallIn`) on the ground the volley's crosshair marks (`resolveMarkerPoint`); one at the
  * empty sky is not spent.
@@ -61,7 +63,7 @@
 
 import { callInDef } from '../../defs/callins';
 import type { CallInId } from '../../defs/ids';
-import { pickupWeaponDef } from '../../defs/pickups';
+import { isWeaponPickup, PICKUP_WEAPONS, pickupWeaponDef } from '../../defs/pickups';
 import type { CallInDef, WeaponDef } from '../../defs/schema';
 import { COMBAT_RULES, DT, SQUAD_RULES } from '../../defs/rules';
 import { unitTypeDef } from '../../defs/units';
@@ -104,9 +106,11 @@ interface Salvo {
   nerveMult: number;
   volley: boolean;
   atWill: boolean;
+  /** Trigger pulls fired at once (a pick-up in a volley, `volleyPulls`); 1 for a single pull. The reload is as many times as long, never less than one. */
+  pulls: number;
 }
 
-const salvo: Salvo = { atPoint: false, x: 0, y: 0, z: 0, error: 0, damageMult: 1, nerveMult: 1, volley: false, atWill: false };
+const salvo: Salvo = { atPoint: false, x: 0, y: 0, z: 0, error: 0, damageMult: 1, nerveMult: 1, volley: false, atWill: false, pulls: 1 };
 
 /** A unit that can fire this tick: alive, on the ground, steady, not stunned, its weapon loaded. */
 function ready(u: Unit): boolean {
@@ -124,7 +128,9 @@ export function unitWeapon(squad: Squad, u: Unit): WeaponDef {
 function fireSalvo(world: World, squad: Squad, u: Unit, weapon: WeaponDef, s: Salvo): void {
   const type = unitTypeDef(u.type);
   const proj = projectileTypeDef(weapon.projectile);
-  const shots = shotsForMembers(weapon, u.members);
+  // One pull's projectiles leave from `muzzles` points; several pulls at once go from the same points.
+  const muzzles = shotsForMembers(weapon, u.members);
+  const shots = muzzles > 0 ? Math.max(1, Math.round(muzzles * s.pulls)) : 0;
   const my = u.y + type.muzzleHeight;
   const fan = weapon.fan ?? 0;
   const loft = weapon.loft ?? 0;
@@ -147,7 +153,7 @@ function fireSalvo(world: World, squad: Squad, u: Unit, weapon: WeaponDef, s: Sa
   const structureDamage = weapon.structureDamage * modMult(squad.mods, 'structureDamage');
 
   for (let j = 0; j < shots; j++) {
-    const off = (j - (shots - 1) / 2) * spread;
+    const off = guided ? (j - (shots - 1) / 2) * spread : ((j % muzzles) - (muzzles - 1) / 2) * spread;
     const mx = u.x + rx * off;
     const mz = u.z + rz * off;
     let yaw = u.aimYaw;
@@ -221,7 +227,7 @@ function fireSalvo(world: World, squad: Squad, u: Unit, weapon: WeaponDef, s: Sa
       ...(guided ? { ax, ay, az, steer } : {}),
     });
   }
-  u.cooldown = weapon.cooldown * modMult(squad.mods, 'weaponCooldown');
+  u.cooldown = weapon.cooldown * Math.max(1, s.pulls) * modMult(squad.mods, 'weaponCooldown');
 }
 
 /**
@@ -252,6 +258,7 @@ function fireLeader(world: World, squad: Squad, leader: Unit, volley: boolean): 
   salvo.damageMult = 1;
   salvo.nerveMult = 1;
   salvo.volley = volley;
+  salvo.pulls = 1;
   // A bot at the controls is no better a shot than a sub-unit, and its plinking is fire at will.
   salvo.atWill = player.bot && !volley;
   const error = player.bot
@@ -284,8 +291,10 @@ function fireVolley(world: World, squad: Squad, leader: Unit): void {
   let charge = 0;
   const ids: number[] = [];
   const fullNerve = 1 + COMBAT_RULES.volleyNervePerCharge;
+  // The squad's weapon pick-up goes into the volley from every gun (round 4).
+  const pulls = isWeaponPickup(squad.pickup) ? PICKUP_WEAPONS[squad.pickup].volleyPulls : 1;
   for (const u of volleyUnits) {
-    const w = weaponDef(unitTypeDef(u.type).weapon);
+    const w = pickupWeaponDef(weaponDef(unitTypeDef(u.type).weapon), squad.pickup);
     // 0 for a ragged shot (worth what fire at will is worth) up to 1 at a full charge.
     const strength = volleyStrength(u.charge);
     salvo.atPoint = true;
@@ -296,7 +305,9 @@ function fireVolley(world: World, squad: Squad, leader: Unit): void {
     salvo.nerveMult = COMBAT_RULES.atWillNerveMult + (fullNerve - COMBAT_RULES.atWillNerveMult) * strength;
     salvo.volley = isChargedVolley(u.charge);
     salvo.atWill = false;
-    salvo.error = (w.aimErrorAtWill + (w.aimErrorVolley - w.aimErrorAtWill) * strength) * unitAimErrorMult(squad, u) * scatter;
+    salvo.pulls = pulls;
+    // The machine gun's spread is on every shot.
+    salvo.error = Math.hypot((w.aimErrorAtWill + (w.aimErrorVolley - w.aimErrorAtWill) * strength) * unitAimErrorMult(squad, u) * scatter, w.spread ?? 0);
     fireSalvo(world, squad, u, w, salvo);
     charge += u.charge;
     ids.push(u.id);
@@ -348,6 +359,7 @@ function fireAtWill(world: World, squad: Squad, u: Unit): void {
   salvo.nerveMult = 1;
   salvo.volley = false;
   salvo.atWill = true;
+  salvo.pulls = 1;
   salvo.error =
     weapon.aimErrorAtWill * unitAimErrorMult(squad, u) * scatterMult(world.match.stage, nearestKaiju(world, u.x, u.z));
   fireSalvo(world, squad, u, weapon, salvo);

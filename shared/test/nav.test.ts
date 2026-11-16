@@ -44,10 +44,12 @@ function navigate(world: World, x: number, z: number, tolerance: number, steer: 
   return steer;
 }
 
+/** The body it moves with (a foot section's is narrower than its hit area) is in a wall. */
 function sunkIntoWall(world: World, u: Unit): boolean {
   const ids: number[] = [];
-  structuresInCircle(world.cityQuery, u.x, u.z, u.radius - 0.3, ids);
-  return ids.some((id) => world.cityIndex.spassable[id] === 0 && structureContact(world.cityIndex, id, u.x, u.z, u.radius - 0.3));
+  const r = UNIT_TYPES[u.type].bodyRadius - 0.3;
+  structuresInCircle(world.cityQuery, u.x, u.z, r, ids);
+  return ids.some((id) => world.cityIndex.spassable[id] === 0 && structureContact(world.cityIndex, id, u.x, u.z, r));
 }
 
 describe('corridors: can a body of this width go straight from here to there', () => {
@@ -212,7 +214,7 @@ describe('finding the way', () => {
       arrived = navigate(world, tx, tz, 1.5, steer).arrived;
       if (leader.nav.path.length > 0) {
         usedRoads = true;
-        for (const p of leader.nav.path) expect(boundsContains(b, p.x, p.z, leader.radius - 0.5)).toBe(true);
+        for (const p of leader.nav.path) expect(boundsContains(b, p.x, p.z, UNIT_TYPES[leader.type].bodyRadius - 0.5)).toBe(true);
       }
       expect(sunkIntoWall(world, leader)).toBe(false);
     }
@@ -244,7 +246,7 @@ describe('finding the way', () => {
           if (ticks % 10 !== 0) continue;
           for (const u of world.units.slice(0, 4)) {
             expect(sunkIntoWall(world, u)).toBe(false);
-            expect(boundsContains(b, u.x, u.z, u.radius - 1e-6)).toBe(true);
+            expect(boundsContains(b, u.x, u.z, UNIT_TYPES[u.type].bodyRadius - 1e-6)).toBe(true);
           }
         }
         expect(arrived, `stage ${stage}, trial ${trial}`).toBe(true);

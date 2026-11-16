@@ -136,7 +136,7 @@ def review_cue(cue: Cue) -> tuple[list[str], list[str]]:
     for stem in cue.stems:
         for part in stem.parts:
             over = part.end_beat() - cue.beats
-            if not cue.loop and over > 0.01 + cue.tail_seconds / 0.625:
+            if not cue.loop and over > 0.01 + cue.tail_seconds / cue.sec_per_beat:
                 errors.append(f"  LENGTH {stem.name}/{part.name} runs {over:g} beats past the end")
     return _glance(cue), errors
 

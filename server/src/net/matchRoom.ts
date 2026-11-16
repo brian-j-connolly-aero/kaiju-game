@@ -211,6 +211,7 @@ export class MatchRoom extends Room {
       now: () => performance.now(),
       log: rt.log,
       logError: rt.logError,
+      slowLog: true,
     });
     this.game = game;
     liveRooms.set(code, this);

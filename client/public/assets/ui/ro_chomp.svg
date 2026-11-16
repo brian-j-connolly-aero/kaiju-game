@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Rose, monster: the chomp. Two jaws full of teeth snapping shut, snap marks at the tips. -->
+  <g transform="matrix(1 0 0 1 -1.5 0)">
+    <path fill="currentColor" stroke="none" d="M6 10Q30 6 46 22L42 27 38 21 34 27 30 20 26 26 22 18 18 24 14 15 10 21 6 18ZM6 54Q30 58 46 42L42 37 38 43 34 37 30 44 26 38 22 46 18 40 14 49 10 43 6 46Z"/>
+    <path d="M52 32H60M50 22L56 16M50 42L56 48"/>
+  </g>
+</svg>

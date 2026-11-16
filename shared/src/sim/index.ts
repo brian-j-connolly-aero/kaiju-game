@@ -18,7 +18,8 @@ export * from './createWorld';
 export { applyInput, inputSystem } from './systems/inputs';
 export { kaijuActionSystem } from './systems/kaijuActions';
 export * from './beam';
-export { attackMult, findEdible, findGrabTarget, shoveUnit, surgeMult, throwAngle, type ReachTarget } from './kaijuEffects';
+export { attackMult, findEdible, findGrabTarget, shoveUnit, surgeMult, throwClearance, type ReachTarget } from './kaijuEffects';
+export * from './throwArc';
 export {
   armHeld,
   canPickUp,

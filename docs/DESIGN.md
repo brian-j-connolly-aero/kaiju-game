@@ -9,7 +9,8 @@ code disagree, fix whichever is wrong and keep them in sync.
 
 **Tier 1 (build first, must be rock solid):** one kaiju (the Lizard, "Gragnor") against four Army
 squads, all three stages, the molt, the full city, bots, lobby with invite codes, the no-reading
-HUD, music, sound effects, voiced radio chatter, end screen, self-hosting package.
+HUD, music, sound effects, voiced radio talk (since round 4: the communication rose), end screen,
+self-hosting package.
 
 **Tier 2 (content on top of the same systems):** Crab, Burrower, Moth; Air, Super Science,
 Coalition of Faiths; upgrade drafts; reporter drones with front-page photos; playable tutorial.
@@ -33,7 +34,7 @@ proposed; eating and call-in limits as specified below; kaiju names: Lizard **Gr
 
 ## 2. Match flow
 
-Phases: `lobby` → `briefing` (voiced, about 10 s) → `playing` (stage 1) → `intermission` →
+Phases: `lobby` → `briefing` (about 10 s) → `playing` (stage 1) → `intermission` →
 `playing` (stage 2) → `intermission` → `playing` (stage 3) → `ended` → end screen → back to lobby.
 
 - **Room size:** up to 5 players: 1 kaiju + up to 4 human squads. Bots fill every empty human
@@ -62,6 +63,7 @@ Phases: `lobby` → `briefing` (voiced, about 10 s) → `playing` (stage 1) → 
 | Kaiju top speed / turn rate | 8.5 m/s / 200°/s | 14 m/s / 120°/s | 22 m/s / 75°/s |
 | Tramples (walks through and destroys) structures up to | 3.5 m tall (cars, kiosks, props) | 12 m tall (houses, small shops) | 70 m tall |
 | Taller structures | block movement | block movement | never block: kaiju wades at 45% speed and deals contact damage |
+| In water (the bay, the river, the moat) | swims (section 4), 50% wading | swims (section 4), 85% wading | wades at 70% speed (15.4 m/s), standing deep in it (round 4; it was 100%) |
 | Human level | 1 | 2 | 3 |
 | Time of day | afternoon | sunset | night |
 
@@ -83,7 +85,9 @@ squares clamped to the city, drawn as a thin glowing quarantine line; nobody can
   about a quarter more.
 - Display: a skyline with three towers. Points 0..P1 map to the first 21% of its width, P1..P2 to
   21..57%, P2..P3 to 57..100% (these are the doc's 15 / 40 / 70 marks, rescaled so the third
-  tower is the end of the bar).
+  tower is the end of the bar). Each tower ends on its mark, and the picture under it (the molt,
+  or the monster's win) is centered on the mark itself: the fill line passes it on the tick the
+  molt is offered (round 4; it used to sit under the tower's middle, 3% of the bar early).
 - Tuning target (since phase 1: every stage about a fifth shorter than before, the owner's word
   after the first multiplayer playtest): contested stages of about 2:35 / 2:30 / 3:05 and a
   match of about 8:15; a kaiju left alone fills a stage's segment in about two minutes. Phase 2
@@ -250,7 +254,7 @@ Action timings are the tells. `r` = body radius for the stage.
 | Swipe | Strike | 0.45 / 0.15 / 0.5 s | 120° arc, reach 2.5 r. Units: 70 damage, 40 nerve. Structures: 40 / 300 / 2000 by stage. |
 | Stomp | Stomp | 0.9 / 0.1 / 0.9 s | Shockwave radius 3.6 r. Units: 100 at center to 30 at edge, knockback. Structures: 55 / 420 / 2600 with falloff. |
 | Grab | Grab | 0.4 s | Grabs the nearest car, wreck, live vehicle (stage 2+) or building chunk (stage 2+) in a 100° arc within 2.5 r. |
-| Throw | Strike, holding something | 0.3 / 0 / 0.2 s | At the aim point: 25 / 45 / 70 m/s ballistic. Impact: units 120 in radius 4 / 10 / 22 m; structures 60 / 350 / 1500. |
+| Throw | Strike, holding something | 0.3 / 0 / 0.2 s | A real ballistic arc along the aim, 15° above where the head looks (round 4, below): a car at 25 / 110 / 310 m/s under 9.8 / 46 / 105 m/s² of gravity; each throw a little off (a cone of 10° / 2.9° / 1.85°). Impact: units 120 in radius 4 / 10 / 22 m; structures 60 / 350 / 1500. |
 | Eat | Grab, holding something (or nothing to grab but something edible in reach) | 2.0 s, rooted | Heals 80 hp. 10 s cooldown. The meal is consumed. |
 | Club | Strike, holding a fast-food sign (phase 2) | 0.5 / 0.15 / 0.55 s | 200° arc in front of the head, reach 4 r (1.6 times the swipe's). Units: 140 damage, 60 nerve, thrown back 2.5 r at the body, half that at the tip. Structures: 80 / 600 / 4000, twice a swipe. Three swings, then the sign breaks. |
 | Molt | Molt, one press | 10 s cocoon | Only when a molt is available. The molt cards are offered (below). |
@@ -331,12 +335,32 @@ definition.
   tank troop takes one tank; the unit dies when its last tank is taken and leaves no wreck.
   Grab with nothing to pick up in reach eats instead, when something edible is in reach and
   the meal is off cooldown; otherwise the hand closes on nothing.
-- **Throw:** a flat ballistic arc that lands on what the crosshair is on (the aim ray starts at
-  the eye, which sits in the head: 1.7 / 11 / 38.5 m ahead of the body's axis and 4.2 / 27.5 /
-  90.7 m up, where the model has its camera); beyond reach it flies at 45°; with the
-  crosshair on the sky it flies where the head points. The object hits the
-  first structure, unit or ground it meets (never its thrower) and damages everything inside
-  the impact radius.
+- **Throw** (round 4, the owner: "real trajectory physics please, could angle over buildings";
+  `shared/src/sim/throwArc.ts`, numbers in the kind's `actions.throw`). The object leaves the
+  hand (0.6 body radii ahead of the body's axis along the aim, at the hand's height: 2.2 / 16 /
+  58 m) along the aim's heading, at the aim's pitch plus a lift of 15° (so looking at a squad
+  throws at it; looking higher lobs over what stands in the way), and flies a true parabola: no
+  aiming at a point, no aiming delay. Its speed is set by the stage and its weight: a car or a
+  car's wreck 25 / 110 / 310 m/s, a tank, a tank's wreck or a chunk of building 0.85 of that.
+  Gravity grows with the monster (9.8 / 46 / 105 m/s²) so that the arc keeps the shape of a
+  real toss at its size and still lands quickly: at real gravity a titan's throw would hang in
+  the air for ten seconds. A car thrown with the head level travels about 39 / 176 / 618 m
+  and the longest throw about 66 / 279 / 972 m; five monster lengths (the snout to the tail
+  tip: 6, 40 and 146 m long, so 30 / 200 / 730 m) take 1.2 / 1.8 / 2.4 s.
+  **The error.** Every throw's launch velocity is off by a random vector, uniform in a ball
+  whose radius is the speed times tan(spread), spread 10° / 2.9° / 1.85° (javelins and the
+  garage door 0.3 of that: thrown point first or spinning flat, they are steadier). It is drawn
+  from the match seed, the tick and the monster, so a match replays the same. After t seconds
+  the throw is within speed × tan(spread) × t of the aimed arc: a cone round it. Measured on flat
+  ground (a squad standing still, the bots' aim, a few hundred throws each): a car hits a foot
+  squad three hatchling lengths away 98% of the time, five 80%, seven 52%, ten 25%; a tank five
+  juvenile lengths away 75%, six 69%, seven 59% (ten is out of reach); a tank troop three titan
+  lengths away 93%, five 73%, six 66% (seven is out of reach). A lob is less accurate than a flat
+  throw (it flies longer).
+  **What it meets.** It hits the first structure, unit or ground its arc meets (never its
+  thrower), exactly as the projectile system flies it, and damages everything inside the impact
+  radius. Aimed high it clears a building and comes down beyond it; aimed low it hits the wall.
+  Rubble and fallen buildings within the monster's grab reach do not stop it (below).
 - **Eat:** the meal is taken at the first bite and the heal lands when the 2 s are over. Edible
   off the ground: cars, kiosks, car wrecks, tank wrecks. Anything in the hand can be eaten.
   The cooldown counts from the first bite; with something in the hand and the meal on
@@ -422,7 +446,7 @@ kind's `cityWeapons` (`shared/src/defs/kaiju/lizard.ts`); all starting values.
 - **Never eaten.** Grab with one in the hand lets go of it: it lies on the ground below the hand
   (a loose object, `world.loose`) and can be picked up again. The cocoon drops whatever is held,
   as before. Strike uses it: a throw, except the fast-food sign, which is swung (the club).
-- **Propane tank.** Thrown (on the throw's arc, 25 m/s), it explodes where it lands: units
+- **Propane tank.** Thrown (on the throw's arc, 25 m/s at stage 1), it explodes where it lands: units
   within 8 m take 110 damage at the middle falling to 40 at the rim and 40 to 20 nerve, and are
   thrown out 7 m (2 m at the rim); structures within it take 120; props within it are destroyed
   and other propane tanks go off with it. The thrower is never hurt. A shot or an explosion that
@@ -437,21 +461,29 @@ kind's `cityWeapons` (`shared/src/defs/kaiju/lizard.ts`); all starting values.
   damage and 20 to 10 nerve, are pushed out 6 m (4 m at the rim) and knocked over: they lie flat
   for 1.5 s, unable to move or fire, exactly like the roar's stun but shorter (their charge is
   lost too). Nothing burns.
-- **Antenna.** Thrown, it is a javelin: it flies straight at the crosshair at 70 m/s with almost
-  no drop (1.5 m/s² of gravity) and gives out after 120 m. It goes through up to three units
+- **Antenna.** Thrown, it is a javelin: fast and nearly flat (50 m/s, twice a car's speed, 5°
+  above where the head looks, never steeper than the angle that carries it 120 m; under the
+  throw's gravity like everything else, round 4). It goes through up to three units
   (110 damage and 40 nerve each, each pushed 3 m along its flight) and flies on past any more,
   stopping in the first structure (150 damage) or the ground; a monster it hits stops it (110
   raw).
-- **Mast.** The radio mast's 8 m top section (section 7). A heavier javelin: 60 m/s, up to 110 m,
+- **Mast.** The radio mast's 8 m top section (section 7). A heavier javelin: 45 m/s at stage 1 (a
+  bigger monster throws it as it throws a car: 4.4 and 12.4 times as fast), up to 110 m,
   through up to five units at 200 damage and 60 nerve each, 400 to the structure it stops in.
+  Unlike the five street weapons, every size of monster can pick it up (round 4: the owner tried
+  to throw one at stage 2, and the juvenile's hand came up with something else).
+- **Every throw** (round 4, after a fallen mast's top stuck in its own lattice two meters from
+  the hand): rubble and fallen buildings within the monster's grab reach do not stop the throw,
+  so a throw from beside a heap goes over it. Heaps farther off, and standing walls, still do.
 - **Fast-food sign.** A club: Strike swings it (the Club row above) instead of throwing it. It
   breaks after its third swing and the hand is empty; Strike swipes again.
 - **Garage door.** A shield: a hit that arrives within 70° of the body's facing hits the door
   instead of the monster (no damage, no nerve, and a charged volley that hits the door does not
   count toward breaking the monster's nerve). The door soaks up 250 of raw hit damage (about 80
   rockets) and breaks. It does not cover a blast with no direction, nor a monster that is
-  staggered or in its cocoon. Strike throws it like a frisbee: flat (32 m/s, 3 m/s² of gravity,
-  70 m at most), 80 damage and 30 nerve to the units within 3.5 m of where it lands, knocked over
+  staggered or in its cocoon. Strike throws it like a frisbee: flat and floating (32 m/s, 3 m/s²
+  of gravity, 5° above the look, never steeper than the angle that carries it 70 m), 80 damage
+  and 30 nerve to the units within 3.5 m of where it lands, knocked over
   for 1.5 s and pushed out 4 m, 60 to structures.
 - **What the snapshot carries.** The held object as before (a 'prop' of its kind); a sign's
   swings left (`clubSwings`) and a door's hp left (`shieldHp`). Events for every new impact
@@ -499,7 +531,8 @@ brink).
 | | Level 1: rocket infantry | Level 2: tank platoon | Level 3: tank company |
 | --- | --- | --- | --- |
 | Unit | section of 10 soldiers (3 launchers) | 1 tank | troop of 3 tanks |
-| Unit hp / speed / radius | 100 / 9.8 m/s / 3 m | 100 / 16.1 m/s / 4 m | 300 / 25.3 m/s / 9 m |
+| Unit hp / speed / radius (what hits it) | 100 / 9.8 m/s / 3 m | 100 / 16.1 m/s / 4 m | 300 / 25.3 m/s / 9 m |
+| Body it moves with (radius) | 1 m: fits a 2.5 m gap between houses | 4 m | 9 m |
 | The driven unit handles | relative to the view | a tank: hull turn 75°/s, turret 140°/s | a tank: hull turn 55°/s, turret 110°/s |
 | Shot | up to 3 rockets (one per 3.4 members) | 1 shell | up to 3 shells (one per tank) |
 | Per projectile: damage / nerve | 3.2 / 1.8 | 9.5 / 5.4 | 3.2 / 4.5 |
@@ -550,24 +583,35 @@ already"; docs/ROADMAP.md).
 - **Taking one:** any living unit on the ground (a leader or a squad-mate) that comes within its
   own radius plus 1.5 m of a landed crate takes it for its squad.
 - **The pick-ups.** Each lasts until the stage ends or the squad is wiped out; a new weapon
-  pick-up replaces the old one. The weapons change only the driven unit's own weapon (its Fire
-  button, and its own shot when it goes with a volley); squad-mates keep theirs. Each is the
-  unit's own weapon changed, so it scales with the stage (rocket infantry, a tank, a troop of
-  three) the way the weapon does:
+  pick-up replaces the old one. The weapons change the driven unit's own weapon (its Fire
+  button, and its own shot when it goes with a volley) and, since round 4 (the owner: "both
+  primary and charge fire should be affected"), what every planted squad-mate fires in a volley;
+  squad-mates shooting on their own keep their own weapons. Each is the unit's own weapon
+  changed, so it scales with the stage (rocket infantry, a tank, a troop of three) the way the
+  weapon does. In a volley each gun fires `volleyPulls` of the pick-up's trigger pulls at once,
+  with the volley's charge on top, and reloads for as many of the pick-up's reloads (never less
+  than one); the rule that two squads' charged volleys within 5 s break the monster stays:
   - **Machine gun:** tracers, 5 times the rate of fire at a third of the damage, nerve and
     structure damage per shot (1.67 times as much over time), a third of the splash, and a
-    spread of 1.5° (one sigma) on every shot, a person's own too.
+    spread of 1.5° (one sigma) on every shot, a person's own too. In a volley every gun fires a
+    burst of five pulls at once (15 tracers from a full section): 1.67 times a volley's damage
+    and nerve, and the gun's own reload after it.
   - **Big cannon:** heavy shells, 2.5 times the reload for 3.5 times the damage and structure
-    damage, twice the nerve and 1.6 times the splash.
+    damage, twice the nerve and 1.6 times the splash. In a volley every gun fires a heavy shell:
+    3.5 times a volley's damage, twice its nerve.
   - **Missile pod:** the Fire button launches a salvo of 6 missiles (fewer as a unit loses
     members, the way its own weapon fires fewer shots) that leave fanned out over 50° and lofted
     12°, and curve onto the point the crosshair is on, arriving in the time a straight shot
     would take. Each is worth 0.6 of a whole trigger pull of the unit's own weapon (about 5.7
-    damage at every stage); 6 s to reload.
+    damage at every stage); 6 s to reload. In a volley every gun fires half a salvo (3 missiles
+    from a full section or a tank), all curving onto the crosshair: 1.8 times a volley.
   - **Artillery radio:** the squad's next 3 charged volleys (60% charge or more) each call an
     artillery barrage onto the ground the volley's crosshair marks (the feet of a kaiju it is
     on). A volley at the empty sky calls none and keeps its barrage; a ragged volley calls none.
     The radio says "strike inbound" (the `callin.inbound` lines). The HUD shows how many are left.
+    It changes nothing about normal fire (round 4 looked at giving it something there, such as a
+    ranging shell with every shot, and left it: each would put a marker and a closing ring on
+    everyone's screen every few seconds).
   - **Reinforcements:** at once, every living unit of the squad is healed to full (hp and
     members), and every dead one comes back at full strength (not a veteran) by parachute
     beside the leader: from 60 m up, straight down over 4 s, unable to move, fire or charge until
@@ -624,7 +668,11 @@ four are gone the player is out until the next molt and gets a free-flying news 
 `sim/squads.ts`, `sim/nav.ts`, `sim/movement.ts`; the numbers the design left open are
 `SQUAD_RULES` in `shared/src/defs/rules.ts`):
 
-- **Driving.** Rocket infantry moves relative to the view and goes any way at once. The tank
+- **Driving.** Rocket infantry moves relative to the view and goes any way at once. A section
+  moves as a body 2 m across, about as wide as its soldiers (round 4: the 6 m one it had could
+  not pass the 1 to 3.5 m gaps between the packed houses of the starting neighborhoods), so it
+  squeezes through gaps of 2.5 m and more, and its squad-mates find their way through them too;
+  what hits it is still the whole section, 6 m across. The tank
   (stages 2 and 3) is driven as above, by throttle and hull turn; its velocity always lies along
   the hull (tracks do not slide; a wall it drives into takes its speed). The input's two stick
   axes are read as a square, so W and D together are full throttle and full turn. The weapon's
@@ -731,8 +779,10 @@ and plays any slot it is handed at any moment.
   shows of a swimming kaiju (the spines). Into a staggered or cocooned kaiju it does not charge:
   everybody fires as fast as the guns load. Its lines of fire count rubble and fallen buildings
   up to their height, so it parks where it can shoot past them. Where its leader sees the kaiju
-  over a heap but most of its planted squad-mates do not, it lets go, does not plant there
-  again, and moves on, passing over that spot (15 m round it) for 20 s; and when it reaches its
+  over a heap but most of its planted squad-mates do not (at stage 1 one in three of them with a
+  line is enough, since round 4: among the packed houses the rest rarely see the hatchling), it
+  lets go, does not plant there again, and moves on, passing over that spot (15 m round it) for
+  20 s; and when it reaches its
   firing spot with no line of fire at all (a hatchling among heaps of rubble), it tries another
   side (its bearing turns 70°). (Before the phase 2 integration it planted and let go there over
   and over: at some starts not one squad fired a charged volley at a hatchling standing still.)
@@ -755,7 +805,10 @@ and plays any slot it is handed at any moment.
   when several things stand around it, and smashes what is in its way. It fights units that
   come close, takes revenge on the nearest squad for 10 s after a stagger, dashes at charging
   guns within reach for a few seconds when lasers are on it (they have to pack up and run),
-  throws what is at hand at a squad in range, eats below 70% health (a grab and a second press
+  throws what is at hand at a squad in range (on the real arc, round 4: the low one when the
+  city leaves it a way, else the lob over what stands in the way, leading a moving unit by the
+  flight's time; from no farther than it threw before, 51 / 120 / 410 m: `BOT_RULES.kaiju.
+  throwRange`, a share of the longest throw by stage), eats below 70% health (a grab and a second press
   for what it can pick up, a single press for a kiosk), and when the molt is offered looks for
   ground where fewer guns can see it and where its next body will have room, for 16 s at most
   (smashing what stands in its way there, as it does when wrecking), then cocoons with one
@@ -834,7 +887,10 @@ server and every client build the identical city from code. No building list goe
 - Roughly 2500 to 3200 structures and 4000 to 6000 small props (cars, kiosks, trees, lamps).
 - Structures collide as oriented boxes; props never block (vehicles and kaiju crush them).
 - The river is shallow: ground units wade at 50% speed; bridges are fast crossings and are
-  destructible. Parks and water are open ground where misses cost nothing.
+  destructible. The titan wades the bay, the river and the moat at 70% of its land speed, and
+  is to be drawn standing deep in the water while the snapshot's kaiju flag `inWater` is set
+  (its middle over water, not on a bridge deck). Parks and water are open ground where misses
+  cost nothing.
 - The Old Moat (owner's note after the second playtest: "water at all stages"): 20 m of water
   outside the beltway along the west, north and east edges, so every stage 1 and stage 2 square
   has water a kaiju can swim in (section 4, "Swimming") within about 165 m of where the match
@@ -891,8 +947,9 @@ in the kind's `rewards` (`shared/src/defs/kaiju/lizard.ts`); all starting values
   fronts, at least 60 m from every landmark; every stage 2 square holds at least one of each
   beyond its stage 1 square (docs/CITY.md section 13, numbers in `SPECIAL_SITES`). The rewards are
   the same for every size of monster; the fireball never hurts one, and the mast falls away from
-  it. The fallen mast's top stays the hatchling's weapon only: at stages 2 and 3 the hand leaves
-  it and the feet crush it, like every city weapon.
+  it. The fallen mast's top is every monster's to throw (round 4; until then it was the
+  hatchling's only, and at stages 2 and 3 the hand left it and the feet crushed it): its feet
+  spare it and any size of hand picks it up (section 4, "Mast").
 - **Measured** (ten bot matches, seeds 1 to 10, every start in turn): the hatchling's monster
   bot wrecked 19 of the 30 special buildings of the starting neighborhoods itself and the squads'
   fire 4 more (substation 9, gas station 8, radio mast 6 of 10); 10 more went at stage 2 and 3.
@@ -974,9 +1031,11 @@ falls in `shared/src/sim/systems/cityDamage.ts`, numbers in `shared/src/defs/rub
 - Color language, each doubled by a shape: humans cyan (circles), kaiju orange (triangles),
   charging volleys yellow (diamonds), rubble grey.
 - The match clock is a sun-and-moon arc: the time of day is the timer.
-- Voice: deadly serious English radio chatter with subtitles. Humans hear military radio; the
-  kaiju player hears a deadpan live news broadcast about its own rampage.
-- End screen: mock hearing (voiced), pictogram tally of what each player flattened, newspaper
+- Voice (since round 4): the players choose what is said, with the communication rose (below).
+  The squads shout inane 1950s monster-movie radio nonsense with subtitles; the monster roars,
+  snuffles and sings. The only automatic line left is the news telling the monster's player it
+  can molt. The players talk to each other on a voice chat of their own; the game has none.
+- End screen: the hearing music, a pictogram tally of what each player flattened, a newspaper
   front page with a photo over squiggle text.
 
 ### Weight and speed (phase 2, as built)
@@ -1053,7 +1112,77 @@ the game (`client/src/render/kaijuAnimator.ts`, `kaijuView.ts`, `kaijuTrails.ts`
   that takes nothing the rules know (no `kaijuHeld` on its tick) with civilians in its reach
   comes up with three to five of them in the claw; the monster lifts them to its mouth and gulps
   them down with a puff (1.25 s; anything else it does gulps them at once). Each screen has its
-  own crowd: two players need not see the same people squashed.
+  own crowd: two players need not see the same people squashed. Round 4: a newcomer is put
+  where that screen's camera cannot see it (outside the view, more than 480 m off, or behind a
+  building), and fades in over 0.9 s only when no such spot is found in eight tries; one who has
+  wandered far from the action is taken away only while out of sight. Nobody in view vanishes
+  but by a squash or a gulp. Nobody is put, or walks, out on the water (the bay, the river, the
+  moat; a bridge is dry ground).
+
+### Round 4's flair on the monster's screen (as built)
+
+`docs/ROADMAP.md` round 4. All pictures, on the monster player's own screen unless said
+otherwise; nothing here changes the game.
+
+- **The grab glow** (`client/src/render/grabGlow.ts`): every prop the hand can pick up at its
+  stage (cars; the city weapons while `grabStage` allows; a fallen mast's top at every stage, as
+  `canPickUp` says), car wrecks, loose city weapons and the army's wrecks, within four grab
+  reaches: a soft gold halo (added light) and a gold ring on the ground (the light alone washes
+  out in daylight). Within the grab's reach and arc round where the monster looks, brighter,
+  bigger and pulsing about three times a second; the nearest of those (the one a grab takes)
+  brightest. The nearest 40 only. Nothing glows while the hand is full, in the cocoon or under
+  water.
+- **The rage meter** (`client/src/ui/kaijuFlair.ts`): three claw gashes swirling round the
+  crosshair (26% of the window's smaller side across), each a tapered slash spiralling outward,
+  with a gap at the lower right where the throw comes in from the hand. Rage heats them one
+  after the other clockwise from the bottom: a dark scar, ember red, orange, white-hot at full.
+  Shown always, faint below 5%; with the beam picked and its rage there they throb and shed
+  embers. A blow landing (a `unitHit` or `structureStage` whose cause is the monster's: swipe,
+  stomp, thrown, beam, roar, charge, tail sweep, javelin, club, splash) flashes three claw
+  slashes over the crosshair (blue-white in a power surge), at most one every 0.12 s; a new body
+  out of the cocoon bursts a hot ring from the crosshair. With something in the hand the gashes
+  fade to a fifth, so the throw's arc and where it lands stay clear. The bottom-left rage bar
+  stays as it was.
+- **The power surge** (`client/src/ui/kaijuKit.ts`, `client/src/kaiju.css`): as it starts every
+  button of the kit snaps white and full with a jolt (the surge clears every cooldown), then the
+  move slots, Strike and Stomp flash blue-white while it lasts; a big lightning badge (15% of the
+  window's smaller side) pops in up and to the right of the crosshair, its white ring running
+  down over the 8 s; the screen's edges crackle blue-white. Every screen: a surging monster's
+  blows that land flash electric where they hit (`Effects.electricHit`: a blue-white flash and
+  glow, sparks and a ring).
+- **Punchier buttons:** a kit button's picture punches out as its attack starts.
+- **The titan in deep water** (`client/src/render/kaijuView.ts`, every screen): a kaiju too big
+  to swim with the snapshot's `inWater` eases down over about a second until the water stands
+  0.62 of the way up to its hips (the opaque water hides its legs), with a collar of white foam
+  round it on the water (two rings), white water splashing up round its legs, a splash and a
+  ring of foam at each step instead of dust, and while it walks a bow wave and a spreading wake.
+  Its own first-person view is not lowered (the claws keep their place before the eye).
+
+### Throwing on screen (round 4, as built)
+
+`docs/ROADMAP.md` round 4: "the arc is shown as a tube whose round cross-section grows with
+distance, so the player reads at a glance where it can land". On the monster player's own
+screen only, whenever the hand holds something to throw (not the fast-food sign, which is
+swung), out of the water and not helpless (`client/src/render/throwPreview.ts`):
+
+- **The preview.** Every frame it works out the throw the server would make with the aim being
+  sent (the same physics: `shared/src/sim/throwArc.ts`): a bright line along the aimed arc from
+  the hand to where it meets a building, a heap beyond the grab reach or the ground; round it the
+  tube of the throw's spread, drawn as its outline as the camera sees it (two lines either side
+  of the arc, as far out as the spread there; a solid tube seen from behind the monster would be
+  a blot over everything) and two of its round cross-sections, faint; where it ends, a ring the
+  size of the spread (an ellipse on the ground or a roof, round for a lob and up to twice as long
+  as it is wide for a flat throw; a circle on a wall) with a faint fill and a dot where the aimed
+  arc lands. Warm yellow with a dark edge, readable by day and at night; where a building stands
+  in front of it, it shows through, fainter. It ignores units (the throw may hit one first).
+- **The aim.** With something to throw in the hand the aim sent is where the view looks, in
+  both views (in third person it otherwise runs from the eye to what the crosshair is on), so
+  the arc moves smoothly with the mouse. The chase camera moves up and over the right shoulder
+  (2.2 body radii across, 0.55 body heights up), so the monster's back does not hide the arc,
+  and neither view looks higher than 8° above level: aiming higher goes on raising the throw
+  (the arc shows it) while the ground where it comes down stays in sight. After the throw the
+  aim comes back down to where the view stopped.
+- The javelin's old straight guide line is gone; the preview shows the javelin's arc too.
 
 ### Controls (as built: `client/src/game/input/actions.ts`)
 
@@ -1092,7 +1221,8 @@ button; `client/src/ui/kaijuKit.ts`). Bottom right, each picture over its button
 the jaws, darkened while the last meal is under 10 s old) and Stomp; then the two move slots, a
 faint egg in a dashed frame until a molt fills it, then the move's picture inside a ring that
 fills as it comes ready (its cooldown; for the beam, the rage it needs, glowing when full; the
-rage meter itself is shown only once the beam is picked); Molt, only while the bar offers one,
+rage bar bottom left is shown only once the beam is picked, the claw-mark rage meter round the
+crosshair always: "Round 4's flair" above); Molt, only while the bar offers one,
 pulsing; the camera. The molt cards (`client/src/ui/moltCards.ts`): when the cocoon starts three
 big cards come up in the middle of the screen, each the move's picture moving the way the move
 does, over the key or d-pad direction that picks it; above them the move button the pick will go
@@ -1107,17 +1237,18 @@ top, `k_club` for the fast-food sign with three pips for the swings left, `k_thr
 else, its frame throbbing red while a propane tank is in the hand) and Grab shows the drop
 (`k_drop`, never the jaws). A garage door adds a tile of its own beside the kit: the door
 (`k_shield`) under a wedge for the front it covers (70 degrees each side) and over a bar for the
-hp it has left, red when low. A power surge adds a lightning bolt (`k_surge`) in a blue-white
-ring that runs down over its 8 s, popping in when the surge starts, while the move slots and
-Strike and Stomp flash blue-white.
+hp it has left, red when low. A power surge adds a big lightning badge (`k_surge`) beside the
+crosshair in a white ring that runs down over its 8 s, popping in when the surge starts, while
+every button snaps full and the move slots and Strike and Stomp flash blue-white ("Round 4's
+flair" above).
 
 **The city weapons and the surge in the world** (`client/src/render/kaijuWeapons.ts`,
 `weaponsFx.ts`, `heldProps.ts`): each weapon is held by its art's `grip` node the way its
 manifest entry says (a tank hangs from the claw, tipped forward when it is longer than the hand
 is high; a javelin points along the aim; the sign follows the club's arc; the door is held in
 front of the chest), thrown the way it flies (tumbling, point first, flat and spinning), and a
-javelin stays stuck where it stops for 12 s. The local player's javelin shows a line of light from
-its point to where the crosshair is. The club leaves a trail of light along its arc and dust
+javelin stays stuck where it stops for 12 s. Where anything in the local player's hand would fly
+is the throw's preview (below, "Throwing on screen"). The club leaves a trail of light along its arc and dust
 under it; the sign flies apart on its third swing; shots that hit the door throw sparks off it,
 jolt it and darken it as its hp goes, and it bursts into slabs when it breaks; a propane tank
 going off in the hand leaves the monster recoiling (the flinch) with smoke streaming off the
@@ -1183,35 +1314,33 @@ crowns and billboards (one in the way brings the camera in, level, over the unit
 marker fades out within about 30 m of the camera, and a soldier within 3.5 m of it is not drawn
 (the squad-mates riding by the camera would otherwise fill the screen).
 
-**The controls card** (`client/src/ui/controlsCard.ts`) teaches all of this without words:
-every control of the player's role, each as the button's glyph on the device in use (it
-switches when the player picks up a controller) followed by a picture of what it does. A ring
-around a glyph means hold it; a small arrow means "then"; the HUD's three growing triangles
-mark a control that only exists at some stages (grabbing tanks and pieces of buildings from
-stage 2, the molt before stages 2 and 3, swimming at stages 1 and 2, moving on foot at stage 1,
-the tank's driving at stages 2 and 3).
-Swimming has no button: its tile is the movement keys, an arrow, and the spines-over-waves
-picture; the HUD shows the same picture, in water blue, while the kaiju is under. The kaiju's
-card: the starting kit (Strike's swipe, and its throw with something in the hand; Grab's grab, its
-meal with something in the hand, and a kiosk eaten when nothing is in reach to pick up; Stomp),
-the city weapons at stage 1 (the sign swung with Strike, an antenna thrown as a javelin with
-Strike, the door held up as a shield with no button, and Grab dropping a city weapon), the molt
-with its three cards over the buttons that pick them, the two move buttons as empty
-slots with the stages they are filled from, then the five moves a card can give, each beside both
-move buttons in a slot frame (the beam after the rage it needs, the roar then a dizzy spiral for
-its stun, the brace with a hold ring), swimming, the map, the camera, the settings and the card
-itself. The squad's card:
-moving on foot, looking, Fire, Volley (the right button with a hold ring, the squad-mates
-charging, the meter past its notch, then the volley going off), letting go early (the meter short
-of its notch, then a dim volley), the tank's driving (W over S: the tank driving forward and back;
-A beside D: the hull turning; the mouse: the turret swinging round), the map, the camera, the news
-drone for after the squad is gone, the settings and the card itself.
+**The controls card** (`client/src/ui/controlsCard.ts`; round 4: "five things at most per side,
+big pictures") shows only what the player can do right now, as at most five big pictures, each
+over its button's glyph on the device in use (it switches when the player picks up a
+controller). A ring round a glyph means hold it. The match screen feeds it the player's state
+every frame; the lobby and the briefing show the start of a match.
+
+- **Monster:** walking and looking (the movement keys and the mouse, under the monster); Strike
+  (the swipe, or with something in the hand its throw, the sign's swing or the javelin); Grab
+  (the grab over a car, or with something in the hand eating it, with the heart, or dropping a
+  city weapon); Stomp; the moves its molts picked, each over its own button, once picked (the
+  brace with a hold ring); the molt, lit and pulsing while the bar offers it. With all six,
+  walking makes room.
+- **Squad:** on foot (stage 1) moving and looking; in a tank (stages 2 and 3) driving (the
+  movement keys, the tank driving and turning) and the turret (the mouse); Fire (its own shot,
+  or a crate's weapon); Volley held (charging, then the shot: a crate's weapon, or the artillery
+  radio while it has barrages); the map. **The drone** (the squad gone): flying, up, down, the
+  map.
+- **Everyone:** the header holds the role's picture and name, the communication rose's key
+  (held) small, and the card's own key.
+
 It has a button in the lobby (for the role picked there) and on the briefing screen, is open
 by itself for the whole briefing, and in a match opens and closes with its key while the game
 runs on. Its picture and button are always the last of the action pictures at the bottom right,
-for every role, and glow for the first 20 seconds of a match so a new player finds them; it takes no mouse input there, so the captured
-pointer stays captured. A test fails if an action a player can press is missing from their
-card (`ACTION_USERS` in `actions.ts` says who presses what).
+for every role, and glow for the first 20 seconds of a match so a new player finds them; it
+takes no mouse input there, so the captured pointer stays captured. Tests check that a card
+never shows more than five pictures nor a button its role cannot press, and keeps the rose
+(`client/test/controlsCard.test.ts`).
 
 ### Voice cues (contract between the simulation and the audio)
 
@@ -1225,56 +1354,36 @@ voiced lines with an audience (`humans`, `kaiju`, `all`).
 `callin.inbound`, `clock.3min`, `clock.1min`, `clock.10s`, `kaiju.lowhp`, `bar.near`,
 `end.humans.kill`, `end.humans.clock`, `end.kaiju`, `hearing.humans.win`, `hearing.kaiju.win`.
 
-**How the radio is kept lively but never spammy** (as built; `shared/src/sim/systems/voice.ts`,
-rules per cue in `shared/src/defs/voice.ts`):
+**Round 4: the automatic lines are gone** (`docs/ROADMAP.md`). The simulation still emits
+every cue above (with its minimum gap and chatter budget, `shared/src/sim/systems/voice.ts`,
+`shared/src/defs/voice.ts`), as the match's record of its moments, but the script now holds only
+the news telling the monster's player that the creature can molt (`molt.available`, two lines
+in the anchor's voice), so that is the one line anybody hears. The radio and the news chatter,
+the briefing, the committee hearing and the client's event lines (a crate coming, a mast down
+and so on) were removed with their sound files.
 
-- The simulation chooses the lines. A `voice` event carries the line ids to play for each
-  side (`lines.humans`, `lines.kaiju`): one line, or the whole sequence for the briefing, or
-  none when the script has nothing for that side. The choice is made from whatever
-  `voiceLines.json` holds, with the match's own random numbers, so every listener and every
-  replay hears the same line. A cue about a squad is spoken in that squad's voice when it has
-  lines for it, and never in another squad's; a cue does not play the line it played last time.
-- Every cue has a minimum gap (for example 8 s between two "volley away" calls) and one of three
-  priorities. Cues the match turns on (briefing, start, nerve break, molt, cocoon, blast,
-  stages, clock, landmark, endings) always go out. Important ones (contact, crossfire, the
-  special, collateral, a squad wiped out, takeover, artillery, low health, the bar nearly
-  full) always go out too and use up chatter budget. Routine chatter (volley ready and fired,
-  roar, brace, a unit lost, a building down, stagger over, contact lost) spends a budget of two
-  lines that refills at one line per 5 s: a burst when something starts, then a trickle.
-- `kaiju.lowhp` is called once per stage, when the kaiju first drops below 25% health;
-  `bar.near` once on the way to each mark, at 85% of the way from the last one.
-- On top of that, each side has its own say (`VOICE_SIDE_RULES`; polish pass of 14 November,
-  after the owner's first game: "the anchor was speaking the whole time"). A cue that passes
-  the rules above is always emitted, so the match itself is unchanged; a side that is not to
-  hear it gets no line, and no subtitle.
-  - The news (the kaiju player) speaks only for: the briefing, the start, a landmark down, the
-    molt being ready, stage 2 and 3, one minute and ten seconds left, the ending, and the
-    hearing. All the colour commentary (volleys, crossfire, roars, buildings, units, artillery,
-    staggers and so on) is off. The lines are still in the script, just not played.
-  - The radio (the squads) keeps every cue but repeats a cue only after twice its gap (at least
-    8 s; nerve break 24 s, landmark 10 s, artillery 45 s), and routine chatter has its own
-    budget of two lines refilling at one per 15 s. Other cues the match turns on are not held.
-- Measured over ten whole bot matches (seeds 1 to 10, 115 minutes, briefing not counted): about
-  13 cues a minute. Before this pass both sides heard all of them (1,473 news lines, 1,484 radio
-  lines). Now the news says 124 (about 1 a minute, 12 times fewer) and the radio 772 (about 6.7
-  a minute, 52%). `test/voice.test.ts` holds a whole bot match to these limits.
+### The communication rose (round 4, as built)
 
-**Event lines (phases 2 and 3; as built, client only).** Some moments of phases 2 and 3 have no
-cue of the simulation's, so the client says a line for the simulation's own event
-(`client/src/audio/eventVoice.ts`; the script is `client/src/audio/eventLines.json`, in the
-same shape as `voiceLines.json`, built and checked with it). Every screen on a side picks the
-same line, by the event's tick, and each moment waits its own gap before it is said again on a
-screen:
+A player holds the rose key (**Z**, or down on a gamepad's directional pad; the same on both
+sides) and a ring of wedges opens around the crosshair. Moving the mouse (or the right stick)
+picks a wedge; letting go sends it; letting go in the middle sends nothing. While the ring is up
+the view holds still (the mouse moves the pick), and the body keeps moving and shooting. Each
+wedge is a picture (no words) and a kind of thing to say; sending it makes the player's
+character say a random line of that kind, which every screen plays at the same moment.
 
-| Moment | Event | Radio (squads) | News (monster) | Gap |
-| --- | --- | --- | --- | --- |
-| A crate is coming for your squad | `crate` drop for the player's own squad | yes | no | 45 s |
-| Your squad's crate lies untouched 3 s after landing | `crate` land | yes | no | 45 s |
-| A radio mast falls | `mastFall` | yes | yes | 30 s |
-| A gas station goes up | `fireball` | yes | yes | 30 s |
-| A substation goes down (the power cut and the surge) | `powerSurge` | yes | yes | 30 s |
-| The monster takes up a garage door as a shield | `kaijuHeld` | yes | no | 90 s |
-| The monster gulps down a handful of civilians | the client's own gulp | no | yes | 90 s |
-
-So the news now also breaks in when the district's power goes out, a gas station explodes, a
-mast falls or the creature eats pedestrians; nothing else changed in what it says.
+- **The army** (8 wedges, clockwise from the top): panic, bravado, orders, science (somebody call
+  the professor), home (my mother lives on this street), food, retreat, admiring the monster.
+  Five one-sentence lines each (`client/src/audio/roseLines.json`), shouted over the radio in
+  the voice of the player's squad (each of the four squads has its own voice), with a subtitle:
+  the player's name and the words. Everyone hears it, the monster's player included.
+- **The monster** (7 wedges): the big roar, the short roar, snuffles, a growl, a chomp, a
+  contented rumble and a little musical mating call. No words and no subtitle. The sound comes
+  from the monster in the world, at its size (three sizes, two versions of each), and at full
+  level for the monster's own player.
+- **No game effect at all.** The simulation never hears of it. Bots stay quiet.
+- **Spam:** one pick every 2 seconds per player. The rose shows the wait running round its
+  middle and greys its wedges meanwhile; the server holds everyone to it as well.
+- **Restart** (round 4): the host's settings panel (Escape) has a circular arrow during a match
+  and on the end screen. One press arms it (it turns red and pulses), a second press within 4
+  seconds starts the match over for everyone: a fresh match with the same people on the same
+  sides, the same kaiju, the same start.

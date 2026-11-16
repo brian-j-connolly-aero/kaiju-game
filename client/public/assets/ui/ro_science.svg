@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Rose, army: science (somebody call the professor). A flask with bubbling liquid. -->
+  <path d="M23 5H41M27 5V24L10 53Q8 58 14 58H50Q56 58 54 53L37 24V5"/>
+  <path fill="currentColor" stroke="none" d="M17 42H47L52 51Q53 54 50 54H14Q11 54 12 51Z"/>
+  <circle cx="30" cy="32" r="3" fill="currentColor" stroke="none"/>
+  <circle cx="36" cy="20" r="2.5" fill="currentColor" stroke="none"/>
+</svg>

@@ -427,7 +427,7 @@ describe('movement under player input', () => {
     run(world, 30 * 40, [input({ moveZ: 1, aimYaw: 0.7 }), input({ moveZ: 1, aimYaw: -2 })]);
     const b = world.match.bounds;
     expect(boundsContains(b, k.x, k.z, k.radius - 1e-9)).toBe(true);
-    for (const u of world.units) expect(boundsContains(b, u.x, u.z, u.radius - 1e-9)).toBe(true);
+    for (const u of world.units) expect(boundsContains(b, u.x, u.z, UNIT_TYPES[u.type].bodyRadius - 1e-9)).toBe(true);
     // The kaiju ran into the quarantine line and stopped there.
     expect(k.x === b.maxX - k.radius || k.z === b.maxZ - k.radius).toBe(true);
     expect(MATCH_RULES.unitsPerSquad).toBe(4);

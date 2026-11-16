@@ -7,3 +7,4 @@ export * from './lobby';
 export * from './protocol';
 export * from './welcome';
 export * from './build';
+export * from './rose';

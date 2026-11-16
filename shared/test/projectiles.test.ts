@@ -12,7 +12,6 @@ import {
   resolveAimPoint,
   spawnProjectile,
   stepProjectile,
-  throwAngle,
   TICK_RATE,
   WEAPONS,
   type Projectile,
@@ -68,18 +67,6 @@ describe('projectile flight', () => {
     expect(p.z).toBeCloseTo(-3 - 7 * t, 9);
     expect(p.y).toBeCloseTo(20 + 9 * t - 0.5 * COMBAT_RULES.gravity * t * t, 9);
     expect(p.vy).toBeCloseTo(9 - COMBAT_RULES.gravity * t, 9);
-  });
-
-  it('solves the throw angle so the arc lands on the target, and gives up at 45 degrees', () => {
-    const g = COMBAT_RULES.gravity;
-    for (const [d, dy, v] of [[20, -2, 25], [60, 0, 25], [150, -16, 45], [300, 40, 70]] as const) {
-      const a = throwAngle(d, dy, v, g);
-      const t = d / (v * Math.cos(a));
-      expect(v * Math.sin(a) * t - 0.5 * g * t * t).toBeCloseTo(dy, 6);
-      // The flat arc of the two possible ones.
-      expect(a).toBeLessThan(Math.PI / 4);
-    }
-    expect(throwAngle(5000, 0, 25, g)).toBeCloseTo(Math.PI / 4, 9);
   });
 
   it('announces a projectile once and ends it once', () => {

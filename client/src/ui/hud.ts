@@ -15,6 +15,11 @@
  * The squad's pick-ups (phase 2): Fire's picture is the weapon a crate gave (machine gun, big
  * cannon, missile pod) while the squad has it; the artillery radio sits beside Volley with a pip
  * for each barrage left; when the squad takes a crate its picture pops up over the crosshair.
+ *
+ * The monster's flair (round 4, ui/kaijuFlair.ts): its rage meter round the crosshair (three
+ * claw gashes that heat up, throbbing when the beam is ready), claw slashes over the crosshair
+ * when its blows land, a hot ring when a new body comes out, and the power surge's big lightning
+ * badge beside the crosshair (the kit's: ui/kaijuKit.ts) with the screen's edges crackling.
  */
 
 import {
@@ -30,16 +35,30 @@ import {
   weaponDef,
   type PickupId,
   type PickupKind,
+  type SimEvent,
   type SnapKaiju,
   type SnapSquad,
   type SnapUnit,
 } from '@mb/shared';
 import { pickupIcon } from '../assets/iconRaster';
 import { glyphFor, keyLayoutVersion, type Bindings, type ButtonAction, type InputDevice } from '../game/input/actions';
+import { kaijuBlowLanded } from '../game/kaijuBlows';
 import type { FrameState, MatchSession } from '../net/matchSession';
 import { skylinePath } from './iconArt';
 import { el, glyph, icon, setGlyph, setIcon, uiMarkup } from './icons';
+import { RageMeter } from './kaijuFlair';
 import { KaijuKit } from './kaijuKit';
+
+/**
+ * Where the icon under a mark of the destruction bar is centered, 0..1 of the bar's width:
+ * exactly on the mark (each tower of the skyline ends on its mark), so the fill line passes the
+ * molt icon on the tick the molt is offered. It used to sit under the middle of its tower, 3% of
+ * the bar early (round 4: "the city meter went past the upgrade icon a bit before upgrade
+ * available").
+ */
+export function barMarkAt(mark: number): number {
+  return MATCH_RULES.bar.display[mark];
+}
 
 export interface HudView {
   /** What the crosshair is on. */
@@ -132,6 +151,10 @@ export class Hud {
   private readonly crosshair: HTMLElement;
   /** The monster's buttons: the starting kit, the two move slots, molt (ui/kaijuKit.ts). */
   readonly kit = new KaijuKit();
+  /** The monster's rage round the crosshair, its hits and its molts (ui/kaijuFlair.ts). */
+  readonly rageMeter = new RageMeter();
+  /** The screen's edges crackle blue-white while the monster is in a power surge. */
+  private readonly surgeEdge = el('div', 'surge-edge hidden');
   private readonly humanHints: Record<string, Hint>;
   private readonly droneHints: Record<string, Hint>;
   private readonly hintsKaiju: HTMLElement;
@@ -183,10 +206,9 @@ export class Hud {
       bar.append(this.barEdge);
       this.lastBar = -1;
     });
-    for (const at of MATCH_RULES.bar.display) {
+    for (let i = 0; i < MATCH_RULES.bar.display.length; i++) {
       const mark = el('div', 'bar-mark', [icon('k_molt')]);
-      // Under the middle of its tower: each tower is 3% of the bar wide and ends on its mark.
-      mark.style.left = `${(at - 0.03) * 100}%`;
+      mark.style.left = `${barMarkAt(i) * 100}%`;
       this.marks.push(mark);
       bar.append(mark);
     }
@@ -266,6 +288,9 @@ export class Hud {
       this.squads,
       el('div', 'hud-bottom-left', [meters]),
       el('div', 'hud-bottom-right', [this.hintsKaiju, this.hintsHuman, this.hintsDrone, this.controlsHint.root]),
+      this.surgeEdge,
+      this.rageMeter.root,
+      this.kit.badge,
       this.crosshair,
       this.status,
       this.taken,
@@ -276,6 +301,11 @@ export class Hud {
     // once, which a slow first frame of a match let people see.
     this.root.classList.add('hidden');
     for (const group of [this.hintsKaiju, this.hintsHuman, this.hintsDrone]) group.classList.add('hidden');
+  }
+
+  /** A simulation event as it is shown: the monster player's blows landing flash its crosshair. */
+  onEvent(e: SimEvent, now: number, isKaiju: boolean): void {
+    if (isKaiju && kaijuBlowLanded(e)) this.rageMeter.hit(now);
   }
 
   /** Lights a status picture for a moment (crossfire, a nerve break, a volley). */
@@ -468,6 +498,9 @@ export class Hud {
 
     // Crosshair.
     setClass(this.crosshair, 'hidden', view.mode === 'drone' || view.mapOpen || (!lk && !lu));
+    // The monster's rage round it, and the surge's crackling edges.
+    this.rageMeter.update(lk, view.mode === 'kaiju' && !view.mapOpen && match.phase === 'playing', now);
+    setClass(this.surgeEdge, 'hidden', !lk || lk.surge <= 0 || view.mode !== 'kaiju');
     setClass(this.crosshair, 'on-kaiju', view.aimOn === 'kaiju');
     setClass(this.crosshair, 'out-of-range', view.mode === 'human' && !view.inRange);
     setClass(this.crosshair, 'kick', view.recoil > 0.5);

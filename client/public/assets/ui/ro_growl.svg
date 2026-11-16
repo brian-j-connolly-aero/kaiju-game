@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Rose, monster: the growl. Bared teeth in a closed jaw, with a rattling line. -->
+  <g transform="matrix(0.9831 0 0 0.9831 1.53 0.542)">
+    <path d="M6 22H46Q58 22 58 34Q58 46 46 46H6"/>
+    <path fill="currentColor" stroke="none" d="M10 24L15 33 20 24ZM22 24L27 33 32 24ZM34 24L39 33 44 24ZM15 44L20 35 25 44ZM27 44L32 35 37 44Z"/>
+    <path d="M4 56L10 52 16 56 22 52 28 56 34 52 40 56"/>
+  </g>
+</svg>

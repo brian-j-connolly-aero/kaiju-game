@@ -76,8 +76,8 @@ client/                   @mb/client
   src/net/                connection, snapshot interpolation, input sending, prediction
   src/render/             three.js scene: city, kaiju, units, crowds, projectiles, effects, sky
   src/game/               local player controllers (kaiju, human, map view, drone), input devices
-  src/ui/                 HUD (the squad's volley meter, the tank's gun reticle), menus, lobby, draft, end screen, subtitles
-  src/audio/              music stems, positional effects, voice queue
+  src/ui/                 HUD (the squad's volley meter, the tank's gun reticle, the monster's rage meter), menus, lobby, draft, end screen, subtitles
+  src/audio/              match music, positional effects, voice queue, the rose's lines (roseLines.json)
   public/assets/          models/ textures/ sprites/ audio/{music,sfx,voice}/ ui/  + manifest.json
 tools/art/                Blender Python sources for every model (source of truth for art)
 tools/audio/              music, sound-effect and voice generators (source of truth for audio)
@@ -282,20 +282,16 @@ section 5, "Bots"):
 - `test/bots.test.ts` checks every input a bot sends over a whole match against
   `sanitizeInput`: a bot can do nothing a client could not.
 
-How the radio works (`systems/voice.ts`, rules per cue in `defs/voice.ts`): every cue goes
+How the voice cues work (`systems/voice.ts`, rules per cue in `defs/voice.ts`): every cue goes
 through `say(world, cue, squad?, player?)`, which applies the cue's minimum gap and the chatter
-budget (`VOICE_CUE_RULES`, `VOICE_RULES`), then chooses the lines for both sides from
-`voiceLines.json` as it stands (`chooseVoiceLines`) and emits the `voice` event. Each side's
-list can be empty: `VOICE_SIDE_RULES` limits the news to a short list of cues and gives the
-radio its own longer waits and budget, without changing which cues are emitted or the random
-numbers they draw. Clients play
-`event.lines.humans` or `event.lines.kaiju` in order (ids are also the audio file names); they
-do not choose lines themselves. (`pickVoiceLine` remains for tools that only have a cue.) The
-one exception is the client's event lines (`client/src/audio/eventVoice.ts`, phase 3): moments
-of phases 2 and 3 that have no cue (a crate for your squad, a mast, a gas station or a
-substation going down, a garage door taken up as a shield, civilians eaten), said for the
-simulation's own events and picked by the event's tick, so a side still hears the same line on
-every screen (`DESIGN.md` section 8, "Event lines").
+budget (`VOICE_CUE_RULES`, `VOICE_RULES`), then chooses one line per side from
+`voiceLines.json` as it stands (`chooseVoiceLine`) and emits the `voice` event. Since round 4
+the automatic lines are gone: the script holds only the news telling the monster's player it can
+molt (`molt.available`), so every other cue's lists are empty and nobody hears it. The cues are
+still emitted (the match's record of its moments, which tests and tools read), and they draw
+the same random numbers as before. Clients play `event.lines.humans` or `event.lines.kaiju`
+(ids are also the audio file names); they do not choose lines themselves. What players say is
+the communication rose (section 4.2, `rose`), which the simulation never sees.
 
 How the human side is put together (`DESIGN.md` section 5 has the rules):
 
@@ -416,7 +412,7 @@ How the kaiju's action state machine, the damage rules and the molt hand over to
   direction, the length and what stopped the beam. The mouth and the eye are where the model
   has them, ahead of the body's axis along the aim heading (`kaijuMouthPoint`, `kaijuEyePoint`
   in `sim/aim.ts`, from `mouthHeight` / `mouthForward` and `eyeHeight` / `eyeForward` in the
-  kind's stage definition); the throw's aim ray starts at the eye. While a special's active phase runs, the
+  kind's stage definition). While a special's active phase runs, the
   movement system turns the head only at the special's reduced rate, so the snapshot's
   `aimYaw` / `aimPitch` are the true beam direction.
 - **Projectiles** fly along `p0 + v0 t - (0, g t² / 2, 0)` with t counted from the spawn tick
@@ -425,6 +421,22 @@ How the kaiju's action state machine, the damage rules and the molt hand over to
   seconds (a whole number of ticks) and straight on after; the weapon system chooses `a` so it
   arrives on the aim point exactly. `spawnProjectile(world, init)` is the one way to launch one.
   The kaiju's throw, unit fire, volleys and artillery shells all use it.
+- **Throws** (round 4) are one set of pure functions in `sim/throwArc.ts`, used by the
+  simulation, both bots and the client's trajectory preview, so the arc drawn is the arc flown:
+  `throwFlight(kind, stage, held, out)` (speed by stage and weight, the stage's gravity, the
+  lift above the look, the steepest elevation, the spread), `throwLaunch(source, flight, out)`
+  (from the hand along `aimYaw` at `aimPitch` + lift; `source` is a kaiju or a snapshot kaiju),
+  `throwError(launch, seed)` (the seeded error: a random vector uniform in a ball of radius
+  speed × tan(spread); the server seeds it with `hash32(world.seed, world.tick, kaiju id, salt)`),
+  `traceThrow(cityQuery, launch, clearRubble, out)` (steps the aimed arc tick by tick exactly as
+  the projectile system does, against the city and the ground, not units), `spreadAt` and
+  `landingSpread` (the tube's radius after t seconds, the ellipse where it ends) and
+  `aimThrowAt(cityQuery, source, flight, x, y, z, tolerance, clearRubble, out)` (the bots' aim:
+  the low arc when it gets there, else the lob). The numbers are the kind's `actions.throw`
+  (`speed`, `gravity`, `lift`, `maxElevation`, `spread`, `heavyMult` per stage where it says) and
+  `cityWeapons` (`JavelinDef.lift`, `range`, `spreadMult`; the garage door's `gravity`, `lift`,
+  `range`, `spreadMult`). No new message: the throw's velocity and gravity go out in
+  `projectileSpawn` as before, and the input's `aimPitch` was already there.
 
 Movement uses one shared pure function,
 `stepMovement(body, input, dt, cityQuery, params, result?)`, for circle bodies against
@@ -443,7 +455,13 @@ header of `shared/src/net/input.ts` has the rules. Since phase 2 `MoveParams` al
 `moundSpeedMult` (units cross rubble at half speed; the kaiju at its own pace) and
 `unitMoveParams` reads the unit's `y`: a ground unit up in the air is coming down by parachute
 and does not move. A client predicting its own unit needs its mirrored city's falls
-(`setStructureFallen`) for the slow-down to match.
+(`setStructureFallen`) for the slow-down to match. Since round 4 `MoveParams.bodyRadius` is the
+radius walls and the bounds see when it is not the body's own: `unitMoveParams` sets it from
+`UnitTypeDef.bodyRadius` (1 m for a foot section, whose hit area `radius` stays 3 m; a vehicle's
+is its radius), `kaijuMoveParams` leaves it undefined. A body may carry the unit's `radius`, as
+a `Unit` and the client's predicted body do: the parameters narrow it, so prediction matches the
+server with no change on the client's side. The squad-mates' way-finding (`sim/nav.ts`) uses the
+same body; hits, blasts, claws, the swarm's spacing and deployment use `radius`.
 
 The city (`shared/src/city`): `generatePortMeridian(seed)` (`city/meridian/`, `docs/CITY.md`)
 builds Port Meridian as `CityData` (structures, props, road graph, water and park areas,
@@ -480,7 +498,11 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
 ### 4.1 Rooms, seats and slots
 
 - Room lifecycle: create → 4-letter room code (also in the URL hash for one-click joining) →
-  lobby → match → end → lobby. `LobbyState.phase` is `lobby`, `match` or `end`.
+  lobby → match → end → lobby. `LobbyState.phase` is `lobby`, `match` or `end`. From the match
+  or the end screen the host may `restart`: the room goes back to the lobby and straight into a
+  new match (a new seed) with the same people on the same sides: the same kaiju seat (a bot if
+  that player has gone, or if a bot was the kaiju), the squads in seat order as at any start,
+  the same start neighborhood; nobody's ready is needed.
 - The room is registered with the room library under `ROOM_NAME` (`'mb'`). A client creates a
   room with that name and joins an existing one **by id, where the id is the room code** (in
   capitals; codes use the letters `BCDFGHJKLMNPQRSTVWXZ`, each drawn from the system's random
@@ -568,16 +590,27 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
 - Client → server (plain data): lobby actions `setName { name }`, `setRole { wantsKaiju,
   kaijuKind? }`, `setFaction { faction }`, `ready { ready }`, `setOptions { botKaiju? }` (host),
   `start {}` (host; everyone else connected must be ready or `waited`, section 4.1), `toLobby {}`
-  (host, on the end screen); in a match `input` (30 Hz):
+  (host, on the end screen), `restart {}` (host, in a match or on the end screen; section 4.1);
+  in a match `rose { cat }` (the communication rose: a wedge picked, an index into the sender's
+  side's list, `ROSE_ARMY` or `ROSE_KAIJU` in `shared/src/net/rose.ts`; the server takes at
+  most one per player every 2 s, less 0.3 s for the network's jitter, and only from somebody
+  who plays a slot) and `input` (30 Hz):
   `{ seq, moveX, moveZ, aimYaw, aimPitch, buttons, card? }`; any time
   `ping { t }`. `draftPick { card }` is accepted and ignored until
   drafts exist. Payload types: `ClientMessages` in `shared/src/net/protocol.ts`. The server
   ignores anything malformed, unknown or out of turn; it never answers with an error.
 - Server → client: `lobby` `{ lobby, you }` (on joining and on every change), `welcome` (seed,
   config, your ids, the tick, the anchor, a city checksum, full structure and prop state as
-  bytes), `snap` (binary, 15 Hz: tick, the acknowledgement of your inputs (section 4.3), match
+  bytes), `rose { player, cat, pick }` (somebody picked a wedge of the communication rose: sent
+  to everyone in the room, the sender included, at once; `pick` is a random number below
+  `ROSE_PICK_RANGE` from which every screen picks the same line or version, `rosePick`; talk
+  only, no game effect, bots never send one), `snap` (binary, 15 Hz: tick, the acknowledgement of your inputs (section 4.3), match
   scalars, every kaiju, squad and unit, the supply crates; compact fixed layout from
-  `shared/src/net/snapshot.ts`, about 860 bytes for a Tier 1 match), `events` (array of `SimEvent` with their tick), `pong { t, tick }`.
+  `shared/src/net/snapshot.ts`, about 860 bytes for a Tier 1 match), `events` (array of `SimEvent` with their tick), `pong { t, tick, wait?, guessed?, dropped? }`
+  (round 4: for a player in a running match also how the server handles their inputs, for the
+  network readout: inputs waiting in their queue now, ticks played on a guess and inputs
+  dropped since they took the slot; the client pings every 2 s, every 250 ms while the readout
+  is open).
   Payload types: `ServerMessages`. `snap` is the only message sent as raw bytes; everything else
   is plain data in the library's own encoding (MessagePack), in which the `cityState` bytes of
   the welcome arrive as a `Uint8Array`.
@@ -593,6 +626,8 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
   - During a match, everything sent after a `welcome` is newer than its tick.
   - When the match ends: the last `events` (with `matchEnd`) and the final `snap`, then `lobby`
     (phase `end`). Back to the lobby: `lobby` (phase `lobby`, everyone's `ready` cleared).
+  - A restart: `lobby` (phase `lobby`), then at once `lobby` (phase `match`) and a `welcome` with
+    tick 0 and a new seed, as for any start.
   - A `lobby` message whose phase goes from `match` straight to `lobby`, with no `matchEnd`,
     means the server abandoned the match after an internal failure: show the lobby.
 - **Input semantics** are specified in the header of `shared/src/net/input.ts` and nowhere else:
@@ -612,6 +647,9 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
 - Server helpers: `snapshotOfWorld` + `encodeSnapshot` (encode once, then `setSnapshotAck` per
   client), `welcomeFor(world, player)`. Client helpers: `decodeSnapshot`, `decodeCityState` +
   `cityStateFromWire` (the live city state for local queries and prediction).
+- `PROTOCOL_VERSION` 3 (round 4): the `rose` messages, `restart`, and the optional `wait`,
+  `guessed` and `dropped` fields on `pong` (the network readout). The snapshot is unchanged
+  (`SNAPSHOT_VERSION` stays 4).
 - Snapshot version 2 (polish pass 2) added the kaiju's `marked` flag, each squad's smoke and
   mark cooldowns, and the smoke clouds standing; version 3 took them out again with smoke and
   mark themselves. The layout is in the header of `shared/src/net/snapshot.ts`.
@@ -649,6 +687,14 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
   body in it and replays the inputs after the acknowledgement, less the ones the server says it
   will drop (section 4.3; `readAck` in `client/src/net/prediction.ts`); an input made after the
   server had already played its tick on a guess (the page stalled) is not predicted at all.
+  States with a known end are counted down while replaying (round 4; `Hold` in
+  `prediction.ts`): a stun (timed from its `unitStunned` event, the snapshot's own figure being
+  rounded to 0.05 s), and the kaiju's own attacks with fixed timings (`actionTicksLeft` in
+  `matchSession.ts`: what is left of the phase plus the phases after it; not the charge, the
+  brace, the beam or a stagger); a press the server has not played yet slows the body only from
+  the input that carried it on. In the intermission a unit the molt's blast threw is predicted
+  sliding to a stop as `coastUnits` moves it. Each of these used to make a correction of a
+  third of a meter to two meters.
   What difference remains fades out over a few frames. The body is drawn between its last two
   predicted poses, so it moves on every frame and not only on every tick. The turret of a tank the
   player drives is predicted with its hull (`stepMovement` turns the predicted body's `aimYaw`
@@ -701,8 +747,9 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
   automatic reconnection. (Two numbers in one field so that the snapshot layout, which others
   were changing at the time, did not have to change; a later layout change can give the second
   its own byte.)
-- **A silent player.** After 15 guessed ticks (0.5 s) a connected but silent player is brought
-  to a stop, and after 30 (1 s) their held buttons are let go too, so a hiccup in the middle of
+- **A silent player.** After 30 guessed ticks (1 s; 0.5 s until round 4, when tunnel stalls of
+  0.6 to 1 s turned into pull-backs of up to 3.5 m) a connected but silent player is brought
+  to a stop, and after 45 (1.5 s) their held buttons are let go too, so a hiccup in the middle of
   a brace or a volley does not cut it short. Only the guesses before the stop stand in for late
   inputs; the ticks after it stand for nothing (the player is away, not late). If that player's
   inputs then arrive all at once and the queue holds more than 5, it skips up to that many that
@@ -711,13 +758,20 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
 - **Backlogs.** Inputs that keep waiting (two or more after every tick for a second, as when
   the cushion was built while the link was slow) are trimmed one at a time, and only while the
   player's body stands still or nothing moves (the briefing), when skipping an input cannot be
-  seen. A queue of more than 32 is cut back regardless; a press among what is cut is carried
+  seen. A queue of more than 48 is cut back regardless; a press among what is cut is carried
   over.
 - What this cannot mend: a release that arrives late was guessed as still held, so the hold
   lasts longer by the ticks guessed after it; behind a stall of about 0.4 s or more a tap can
   become a hold (`docs/STATUS.md`, known risks).
 - If the simulation throws, the match is abandoned and the room returns to the lobby; the
   server keeps running.
+- **Slow moments** go to the log like failures (printed whatever `MB_QUIET` says;
+  `server/src/room/slowLog.ts`, round 4), at most one line per room every 5 s: an update that
+  took over 30 ms (with the three systems that took the most, timed through the optional
+  `mark` of `World.step` / `stepWorld`, the snapshot and sending, and garbage collection
+  pauses), the loop standing still for over 100 ms or dropping simulation time
+  (`FixedStep.dropped`), and a player whose inputs stopped for 0.3 s or more (written when they
+  come again, with whether the body was stopped).
 - The end screen returns to the lobby when the host sends `toLobby`, or by itself after 120 s
   (20 s with `MB_FAST`, `MB_END_SCREEN` to change, 0 to wait for the host).
 
@@ -984,7 +1038,13 @@ layout, requires bumping `SNAPSHOT_VERSION` / `PROTOCOL_VERSION`.
   `audio.stats()` (through `__mb.internals.ctx.audio`) reports voices and megabytes held.
 - Debug and automation hooks (required for automated playtests): `window.__mb` exposes state,
   `renderer.info`, and helpers; `?autoplay=1` makes the client play itself with a simple
-  autopilot; `?debug=1` shows an overlay. The server honors `MB_FAST=1` (short timers) and a
+  autopilot; `?debug=1` shows an overlay; the ` key (`Backquote`, outside the action map, on
+  every screen) opens the network readout (`client/src/ui/netReadout.ts`, round 4: round trip,
+  snapshot gaps, the server's view of this player's inputs from the pong, the prediction's
+  corrections from `MatchSession.net`, the page's own long frames, and a 30 s graph). The
+  network probe (`npx tsx tools/playtest/netprobe.ts`) plays headless players with the
+  client's own network code through a slow, stalling relay (`tools/playtest/relay.mjs`) and
+  counts their corrections. The server honors `MB_FAST=1` (short timers) and a
   practice option (bot kaiju), see section 4.4. `?sandbox=1|2|3` runs the shared simulation
   inside the page (one player against the bots, starting at that stage) behind the same
   message interface as a room: it is how stages are looked at without a server

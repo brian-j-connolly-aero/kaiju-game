@@ -1,123 +1,122 @@
 /**
- * The controls card shows every control a player can press. The list of who presses what is
- * `ACTION_USERS` next to the bindings; the kaiju's verbs come from its kind's action table.
+ * The controls card (H) shows what the player can do right now: five big pictures at most per
+ * side (docs/ROADMAP.md round 4), each over its button, and the communication rose's key under
+ * them. `ACTION_USERS` next to the bindings says who presses what.
  */
 
 import { describe, expect, it } from 'vitest';
-import { kaijuKindDef, PLAYABLE_KAIJU_KINDS } from '@mb/shared';
+import { kaijuKindDef, PLAYABLE_KAIJU_KINDS, type HeldObject, type KaijuMoveId, type PickupId, type StageId } from '@mb/shared';
 import { ACTION_USERS, BUTTON_ACTIONS, browserShortcutRisk, defaultBindings, type ButtonAction } from '../src/game/input/actions';
-import { cardActions, cardButton, cardTiles, kaijuTiles, partGlyph, squadTiles, type CardTile } from '../src/ui/controlsCard';
+import { cardActions, cardTiles, kaijuTiles, MAX_TILES, partGlyph, roseTile, squadTiles, START_STATE, type CardState, type CardTile } from '../src/ui/controlsCard';
 
 function buttonParts(tiles: CardTile[]) {
-  return tiles.flatMap((t) => t.parts.filter((p): p is Extract<typeof p, { kind: 'button' }> => p.kind === 'button'));
+  return tiles.flatMap((t) => t.pairs.flatMap((p) => p.keys.filter((k): k is Extract<typeof k, { kind: 'button' }> => k.kind === 'button')));
+}
+
+function pictures(tile: CardTile | undefined): string[] {
+  return tile ? tile.pairs.flatMap((p) => p.pics.flatMap((k) => (k.kind === 'picture' ? [k.icon] : []))) : [];
+}
+
+const state = (s: Partial<CardState>): CardState => ({ ...START_STATE, ...s });
+const MOVES: Array<readonly [KaijuMoveId, KaijuMoveId]> = [['none', 'none'], ['beam', 'none'], ['roar', 'brace'], ['charge', 'tailSweep']];
+const HELD: Array<HeldObject | null> = [null, { kind: 'wreck', wreck: 'car' }, { kind: 'prop', prop: 'foodsign' }, { kind: 'prop', prop: 'antenna' }, { kind: 'prop', prop: 'garagedoor' }];
+const PICKUPS: PickupId[] = ['none', 'machineGun', 'bigCannon', 'missilePod', 'artilleryRadio'];
+
+/** Every state the card can be asked to show, for both sides. */
+function everyState(): CardState[] {
+  const out: CardState[] = [];
+  for (const stage of [1, 2, 3] as StageId[]) {
+    for (const moves of MOVES) for (const held of HELD) for (const moltOffered of [false, true]) out.push(state({ stage, moves, held, moltOffered }));
+    for (const pickup of PICKUPS) for (const drone of [false, true]) out.push(state({ stage, pickup, barrages: pickup === 'artilleryRadio' ? 2 : 0, drone }));
+  }
+  return out;
 }
 
 describe('the controls card', () => {
-  it('shows every action a player can press to everyone who can press it', () => {
+  it('shows five things at most, on either side, whatever the player has', () => {
     for (const kind of PLAYABLE_KAIJU_KINDS) {
-      const kaiju = cardActions(cardTiles('kaiju', kind));
-      const squad = cardActions(cardTiles('squad', kind));
-      for (const action of BUTTON_ACTIONS) {
-        const users = ACTION_USERS[action];
-        if (users.includes('kaiju')) expect(kaiju.has(action), `kaiju card misses ${action}`).toBe(true);
-        // An eliminated squad leader flies the drone: its controls are on the squad's card.
-        if (users.includes('squad') || users.includes('drone')) expect(squad.has(action), `squad card misses ${action}`).toBe(true);
+      for (const s of everyState()) {
+        expect(cardTiles('kaiju', kind, s).length).toBeLessThanOrEqual(MAX_TILES);
+        expect(cardTiles('squad', kind, s).length).toBeLessThanOrEqual(MAX_TILES);
       }
     }
   });
 
-  it('does not show a button to a role that cannot press it', () => {
+  it('never shows a button to a role that cannot press it, and keeps the communication rose for everyone', () => {
     const kind = PLAYABLE_KAIJU_KINDS[0];
-    for (const action of cardActions(cardTiles('kaiju', kind))) expect(ACTION_USERS[action], action).toContain('kaiju');
-    for (const action of cardActions(cardTiles('squad', kind))) {
-      const users = ACTION_USERS[action];
-      expect(users.includes('squad') || users.includes('drone'), action).toBe(true);
-    }
-  });
-
-  it('has a tile for every verb in the kaiju action table, on its button, held only for the brace', () => {
-    for (const kind of PLAYABLE_KAIJU_KINDS) {
-      const def = kaijuKindDef(kind);
-      const tiles = kaijuTiles(kind);
-      for (const [verb, action] of Object.entries(def.actions)) {
-        const tile = tiles.find((t) => t.verb === verb);
-        expect(tile, `${kind} ${verb}`).toBeDefined();
-        const key = cardButton(verb as keyof typeof def.actions);
-        // A move a molt card gives sits on whichever move button its slot is: the card shows both.
-        expect(key.slot, `${kind} ${verb} is a move picked at a molt`).toBe(action.button === 'slot');
-        if (key.slot) {
-          const moves = (tile as CardTile).parts.find((p) => p.kind === 'moves');
-          expect(moves, `${kind} ${verb} shows the move buttons`).toBeDefined();
-          expect(moves?.kind === 'moves' && moves.hold === true, `${kind} ${verb} hold ring`).toBe(action.whileHeld);
-        } else {
-          const press = buttonParts([tile as CardTile]).find((p) => p.action === key.action);
-          expect(press, `${kind} ${verb} shows ${key.action}`).toBeDefined();
-          expect(press?.hold === true, `${kind} ${verb} hold ring`).toBe(action.whileHeld);
-        }
+    for (const s of everyState()) {
+      for (const action of cardActions(cardTiles('kaiju', kind, s))) expect(ACTION_USERS[action], action).toContain('kaiju');
+      for (const action of cardActions(cardTiles('squad', kind, s))) {
+        const users = ACTION_USERS[action];
+        expect(users.includes(s.drone ? 'drone' : 'squad'), `${action} drone ${s.drone}`).toBe(true);
       }
-      // Grabbing tanks and pieces of buildings, and the molt, are limited to their stages.
-      expect(tiles.find((t) => t.id === 'grab-big')?.stages).toEqual([2, 3]);
-      expect(tiles.find((t) => t.id === 'molt')?.stages).toEqual([1, 2]);
     }
+    expect(buttonParts([roseTile()])).toEqual([{ kind: 'button', action: 'rose', hold: true }]);
+    for (const role of ['kaiju', 'squad', 'drone'] as const) expect(ACTION_USERS.rose).toContain(role);
   });
 
-  it('shows the starting kit, the two empty move slots and the molt with its three cards', () => {
-    const tiles = kaijuTiles('lizard');
-    const parts = (id: string) => (tiles.find((t) => t.id === id) as CardTile).parts;
-    // One move per button: Strike swipes, Grab grabs, Stomp stomps; with something in the hand
-    // the same two buttons throw it and eat it; with nothing to pick up a kiosk is eaten.
-    expect(buttonParts([tiles.find((t) => t.id === 'swipe') as CardTile]).map((p) => p.action)).toEqual(['strike']);
-    expect(buttonParts([tiles.find((t) => t.id === 'stomp') as CardTile]).map((p) => p.action)).toEqual(['stomp']);
-    expect(buttonParts([tiles.find((t) => t.id === 'throw') as CardTile]).map((p) => p.action)).toEqual(['strike']);
-    expect(buttonParts([tiles.find((t) => t.id === 'eat') as CardTile]).map((p) => p.action)).toEqual(['grab']);
-    expect(parts('eat-kiosk').some((p) => p.kind === 'picture' && p.icon === 'tl_kiosk')).toBe(true);
-    // Nothing is held any more, but the brace.
-    expect(buttonParts(tiles).every((p) => !p.hold)).toBe(true);
-    // The slots: the first move button filled from stage 2, the second from stage 3.
-    expect(parts('slots')).toEqual([
-      { kind: 'slot', action: 'move1', stages: [2, 3] },
-      { kind: 'slot', action: 'move2', stages: [3] },
+  it('shows the monster its starting kit, and the molt picks only once picked, each on its own button', () => {
+    const ids = (s: CardState) => kaijuTiles('lizard', s).map((t) => t.id);
+    expect(ids(START_STATE)).toEqual(['walk', 'strike', 'grab', 'stomp']);
+    const buttons = (s: CardState, id: string) => buttonParts(kaijuTiles('lizard', s).filter((t) => t.id === id)).map((p) => p.action);
+    expect(buttons(START_STATE, 'strike')).toEqual(['strike']);
+    expect(buttons(START_STATE, 'grab')).toEqual(['grab']);
+    expect(buttons(START_STATE, 'stomp')).toEqual(['stomp']);
+    // The bar offers a molt: its button lights up.
+    const offered = kaijuTiles('lizard', state({ moltOffered: true }));
+    expect(offered.map((t) => t.id)).toEqual(['walk', 'strike', 'grab', 'stomp', 'molt']);
+    expect(offered.find((t) => t.id === 'molt')?.glow).toBe(true);
+    // Picked at the first molt: the beam on the first move button.
+    const one = kaijuTiles('lizard', state({ stage: 2, moves: ['beam', 'none'] }));
+    expect(buttons(state({ stage: 2, moves: ['beam', 'none'] }), 'moves')).toEqual(['move1']);
+    expect(pictures(one.find((t) => t.id === 'moves'))).toEqual(['k_special']);
+    // Both picked, the brace held; with the molt on offer too, walking makes room.
+    const both = state({ stage: 2, moves: ['roar', 'brace'], moltOffered: true });
+    expect(ids(both)).toEqual(['strike', 'grab', 'stomp', 'moves', 'molt']);
+    const moves = buttonParts(kaijuTiles('lizard', both).filter((t) => t.id === 'moves'));
+    expect(moves).toEqual([
+      { kind: 'button', action: 'move1', hold: false },
+      { kind: 'button', action: 'move2', hold: kaijuKindDef('lizard').actions.brace.whileHeld },
     ]);
-    // The molt: one press, then the first molt's three cards.
-    expect(buttonParts([tiles.find((t) => t.id === 'molt') as CardTile]).map((p) => p.action)).toEqual(['molt']);
-    expect(parts('molt').find((p) => p.kind === 'cards')).toEqual({ kind: 'cards', moves: kaijuKindDef('lizard').cards.first });
-    // Every move a card can give, from the stage it can first be had: the second molt's only at stage 3.
-    for (const move of ['beam', 'roar', 'charge']) expect(tiles.find((t) => t.id === move)?.stages, move).toEqual([2, 3]);
-    for (const move of ['brace', 'tailSweep']) expect(tiles.find((t) => t.id === move)?.stages, move).toEqual([3]);
   });
 
-  it('pictures swimming (no button: walk into deep water) at the stages the kaiju can swim', () => {
-    const tiles = kaijuTiles('lizard');
-    const swim = tiles.find((t) => t.id === 'swim') as CardTile;
-    expect(swim).toBeDefined();
-    expect(buttonParts([swim])).toEqual([]);
-    expect(swim.parts.some((p) => p.kind === 'move')).toBe(true);
-    expect(swim.parts.some((p) => p.kind === 'picture' && p.icon === 'k_swim')).toBe(true);
-    // The hatchling and the juvenile; the titan is too big.
-    expect(swim.stages).toEqual([1, 2]);
+  it('changes Strike and Grab with what is in the hand', () => {
+    const tile = (held: HeldObject | null, id: string) => pictures(kaijuTiles('lizard', state({ held })).find((t) => t.id === id));
+    expect(tile(null, 'strike')).toEqual(['k_swipe']);
+    expect(tile(null, 'grab')).toEqual(['k_grab', 'tl_car']);
+    // A car wreck: thrown, or eaten (it heals).
+    expect(tile({ kind: 'wreck', wreck: 'car' }, 'strike')).toEqual(['k_throw']);
+    expect(tile({ kind: 'wreck', wreck: 'car' }, 'grab')).toEqual(['k_eat', 'st_health']);
+    // City weapons: swung, thrown as a javelin, and dropped (never eaten).
+    expect(tile({ kind: 'prop', prop: 'foodsign' }, 'strike')).toEqual(['k_club']);
+    expect(tile({ kind: 'prop', prop: 'antenna' }, 'strike')).toEqual(['k_javelin']);
+    expect(tile({ kind: 'prop', prop: 'garagedoor' }, 'grab')).toEqual(['k_drop']);
   });
 
-  it('shows the squad its two buttons (Volley held), and the tank’s driving at stages 2 and 3', () => {
-    const tiles = squadTiles();
-    for (const id of ['move', 'look', 'fire', 'volley', 'volleyEarly', 'drive', 'turn', 'turret', 'map', 'camera', 'settings', 'controls', 'drone']) {
-      expect(tiles.some((t) => t.id === id), id).toBe(true);
-    }
-    const tile = (id: string): CardTile => tiles.find((t) => t.id === id) as CardTile;
-    expect(buttonParts([tile('fire')])).toEqual([{ kind: 'button', action: 'fire', hold: false }]);
-    expect(buttonParts([tile('volley')])).toEqual([{ kind: 'button', action: 'volley', hold: true }]);
-    // On foot the keys move relative to the view; at stages 2 and 3 W and S drive and A and D turn.
-    expect(tile('move').stages).toEqual([1]);
-    for (const id of ['drive', 'turn', 'turret']) expect(tile(id).stages, id).toEqual([2, 3]);
-    expect(cardActions([tile('drive')])).toEqual(new Set(['moveForward', 'moveBack']));
-    expect(cardActions([tile('turn')])).toEqual(new Set(['moveLeft', 'moveRight']));
+  it('shows a squad on foot, then its tank, a crate weapon on both buttons, the radio on the volley, and the drone', () => {
+    const ids = (s: CardState) => squadTiles(s).map((t) => t.id);
+    expect(ids(START_STATE)).toEqual(['walk', 'fire', 'volley', 'map']);
+    expect(ids(state({ stage: 2 }))).toEqual(['drive', 'turret', 'fire', 'volley', 'map']);
+    expect(buttonParts(squadTiles(START_STATE).filter((t) => t.id === 'volley'))).toEqual([{ kind: 'button', action: 'volley', hold: true }]);
+    const tile = (s: CardState, id: string) => pictures(squadTiles(s).find((t) => t.id === id));
+    expect(tile(START_STATE, 'fire')).toEqual(['st_reload']);
+    // A crate's weapon replaces Fire's picture and is what the volley fires too.
+    expect(tile(state({ pickup: 'machineGun' }), 'fire')).toEqual(['pk_machinegun']);
+    expect(tile(state({ pickup: 'machineGun' }), 'volley')).toEqual(['sq_charge', 'pk_machinegun']);
+    expect(tile(state({ pickup: 'artilleryRadio', barrages: 2 }), 'volley')).toEqual(['sq_charge', 'pk_artilleryradio']);
+    // The squad gone: flying the news drone.
+    expect(ids(state({ drone: true }))).toEqual(['fly', 'rise', 'sink', 'map']);
+    expect(cardActions(squadTiles(state({ drone: true })))).toEqual(new Set<ButtonAction>(['moveForward', 'moveBack', 'moveLeft', 'moveRight', 'rise', 'sink', 'map']));
   });
 
   it('has a glyph for every button on both devices', () => {
     const b = defaultBindings();
     for (const role of ['kaiju', 'squad'] as const) {
-      for (const part of buttonParts(cardTiles(role, PLAYABLE_KAIJU_KINDS[0]))) {
-        expect(partGlyph(part, b, 'keyboard'), `${role} ${part.action} keyboard`).not.toBeNull();
-        expect(partGlyph(part, b, 'gamepad'), `${role} ${part.action} gamepad`).not.toBeNull();
+      for (const s of everyState()) {
+        for (const part of buttonParts([...cardTiles(role, PLAYABLE_KAIJU_KINDS[0], s), roseTile()])) {
+          expect(partGlyph(part, b, 'keyboard'), `${role} ${part.action} keyboard`).not.toBeNull();
+          expect(partGlyph(part, b, 'gamepad'), `${role} ${part.action} gamepad`).not.toBeNull();
+        }
       }
     }
   });

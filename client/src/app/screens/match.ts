@@ -11,15 +11,22 @@
  * while they wait for a pick: a click on a card picks it and takes the pointer back. Escape belongs to the browser while the pointer is
  * captured (it frees the pointer and the page never sees the key), so "the pointer was taken
  * away while this window had the focus" is read as Escape: the settings panel opens.
+ *
+ * The communication rose (ui/rose.ts, round 4) opens over the crosshair while its key is held:
+ * it takes the mouse's movement before the controller sees it (`MatchRuntime.onInput`), so the
+ * view holds still, and a pick goes to the server as a `rose` message.
  */
 
 import { kaijuStageDef, unitTypeDef, weaponDef, type SimEvent } from '@mb/shared';
 import { iconImage, pickupIcon } from '../../assets/iconRaster';
+import { cardState } from '../../ui/controlsCard';
+import { MOUSE_SENSITIVITY } from '../../game/input/inputManager';
 import { GunReticle } from '../../ui/gunReticle';
 import { Hud } from '../../ui/hud';
 import { el } from '../../ui/icons';
 import { MapView } from '../../ui/mapView';
 import { MoltCardPicker } from '../../ui/moltCards';
+import { CommRose } from '../../ui/rose';
 import { ThreatRing } from '../../ui/threats';
 import { VolleyMeter } from '../../ui/volleyMeter';
 import type { AppContext, Screen } from '../context';
@@ -77,6 +84,7 @@ export class MatchScreen implements Screen {
       this.cardsTookPointer = false;
     };
     this.root = el('div', 'screen match', [this.threats.root, this.volley.root, this.gun.root, this.hud.root, this.map.root, cards.root]);
+    this.startRose(ctx);
     // The gun reticle is placed once the camera is where this frame's picture is drawn from.
     runtime.onCamera = () => this.placeGun(ctx);
     ctx.ui.append(this.root);
@@ -105,6 +113,38 @@ export class MatchScreen implements Screen {
     };
   }
 
+  /**
+   * The communication rose: open while its key is held during play (not over the map, the menu
+   * or the molt cards); while it is open the mouse moves the pick and not the view. A pick is
+   * sent to the server, which passes it on to everyone (the line or noise is played when it
+   * comes back, the same moment on every screen).
+   */
+  private startRose(ctx: AppContext): void {
+    const runtime = ctx.runtime;
+    const kind = runtime?.session.role.kind;
+    if (!runtime || !this.root || (kind !== 'kaiju' && kind !== 'human')) return;
+    const rose = new CommRose(kind === 'kaiju' ? 'kaiju' : 'army');
+    this.root.append(rose.root);
+    rose.onSend = (cat) => {
+      ctx.client.send('rose', { cat });
+      ctx.audio.play('ui_wheel_select', { gain: 0.6 });
+    };
+    runtime.onInput = (actions) => {
+      const phase = runtime.frame?.match.phase;
+      const allowed = (phase === 'playing' || phase === 'intermission') && !runtime.mapOpen && !runtime.menuOpen && !this.cardsWaiting;
+      const wasOpen = rose.open;
+      const perPixel = MOUSE_SENSITIVITY * ctx.input.sensitivity;
+      // Back to screen pixels, y down, whatever the player's look settings.
+      const up = ctx.input.invertY ? -actions.lookY : actions.lookY;
+      const open = rose.update({ held: actions.down.rose, dx: actions.lookX / perPixel, dy: -up / perPixel, allowed, now: ctx.now() });
+      if (open) {
+        actions.lookX = 0;
+        actions.lookY = 0;
+        if (!wasOpen) ctx.audio.play('ui_wheel_open', { gain: 0.5 });
+      }
+    };
+  }
+
   private openPanel(ctx: AppContext, hadPointer: boolean): void {
     this.panelTookPointer = hadPointer;
     ctx.input.unlockPointer();
@@ -124,6 +164,7 @@ export class MatchScreen implements Screen {
     if (!hud) return;
     const now = ctx.now();
     this.volley?.onEvent(e, now);
+    hud.onEvent(e, now, ctx.runtime?.session.role.kind === 'kaiju');
     if (e.type === 'moltPick' && e.kaiju === ctx.runtime?.session.role.kaijuId) this.cards?.picked(e);
     if (e.type === 'crossfire') hud.flash('crossfire', now);
     else if (e.type === 'nerveBreak') hud.flash('nerveBreak', now, 2.5);
@@ -244,6 +285,8 @@ export class MatchScreen implements Screen {
     const view = runtime.hudView();
     hud.root.classList.toggle('cinematic', runtime.shot !== null);
     hud.update(frame, runtime.session, view, ctx.now());
+    // The controls card shows only what the player can do now (what is in the hand, the moves picked, a crate's weapon).
+    ctx.controls.setState(cardState(frame.match.stage, frame.localKaiju, frame.squads[runtime.session.role.squadId], view.mode === 'drone'));
     // The kaiju's own warnings, while it plays (not under the intermission's cinematic camera).
     const threats = this.threats;
     const lk = frame.localKaiju;
@@ -275,6 +318,7 @@ export class MatchScreen implements Screen {
     if (ctx.runtime) {
       ctx.runtime.onEvent = null;
       ctx.runtime.onCamera = null;
+      ctx.runtime.onInput = null;
       ctx.runtime.mapOpen = false;
       ctx.runtime.menuOpen = false;
       ctx.runtime.shot = null;

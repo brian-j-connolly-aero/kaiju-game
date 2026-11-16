@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Rose, army: panic. A face with wide eyes and a round open mouth, shock lines above. -->
+  <g transform="matrix(0.9508 0 0 0.9508 1.57 3.48)">
+    <circle cx="32" cy="36" r="22"/>
+    <circle cx="24" cy="32" r="5.5" fill="currentColor" stroke="none"/>
+    <circle cx="40" cy="32" r="5.5" fill="currentColor" stroke="none"/>
+    <ellipse cx="32" cy="47" rx="5.5" ry="7" fill="currentColor" stroke="none"/>
+    <path d="M12 6L17 12M32 2V8M52 6L47 12"/>
+  </g>
+</svg>

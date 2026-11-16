@@ -33,7 +33,10 @@ import { Boundary } from './boundary';
 import { CityView } from './cityView';
 import { CratesView } from './cratesView';
 import { atlasPixels, renderLandmarkPictures } from './landmarkPictures';
+import { kaijuBlowLanded } from '../game/kaijuBlows';
 import { Crowd } from './crowd';
+import { GrabGlow } from './grabGlow';
+import { ThrowPreview } from './throwPreview';
 import { Effects } from './effects';
 import { buildGround, setGroundNight } from './ground';
 import { TrailRibbons } from './kaijuTrails';
@@ -152,6 +155,10 @@ export class GameRenderer {
   private readonly glow: QuadBatch;
   private readonly units: UnitsView;
   private readonly crowd: Crowd;
+  /** What the local monster can pick up glows (round 4). */
+  private readonly grabGlow: GrabGlow;
+  /** The arc of what the local monster holds, and where it can land (round 4). */
+  private readonly throwPreview = new ThrowPreview();
   /**
    * Grabs (and eats) whose hand closed this frame: unless the simulation said it took something
    * (`kaijuHeld` on the same tick), the hand comes up with a handful of civilians in reach
@@ -220,6 +227,7 @@ export class GameRenderer {
     this.glow = new QuadBatch(atlas.texture, { mode: 'facing', capacity: 256, additive: true, renderOrder: 17 });
     this.units = new UnitsView(assets, this.materials, this.sprites, this.decals, this.markers);
     this.crowd = new Crowd(assets, this.sprites);
+    this.grabGlow = new GrabGlow(assets);
     this.projectiles = new ProjectilesView(assets, this.materials, this.glow);
     this.weaponsFx = new WeaponsFx(assets, this.materials, this.effects, this.units);
     this.crates = new CratesView(assets, this.materials, this.effects, this.glow);
@@ -238,6 +246,7 @@ export class GameRenderer {
       this.trails.mesh,
       this.motion.lines.mesh,
       this.boundary.mesh,
+      this.throwPreview.group,
     );
     const first = (id: string, out: number[]): void => {
       const anim = [...assets.sprite(id).anims.values()][0];
@@ -486,6 +495,7 @@ export class GameRenderer {
         // `structureFall` of the same tick tips it over instead (`collapses`, `endEvents`).
         const info = city.setStage(e.id, e.stage, e.stage < 3);
         city.flush();
+        if (info && kaijuBlowLanded(e) && this.lastFrame?.kaijus.some((k) => k.surge > 0)) fx.electricHit(info.x, info.height * 0.5, info.z, Math.min(12, info.radius * 0.5));
         if (e.stage >= 3) this.collapses.add(e.id);
         else if (info) {
           fx.dust(info.x, info.height * 0.5, info.z, info.radius * 0.6, 4);
@@ -620,6 +630,8 @@ export class GameRenderer {
         break;
       case 'unitHit':
         fx.glowAt(e.x, 1.5, e.z, 4.5, 0xffb080, 0.08);
+        // A monster in a power surge: its blows flash electric (round 4).
+        if (kaijuBlowLanded(e) && this.lastFrame?.kaijus.some((k) => k.surge > 0)) fx.electricHit(e.x, 1.5, e.z, 3);
         break;
       case 'memberLost': {
         const u = this.lastFrame?.units[e.unit];
@@ -903,6 +915,7 @@ export class GameRenderer {
     this.glow.begin();
     this.lines.begin();
     this.trails.begin();
+    this.throwPreview.group.visible = false;
 
     if (frame && view) {
       const query = this.mirror?.query ?? null;
@@ -918,7 +931,6 @@ export class GameRenderer {
           firstPerson: own,
           insideHead: own && view.kaijuInsideHead,
           camera: this.camera.position,
-          local: k.id === view.localKaiju,
           tick: frame.tick,
         });
         const st = kaijuStageDef(k.kind, k.stage);
@@ -926,6 +938,13 @@ export class GameRenderer {
         if (k.phase === 'charge' && k.alive) this.squashed(this.crowd.squash(k.x, k.z, st.bodyRadius, this.effects), k.x, k.z);
         if (k.phase !== 'cocoon' || k.id === view.localKaiju || view.seesKaiju) {
           this.decals.push(k.x, 0.12, k.z, st.bodyRadius * 3.4, st.bodyRadius * 3.4, this.ringShadowUv(), 0, 0, 0, 0, 0.6);
+        }
+        // Standing deep in water (the titan): a collar of white foam round it at the waterline (round 4).
+        const wade = kv.wading;
+        if (wade > 0.05) {
+          const d = st.bodyRadius * (2.5 + Math.sin(time * 2.6) * 0.08);
+          this.decals.push(k.x, 0.3, k.z, d, d, this.ringUv, 0, 0.92, 0.97, 1, 0.85 * wade);
+          this.decals.push(k.x, 0.3, k.z, d * 1.3, d * 1.3, this.ringUv, 0, 0.85, 0.93, 1, 0.45 * wade);
         }
         // An orange triangle over the kaiju, far away, only while a squad leader has it in plain
         // sight (the spotting rules): not always (polish pass 2).
@@ -956,6 +975,10 @@ export class GameRenderer {
       );
 
       this.drawDaze(frame, view, time);
+      // On the monster's own screen, what its hand can pick up glows, brighter within reach.
+      this.grabGlow.update(frame.kaijus.find((k) => k.id === view.localKaiju) ?? null, this.mirror, frame.units, this.glow, this.decals, time);
+      // ... and what it holds shows the arc it would fly, and where it can come down.
+      this.throwPreview.update(frame.kaijus.find((k) => k.id === view.localKaiju) ?? null, query, this.camera, view.kaijuFirstPerson, this.sky.night);
 
       // The crowd is kept around the kaiju and runs from it, but only where the viewer may know
       // where it is: a squad that has lost the kaiju gets its crowd around its own camera and

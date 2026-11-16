@@ -219,7 +219,7 @@ describe('a bigger monster sets them off as well (phase 3: special buildings bey
     expect(world.match.staticUntil).toBe(world.tick + REWARDS.radiomast.staticTime * TICK_RATE);
   });
 
-  it("the fallen top is the hatchling's only: a juvenile's hand leaves it and its feet crush it", () => {
+  it('the fallen top is every monster\'s: a juvenile walks over it, picks it up and throws it (round 4)', () => {
     const world = arena([mast]);
     beginStage(world, 2);
     placeKaiju(world, 0, 0, 0);
@@ -228,15 +228,39 @@ describe('a bigger monster sets them off as well (phase 3: special buildings bey
     const m = eventsOf(wreck(world, 0), 'mastFall')[0];
     play(world, Math.round(m.duration * TICK_RATE) + 1);
     expect(world.loose[m.topId].state).toBe('down');
-    // Just short of touching it, reaching for it: the hand comes back without it.
-    const k = placeKaiju(world, m.topX, m.topZ - 14, 0);
-    play(world, 2, { buttons: Btn.grab });
-    play(world, 30);
-    expect(k.held).toBeNull();
-    expect(world.loose[m.topId].state).toBe('down');
-    // Standing on it: gone.
+    // Standing on it: its feet spare it, as the hatchling's do.
     placeKaiju(world, m.topX, m.topZ, 0);
-    const crushed = play(world, 2);
-    expect(eventsOf(crushed, 'looseProp')).toEqual([expect.objectContaining({ id: m.topId, state: 'gone', cause: 'crushed' })]);
+    expect(eventsOf(play(world, 2), 'looseProp')).toEqual([]);
+    expect(world.loose[m.topId].state).toBe('down');
+    // Reaching for it from 14 m short: it comes up in the hand.
+    const k = placeKaiju(world, m.topX, m.topZ - 14, 0);
+    const grabbed = [...play(world, 2, { buttons: Btn.grab }), ...play(world, 30)];
+    expect(k.held).toEqual({ kind: 'prop', prop: 'mast' });
+    expect(eventsOf(grabbed, 'kaijuHeld')[0]).toMatchObject({ source: 'loose', sourceId: m.topId });
+    // Thrown, it leaves the hand as a javelin.
+    const thrown = [...play(world, 2, { buttons: Btn.strike }), ...play(world, 30)];
+    expect(k.held).toBeNull();
+    expect(eventsOf(thrown, 'projectileSpawn')).toEqual([expect.objectContaining({ owner: 'kaiju', payload: { kind: 'prop', prop: 'mast' } })]);
+  });
+
+  it('a top thrown from beside its fallen mast, across it, flies over the lattice instead of sticking in it (round 4)', () => {
+    const world = arena([mast]);
+    const m = eventsOf(wreck(world, 0), 'mastFall')[0];
+    play(world, Math.round(m.duration * TICK_RATE) + 1);
+    // The fallen mast lies north from z = 24 to 48, 8 m wide and 4 m high; the hatchling stands
+    // 6 m west of its top, picks it up, and throws it east, looking a little down at the ground beyond.
+    const east = Math.PI / 2;
+    const k = placeKaiju(world, m.topX - 6, m.topZ, east);
+    play(world, 2, { buttons: Btn.grab, aimYaw: east });
+    play(world, 20, { aimYaw: east });
+    expect(k.held).toEqual({ kind: 'prop', prop: 'mast' });
+    const aim = { aimYaw: east, aimPitch: -0.3 };
+    const events = [...play(world, 2, { ...aim, buttons: Btn.strike }), ...play(world, 60, aim)];
+    expect(k.held).toBeNull();
+    const hits = eventsOf(events, 'projectileHit');
+    expect(hits).toHaveLength(1);
+    expect(hits[0].target).toBe('ground');
+    // Past the far side of the lattice (x = 4), not in it two meters from the hand.
+    expect(hits[0].x).toBeGreaterThan(m.topX + 4);
   });
 });

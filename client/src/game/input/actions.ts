@@ -36,6 +36,8 @@ export const BUTTON_ACTIONS = [
   'menu',
   // the controls card
   'controls',
+  // the communication rose (ui/rose.ts): held, a wedge picked with the mouse, let go to say it
+  'rose',
 ] as const;
 export type ButtonAction = (typeof BUTTON_ACTIONS)[number];
 
@@ -73,6 +75,7 @@ export const ACTION_USERS: Record<ButtonAction, readonly ActionUser[]> = {
   back: [],
   menu: ['kaiju', 'squad', 'drone'],
   controls: ['kaiju', 'squad', 'drone'],
+  rose: ['kaiju', 'squad', 'drone'],
 };
 
 export type InputDevice = 'keyboard' | 'gamepad';
@@ -142,6 +145,8 @@ export function defaultBindings(): Bindings {
       back: ['Escape'],
       menu: ['Escape'],
       controls: ['KeyH', 'Enter', 'NumpadEnter'],
+      // Free on both sides, beside the movement keys.
+      rose: ['KeyZ'],
     },
     gamepad: {
       moveForward: [],
@@ -168,6 +173,8 @@ export function defaultBindings(): Bindings {
       menu: [PAD.start],
       // The one button nothing else uses: a click of the left stick.
       controls: [PAD.ls],
+      // Free on both sides; the right stick picks the wedge.
+      rose: [PAD.down],
     },
   };
 }

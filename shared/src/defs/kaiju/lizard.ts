@@ -82,7 +82,9 @@ export const LIZARD: KaijuKindDef = {
       wadesTall: true,
       wadeSpeedMult: 0.45,
       wadeContactDps: 900,
-      waterSpeedMult: 1,
+      // Round 4 (docs/ROADMAP.md): the titan wades the bay, the river and the moat at 0.7 of its
+      // land speed (15.4 m/s), standing deep in the water (the snapshot's kaiju flag `inWater`).
+      waterSpeedMult: 0.7,
       eyeHeight: 90.7,
       eyeForward: 38.5,
       mouthHeight: 72,
@@ -207,7 +209,18 @@ export const LIZARD: KaijuKindDef = {
       rageCost: 0,
       moveMult: 0.5,
       turnMult: 0.6,
-      speed: [25, 45, 70],
+      // Real ballistic arcs (round 4; sim/throwArc.ts). Gravity grows with the monster, so that a
+      // throw keeps the shape of a real toss at its size and still lands within a couple of seconds:
+      // at real gravity a titan's throw would hang in the air for ten. Each stage's speed carries a
+      // car about five monster lengths (6, 40 and 146 m from snout to tail) on a low arc with the head
+      // level, and twice that lobbed at 45 degrees.
+      speed: [25, 110, 310],
+      gravity: [9.8, 46, 105],
+      lift: 15 * DEG,
+      maxElevation: 80 * DEG,
+      // Tuned so that a squad standing still five monster lengths away is hit about three times in four.
+      spread: [10 * DEG, 2.9 * DEG, 1.85 * DEG],
+      heavyMult: 0.85,
       unitDamage: 120,
       unitNerve: 40,
       impactRadius: [4, 10, 22],
@@ -366,6 +379,7 @@ export const LIZARD: KaijuKindDef = {
   // hand can do with the things that stand about its starting neighborhood.
   cityWeapons: {
     grabStage: 1,
+    topGrabStage: 3,
     detonateRadius: 2,
     propane: {
       speed: 25,
@@ -413,9 +427,10 @@ export const LIZARD: KaijuKindDef = {
       kaijuDamage: 0,
     },
     antenna: {
-      speed: 70,
-      gravity: 1.5,
+      speed: 50,
+      lift: 5 * DEG,
       range: 120,
+      spreadMult: 0.3,
       pierce: 3,
       unitDamage: 110,
       unitNerve: 40,
@@ -424,9 +439,10 @@ export const LIZARD: KaijuKindDef = {
       kaijuDamage: 110,
     },
     mast: {
-      speed: 60,
-      gravity: 2,
+      speed: 45,
+      lift: 5 * DEG,
       range: 110,
+      spreadMult: 0.3,
       pierce: 5,
       unitDamage: 200,
       unitNerve: 60,
@@ -441,7 +457,9 @@ export const LIZARD: KaijuKindDef = {
       throw: {
         speed: 32,
         gravity: 3,
+        lift: 5 * DEG,
         range: 70,
+        spreadMult: 0.3,
         radius: 3.5,
         unitDamageCenter: 80,
         unitDamageEdge: 80,

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  aimThrowAt,
   applyHit,
   beamPath,
   beamShake,
@@ -7,14 +8,24 @@ import {
   bitGet,
   Btn,
   COMBAT_RULES,
+  createLandingSpread,
+  createThrowAim,
+  createThrowFlight,
+  createThrowLaunch,
+  createThrowTrace,
   DEG,
+  HAND_FORWARD,
   DT,
   INPUT_BUFFER_TICKS,
   kaijuEyePoint,
+  landingSpread,
   LIZARD,
   MATCH_RULES,
   PROP_KINDS,
+  throwFlight,
+  throwLaunch,
   TICK_RATE,
+  traceThrow,
   type KaijuActionEvent,
   type KaijuMoveId,
   type PlayerInput,
@@ -414,47 +425,54 @@ describe('grab and throw', () => {
     expect(world.match.barPoints).toBe(PROP_KINDS.car_taxi.value);
   });
 
-  it('throws what it holds at the aim point with strike', () => {
-    for (const button of [Btn.strike]) {
-      const world = arena({
-        props: [{ kind: 'car_sedan', x: 0, z: clearOf('car_sedan') }],
-        structures: [{ x: 30, z: 0, w: 8, d: 8, height: 6, hp: 1000 }],
-      });
-      const k = world.kaijus[0];
-      tap(world, Btn.grab);
-      untilIdle(world);
-      expect(k.held).not.toBeNull();
+  it('throws what it holds with strike, from the hand along the aim on a ballistic arc (round 4)', () => {
+    const world = arena({ props: [{ kind: 'car_sedan', x: 0, z: clearOf('car_sedan') }] });
+    const k = world.kaijus[0];
+    tap(world, Btn.grab);
+    untilIdle(world);
+    expect(k.held).not.toBeNull();
 
-      // Look at a point on the ground 20 m ahead (the eye is in the head, a little ahead of the body's axis).
-      const eye = LIZARD.stages[0].eyeHeight;
-      const aim = { aimPitch: -Math.atan2(eye, 20 - LIZARD.stages[0].eyeForward) };
-      let events = tap(world, button, aim);
-      expect(actions(events)).toEqual([['throw', 'windup']]);
-      events = [...events, ...play(world, 120, aim)];
-      expect(actions(events)).toEqual([
-        ['throw', 'windup'],
-        ['throw', 'active'],
-        ['throw', 'recover'],
-        ['throw', 'idle'],
-      ]);
-      const spawn = eventsOf(events, 'projectileSpawn');
-      expect(spawn).toMatchObject([
-        { projectile: 'thrown', flight: 'thrown', owner: 'kaiju', ownerId: 0, player: KAIJU_PLAYER, payload: { kind: 'prop', prop: 'car_sedan' } },
-      ]);
-      expect(Math.hypot(spawn[0].vx, spawn[0].vy, spawn[0].vz)).toBeCloseTo(A.throw.speed[0], 6);
-      expect(spawn[0].y).toBe(LIZARD.stages[0].handHeight);
-      expect(k.held).toBeNull();
-      expect(eventsOf(events, 'kaijuHeld')).toMatchObject([{ held: null, reason: 'throw', source: 'none', sourceId: -1 }]);
+    // Looking a little down: the throw leaves the throw's lift above that.
+    const aim = { aimPitch: -5 * DEG };
+    let events = tap(world, Btn.strike, aim);
+    expect(actions(events)).toEqual([['throw', 'windup']]);
+    events = [...events, ...play(world, 120, aim)];
+    expect(actions(events)).toEqual([
+      ['throw', 'windup'],
+      ['throw', 'active'],
+      ['throw', 'recover'],
+      ['throw', 'idle'],
+    ]);
+    const spawn = eventsOf(events, 'projectileSpawn');
+    expect(spawn).toMatchObject([
+      { projectile: 'thrown', flight: 'thrown', owner: 'kaiju', ownerId: 0, player: KAIJU_PLAYER, payload: { kind: 'prop', prop: 'car_sedan' } },
+    ]);
+    expect(k.held).toBeNull();
+    expect(eventsOf(events, 'kaijuHeld')).toMatchObject([{ held: null, reason: 'throw', source: 'none', sourceId: -1 }]);
 
-      // It lands where the kaiju was looking.
-      const hit = eventsOf(events, 'projectileHit');
-      expect(hit).toMatchObject([{ id: spawn[0].id, target: 'ground', splash: A.throw.impactRadius[0] }]);
-      expect(hit[0].x).toBeCloseTo(0, 1);
-      expect(hit[0].z).toBeCloseTo(20, 0);
-      expect(world.projectiles).toEqual([]);
-      // Strike with something in the hand is a throw, not a swipe.
-      expect(actions(events).map((a) => a[0])).not.toContain('swipe');
-    }
+    // From the hand, under the stage's gravity, at the throw's speed and elevation give or take its spread.
+    const s = spawn[0];
+    expect(s.y).toBe(LIZARD.stages[0].handHeight);
+    expect(s.z).toBeCloseTo(R * HAND_FORWARD, 9);
+    expect(s.gravity).toBe(A.throw.gravity[0]);
+    const flight = throwFlight('lizard', 1, { kind: 'prop', prop: 'car_sedan' }, createThrowFlight());
+    const launch = throwLaunch({ kind: 'lizard', stage: 1, x: 0, z: 0, aimYaw: 0, aimPitch: aim.aimPitch }, flight, createThrowLaunch());
+    expect(launch.elevation).toBeCloseTo(aim.aimPitch + A.throw.lift, 12);
+    const off = Math.hypot(s.vx - launch.vx, s.vy - launch.vy, s.vz - launch.vz);
+    expect(off).toBeLessThanOrEqual(A.throw.speed[0] * Math.tan(A.throw.spread[0]) + 1e-9);
+
+    // It comes down inside the spread round where the aimed arc lands.
+    const trace = traceThrow(world.cityQuery, launch, 0, createThrowTrace());
+    expect(trace.end).toBe('ground');
+    const spread = landingSpread(launch, trace, createLandingSpread());
+    const hit = eventsOf(events, 'projectileHit');
+    expect(hit).toMatchObject([{ id: s.id, target: 'ground', splash: A.throw.impactRadius[0] }]);
+    const along = (hit[0].x - trace.x) * spread.dirX + (hit[0].z - trace.z) * spread.dirZ;
+    const across = (hit[0].x - trace.x) * spread.dirZ - (hit[0].z - trace.z) * spread.dirX;
+    expect((along / spread.along) ** 2 + (across / spread.across) ** 2).toBeLessThanOrEqual(1.05);
+    expect(world.projectiles).toEqual([]);
+    // Strike with something in the hand is a throw, not a swipe.
+    expect(actions(events).map((a) => a[0])).not.toContain('swipe');
   });
 
   it('damages what the thrown object lands on: structures, and units in the impact radius', () => {
@@ -463,21 +481,29 @@ describe('grab and throw', () => {
       structures: [{ x: 0, z: 28, w: 10, d: 8, height: 8, hp: 1000 }],
     });
     const k = world.kaijus[0];
-    // The wall is at z = 24. One unit stands inside the impact radius of its foot, one outside.
+    // The wall is at z = 24. Two units stand by its foot, one either side of the throw.
     const splash = A.throw.impactRadius[0];
-    const close = placeUnit(world, 0, 5, 20);
+    const close = placeUnit(world, 0, -6.5, 21);
     const away = placeUnit(world, 1, splash + 3 + 3, 20);
-    expect(Math.hypot(5, 4) - close.radius).toBeLessThan(splash);
     toughen(world, 0);
     toughen(world, 1);
     tap(world, Btn.grab);
     untilIdle(world);
     expect(k.held).toEqual({ kind: 'prop', prop: 'bus' });
 
-    // The crosshair is on the building's front wall, near its foot.
-    const aim = { aimPitch: -Math.atan2(LIZARD.stages[0].eyeHeight - 1, 24 - LIZARD.stages[0].eyeForward) };
+    // Aimed at the foot of the building's front wall (the arc the bots aim with).
+    const flight = throwFlight('lizard', 1, k.held ?? { kind: 'prop', prop: 'bus' }, createThrowFlight());
+    const want = createThrowAim();
+    expect(aimThrowAt(world.cityQuery, k, flight, 0, 1, 24, 1, 0, want)).toBe(true);
+    const aim = { aimYaw: want.yaw, aimPitch: want.pitch };
     const events = [...tap(world, Btn.strike, aim), ...play(world, 90, aim)];
-    expect(eventsOf(events, 'projectileHit')).toMatchObject([{ target: 'structure', targetId: 0 }]);
+    const hit = eventsOf(events, 'projectileHit');
+    expect(hit).toMatchObject([{ target: 'structure', targetId: 0 }]);
+    // This throw's own error put it on the wall left of the middle: the unit on that side is
+    // within the impact radius of where it struck, the other is not.
+    const reach = (u: typeof close): number => Math.hypot(Math.max(0, Math.hypot(u.x - hit[0].x, u.z - hit[0].z) - u.radius), Math.max(0, hit[0].y - 2));
+    expect(reach(close)).toBeLessThan(splash);
+    expect(reach(away)).toBeGreaterThan(splash);
     expect(1000 - world.structureHp[0]).toBe(A.throw.structureDamage[0]);
     expect(close.maxHp - close.hp).toBe(A.throw.unitDamage);
     expect(close.nerve).toBeGreaterThan(0);

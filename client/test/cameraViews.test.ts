@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { CITY_SEED, createCityQuery, createCityState, getCity, kaijuKindDef, wrapAngle, type SnapKaiju, type SnapUnit } from '@mb/shared';
 import { createActionState, type ActionState, type ButtonAction } from '../src/game/input/actions';
 import { HUMAN_PITCH_LIMIT, HumanController } from '../src/game/controllers/humanController';
-import { KAIJU_PITCH_LIMIT, KaijuController } from '../src/game/controllers/kaijuController';
+import { KAIJU_PITCH_LIMIT, KaijuController, THROW_VIEW_UP } from '../src/game/controllers/kaijuController';
 import type { ControlContext } from '../src/game/controllers/types';
 
 const { city, index } = getCity(CITY_SEED);
@@ -218,6 +218,31 @@ describe('kaiju cameras', () => {
       c.update(context(frameInput(input, { x: 1 }), { k }));
       c.applyCamera(context(input, { k }), camera);
       expectSameDirection(cameraDirection(camera), { yaw: 0.4, pitch: -0.2 });
+    }
+  });
+
+  it('with something to throw, send where the view looks and stop the view a little above level while the aim goes on up (round 4)', () => {
+    for (const third of [false, true]) {
+      const input = createActionState();
+      const k = kaiju({ yaw: 0.3, held: { kind: 'prop', prop: 'car_sedan' } });
+      const c = new KaijuController(third);
+      const camera = new THREE.PerspectiveCamera();
+      // A little down: the aim sent is the view's own (no crosshair target in third person either).
+      c.update(context(frameInput(input, { y: -0.2 }), { k }));
+      c.applyCamera(context(input, { k }), camera);
+      expect(c.sendPitch, `third person: ${third}`).toBeCloseTo(-0.2, 9);
+      expectSameDirection(cameraDirection(camera), { yaw: c.sendYaw, pitch: -0.2 });
+      // Far up, to lob: the aim goes to its limit, the view stops just above the horizon.
+      c.update(context(frameInput(input, { y: 5 }), { k }));
+      c.applyCamera(context(input, { k }), camera);
+      expect(c.sendPitch, `third person: ${third}`).toBeCloseTo(KAIJU_PITCH_LIMIT, 9);
+      expect(cameraDirection(camera).pitch, `third person: ${third}`).toBeCloseTo(THROW_VIEW_UP, 4);
+      // Thrown: the aim comes back down to where the view stopped, and the view does not leap up.
+      k.held = null;
+      c.update(context(frameInput(input), { k }));
+      c.applyCamera(context(input, { k }), camera);
+      expect(c.aimPitch, `third person: ${third}`).toBeCloseTo(THROW_VIEW_UP, 9);
+      expect(cameraDirection(camera).pitch, `third person: ${third}`).toBeCloseTo(THROW_VIEW_UP, 4);
     }
   });
 });

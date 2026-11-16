@@ -7,8 +7,8 @@ generators, not this file. What the game code still has to do with these sounds 
 
 ## What is here
 
-- **129 sounds, 195 variants**, each as `.ogg` (Vorbis) and `.mp3`, 44.1 kHz, in
-  `client/public/assets/audio/sfx/`. Total size 10.9 MB for both formats together.
+- **150 sounds, 237 variants**, each as `.ogg` (Vorbis) and `.mp3`, 44.1 kHz, in
+  `client/public/assets/audio/sfx/`. Total size 15.2 MB for both formats together.
 - `client/public/assets/manifest.sfx.json`: the partial manifest (section `"sfx"`). Run
   `npm run assets:manifest` to merge it into `manifest.json`.
 - Everything is synthesized from code: no samples, no recordings, nothing to license.
@@ -247,6 +247,27 @@ Lengths are of the encoded files. "Loudest at" is where the sound peaks, counted
 | `kaiju_stumble_s2` | 3 | 1.79 to 2.38 | mono |  | 461 to 514 | The stumble that ends a charge at stage 2. Not picked at random: variant 1 is the look pitching forward onto a knee, 2 spinning out to the side, 3 sitting down hard on its tail. The fall lands about 0.3 s in. |
 | `kaiju_stumble_s3` | 3 | 2.86 to 3.72 | mono |  | 508 to 1023 | The stumble that ends a charge at stage 3. Not picked at random: variant 1 is the look pitching forward onto a knee, 2 spinning out to the side, 3 sitting down hard on its tail. The fall lands about 0.3 s in. |
 | `kaiju_gulp` | 1 | 0.49 | mono |  | 112 | A handful of civilians gulped down (the puff at the mouth): the jaws close, one big comic swallow and a little bubble. One size: play it at about 1.2, 1.0 and 0.8 for stages 1, 2 and 3. |
+| `kaiju_rose_roar_s1` | 2 | 1.90 to 2.01 | stereo |  | 975 to 1157 | Communication rose, stage 1: the big roar: two swells and a long falling rumble. Two versions; the server's pick chooses one, so every screen plays the same. |
+| `kaiju_rose_roar_s2` | 2 | 3.17 to 3.38 | stereo |  | 1554 to 1730 | Communication rose, stage 2: the big roar: two swells and a long falling rumble. Two versions; the server's pick chooses one, so every screen plays the same. |
+| `kaiju_rose_roar_s3` | 2 | 4.97 to 5.27 | stereo |  | 1898 to 2488 | Communication rose, stage 3: the big roar: two swells and a long falling rumble. Two versions; the server's pick chooses one, so every screen plays the same. |
+| `kaiju_rose_roar_short_s1` | 2 | 0.97 to 1.01 | stereo |  | 314 to 397 | Communication rose, stage 1: a short roar: one quick bark. Two versions; the server's pick chooses one, so every screen plays the same. |
+| `kaiju_rose_roar_short_s2` | 2 | 1.81 to 1.87 | stereo |  | 446 to 546 | Communication rose, stage 2: a short roar: one quick bark. Two versions; the server's pick chooses one, so every screen plays the same. |
+| `kaiju_rose_roar_short_s3` | 2 | 3.02 to 3.09 | stereo |  | 910 to 944 | Communication rose, stage 3: a short roar: one quick bark. Two versions; the server's pick chooses one, so every screen plays the same. |
+| `kaiju_rose_snuffle_s1` | 2 | 1.06 to 1.22 | stereo |  | 69 to 355 | Communication rose, stage 1: snuffles: sniffs, a puff of breath and a snort. Two versions; the server's pick chooses one, so every screen plays the same. |
+| `kaiju_rose_snuffle_s2` | 2 | 1.84 to 2.05 | stereo |  | 469 to 648 | Communication rose, stage 2: snuffles: sniffs, a puff of breath and a snort. Two versions; the server's pick chooses one, so every screen plays the same. |
+| `kaiju_rose_snuffle_s3` | 2 | 3.12 to 3.43 | stereo |  | 613 to 876 | Communication rose, stage 3: snuffles: sniffs, a puff of breath and a snort. Two versions; the server's pick chooses one, so every screen plays the same. |
+| `kaiju_rose_growl_s1` | 2 | 1.61 to 1.73 | stereo |  | 586 to 897 | Communication rose, stage 1: a low, rattling growl. Two versions; the server's pick chooses one, so every screen plays the same. |
+| `kaiju_rose_growl_s2` | 2 | 2.64 to 2.86 | stereo |  | 602 to 628 | Communication rose, stage 2: a low, rattling growl. Two versions; the server's pick chooses one, so every screen plays the same. |
+| `kaiju_rose_growl_s3` | 2 | 4.22 to 4.42 | stereo |  | 800 to 1547 | Communication rose, stage 3: a low, rattling growl. Two versions; the server's pick chooses one, so every screen plays the same. |
+| `kaiju_rose_chomp_s1` | 2 | 0.80 to 0.87 | stereo |  | 162 | Communication rose, stage 1: a grunt and the jaws snapping shut twice. Two versions; the server's pick chooses one, so every screen plays the same. |
+| `kaiju_rose_chomp_s2` | 2 | 1.53 to 1.53 | stereo |  | 204 to 426 | Communication rose, stage 2: a grunt and the jaws snapping shut twice. Two versions; the server's pick chooses one, so every screen plays the same. |
+| `kaiju_rose_chomp_s3` | 2 | 2.48 to 2.56 | stereo |  | 263 to 265 | Communication rose, stage 3: a grunt and the jaws snapping shut twice. Two versions; the server's pick chooses one, so every screen plays the same. |
+| `kaiju_rose_rumble_s1` | 2 | 1.98 to 2.14 | stereo |  | 1118 to 1244 | Communication rose, stage 1: a contented rumble: a giant purr with a pleased lilt. Two versions; the server's pick chooses one, so every screen plays the same. |
+| `kaiju_rose_rumble_s2` | 2 | 3.14 to 3.37 | stereo |  | 1536 to 1744 | Communication rose, stage 2: a contented rumble: a giant purr with a pleased lilt. Two versions; the server's pick chooses one, so every screen plays the same. |
+| `kaiju_rose_rumble_s3` | 2 | 4.79 to 4.97 | stereo |  | 726 to 849 | Communication rose, stage 3: a contented rumble: a giant purr with a pleased lilt. Two versions; the server's pick chooses one, so every screen plays the same. |
+| `kaiju_rose_mating_s1` | 2 | 1.95 to 1.98 | stereo |  | 174 to 564 | Communication rose, stage 1: the mating call: a silly warbling tune. Two versions; the server's pick chooses one, so every screen plays the same. |
+| `kaiju_rose_mating_s2` | 2 | 2.88 to 2.90 | stereo |  | 392 to 1599 | Communication rose, stage 2: the mating call: a silly warbling tune. Two versions; the server's pick chooses one, so every screen plays the same. |
+| `kaiju_rose_mating_s3` | 2 | 4.28 to 4.40 | stereo |  | 1518 to 1543 | Communication rose, stage 3: the mating call: a silly warbling tune. Two versions; the server's pick chooses one, so every screen plays the same. |
 
 ### Humans
 
@@ -513,6 +534,9 @@ Pictures (decoded `.ogg` unless marked):
 - `docs/audio/sfx/sheet_kaiju_4.png`
 - `docs/audio/sfx/sheet_kaiju_5.png`
 - `docs/audio/sfx/sheet_kaiju_6.png`
+- `docs/audio/sfx/sheet_kaiju_7.png`
+- `docs/audio/sfx/sheet_kaiju_8.png`
+- `docs/audio/sfx/sheet_kaiju_9.png`
 - `docs/audio/sfx/sheet_tier2_1.png`
 - `docs/audio/sfx/sheet_tier2_2.png`
 - `docs/audio/sfx/sheet_ui_1.png`

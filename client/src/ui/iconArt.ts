@@ -146,6 +146,11 @@ const ART: Record<string, string> = {
   // The controls card: a card with a keycap and a directional pad on it.
   ui_controls: `<rect x="4" y="12" width="56" height="40" rx="7" ${S} stroke-width="4"/><rect x="13" y="23" width="17" height="17" rx="3" ${F}/><path d="M46 21 L46 43 M35 32 L57 32" ${S} stroke-width="6" stroke-linecap="butt"/>`,
   ui_settings: `<path d="${cogPath(32, 32, 28, 20, 9, 8)}" fill="currentColor" fill-rule="evenodd" stroke="none"/>`,
+  // Round 4: restart the match (a circular arrow going round to its start; the settings panel is
+  // built before the art files are known, so this drawing is what it shows), and the
+  // communication rose's key (a ring of wedges round a dot).
+  ui_restart: `<path d="M50 22A22 22 0 1 0 54 36" ${S}/><path d="M58 8V28H38Z" ${F}/>`,
+  ui_rose: `<circle cx="32" cy="32" r="5" ${F}/><path d="M32 6A26 26 0 0 1 52 15M57 26A26 26 0 0 1 54 44M46 53A26 26 0 0 1 28 58M17 53A26 26 0 0 1 7 38M7 26A26 26 0 0 1 22 8" ${S} stroke-width="7"/>`,
   ui_invert: `<path d="M20 54 L20 10 M8 22 L20 10 L32 22" ${S}/><path d="M44 10 L44 54 M32 42 L44 54 L56 42" ${S}/>`,
   ui_fullscreen: `<path d="M8 22 L8 8 L22 8 M42 8 L56 8 L56 22 M56 42 L56 56 L42 56 M22 56 L8 56 L8 42" ${S}/><rect x="22" y="24" width="20" height="16" rx="2" ${F}/>`,
   ui_rise: `<path d="M32 46 L32 8 M16 24 L32 8 L48 24" ${S} stroke-width="7"/><path d="M12 57 L52 57" ${S}/>`,

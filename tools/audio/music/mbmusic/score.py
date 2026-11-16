@@ -1,8 +1,11 @@
-"""Score notation: parts made of notes on one shared tempo grid.
+"""Score notation: parts made of notes on a cue's tempo grid.
 
-Everything in the soundtrack sits on one grid: 96 beats per minute, 4/4, so one bar is exactly
-2.5 seconds (110250 samples at 44.1 kHz). Positions are in beats from the start of the cue;
-bar numbers are 1-based like a printed score.
+The orchestral soundtrack sits on one grid: 96 beats per minute, 4/4, so one bar is exactly
+2.5 seconds (110250 samples at 44.1 kHz). The arcade match tracks of round 4 (stage1, stage2,
+stage3, final_minute) set their own tempo on the cue (`Cue(bpm=...)`), chosen so that one bar is
+still a whole number of samples. Positions are in beats from the start of the cue; bar numbers
+are 1-based like a printed score. Beats do not depend on the tempo: only the conversion to
+seconds does, and that goes through the cue's (and so the part's) `bpm`.
 """
 from __future__ import annotations
 
@@ -53,9 +56,10 @@ class Part:
                  rev: float | None = None, width: float | None = None, ofs: int | None = None,
                  atk_ms: float | None = None, tune: float = 0.0, hp: float | None = None,
                  lp: float | None = None, sub: float | None = None, human_ms: float | None = None,
-                 human_vel: int = 4, role: str = ""):
+                 human_vel: int = 4, role: str = "", bpm: float = BPM):
         from .orchestra import INSTRUMENTS
         self.name = name
+        self.bpm = bpm                        # the cue's tempo (set by Stem.add)
         self.inst = INSTRUMENTS[inst]
         self.gain = gain                      # dB trim on top of the instrument default
         self.pan = self.inst.pan if pan is None else pan
@@ -185,6 +189,10 @@ class Part:
         self.bends.append((points[-1][0], int(max(-8192, min(8191, points[-1][1] / 2 * 8192)))))
 
     # ---- export ----------------------------------------------------------------------------
+    @property
+    def sec_per_beat(self) -> float:
+        return 60.0 / self.bpm
+
     def end_beat(self) -> float:
         return max((s + d for s, d, _, _ in self.notes), default=0.0)
 
@@ -197,8 +205,8 @@ class Part:
         jitter_by_start: dict[float, float] = {}
         timed = []
         for start, dur, p, vel in sorted(self.notes):
-            base = jitter_by_start.setdefault(start, rng.gauss(0, self.human_ms) / 1000.0 / SEC_PER_BEAT)
-            j = base + rng.gauss(0, self.human_ms * 0.3) / 1000.0 / SEC_PER_BEAT
+            base = jitter_by_start.setdefault(start, rng.gauss(0, self.human_ms) / 1000.0 / self.sec_per_beat)
+            j = base + rng.gauss(0, self.human_ms * 0.3) / 1000.0 / self.sec_per_beat
             s = max(0.0, start + j)
             v = max(1, min(127, vel + rng.randint(-self.human_vel, self.human_vel)))
             timed.append([s, max(s + 0.03, start + dur), p, v])
@@ -261,7 +269,7 @@ class Part:
         mid = mido.MidiFile(ticks_per_beat=PPQ)
         track = mido.MidiTrack()
         mid.tracks.append(track)
-        track.append(mido.MetaMessage("set_tempo", tempo=int(round(60_000_000 / BPM)), time=0))
+        track.append(mido.MetaMessage("set_tempo", tempo=int(round(60_000_000 / self.bpm)), time=0))
         now = 0
         for tick, _, msg in ev:
             track.append(msg.copy(time=tick - now))
@@ -274,12 +282,13 @@ class Part:
 class Stem:
     """A group of parts that is mixed down to one audio file."""
 
-    def __init__(self, name: str):
+    def __init__(self, name: str, bpm: float = BPM):
         self.name = name
+        self.bpm = bpm
         self.parts: list[Part] = []
 
     def add(self, name: str, inst: str, **kw) -> Part:
-        p = Part(name, inst, **kw)
+        p = Part(name, inst, bpm=self.bpm, **kw)
         self.parts.append(p)
         return p
 
@@ -289,8 +298,10 @@ class Cue:
 
     def __init__(self, name: str, bars: float, *, loop: bool, group: str | None = None,
                  title: str = "", tail_seconds: float = 0.0, sections: list[tuple[int, str]] | None = None,
-                 target_lufs: float = -16.0, notes: str = "", mark: float | None = None):
+                 target_lufs: float = -16.0, notes: str = "", mark: float | None = None,
+                 bpm: float = BPM):
         self.name = name
+        self.bpm = bpm                        # beats per minute; one bar must be whole samples
         self.bars = bars
         self.loop = loop
         self.group = group
@@ -306,7 +317,7 @@ class Cue:
         self.stems: list[Stem] = []
 
     def stem(self, name: str) -> Stem:
-        s = Stem(name)
+        s = Stem(name, self.bpm)
         self.stems.append(s)
         return s
 
@@ -315,5 +326,13 @@ class Cue:
         return self.bars * BEATS_PER_BAR
 
     @property
+    def sec_per_beat(self) -> float:
+        return 60.0 / self.bpm
+
+    @property
+    def bar_seconds(self) -> float:
+        return self.sec_per_beat * BEATS_PER_BAR
+
+    @property
     def seconds(self) -> float:
-        return self.bars * BAR_SECONDS
+        return self.bars * self.bar_seconds

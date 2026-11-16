@@ -44,15 +44,19 @@ export const CRATE_RULES = {
 } as const;
 
 /**
- * The weapon pick-ups. Each changes only the driven unit's own weapon (its Fire button, and its
- * own shot when it goes with a volley), from when it is taken until the stage ends or the squad
- * is wiped out; a new one replaces the old.
+ * The weapon pick-ups. Each changes the driven unit's own weapon (its Fire button, and its own
+ * shot when it goes with a volley) and, since round 4, what the planted squad-mates fire in a
+ * volley (`volleyPulls`), from when it is taken until the stage ends or the squad is wiped out; a
+ * new one replaces the old. Squad-mates firing on their own keep their own weapons.
  *
  * - Machine gun: five times the rate of fire at a third of the damage, nerve and structure damage
  *   per shot (1.67 times as much over time), with a slight spread, a person's own shots included.
+ *   In a volley every gun fires a burst of five pulls of tracers: 1.67 times a volley.
  * - Big cannon: 2.5 times the reload for 3.5 times the damage, twice the nerve, and a wider splash.
+ *   In a volley every gun fires one heavy shell: 3.5 times a volley's damage, twice its nerve.
  * - Missile pod: a salvo of 6 missiles that fan out and curve onto the aim point, each worth 0.6
- *   of a whole trigger pull of the unit's own weapon; 6 s to reload.
+ *   of a whole trigger pull of the unit's own weapon; 6 s to reload. In a volley every gun fires
+ *   half a salvo (3 missiles from a full section or a tank): 1.8 times a volley.
  */
 export const PICKUP_WEAPONS: Readonly<Record<WeaponPickupId, PickupWeaponDef>> = {
   machineGun: {
@@ -67,6 +71,7 @@ export const PICKUP_WEAPONS: Readonly<Record<WeaponPickupId, PickupWeaponDef>> =
     spread: 1.5 * DEG,
     fan: 0,
     loft: 0,
+    volleyPulls: 5,
   },
   bigCannon: {
     id: 'bigCannon',
@@ -80,6 +85,7 @@ export const PICKUP_WEAPONS: Readonly<Record<WeaponPickupId, PickupWeaponDef>> =
     spread: 0,
     fan: 0,
     loft: 0,
+    volleyPulls: 1,
   },
   missilePod: {
     id: 'missilePod',
@@ -94,6 +100,7 @@ export const PICKUP_WEAPONS: Readonly<Record<WeaponPickupId, PickupWeaponDef>> =
     spread: 0,
     fan: 50 * DEG,
     loft: 12 * DEG,
+    volleyPulls: 0.5,
   },
 };
 

@@ -496,7 +496,7 @@ export function squadBot(world: World, p: PlayerState, squad: Squad): void {
       if (planted > 0) {
         // Remembered for this spot: the leader alone seeing the kaiju (once they have let go)
         // does not make a volley from here worth planting again.
-        bs.matesBlind = clear < planted * S.clearLines;
+        bs.matesBlind = clear < planted * perStage(S.clearLines, world.match.stage);
         if (bs.matesBlind) bs.los = false;
       }
     }

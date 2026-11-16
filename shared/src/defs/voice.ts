@@ -2,6 +2,11 @@
  * Voice cues: the contract between the simulation (which emits cue ids) and the audio (which
  * voices lines for them). The script itself is `voiceLines.json`, owned by the audio team
  * (schema in ASSETS.md section 6). This module only reads it.
+ *
+ * Round 4 (docs/ROADMAP.md): the automatic lines are gone. The script holds only the news telling
+ * the monster's player it can molt (`molt.available`); every other cue is still emitted, as the
+ * match's record of its moments, and nobody hears it. What players say now comes from the
+ * communication rose (shared/src/net/rose.ts), which the simulation never sees.
  */
 
 import rawVoiceLines from './voiceLines.json' with { type: 'json' };
@@ -58,12 +63,6 @@ export interface VoiceLine {
   /** Subtitle text. */
   text: string;
 }
-
-/**
- * Cues whose lines are played one after another, in script order, instead of one being picked.
- * Every other cue plays a single line chosen by the `variant` number in the voice event.
- */
-export const VOICE_SEQUENCE_CUES: readonly VoiceCueId[] = ['match.briefing'];
 
 /**
  * How urgent a cue is. 2: the match turns on it, it always goes out. 1: worth interrupting
@@ -128,50 +127,8 @@ export const VOICE_RULES = {
 } as const;
 
 /**
- * What each side actually hears, on top of the cue rules above. A cue that passes those is
- * always emitted (so the match itself never changes); these rules only decide whether a side
- * gets a line for it, and a side that gets none hears and reads nothing.
- *
- * The news (the kaiju player's side) speaks only for the moments listed here: the match
- * starting and ending, the creature growing, a landmark falling, the last minute. Everything
- * else the anchor used to say was colour commentary, and it talked the whole match.
- *
- * The radio (the squads' side) keeps every cue but is half as chatty as the cue rules alone:
- * each cue waits `gapScale` times its own gap (at least `minGap`) before the radio repeats
- * it, and routine and important cues share a budget that refills at `chatterRefill`.
- * Cues the match turns on (priority 2) skip both, except the ones listed in `gaps`, which
- * happen over and over in a match and get a fixed gap of their own.
- */
-export const VOICE_SIDE_RULES = {
-  news: {
-    cues: [
-      'match.briefing',
-      'match.start',
-      'landmark.down',
-      'molt.available',
-      'stage.2',
-      'stage.3',
-      'clock.1min',
-      'clock.10s',
-      'end.humans.kill',
-      'end.humans.clock',
-      'end.kaiju',
-      'hearing.humans.win',
-      'hearing.kaiju.win',
-    ] as readonly VoiceCueId[],
-  },
-  radio: {
-    gapScale: 3,
-    minGap: 8,
-    chatterTokens: 2,
-    chatterRefill: 15,
-    gaps: { 'nerve.break': 24, 'landmark.down': 10, 'callin.inbound': 45 } as Readonly<Partial<Record<VoiceCueId, number>>>,
-  },
-} as const;
-
-/**
- * Default squad callsigns, by squad index. The first three have voiced radio lines in the
- * script; lines for a cue fall back to Overlord when a squad has none of its own.
+ * Default squad callsigns, by squad index. Each is also the voice the squad's leader shouts the
+ * communication rose's lines in (client/src/audio/roseLines.json, tools/audio/voice/cast.json).
  */
 export const SQUAD_CALLSIGNS: readonly string[] = ['Granite', 'Beacon', 'Tempest', 'Anvil'];
 
@@ -246,40 +203,6 @@ export const VOICE_LINES: readonly VoiceLine[] = SCRIPT.lines;
 /** Schema problems found in voiceLines.json (empty when the script is valid). */
 export const VOICE_LINE_PROBLEMS: readonly string[] = SCRIPT.problems;
 
-/**
- * Lines a listener on the given side can hear for a cue, in script order: lines addressed to
- * that side plus lines addressed to everyone.
- */
-export function voiceLinesFor(
-  cue: VoiceCueId,
-  listener: 'humans' | 'kaiju',
-  lines: readonly VoiceLine[] = VOICE_LINES,
-): VoiceLine[] {
-  return lines.filter((l) => l.cue === cue && (l.audience === listener || l.audience === 'all'));
-}
-
-/**
- * Picks the line to play for a cue. `variant` is the number carried by the voice event, so every
- * client hearing the cue picks the same line. Lines spoken by `preferSpeaker` (a squad callsign)
- * win when there are any. Returns null when the script has nothing for this listener.
- */
-export function pickVoiceLine(
-  cue: VoiceCueId,
-  listener: 'humans' | 'kaiju',
-  variant: number,
-  preferSpeaker?: string,
-  lines: readonly VoiceLine[] = VOICE_LINES,
-): VoiceLine | null {
-  let pool = voiceLinesFor(cue, listener, lines);
-  if (pool.length === 0) return null;
-  if (preferSpeaker) {
-    const own = pool.filter((l) => l.speaker === preferSpeaker);
-    if (own.length > 0) pool = own;
-  }
-  const i = ((Math.floor(variant) % pool.length) + pool.length) % pool.length;
-  return pool[i];
-}
-
 let linesByCue: Map<VoiceCueId, VoiceLine[]> | null = null;
 
 /** The shipped script, grouped by cue (built on first use from whatever the script holds today). */
@@ -295,56 +218,22 @@ function scriptLinesFor(cue: VoiceCueId): readonly VoiceLine[] {
   return linesByCue.get(cue) ?? [];
 }
 
-export interface VoiceChoice {
-  /** The squad callsign whose own lines are preferred (the squad the cue is about), if any. */
-  callsign?: string;
-  /** Every squad callsign in the match: a line spoken by ANOTHER squad is never put in this one's mouth. */
-  callsigns?: readonly string[];
-  /** Id of the line this cue played last time on this side; another one is taken when there is a choice. */
-  avoid?: string;
-}
-
 /**
- * Chooses the lines one side hears for a cue, deterministically from `variant`. A sequence cue
- * (the briefing) gets all of its lines in script order; every other cue gets one:
- * - when the cue is about a squad that has lines of its own, one of those;
- * - when it is about a squad that has none, a line that is not spoken by some other squad
- *   (command, the news anchor), falling back to any line at all;
- * - when it is about nobody in particular, any line: whoever is on the radio says it;
- * - never the line in `avoid` when there is another to take.
- * Returns an empty list when the script has nothing for this side.
+ * Chooses the line one side hears for a cue, deterministically from `variant`: one of the lines
+ * addressed to that side (or to everyone), never `avoid` (the line the cue played last time on
+ * this side) when there is another to take. Null when the script has nothing for this side.
  */
-export function chooseVoiceLines(
+export function chooseVoiceLine(
   cue: VoiceCueId,
   listener: 'humans' | 'kaiju',
   variant: number,
-  choice: VoiceChoice = {},
+  avoid?: string,
   lines?: readonly VoiceLine[],
-): VoiceLine[] {
+): VoiceLine | null {
   const all = lines ? lines.filter((l) => l.cue === cue) : scriptLinesFor(cue);
-  let pool = all.filter((l) => l.audience === listener || l.audience === 'all');
-  if (pool.length === 0) return [];
-  if (VOICE_SEQUENCE_CUES.includes(cue)) return pool;
-
-  if (choice.callsign) {
-    const own = pool.filter((l) => l.speaker === choice.callsign);
-    if (own.length > 0) {
-      pool = own;
-    } else if (choice.callsigns) {
-      const others = choice.callsigns.filter((c) => c !== choice.callsign);
-      const neutral = pool.filter((l) => !others.includes(l.speaker));
-      if (neutral.length > 0) pool = neutral;
-    }
-  }
+  const pool = all.filter((l) => l.audience === listener || l.audience === 'all');
+  if (pool.length === 0) return null;
   let i = ((Math.floor(variant) % pool.length) + pool.length) % pool.length;
-  if (pool.length > 1 && pool[i].id === choice.avoid) i = (i + 1) % pool.length;
-  return [pool[i]];
-}
-
-/** Cues with no line at all for a listener; used by tests and tools to report script coverage. */
-export function missingVoiceCues(
-  listener: 'humans' | 'kaiju',
-  lines: readonly VoiceLine[] = VOICE_LINES,
-): VoiceCueId[] {
-  return VOICE_CUE_IDS.filter((cue) => voiceLinesFor(cue, listener, lines).length === 0);
+  if (pool.length > 1 && pool[i].id === avoid) i = (i + 1) % pool.length;
+  return pool[i];
 }

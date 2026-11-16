@@ -1182,3 +1182,47 @@ count above were run once more on the final tree. Both came out exactly as in th
 2:32 / 3:02, 7:37, 22 of 40, something new every 11 / 13 / 8 s for the monster and 17 / 24 / 23
 s for a squad), as a deterministic simulation should when nothing in it has changed. Nothing was
 retuned.
+
+## 12. Round 4: real throws, and the squad bots' volleys at stage 1 (16 November, the round 4 integration)
+
+Round 4 changed the simulation in three ways that touch balance: throws fly real arcs with a
+seeded error (docs/DESIGN.md, "Throw"), foot squads move with a narrower body and fit between
+houses, and the titan wades at 0.7 of its speed. Each builder measured its own change (docs/
+STATUS.md, round 4). This section is the whole tree together, with `npm run sim -- --seeds 20
+--every-anchor` (seeds 1 to 20) and `--seeds 40` (seeds 1 to 40), against section 11.
+
+| | Stage 1 | Stage 2 | Stage 3 | Kaiju wins |
+| --- | --- | --- | --- | --- |
+| Section 11 (40 matches) | 2:00 | 2:32 | 3:02 | 22 of 40 |
+| Round 4 as the builders left it, seeds 1 to 20 | 1:51 | 2:14 | 2:57 (7) | 7 of 20 |
+| Round 4 as the builders left it, seeds 1 to 40 | 1:53 | 2:10 | 3:04 (20) | 20 of 40 |
+| Round 4 final, seeds 1 to 20 | 1:54 | 2:16 | 3:13 (8) | 8 of 20 |
+| Round 4 final, seeds 1 to 40 | 1:57 | 2:19 | 3:13 (16) | 16 of 40 |
+
+(Stage 3 counts only the third stages the monster finished: the number in brackets.)
+
+Every stage time is within about a tenth of section 11 and the monster wins 40% of bot matches,
+inside the 30 to 70% band, so the throw's speed and spread were **not** retuned.
+
+One thing was changed, in the squad bot, because a whole-match test caught it: in 2 of 40 bot
+matches the squads fired **no** charged volley in all of stage 1 (seeds 101 and 104 of the soak
+test's range), and in several only one. Watching seed 101 showed why. The hatchling stood among
+the packed houses; each squad parked where its leader saw it through a gap, planted, and 0.4 s
+later let go again, because two of its three squad-mates, standing 6 to 24 m off among the
+houses, had no line of fire (`BOT_RULES.squad.clearLines`: the leader and 60% of the planted
+squad-mates must see). It did that over and over all stage. `clearLines` is now per stage,
+**0.3 / 0.6 / 0.6**: at stage 1 one planted squad-mate in three with a line is enough. Measured:
+
+- Stage 1 charged volleys in bot matches, seeds 101 to 140: no match without one (2 before);
+  13.1 a match over seeds 1 to 40 (7.8 before), 1.0 staggers at stage 1 (0.5 before).
+- The same change at every stage (0.3 throughout) was tried first and was too much: stage 2
+  volleys doubled (25.8 a match), stage 3 grew to 3:26 and the monster won 12 of 40.
+
+### Limits
+
+- Bots, not people. A human monster can throw much farther than the bot does (279 m at stage 2,
+  972 m at stage 3; the bot's reach was shortened by the throwing builder to keep it about as
+  dangerous as before), and people aim better than the bots' squad-mates stand.
+- Stage 2 is still about a tenth shorter than section 11 (2:16 against 2:32), though its charged
+  volleys are back near the throwing builder's baseline (16.5 a match against 17.5). Not chased:
+  left for the next round, after people have played it.

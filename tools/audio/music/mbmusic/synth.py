@@ -11,7 +11,7 @@ import numpy as np
 import soundfile as sf
 
 from . import tuning
-from .score import SEC_PER_BEAT, Part
+from .score import Part
 
 SR = 44100
 SOUNDFONT = os.environ.get("MB_SOUNDFONT", "/usr/share/sounds/sf2/FluidR3_GM.sf2")
@@ -50,11 +50,11 @@ def render_part(part: Part, total_beats: float, tail_seconds: float, seed_text: 
     The soundfont's samples are not all in tune (see tuning.py), so the part's notes are
     grouped by the correction their key needs and each group is rendered with that fine-tune
     offset; the groups are then summed."""
-    n = int(round((total_beats * SEC_PER_BEAT + tail_seconds) * SR))
+    n = int(round((total_beats * part.sec_per_beat + tail_seconds) * SR))
     out = np.zeros((n, 2), dtype=np.float32)
     if not part.notes:
         return out
-    beats = total_beats + tail_seconds / SEC_PER_BEAT
+    beats = total_beats + tail_seconds / part.sec_per_beat
     groups: dict[int, list] = {}
     for note in part.timed_notes(seed_text):
         cents = part.tune

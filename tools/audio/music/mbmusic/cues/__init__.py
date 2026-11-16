@@ -1,7 +1,8 @@
 """The cue list. Each module has build() returning a Cue (or build_all() returning several)."""
 from importlib import import_module
 
-MODULES = ["lobby", "briefing", "stage1", "stage2", "stage3", "cocoon", "intermission", "win", "hearing"]
+MODULES = ["lobby", "briefing", "stage1", "stage2", "stage3", "final_minute", "cocoon", "intermission", "win",
+           "hearing"]
 
 
 def all_cues(only=None):

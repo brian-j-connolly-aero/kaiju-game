@@ -1,5 +1,11 @@
 # Music: what the client has to change
 
+> **Done, and partly superseded (round 4).** Everything listed here was built. Since round 4 the
+> stage music is one arcade track per stage (`stage1`, `stage2`, `stage3`) plus `final_minute`,
+> and the base and combat stems this page talks about are gone; see `docs/audio/MUSIC.md`
+> section 4 for how the game plays the music now. The page is kept for its reasoning about the
+> intermission and the cocoon, which still holds.
+
 For the client engineer. The audio review (quality assurance pass on every sound file) found
 that the music files are sound but that the game does not yet play two of them the way they were
 written. The music side is done and rebuilt; this page lists what is left in `client/src`, which

@@ -97,8 +97,8 @@ export function createWorld(options: WorldOptions): World {
     propHits: [],
     voice: createVoiceState(),
     events: [],
-    step(inputs?: InputsByPlayer) {
-      return stepWorld(world, inputs);
+    step(inputs?: InputsByPlayer, mark?: (system: number) => void) {
+      return stepWorld(world, inputs, mark);
     },
   };
 

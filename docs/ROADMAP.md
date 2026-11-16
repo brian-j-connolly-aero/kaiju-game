@@ -124,6 +124,8 @@ file is the newer intent: change `DESIGN.md` to match as each piece is built.
 
 ## Round 4: after the second playtest (16 November 2026)
 
+**Built** (16 November 2026; `docs/STATUS.md`, the round 4 sections at its end; what to try this afternoon: `docs/PLAYTEST.md`). In bot matches the stages take about 1:54 / 2:16 / 3:13 and the monster wins 8 of 20 (`docs/BALANCE.md` section 12).
+
 The owner hosted on their own computer and played through the tunnel. Verdict: "much improved,
 it's fun": the monster's molt picks, the army's charged volley and the rubble all worked, and the
 old stutter on foot is gone. The owner plays again on 16 November in the afternoon, a live

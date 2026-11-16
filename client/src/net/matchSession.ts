@@ -13,6 +13,7 @@
 import {
   Btn,
   clampAngleAround,
+  DT,
   decodeSnapshot,
   heldEdible,
   kaijuKindDef,
@@ -39,10 +40,11 @@ import {
   type SnapUnit,
   type Snapshot,
   type StageId,
+  type UnitMoveState,
   type WelcomeMessage,
 } from '@mb/shared';
 import { applyCityEvent, createCityMirror, resyncCityMirror, type CityMirror } from './cityMirror';
-import { createPredictor, decayPredictionError, predictedPose, predictedTurret, predictStep, readAck, reconcile, resetPredictor, type Predictor } from './prediction';
+import { createPredictor, decayPredictionError, predictedPose, predictedTurret, predictStep, readAck, reconcile, resetPredictor, type Hold, type Predictor } from './prediction';
 import { clockSample, createServerClock, renderTick, type ServerClock } from './serverClock';
 import { createSnapshotBuffer, newestSnapshot, pushSnapshot, sampleSnapshots, type SnapshotBuffer } from './snapshotBuffer';
 
@@ -159,12 +161,87 @@ export function hintPose(k: SnapKaiju, hint: ActionHint | null, now: number): Hi
   return { action: hint.verb, phase: 'windup', phaseTime: Math.min(elapsed, def.timing.windup), phaseDuration: def.timing.windup };
 }
 
+/** One snapshot as the network readout sees it (ui/netReadout.ts). */
+export interface NetSample {
+  /** Local time it arrived, seconds. */
+  at: number;
+  /** Milliseconds since the snapshot before it. */
+  gap: number;
+  /** How far it moved the prediction of the local body, meters (`Predictor.lastJump`). */
+  jump: number;
+  /** Inputs the server said it will drop (the acknowledgement's second number). */
+  drops: number;
+  /** Inputs sent and not yet played by the server (in flight, or waiting there). */
+  pending: number;
+}
+
+/** Snapshots the readout's history keeps: 30 seconds. */
+export const NET_HISTORY = 450;
+
 export interface SessionCallbacks {
   sendInput(input: PlayerInput): void;
   /** A simulation event whose moment on screen has come. */
   onEvent(event: SimEvent): void;
   /** The mirrored city was replaced wholesale (reconnection): redraw every structure and prop. */
   onCityResync(): void;
+}
+
+/** A unit in the intermission: no drive, only braking (as `coastUnits` in sim/systems/matchFlow.ts moves it). */
+const COASTING: UnitMoveState = { alive: true, rooted: true };
+
+/** Seconds below which the simulation counts a stun as over (sim/systems/damage.ts). */
+const STUN_EPS = 1e-6;
+/** How far a snapshot's stun may be from the true one: it is rounded to 0.05 s (net/snapshot.ts). */
+const STUN_SNAPSHOT_STEP = 0.026;
+
+/**
+ * Ticks after a snapshot during which a unit with `stun` seconds left stays frozen: the damage
+ * system counts the stun down at the end of every tick, and movement reads it before that.
+ */
+export function stunTicks(stun: number): number {
+  let left = stun;
+  let ticks = 0;
+  while (left > 0 && ticks < 600) {
+    ticks++;
+    left = left - DT > STUN_EPS ? left - DT : 0;
+  }
+  return ticks;
+}
+
+/** Seconds the simulation allows a phase to end early by (sim/systems/kaijuActions.ts). */
+const PHASE_EPS = 1e-6;
+
+/** Ticks a phase of `seconds` lasts from the tick it begins (none when it has no length). */
+function phaseTicks(seconds: number): number {
+  return seconds > 0 ? Math.max(1, Math.ceil((seconds - PHASE_EPS) / DT - 1e-9)) : 0;
+}
+
+/**
+ * Ticks after a snapshot during which a kaiju is still slowed by the attack it is in, by the
+ * action system's own clock (sim/systems/kaijuActions.ts: the phase time grows at the start of
+ * every tick and the phase ends once it reaches its length): what is left of this phase plus
+ * the phases after it (0: it is over by the next tick). -1 when the end is not known in
+ * advance: idle, the charge (a wall or a second press ends it), the brace (held), the beam, the
+ * molt, a stagger.
+ */
+export function actionTicksLeft(k: SnapKaiju): number {
+  let rest: number[];
+  if (k.phase === 'flinch') {
+    rest = [];
+  } else {
+    if (k.action === 'none' || k.action === 'brace' || k.action === 'charge' || k.action === 'special' || k.action === 'molt') return -1;
+    const action = kaijuKindDef(k.kind).actions[k.action];
+    const t = action.timing;
+    if (k.phase === 'windup') rest = [t.active, t.recover];
+    else if (k.phase === action.activePhase) rest = [t.recover];
+    else if (k.phase === (action.recoverPhase ?? 'recover')) rest = [];
+    else return -1;
+  }
+  // This phase ends on the first tick whose phase time reaches its length; that tick is the next phase's.
+  const ends = Math.max(1, Math.ceil((k.phaseDuration - PHASE_EPS - k.phaseTime) / DT - 1e-9));
+  let ticks = ends - 1;
+  for (const seconds of rest) ticks += phaseTicks(seconds);
+  return ticks;
 }
 
 /** A press the server has said nothing about for this long is no longer predicted (seconds). */
@@ -210,12 +287,21 @@ export class MatchSession {
   catchingUp = false;
   /** Counters for the debug overlay and the automation hook. */
   stats = { snapshots: 0, snapshotBytes: 0, events: 0, inputs: 0, lastSnapshotAt: 0 };
+  /** The newest snapshots, oldest first, for the network readout (NET_HISTORY of them). */
+  readonly net: NetSample[] = [];
 
   private readonly callbacks: SessionCallbacks;
   private queue: QueuedEvent[] = [];
   private seq = 0;
   private boundsCache: { stage: StageId; bounds: Bounds } | null = null;
   private readonly params = {} as MoveParams;
+  /** A stunned unit's parameters once the stun is over, and the state unit parameters are built from. */
+  private readonly freeParams = {} as MoveParams;
+  private readonly unitState: UnitMoveState = { alive: true, rooted: false, stun: 0 };
+  /** A kaiju standing idle, for its movement once an attack is over. */
+  private readonly idleKaiju: KaijuMoveState = { kind: 'lizard', stage: 1, nerve: 0, action: 'none', phase: 'idle', submerge: 0 };
+  /** The newest stun of each unit, from its `unitStunned` event: the tick it began and its length. */
+  private readonly stuns = new Map<number, { tick: number; duration: number }>();
   private predictedKey = '';
   private lastButtons = 0;
   private readonly pose = { x: 0, z: 0, yaw: 0 };
@@ -263,14 +349,22 @@ export class MatchSession {
     if (!pushSnapshot(this.buffer, snap)) return;
     this.latest = newestSnapshot(this.buffer);
     clockSample(this.clock, snap.tick, now);
+    const gap = this.stats.snapshots > 0 ? (now - this.stats.lastSnapshotAt) * 1000 : 0;
     this.stats.snapshots++;
     this.stats.snapshotBytes += bytes.length;
     this.stats.lastSnapshotAt = now;
     this.reconcileFrom(snap);
+    const p = this.predictor;
+    this.net.push({ at: now, gap, jump: p.ready ? p.lastJump : 0, drops: readAck(snap.ackSeq).drops, pending: p.pending.length });
+    if (this.net.length > NET_HISTORY) this.net.shift();
   }
 
   handleEvents(events: SimEvent[], now: number): void {
     for (const event of events) {
+      if (event.type === 'unitStunned') {
+        if (this.stuns.size > 64) this.stuns.clear();
+        this.stuns.set(event.unit, { tick: event.tick, duration: event.duration });
+      }
       applyCityEvent(this.mirror, event);
       this.queue.push({ event, arrivedAt: now });
       this.stats.events++;
@@ -300,22 +394,96 @@ export class MatchSession {
   }
 
   /**
-   * How the local body moves: its movement parameters, its radius and, for a kaiju, the
-   * movement state that can override the stick (a charge's run), as the server's movement uses them.
+   * How the local body moves: whether it moves at all (`moving`), its movement parameters, its
+   * radius and, for a kaiju, the movement state that can override the stick (a charge's run), as
+   * the server's movement uses them. A stunned unit's frozen parameters hold only until its stun
+   * runs out (`hold`). In the intermission nobody drives, but a unit the molt's blast threw
+   * slides on until it stops (sim/systems/matchFlow.ts, `coastUnits`): it is predicted braking.
    */
   private paramsFor(
     body: { kaiju: SnapKaiju | null; unit: SnapUnit | null },
     snap: Snapshot,
     now: number,
-  ): { params: MoveParams; radius: number; drive: KaijuMoveState | null } {
+  ): { moving: boolean; params: MoveParams; radius: number; drive: KaijuMoveState | null; hold: Hold | null } {
     const bounds = this.boundsFor(snap.match.stage);
+    const phase = snap.match.phase;
     if (body.kaiju) {
-      const drive = this.kaijuState(body.kaiju, now);
-      return { params: kaijuMoveParams(drive, bounds, undefined, this.params), radius: kaijuStageDef(body.kaiju.kind, body.kaiju.stage).bodyRadius, drive };
+      const k = body.kaiju;
+      const radius = kaijuStageDef(k.kind, k.stage).bodyRadius;
+      const moving = phase === 'playing';
+      const hint = this.predictedHint(k, now) ? this.hint : null;
+      if (hint) {
+        // A press the server has not played yet: the body moves as the snapshot has it (idle)
+        // for the inputs before the press, and as the press's wind-up from the press on.
+        const drive = this.kaijuState(k, now);
+        const free = kaijuMoveParams(drive, bounds, undefined, this.freeParams);
+        const before = this.inputsBefore(hint.seq, snap);
+        if (before === 0) return { moving, params: free, radius, drive, hold: null };
+        return { moving, params: kaijuMoveParams(k, bounds, undefined, this.params), radius, drive, hold: { ticks: before, free } };
+      }
+      const params = kaijuMoveParams(k, bounds, undefined, this.params);
+      // An attack with a known end: its slower steps last that many ticks, then it walks freely.
+      const ticks = actionTicksLeft(k);
+      if (ticks < 0) return { moving, params, radius, drive: k, hold: null };
+      const idle = this.idleKaiju;
+      idle.kind = k.kind;
+      idle.stage = k.stage;
+      idle.nerve = k.nerve;
+      idle.submerge = k.submerge;
+      const free = kaijuMoveParams(idle, bounds, undefined, this.freeParams);
+      if (ticks === 0) return { moving, params: free, radius, drive: idle, hold: null };
+      return { moving, params, radius, drive: k, hold: { ticks, free } };
     }
     const u = body.unit as SnapUnit;
     const def = unitTypeDef(u.type);
-    return { params: unitMoveParams(def, u, bounds, undefined, this.params), radius: def.radius, drive: null };
+    if (phase === 'intermission') {
+      return { moving: u.alive, params: unitMoveParams(def, COASTING, bounds, undefined, this.params), radius: def.radius, drive: null, hold: null };
+    }
+    const state = this.unitState;
+    state.alive = u.alive;
+    state.rooted = u.rooted;
+    state.driven = u.driven;
+    state.y = u.y;
+    state.stun = 0;
+    const left = u.alive ? this.stunLeft(u, snap.tick) : 0;
+    const ticks = left > 0 ? stunTicks(left) : 0;
+    if (ticks === 0) return { moving: phase === 'playing', params: unitMoveParams(def, state, bounds, undefined, this.params), radius: def.radius, drive: null, hold: null };
+    // Frozen by a stun for `ticks` more ticks, then free again.
+    const free = unitMoveParams(def, state, bounds, undefined, this.freeParams);
+    state.stun = left;
+    return { moving: phase === 'playing', params: unitMoveParams(def, state, bounds, undefined, this.params), radius: def.radius, drive: null, hold: { ticks, free } };
+  }
+
+  /**
+   * How many of the inputs the server will play after this snapshot come before the input with
+   * sequence number `seq` (the ones it will drop are left out, as `reconcile` leaves them out).
+   */
+  private inputsBefore(seq: number, snap: Snapshot): number {
+    const { played, drops } = readAck(snap.ackSeq);
+    let skip = drops;
+    let n = 0;
+    for (const input of this.predictor.pending) {
+      if (input.seq <= played) continue;
+      if (input.seq >= seq) break;
+      if (skip > 0) skip--;
+      else n++;
+    }
+    return n;
+  }
+
+  /**
+   * Seconds of stun a unit has left after the snapshot's tick: worked out from the `unitStunned`
+   * event that began it when that agrees with the snapshot, whose own figure is rounded to 0.05 s
+   * (a tick and a half; read as it is, the stun would end a tick early or late on the page).
+   */
+  private stunLeft(u: SnapUnit, tick: number): number {
+    const began = this.stuns.get(u.id);
+    if (began && tick >= began.tick) {
+      // The stun is set on its tick and counted down at the end of that same tick (sim/systems/damage.ts).
+      const left = began.duration - (tick - began.tick + 1) * DT;
+      if (Math.abs(left - u.stun) <= STUN_SNAPSHOT_STEP) return Math.max(0, left);
+    }
+    return u.stun;
   }
 
   private reconcileFrom(snap: Snapshot): void {
@@ -340,9 +508,9 @@ export class MatchSession {
       // The server has played the press and the kaiju is still idle: it was refused. Stop pretending.
       else if (ack.played >= hint.seq) this.hint = null;
     }
-    const { params, radius, drive } = this.paramsFor(body, snap, now);
+    const { moving, params, radius, drive, hold } = this.paramsFor(body, snap, now);
     const server = body.kaiju ?? (body.unit as SnapUnit);
-    reconcile(this.predictor, server, radius, snap.ackSeq, this.mirror.query, params, snap.match.phase === 'playing', drive);
+    reconcile(this.predictor, server, radius, snap.ackSeq, this.mirror.query, params, moving, drive, hold);
   }
 
   /**
@@ -383,8 +551,8 @@ export class MatchSession {
     if (snap && body && this.mirror.trusted) {
       const playing = snap.match.phase === 'playing';
       if (body.kaiju && playing) this.updateHint(input.buttons, body.kaiju, now, input.seq);
-      const { params, drive } = this.paramsFor(body, snap, now);
-      predictStep(this.predictor, input, this.mirror.query, params, playing, drive);
+      const { moving, params, drive, hold } = this.paramsFor(body, snap, now);
+      predictStep(this.predictor, input, this.mirror.query, params, moving, drive, hold ? hold.free : params);
     }
     this.lastButtons = input.buttons;
     return input;

@@ -3,7 +3,7 @@
 File layout of a loop (all times exact multiples of one sample at 44.1 kHz):
 
     [ lead-in 0.25 s ][ loop body: whole bars ][ pad 0.25 s ]
-      loop start = 0.25 s                        loop end = 0.25 s + bars * 2.5 s
+      loop start = 0.25 s                        loop end = 0.25 s + bars * bar length
 
 The lead-in is the last quarter second of the loop (faded in) and the pad is its first quarter
 second, so the audio is periodic on both sides of both loop points. A decoder that shifts the
@@ -21,7 +21,7 @@ import numpy as np
 import soundfile as sf
 
 from . import dsp
-from .score import BAR_SECONDS, BPM, Cue, Stem
+from .score import Cue, Stem
 from .synth import SCRATCH, SR, render_part
 
 REPO = Path(__file__).resolve().parents[4]
@@ -40,7 +40,7 @@ MP3_QUALITY = "5"         # libmp3lame -q:a (VBR, about 115 kbit/s for this mate
 
 def _section_bounds(cue: Cue) -> list[tuple[int, int]]:
     firsts = [b for b, _ in cue.sections] or [1]
-    edges = [int(round((b - 1) * BAR_SECONDS * SR)) for b in firsts] + [int(round(cue.seconds * SR))]
+    edges = [int(round((b - 1) * cue.bar_seconds * SR)) for b in firsts] + [int(round(cue.seconds * SR))]
     return list(zip(edges, edges[1:]))
 
 
@@ -172,7 +172,7 @@ def render_cue(cue: Cue, encode: bool = True, verbose: bool = True) -> dict:
             entry["loop"] = [LEAD_IN, round(LEAD_IN + cue.seconds, 6)]
         else:
             out = x
-        entry["bpm"] = BPM
+        entry["bpm"] = cue.bpm
         if cue.group:
             entry["group"] = cue.group
         entry["duration"] = round(len(out) / SR, 3)
@@ -194,8 +194,8 @@ def render_cue(cue: Cue, encode: bool = True, verbose: bool = True) -> dict:
 
 def write_manifest(entries: dict) -> None:
     """Writes the partial manifest (merged into manifest.json by `npm run assets:manifest`)."""
-    order = ["lobby", "briefing", "stage1_base", "stage1_combat", "stage2_base", "stage2_combat",
-             "stage3_base", "stage3_combat", "cocoon", "intermission", "win_humans", "win_kaiju", "hearing"]
+    order = ["lobby", "briefing", "stage1", "stage2", "stage3", "final_minute", "cocoon", "intermission",
+             "win_humans", "win_kaiju", "hearing"]
     music = {k: entries[k] for k in order if k in entries}
     music.update({k: v for k, v in entries.items() if k not in music})
     MANIFEST.parent.mkdir(parents=True, exist_ok=True)

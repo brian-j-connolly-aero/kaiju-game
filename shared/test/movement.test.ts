@@ -227,6 +227,32 @@ describe('stepMovement against the city', () => {
     expect(circleVsObb(b.x, b.z, b.radius - 1e-6, built.city.structures[0])).toBe(false);
   });
 
+  it('lets a foot section through a 2.5 m gap between two houses, but not a tank (round 4)', () => {
+    // Two houses side by side, 2.5 m apart, 20 m north; the section aims a little off the gap.
+    const built = makeTestCity({
+      structures: [
+        { x: -6.25, z: 25, w: 10, d: 10, height: 6 },
+        { x: 6.25, z: 25, w: 10, d: 10, height: 6 },
+      ],
+    });
+    const city = queryFor(built);
+    const north: MoveInput = { moveX: 0, moveZ: 1, aimYaw: 0 };
+    const foot = UNIT_TYPES.army_rocket_infantry;
+    // Its hit area is the whole section; it moves as a body about as wide as its soldiers.
+    expect(foot.radius).toBe(3);
+    expect(foot.bodyRadius).toBe(1);
+    // The body carries the hit radius (as a unit and the client's prediction do): the movement parameters narrow it.
+    const section = body(0.6, 0, foot.radius);
+    drive(section, north, unitMoveParams(foot, { alive: true, rooted: false }, BIG), city, 6);
+    expect(section.z).toBeGreaterThan(40);
+    for (const s of built.city.structures) expect(circleVsObb(section.x, section.z, foot.bodyRadius - 1e-6, s)).toBe(false);
+
+    const tankDef = UNIT_TYPES.army_tank;
+    const tank = body(0, 0, tankDef.radius);
+    drive(tank, north, unitMoveParams(tankDef, { alive: true, rooted: false }, BIG), city, 6);
+    expect(tank.z).toBeLessThan(20 - tankDef.bodyRadius + 1e-6);
+  });
+
   it('walks through structures up to the trample height and reports them', () => {
     const built = makeTestCity({
       structures: [
@@ -271,6 +297,24 @@ describe('stepMovement against the city', () => {
     // It came out the far side at full speed again.
     expect(b.z).toBeGreaterThan(150);
     expect(Math.hypot(b.vx, b.vz)).toBeCloseTo(22, 6);
+  });
+
+  it('slows the titan to 0.7 of its land speed in water and says it stands in it (round 4)', () => {
+    const city = queryFor(makeTestCity({ water: [[-500, 100, 500, 400]] }));
+    const params = kaijuMoveParams(hatchling({ stage: 3 }), BIG);
+    const b = body(0, 0, 26);
+    const result = createMoveResult();
+    let wetSpeed = 0;
+    for (let i = 0; i < 30 * 12; i++) {
+      stepMovement(b, { moveX: 0, moveZ: 1, aimYaw: 0 }, DT, city, params, result);
+      if (b.z > 160) {
+        expect(result.inWater).toBe(true);
+        wetSpeed = Math.hypot(b.vx, b.vz);
+      } else if (b.z < 90) {
+        expect(result.inWater).toBe(false);
+      }
+    }
+    expect(wetSpeed).toBeCloseTo(22 * 0.7, 6);
   });
 
   it('ignores rubble', () => {

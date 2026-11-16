@@ -19,6 +19,12 @@ export interface FixedStep {
   /** Simulation time owed and not yet stepped, milliseconds. */
   owed: number;
   started: boolean;
+  /**
+   * Wall-clock time that was never simulated, milliseconds, in total: a gap over `maxFrameMs`
+   * and whatever was owed beyond `maxSteps`. While it grows the match runs slow (slowLog.ts
+   * reports it), and the players' inputs wait longer at the server.
+   */
+  dropped: number;
 }
 
 export interface FixedStepOptions {
@@ -35,7 +41,7 @@ export interface FixedStepOptions {
 }
 
 export function createFixedStep(): FixedStep {
-  return { last: 0, owed: 0, started: false };
+  return { last: 0, owed: 0, started: false, dropped: 0 };
 }
 
 /** Forgets owed time, so the next call starts a fresh measurement. */
@@ -56,11 +62,13 @@ export function dueSteps(clock: FixedStep, nowMs: number, o: FixedStepOptions): 
   // A clock that stood still, ran backwards or returned NaN adds nothing.
   if (!(dt > 0)) return 0;
 
+  if (dt > o.maxFrameMs) clock.dropped += dt - o.maxFrameMs;
   clock.owed += Math.min(dt, o.maxFrameMs) * o.speed;
   let steps = Math.floor((clock.owed + o.slopMs) / o.stepMs);
   if (steps <= 0) return 0;
   if (steps > o.maxSteps) {
     steps = o.maxSteps;
+    clock.dropped += Math.max(0, clock.owed - steps * o.stepMs) / o.speed;
     clock.owed = 0;
   } else {
     clock.owed -= steps * o.stepMs;

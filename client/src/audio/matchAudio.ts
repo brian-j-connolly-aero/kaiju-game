@@ -1,8 +1,10 @@
 /**
  * Turns what happens in a match into sound: simulation events into effects at their place in
- * the world, the match phase and stage into music, voice cues into spoken lines for the side
- * the local player is on (humans hear the radio, the kaiju player hears the news), and the
- * state of the fight into how much of the combat stem plays.
+ * the world, the match phase, stage and clock into music (one arcade track per stage, and the
+ * final-minute track once the clock is under a minute), and the communication rose into talk
+ * (`rose`: a squad's line on the radio
+ * in its own voice, the monster's noises from the monster). Since round 4 the only automatic
+ * voice line left is the news telling the monster's player it can molt (`molt.available`).
  *
  * Every move, weapon, crate and special building of phases 1 to 3 has a sound of its own
  * (docs/audio/SFX.md), and an attack's sound follows the look the screens draw for it (the
@@ -12,12 +14,11 @@
  * Two rules keep it honest when the page has missed something (a hidden tab, a reconnection):
  * what should be sounding NOW is read from the frame state on every update (the beam, the
  * heartbeat, the charging tone, the stage music), and an event that is delivered long after it
- * happened still counts for that state but its one-shot sounds and radio lines are skipped.
+ * happened still counts for that state but its one-shot sounds and its line are skipped.
  */
 
 import {
   archetypeSpecial,
-  chooseVoiceLines,
   DT,
   heldCityWeapon,
   kaijuKindDef,
@@ -26,23 +27,23 @@ import {
   TICK_RATE,
   unitTypeDef,
   VOICE_LINES,
-  VOICE_SIDE_RULES,
   type CityData,
   type KaijuKindId,
   type MatchEndEvent,
+  type PlayerSlot,
   type PropKindId,
+  type RoseMessage,
   type SimEvent,
   type SnapKaiju,
   type SnapUnit,
   type StageId,
-  type VoiceCueId,
   type VoiceEvent,
   type VoiceLine,
 } from '@mb/shared';
 import type { FrameState, LocalRole } from '../net/matchSession';
 import { attackVariant } from '../render/kaijuAnimator';
-import type { AudioEngine, LoopHandle, PlayOptions } from './audioEngine';
-import { EVENT_CUES, eventLine, type EventCueId } from './eventVoice';
+import type { AudioEngine, LoopHandle, MusicOptions, PlayOptions } from './audioEngine';
+import { ROSE_KAIJU_SOUNDS, roseArmyLine, roseKaijuSound, roseVoiceOf } from './roseLines';
 
 /** What the match audio reads from the match session. */
 export interface MatchAudioSession {
@@ -69,10 +70,8 @@ export const STALE_EVENT_SECONDS = 1;
 const LOOP_GRACE = 0.3;
 /** Seconds after the end of the match: the win cue has rung out (both are below -30 dBFS from 12.2 s). */
 export const HEARING_MUSIC_AT = 12.5;
-/** Seconds after the end of the match: one bar of the hearing music later, the committee chair speaks. */
-export const CHAIR_AT = 15;
-/** An order for a window that is closing (the stagger, the signature attack) is worthless after this wait. */
-const ORDER_STALE_SECONDS = 1.5;
+/** A rose line still waiting for the radio this long after it was picked is not said at all (seconds). */
+export const ROSE_STALE_SECONDS = 4;
 /** At most one "volley ready" ping in this time: sub-units ordered together fill on the same frame. */
 const READY_GAP = 0.3;
 
@@ -139,9 +138,6 @@ export function fallTime(y: number, vy: number, gravity: number): number {
   return (vy + Math.sqrt(vy * vy + 2 * gravity * Math.max(0, y))) / gravity;
 }
 
-/** Cues whose lines are loaded before the match, so that they start at once. */
-const VOICE_AHEAD: readonly VoiceCueId[] = ['match.briefing', 'match.start', 'nerve.break', 'kaiju.special'];
-
 let linesById: Map<string, VoiceLine> | null = null;
 
 function lineById(id: string): VoiceLine | undefined {
@@ -149,23 +145,9 @@ function lineById(id: string): VoiceLine | undefined {
   return linesById.get(id);
 }
 
-/**
- * Radio is a property of the line, not of the listener: the lines only the humans hear are
- * the radio voices (command and the squads). The news anchor and the committee chair are not.
- */
-export function isRadioLine(line: Pick<VoiceLine, 'audience'>): boolean {
-  return line.audience === 'humans';
-}
-
-/**
- * The ids of the lines a side should have decoded before the match starts. The news only ever
- * speaks for its own short list of cues (VOICE_SIDE_RULES), so nothing else is loaded for it.
- */
+/** The automatic lines this side can hear (since round 4: the monster's molt line), loaded ahead so they start at once. */
 export function voiceAheadIds(side: 'humans' | 'kaiju'): string[] {
-  const news: readonly VoiceCueId[] = VOICE_SIDE_RULES.news.cues;
-  return VOICE_LINES.filter(
-    (l) => l.audience === side && VOICE_AHEAD.includes(l.cue) && (side === 'humans' || news.includes(l.cue)),
-  ).map((l) => l.id);
+  return VOICE_LINES.filter((l) => l.audience === side || l.audience === 'all').map((l) => l.id);
 }
 
 /**
@@ -194,10 +176,6 @@ export function chargeTone(
 
 /** Seconds the fire of a gas station's fireball crackles on (the picture's fire lasts as long). */
 const FIRE_SECONDS = 9;
-/** Seconds the player's own squad's crate lies untouched before the radio reminds them of it. */
-export const CRATE_REMINDER = 3;
-/** An event line (eventVoice.ts) not begun this long after its moment is not said at all. */
-const EVENT_LINE_STALE = 4;
 /** A substation hums for a player whose body is this close to it (meters). */
 const HUM_RANGE = 70;
 /** At most one burst of glass from the monster's feet in this time (seconds). */
@@ -249,10 +227,17 @@ export const PRELOAD_SFX = [
   'radio_static',
 ];
 
-/** The music of a stage: the base stem and the combat stem. */
-function stems(stage: StageId): string[] {
-  return [`stage${stage}_base`, `stage${stage}_combat`];
+/** The music of a stage: one track (round 4; until then a base and a combat stem). */
+function stageMusic(stage: StageId): string[] {
+  return [`stage${stage}`];
 }
+
+/** The track of the last minute on the clock, whatever the stage. */
+export const FINAL_MINUTE_MUSIC = 'final_minute';
+/** Seconds left on the clock when the final-minute track takes over. */
+export const FINAL_MINUTE_AT = 60;
+/** Seconds left on the clock when the final-minute track is loaded ahead. */
+const FINAL_MINUTE_LOAD_AT = 80;
 
 export class MatchAudio {
   private readonly audio: AudioEngine;
@@ -267,12 +252,14 @@ export class MatchAudio {
   private charge: LoopHandle | null = null;
   private chargedCount = 0;
   private lastReady = -1;
-  private musicStage: StageId | 0 = 0;
+  /** The match music last started: its track and the stage it started in ('' for none). */
+  private musicKey = '';
+  /** The final-minute track has been loaded ahead. */
+  private finalLoaded = false;
   /** The stage whose sounds and music have been loaded ahead. */
   private loadedStage: StageId | 0 = 0;
   /** The kaiju whose cocoon has been announced to the loader, or -1. */
   private cocoonOf = -1;
-  private heat = 0;
   private lastHurt = 0;
   private lastCrush = 0;
   private time = 0;
@@ -287,12 +274,9 @@ export class MatchAudio {
   private lastSalvo = '';
   private lastCrack = -1;
   private lastClang = -1;
-  /** The committee chair's line for this match, held for the end screen. */
-  private hearing: VoiceLine | null = null;
   private result: MatchEndEvent | null = null;
   /** Seconds since the match ended. */
   private sinceEnd = 0;
-  private chairSaid = false;
   /** Phase 2's city: the player's tank engine, a substation's hum, fires burning on, the last glass. */
   private engine: LoopHandle | null = null;
   private hum: LoopHandle | null = null;
@@ -308,11 +292,6 @@ export class MatchAudio {
   private stunUntil = -1;
   private lastStun = -1;
   private lastShaken = -1;
-  /** Event lines (eventVoice.ts): when each cue was last said here, the crates coming down for squads, the player's own lying about. */
-  private readonly eventSaid = new Map<EventCueId, number>();
-  private readonly crateFor = new Map<number, number>();
-  private readonly cratesDown = new Map<number, number>();
-  private eaten = 0;
 
   constructor(audio: AudioEngine) {
     this.audio = audio;
@@ -322,7 +301,7 @@ export class MatchAudio {
     this.end();
     this.session = session;
     this.audio.preload(PRELOAD_SFX);
-    // The one-shots are short; the stage's own stems follow as soon as the stage is known.
+    // The one-shots are short; the stage's own track follows as soon as the stage is known.
     this.audio.preloadMusic(['cocoon', 'intermission', 'win_humans', 'win_kaiju']);
     this.audio.preloadVoice(voiceAheadIds(this.side()));
   }
@@ -344,18 +323,12 @@ export class MatchAudio {
     this.due.length = 0;
     this.thrown.clear();
     this.lastReady = -1;
-    this.musicStage = 0;
+    this.musicKey = '';
+    this.finalLoaded = false;
     this.loadedStage = 0;
     this.cocoonOf = -1;
-    this.heat = 0;
-    this.hearing = null;
     this.result = null;
     this.sinceEnd = 0;
-    this.chairSaid = false;
-    this.eventSaid.clear();
-    this.crateFor.clear();
-    this.cratesDown.clear();
-    this.eaten = 0;
     this.audio.clearVoice();
     this.audio.releaseMusic();
     this.audio.releaseVoice();
@@ -388,57 +361,43 @@ export class MatchAudio {
 
   /**
    * Plays the lines the simulation chose for this side (`event.lines`; the id of a line is also
-   * its audio file). The client never picks lines itself, so everyone hears the same ones.
+   * its audio file): since round 4 only the news telling the monster's player it can molt. The
+   * client never picks lines itself, so everyone on a side hears the same ones.
    */
   private speak(e: VoiceEvent, fresh: boolean): void {
-    const side = this.side();
-    // `lines` is always sent; the guard is for a message that lost it on the way.
-    const lines: VoiceLine[] = [];
-    for (const id of (e.lines as Partial<VoiceEvent['lines']> | undefined)?.[side] ?? []) {
-      const line = lineById(id);
-      if (line) lines.push(line);
-    }
-    if (e.cue.startsWith('hearing.')) {
-      // The hearing belongs to the hearing music on the end screen, not to the win fanfare.
-      this.hearing = lines[0] ?? null;
-      return;
-    }
     if (!fresh) return;
-    const many = lines.length > 1;
-    const ending = e.cue.startsWith('end.');
-    const order = side === 'humans' && (e.cue === 'nerve.break' || e.cue === 'kaiju.special');
-    const urgent = e.cue.startsWith('stage.') || e.cue === 'nerve.break' || e.cue === 'molt.available';
-    for (const line of lines) {
-      this.audio.say(line, {
-        // The briefing and the last word on the match are never dropped; an order goes before chatter.
-        priority: many || ending ? 3 : order ? 2.5 : urgent ? 2 : 1,
-        radio: isRadioLine(line),
-        staleAfter: order ? ORDER_STALE_SECONDS : undefined,
-        cutsIn: order,
-      });
+    // `lines` is always sent; the guard is for a message that lost it on the way.
+    for (const id of (e.lines as Partial<VoiceEvent['lines']> | undefined)?.[this.side()] ?? []) {
+      const line = lineById(id);
+      if (line) this.audio.say(line, { priority: 2, radio: line.audience === 'humans' });
     }
   }
 
   /**
-   * An event line (eventVoice.ts) for a moment the simulation sends no voice cue for: said on this
-   * side if the cue has a line for it and has not been said here within its gap. `seed` (the
-   * event's tick) picks the line, so every screen on a side says the same one.
+   * A wedge of the communication rose (shared/src/net/rose.ts), picked by `msg.player`, who plays
+   * `who`. Talk only: a squad's line goes out on the radio in the squad's own voice, with the
+   * player's name under it as the subtitle, for everyone; the monster's noise comes from the
+   * monster in the world, and for the monster's own player at full level wherever the camera is.
+   * Every screen plays the same line or version (the server's `pick`).
    */
-  private sayEvent(cue: EventCueId, seed: number): void {
-    const line = eventLine(cue, this.side(), seed);
-    if (!line) return;
-    const last = this.eventSaid.get(cue);
-    if (last !== undefined && this.time - last < EVENT_CUES[cue].gap) return;
-    this.eventSaid.set(cue, this.time);
-    this.audio.say(line, { priority: 1, radio: isRadioLine(line), staleAfter: EVENT_LINE_STALE });
-  }
-
-  /** The committee chair's line for this match, once; whoever takes it says it. Null when it is gone or never came. */
-  takeHearing(): VoiceLine | null {
-    const line = this.hearing;
-    this.hearing = null;
-    if (line) this.chairSaid = true;
-    return line;
+  rose(msg: RoseMessage, who: Pick<PlayerSlot, 'role' | 'name' | 'callsign'> | undefined): void {
+    if (!who || !this.session) return;
+    if (who.role === 'kaiju') {
+      const k = this.frame?.kaijus.find((x) => x.player === msg.player) ?? this.frame?.kaijus[0];
+      const stage = k?.stage ?? 1;
+      const sound = roseKaijuSound(msg.cat, msg.pick, stage);
+      if (!sound) return;
+      const role = this.session.role;
+      if (!k || (role.kind === 'kaiju' && role.playerId === msg.player)) {
+        this.audio.play(sound.id, { variant: sound.variant, gain: 1 });
+      } else {
+        const y = kaijuStageDef(k.kind, stage).height * 0.8;
+        this.audio.play(sound.id, { variant: sound.variant, x: k.x, y, z: k.z, refDistance: REACH[stage] * 2, gain: 1 });
+      }
+      return;
+    }
+    const line = roseArmyLine(msg.cat, msg.pick, roseVoiceOf(who.callsign, msg.player - 1), who.name);
+    if (line) this.audio.say(line, { priority: 1, radio: true, staleAfter: ROSE_STALE_SECONDS });
   }
 
   private startHeartbeat(x: number, z: number, stage: StageId): void {
@@ -460,10 +419,10 @@ export class MatchAudio {
     if (this.cocoonOf === k.id) return;
     this.cocoonOf = k.id;
     this.audio.preload(['kaiju_molt_blast']);
-    this.audio.releaseMusic(stems(k.stage));
+    this.audio.releaseMusic(stageMusic(k.stage));
     if (k.stage < 3) {
       const next = (k.stage + 1) as StageId;
-      this.audio.preloadMusic(['intermission', ...stems(next)]);
+      this.audio.preloadMusic(['intermission', ...stageMusic(next)]);
       this.loadKaijuSounds(k.kind, next);
     }
   }
@@ -481,6 +440,8 @@ export class MatchAudio {
       `kaiju_charge_s${stage}`,
       `kaiju_stumble_s${stage}`,
       'kaiju_gulp',
+      // The communication rose's noises at this size.
+      ...Object.values(ROSE_KAIJU_SOUNDS).map((id) => `${id}_s${stage}`),
     ]);
   }
 
@@ -533,7 +494,6 @@ export class MatchAudio {
       case 'roar': {
         const s = this.stageOf(e.kaiju);
         if (s) a.play(`kaiju_roar_${s.k.kind}_s${s.stage}`, { x: e.x, y: 10, z: e.z, refDistance: REACH[s.stage] * 2.5 });
-        this.heat = 1;
         break;
       }
       case 'kaijuHit': {
@@ -543,7 +503,6 @@ export class MatchAudio {
           // One recording of one size of animal: higher for the hatchling, lower for the titan.
           a.play('kaiju_hurt', { x: s.k.x, y: 5, z: s.k.z, refDistance: REACH[s.stage], gain: 0.7, rate: [1.2, 1, 0.8][s.stage - 1] });
         }
-        this.heat = 1;
         break;
       }
       case 'kaijuStagger': {
@@ -558,7 +517,6 @@ export class MatchAudio {
       }
       case 'projectileSpawn':
         this.shot(e);
-        this.heat = 1;
         break;
       case 'projectileHit': {
         const thrown = this.thrown.get(e.id);
@@ -682,18 +640,11 @@ export class MatchAudio {
         // The substation blows, arcs leap to the monster, the district's power whines down.
         const s = this.stageOf(e.kaiju);
         a.play('power_surge', { x: e.x, y: 6, z: e.z, refDistance: Math.max(45, REACH[s ? s.stage : 1] * 2), gain: 0.9 });
-        this.sayEvent('power.cut', e.tick);
-        this.heat = 1;
         break;
       }
-      case 'kaijuHeld':
-        // The monster takes up a garage door: the radio warns the squads to come at it from the side.
-        if (e.reason === 'grab' && heldCityWeapon(e.held) === 'garagedoor') this.sayEvent('door.shield', e.tick);
-        break;
       case 'propaneBlast':
         // A thrown tank, or one going off in the hand (one set off where it stands is the city's).
         if (e.how === 'thrown' || e.how === 'hand') a.play('propane_blast', { x: e.x, y: e.y, z: e.z, refDistance: 30 + e.radius * 3 });
-        this.heat = 1;
         break;
       case 'kaijuFlinch': {
         const s = this.stageOf(e.kaiju);
@@ -729,28 +680,19 @@ export class MatchAudio {
       case 'mastFall':
         // The squads' radios fill with static (their map shows nothing but static).
         if (this.side() === 'humans') a.play('radio_static', { gain: 0.9 });
-        this.sayEvent('mast.down', e.tick);
         break;
       // --- phase 2: the army's supply crates ---------------------------------------------------
       case 'crate': {
         // The plane comes over and the chute snaps open; the crate thumps down; a squad opens it.
-        // The radio tells a squad its crate is coming, and reminds it if the crate lies untouched.
         const mine = this.session?.role.squadId ?? -1;
         if (e.phase === 'drop') {
           a.play('supply_drop', { x: e.x, y: e.height, z: e.z, refDistance: 90, gain: 0.5 });
-          this.crateFor.set(e.id, e.squad);
-          if (mine >= 0 && e.squad === mine) this.sayEvent('crate.drop', e.tick + e.id);
         } else if (e.phase === 'land') {
           a.play('crate_land', { x: e.x, y: 0, z: e.z, refDistance: 16, gain: 0.9 });
-          if (mine >= 0 && this.crateFor.get(e.id) === mine) this.cratesDown.set(e.id, this.time);
-        } else {
-          if (e.phase === 'take') {
-            // The player's own squad hears it whatever the distance (the HUD shows what it was).
-            if (e.squad === mine) a.play('crate_take', { gain: 0.9 });
-            else a.play('crate_take', { x: e.x, y: 1, z: e.z, refDistance: 20, gain: 0.8 });
-          }
-          this.crateFor.delete(e.id);
-          this.cratesDown.delete(e.id);
+        } else if (e.phase === 'take') {
+          // The player's own squad hears it whatever the distance (the HUD shows what it was).
+          if (e.squad === mine) a.play('crate_take', { gain: 0.9 });
+          else a.play('crate_take', { x: e.x, y: 1, z: e.z, refDistance: 20, gain: 0.8 });
         }
         break;
       }
@@ -765,7 +707,7 @@ export class MatchAudio {
           // A build whose one hit must land as the next stage begins: start it part-way in.
           a.playMusic(['intermission'], { fade: 0.6, landIn: e.duration - age });
         } else if (e.phase === 'playing') {
-          this.musicStage = 0;
+          this.musicKey = '';
           if (fresh) a.play('ui_match_start', { gain: 0.7 });
         }
         break;
@@ -870,7 +812,6 @@ export class MatchAudio {
       case 'fireball': {
         a.play('fireball', { x: e.x, y: 4, z: e.z, refDistance: 60, gain: 1.2 });
         if (a.unlocked) this.fires.push({ loop: a.loop('fire_loop', { x: e.x, y: 2, z: e.z, refDistance: 25, gain: 0.9 }), until: this.time + FIRE_SECONDS });
-        this.sayEvent('gas.station', e.tick);
         break;
       }
       case 'propaneBlast':
@@ -904,14 +845,10 @@ export class MatchAudio {
     this.audio.play('civ_pop', { x, y, z, refDistance: 10, gain: Math.min(1, 0.6 + count * 0.08), rate: jitter(0.08) });
   }
 
-  /**
-   * A handful of civilians gulped down at the mouth: one big comic swallow, its size the kaiju's.
-   * The news reports the creature's appetite, calmly (the monster's player hears it).
-   */
+  /** A handful of civilians gulped down at the mouth: one big comic swallow, its size the kaiju's. */
   gulp(x: number, y: number, z: number): void {
     const stage = this.frame?.kaijus[0]?.stage ?? 1;
     this.audio.play('kaiju_gulp', { x, y, z, refDistance: REACH[stage] * 0.6, gain: 1.2, rate: [1.2, 1, 0.8][stage - 1] });
-    this.sayEvent('civilians.eaten', this.eaten++);
   }
 
   /**
@@ -1014,7 +951,7 @@ export class MatchAudio {
     this.audio.play('splash', { x: k.x, y: 0, z: k.z, refDistance: REACH[k.stage] * 0.8, gain: 1 });
   }
 
-  /** Once per frame: music for the phase and stage, ambience for the time of day, combat heat, loops. */
+  /** Once per frame: music for the phase, stage and clock, ambience for the time of day, loops. */
   update(frame: FrameState, dt: number): void {
     this.time += dt;
     this.frame = frame;
@@ -1032,8 +969,8 @@ export class MatchAudio {
     const coming = match.phase === 'intermission' && k0 && k0.stage > match.stage ? k0.stage : match.stage;
     if (match.phase !== 'ended' && !cocoon && coming !== this.loadedStage) {
       this.loadedStage = coming;
-      a.releaseMusic(([1, 2, 3] as const).filter((s) => s !== coming).flatMap(stems));
-      a.preloadMusic(stems(coming));
+      a.releaseMusic(([1, 2, 3] as const).filter((s) => s !== coming).flatMap(stageMusic));
+      a.preloadMusic(stageMusic(coming));
       // The last stage has no molt: the two cues that go with one are not needed again.
       if (coming === 3) a.releaseMusic(['cocoon', 'intermission']);
       if (k0) this.loadKaijuSounds(k0.kind, coming);
@@ -1043,11 +980,22 @@ export class MatchAudio {
     // middle of one (a late join, a reconnection) gets it from the frame, timed by what is left.
     if (match.phase === 'briefing' && a.music !== 'briefing') a.playMusic(['briefing']);
     if (match.phase === 'intermission' && a.music !== 'intermission') a.playMusic(['intermission'], { fade: 0.6, landIn: match.phaseTime });
-    if (playing && !cocoon && this.musicStage !== match.stage) {
+    // The last minute on the clock has its own track, in any stage; it is loaded a little ahead.
+    const finalMinute = playing && match.clock <= FINAL_MINUTE_AT;
+    if (playing && match.clock <= FINAL_MINUTE_LOAD_AT && !this.finalLoaded) {
+      this.finalLoaded = true;
+      a.preloadMusic([FINAL_MINUTE_MUSIC]);
+    }
+    const musicKey = `${finalMinute ? FINAL_MINUTE_MUSIC : `stage${match.stage}`}@${match.stage}`;
+    if (playing && !cocoon && this.musicKey !== musicKey) {
       // After the intermission: its hit rings out under the first bar, and the stage comes in at once.
       const afterIntermission = a.music === 'intermission';
-      this.musicStage = match.stage;
-      a.playMusic(stems(match.stage), afterIntermission ? { fade: 0.3, fadeOut: 2.5 } : {});
+      this.musicKey = musicKey;
+      const options: MusicOptions = afterIntermission ? { fade: 0.3, fadeOut: 2.5 } : {};
+      // The final minute builds to an end written to land as the clock runs out (its `mark`),
+      // so it starts part-way in when less than a minute is left.
+      if (finalMinute) options.landIn = match.clock;
+      a.playMusic(finalMinute ? [FINAL_MINUTE_MUSIC] : stageMusic(match.stage), options);
     }
     const wanted = match.phase === 'ended' ? '' : AMBIENCE[stageDef(match.stage).timeOfDay];
     if (wanted !== this.ambienceId && a.unlocked) {
@@ -1055,10 +1003,6 @@ export class MatchAudio {
       this.ambience = wanted ? a.loop(wanted, { gain: 0.5 }) : null;
       this.ambienceId = wanted;
     }
-    // The fight is "on" while shots fly or lasers are lit, and cools down over a few seconds.
-    if (frame.units.some((u) => u.alive && u.laser)) this.heat = Math.max(this.heat, 0.7);
-    this.heat = Math.max(0, this.heat - dt * 0.12);
-    a.setCombat(playing ? this.heat : 0);
 
     // The loops normally start and stop on their events. When the frame says otherwise for a
     // while, an event was missed (a reconnection, a hidden tab): the frame wins.
@@ -1106,13 +1050,6 @@ export class MatchAudio {
       this.surge.setGain(0.8 * Math.min(1, surger.surge / 1.5));
     }
 
-    // The player's own squad's crate, still lying where it landed: the radio reminds them once.
-    for (const [id, landed] of this.cratesDown) {
-      if (this.time - landed < CRATE_REMINDER) continue;
-      this.cratesDown.delete(id);
-      if (playing) this.sayEvent('crate.land', frame.tick + id);
-    }
-
     // Sounds that were due a moment after their event.
     for (let i = 0; i < this.due.length; i++) {
       const d = this.due[i];
@@ -1140,17 +1077,10 @@ export class MatchAudio {
       this.chargedCount = tone.full;
     }
 
-    // The end screen: the hearing music once the win cue has rung out, then the chair over it.
-    const result = this.result;
-    if (result) {
+    // The end screen: the hearing music once the win cue has rung out.
+    if (this.result) {
       this.sinceEnd += dt;
       if (this.sinceEnd > HEARING_MUSIC_AT && a.music !== 'hearing') a.playMusic(['hearing']);
-      if (this.sinceEnd > CHAIR_AT && !this.chairSaid) {
-        this.chairSaid = true;
-        // Someone who arrived after the match ended never got the cue: they hear the chair too.
-        const line = this.takeHearing() ?? chooseVoiceLines(result.winner === 'kaiju' ? 'hearing.kaiju.win' : 'hearing.humans.win', this.side(), 0)[0];
-        if (line) a.say(line, { priority: 3, radio: false });
-      }
     }
   }
 }

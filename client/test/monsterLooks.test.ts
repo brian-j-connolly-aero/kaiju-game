@@ -7,7 +7,7 @@
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { Btn, createMatchConfig, createWorld, DT, kaijuKindDef, type KaijuActionEvent, type PlayerInput, type SnapKaiju } from '@mb/shared';
+import { Btn, createMatchConfig, createWorld, DT, inWater, kaijuKindDef, lineOfSight, type KaijuActionEvent, type PlayerInput, type SnapKaiju } from '@mb/shared';
 import type { AssetStore } from '../src/assets/assetStore';
 import { proceduralModel } from '../src/assets/procedural/models';
 import type { SpriteInfo } from '../src/assets/spriteAtlas';
@@ -247,7 +247,7 @@ describe('civilians', () => {
   const crowdAt = (spots: Array<[number, number]>): Crowd => {
     const crowd = new Crowd(assets, batch, 0);
     const people = (crowd as unknown as { people: object[] }).people;
-    for (const [x, z] of spots) people.push({ x, z, dirX: 0, dirZ: 1, sprite, wander: 1, panic: 0, pace: 1, frozen: 0 });
+    for (const [x, z] of spots) people.push({ x, z, dirX: 0, dirZ: 1, sprite, wander: 1, panic: 0, pace: 1, frozen: 0, fade: 1, check: 0 });
     return crowd;
   };
 
@@ -281,5 +281,70 @@ describe('civilians', () => {
     expect(crowd.tally.eaten).toBe(3);
     // Nobody in reach: the hand stays empty.
     expect(crowd.takeHandful(0, 100, 100, 0, 6, Math.PI / 4, 3)).toBe(0);
+  });
+
+  it('never pop in or out where the camera sees them: newcomers come out of sight or fade in (round 4)', () => {
+    const config = createMatchConfig({ humans: [{ name: 'Tester', role: 'kaiju' }], fast: true, anchor: 1 });
+    const world = createWorld({ seed: 11, config });
+    const start = world.kaijus[0];
+    const crowd = new Crowd(assets, batch, 120);
+    const people = (crowd as unknown as { people: Array<{ x: number; z: number; fade: number }> }).people;
+    const camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.5, 3000);
+    const frustum = new THREE.Frustum();
+    let vanished = 0;
+    let poppedIn = 0;
+    for (let f = 0; f < 240; f++) {
+      // The monster walks on at 6 m/s, the camera behind and above it, as in third person.
+      const k = kaiju({ x: start.x + f * 0.2, z: start.z, vx: 6 });
+      camera.position.set(k.x - 25, 14, k.z);
+      camera.lookAt(k.x + 20, 2, k.z);
+      camera.updateMatrixWorld();
+      // Seen: in the view and no building between (the test's own reckoning, not the crowd's).
+      frustum.setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+      const sees = (c: { x: number; z: number }): boolean =>
+        frustum.containsPoint(new THREE.Vector3(c.x, 1, c.z)) && Math.hypot(c.x - camera.position.x, c.z - camera.position.z) < 300 && lineOfSight(world.cityQuery, camera.position, { x: c.x, y: 1.7, z: c.z }, true);
+      const seen = new Set(people.filter(sees));
+      const before = new Set(people);
+      crowd.update(1 / 30, f / 30, world.cityQuery, world.match.bounds, [k], k.x, k.z, 110, 40, camera, k.vx, k.vz);
+      const after = new Set(people);
+      for (const c of seen) if (!after.has(c)) vanished++;
+      for (const c of people) if (!before.has(c) && sees(c) && c.fade > 0.5) poppedIn++;
+    }
+    expect(vanished).toBe(0);
+    expect(poppedIn).toBe(0);
+    expect(crowd.count).toBeGreaterThan(60);
+    expect(crowd.arrivals.hidden).toBeGreaterThan(0);
+  });
+
+  it('never stand or walk out on the water (round 4 integration: the titan in the bay had people round it)', () => {
+    const config = createMatchConfig({ humans: [{ name: 'Tester', role: 'kaiju' }], fast: true, anchor: 1 });
+    const world = createWorld({ seed: 11, config });
+    const q = world.cityQuery;
+    // The first water on the way from the start out into the bay: the action on the shore.
+    const start = world.kaijus[0];
+    let fx = start.x;
+    let fz = start.z;
+    for (let t = 0; t <= 1; t += 0.002) {
+      fx = start.x + (320 - start.x) * t;
+      fz = start.z + (-480 - start.z) * t;
+      if (inWater(q, fx, fz)) break;
+    }
+    expect(inWater(q, fx, fz)).toBe(true);
+    const crowd = new Crowd(assets, batch, 120);
+    const people = (crowd as unknown as { people: Array<{ x: number; z: number }> }).people;
+    const camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.5, 3000);
+    camera.position.set(fx, 60, fz + 80);
+    camera.lookAt(fx, 0, fz);
+    camera.updateMatrixWorld();
+    const k = kaiju({ x: fx, z: fz });
+    // The bounds of a late stage, which take in the bay (stage 1's square is all dry land).
+    const bounds = { minX: fx - 300, maxX: fx + 300, minZ: fz - 300, maxZ: fz + 300 };
+    let wet = 0;
+    for (let f = 0; f < 300; f++) {
+      crowd.update(1 / 30, f / 30, q, bounds, [k], fx, fz, 110, 40, camera);
+      for (const c of people) if (inWater(q, c.x, c.z)) wet++;
+    }
+    expect(crowd.count).toBeGreaterThan(20);
+    expect(wet).toBe(0);
   });
 });

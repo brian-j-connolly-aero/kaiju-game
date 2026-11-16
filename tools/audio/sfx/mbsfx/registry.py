@@ -50,5 +50,7 @@ def load_all() -> dict[str, Spec]:
     # and crates, the city's special buildings and weapons; after the first four, so the
     # manifest keeps its order and the new sounds follow
     from . import army, city, moves  # noqa: F401
-    from . import tier2  # noqa: F401  (last, so the Tier 2 sounds follow the others in the manifest)
+    from . import tier2  # noqa: F401  (so the Tier 2 sounds follow the others in the manifest)
+    # round 4: the monster's communication rose, after everything else for the same reason
+    from . import rose  # noqa: F401
     return REGISTRY

@@ -51,12 +51,12 @@ export const INPUT_QUEUE_MAX = 5;
 /** Inputs the queue is brought back to when it skips. */
 export const INPUT_QUEUE_KEEP = 2;
 /**
- * Inputs a queue may hold at all: over this the oldest are discarded outright. A little over a
- * second of play: more than the longest stall during which the match loop keeps a silent
+ * Inputs a queue may hold at all: over this the oldest are discarded outright. A little over 1.5
+ * seconds of play: more than the longest stall during which the match loop keeps a silent
  * player's buttons held (STARVED_BUTTON_TICKS in match.ts), so a hold that arrives after such a
  * stall still fits in whole.
  */
-export const INPUT_QUEUE_HARD_MAX = 32;
+export const INPUT_QUEUE_HARD_MAX = 48;
 /** The most inputs the server may be committed to drop, and the most dead ticks it remembers. */
 export const INPUT_DROPS_MAX = 30;
 /** A backlog: this many inputs or more still waiting after every tick for INPUT_BACKLOG_TICKS (one second). */
@@ -100,9 +100,9 @@ export interface InputQueue {
   droppedAhead: number[];
   /** One-shot fields of dropped inputs, waiting for the next input that is kept. */
   carry: Record<string, unknown> | null;
-  /** Ticks played on a guess since the queue was made (diagnostics). */
+  /** Ticks played on a guess since the player's first input (the network readout: `pong.guessed`). */
   guessed: number;
-  /** Inputs dropped or discarded since the queue was made (diagnostics). */
+  /** Inputs dropped or discarded since the queue was made (the network readout: `pong.dropped`). */
   dropped: number;
 }
 
@@ -174,10 +174,10 @@ function holdOneShots(q: InputQueue, input: PlayerInput): void {
  * buttons. `repeats`: the guess is the last input again (the player is late, not away).
  */
 export function noteGuessedTick(q: InputQueue, buttons: number, repeats: boolean): void {
-  q.guessed++;
   q.lastButtons = buttons;
   q.minWaiting = 0;
   if (!q.started) return;
+  q.guessed++;
   if (q.cushion < INPUT_CUSHION) {
     q.cushion++;
   } else if (repeats && q.drops < INPUT_DROPS_MAX) {

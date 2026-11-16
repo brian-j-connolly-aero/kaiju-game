@@ -1,16 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
-  chooseVoiceLines,
+  chooseVoiceLine,
   say,
-  SQUAD_CALLSIGNS,
-  TICK_RATE,
   VOICE_CUE_IDS,
   VOICE_CUE_RULES,
   VOICE_LINES,
   VOICE_RULES,
-  VOICE_SEQUENCE_CUES,
-  VOICE_SIDE_RULES,
-  voiceLinesFor,
   type VoiceCueId,
   type VoiceEvent,
   type VoiceLine,
@@ -42,43 +37,27 @@ const IMPORTANT: VoiceCueId = 'crossfire';
 const CRITICAL: VoiceCueId = 'nerve.break';
 
 describe('voice lines: chosen by the simulation, from whatever the script holds', () => {
-  it('names real lines of the right cue and audience for both sides, for every cue', () => {
+  it('holds only the news telling the monster it can molt (round 4: the automatic lines are gone)', () => {
+    expect(VOICE_LINES.length).toBeGreaterThan(0);
+    for (const line of VOICE_LINES) expect([line.cue, line.audience]).toEqual(['molt.available', 'kaiju']);
+  });
+
+  it('gives each side exactly what the script has for it: the molt line to the monster, silence elsewhere', () => {
     const world = quietWorld();
     for (const cue of VOICE_CUE_IDS) {
       world.voice.cooldowns = {};
       world.voice.tokens = VOICE_RULES.chatterTokens;
-      world.voice.radio.cooldowns = {};
-      world.voice.radio.tokens = VOICE_SIDE_RULES.radio.chatterTokens;
       expect(say(world, cue)).toBe(true);
       const e = lastVoice(world);
       expect(e.cue).toBe(cue);
-      for (const side of ['humans', 'kaiju'] as const) {
-        const ids = e.lines[side];
-        // Exactly what the script offers that side: one line, or the whole sequence, or nothing.
-        // The news only speaks for its own short list of cues.
-        const offered = side === 'kaiju' && !VOICE_SIDE_RULES.news.cues.includes(cue) ? [] : voiceLinesFor(cue, side);
-        if (offered.length === 0) expect(ids).toEqual([]);
-        else if (VOICE_SEQUENCE_CUES.includes(cue)) expect(ids).toEqual(offered.map((l) => l.id));
-        else expect(ids.length).toBe(1);
-        for (const id of ids) {
-          const line = BY_ID.get(id);
-          expect(line, `${cue}: unknown line id ${id}`).toBeDefined();
-          expect(line?.cue).toBe(cue);
-          expect([side, 'all']).toContain(line?.audience);
-        }
+      expect(e.lines.humans).toEqual([]);
+      if (cue === 'molt.available') {
+        expect(e.lines.kaiju.length).toBe(1);
+        expect(BY_ID.get(e.lines.kaiju[0])?.cue).toBe(cue);
+      } else {
+        expect(e.lines.kaiju).toEqual([]);
       }
-      // Every cue of the contract has something to say to somebody.
-      expect(e.lines.humans.length + e.lines.kaiju.length).toBeGreaterThan(0);
     }
-  });
-
-  it('plays the briefing as a sequence, in script order', () => {
-    const world = makeTestWorld({ skipBriefing: false, people: 'none' });
-    const e = eventsOf(world.step(), 'voice')[0];
-    expect(e.cue).toBe('match.briefing');
-    expect(e.lines.humans.length).toBeGreaterThan(1);
-    expect(e.lines.humans).toEqual(voiceLinesFor('match.briefing', 'humans').map((l) => l.id));
-    expect(e.lines.kaiju).toEqual(voiceLinesFor('match.briefing', 'kaiju').map((l) => l.id));
   });
 
   it('is deterministic: the same match says the same lines', () => {
@@ -97,58 +76,56 @@ describe('voice lines: chosen by the simulation, from whatever the script holds'
     expect(talk()).toEqual(talk());
   });
 
-  it('does not play the same line twice running when the script has a choice', () => {
+  it('picks per listener, and not the same line twice running when there is a choice', () => {
+    const lines: VoiceLine[] = [
+      { id: 'a', cue: 'molt.available', audience: 'kaiju', speaker: 'Anchor', text: 'One.' },
+      { id: 'b', cue: 'molt.available', audience: 'kaiju', speaker: 'Anchor', text: 'Two.' },
+      { id: 'c', cue: 'molt.available', audience: 'all', speaker: 'Anchor', text: 'Three.' },
+    ];
+    expect(chooseVoiceLine('molt.available', 'humans', 0, undefined, lines)?.id).toBe('c');
+    expect(chooseVoiceLine('molt.available', 'kaiju', 1, undefined, lines)?.id).toBe('b');
+    expect(chooseVoiceLine('molt.available', 'kaiju', 1, 'b', lines)?.id).toBe('c');
+    expect(chooseVoiceLine('crossfire', 'kaiju', 0, undefined, lines)).toBeNull();
+
     const world = quietWorld();
-    const cue: VoiceCueId = 'landmark.down';
-    expect(VOICE_SIDE_RULES.news.cues).toContain(cue);
-    expect(voiceLinesFor(cue, 'kaiju').length).toBeGreaterThan(1);
     let previous = '';
-    const heard = new Set<string>();
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 12; i++) {
       world.voice.cooldowns = {};
-      say(world, cue);
+      say(world, 'molt.available');
       const id = lastVoice(world).lines.kaiju[0];
-      expect(id).not.toBe(previous);
+      if (VOICE_LINES.length > 1) expect(id).not.toBe(previous);
       previous = id;
-      heard.add(id);
     }
-    // And it gets round to more than two of them.
-    expect(heard.size).toBeGreaterThan(Math.min(2, voiceLinesFor(cue, 'kaiju').length - 1));
   });
 
-  it('gives a squad its own voice, and never puts one squad\'s line in another\'s mouth', () => {
-    const lines: VoiceLine[] = [
-      { id: 'a', cue: 'unit.lost', audience: 'humans', speaker: 'Overlord', text: 'A unit is down.' },
-      { id: 'b', cue: 'unit.lost', audience: 'humans', speaker: 'Granite', text: 'Granite has lost a unit.' },
-      { id: 'c', cue: 'unit.lost', audience: 'humans', speaker: 'Beacon', text: 'Beacon reports a loss.' },
-      { id: 'd', cue: 'unit.lost', audience: 'kaiju', speaker: 'Anchor', text: 'The army has lost a unit.' },
-    ];
-    const callsigns = ['Granite', 'Beacon', 'Tempest', 'Anvil'];
-    for (let variant = 0; variant < 12; variant++) {
-      // About Granite: Granite speaks. About Beacon: Beacon.
-      expect(chooseVoiceLines('unit.lost', 'humans', variant, { callsign: 'Granite', callsigns }, lines).map((l) => l.id)).toEqual(['b']);
-      expect(chooseVoiceLines('unit.lost', 'humans', variant, { callsign: 'Beacon', callsigns }, lines).map((l) => l.id)).toEqual(['c']);
-      // About Anvil, who has no line of its own: command speaks, never another squad.
-      expect(chooseVoiceLines('unit.lost', 'humans', variant, { callsign: 'Anvil', callsigns }, lines).map((l) => l.id)).toEqual(['a']);
-      // The kaiju's side hears the news, whoever it is about.
-      expect(chooseVoiceLines('unit.lost', 'kaiju', variant, { callsign: 'Granite', callsigns }, lines).map((l) => l.id)).toEqual(['d']);
-    }
-    // About nobody in particular: any of them, and all of them over time.
-    const any = new Set<string>();
-    for (let variant = 0; variant < 12; variant++) any.add(chooseVoiceLines('unit.lost', 'humans', variant, { callsigns }, lines)[0].id);
-    expect([...any].sort()).toEqual(['a', 'b', 'c']);
-    // The line to avoid is avoided when there is another.
-    expect(chooseVoiceLines('unit.lost', 'humans', 0, { callsigns, avoid: 'a' }, lines)[0].id).not.toBe('a');
-    expect(chooseVoiceLines('unit.lost', 'kaiju', 0, { avoid: 'd' }, lines)[0].id).toBe('d');
-    // A cue the script has nothing for is silent, not an error.
-    expect(chooseVoiceLines('kaiju.roar', 'humans', 3, {}, lines)).toEqual([]);
-
-    // In a match: a cue about the first squad is in its callsign's voice when it has one.
+  it('never changes the match: a cue nobody hears is still emitted and still draws its number', () => {
     const world = quietWorld();
-    const own = voiceLinesFor('volley.ready', 'humans').filter((l) => l.speaker === SQUAD_CALLSIGNS[0]);
-    expect(own.length).toBeGreaterThan(0);
-    say(world, 'volley.ready', 0, 1);
-    expect(own.map((l) => l.id)).toContain(lastVoice(world).lines.humans[0]);
+    say(world, 'crossfire');
+    world.voice.cooldowns = {};
+    const before = world.rng.s;
+    expect(say(world, 'crossfire')).toBe(true);
+    expect(lastVoice(world).lines).toEqual({ humans: [], kaiju: [] });
+    expect(world.rng.s).not.toBe(before);
+  });
+
+  it('over a whole bot match: the monster hears its molt line at every molt, and nothing else is said', () => {
+    let molts = 0;
+    let heard = 0;
+    let other = 0;
+    runBotMatch({
+      seed: 1,
+      onTick: (_w, events) => {
+        for (const e of events) {
+          if (e.type === 'moltAvailable') molts++;
+          if (e.type !== 'voice') continue;
+          if (e.cue === 'molt.available' && e.lines.kaiju.length === 1) heard++;
+          else other += e.lines.kaiju.length + e.lines.humans.length;
+        }
+      },
+    });
+    expect(molts).toBeGreaterThan(0);
+    expect(heard).toBe(molts);
+    expect(other).toBe(0);
   });
 });
 
@@ -253,104 +230,5 @@ describe('the cues that watch a number', () => {
     wait();
     expect(near(add(620))).toBe(1);
     expect(near(run(world, 30 * 30))).toBe(0);
-  });
-});
-
-describe('what each side hears (VOICE_SIDE_RULES)', () => {
-  it('keeps the news to the big moments, while the cue still goes out to the radio', () => {
-    const world = quietWorld();
-    for (const cue of ['building.down', 'volley.ready', 'crossfire', 'nerve.break', 'kaiju.roar'] as const) {
-      expect(VOICE_SIDE_RULES.news.cues).not.toContain(cue);
-      world.voice.cooldowns = {};
-      world.voice.tokens = VOICE_RULES.chatterTokens;
-      world.voice.radio.cooldowns = {};
-      world.voice.radio.tokens = VOICE_SIDE_RULES.radio.chatterTokens;
-      expect(say(world, cue)).toBe(true);
-      const e = lastVoice(world);
-      expect(e.lines.kaiju).toEqual([]);
-      expect(e.lines.humans.length).toBe(1);
-    }
-    for (const cue of ['stage.2', 'landmark.down', 'end.kaiju', 'match.start'] as const) {
-      world.voice.cooldowns = {};
-      say(world, cue);
-      expect(lastVoice(world).lines.kaiju.length).toBe(1);
-    }
-  });
-
-  it('makes the radio wait longer than the cue itself before repeating it', () => {
-    const world = quietWorld();
-    const cue = IMPORTANT;
-    const gap = VOICE_CUE_RULES[cue].gap;
-    const radioGap = Math.max(VOICE_SIDE_RULES.radio.minGap, gap * VOICE_SIDE_RULES.radio.gapScale);
-    expect(radioGap).toBeGreaterThan(gap);
-    say(world, cue);
-    expect(lastVoice(world).lines.humans.length).toBe(1);
-    // The cue may go out again after its own gap, but the radio stays quiet for it...
-    run(world, 30 * gap + 1);
-    expect(say(world, cue)).toBe(true);
-    expect(lastVoice(world).lines.humans).toEqual([]);
-    // ...until its own, longer wait is over.
-    run(world, 30 * (radioGap - gap) + 1);
-    world.voice.cooldowns = {};
-    say(world, cue);
-    expect(lastVoice(world).lines.humans.length).toBe(1);
-  });
-
-  it('rations radio chatter on its own, slower budget', () => {
-    const world = quietWorld();
-    run(world, 30 * VOICE_SIDE_RULES.radio.chatterRefill * VOICE_SIDE_RULES.radio.chatterTokens);
-    const routine = VOICE_CUE_IDS.filter((c) => VOICE_CUE_RULES[c].priority === 0);
-    const heard = routine.filter((cue) => {
-      world.voice.tokens = VOICE_RULES.chatterTokens;
-      say(world, cue);
-      return lastVoice(world).lines.humans.length > 0;
-    });
-    expect(heard.length).toBe(VOICE_SIDE_RULES.radio.chatterTokens);
-    expect(VOICE_SIDE_RULES.radio.chatterRefill).toBeGreaterThan(VOICE_RULES.chatterRefill);
-  });
-
-  it('never changes the match: a cue nobody hears is still emitted and still draws its number', () => {
-    const world = quietWorld();
-    say(world, 'crossfire');
-    world.voice.cooldowns = {};
-    const before = world.rng.s;
-    expect(say(world, 'crossfire')).toBe(true);
-    const e = lastVoice(world);
-    expect(e.lines).toEqual({ humans: [], kaiju: [] });
-    expect(world.rng.s).not.toBe(before);
-  });
-
-  it('over a whole bot match: the news speaks about ten times less, the radio about half as often', () => {
-    let cues = 0;
-    let anchor = 0;
-    let radio = 0;
-    const heard = new Set<string>();
-    const { world } = runBotMatch({
-      seed: 1,
-      onTick: (_w, events) => {
-        for (const e of events) {
-          if (e.type !== 'voice' || e.cue === 'match.briefing') continue;
-          cues++;
-          if (e.lines.kaiju.length > 0) {
-            anchor++;
-            heard.add(e.cue);
-          }
-          if (e.lines.humans.length > 0) radio++;
-        }
-      },
-    });
-    const minutes = world.tick / TICK_RATE / 60;
-    // Before this pass both sides spoke for every cue: about 13 lines a minute each.
-    expect(cues / minutes).toBeGreaterThan(10);
-    expect(anchor / minutes).toBeLessThan(1.6);
-    // The news still has its say: every one of its cues that this match came to was heard (a
-    // match that ends at stage 2 has fewer of them than one that goes the distance).
-    const ending = world.match.winner === 'kaiju' ? 'end.kaiju' : `end.humans.${world.match.endReason}`;
-    const must = ['match.start', ending, world.match.winner === 'kaiju' ? 'hearing.kaiju.win' : 'hearing.humans.win'];
-    for (let stage = 2; stage <= world.match.stage; stage++) must.push('molt.available', `stage.${stage}`);
-    for (const cue of must) expect(heard, cue).toContain(cue);
-    expect(anchor).toBeGreaterThanOrEqual(new Set(must).size);
-    expect(radio / cues).toBeLessThan(0.6);
-    expect(radio / cues).toBeGreaterThan(0.4);
   });
 });

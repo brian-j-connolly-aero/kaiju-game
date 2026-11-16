@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Rose, monster: snuffles. A big snout with two nostrils drawing in puffs of air. -->
+  <g transform="matrix(1 0 0 1 3.5 2)">
+    <path fill="currentColor" stroke="none" fill-rule="evenodd" d="M30 14Q52 14 56 30 60 48 44 54 32 58 20 52 8 46 10 32 12 14 30 14ZM24 34A4.5 6 0 1 0 24.1 34ZM42 34A4.5 6 0 1 0 42.1 34Z"/>
+    <path d="M6 8Q12 4 14 10M22 6Q27 1 30 6M2 22Q4 16 9 18"/>
+  </g>
+</svg>

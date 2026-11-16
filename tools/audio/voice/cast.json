@@ -1,38 +1,33 @@
 {
   "speakers": {
-    "Overlord": {
-      "voice": { "engine": "kokoro", "voice": "am_onyx", "rate": 0.92 },
-      "orders": { "rate": 1.05, "max_pause_ms": 200 },
-      "chain": "radio",
-      "chain_settings": { "band_hz": [260.0, 4500.0], "presence_db": 7.0, "drive_db": 2.0, "static_db": -38.0 },
-      "max_pause_ms": 380
-    },
     "Granite": {
-      "voice": { "engine": "kokoro", "voice": "am_echo", "rate": 0.95 },
+      "voice": { "engine": "kokoro", "voice": "am_fenrir", "rate": 1.15, "pitch_st": 1.0, "shout": 3 },
       "chain": "radio",
-      "max_pause_ms": 300
+      "chain_settings": { "band_hz": [320.0, 3400.0], "presence_db": 7.0, "drive_db": 10.0, "comp_threshold_db": -30.0, "comp_ratio": 10.0, "static_db": -30.0 },
+      "max_pause_ms": 160
     },
     "Beacon": {
-      "voice": { "engine": "kokoro", "voice": "af_sky", "rate": 0.9 },
-      "orders": { "rate": 1.1, "max_pause_ms": 200 },
+      "voice": { "engine": "kokoro", "voice": "af_sky", "rate": 1.12, "pitch_st": 1.5, "shout": 3 },
       "chain": "radio",
-      "max_pause_ms": 260
+      "chain_settings": { "band_hz": [320.0, 3400.0], "presence_db": 7.0, "drive_db": 10.0, "comp_threshold_db": -30.0, "comp_ratio": 10.0, "static_db": -30.0 },
+      "max_pause_ms": 160
     },
     "Tempest": {
-      "voice": { "engine": "piper", "voice": "en_GB-alba-medium" },
+      "voice": { "engine": "piper", "voice": "en_GB-alba-medium", "rate": 1.15, "shout": 3 },
       "chain": "radio",
-      "max_pause_ms": 300
+      "chain_settings": { "band_hz": [320.0, 3400.0], "presence_db": 7.0, "drive_db": 10.0, "comp_threshold_db": -30.0, "comp_ratio": 10.0, "static_db": -30.0 },
+      "max_pause_ms": 160
+    },
+    "Anvil": {
+      "voice": { "engine": "kokoro", "voice": "am_echo", "rate": 1.15, "pitch_st": 2.0, "shout": 3 },
+      "chain": "radio",
+      "chain_settings": { "band_hz": [320.0, 3400.0], "presence_db": 7.0, "drive_db": 10.0, "comp_threshold_db": -30.0, "comp_ratio": 10.0, "static_db": -30.0 },
+      "max_pause_ms": 160
     },
     "Anchor": {
       "voice": { "engine": "kokoro", "voice": "af_heart", "rate": 0.85 },
       "chain": "broadcast",
       "max_pause_ms": 380
-    },
-    "Chair": {
-      "voice": { "engine": "kokoro", "voice": "bm_lewis", "rate": 0.85 },
-      "chain": "hall",
-      "max_pause_ms": 650,
-      "min_pause_ms": 450
     }
   }
 }

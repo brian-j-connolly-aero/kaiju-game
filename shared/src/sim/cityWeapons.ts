@@ -4,19 +4,20 @@
  * that stand about every starting neighborhood, and the top of a fallen radio mast, in the
  * hatchling's hand. Numbers: the kind's `cityWeapons` (defs/kaiju/lizard.ts).
  *
- * - Picking up: Grab, while the kaiju is no bigger than `grabStage` (the hatchling). Its own feet
- *   spare them then (`sparedUnderfoot`); at later stages feet and tracks crush them like any small
- *   prop. They are never eaten: Grab with one in the hand drops it (`dropToGround`), and it lies
- *   loose on the ground (`world.loose`) to be picked up again.
+ * - Picking up: Grab, while the kaiju is no bigger than `grabStage` (the hatchling); the fallen
+ *   mast's top at every stage (`topGrabStage`, round 4). Its own feet spare them then
+ *   (`sparedByKaiju`); at later stages feet and tracks crush them like any small prop. They are
+ *   never eaten: Grab with one in the hand drops it (`dropToGround`), and it lies loose on the
+ *   ground (`world.loose`) to be picked up again.
  * - In the hand: Strike throws it (kaijuEffects.ts `throwEffect`, with `cityThrow`), except the
  *   fast-food sign, which is swung as a club (the 'club' verb, `clubEffect` in kaijuEffects.ts)
  *   and breaks after its swings, while the garage door is a shield against hits from the front
  *   until its hp runs out (`shieldTakes`, called by the damage system).
  * - Thrown (`cityWeaponImpact`, called by the projectile system where it lands): the propane
  *   tank explodes; the water tank bursts into a splash that knocks units over and pushes them
- *   out; the antenna and the mast fly straight and fast as javelins through units
- *   (`javelinPierce`) into the first wall or the ground; the garage door flies flat like a
- *   frisbee and knocks over what it hits.
+ *   out; the antenna and the mast fly fast and nearly flat as javelins through units
+ *   (`javelinPierce`) into the first wall or the ground; the garage door floats flat like a
+ *   frisbee and knocks over what it hits. How each flies: sim/throwArc.ts `throwFlight`.
  * - Propane: a shot or explosion landing within `detonateRadius` of a tank sets it off, where it
  *   stands (a full blast) or in the hand (the blast, and the kaiju loses `handDamage` exactly and
  *   flinches); crushed or struck it goes off with a small bang. `cityBlastAt` is called wherever
@@ -108,10 +109,16 @@ export function strikeVerb(held: HeldObject | null): 'swipe' | 'throw' | 'club' 
   return heldCityWeapon(held) === 'foodsign' ? 'club' : 'throw';
 }
 
-/** Whether the hand can pick up a prop of this kind now (a city weapon only while the kaiju is small). */
+/** The last stage at which a city weapon of this kind can be picked up (the fallen mast's top has its own). */
+function grabStageOf(k: Kaiju, kind: PropKindId): number {
+  const w = weaponDefs(k);
+  return kind === 'mast' ? w.topGrabStage : w.grabStage;
+}
+
+/** Whether the hand can pick up a prop of this kind now (a city weapon only while the kaiju is small; the mast's top always). */
 export function canPickUp(k: Kaiju, kind: PropKindId): boolean {
   const def = PROP_KINDS[kind];
-  return def.grabbable && (!def.cityWeapon || k.stage <= weaponDefs(k).grabStage);
+  return def.grabbable && (!def.cityWeapon || k.stage <= grabStageOf(k, kind));
 }
 
 /**
@@ -120,7 +127,8 @@ export function canPickUp(k: Kaiju, kind: PropKindId): boolean {
  * are there to be picked up); a charge, fire and explosions still wreck them.
  */
 export function sparedByKaiju(world: World, k: Kaiju, propId: number): boolean {
-  return PROP_KINDS[world.city.props[propId].kind].cityWeapon && k.stage <= weaponDefs(k).grabStage;
+  const kind = world.city.props[propId].kind;
+  return PROP_KINDS[kind].cityWeapon && k.stage <= grabStageOf(k, kind);
 }
 
 /** A city weapon has just come into the hand: a fast-food sign's swings, a garage door's hp. */
@@ -207,7 +215,7 @@ export function updateLoose(world: World): void {
     for (const k of world.kaijus) {
       if (!k.alive || kaijuSwimming(k)) continue;
       const charging = k.action === 'charge' && k.phase === 'charge';
-      if (k.stage <= weaponDefs(k).grabStage && !charging) continue;
+      if (k.stage <= grabStageOf(k, o.kind) && !charging) continue;
       const reach = k.radius + r;
       if ((k.x - o.x) * (k.x - o.x) + (k.z - o.z) * (k.z - o.z) < reach * reach) {
         by = k.player;
@@ -459,12 +467,8 @@ export function shieldTakes(world: World, k: Kaiju, hit: Hit): boolean {
 // Thrown city weapons
 // ---------------------------------------------------------------------------------------------
 
-/** How a city weapon leaves the hand (kaijuEffects.ts `throwEffect` launches it). */
+/** What a thrown city weapon does (kaijuEffects.ts `throwEffect` launches it; how it flies is sim/throwArc.ts `throwFlight`). */
 export interface CityThrow {
-  speed: number;
-  gravity: number;
-  /** Seconds before it gives out in the air. */
-  ttl: number;
   cause: DamageKind;
   /** For the spawn record (what it does is `cityWeaponImpact`'s): unit damage, nerve, splash, structure damage. */
   damage: number;
@@ -486,7 +490,6 @@ function javelinDef(w: KaijuCityWeapons, kind: PropKindId): JavelinDef {
 export function cityThrow(k: Kaiju, kind: PropKindId | null, surgeMult: number): CityThrow | null {
   if (kind === null || kind === 'foodsign' || !PROP_KINDS[kind].cityWeapon) return null;
   const w = weaponDefs(k);
-  const gravity = projectileTypeDef('thrown').gravity;
   const unitMult = modMult(k.mods, 'unitDamage') * surgeMult;
   const nerveMult = modMult(k.mods, 'nerveDamage');
   const structureMult = modMult(k.mods, 'structureDamage') * surgeMult;
@@ -495,17 +498,14 @@ export function cityThrow(k: Kaiju, kind: PropKindId | null, surgeMult: number):
   if (javelin) {
     const j = javelinDef(w, kind);
     city.pierce = j.pierce;
-    return { speed: j.speed, gravity: j.gravity, ttl: j.range / j.speed, cause: 'javelin', damage: j.unitDamage * unitMult, nerve: j.unitNerve * nerveMult, splash: 0, structureDamage: j.structureDamage * structureMult, city };
+    return { cause: 'javelin', damage: j.unitDamage * unitMult, nerve: j.unitNerve * nerveMult, splash: 0, structureDamage: j.structureDamage * structureMult, city };
   }
   if (kind === 'garagedoor') {
     const d = w.garagedoor.throw;
-    return { speed: d.speed, gravity: d.gravity, ttl: d.range / d.speed, cause: 'thrown', damage: d.unitDamageCenter * unitMult, nerve: d.unitNerveCenter * nerveMult, splash: d.radius, structureDamage: d.structureDamage * structureMult, city };
+    return { cause: 'thrown', damage: d.unitDamageCenter * unitMult, nerve: d.unitNerveCenter * nerveMult, splash: d.radius, structureDamage: d.structureDamage * structureMult, city };
   }
   const b = kind === 'propane' ? w.propane : w.watertank;
   return {
-    speed: b.speed,
-    gravity,
-    ttl: projectileTypeDef('thrown').ttl,
     cause: kind === 'propane' ? 'propane' : 'splash',
     damage: b.unitDamageCenter * unitMult,
     nerve: b.unitNerveCenter * nerveMult,

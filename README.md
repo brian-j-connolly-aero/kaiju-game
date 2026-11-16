@@ -18,10 +18,13 @@ to send. `host/stop.cmd` or `host/stop.sh` stops it.
 ## Playing
 
 Send your friends **[docs/PLAYING.md](docs/PLAYING.md)**: what the game is, how to join, the
-controls and tips for both sides. In the game, H opens the controls card.
+controls and tips for both sides. In the game, H opens the controls card, holding Z opens the
+communication rose (your character says something silly; talk itself happens on your own voice
+chat), and the host restarts a match from the Escape menu.
 
 Before the next playtest, read **[docs/PLAYTEST.md](docs/PLAYTEST.md)**: one page on what changed
-since the first multiplayer evening, what to try on each side, and the known risks.
+since the second playtest, what to try on each side, what to send back if your character snaps
+back, and the known risks.
 
 ## For developers
 

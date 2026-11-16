@@ -4,7 +4,11 @@ Living status file. Keep it short and true: when you finish a task, update what 
 the stubs you filled in, and add any decision the docs left open. Contracts live in
 `ARCHITECTURE.md`; numbers live in `DESIGN.md` and `shared/src/defs/`.
 
-Last updated by: the phase 3 integration (the last section: the seven phase 3 builders' work
+Last updated by: the round 4 integration (the last section: the six round 4 builders' work run
+together after the second playtest, `docs/ROADMAP.md` "Round 4": the simulation fixes, real
+throwing arcs, the stutter through the tunnel, the communication rose and restart, the clarity
+and flair pass, the new music; checked, played end to end and made ready for the owner's live
+playtest). Before it: the phase 3 integration (the seven phase 3 builders' work
 run together and played end to end in the browser, the pace re-checked, the slide pictures, and
 `docs/PLAYTEST.md`, a page for the owner's next playtest), after the phase 3 tasks of
 `docs/ROADMAP.md` ("looks and sound"): the pacing pass (the stage times held where phase 2 left
@@ -50,6 +54,7 @@ last fixes before the first playtest (section 14); the rest is from the scaffold
 | `npx vitest run client/test` | Only the client tests: 20 tests, about 1 second (prediction against a real simulation through latency, the mirrored city, interpolation, the clock, the action map, the animator, the manifest tool). |
 | `node tools/playtest/smoke.mjs` | The browser smoke playtest: starts the server with `MB_FAST=1` on a free port against the production build, opens 5 headless Chromium pages on autoplay (one creates a room, four join by code), plays one match to its end, fails on any console error or page crash, saves screenshots to `/tmp/mb-scratch/playtest/` and prints, per page, draw calls and triangles (peak, and peak at stage 3), bytes over the WebSocket, snapshot size, a smoothness probe, and the server's own timing from `/healthz`. About 4 minutes on this machine. Options in the file header (`--url URL` plays against a server that is already running, such as the game container started with `MB_FAST=1`, and starts nothing; `--players N`, `--role human`, `--no-assets`, `--reconnect`, `--debug`, `--idle-humans`, `--expect kaiju\|humans`, `--expect-stage N`). Five software-rendered pages take the whole machine: the server then runs at about 21 ticks a second, so this run's timing and bandwidth figures describe the test rig, not the game (section 8.3). |
 | `node tools/playtest/scripted.mjs` | The scripted playtest with real inputs: no autopilot. One headless page plays the kaiju, then another plays a squad in a practice match, then a third drives a tank at stage 2 in the sandbox, with real key presses, mouse buttons, mouse movement and clicks on the real lobby buttons (`tools/playtest/driver.mjs`). Each action is judged only by what the server (for the tank, the sandbox's own simulation) sent back (its newest snapshot and its events) and ends as pass, FAIL or not attempted; the run passes only if everything was attempted and confirmed. Screenshots and `report.json` in `/tmp/mb-scratch/playtest/scripted/`. About 5 to 10 minutes, plus about 6 for the phase 2 sessions (every city weapon picked up, dropped and used; a crate of each kind taken; each weapon pick-up fired; an artillery barrage called; reinforcements), which run in the sandbox. `--only kaiju\|human\|tank\|weapons` (human runs the squad and the tank; tank the tank alone; weapons the two phase 2 sessions alone), `--out DIR`. It switches pointer lock off (headless Chromium reports garbage mouse movement under it), so mouse look under pointer lock is NOT covered by it. |
+| `npx tsx tools/playtest/netprobe.ts` | The network probe (round 4): the real server, a slow and stalling relay in front of it (`tools/playtest/relay.mjs`, also usable alone in front of a running server for a browser), and headless players running the client's own network code and prediction, walking about; prints the corrections of each player's body, second by second, with what was going on. Options in the file header (`--kaiju`, `--stall-every`, `--freeze-every`, `--server-pause-every`, `--relay none`). About 3 minutes. |
 | `node tools/playtest/shots.mjs` | Stage screenshots with no server: opens the built client in sandbox mode (`?sandbox=<stage>`, the simulation runs in the page) for stages 1 to 3 on both sides, plus scripted extras (the squad's volley meter from empty to full and its countdown ring, the tank's third-person view with both reticles, the monster's kit, molt cards and moves, the beam, a stagger, swimming; phase 2's city weapons, power surge, crates, pick-up weapons, artillery and reinforcements: `--only x-weapons,x-pickups`). Pictures in `/tmp/mb-scratch/playtest/shots/`; fails on console errors. |
 
 ## 2. What exists
@@ -4375,3 +4380,733 @@ ones taken in the sandbox with the game held still, by a scratch script,
   nice-to-have); `crowd_panic_loop` is still not played.
 - The build's size warning (above). The scripted harness can still lose a quick key press or a
   frame-timed look on a page drawing a frame a second; both were confirmed on a re-run.
+
+## Round 4: the simulation fixes (16 November, the simulation-fixes task)
+
+`docs/ROADMAP.md`, "Round 4: after the second playtest": the fixes that live in the simulation
+(`shared/src/defs`, `shared/src/sim`), plus one line of the client's heads-up display (HUD).
+Built while the communication rose and restart builder worked in the same tree. No bytes on the
+wire changed: `PROTOCOL_VERSION` and `SNAPSHOT_VERSION` are untouched by this task.
+
+**Is the tree green?** All but one test: `npm run check` type checks, lints (288 files clean,
+one `STUB(server)`) and passes 928 of 929 tests. The one failing, `net.test.ts` "lists every
+message type once", is the rose builder's new `rose` message, which that test does not list yet
+(their file, mid-edit). On a machine this busy (load average 13 to 23 on 4 cores) the whole-match
+tests (`matchSoak`, `determinism`) and the server's real-time test have timed out once or twice;
+they pass when run again.
+
+**What changed**
+
+- **Foot squads fit between houses.** A unit type now has a `bodyRadius` beside its `radius`
+  (`defs/schema.ts`, `defs/units.ts`): the body it moves with. A foot section's is 1 m (a 2 m wide
+  body, about as wide as the soldiers drawn, so it passes the 2.5 m gaps between packed houses);
+  a tank's and a troop's are their radius (4 and 9 m). What hits a section is unchanged: its
+  `radius` of 3 m stays the hit area for shots, blasts, claws, the beam, the swarm's spacing and
+  deployment. (Chosen over shrinking the hit area too: that would have made the section much
+  harder to hit by claws, throws and blasts, and the throwing builder is about to tune how often
+  a throw hits a squad.) `MoveParams.bodyRadius` (`sim/movement.ts`) is what walls and the
+  bounds see; `unitMoveParams` sets it, so the client's prediction of its own unit (which passes
+  the unit's `radius` on the body) matches the server with no change on the client's side. The
+  squad-mates' and the squad bot's way-finding (`sim/nav.ts`, `navRadius`) uses the same body, so
+  they follow through the gaps.
+- **Pick-ups change the volley too.** `PickupWeaponDef.volleyPulls` (`defs/pickups.ts`): in a
+  charged volley every planted squad-mate fires the squad's weapon pick-up instead of its own
+  weapon, that many trigger pulls at once, with the volley's charge on top: the machine gun a
+  burst of five pulls (15 tracers from a full section; 1.67 times a volley's damage and nerve,
+  then the gun's own reload), the big cannon one heavy shell (3.5 times the damage, twice the
+  nerve), the missile pod half a salvo (3 missiles from a full section or a tank, all curving
+  onto the crosshair; 1.8 times). Firing on their own they keep their own weapons; the leader's
+  own shot is as before. The two-squad rule (two squads' charged volleys within 5 s) is
+  untouched. The artillery radio still does nothing on normal fire: a ranging shell with each
+  shot was the simple idea, but it would put a red marker and a closing ring on everyone's
+  screen every few seconds (`DESIGN.md` section 5 says so).
+- **The titan in water**: `waterSpeedMult` 1 → 0.7 at stage 3 (`defs/kaiju/lizard.ts`): it
+  wades the bay, the river and the moat at 15.4 m/s instead of 22. What the client needs to
+  draw it standing deep in the water is already in the snapshot: the kaiju flag `inWater` (its
+  middle over water, not on a bridge deck; `SnapKaiju.inWater`, set every tick). The client does
+  not read it for the kaiju yet (the titan-wading client work).
+- **The fallen radio mast's top.** Two causes found, both fixed:
+  1. At stages 2 and 3 the top could not be picked up (it was the hatchling's only, decided in
+     phase 3): the juvenile's grab came up with a chunk of a nearby building or a car instead,
+     and its feet crushed the top. Now every size of monster can pick it up and its feet spare
+     it (`KaijuCityWeapons.topGrabStage: 3`, `canPickUp` and `sparedByKaiju` in
+     `sim/cityWeapons.ts`). Chosen: simply allowed.
+  2. At stage 1 a throw "never left the hand": the top lies on the far end of the fallen mast,
+     which lies as a mound 4 m high (half its 8 m width) under its whole length, the last 8 m of
+     which are not drawn (the client draws the lattice without its top). The hatchling's hand is
+     at 2.2 m and its eye at 4.2 m. Thrown from beside the mast, the crosshair landed on that
+     mound two meters off, the javelin was aimed there and stuck in it (measured in a scratch
+     run: hit at 2.0 m). Now rubble and fallen buildings within the monster's grab reach neither
+     catch a throw's crosshair (it aims at what lies beyond, as the javelin's guide line on
+     screen already showed; `resolveAimPoint`'s new `mounds` flag in `sim/aim.ts`, used by
+     `throwEffect` only when the first point found is such a heap within reach) nor stop the
+     throw (`Projectile.clearRubble`, `sim/systems/projectiles.ts`): the same throw lands on the
+     ground beyond the mast. Heaps farther off still catch the crosshair and stop throws (a squad
+     on a heap is aimed at there). Standing walls still stop throws, and the projectile always leaves the hand
+     (the hand is empty on the tick it is thrown, as before). The throwing builder after this
+     task reworks throws as a whole; these two lines are the small version.
+- **The destruction bar.** The simulation offers the molt on the very tick the bar's points
+  reach the mark (`checkBarMarks`, unchanged). The client drew the molt picture under the middle
+  of the mark's tower, 3% of the bar's width short of the mark: on the first segment that is 14%
+  of the first stage's points, so the fill passed the picture a little before the molt came.
+  The picture is now centered on the mark (`barMarkAt` in `client/src/ui/hud.ts`). Screenshots
+  taken in the sandbox: at 90% of the mark the fill line stands short of the picture; at the
+  mark it sits on it and the picture lights up (the molt is offered).
+- **Tests**: new `movement.test.ts` (a section through a 2.5 m gap, a tank stopped by it; the
+  titan at 0.7 in water), `pickups.test.ts` (the volley with each weapon pick-up), `specials.test.ts`
+  (the juvenile picks up and throws the top, replacing the test that it could not; a top thrown
+  across its fallen mast lands beyond it), `molt.test.ts` (the molt on the tick the fill reaches
+  the mark), `client/test/destructionBar.test.ts` (the pictures sit where the fill stands when
+  each mark is reached). The wall and bounds invariants of `nav`, `squads`, `soak`, `matchSoak` and
+  `world` tests now measure the body a unit moves with (`bodyRadius`), not its hit area.
+- **Docs**: `DESIGN.md` sections 2, 4, 5 and 7, `ARCHITECTURE.md` (the movement contract),
+  `CITY.md` (the mast's top), `PLAYING.md`, `PLAYTEST.md`, this section.
+
+**Measured**
+
+- Bot matches, the same seeds on this tree and on a copy of it with this task's source changes
+  taken out (both with the rose builder's changes as they stood), `--seeds 20 --every-anchor`:
+  the monster won 8 of 20 (40%) here against 12 of 20 (60%); stages 1:52 / 2:33 / 3:06 against
+  2:02 / 2:34 / 3:11; staggers per match 0.7 / 1.9 / 4.4 against 0.8 / 1.9 / 4.4. With no crates
+  at all (`--no-crates`, so the stronger volleys play no part): 6 of 20 against 9 of 20, with
+  stage 3 the biggest difference (staggers 6.5 against 4.5, volleys 39 against 30 a match): the
+  titan, slower in water, is caught more often; the monster bot does not avoid water at stage 3
+  (it never had a reason to). So the army does better: by about one match in seven in these
+  bot runs. Numbers are left as they are: balance is the next round's (`docs/ROADMAP.md`), and
+  the owner may find a person playing the titan keeps out of the water.
+- `npm run sim -- --seeds 10 --every-anchor --nav` on the final tree: no errors; units stuck
+  0.01% of their time (longest 2.6 s), one give-up in 10 matches, against 0.06% and 7 give-ups
+  without this task; squad-mates out of the swarm 3.9% of their time against 3.5%.
+- No unit inside a house: a scratch script checked every unit's body against every standing
+  structure on every tick of 10 whole bot matches (seeds 1 to 10, every start): never deeper
+  than 5 cm. Foot sections spent 4.7% of their time where the old 6 m body would not have fit
+  (in gaps, gardens and lanes); without this task, 0%.
+
+**Still open**
+
+- The client draws a section's ten soldiers spread over 2.5 m round its body (`memberOffset`,
+  `client/src/render/unitsView.ts`): squeezed into a 2.5 m gap, some are drawn over a wall
+  corner. Squeezing the spread near walls would be a small client change. The squad's camera in
+  a gap sits very close (it is pulled in by the walls).
+- The titan standing deep in the water is not drawn yet (client): `SnapKaiju.inWater` is there.
+- The grabbable glow (client) can use `canPickUp` (exported) so that it never glows on
+  something the hand will not take.
+- Throws as a whole (arcs over buildings, the hit tube, accuracy) are the next builder's.
+
+## Round 4: the communication rose instead of the automatic lines, and restart (16 November, the rose task)
+
+`docs/ROADMAP.md`, round 4: "the automatic lines go", the communication rose, restart from the
+Escape menu. Rules: `DESIGN.md` section 8 ("The communication rose"); messages:
+`ARCHITECTURE.md` sections 4.1 and 4.2; files: `ASSETS.md` sections 5 and 6; players:
+`PLAYING.md` (controls), `PLAYTEST.md`.
+
+**Is the tree green? Yes, at the time of writing** (with the simulation-fixes builder's work in
+the tree as it stood): `npm run check` passes, type checks, lint (288 files clean, one
+`STUB(server)`), 929 tests in 74 files. `node tools/playtest/smoke.mjs` (five pages, the
+production build): the match ran to its end at stage 3 with no console errors and no warnings.
+
+**What changed**
+
+- **The automatic lines are gone**, with their files: the radio and news chatter, the briefing,
+  the committee hearing and the client's event lines (`client/src/audio/eventVoice.ts` and
+  `eventLines.json` deleted). 470 voice files removed (14.0 MB of voice became 6.7 MB). Kept:
+  the news telling the monster's player it can molt (`v_molt_available_3` and `_4`, unchanged
+  byte for byte), loaded ahead on the monster's page. The simulation still emits every voice cue
+  (many simulation tests read them as the match's record, and they draw the same random numbers
+  as before, so no match changed); `voiceLines.json` simply has no line for them. Dead plumbing
+  removed: the news and radio side rules (`VOICE_SIDE_RULES`, the radio's own budget in the
+  world's voice state), the briefing's sequence rule, the squad-voice preference,
+  `pickVoiceLine`, `missingVoiceCues`, `voiceLinesFor`; `chooseVoiceLine` picks one line per
+  side. On the client: the orders' queue rules, the chair's line on the end screen, the crate
+  reminders. The hearing music on the end screen stays. Old voice experiment tools and notes went
+  too (`audition.py`, `experiments.py`, `encode_test.py`, `mbvoice/notes.py`, their numbers in
+  `docs/audio/voice/`, `docs/audio/client-notes-voice.md`).
+- **The communication rose** (`client/src/ui/rose.ts`, `RosePicker` holds its workings): hold
+  **Z** (gamepad: d-pad down; free on both sides and for the drone), a ring of 8 (army) or 7
+  (monster) picture wedges opens round the crosshair, the mouse or the right stick picks one, letting go
+  sends it, letting go in the middle sends nothing. While it is open the view holds still (the
+  rose takes the mouse's movement in `MatchRuntime.onInput`, before the controller sees it); moving
+  and the buttons still work. It shuts without sending over the map, the menu or the molt cards.
+  After a pick it waits 2 s (greyed, the wait running round its middle). It is on the controls
+  card (`ui_rose`). 17 new pictures in `client/public/assets/ui/` (`ro_*`, `ui_rose`,
+  `ui_restart`).
+- **The network** (`shared/src/net/rose.ts`, `PROTOCOL_VERSION` 3, snapshot unchanged): the
+  client sends `rose { cat }`; the room (`server/src/room/gameRoom.ts`) drops anything malformed,
+  from a spectator or from outside a match, and anything less than 1.7 s after the same player's
+  last one, then sends `rose { player, cat, pick }` to everyone, the sender included. `pick` (a
+  random number) makes every screen play the same line. The sandbox echoes picks locally.
+- **The army's lines**: `client/src/audio/roseLines.json`, 8 wedges (panic, bravado, orders,
+  science, home, food, retreat, admiring the monster) of 5 one-sentence lines, each spoken in
+  each squad's voice (Granite, Beacon, Tempest and a new one, Anvil): 160 files
+  `rose_<voice>_<wedge>_<n>`. Made with the project's speech tools: faster (rate 1.12 to 1.15),
+  pitched up 1 to 2 semitones, three exclamation marks fed to the speech model, and a hotter
+  radio chain (band 320 to 3,400 Hz, overdrive 10 dB, compression 10 to 1, static -30 dB). The
+  voice tools now read the rose file (`mbvoice/script.py`), check its rules (`scriptcheck.py`
+  rewritten: one sentence, at most 12 words, ends with "!", 4 to 6 lines per wedge, dictionary
+  words, no heteronyms) and write a shorter `docs/audio/VOICE.md` and `docs/VOICE_SCRIPT.md`.
+  Played on everyone's radio in the speaker's squad voice with a subtitle: the player's name and
+  the words.
+- **The monster's noises**: `tools/audio/sfx/mbsfx/rose.py`, in the Lizard's own synthesized
+  voice: the big roar, a short roar, snuffles, a growl, a chomp, a contented rumble (a giant purr)
+  and the mating call (a little warbling tune doubled by a soft whistle), each at the three
+  sizes, two versions each (`kaiju_rose_*_s1..s3`). Nothing downloaded. Heard from the monster
+  in the world, and at full level on the monster's own page; no subtitle.
+- **Restart**: the settings panel (Escape) shows the room's host a circular arrow in a match and
+  on the end screen; one press arms it (red, pulsing), a second within 4 s restarts. The room
+  goes to the lobby and straight into a new match: the same people on the same sides, the same
+  kaiju seat (a bot if that player has left), the same start neighborhood, a new seed, no ready
+  needed. Every page follows through its usual lobby, briefing, match path. Not in the sandbox.
+
+**Measured**
+
+- Voice build (`tools/audio/voice/build.sh`): 162 lines, 0 failed checks, built in 5 minutes,
+  measured in 5 more. Rose lines last 1.7 to 3.5 s. The modern speech recognizer heard 98 words
+  in 100 of the shouted radio lines (word errors per hundred: Granite 2.9, Beacon 1.2, Tempest
+  2.9, Anvil 1.5); most misses are spellings ("fallback", "barber shop", "tale"); the worst is
+  Tempest's "Mayday, mayday" ("meadey mey"). The old recognizer, pocketsphinx, misses about 40
+  in 100 through the grit (Tempest's lighter voice 74): it was never good with radio.
+- Sound build: 21 sounds, 42 versions, all checks passed; no older sound changed by a byte. The
+  rose sounds add 4.3 MB (both formats; a page loads one format, one stage at a time).
+- Tests: `server/test/roseRestart.test.ts` (the relay to everyone with one pick, the 2-second
+  limit per player, nonsense and spectators ignored, restart by the host only with the same slots
+  and start, a lone player's bot match from the match and from the end screen, a departed kaiju
+  becoming a bot), `client/test/rose.test.ts` (wedge geometry, send on release, nothing in the
+  middle or during the wait, shut when not allowed, pictures and a free key),
+  `client/test/matchAudio.test.ts` (the molt line for the monster only; a rose line in the
+  squad's own voice with the player's name, the same on every page; the monster's noise
+  positional, full level for its own player; every rose file in the manifest), and the voice
+  tests in `shared/test/voice.test.ts` and `defs.test.ts` rewritten for the one remaining line;
+  `shared/test/net.test.ts` lists the new message types.
+- Browser (scratch script `/tmp/mb-scratch/rose/browser.mjs`, three headless pages on the
+  production build: monster and two squads): the rose opens on Z, the right wedge lights up, the
+  monster's mating call plays on all three pages, a squad's science line is said on all three
+  (the same line, with the player's name in the subtitle), two quick picks give one line, only
+  the host sees restart, the first press only arms it, the second puts all three pages into the
+  same new match on the same sides, no console errors.
+- `npm run build` passes; `npm run assets:manifest -- --check`: up to date (150 sounds, 162 voice
+  lines, 127 pictures).
+
+**Still open**
+
+- Nobody has listened: the machine has no speakers. Listen first to the four squad voices
+  (are they distinct enough, and is Tempest's lighter, faster voice clear through the grit?) and
+  to the mating call. The commercial voice pass can rebuild every army line from
+  `roseLines.json` (`cast.json`, or a new `synthesize` in `mbvoice/synth.py`).
+- One radio channel: lines queue behind each other; a line still waiting after 4 s is dropped.
+- If the monster molts while its player holds Z, the rose shuts for the molt cards and opens
+  again centred when play resumes (so a release then sends nothing until a new pick).
+- The simulation's voice cues (and the `voice` events on the wire) remain with empty lists; they
+  could be cut down to the molt cue in a later simulation pass if the bytes matter.
+- `git rm` was used once by mistake for the two event-line files, so their deletion is already
+  staged in the index; everything else is left unstaged for the coordinator.
+
+## Round 4: clarity and flair on screen (16 November, the flair task)
+
+`docs/ROADMAP.md` round 4: the controls card with five things at most, the grab glow, the power
+surge saying what it does, the monster's own rage meter and flair, civilians that popped in and
+out, and the titan standing in deep water. Client only: nothing on the wire changed (no protocol
+or snapshot version bump), and no rule of the simulation changed. The rules as built are in
+`docs/DESIGN.md` section 8 ("Round 4's flair on the monster's screen" and "The controls card");
+for players, `docs/PLAYING.md`; what to try, `docs/PLAYTEST.md` ("clearer screens").
+
+**What changed**
+
+- **Controls card (H)** (`client/src/ui/controlsCard.ts`, rewritten; `styles.css`): five big
+  pictures at most, each over its button, showing only what the player can do now. The match
+  screen feeds it the player's state every frame (`cardState`, one line in
+  `client/src/app/screens/match.ts`): the monster's molt moves appear once picked, the molt
+  lights up while offered, what is in the hand changes Strike's and Grab's pictures; a squad's
+  tank driving replaces walking at stage 2, a crate's weapon shows on Fire and Volley, the radio
+  on Volley; the drone has its own four. The communication rose's key sits small in the header.
+  The card now ends above the crosshair. The old card's every-button test was replaced by: at
+  most five in every state, never a button the role cannot press, the rose always, and the state
+  rules (`client/test/controlsCard.test.ts`). `docs/progress/controls-kaiju.png` and
+  `controls-squad.png` were retaken.
+- **Grab glow** (`client/src/render/grabGlow.ts`, new; wired in `gameRenderer.ts`): on the
+  monster's own screen, a gold halo (the renderer's added-light batch) and a gold ring on the
+  ground (the decal batch) round each thing the hand can lift now, brighter and pulsing within
+  the grab's reach and arc, the one a grab would take brightest; the nearest 40 within four
+  reaches; nothing while the hand is full. No draw call of its own. `canLift` repeats
+  `canPickUp`'s rule from what the snapshot says; a test keeps the two alike.
+- **Power surge** (`ui/kaijuKit.ts`, `kaiju.css`, `hud.ts`, `effects.ts`): the kit's surge tile
+  became a big blue lightning badge up and to the right of the crosshair with a thick white ring
+  that runs down; as the surge starts every button snaps white and full with a jolt; the
+  screen's edges crackle blue-white; a surging monster's blows flash electric where they land
+  (`Effects.electricHit`, on every screen). Found on the way: the kit's surge used the class
+  `start`, which `styles.css` also uses for the lobby's green start button, so the whole kit
+  turned green during a surge; renamed `surge-in`.
+- **Rage meter and flair** (`client/src/ui/kaijuFlair.ts`, new; `client/src/game/kaijuBlows.ts`,
+  new; `hud.ts`, `kaiju.css`): three claw gashes swirling round the crosshair, heated by rage one
+  after the other clockwise from the bottom (dark scar, ember red, orange, white-hot), with a gap
+  at the lower right where the throw's arc comes in; throbbing with embers when the beam is
+  ready, and faded to a fifth while something is in the hand (the throw preview, built in
+  parallel by the throwing builder, then stays clear: checked in a picture with both). Claw
+  slashes flash over the crosshair when the monster's blow lands (the HUD now takes
+  the match's events: one line in `match.ts`), a hot ring bursts when a new body comes out, and
+  a kit button punches out as its attack starts.
+- **Civilians** (`client/src/render/crowd.ts`). Cause: a civilian who wandered more than 1.3
+  spreads from the action (the monster, or for a squad that lost it, the camera, which jumps
+  between the two) was replaced at once by a new one dropped anywhere near the action, often in
+  plain view; the crowd was topped up in plain view too. Now a newcomer is put where this
+  screen's camera cannot see it (outside the view, beyond 480 m, or behind a building, eight
+  tries), else it fades in over 0.9 s; one far from the action is taken away only while out of
+  sight. Regression test (`client/test/monsterLooks.test.ts`): a monster walking for eight
+  seconds with a camera behind it, nobody seen vanishes and nobody appears in view at full
+  strength (the test fails on the old rule: 70 did).
+- **Titan in deep water** (`client/src/render/kaijuView.ts`, `gameRenderer.ts`): a kaiju too big
+  to swim with the snapshot's `inWater` eases down until the water stands 0.62 of the way up to
+  its hips, with a collar of foam round it (two decal rings), white water splashing up round its
+  legs, a splash and a foam ring at each step instead of dust, and a bow wave and wake while it
+  walks. Its own first-person view is not lowered. The hatchling's and juvenile's swimming is
+  unchanged.
+
+**Measured**
+
+- Sandbox pages (production build, headless Chromium drawing in software, 1280 by 720), every
+  picture looked at: the cards at the start, with a fast-food sign and the molt on offer, with
+  the beam and roar picked, a squad on foot and in a tank with a machine gun or missile pod; the
+  grab glow beside cars (5 lit, 2 in reach); rage at 35%, 55% and ready; a hit's slashes; the
+  surge's badge and an electric hit; the molt burst; the titan in the bay from behind and from
+  the side (in water after 3.5 s, drawn 96 to 99% sunk). No console errors on any page.
+- Civilians in 12 s of a stage 1 sandbox: about 150 to 170 newcomers placed out of sight and 110
+  to 125 faded in (the hatchling's third-person view sees a lot of open street), 260 kept.
+- `npx vitest run client/test`: 24 files, 278 tests pass. `npm run build` passes; the asset
+  manifest is up to date.
+- `npm run check`: types and lint clean (295 files); 937 of 939 tests pass. The two failures are
+  in the throwing builder's area, mid-edit while I worked: `shared/test/defs.test.ts` (the
+  throw's numbers changed in `lizard.ts`) and `shared/test/matchSoak.test.ts` seed 101 (no
+  volley in stage 1). Neither touches a file of this task.
+
+**Still open**
+
+- Nobody has played it with a mouse or looked at it on a real graphics card. Worth a look: the
+  grab glow in a street full of cars (too busy?), the foam collar by day, the rage meter round
+  the crosshair while aiming the beam.
+- The titan's footsteps are far apart (one every 100 m or so), so its step splashes are rare;
+  the wake and the foam carry the look.
+- The bottom-left rage bar (shown once the beam is picked) stays beside the new meter; drop it
+  if the meter reads well.
+- The controls card covers the top of the view while open (it is a toggle; the game runs
+  behind it); it now ends just above the crosshair.
+
+## Round 4: throwing on real arcs, with a trajectory preview (16 November, the throwing task)
+
+`docs/ROADMAP.md`, "Round 4": "Throws follow real ballistic arcs (they can lob over buildings),
+aimed where the monster looks, with no aiming delay ... shown as a tube whose round
+cross-section grows with distance ... an unmoving squad about five monster lengths away is hit
+most of the time; farther, less often." Built in the simulation, both bots and the monster
+player's screen. No bytes on the wire changed: the input already carried the aim's pitch, and a
+throw's velocity and gravity already went out in `projectileSpawn`; `PROTOCOL_VERSION` and
+`SNAPSHOT_VERSION` are untouched by this task.
+
+**What changed**
+
+- **One place for the physics: `shared/src/sim/throwArc.ts`.** `throwFlight` (speed by stage
+  and weight, the stage's gravity, the lift, the steepest angle, the spread), `throwLaunch` (from
+  the hand along the aim's heading, at the aim's pitch plus the lift), `throwError` (the seeded
+  error), `traceThrow` (the aimed arc, tick by tick, exactly as the projectile system flies it,
+  against the city and the ground), `spreadAt` and `landingSpread` (the tube and the ring), and
+  `aimThrowAt` (the bots' aim: the low arc when the city leaves a way, else the lob). The server's
+  throw (`throwEffect`), the monster bot, the client's autopilot and the preview all use it. The
+  old "land on whatever the crosshair is on, on the flat arc" (`throwAngle`) is gone.
+- **The numbers** (`actions.throw` in `defs/kaiju/lizard.ts`; DESIGN.md section 4 "Throw"):
+  - Launch 15° above where the head looks (javelins and the garage door 5°), from the hand.
+  - A car or a car's wreck at 25 / 110 / 310 m/s by stage; a tank, a tank's wreck or a chunk of
+    building at 0.85 of that; city weapons at their own stage-1 speeds (propane 25, water tank
+    22, antenna 50, mast's top 45, door 32), scaled like a car's at later stages.
+  - Gravity 9.8 / 46 / 105 m/s². Why: the arc keeps the shape of a real toss whatever the size,
+    and only the clock changes. At real gravity a titan's throw would hang ten seconds in the
+    air; with these a throw five monster lengths out (the snout to the tail tip: 30, 200, 730 m)
+    lands in 1.2 / 1.8 / 2.4 s and the longest throw reaches 66 / 279 / 972 m. The garage door
+    keeps its frisbee float (3 m/s²). Javelins and the door are thrown flat: never steeper than the
+    angle that carries them their old range (120, 110, 70 m), so a javelin cannot be lobbed.
+  - The error: each throw's launch velocity is off by a random vector uniform in a ball of
+    radius speed × tan(spread), spread 10° / 2.9° / 1.85° (javelins and the door 0.3 of that),
+    seeded by the match seed, the tick and the kaiju (`hash32`; not the world's random stream).
+    After t seconds the throw is within speed × tan(spread) × t of the aimed arc: the tube.
+- **Measured hit rates** (a scratch script, `/tmp/mb-scratch/throw/cal.ts`: the real throw and
+  projectile code on flat ground, a squad leader standing still, aimed by the bots' aim, 300
+  throws each): a car on a foot squad 3 / 5 / 6 / 7 / 10 hatchling lengths away (18 to 61 m): 98 /
+  80 / 65 / 52 / 25%. On a tank 3 / 5 / 6 / 7 juvenile lengths: 98 / 75 / 69 / 59% (10 is out of
+  reach). On a tank troop 3 / 5 / 6 titan lengths: 93 / 73 / 66% (7 is out of reach). Antenna at
+  stage 1: 79% at 31 m, 61% at 61 m, 38% at 116 m. A test (`shared/test/throwArc.test.ts`) checks
+  the stage 1 numbers on 80 throws each (65 to 92% at five lengths, far fewer at ten).
+- **The preview** (`client/src/render/throwPreview.ts`, hooked into `gameRenderer.ts`): on the
+  monster's own screen whenever the hand holds something to throw. A bright line along the aimed
+  arc, the tube as its outline seen from the camera (two lines as far out as the spread there)
+  and two faint round cross-sections, and where it ends a ring the size of the spread (an
+  ellipse on the ground or a roof, at most twice as long as it is wide; a circle on a wall) with
+  a faint fill and a dot. Warm yellow with a dark edge, shown faintly through buildings in front.
+  First tried as a see-through solid tube: seen from behind the monster that was a yellow blot
+  over everything, so it became an outline.
+- **The aim and the camera** (`client/src/game/controllers/kaijuController.ts`): with something
+  to throw in the hand, the aim sent is where the view looks in both views (third person used to
+  send the eye-to-crosshair-target direction, which jumps at every roof edge); the chase camera
+  eases up and over the right shoulder (2.2 body radii across, 0.55 heights up) because the
+  monster's own back hid the arc and the ring; and neither view looks more than 8° above level
+  while the aim goes on up (to lob, the player looks up, and the ground where it lands left the
+  screen). After a throw the aim comes back down to where the view stopped. Test:
+  `client/test/cameraViews.test.ts`.
+- **Gone:** the javelin's straight guide line on the monster's screen (`kaijuWeapons.ts`; the
+  preview replaces it), `resolveAimPoint`'s `mounds` flag (only the old throw used it). Kept: a
+  throw from beside a heap flies over it (`clearRubble`; the specials test still passes).
+- **Bots.** The monster bot aims every throw with `aimThrowAt`, leading a moving unit by the
+  flight's time, and lobs when nothing lower gets there; with no arc at all it throws the low one
+  at the unit (into the wall, as before). Its reach is now a share of the longest throw by stage
+  (`BOT_RULES.kaiju.throwRange` 0.8 / 0.45 / 0.45: 51 / 118 / 412 m, against 51 / 165 / 400 m
+  before). The client's autopilot aims the same way.
+- **Tests:** new `shared/test/throwArc.test.ts` (both elevations solve; the projectile system
+  lands exactly where the preview's trace ends; the error comes from the seed alone and stays in
+  its ball; the same match throws the same; a lob clears a house the low arc hits and comes down
+  beyond it; the spread at range). Rewritten in `kaijuActions.test.ts` (the throw leaves the hand
+  along the aim and lands inside the ring; the wall throw's damage), `cityWeapons.test.ts` (the
+  antenna), `defs.test.ts`; the old `throwAngle` test is gone.
+
+**Balance** (`npx tsx shared/scripts/sim.ts --seeds 20 --every-anchor`, this tree against a copy
+of it with this task's source taken out, same seeds):
+
+| | Stage 1 | Stage 2 | Stage 3 | Monster wins |
+| --- | --- | --- | --- | --- |
+| Before this task | 1:52 | 2:33 | 3:06 | 8 of 20 |
+| First try (the bot throwing from 0.8 of the longest throw) | 1:51 | 2:12 | 2:49 | 13 of 20 |
+| As shipped (reach 51 / 118 / 412 m) | 1:51 | 2:14 | 2:57 | 7 of 20 |
+
+At stage 2 the first try's juvenile killed nearly twice the squads (6.2 units lost a match
+against 3.3): lobs and clear arcs waste far fewer throws on walls (3 of 28 thrown cars hit a
+building in 10 matches, against 28 of 55 before), and it reached farther. With the reach as
+shipped, units lost per match are 5.0 / 3.4 / 2.5 against 4.4 / 3.3 / 2.8 before. Stage 2 still
+runs about 20 s shorter (fewer charged volleys: 11.7 against 17.5 a match).
+`npm run sim -- --seeds 10 --every-anchor` on the final tree: stages 1:49 / 2:17 / 2:48, the
+monster winning 4 of 10 (BALANCE.md section 11, the phase 3 reference: 2:00 / 2:32 / 3:02 and 22
+of 40; the simulation fixes just before this task: 4 of 10). Nothing else was retuned.
+
+**Checks.** `npm run check`: types and lint clean (295 files), 939 of 940 tests pass (the one
+failing is below). `npm run build` passes. `node tools/playtest/scripted.mjs --only kaiju`: the
+first run could not reach a car at stage 1 from its start (every car near it stood behind houses
+the script's straight walk cannot pass; nothing to do with throwing) and so did not throw; the
+second run, from another start, passed all 32 steps, grab and throw included. Pictures of the
+preview (a sandbox page, my own build, headless software drawing): stage 1 by day from behind,
+from the side, through the eyes, lobbing and with an antenna; stage 3 at night from behind, from
+the side and through the eyes; a throw in flight and landed (`/tmp/mb-scratch/throw/shots/`).
+
+**Still open**
+
+- `shared/test/matchSoak.test.ts`, seed 101: "the first stage was fought over" counts charged
+  volleys in stage 1, and that match now has none (it had one before this task: a hatchling that
+  stays close to the squads keeps them backing off all stage; the match is reshuffled by any
+  change to the throws, nine units were still lost and the monster was hit). Seeds 102 and 103
+  and the fast matches pass. I did not change the test; it needs a decision (a squad bot that
+  charges at a close hatchling, another seed, or a different "fought over" check).
+- Nobody has thrown with a mouse yet. Worth a look: the over-the-shoulder camera while holding
+  something (does it feel jumpy?), the view stopping at 8° while the aim goes on up (natural, or
+  confusing?), whether the ring reads at a glance at stage 3 (the titan's third-person camera is
+  high and the arc is small on screen).
+- A flat throw's landing spreads farther along its flight than the ring shows (the ring stops at
+  twice its width; the error is thickest in its middle, so few throws land beyond it).
+- The preview ignores units: a throw can hit a squad standing on its arc before the ring.
+
+## Round 4: the stutter through the tunnel (16 November, the tunnel-stutter task)
+
+**What the owner saw.** Hosting on their own Windows computer and playing through the tunnel,
+their own body snapped back about every 20 seconds.
+
+**What it most likely was: the tunnel stalling, made worse by the game.** A slow relay written
+for this (`tools/playtest/relay.mjs`: 30 to 80 ms each way, up to 15 ms of jitter, and every 15
+to 25 s a stall in which nothing gets through) and headless players that run the client's own
+network code and walk about like people (`tools/playtest/netprobe.ts`) reproduce it. When the
+line stalls for 0.5 to 1 s, the server used to stop the player's body after half a second
+without inputs, while the player's own screen walked on; when the inputs came the body was
+pulled back by up to 3.6 m. That is the snap. The stall itself is the tunnel's (nothing in the
+game can make TCP deliver sooner), but stopping the body so early was the game's choice. The
+server now plays a silent player on as before (the last input repeated, which the late inputs
+then stand for) for a full second (`STARVED_TICKS` 30, buttons let go after 1.5 s
+`STARVED_BUTTON_TICKS` 45; the queue's hard limit 48; `server/src/room/match.ts`,
+`inputQueue.ts`). Same seed, two players, stalls of 0.5 to 1 s about every 20 s, two minutes:
+
+| | before | after |
+| --- | --- | --- |
+| Worst pull-back | 3.59 m | 1.07 m (inside a burst, turning) |
+| Pull-backs over 1 m / over 0.5 m | 4 / 10 | 1 / 4 |
+| "body was stopped" lines in the server log | 5 | 0 |
+
+Stalls shorter than half a second never stopped the body; they still give a small correction
+(0.3 to 0.7 m measured) when the player turns or changes direction during the stall, because
+the server's guess walks on the old way. Longer than a second, the body is still stopped and
+snaps back: that is the tunnel.
+
+**Corrections the game made by itself** (found with the same probe, on a clean line), fixed in
+the client's prediction (`client/src/net/prediction.ts` `Hold`, `matchSession.ts`):
+- A roar's stun: the page held the soldier frozen for every input replayed from a snapshot that
+  still showed the stun, and the snapshot rounds the stun to 0.05 s: up to 0.67 m forward at its
+  end. Now the stun's end is counted down per replayed input, timed from its `unitStunned` event.
+- The molt's blast in the intermission: the server slides a thrown unit to a stop
+  (`coastUnits`); the page held it still and caught up a snapshot at a time, 1 to 2.9 m each
+  (seen as a long jerky slide). Now it predicts the slide.
+- The monster's own attacks: the page replayed every input at the speed of the newest
+  snapshot's phase, so at the start and the end of a swipe, stomp, grab, throw, roar or meal it
+  was a few ticks off: 0.3 to 0.5 m (the phase 1 stutter section's open item). Now an attack
+  with fixed timings is counted down to its end (`actionTicksLeft`), and a press the server has
+  not played yet slows the body only from the input that carried it on. Not covered: the
+  charge, the brace, the beam, a stagger (their ends are not known in advance).
+- Knock-backs (a stomp, a thrown car, a water tank) stay corrections: the server decides them.
+
+Measured with the probe (two minutes each, through the relay without stalls, one monster and
+one squad as people): the monster's corrections over 15 cm went from 8.0 to 6.0 a minute, the
+largest from 0.50 to 0.81 m; the squad's from 7.5 to 0.5 a minute. In a deterministic test
+(walking, a swipe and a stomp, 160 ms round trip) the monster's largest correction went from
+0.50 m to 0. What is left for the monster happens while it is being shot (its nerve slows it,
+which the page cannot know in advance) and was not pinned down further. On a perfect line
+(no relay) nothing over 15 cm happened (largest 0.08 m).
+
+**Also measured, not changed:**
+- Server pauses of 150 to 400 ms every 20 s (the process stopped and started, like a garbage
+  collection or the container's virtual machine pausing): no snaps, but the server drops the
+  time it could not simulate, so the inputs waiting at the server grew to 10 or 11 (a third of a
+  second more delay) until the player stood still and the queue was trimmed. If the readout
+  shows "waiting at server" climbing at the owner's next playtest, the fixed step should catch
+  up instead of dropping (`server/src/room/fixedStep.ts`); not done today (it changes a tested
+  rule of the loop on the day of the playtest).
+- Page freezes (a browser's garbage collection): after one, the body catches up forward with
+  what the server played meanwhile, which is right; freezes over a second still stop the body.
+- Nothing periodic near 20 s came from the game: no timer, no server tick that runs long here
+  (no slow-moment line in any clean run); the 20 s in these runs is the relay's own stall
+  schedule.
+
+**The readout and the log, for the next playtest.**
+- The ` key (left of 1) shows and hides a panel at the top left on every screen
+  (`client/src/ui/netReadout.ts`, mounted in `app.ts`): round trip (now and worst), snapshot
+  gaps, inputs waiting at the server and not yet played, ticks the server guessed and inputs it
+  dropped (from the pong, round 4: `pong { wait, guessed, dropped }`), the last and worst
+  correction and how many were over 15 cm, the page's own worst frame, and a 30 s graph (bars:
+  corrections; blue line: snapshot gaps; purple: the page froze). Off by default; while open the
+  page pings four times a second. Checked in a real headless browser through the relay: it
+  opens and closes with the key, shows sane numbers (round trip 100 to 140 ms through the relay)
+  and, on this machine's slow software drawing, clearly blamed the page's own freezes.
+- The server writes a line (printed like failures, whatever `MB_QUIET` says; at most one per room
+  every 5 s) when an update takes over 30 ms (with the three systems that took the most, timed
+  through a new optional `mark` on `World.step` / `stepWorld`, the sending, and garbage
+  collection pauses), when it stood still for over 100 ms or dropped simulation time, and when a
+  player's inputs stopped for 0.3 s or more (`server/src/room/slowLog.ts`). Their wording is in
+  `docs/HOSTING.md` section 6, item 9, which also tells the owner what to send back.
+
+**Contracts.** `PongMessage` gains optional `wait`, `guessed`, `dropped` (PROTOCOL_VERSION stays 3:
+the rose builder's bump this round already covers it; nothing else on the wire changed, the
+snapshot is untouched). `stepWorld(world, inputs, mark?)` and `World.step(inputs, mark?)`;
+`SystemMark` exported. `FixedStep.dropped`. `Predictor.lastJump`, `Predictor.held`, `Hold`;
+`reconcile(..., hold)` and `predictStep(..., free)`. `MatchSession.net` (`NetSample`,
+`NET_HISTORY`), `stunTicks`, `actionTicksLeft`. `GameClient.pingEvery`, `pingLast`, `pongAt`,
+`serverInputs`. `GameRoomOptions.slowLog`; `MatchSession.timer`, `stalls`; the queue's
+`guessed` now counts from the player's first input.
+
+**Tests.** `server/test/gameRoom.test.ts`: walking through a 0.9 s stall ends exactly where a
+steady line does (fails with the old half second: 2.56 m apart); the brace test now stalls past
+the new second; the ping test checks the new pong fields. `server/test/slowLog.test.ts`: a slow
+update names its systems and lines are rationed; the server standing still and a player's stall
+are reported. `server/test/inputQueue.test.ts`: the stopped-player test follows the constant.
+`client/test/session.test.ts`: the stun's end (fails before: 0.67 m), the blast's slide (fails
+before: 1.12 m) and the monster's swipe and stomp (fails before: 0.50 m) make no correction.
+`client/test/netReadout.test.ts`: the readout's summary.
+
+**Running it again.**
+`npx tsx tools/playtest/netprobe.ts --secs 180 --players 2 [--kaiju] [--stall-every 20
+--stall-ms 500-1000] [--freeze-every 20] [--server-pause-every 20] [--relay none]` (report in
+`/tmp/mb-scratch/netprobe/`); `node tools/playtest/relay.mjs --listen 3100 --target
+127.0.0.1:2567` puts the same bad line in front of a running server for a browser.
+
+**Still open**
+- `npm run check`: one failure, `shared/test/matchSoak.test.ts` seed 101 (no charged volleys in
+  stage 1), the one the throwing task reported; nothing in this task touches the simulation's
+  behavior.
+- Turning the mouse during a stall still costs a small correction afterwards (the server's guess
+  walks the old way); stalls over a second still snap back. Both are the line.
+- The server drops simulation time after a pause instead of catching up (see above).
+- The monster's remaining corrections while it is being shot (nerve), and the charge, brace and
+  beam, are still predicted from the newest snapshot only.
+- Nobody has looked at the readout on a real screen with a graphics card; the ` key is the
+  physical key left of 1, whatever the keyboard layout prints on it.
+
+## Round 4: new match music, fast arcade tracks (16 November, the music task)
+
+The owner asked for match music that is "longer, faster, more of it": pulse-pounding, in the
+style of a late-1990s high-end arcade cabinet, a few tracks, with the molt and upgrade music
+kept. Done: four new tracks, written as code like the rest of the soundtrack, and the game plays
+them.
+
+**What a player hears**
+
+- **Stage 1, "Hatchling on Main Street"**: 150 beats per minute, D minor, 2 min 34 s before it
+  repeats. Funk-rock: slap bass, rock drums, a square-wave riff and verse tune, synth-brass
+  stabs, a saw-wave chorus hook with orchestra hits on its rhythm, a breakdown that plays the
+  game's own theme with a tape echo, an overdrive guitar solo, and a last chorus a tone higher.
+- **Stage 2, "Steel Rain"**: 160 per minute, 2 min 36 s. Heavier: two distorted guitars on a
+  galloping chug, synth bass in octaves, a fifth-saw verse tune, a hook on saw lead with the
+  real brass section under it, choir shouts, timpani, violins in sixteenths, the game's theme as
+  a heavy riff, traded solos, a last chorus a tone higher.
+- **Stage 3, "Colossus Overdrive"**: 168 per minute, 2 min 40 s. The biggest: double-kick drums,
+  guitars, the whole choir, brass and horns, timpani, taiko and orchestra hits around an anthem
+  hook; the game's theme sung by the choir, its second strain, a guitar solo, and a last chorus
+  a semitone higher.
+- **The final minute, "Sixty Seconds"**: 168 per minute, exactly 60 s. When the match clock shows
+  one minute left (at any stage) an alarm goes off, a countdown riff ticks, the stage 3 hook
+  climbs a key every eight bars, and a ten-second build ends exactly as the clock runs out.
+- The stage music now plays at full strength all the time (the old orchestral stage music had a
+  calm half and a fight half that faded in during fights). Lobby, briefing, molt (cocoon),
+  intermission, win and hearing music are unchanged.
+
+**How it was made**
+
+- `tools/audio/music/`: the score system takes a tempo per cue now (`Cue(bpm=...)`, default 96;
+  tempos chosen so a bar is a whole number of samples). New `mbmusic/arcade.py`: chord symbols,
+  a rock kit on a sixteenth-note grid with grooves and fills, bass lines, arpeggios, voice-led
+  stabs and pads, power chords, orchestra hits, a tape echo. Nineteen new instruments in
+  `orchestra.py` (the soundfont's "Power" rock kit split into five parts, slap and synth basses,
+  saw, square and fifth-saw leads, polysynth, synth brass and strings, orchestra hit, distorted
+  and overdriven guitars). New `cues/stage1.py`, `stage2.py`, `stage3.py` (replacing
+  the orchestral ones) and `final_minute.py`. `build.py --measure-tuning-new` measures the
+  intonation of new instruments only. Partial builds drop manifest entries of cues that no longer
+  exist; the measurements drop them too.
+- Files: `stage1`, `stage2`, `stage3`, `final_minute` (`.ogg` and `.mp3`); the twelve
+  `stageN_base` and `stageN_combat` files and their pictures are deleted. The manifest entry of
+  `final_minute` carries `mark: 60.25` (the end of its build).
+- `client/src/audio/matchAudio.ts` (music part only): one track per stage instead of two stems;
+  the final-minute track from 60 s left on the clock, loaded 20 s before, started part-way in so
+  its end lands on the clock's zero (the same mechanism as the intermission's hit), and picked up
+  again after an intermission if a molt happens in the last minute. The "fight heat" that faded
+  the combat stem is gone (nothing else used it). No network or simulation change.
+
+**What I measured** (nobody can listen here; `docs/audio/music/MEASUREMENTS.md` and the
+spectrograms in `docs/audio/music/` have it all)
+
+- Loudness, matched to the music it replaces: the old stage music ran from -19, -17 and -16.6
+  LUFS (calm) to -16.5, -15.6 and -15.0 (full fight); the new tracks are mastered to -17, -16.5
+  and -16, the final minute to -16 (measured on the files: -17.1, -16.6, -16.1, -16.0; `.mp3`
+  within 0.2). Other full music cues are -16. The limiter takes at most 1.5 dB, on 0.6% of
+  stage 1.
+- Nothing clips: true peaks -0.6 to -1.8 dBTP (decibels true peak) per file; the intermission's
+  hit overlapping the first downbeat of stage 2 peaks at -0.5 dBTP at full volume (stage 3:
+  -1.6), and the music bus plays at 0.55 by default.
+- Loops are seamless (checked in both formats at the splice: no step, no extra onset energy;
+  pictures `docs/audio/music/<id>_seam_ogg.png`); onsets sit within 3 to 5 ms of each track's own
+  beat grid; lengths exact.
+- Shape (bar by bar): every stage track has a breakdown 4 to 6 dB under its choruses; the final
+  minute rises to its last bar (-14 to -11 in the last ten seconds).
+- Size: the four tracks are 8.2 MB of `.ogg` (the six old stems were 7.1 MB); all music is
+  11.1 MB of `.ogg` and 11.8 MB of `.mp3` (the game loads one format). Memory in the browser: at
+  most one stage track, the short cues and the final minute are held decoded at once (the test
+  "holds a fraction of the music in memory" passes under its 100 MB limit: 92 MB in the
+  briefing).
+- The older cues are untouched: the briefing and the cocoon rebuilt before and after the tool
+  change gave identical masters, and the intonation table only gained entries.
+
+**Checks.** `npm run assets:manifest -- --check`: up to date. Music score review: no findings
+on any of the four. `npx vitest run client/test/matchAudio.test.ts client/test/audioEngine.test.ts
+client/test/manifestTool.test.ts`: all pass, with a new test for the final minute (loaded
+ahead, started part-way in to land on the clock's zero, back after a molt's intermission) and
+the old stage-stem expectations rewritten for one track per stage. `npm run build` passes.
+Browser check (one self-playing page, fast timers, headless): the music went lobby, briefing,
+stage1 (154.1 s loop), cocoon, intermission, stage2, cocoon, intermission, stage3, final_minute
+at exactly 60 s on the clock, win_humans, hearing, with no console errors and no music warnings.
+`npm run check`: types and lint clean, 947 of 948 tests pass; the one failing is
+`shared/test/matchSoak.test.ts` seed 101, the simulation failure the throwing task reported
+(not touched by this task).
+
+**Still open**
+
+- Nobody has heard the new music. Things to listen for at the playtest: are the hooks catchy,
+  do the guitars and the slap bass sound good enough from this soundfont, are the loops tiring
+  after a couple of rounds, is the music too loud against the effects (it is no louder than the
+  old music at full fight, but it is always at full fight now)?
+- The stage music no longer reacts to the fight; the audio engine can still play a fight layer,
+  should a later version want one.
+- The final minute's countdown section dips in level after the alarm on purpose; it may feel
+  like a gap.
+
+## Round 4 integration: everything together, ready for the live playtest (16 November, the integration task)
+
+The six round 4 builders' work (simulation fixes, real throwing arcs, the stutter through the
+tunnel; the communication rose and restart, the clarity and flair pass, the new music) was run
+together, checked, played end to end in the browser and measured, the same morning as the
+owner's live multiplayer playtest. For the owner: `docs/PLAYTEST.md`, rewritten as one page for
+this afternoon, linked from `README.md`.
+
+**Is the tree green? Yes.** `npm run check` passes: type checks in all three workspaces, lint
+(299 files clean, one `STUB(server)`), 949 tests in 78 files. When this task started one test
+failed: `shared/test/matchSoak.test.ts`, the full bot match from seed 101 fired no charged
+volley in stage 1 (fixed below, without touching the test). On the wire: `PROTOCOL_VERSION` 3
+(`origin/main` has 2: one bump, by the rose task; the network readout's new `pong` fields rode on
+it), `SNAPSHOT_VERSION` 4 (unchanged, as on `origin/main`). The protocol header and
+`docs/ARCHITECTURE.md` now name all three round 4 additions (`rose`, `restart`, the `pong`
+fields).
+
+**What changed**
+
+- **The squad bots at stage 1** (`shared/src/defs/bots.ts` `BOT_RULES.squad.clearLines`, now per
+  stage, read in `shared/src/sim/bots/squadBot.ts`). Seed 101's match: the hatchling stood among
+  the packed houses; each squad parked where its leader saw it through a gap, planted, and 0.4 s
+  later let go, because two of three squad-mates standing 6 to 24 m off had no line; over and
+  over, all stage. 2 of 40 bot matches (seeds 101 to 140) fired no stage 1 volley at all. At
+  stage 1 one planted squad-mate in three with a line is now enough (0.3 / 0.6 / 0.6). 0 of 40
+  without a volley now; the soak test passes as written. The same change at every stage was
+  tried first and swung the balance too far (`docs/BALANCE.md` section 12).
+- **Civilians on the water** (`client/src/render/crowd.ts`): pictures of the titan in the bay
+  showed little people standing out on the open water round it. A newcomer was only kept out of
+  buildings, and a walker only turned at walls. Now neither is put nor walks onto water (a bridge
+  is dry). This was there before round 4; it showed now because the titan wades. A new test in
+  `client/test/monsterLooks.test.ts` fails without the fix (9,044 people-frames on water).
+- **The rose's pictures in the icon checker** (`tools/art/ui/preview.cjs`): the 15 wedge pictures
+  and `ui_rose`, `ui_restart` were in the folder but not in the checker's list (17 warnings). Now
+  listed (two new groups, the army's rose and the monster's rose), they failed the set's rules:
+  stroke widths of 4, 6, 7 and 8 (the set uses 5 everywhere) and seven drawings touching the edge.
+  Fixed in the files: every stroke at 5, the seven drawings scaled down (to 0.88 at most) and
+  moved inside the margin. Looked at on the contact sheets: same pictures, all legible at 18 px.
+- **Leftovers of the removed voice lines**: none found in code, manifests or the folder (162 voice
+  files: 160 rose lines, the two molt lines); one stale example in `tools/audio/voice/build.sh`'s
+  usage text fixed. (The validation tests' fixtures still use made-up speaker names; harmless.)
+- **Docs**: `docs/PLAYTEST.md` (rewritten, one page), `README.md`, `docs/HOSTING.md` (restart,
+  and a note that the start files and tunnel have now been used for real), `docs/BALANCE.md`
+  (section 12), `docs/DESIGN.md` (the stage 1 bot rule; civilians off the water),
+  `docs/ARCHITECTURE.md` (protocol 3), `docs/ROADMAP.md` (round 4 marked built), this file.
+
+**Measured** (headless Chromium drawing in software on this 4-core machine)
+
+- `npm run export:defs -- --check`: up to date. `tools/art/validate.py --all -q`: 82 models, 0
+  failed, the 5 old warnings. `node tools/art/ui/preview.cjs --check`: 125 of 125 icons (was 108
+  of 108 plus 17 unlisted). `npm run assets:manifest -- --check`: up to date (82 models, 11 music,
+  150 sound effects, 162 voice, 127 pictures).
+- `npm run build`: passes (Vite's old warning that the main script is over 1,500 kB stays).
+- `node tools/playtest/smoke.mjs`: PASSED. Five pages, a whole fast match to stage 3, the
+  humans won on the clock; no console errors or warnings; 876-byte snapshots, about 51 kbit/s
+  down per page; at most 169 draw calls and 608,000 triangles. Run again after the civilians fix
+  and a fresh build: PASSED the same way (stage 3, humans on the clock, no console errors).
+  `--reconnect --players 3`: PASSED (the dropped page came back and saw the end; humans won by
+  kill at stage 3).
+- `node tools/playtest/scripted.mjs` (every session): 112 of 112 confirmed, 0 failed, 0 not
+  attempted, no console errors (the monster's grab and throw at stage 1 included).
+- `node tools/playtest/shots.mjs`: PASSED, every stage and extra drew with no console errors.
+- The rose task's own three-page check against the real server (scratch, `rosecheck.mjs`): all
+  passed. The monster's mating call heard on all three pages, an army line said once and the
+  same on every page with the player's name as subtitle, two quick picks give one line, only the
+  host sees restart, the first press only arms it, the second puts every page into the same new
+  match on the same sides, no console errors.
+- Balance, `npm run sim -- --seeds 20 --every-anchor`: stage times 1:54 / 2:16 / 3:13, the
+  monster won 8 of 20 (seeds 1 to 40: 1:57 / 2:19 / 3:13, 16 of 40). Section 11's 2:00 / 2:32 /
+  3:02 and 22 of 40: within about a tenth, inside the 30 to 70% band, so the throw was not
+  retuned (`docs/BALANCE.md` section 12).
+- Slide pictures, 1920 by 1080, in `docs/progress/`: `round4-throw-arc.jpg`, `round4-rose.jpg`,
+  `round4-titan-wading.jpg`, `round4-surge-rage.jpg`, `round4-grab-glow.jpg`,
+  `round4-controls-card.jpg` (215 to 397 KB each).
+
+**Still open**
+
+- Nobody has heard any of round 4's sound: the 160 shouted rose lines, the monster's noises, the
+  four new music tracks. Nobody has thrown with a real mouse, or seen the glow, the rage meter,
+  the surge badge or the titan's foam on a real graphics card.
+- In the over-the-shoulder view a high lob draws its tube's cross-section circles large near the
+  top of the arc: busy, though the landing ring stays clear. The side view reads well.
+- The throwing builder's open points stand: the preview ignores soldiers in the way; the ring
+  is small on screen at stage 3; a stage 1 lob is slow and loose. Stage 2 is about a tenth
+  shorter than section 11 in bot matches.
+- The network readout and slow-moment log lines exist to catch the snapping back on the real
+  tunnel: stalls over a second still snap back by design.
+- The rose's deletion of `client/src/audio/eventVoice.ts` and `eventLines.json` is already
+  staged in git (the rose task ran `git rm`); everything else is unstaged for the coordinator.

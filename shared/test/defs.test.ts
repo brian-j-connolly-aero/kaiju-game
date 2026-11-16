@@ -17,17 +17,16 @@ import {
   idOf,
   KAIJU_ACTION_IDS,
   KAIJU_KIND_IDS,
+  chooseVoiceLine,
   kaijuActionDef,
   kaijuKindDef,
   kaijuStageDef,
   LIZARD,
   MATCH_RULES,
   membersForHp,
-  missingVoiceCues,
   modMult,
   parseVoiceLines,
   perStage,
-  pickVoiceLine,
   PLAYABLE_FACTIONS,
   PLAYABLE_KAIJU_KINDS,
   PROJECTILE_TYPE_IDS,
@@ -46,8 +45,6 @@ import {
   VOICE_CUE_IDS,
   VOICE_LINE_PROBLEMS,
   VOICE_LINES,
-  VOICE_SEQUENCE_CUES,
-  voiceLinesFor,
   WEAPON_IDS,
   WEAPONS,
   type KaijuVerb,
@@ -206,7 +203,8 @@ describe('the Lizard (DESIGN.md sections 2 and 4)', () => {
     expect(a.grab.timing.windup).toBe(0.4);
     expect(a.grab.arc).toBeCloseTo(100 * DEG, 12);
     expect(a.throw).toMatchObject({
-      speed: [25, 45, 70],
+      speed: [25, 110, 310],
+      gravity: [9.8, 46, 105],
       unitDamage: 120,
       impactRadius: [4, 10, 22],
       structureDamage: [60, 350, 1500],
@@ -445,9 +443,9 @@ describe('voice script (owned by the audio team; schema in ASSETS.md section 6)'
     expect(VOICE_LINES.length).toBeGreaterThan(0);
   });
 
-  it('covers every cue in the contract', () => {
-    const covered = new Set(VOICE_LINES.map((l) => l.cue));
-    expect(VOICE_CUE_IDS.filter((cue) => !covered.has(cue))).toEqual([]);
+  it('has the monster\'s molt line, the one automatic line left (round 4)', () => {
+    expect(VOICE_LINES.some((l) => l.cue === 'molt.available' && l.audience === 'kaiju')).toBe(true);
+    expect(VOICE_LINES.every((l) => VOICE_CUE_IDS.includes(l.cue))).toBe(true);
   });
 
 
@@ -466,25 +464,20 @@ describe('voice script (owned by the audio team; schema in ASSETS.md section 6)'
     expect(parseVoiceLines({ nope: true }).problems).toEqual(['voice script is not an array']);
   });
 
-  it('picks lines per listener, deterministically, preferring the squad that is speaking', () => {
+  it('picks a line per listener, deterministically, and not the one it played last', () => {
     const lines = parseVoiceLines([
       { id: 'a', cue: 'volley.ready', audience: 'humans', speaker: 'Overlord', text: 'Ready.' },
       { id: 'b', cue: 'volley.ready', audience: 'humans', speaker: 'Granite', text: 'Granite ready.' },
       { id: 'c', cue: 'volley.ready', audience: 'kaiju', speaker: 'Anchor', text: 'They are ready.' },
       { id: 'd', cue: 'hearing.kaiju.win', audience: 'all', speaker: 'Chair', text: 'Order.' },
     ]).lines;
-    expect(voiceLinesFor('volley.ready', 'humans', lines).map((l) => l.id)).toEqual(['a', 'b']);
-    expect(voiceLinesFor('volley.ready', 'kaiju', lines).map((l) => l.id)).toEqual(['c']);
-    expect(voiceLinesFor('hearing.kaiju.win', 'kaiju', lines).map((l) => l.id)).toEqual(['d']);
-    expect(pickVoiceLine('volley.ready', 'humans', 0, undefined, lines)?.id).toBe('a');
-    expect(pickVoiceLine('volley.ready', 'humans', 1, undefined, lines)?.id).toBe('b');
-    expect(pickVoiceLine('volley.ready', 'humans', 2, undefined, lines)?.id).toBe('a');
-    expect(pickVoiceLine('volley.ready', 'humans', 0, 'Granite', lines)?.id).toBe('b');
-    expect(pickVoiceLine('volley.ready', 'humans', 0, 'Anvil', lines)?.id).toBe('a');
-    expect(pickVoiceLine('crossfire', 'humans', 0, undefined, lines)).toBeNull();
-    expect(missingVoiceCues('kaiju', lines)).toContain('crossfire');
-    expect(missingVoiceCues('kaiju', lines)).not.toContain('volley.ready');
-    expect(VOICE_SEQUENCE_CUES).toContain('match.briefing');
+    expect(chooseVoiceLine('volley.ready', 'humans', 0, undefined, lines)?.id).toBe('a');
+    expect(chooseVoiceLine('volley.ready', 'humans', 1, undefined, lines)?.id).toBe('b');
+    expect(chooseVoiceLine('volley.ready', 'humans', 2, undefined, lines)?.id).toBe('a');
+    expect(chooseVoiceLine('volley.ready', 'humans', 0, 'a', lines)?.id).toBe('b');
+    expect(chooseVoiceLine('volley.ready', 'kaiju', 0, 'c', lines)?.id).toBe('c');
+    expect(chooseVoiceLine('hearing.kaiju.win', 'kaiju', 5, undefined, lines)?.id).toBe('d');
+    expect(chooseVoiceLine('crossfire', 'humans', 0, undefined, lines)).toBeNull();
     expect(SQUAD_CALLSIGNS.length).toBe(4);
   });
 });

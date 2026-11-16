@@ -9,6 +9,13 @@
  *
  *   lobby --start--> match --match over--> end --toLobby or timeout--> lobby
  *
+ * The host may also `restart` from the match or the end screen: the room goes back to the lobby
+ * and straight into a new match with the same people on the same sides (the same kaiju seat, the
+ * same start), so every page sees the old match end and the new one begin.
+ *
+ * The communication rose (`rose`, shared/src/net/rose.ts) is talk: the room checks the wedge,
+ * keeps each player to one every two seconds, and passes it on to everyone; the simulation never
+ * hears of it.
  * Seats and slots. A person in the room holds a seat (0..4) for as long as they stay. When a
  * match starts every connected seat gets a match slot (slot 0 is the kaiju); bots play the
  * rest. Someone who joins while a match is running takes over a bot squad if one is free and
@@ -30,6 +37,7 @@ import {
   buildsMatch,
   canStartMatch,
   cleanPlayerName,
+  cleanRoseCategory,
   CLOSE_REPLACED,
   CLOSE_SEAT_RELEASED,
   createLobbyState,
@@ -41,6 +49,10 @@ import {
   PLAYABLE_KAIJU_KINDS,
   PROTOCOL_VERSION,
   removeLobbyPlayer,
+  ROSE_GAP_SECONDS,
+  ROSE_PICK_RANGE,
+  ROSE_SLACK_SECONDS,
+  rngInt,
   rngU32,
   sanitizeInput,
   SESSION_TOKEN_PATTERN,
@@ -67,6 +79,7 @@ import {
   type MatchSession,
 } from './match';
 import { JoinRefused, type Peer } from './peer';
+import { SlowWatch } from './slowLog';
 
 export interface GameRoomOptions {
   /** The 4-letter room code. */
@@ -105,6 +118,12 @@ export interface GameRoomOptions {
   log?: (line: string) => void;
   /** Failures (a match that could not start or was abandoned). Falls back to `log`. */
   logError?: (line: string) => void;
+  /**
+   * Write the slow moments of the match loop to the log, like failures (slowLog.ts): updates that
+   * take too long, the server standing still, stalls on a player's connection. The real server
+   * sets it; unit tests leave it off.
+   */
+  slowLog?: boolean;
 }
 
 export const DEFAULT_GRACE_SECONDS = 45;
@@ -126,6 +145,8 @@ interface Seat {
   lobbySince: number;
   /** Match slot, or -1 (no match, or watching). */
   slot: PlayerId;
+  /** When this player's last communication rose message went out (milliseconds), for the limit. */
+  roseAt: number;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -151,12 +172,15 @@ export class GameRoom {
   private slotOwners: Array<string | null> = [];
   /** When a page from another build was last reported (the report is rationed). */
   private buildRefusalLoggedAt = Number.NEGATIVE_INFINITY;
+  /** Slow moments of the match loop, for the log (null when `slowLog` is off). */
+  private readonly slow: SlowWatch | null;
 
   constructor(options: GameRoomOptions) {
     this.options = options;
     this.lobby = createLobbyState(options.code);
     this.lobby.options.fast = options.fast;
     this.rng = createRng(options.seed);
+    this.slow = options.slowLog ? new SlowWatch({ now: options.now, gc: true, log: (line) => this.logError(line) }) : null;
   }
 
   // --- Queries -------------------------------------------------------------------------------
@@ -240,7 +264,7 @@ export class GameRoom {
       if (!player) throw new JoinRefused(JOIN_ERROR.roomFull, 'the room is full');
       player.slot = -1;
       player.waited = false;
-      seat = { seat: player.seat, token, peer, connected: true, droppedAt: 0, lobbySince: this.options.now(), slot: -1 };
+      seat = { seat: player.seat, token, peer, connected: true, droppedAt: 0, lobbySince: this.options.now(), slot: -1, roseAt: Number.NEGATIVE_INFINITY };
       this.seats.push(seat);
       this.byPeer.set(peer.id, seat);
       this.log(`seat ${seat.seat} joined as "${player.name}"`);
@@ -322,7 +346,11 @@ export class GameRoom {
       }
       case 'ping': {
         if (typeof data.t !== 'number' || !Number.isFinite(data.t)) return;
-        seat.peer.send('pong', { t: data.t, tick: this.match ? this.match.world.tick : 0 });
+        const m = this.match;
+        const q = m && lobby.phase === 'match' && seat.slot >= 0 ? m.queues[seat.slot] : undefined;
+        // How this player's inputs fare at the server, for the network readout (client/src/ui/netReadout.ts).
+        const queue = q ? { wait: q.items.length, guessed: q.guessed, dropped: q.dropped } : {};
+        seat.peer.send('pong', { t: data.t, tick: m ? m.world.tick : 0, ...queue });
         return;
       }
       case 'setName': {
@@ -365,6 +393,14 @@ export class GameRoom {
         this.toLobby();
         return;
       }
+      case 'restart': {
+        if ((lobby.phase !== 'match' && lobby.phase !== 'end') || seat.seat !== lobby.host || !this.match) return;
+        this.restartMatch();
+        return;
+      }
+      case 'rose':
+        this.relayRose(seat, data.cat);
+        return;
       case 'draftPick':
         // STUB(server): upgrade drafts are Tier 2; the simulation has no draft to pick from yet.
         return;
@@ -385,13 +421,16 @@ export class GameRoom {
 
     if (this.lobby.phase === 'match' && this.match) {
       const m = this.match;
+      const tick = m.world.tick;
       try {
         advanceMatch(m, now);
       } catch (err) {
         this.abortMatch(err);
         return;
       }
+      const simulated = this.slow ? this.options.now() : 0;
       this.sendFrame(false);
+      if (this.slow) this.reportSlow(this.slow, m, now, simulated, m.world.tick - tick);
       if (matchOver(m)) {
         this.lobby.phase = 'end';
         this.endedAt = now;
@@ -409,6 +448,18 @@ export class GameRoom {
 
   private log(line: string): void {
     this.options.log?.(`[room ${this.options.code}] ${line}`);
+  }
+
+  /** Hands one update of the match to the slow-moment watch, and the stalls of players' inputs. */
+  private reportSlow(slow: SlowWatch, m: MatchSession, began: number, simulated: number, ticks: number): void {
+    const ended = this.options.now();
+    const elapsed = m.world.match.elapsed;
+    for (const stall of m.stalls) {
+      const seat = this.seats.find((s) => s.slot === stall.slot);
+      if (seat) slow.stall(seat.seat, stall.ticks, stall.stopped, elapsed, ended);
+    }
+    m.stalls.length = 0;
+    slow.update({ began, ended, simulated, ticks, dropped: m.clock.dropped, elapsed });
   }
 
   /** For failures: these are printed even when the room chatter is switched off. */
@@ -523,10 +574,52 @@ export class GameRoom {
     return fallback;
   }
 
-  private startMatch(): void {
+  /**
+   * A wedge of the communication rose: passed on to everyone in the room (the sender included,
+   * so every screen plays it at the same moment) with a random pick of the line, unless it is
+   * malformed, comes from somebody with no slot in the match, or comes too soon after the
+   * sender's last one.
+   */
+  private relayRose(seat: Seat, cat: unknown): void {
+    const m = this.match;
+    if (!m || this.lobby.phase !== 'match' || seat.slot < 0) return;
+    const player = m.world.players[seat.slot];
+    if (!player || player.bot) return;
+    const side = player.role === 'kaiju' ? 'kaiju' : 'army';
+    const wedge = cleanRoseCategory(side, cat);
+    if (wedge < 0) return;
+    const now = this.options.now();
+    if (now - seat.roseAt < (ROSE_GAP_SECONDS - ROSE_SLACK_SECONDS) * 1000) return;
+    seat.roseAt = now;
+    const message = { player: seat.slot, cat: wedge, pick: rngInt(this.rng, ROSE_PICK_RANGE) };
+    for (const other of this.seats) if (other.connected) other.peer.send('rose', message);
+  }
+
+  /**
+   * The host asked to start over: back to the lobby and straight into a new match with the same
+   * people on the same sides, the kaiju seat (or the bot kaiju) and the start neighborhood kept.
+   * Nobody's ready is needed: they were all playing a moment ago.
+   */
+  private restartMatch(): void {
+    const m = this.match;
+    if (!m) return;
+    const kaijuSeat = this.lobby.lastKaijuSeat;
+    const anchor = m.world.match.anchor;
+    this.log(`the host restarts match ${this.matchCount}`);
+    this.toLobby();
+    const stillHere = this.lobby.players.some((p) => p.seat === kaijuSeat && p.connected);
+    this.startMatch(stillHere ? kaijuSeat : -1, anchor);
+  }
+
+  /**
+   * Starts a match from the lobby. `kaijuSeat` and `anchor` are given for a restart (the same
+   * kaiju, -1 for a bot, and the same start); otherwise the kaiju is picked by the rotation rules
+   * and the start is random.
+   */
+  private startMatch(forcedKaijuSeat?: number, anchor = -1): void {
     const lobby = this.lobby;
-    const kaijuSeat = pickKaijuSeat(lobby, this.rng);
-    const { config, slotBySeat } = buildMatchConfig(lobby, kaijuSeat);
+    const kaijuSeat = forcedKaijuSeat ?? pickKaijuSeat(lobby, this.rng);
+    const { config, slotBySeat } = buildMatchConfig(lobby, kaijuSeat, anchor);
     const seed = rngU32(this.rng);
     let m: MatchSession;
     try {
@@ -536,6 +629,10 @@ export class GameRoom {
       return;
     }
     this.match = m;
+    if (this.slow) {
+      m.timer = this.slow;
+      this.slow.reset();
+    }
     this.matchCount++;
     lobby.phase = 'match';
     lobby.lastKaijuSeat = kaijuSeat;
