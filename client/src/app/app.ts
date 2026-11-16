@@ -17,6 +17,7 @@ import { browserStore, sessionToken, storedName } from '../net/session';
 import { GameRenderer } from '../render/gameRenderer';
 import { setIconSource } from '../ui/icons';
 import { ControlsCard } from '../ui/controlsCard';
+import { NetReadout } from '../ui/netReadout';
 import { SettingsPanel } from '../ui/settingsPanel';
 import { Subtitles } from '../ui/subtitles';
 import type { AppContext, Screen, ScreenId } from './context';
@@ -53,6 +54,8 @@ export class App {
   private booted = false;
   private readonly subtitles = new Subtitles();
   private readonly debug: DebugOverlay | null;
+  /** The hidden network readout (the ` key): for finding out why a body snaps back. */
+  private readonly netReadout = new NetReadout();
   private readonly backdrop = new CinematicCamera();
   private readonly errors: string[] = [];
   private readonly frameStats = { ms: 0, maxMs: 0, count: 0, fps: 0 };
@@ -119,6 +122,14 @@ export class App {
         audio.unlock();
         audio.play('ui_click');
       },
+      // The room's host may start the match over (with the same people on the same sides) from
+      // the match or its end screen; not in the sandbox, which has no room.
+      canRestart: () => {
+        const { client } = this.ctx;
+        const lobby = client.lobby;
+        return !client.local && !!lobby && lobby.host === client.seat && (lobby.phase === 'match' || lobby.phase === 'end');
+      },
+      restart: () => this.ctx.client.send('restart', {}),
     });
     document.addEventListener('fullscreenchange', () => panel.sync());
     this.ctx = {
@@ -151,6 +162,7 @@ export class App {
     this.debug = params.debug ? new DebugOverlay() : null;
     ui.append(this.subtitles.root, this.ctx.controls.root, panel.root);
     if (this.debug) document.body.append(this.debug.root);
+    document.body.append(this.netReadout.root);
 
     window.addEventListener('error', (e) => this.errors.push(String(e.message)));
     window.addEventListener('unhandledrejection', (e) => this.errors.push(`unhandled rejection: ${String((e as PromiseRejectionEvent).reason)}`));
@@ -205,6 +217,7 @@ export class App {
       }
     });
     client.events.on('cityResync', () => this.ctx.renderer?.resync());
+    client.events.on('rose', (msg) => this.ctx.runtime?.rose(msg));
     client.events.on('lobby', (msg) => {
       // The address carries the room from the moment the client is in it, however it got there
       // (created, joined from the lobby, or typed into a match that was already running), so a
@@ -342,5 +355,6 @@ export class App {
     stats.ms += (ms - stats.ms) * 0.05;
     stats.maxMs = Math.max(stats.maxMs * 0.995, ms);
     this.debug?.update(ctx, ms, dt, this.current?.id ?? 'boot', stats.fps);
+    this.netReadout.update(ctx.client, elapsed * 1000, time / 1000);
   };
 }

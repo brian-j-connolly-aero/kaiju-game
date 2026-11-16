@@ -11,6 +11,7 @@ import {
   type ClientMessageType,
   type LobbyMessage,
   type LobbyState,
+  type RoseMessage,
   type SimEvent,
   type WelcomeMessage,
 } from '@mb/shared';
@@ -48,10 +49,26 @@ export interface GameClientEvents {
   event: SimEvent;
   /** The city was replaced wholesale after a reconnection. */
   cityResync: null;
+  /** Somebody in the match picked a wedge of the communication rose (shared/src/net/rose.ts). */
+  rose: RoseMessage;
   closed: ClosedReason;
 }
 
 const PING_EVERY_MS = 2000;
+/** How often the ping timer looks whether a ping is due (the network readout asks for one every 250 ms). */
+const PING_TIMER_MS = 250;
+
+/** How the server handles this player's inputs, from the newest pong (shared/src/net/protocol.ts `PongMessage`). */
+export interface ServerInputs {
+  /** Inputs waiting at the server to be played. */
+  wait: number;
+  /** Ticks the server played on a guess because an input was late, since this player took the slot. */
+  guessed: number;
+  /** Inputs the server dropped or skipped, since this player took the slot. */
+  dropped: number;
+  /** Local time of the pong, milliseconds. */
+  at: number;
+}
 const REJOIN_DELAYS_MS = [300, 1000, 2000, 3000, 4000, 5000, 5000, 5000, 5000, 5000, 5000, 5000];
 
 export interface GameClientOptions {
@@ -81,6 +98,13 @@ export class GameClient {
   session: MatchSession | null = null;
   /** Round trip time in milliseconds, smoothed; 0 until measured. */
   ping = 0;
+  /** The newest round trip, milliseconds (0 until measured), and when it came back (local milliseconds). */
+  pingLast = 0;
+  pongAt = 0;
+  /** Milliseconds between pings: 2 s, or 250 ms while the network readout is open. */
+  pingEvery = PING_EVERY_MS;
+  /** The server's view of this player's inputs from the newest pong, or null (not in a match). */
+  serverInputs: ServerInputs | null = null;
   /** The sandbox simulation when this client runs one (`startLocal`), else null. */
   local: LocalMatchControl | null = null;
 
@@ -89,6 +113,7 @@ export class GameClient {
   private name = '';
   private leaving = false;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
+  private pingSentAt = Number.NEGATIVE_INFINITY;
   private rejoinTimer: ReturnType<typeof setTimeout> | null = null;
   /** Counts connections so callbacks from an old link are ignored. */
   private generation = 0;
@@ -184,10 +209,17 @@ export class GameClient {
     link.on('events', (events) => {
       if (current()) this.session?.handleEvents(events, this.nowSeconds());
     });
+    link.on('rose', (msg) => {
+      if (current() && this.session) this.events.emit('rose', msg);
+    });
     link.on('pong', (msg) => {
       if (!current()) return;
-      const rtt = Math.max(0, this.options.now() - msg.t);
+      const now = this.options.now();
+      const rtt = Math.max(0, now - msg.t);
+      this.pingLast = rtt;
+      this.pongAt = now;
       this.ping = this.ping === 0 ? rtt : this.ping + (rtt - this.ping) * 0.3;
+      this.serverInputs = msg.wait !== undefined ? { wait: msg.wait, guessed: msg.guessed ?? 0, dropped: msg.dropped ?? 0, at: now } : null;
     });
     link.onDropped(() => {
       if (current()) this.setStatus('reconnecting');
@@ -200,8 +232,11 @@ export class GameClient {
     });
     if (this.pingTimer === null) {
       this.pingTimer = setInterval(() => {
-        if (this.status === 'online') this.link?.send('ping', { t: this.options.now() });
-      }, PING_EVERY_MS);
+        const now = this.options.now();
+        if (this.status !== 'online' || now - this.pingSentAt < this.pingEvery - PING_TIMER_MS / 2) return;
+        this.pingSentAt = now;
+        this.link?.send('ping', { t: now });
+      }, PING_TIMER_MS);
     }
   }
 

@@ -9,8 +9,9 @@
  * `viewPitch`: the head's), with the same limits, so the toggle changes where the camera sits
  * and never where the player is looking. The chase camera hangs behind a point above the
  * kaiju's shoulders along that direction. In the chase camera the aim sent to the server runs
- * from the kaiju's eye to whatever the camera's center ray lands on, so the crosshair shows
- * where a throw goes.
+ * from the kaiju's eye to whatever the camera's center ray lands on (so the beam goes where the
+ * crosshair is), except while the hand holds something to throw: then the view's own direction
+ * goes out, and the throw's arc on screen (render/throwPreview.ts) shows where it goes.
  *
  * While the head is not the player's (the beam drags it, or the kaiju is staggered) both
  * cameras ride the head as the server has it, and the mouse only says where it should go.
@@ -31,6 +32,7 @@ import {
   kaijuKindDef,
   kaijuStageDef,
   resolveAimPoint,
+  strikeVerb,
   wrapAngle,
   type AimPoint,
   type SnapKaiju,
@@ -51,6 +53,15 @@ const CHASE_PIVOT = 1.25;
 const CHASE_FLOOR = 0.12;
 /** Swimming: the first-person eye never goes lower than this over the water (body heights). */
 const SWIM_EYE = 0.1;
+/**
+ * With something to throw in the hand the chase camera moves up and over the right shoulder (body
+ * radii across, body heights up), so the throw's arc and where it lands (render/throwPreview.ts)
+ * are not hidden behind the monster's own back. The view's direction does not change.
+ */
+const THROW_SIDE = 2.2;
+const THROW_UP = 0.55;
+/** With something to throw in the hand, both views look no higher than this (radians); the aim goes on up. */
+export const THROW_VIEW_UP = 8 * DEG;
 /** The chase camera's lens, and how much wider it opens during a charge's run (degrees). */
 const CHASE_FOV = 60;
 const CHARGE_FOV = 12;
@@ -129,6 +140,10 @@ export class KaijuController implements Controller {
   private stride = 0;
   /** Where the sway is in its swing: one swing every two steps, as the animator steps. */
   private swayPhase = 0;
+  /** How far the chase camera has moved over the shoulder for a throw, 0..1 (eased). */
+  private throwShift = 0;
+  /** The hand held something to throw on the last update. */
+  private wasHolding = false;
 
   constructor(thirdPerson = false) {
     this.thirdPerson = thirdPerson;
@@ -163,7 +178,9 @@ export class KaijuController implements Controller {
   private placeView(k: SnapKaiju): void {
     if (this.headFree(k)) {
       this.viewYaw = clampAngleAround(this.aimYaw, k.yaw, kaijuKindDef(k.kind).headLeadMax);
-      this.viewPitch = this.aimPitch;
+      // Lobbing over a building means aiming high: the view stops a little above level, so the
+      // ground where the throw comes down stays in sight (the aim goes on up; the arc shows it).
+      this.viewPitch = strikeVerb(k.held) === 'throw' ? Math.min(this.aimPitch, THROW_VIEW_UP) : this.aimPitch;
     } else {
       this.viewYaw = k.aimYaw;
       this.viewPitch = clamp(k.aimPitch, -PITCH_LIMIT, PITCH_LIMIT);
@@ -192,14 +209,22 @@ export class KaijuController implements Controller {
     }
     this.aimYaw = clampAngleAround(this.aimYaw, k.yaw, MAX_HEADING_LEAD);
     this.aimPitch = clamp(this.aimPitch, -PITCH_LIMIT, PITCH_LIMIT);
+    // Thrown (or dropped): the aim comes back down to where the view stopped, so the view does
+    // not leap up into the sky after a lob.
+    const holding = strikeVerb(k.held) === 'throw';
+    if (this.wasHolding && !holding) this.aimPitch = Math.min(this.aimPitch, THROW_VIEW_UP);
+    this.wasHolding = holding;
     this.sendYaw = this.aimYaw;
     this.sendPitch = this.aimPitch;
     this.placeView(k);
     if (this.thirdPerson && k.phase !== 'cocoon' && k.phase !== 'dead') {
       this.placeChase(ctx, k);
       // (While the head is not the player's the camera rides it, and aiming from the camera
-      // would steer the head by its own picture: the mouse's wish goes out as it is.)
-      if (!input.aimOverride && this.headFree(k)) this.aimFromCamera(ctx, k);
+      // would steer the head by its own picture: the mouse's wish goes out as it is.) With
+      // something to throw in the hand the view's own direction goes out: the throw leaves along
+      // it (sim/throwArc.ts) and the arc on screen moves smoothly with the mouse, where the
+      // crosshair's target jumps from wall to ground at every roof's edge.
+      if (!input.aimOverride && this.headFree(k) && strikeVerb(k.held) !== 'throw') this.aimFromCamera(ctx, k);
     }
     ctx.session.aimYaw = this.sendYaw;
     ctx.session.aimPitch = this.sendPitch;
@@ -250,6 +275,16 @@ export class KaijuController implements Controller {
     p.x = k.x - Math.sin(this.viewYaw) * back * cp;
     p.y = Math.max(st.height * CHASE_FLOOR, pivotY - Math.sin(this.viewPitch) * back);
     p.z = k.z - Math.cos(this.viewYaw) * back * cp;
+    // Over the right shoulder while there is something to throw (the view's right is (-cos, sin)).
+    const throwing = strikeVerb(k.held) === 'throw' && this.headFree(k) && k.submerge <= 0;
+    this.throwShift += ((throwing ? 1 : 0) - this.throwShift) * (1 - Math.exp(-ctx.dt * 5));
+    if (this.throwShift < 0.002) this.throwShift = 0;
+    if (this.throwShift > 0) {
+      const side = st.bodyRadius * THROW_SIDE * this.throwShift;
+      p.x -= Math.cos(this.viewYaw) * side;
+      p.z += Math.sin(this.viewYaw) * side;
+      p.y += st.height * THROW_UP * this.throwShift;
+    }
     const near = Math.max(0.3, st.height * 0.05);
     this.pivot.x = k.x;
     this.pivot.y = st.height * 0.85;

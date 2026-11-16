@@ -12,8 +12,10 @@ wades through skyscrapers. The army grows with it: soldiers with rockets, then t
 tank companies.
 
 You need a computer (not a phone or tablet) with a keyboard and mouse, or a game controller,
-and an up-to-date Chrome, Edge or Firefox. Nothing to install. Turn the sound on: the radio
-chatter tells you what is going on. A voice chat beside the game helps a lot.
+and an up-to-date Chrome, Edge or Firefox. Nothing to install. Turn the sound on. A voice chat
+beside the game helps a lot: the game has none of its own, only the communication rose (below).
+The music gets faster with each stage, and when one minute is left on the clock an alarm sounds
+and the music races to the end of the match.
 
 ## Joining
 
@@ -47,7 +49,12 @@ is the last squad standing, your volleys alone are enough.)
 Press **H** or **Enter** (or click the left stick on a controller) at any time to open the
 controls card; press it again to close it. The game keeps running behind it. Its picture, a card
 with its button under it, is always the last picture at the bottom right of the screen, and it
-glows for the first 20 seconds of a match.
+glows for the first 20 seconds of a match. The card shows only what you can do right now, as
+five big pictures at most, each over its button: as the monster, the moves you picked at your
+molts appear once you have them, the molt lights up while it is on offer, and what you hold
+changes what your two mouse buttons show; as a squad, the tank's driving replaces walking at
+stage 2, and a crate's weapon shows on both your buttons. The communication rose's key sits
+small at the top of the card.
 
 | What | Keyboard and mouse | Controller |
 | --- | --- | --- |
@@ -57,6 +64,25 @@ glows for the first 20 seconds of a match.
 | Switch the view: from behind (you start there) or through the eyes (you keep looking the same way) | V | Click the right stick |
 | Settings | Escape | Start (Menu) |
 | Controls card | H or Enter | Click the left stick |
+| Say something (the communication rose): hold, move the mouse to a picture, let go | Hold Z | Hold the d-pad down, pick with the right stick |
+
+**The communication rose.** Hold **Z** and a ring of pictures opens around your crosshair. Move
+the mouse toward one (the view holds still meanwhile; you can keep moving and shooting) and let
+go: your character says something of that kind, and everybody hears it. Let go in the middle to
+say nothing. It changes nothing in the game; it is just talk. One every two seconds: while you
+wait, the ring is greyed and the wait runs round its middle.
+
+- **Army** (shouted over the radio in your squad's own voice, with your name and the words as a
+  subtitle; clockwise from the top): a panicked face (panic), a thumb up (bravado), a megaphone
+  (orders), a bubbling flask (somebody call the professor), a house with a heart (home: "my
+  mother lives on this street"), a steaming pie (food), a soldier running off (retreat), a face
+  with hearts for eyes (admiring the monster).
+- **Monster** (no words, no subtitle; the noise comes from you, at your size): the big roar, the
+  short roar, snuffles, a growl, a chomp, a contented rumble, and a little musical mating call.
+
+**Restart.** The room's host finds a circular arrow in the settings panel (Escape) during a match
+and on the end screen. Press it once (it turns red and pulses), then again within four seconds:
+the match starts over for everyone, with the same people on the same sides.
 
 **Monster**
 
@@ -72,6 +98,18 @@ glows for the first 20 seconds of a match.
 | Swim (stages 1 and 2) | No button: walk into deep water and you go under by yourself. Any monster button brings you up. | The same |
 
 Every button does one thing. Nothing changes when you hold a button down, except the brace.
+
+**Throwing.** With something in your hand, a yellow arc on your screen shows where it will fly:
+a bright line from your hand, a widening tube round it, and a ring where it can land. Throws
+are real tosses: they leave your hand a little above where you look, rise and fall, and land
+somewhere inside the ring (never exactly in the middle twice), so a squad standing still about
+five of your own lengths away is hit most of the time, and farther away less often. Look higher
+to throw farther, or to lob it over a building onto whoever hides behind it; a lob is slower
+and less accurate. Look lower to throw short and flat. While you hold something the camera
+moves over your right shoulder and stops tilting up a little above the horizon, so you can
+always see the ring: moving the mouse up keeps raising the arc. A javelin (an antenna, a radio
+mast's top) flies fast and flat and is steadier than a car; a garage door floats like a frisbee.
+Things you throw hit the first building, soldier or patch of ground in their way.
 
 **Growing, and new moves.** When the skyline reaches a tower, the cocoon picture by F pulses:
 press F once to shed your skin. In the cocoon three cards come up in the middle of the screen,
@@ -100,19 +138,27 @@ them at the first size; later you just tread on them. They are never eaten: the 
 drops one again, and it lies there to be picked up later. The pictures over your buttons change
 to show what the left and right buttons will do with what you hold.
 
+**What you can pick up glows** (on your screen only): every car and wreck, every one of the
+city's weapons while you are small enough to lift it, and a fallen radio mast's top, has a soft
+gold glow and a gold ring on the ground round it. Within reach of your hand, where you are
+looking, it glows brighter and pulses; the one a grab would take shines brightest. Nothing
+glows while your hand is full.
+
 | You hold | The left button | What happens |
 | --- | --- | --- |
 | Propane tank | throws it | It blows up where it lands. Careful: if a shot lands right by your hand while you hold it, it goes off in your claw, hurts you and makes you flinch. Your left button's picture throbs red while you hold one. |
 | Water tank | throws it | It bursts in a big splash that knocks the soldiers in it flat for a moment. |
-| Television antenna | throws it like a javelin | It flies straight and fast to your crosshair, through up to three groups of soldiers, and sticks in whatever stops it. A light line shows where it will go. |
+| Television antenna | throws it like a javelin | It flies fast and nearly flat along your arc, through up to three groups of soldiers, and sticks in whatever stops it. |
 | Fast-food sign | swings it like a club | Three big swings, each a wide sweep in front of you with a trail of light. Three dots under the button show the swings left; after the third the sign breaks. |
 | Garage door | throws it like a frisbee | While you hold it, it is a shield: shots from in front of you hit the door instead of you (sparks fly off it). A bar by your buttons shows how much it can still take; when it runs out the door breaks apart. |
-| The top of a radio mast (left lying when a mast falls) | throws it like a heavy javelin | Like the antenna, but heavier: it goes through up to five groups of soldiers. |
+| The top of a radio mast (left lying when a mast falls) | throws it like a heavy javelin | Like the antenna, but heavier: it goes through up to five groups of soldiers. Unlike the rest, you can pick this one up at every size. |
 
-**The power surge.** Wreck a power substation and for eight seconds lightning crackles over
-your back and tail, every move button flashes full, and a lightning bolt in a ring by your
-buttons runs down until the surge is over. Meanwhile your moves come back three times as fast
-and every hit lands harder.
+**The power surge.** Wreck a power substation and you are supercharged for eight seconds:
+every button snaps full with a white crackle (all your moves are ready at once), a big blue
+lightning badge pops up beside your crosshair with a white ring round it that runs down until
+the surge is over, the edges of your screen crackle blue-white, lightning jumps over your back
+and tail, and every hit you land flashes electric. Meanwhile your moves come back three times as
+fast and every hit lands harder.
 
 **How your attacks look.** Each attack comes in two or three versions, picked for you, that
 look different and do exactly the same: a swipe with the right claw, the left claw or both
@@ -124,6 +170,14 @@ arcs follow your claws and your tail through a strike, and a stomping foot lands
 
 ![Both claws raking down at sunset, an orange slash trail behind each hand](progress/phase3-monster-rake.jpg)
 
+**Your rage round your crosshair.** Three claw marks swirl round your crosshair. They heat up
+with your rage, one after the other clockwise from the bottom: a dark scar, then ember red,
+orange and white-hot when your rage is full. Once you have the beam and it is ready, they throb
+and shed little embers: breathe it now. When one of your blows lands, three claw slashes flash
+over your crosshair (blue-white in a power surge), and when you burst out of the cocoon in a
+new body a hot ring bursts out from the middle of the screen. While you hold something to
+throw, the claw marks fade right down, so the arc of your throw and where it lands stay clear.
+
 **Your stripes glow with your rage:** faint when you are calm, bright when you are full of it.
 Once you have the beam and it is ready, they throb slowly, and the army can see it. A power
 surge turns them blue-white, and they flare white-hot when you burst out of the cocoon.
@@ -132,7 +186,8 @@ surge turns them blue-white, and they flare white-hot when you burst out of the 
 under your feet, under a stomp, in a charge or under your tail's sweep vanishes in a puff (no
 harm is shown). A grab that closes on nothing you can hold, with people in reach, comes up with
 a handful of them, and you gulp them down. People change nothing in the game: they do not heal
-you and they score nothing.
+you and they score nothing. New people arrive out of your sight (round a corner, behind a
+house, far off) or fade in gently; nobody you can see disappears except under your feet.
 
 ![The cards at a molt: the beam, the roar and the charge, each over the key that picks it](progress/monster-molt-cards.png)
 
@@ -150,7 +205,8 @@ you and they score nothing.
 
 Your squad has two buttons and nothing else: no orders to give, nothing to switch. Your three
 other units follow you around as a loose group and shoot at the monster by themselves whenever
-they can. Your own gun is rockets at first, then a tank gun, then a troop of three tanks, until
+they can. On foot you fit through the narrow gaps between houses (a couple of meters and up),
+and your other units follow you through. Your own gun is rockets at first, then a tank gun, then a troop of three tanks, until
 a supply crate gives you something better (below).
 
 **The volley.** Hold the right button: your three other units stop where they are, point
@@ -194,8 +250,11 @@ your squad (anyone's squad may take any crate). Its picture pops up over your cr
 | Artillery radio | Your next three charged volleys each call an artillery barrage where they land (see below). |
 | Reinforcements | Your lost units come back at once by parachute beside you, and everyone is healed. |
 
-The machine gun, big cannon and missile pod replace your own gun only; your other units keep
-theirs. While you have one, the picture on your left button is that weapon.
+The machine gun, big cannon and missile pod replace your own gun, and your volleys use them
+too: with the machine gun every unit lets rip a burst of tracers, with the big cannon each fires
+a heavy shell, with the missile pod each sends three missiles curving onto your crosshair.
+Between volleys your other units shoot their own guns. While you have one, the picture on your
+left button is that weapon.
 
 **Artillery.** With the radio, let go of a charged volley (past the notch) and the radio
 crackles: red smoke rises where your volley landed and a red ring closes in on the spot. When the
@@ -207,9 +266,9 @@ for each barrage left. A volley fired at the empty sky calls nothing and keeps t
 but crackling static for twenty seconds: you know where the monster is only from what you can
 see.
 
-![The squad's controls card](progress/controls-squad.png)
+![The squad's controls card (H) in a tank with a missile pod: drive, turret, fire, volley, map, and the rose's key at the top](progress/controls-squad.png)
 
-![The monster's controls card](progress/controls-kaiju.png)
+![The monster's controls card (H) at stage 2 with the beam picked and the molt on offer: swipe, grab, stomp, the beam on Q, the molt on F](progress/controls-kaiju.png)
 
 ## What the pictures mean
 
@@ -233,6 +292,13 @@ see.
   squad leader has it in plain sight; it is not there all the time.
 - **Glowing stripes on the monster:** its rage. Faint means calm, bright means full; a slow
   throb means it has the beam and can breathe it now. Blue-white means a power surge.
+- **Three claw marks round the crosshair (monster only):** your rage, heating up from a dark
+  scar to white-hot; throbbing with embers when your beam is ready. Claw slashes flashing over
+  the crosshair: your blow landed.
+- **Gold glow and a gold ring round a car or a thing in the street (monster only):** you can
+  pick it up; brighter and pulsing when it is within reach of your hand.
+- **Big blue lightning badge beside the crosshair, screen edges crackling (monster only):** a
+  power surge; the white ring round the badge runs down until it ends.
 - **Spines over two waves, top middle (monster only):** you are swimming under water. Faint
   while you are going down or coming up.
 - **Yellow diamonds at the edge of the monster's screen:** squads charging a volley at it, in
@@ -243,18 +309,15 @@ see.
   round a move fills as it comes ready again. Yellow stars spinning over soldiers mean the roar
   has frozen them. With something from the city in its hand the monster's left button shows a
   throw, a javelin or a club (with three dots for the club's swings left), and its right button
-  a hand letting go; a garage door adds a door with a bar for what it can still take, and a
-  power surge a lightning bolt in a ring that runs down. The squad's left button shows the
+  a hand letting go; a garage door adds a door with a bar for what it can still take. The squad's left button shows the
   weapon a crate gave (machine gun, big cannon, missile pod); the artillery radio sits by the
   right button with a dot per barrage left.
 - **A cyan column of light with a picture over it:** a supply crate, and what is in it.
 - **Grey snow on the map (army):** a radio mast has fallen; the map comes back after twenty
   seconds.
-- **Subtitles:** what the radio (army) and the television news (monster) say out loud, with
-  the speaker's name. The radio calls out what is happening in the fight (and tells a squad
-  when a supply crate is coming for it); the news only breaks in for the big moments (the
-  start, a landmark falling, the monster growing, the power going out, a gas station or a
-  radio mast going down, people eaten, the last minute, the end).
+- **Subtitles:** what a squad leader shouts with the communication rose, under the player's
+  name. The monster's player also hears the television news say once that the creature is
+  ready to shed its skin. Nothing else is said by itself.
 
 ## The city
 
@@ -284,11 +347,13 @@ than their size, a short walk from where the monster hatches. You can tell them 
   soldiers near it (never the monster), then burns for a while under a column of black smoke;
 - a **radio mast** (red and white, with red lamps that blink) falls over away from the monster
   when it is wrecked, crushing whatever it lands on. Its top section lies at the end of it: the
-  small monster can pick it up and throw it. For twenty seconds the army's map shows only static.
+  monster can pick it up and throw it, at any size. For twenty seconds the army's map shows only
+  static.
 
 **Rubble stays.** A building that comes down leaves a heap of its own walls and roof, half as
 high as it was. Heaps stop shots and hide whatever is behind them, from both sides: a pile of
-house rubble can hide the small monster. Soldiers and tanks climb over heaps at half speed; the
+house rubble can hide the small monster. The monster throws over the heap it stands by,
+though. Soldiers and tanks climb over heaps at half speed; the
 monster walks over them. Tall towers sometimes fall over on their side instead and lie across
 the street as a long wall of rubble.
 
@@ -335,7 +400,9 @@ Tips:
    to come close to see you, and it can only hit the spines. You cannot attack, grab or burn
    from the water, and you wreck nothing there, so it is for getting away and getting about:
    the clock keeps running for the army. Press any monster button to come up (it takes about
-   half a second, then that button does its thing).
+   half a second, then that button does its thing). As a titan you are too big to swim: you
+   wade through the water up to your thighs, a little slower than you walk, with foam round
+   your legs, a splash at each step and a wake behind you.
 8. While you are small, pick things up. A garage door held in front of you soaks up the shots
    of a squad you walk at; a fast-food sign clears a street corner in three swings; an antenna
    thrown down a straight street goes through three groups of soldiers in a row. Do not carry a propane tank into

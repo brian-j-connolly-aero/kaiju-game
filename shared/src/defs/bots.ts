@@ -33,8 +33,13 @@ export const BOT_RULES = {
     safeAt: 0.45,
     /** Squads keep at least this bearing apart around the kaiju, so their fire crosses. */
     bearingSpread: 70 * DEG,
-    /** A parked squad has a line of fire when its leader and this share of its planted squad-mates have one. */
-    clearLines: 0.6,
+    /**
+     * A parked squad has a line of fire when its leader and this share of its planted squad-mates
+     * have one (per stage). At stage 1 one planted squad-mate in three will do: in the packed
+     * starting streets the hatchling hides behind every house, and the squad-mates standing round
+     * a leader in a gap rarely all see it (round 4: some bot matches fired no volley all stage).
+     */
+    clearLines: [0.3, 0.6, 0.6] as PerStage<number>,
     /** A parked squad waits this long with no line of fire before it moves on. */
     losPatience: 4,
     /**
@@ -143,8 +148,13 @@ export const BOT_RULES = {
     /** The beam: used on units inside this fraction of its range, else on a structure worth at least this many points. */
     beamUnitRange: 0.9,
     beamStructureValue: [12, 90, 300] as PerStage<number>,
-    /** Throwing: at a unit within this fraction of the longest throw, at most once every so many seconds. */
-    throwRange: 0.8,
+    /**
+     * Throwing: at a unit within this fraction of the longest throw (per stage), at most once
+     * every so many seconds. Round 4's throws reach farther at stages 2 and 3 and lob over what
+     * is in the way, so fewer are wasted on walls: these (51, 118 and 412 m) keep the bot about as
+     * dangerous as before (it threw from 51, 165 and 400 m; docs/STATUS.md, round 4 throwing).
+     */
+    throwRange: [0.8, 0.45, 0.45] as PerStage<number>,
     throwEvery: 7,
 
     /**

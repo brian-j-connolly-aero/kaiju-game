@@ -4,7 +4,7 @@
  *
  *   HeldWeapon   a city weapon on the `hold` node, held by its grip node the way its manifest
  *                entry says (render/heldProps.ts): a tank hangs, a javelin points along the
- *                aim (the monster's own player sees a straight aim line out to its range), the
+ *                aim (where it will fly is the throw's preview: render/throwPreview.ts), the
  *                fast-food sign is swung along the club's arc (one of three looks) with a slash
  *                trail behind its head (render/kaijuTrails.ts, shared with the claws and the
  *                tail), the garage door is held up in front and dents, scorches and shakes as
@@ -71,10 +71,6 @@ export interface HeldPose {
 export interface HeldFrame {
   /** Seen from inside the kaiju's head: shrunk out of the lens (KaijuView's rule for anything held). */
   firstPerson: boolean;
-  /** The local player's own kaiju: a javelin shows its aim line. */
-  local: boolean;
-  /** Where the camera is (the aim line is drawn wider the farther it is, so it reads all the way out). */
-  camera?: THREE.Vector3;
 }
 
 /** How fast a shield's shake from a hit dies away (its share left falls by e every 1/9 s). */
@@ -237,7 +233,6 @@ export class HeldWeapon {
     }
 
     if (grip.hold === 'club' && pose.action === 'club' && ribbons) this.drawSwingTrail(k, pose, st.height, scale, lines, ribbons, view.firstPerson);
-    if (grip.hold === 'javelin' && view.local && pose.action !== 'throw') this.drawAimLine(k, lines, view.camera);
   }
 
   /**
@@ -274,45 +269,6 @@ export class HeldWeapon {
       addTrailPoint(swingInner, p1.x, p1.y, p1.z);
     }
     ribbons.ribbon(swingTip, swingInner, fade * (firstPerson ? 0.5 : 1), k.surge > 0, lines, firstPerson ? 0 : height * 0.03);
-  }
-
-  /**
-   * A javelin in the local player's hand: a straight line from its point to where the crosshair
-   * is (the aim ray from the eye, as the simulation aims it; the ground or how far the javelin
-   * flies, whichever comes first), with a cross where it would strike. Buildings are not looked
-   * for: it is a guide. Seen from behind it runs almost straight away from the camera, so it is
-   * drawn unbroken and as wide as it needs to be to read at each distance.
-   */
-  private drawAimLine(k: SnapKaiju, lines: LineBatch, camera: THREE.Vector3 | undefined): void {
-    const def = kaijuKindDef(k.kind).cityWeapons;
-    const st = kaijuStageDef(k.kind, k.stage);
-    const range = this.kind === 'mast' ? def.mast.range : def.antenna.range;
-    aimDirection(k.aimYaw, k.aimPitch, dir);
-    // Where the eye's ray meets the ground, or the javelin's range along it.
-    let reach = range;
-    if (dir.y < -1e-3) reach = Math.min(range, st.eyeHeight / -dir.y);
-    p1.set(k.x + Math.sin(k.aimYaw) * st.eyeForward, st.eyeHeight, k.z + Math.cos(k.aimYaw) * st.eyeForward).addScaledVector(dir, reach);
-    hint.subVectors(p1, this.end);
-    const len = hint.length();
-    if (len < 1) return;
-    hint.multiplyScalar(1 / len);
-    const base = Math.max(0.08, st.height * 0.018);
-    const widthAt = (x: number, y: number, z: number): number => (camera ? Math.max(base, Math.hypot(x - camera.x, y - camera.y, z - camera.z) * 0.006) : base);
-    const pieces = 10;
-    for (let i = 0; i < pieces; i++) {
-      p0.copy(this.end).addScaledVector(hint, (len * i) / pieces);
-      const x = p0.x;
-      const y = Math.max(0.05, p0.y);
-      const z = p0.z;
-      p0.addScaledVector(hint, len / pieces);
-      lines.push(x, y, z, p0.x, Math.max(0.05, p0.y), p0.z, widthAt(x, y, z), 1, 0.82, 0.5, 0.5 - 0.2 * (i / pieces));
-    }
-    // A cross of light where it would strike.
-    const w = camera ? Math.max(base * 4, Math.hypot(p1.x - camera.x, p1.y - camera.y, p1.z - camera.z) * 0.025) : base * 4;
-    const y = Math.max(0.1, p1.y);
-    lines.push(p1.x - w, y, p1.z, p1.x + w, y, p1.z, w * 0.3, 1, 0.82, 0.5, 0.85);
-    lines.push(p1.x, y, p1.z - w, p1.x, y, p1.z + w, w * 0.3, 1, 0.82, 0.5, 0.85);
-    lines.push(p1.x, y - w, p1.z, p1.x, y + w, p1.z, w * 0.3, 1, 0.82, 0.5, 0.85);
   }
 
   dispose(): void {

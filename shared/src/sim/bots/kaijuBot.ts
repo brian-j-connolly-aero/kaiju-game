@@ -41,7 +41,7 @@ import type { KaijuKindDef, KaijuStageDef } from '../../defs/schema';
 import { LAST_STAGE } from '../../defs/stages';
 import { unitTypeDef } from '../../defs/units';
 import { modMult } from '../../defs/upgrades';
-import { projectileTypeDef, weaponDef } from '../../defs/weapons';
+import { weaponDef } from '../../defs/weapons';
 import { angleDist, wrapAngle, yawFromTo, yawOf } from '../../math/angle';
 import { boundsContains, circleInArc, obbInArc } from '../../math/geom';
 import { rngRange, rngWeightedIndex } from '../../math/rng';
@@ -49,10 +49,12 @@ import { clamp, lerp } from '../../math/scalar';
 import type { Vec3 } from '../../math/vec';
 import { Btn, MAX_AIM_PITCH, type PlayerInput } from '../../net/input';
 import { heldCityWeapon } from '../cityWeapons';
-import { findEdible, findGrabTarget } from '../kaijuEffects';
+import { findEdible, findGrabTarget, throwClearance } from '../kaijuEffects';
+import { aimThrowAt, createThrowAim, createThrowFlight, throwElevations, throwFlight, throwHand, type ThrowFlight } from '../throwArc';
 import { laserOnKaiju } from '../squads';
 import { unitSeesKaiju } from '../spotting';
 import { canSwimAt, deepWaterAt, swimDef } from '../swim';
+import type { HeldObject } from '../events';
 import type { Kaiju, PlayerState, Unit, World } from '../types';
 import { beginBotInput, botHandicap, busyWith, heldButtons, hesitates, press, releaseAll } from './common';
 import type { BotState } from './types';
@@ -682,6 +684,59 @@ function pitchTo(fromY: number, y: number, dist: number): number {
   return clamp(Math.atan2(y - fromY, Math.max(dist, 0.5)), -MAX_AIM_PITCH, MAX_AIM_PITCH);
 }
 
+const flight = createThrowFlight();
+const throwAim = createThrowAim();
+const leadAim = createThrowAim();
+const handAt: Vec3 = { x: 0, y: 0, z: 0 };
+/** The aim for a throw is worked out again this often (ticks): tracing arcs is not free. */
+const THROW_AIM_TICKS = 4;
+
+/** How `held` flies from this kaiju now (sim/throwArc.ts). */
+function flightOf(k: Kaiju, held: HeldObject): ThrowFlight {
+  return throwFlight(k.kind, k.stage, held, flight);
+}
+
+/** How far the bot throws `held`: a share (BOT_RULES.kaiju.throwRange, by stage) of the farthest it can go on flat ground. */
+function throwReachOf(k: Kaiju, held: HeldObject): number {
+  const f = flightOf(k, held);
+  const e = Math.min(f.maxElevation, Math.PI / 4);
+  return ((f.speed * f.speed * Math.sin(2 * e)) / f.gravity) * perStage(R.throwRange, k.stage);
+}
+
+/**
+ * Aims what is in the hand at unit `u` (sim/throwArc.ts `aimThrowAt`): the low arc when the city
+ * leaves it a way there, else the lob over what is in the way, leading the unit by the flight's
+ * time. Worked out every few ticks and kept in the bot state. When no arc gets there it still
+ * aims the low arc at the unit (the throw lands on whatever is in the way, as a person's would)
+ * and says false.
+ */
+function aimThrowAtUnit(world: World, k: Kaiju, def: KaijuKindDef, bs: BotState, u: Unit, splash: number): boolean {
+  if (!k.held) return false;
+  if (bs.throwAimUnit === u.id && world.tick - bs.throwAimTick < THROW_AIM_TICKS && bs.throwAimTick >= 0) return true;
+  const f = flightOf(k, k.held);
+  const clear = throwClearance(k, def);
+  const tolerance = Math.max(3, u.radius + splash * 0.5);
+  bs.throwAimUnit = u.id;
+  bs.throwAimTick = world.tick;
+  if (aimThrowAt(world.cityQuery, k, f, u.x, u.y, u.z, tolerance, clear, throwAim)) {
+    // Where it will be when the throw gets there.
+    const t = throwAim.time;
+    const ok = aimThrowAt(world.cityQuery, k, f, u.x + u.vx * t, u.y, u.z + u.vz * t, tolerance, clear, leadAim);
+    const a = ok ? leadAim : throwAim;
+    bs.throwYaw = a.yaw;
+    bs.throwPitch = clamp(a.pitch, -MAX_AIM_PITCH, MAX_AIM_PITCH);
+    return true;
+  }
+  // No arc gets there: the low arc at it all the same (or the longest throw, when it is out of reach).
+  bs.throwYaw = yawFromTo(k.x, k.z, u.x, u.z);
+  const src = { kind: k.kind, stage: k.stage, x: k.x, z: k.z, aimYaw: bs.throwYaw, aimPitch: 0 };
+  throwHand(src, handAt);
+  const both = throwElevations(Math.hypot(u.x - handAt.x, u.z - handAt.z), u.y - handAt.y, f.speed, f.gravity);
+  const e = Math.min(both ? both[0] : Math.PI / 4, f.maxElevation);
+  bs.throwPitch = clamp(e - f.lift, -MAX_AIM_PITCH, MAX_AIM_PITCH);
+  return false;
+}
+
 /** A unit the beam can reach and see from the mouth, nearest to (nx, nz); null when there is none. */
 function beamUnit(world: World, k: Kaiju, st: KaijuStageDef, range: number, nx: number, nz: number): Unit | null {
   let best: Unit | null = null;
@@ -814,8 +869,7 @@ function weaponSpot(world: World, bs: BotState): { x: number; z: number; r: numb
  */
 function chooseCityWeapon(world: World, k: Kaiju, bs: BotState, def: KaijuKindDef, near: { unit: Unit | null; dist: number }): boolean {
   const w = def.cityWeapons;
-  const g = projectileTypeDef('thrown').gravity;
-  const burstRange = ((w.propane.speed * w.propane.speed) / g) * R.throwRange;
+  const burstRange = throwReachOf(k, { kind: 'prop', prop: 'propane' });
   const t = groupTarget(world, k, burstRange);
   const groupThere = t.unit !== null && t.count + 1 >= R.groupUnits;
   const melee = R.meleeRadii * k.radius + R.meleeMargin;
@@ -931,13 +985,12 @@ function useCityWeapon(
   kind: PropKindId,
 ): boolean {
   const w = def.cityWeapons;
-  const g = projectileTypeDef('thrown').gravity;
   let aimYaw = k.aimYaw;
   let aimPitch = 0;
   let moveYaw = aimYaw;
   let throttle = 0;
   let throwAt: Unit | null = null;
-  let throwHeight = 0;
+  let splash = 0;
   const approach = (u: Unit): void => {
     aimYaw = yawFromTo(k.x, k.z, u.x, u.z);
     moveYaw = steer(world, k, bs, u.x, u.z, -1);
@@ -957,31 +1010,30 @@ function useCityWeapon(
     if (near.dist <= reach * 0.95 && canAct(k) && angleDist(k.aimYaw, aimYaw) < club.arc * 0.4) press(bs, 'strike', TAP_TICKS, 6);
   } else if (kind === 'propane' || kind === 'watertank') {
     const b = kind === 'propane' ? w.propane : w.watertank;
-    const t = groupTarget(world, k, ((b.speed * b.speed) / g) * R.throwRange);
-    if (t.unit) throwAt = t.unit;
-    else if (near.unit && near.dist < 160) approach(near.unit);
+    const t = groupTarget(world, k, throwReachOf(k, { kind: 'prop', prop: kind }));
+    if (t.unit) {
+      throwAt = t.unit;
+      splash = b.radius;
+    } else if (near.unit && near.dist < 160) approach(near.unit);
   } else if (kind === 'antenna' || kind === 'mast') {
     const u = javelinTarget(world, k, st, (kind === 'mast' ? w.mast : w.antenna).range * 0.85);
-    if (u) {
-      throwAt = u;
-      throwHeight = 1;
-    } else if (near.unit && near.dist < 200) approach(near.unit);
+    if (u) throwAt = u;
+    else if (near.unit && near.dist < 200) approach(near.unit);
   } else if (kind === 'garagedoor') {
     const frisbee = w.garagedoor.throw.range * 0.8;
     const worn = k.shieldHp < w.garagedoor.hp * R.doorLow;
-    if (near.unit && near.dist <= frisbee && (near.dist <= R.doorThrowAt || worn)) throwAt = near.unit;
+    if (near.unit && near.dist <= frisbee && (near.dist <= R.doorThrowAt || worn)) {
+      throwAt = near.unit;
+      splash = w.garagedoor.throw.radius;
+    }
     // Carried into the guns, facing them: it takes their fire.
     else if (near.unit && near.dist < 200) approach(near.unit);
   }
   if (throwAt) {
-    const u = throwAt;
-    const d = Math.hypot(u.x - k.x, u.z - k.z);
-    // Where it will be when the throw gets there (roughly: the throw is fast and short).
-    const lead = Math.min(1.5, d / 30);
-    const tx = u.x + u.vx * lead;
-    const tz = u.z + u.vz * lead;
-    aimYaw = yawFromTo(k.x, k.z, tx, tz);
-    aimPitch = pitchTo(st.eyeHeight, throwHeight, Math.hypot(tx - k.x, tz - k.z) - st.eyeForward);
+    // On a real arc (sim/throwArc.ts): the low one, or the lob over what is in the way.
+    aimThrowAtUnit(world, k, def, bs, throwAt, splash);
+    aimYaw = bs.throwYaw;
+    aimPitch = bs.throwPitch;
     if (canAct(k) && angleDist(aimYaw, k.yaw) <= FACE_ANGLE && angleDist(k.aimYaw, aimYaw) < 0.1) press(bs, 'strike', TAP_TICKS, 6);
   } else if (throttle === 0 && kind !== 'foodsign') {
     // Nobody about to use it on: it lets go of it (it lies there for later) and goes back to work.
@@ -1201,16 +1253,17 @@ export function kaijuBot(world: World, p: PlayerState, k: Kaiju): void {
 
   // --- Something in the hand: throw it at a squad, or eat it when hurt ------------------------
   // (Not a city weapon: those are never eaten, and are used above or swung as a club below.)
-  const throwSpeed = perStage(a.throw.speed, k.stage);
-  const throwReach = ((throwSpeed * throwSpeed) / projectileTypeDef('thrown').gravity) * R.throwRange;
+  // How far it throws a car (what it picks up to throw); what it holds may fly a little shorter.
+  const throwReach = throwReachOf(k, { kind: 'prop', prop: 'car_sedan' });
   if (k.held && heldCityWeapon(k.held) === null) {
     if (hurt && k.cooldowns.eat <= 0) {
       // Grab with something in the hand eats it.
       if (canAct(k)) press(bs, 'grab', TAP_TICKS, 6);
     } else if (near.unit && near.dist <= throwReach) {
-      const u = near.unit;
-      aimYaw = yawFromTo(k.x, k.z, u.x, u.z);
-      aimPitch = pitchTo(st.eyeHeight, 0.5, Math.hypot(u.x - k.x, u.z - k.z) - st.eyeForward);
+      // On a real arc (sim/throwArc.ts): the low one, or the lob over what is in the way.
+      aimThrowAtUnit(world, k, def, bs, near.unit, perStage(a.throw.impactRadius, k.stage));
+      aimYaw = bs.throwYaw;
+      aimPitch = bs.throwPitch;
       facing = true;
       if (canAct(k) && angleDist(aimYaw, k.yaw) <= FACE_ANGLE && angleDist(k.aimYaw, aimYaw) < 0.1) press(bs, 'strike', TAP_TICKS, 6);
     } else if (canAct(k) && !busyWith(bs, 'strike')) {

@@ -8,7 +8,7 @@
  * cinematic one.
  */
 
-import { kaijuStageDef, unitTypeDef, weaponDef, type MatchEndEvent, type SimEvent, type SnapKaiju } from '@mb/shared';
+import { kaijuStageDef, unitTypeDef, weaponDef, type MatchEndEvent, type RoseMessage, type SimEvent, type SnapKaiju } from '@mb/shared';
 import type { AudioEngine } from '../audio/audioEngine';
 import { MatchAudio } from '../audio/matchAudio';
 import type { Autopilot } from '../game/autoplay';
@@ -17,6 +17,7 @@ import { DroneController } from '../game/controllers/droneController';
 import { HumanController } from '../game/controllers/humanController';
 import { KaijuController } from '../game/controllers/kaijuController';
 import { CameraShake, squadIsOut, type ControlContext, type Controller, type InputSample } from '../game/controllers/types';
+import type { ActionState } from '../game/input/actions';
 import type { InputManager } from '../game/input/inputManager';
 import { InputTicker } from '../game/input/inputTicker';
 import type { FrameState, MatchSession } from '../net/matchSession';
@@ -79,6 +80,12 @@ export class MatchRuntime {
    * reticle) here, so they move with the picture and not a frame behind it.
    */
   onCamera: (() => void) | null = null;
+  /**
+   * Called every frame right after the devices are read and before the controller sees them:
+   * the communication rose (ui/rose.ts) takes the mouse's movement here while it is open, so the
+   * view holds still.
+   */
+  onInput: ((actions: ActionState, dt: number) => void) | null = null;
   eventCounts: Record<string, number> = {};
   /** Where a frame's time goes, milliseconds, smoothed: input and network, scene update, drawing. */
   readonly timing = { logic: 0, scene: 0, draw: 0 };
@@ -131,6 +138,12 @@ export class MatchRuntime {
   /** The kaiju player's controller, or null for the other roles. */
   get kaiju(): KaijuController | null {
     return this.player instanceof KaijuController ? this.player : null;
+  }
+
+  /** Somebody in the match picked a wedge of the communication rose: say it (talk only, no game effect). */
+  rose(msg: RoseMessage): void {
+    if (this.session.catchingUp) return;
+    this.matchAudio.rose(msg, this.session.config.players[msg.player]);
   }
 
   /** The kaiju player picked molt card `n` (1 to 3): it goes to the server with the next input. */
@@ -333,6 +346,7 @@ export class MatchRuntime {
     this.clockNow = now;
     autopilot?.setContext(session, this.frame);
     const actions = input.poll(dt);
+    this.onInput?.(actions, dt);
     const frame = session.sample(now, dt);
     this.frame = frame;
 

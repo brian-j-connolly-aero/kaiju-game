@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Rose, monster: the big roar. A roaring maw with three waves of sound. -->
+  <g transform="matrix(0.8761 0 0 0.8761 -0.505 3.96)">
+    <path fill="currentColor" stroke="none" fill-rule="evenodd" d="M4 44V24Q4 9 19 8L25 8.5 28 12 35 12.5Q40.5 13 40 18.5L39.5 22Q39 24.5 36.5 25.5L18.5 33.5 33.5 47Q36 49.5 34.5 52.5 33 55.5 29 56L15 57Q4 57 4 44ZM15 17L23.5 20 16 22.5Z"/>
+    <path d="M44 26A10 10 0 0 1 44 42"/>
+    <path d="M51 19A20 20 0 0 1 51 49"/>
+    <path d="M58 12A30 30 0 0 1 58 56"/>
+  </g>
+</svg>

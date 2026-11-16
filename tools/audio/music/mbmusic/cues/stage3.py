@@ -1,273 +1,254 @@
-"""stage3: "Colossus over Port Meridian" (the titan). 32 bars, 80 s loop, base and combat stems.
+"""stage3: "Colossus Overdrive" (stage 3, the titan). 168 beats per minute, 112 bars, 160 s loop.
+D minor with the flat second (E flat) of the monster's cadence; the last chorus a semitone up in
+E flat minor.
 
-Enormous: the whole choir, full brass and strings, bells; timpani and drums in the combat stem.
-The pulse is the same 96 beats per minute, but the accents fall 3+3+2, so it lurches like
-something very heavy walking.
+The biggest of the three: double-kick drums, two distorted guitars, synth bass, the whole choir
+(sustained "aah" and shouts), brass section and horns, timpani, taiko and orchestra hits, a saw
+lead with a square wave an octave below. The accents of the intro and the breakdown fall
+3+3+2, like the titan's orchestral music before it. One bar is 10/7 s (63000 samples).
 
-    bars  1-8   theme, dark: men's voices, trombones and horns in unison; women hold the harmony
-    bars  9-16  second strain: women and violins; men, horns and low brass in harmony, building
-    bars 17-24  the theme at half speed in the bass (men, trombones, tuba, basses, organ pedal)
-                under a slow rising chorale for the women and strings; bells toll every two bars
-    bars 25-32  theme, apotheosis: choir in octaves, trumpets and high woodwind above, bells on
-                every bar, closing on the flat-second cadence
-
-Base stem: everything pitched that carries harmony or tune, including the bells.
-Combat stem: timpani, bass drum, taiko, snare, cymbals; trumpet calls and trombone punches on
-the 3+3+2 accents; choir shouts.
+    bars   1-8    intro: the 3+3+2 riff on D with E flat stabs, choir and brass on the accents
+    bars   9-24   verse: the saw lead in running eighths over the double kick
+    bars  25-32   pre-chorus: long rising notes, choir swelling, snare build
+    bars  33-48   chorus: the anthem hook, brass and choir under it, 3+3+2 orchestra hits
+    bars  49-56   Gragnor's theme (the game's own) for the whole choir, brass and band
+    bars  57-64   the theme's second strain, women and tenors
+    bars  65-72   breakdown: taiko, toms and timpani, choir "ooh", the hook echoing, a build
+    bars  73-88   guitar solo; ends on B flat to lift the key
+    bars  89-104  chorus a semitone up (E flat minor); B flat, then A, turns it home
+    bars 105-112  outro: the intro riff again, back to bar 1
 """
-from ..orchestra import BASS_DRUM, CRASH, SNARE, SNARE_ALT, TAIKO_LONG, TAIKO_SHORT
-from ..patterns import bass, hammer, motor, octaves, stab, swell_into, voice, voices
-from ..score import B, Cue, pitch
-from ..theme import B1, HARM_A, HARM_B, STRAIN_B, THEME, pad, sustain
+from ..arcade import Harmony, Kit, arp, bass, echo, groove, hits, long_bass, pad, power, stabs, swell
+from ..score import B, Cue
+from ..theme import STRAIN_B, THEME
 
-P = pitch
-LOW_BRASS = ("D3+A3+D4:4 | C3+G3+C4:4 | Bb2+F3+Bb3:2 G2+D3+G3:2 | A2+E3+A3:4 | "
-             "D3+A3+D4:4 | C3+G3+C4:4 | Eb3+Bb3+Eb4:2 A2+G3+A3:2 | D3+A3+D4:4")
-# bars 17-24: the first half of the theme at half speed, as the bass (cello octave)
-CANTUS = "D3:3 D3:1 | F3:4 | E3:3 D3:1 | C3:4 | F3:3 F3:1 | Bb3:4 | A3:3 G3:1 | E3:4"
-# the basses' lower octave of the cantus. It rests on the long C of the fourth bar: bowed C1 under
-# C2 adds up to a boom at 65 Hz there (measured 5 dB over every other bar), and the organ pedal
-# holds that C1 anyway.
-CANTUS_LOW = "D3:3 D3:1 | F3:4 | E3:3 D3:1 | r:4 | F3:3 F3:1 | Bb3:4 | A3:3 G3:1 | E3:4"
-# and the chorale above it (soprano, alto, tenor), led against the bass in contrary motion
-CHORALE_S = "A4:4 | A4:2 C5:2 | C5:3 D5:1 | E5:4 | F5:4 | F5:2 D5:2 | E5:4 | E5:2 C#5:2"
-CHORALE_A = "F4:4 | F4:2 A4:2 | G4:4 | G4:2 C5:2 | C5:4 | Bb4:4 | A4:4 | A4:2 G4:2"
-CHORALE_T = "D4:4 | C4:4 | C4:4 | C4:4 | A3:4 | D4:4 | C#4:4 | E4:4"
-# harmony of those bars per half bar, for the string motor: (bass, upper voices)
-HARM_C = [
-    ("D3", "D4 F4 A4"), ("D3", "D4 F4 A4"), ("F3", "C4 F4 A4"), ("F3", "C4 A4 C5"),
-    ("E3", "C4 G4 C5"), ("E3", "C4 G4 C5"), ("C3", "C4 G4 E5"), ("C3", "C4 C5 E5"),
-    ("F3", "A3 C5 F5"), ("F3", "A3 C5 F5"), ("Bb3", "D4 Bb4 F5"), ("Bb3", "D4 Bb4 D5"),
-    ("A3", "C#4 A4 E5"), ("G3", "C#4 A4 E5"), ("E3", "E4 A4 E5"), ("E3", "E4 G4 C#5"),
-]
-# low-brass and men's-shout dyads for those bars: the bass note plus a chord tone that is
-# clean above it (these chords are not all in root position, so "root and fifth" would be wrong)
-DYADS_C = ["D3 A3", "D3 A3", "F3 C4", "F3 C4", "E3 C4", "E3 C4", "C3 G3", "C3 G3",
-           "F3 C4", "F3 C4", "Bb2 F3", "Bb2 F3", "A2 E3", "G3 E4", "E3 C#4", "E3 C#4"]
-BELLS_A = {1: "D5", 3: "D5", 5: "D5", 7: "Bb4", 8: "D5"}
-BELLS_C = {17: "D5", 19: "C5", 21: "F5", 23: "A4"}
-BELLS_Z = {25: "D5", 26: "C5", 27: "D5", 28: "A4", 29: "D5", 30: "C5", 31: "Eb5", 32: "D5"}
-CALL = {  # trumpet call per theme bar: (lower note, top note) for two trumpet parts
-    1: (("A4", "D5"), ("F4", "A4")), 2: (("G4", "C5"), ("E4", "G4")), 3: (("Bb4", "D5"), ("G4", "Bb4")),
-    4: (("A4", "C#5"), ("E4", "A4")), 5: (("A4", "D5"), ("F4", "A4")), 6: (("G4", "C5"), ("E4", "G4")),
-    7: (("A4", "C#5"), ("G4", "A4")),
-}
+BPM = 168
+
+INTRO = "Dm | Dm Eb | Dm | Dm Eb | Dm | Dm Eb | Bb | A"
+VERSE = "Dm | Dm | Bb | Bb | Gm | Gm | A | A | Dm | Dm | Bb | Bb | Gm | Gm | Eb | A"
+PRE = "Bb | C | Dm | Dm | Bb | C | Eb | A"
+CHORUS = "Dm | C | Bb | A | Dm | C | Eb | A | Dm | C | Bb | A | Gm | Bb | Eb A | Dm"
+THEME_H = "Dm | C | Bb Gm | A | Dm | C | Eb | Dm"
+STRAIN_H = "Gm | Dm | Eb | A | Gm | Bb | Gm | A"
+BREAK = "Dm | Dm | Bb | Bb | Gm | Gm | A | A"
+SOLO = "Dm | Bb | C | Dm | Dm | Bb | C | A | Gm | Bb | C | Dm | Eb | C | Bb | Bb"
+
+VERSE_MEL = (
+    "D5:.5 F5:.5 A5:.5 D6:.5 C6:.5 A5:.5 F5:.5 A5:.5 | G5:.75 F5:.75 E5:.5 F5:1 D5:1 | "
+    "D5:.5 F5:.5 Bb5:.5 D6:.5 C6:.5 Bb5:.5 F5:.5 Bb5:.5 | A5:.75 G5:.75 F5:.5 G5:1 D5:1 | "
+    "D5:.5 G5:.5 Bb5:.5 D6:.5 C6:.5 Bb5:.5 G5:.5 Bb5:.5 | A5:.75 G5:.75 F5:.5 G5:2 | "
+    "E5:.5 A5:.5 C#6:.5 E6:.5 D6:.5 C#6:.5 Bb5:.5 A5:.5 | G5:.75 F5:.75 E5:.5 C#5:2")
+VERSE_END = "Eb5:.5 G5:.5 Bb5:.5 Eb6:.5 D6:.5 Bb5:.5 G5:.5 Bb5:.5 | A5:1 E5:.5 C#5:.5 A4:2"
+PRE_MEL = "F5:2 D6:2 | E6:2 C6:2 | D6:2 A5:2 | F5:4 | F5:2 D6:2 | E6:2 G6:2 | G6:2 Bb6:2 | A6:4"
+HOOK = (
+    "D6:1.5 A5:.5 D6:1 E6:1 | F6:1.5 E6:.5 C6:1 G5:1 | D6:1.5 C6:.5 Bb5:1 F5:1 | E6:2 C#6:1 A5:1 | "
+    "D6:1.5 A5:.5 D6:1 E6:1 | F6:1.5 G6:.5 E6:1 C6:1 | G6:1.5 F6:.5 Eb6:1 Bb5:1 | A5:2 C#6:1 E6:1 | "
+    "F6:1.5 E6:.5 D6:1 A5:1 | G6:1.5 F6:.5 E6:1 C6:1 | F6:1.5 E6:.5 D6:1 Bb5:1 | C#6:2 E6:2 | "
+    "D6:1.5 C6:.5 Bb5:1 G5:1 | F6:1.5 Eb6:.5 D6:1 Bb5:1")
+HOOK_END = "G6:1 Eb6:1 E6:1 C#6:1 | D6:4"
+HOOK2_END = "F6:1.5 Eb6:.5 D6:1 Bb5:1 | A5:2 C#6:1 E6:1"
+HOOK_HEAD = "D6:1.5 A5:.5 D6:1 E6:1"
+SOLO_MEL = (
+    "F5:.25 A5:.25 D6:.25 A5:.25 F5:.25 D5:.25 A4:.25 D5:.25 F5:1 A5:1 | "
+    "F5:.25 Bb5:.25 D6:.25 Bb5:.25 F5:.25 D5:.25 Bb4:.25 D5:.25 F5:1 Bb5:1 | "
+    "C6:.25 E6:.25 C6:.25 G5:.25 E5:.25 G5:.25 C6:.25 G5:.25 E6:1 C6:1 | "
+    "D6:.5 C6:.5 A5:.5 F5:.5 D6:2 | "
+    "F5:.25 E5:.25 D5:.25 E5:.25 F5:.25 G5:.25 A5:.25 C6:.25 D6:2 | "
+    "D6:.25 C6:.25 Bb5:.25 A5:.25 Bb5:.25 C6:.25 D6:.25 F5:.25 Bb5:2 | "
+    "C6:.25 Bb5:.25 A5:.25 G5:.25 A5:.25 Bb5:.25 C6:.25 E6:.25 G5:2 | "
+    "A5:.5 Bb5:.5 C#6:.5 E6:.5 C#6:1 A5:1 | "
+    "G5:.25 Bb5:.25 D6:.25 Bb5:.25 G5:.25 D5:.25 G5:.25 Bb5:.25 D6:2 | "
+    "F5:.25 Bb5:.25 D6:.25 Bb5:.25 F5:.25 D5:.25 F5:.25 Bb5:.25 D6:2 | "
+    "E5:.25 G5:.25 C6:.25 G5:.25 E5:.25 C5:.25 E5:.25 G5:.25 C6:2 | "
+    "D5:.25 F5:.25 A5:.25 F5:.25 D5:.25 A4:.25 D5:.25 F5:.25 A5:2 | "
+    "Eb6:1.5 D6:.5 Bb5:1 G5:1 | E6:1.5 D6:.5 C6:1 G5:1 | "
+    "D6:.5 C6:.5 Bb5:.5 A5:.5 Bb5:.5 C6:.5 D6:.5 E6:.5 | "
+    "F5:.25 Bb5:.25 D6:.25 F5:.25 Bb5:.25 D6:.25 F5:.25 Bb5:.25 D6:2")
+
+RIFF_332 = "XmmXmmXmXmmXmmXm"
+HOOK_HITS = "X.....X.X...X..."
+ACCENTS = "X..X..X.X..X..X."
+HELD = "X-------x-----x-"
+CHUG8 = "x.m.m.m.x.m.m.m."
+BASS_16 = "RrrrRrrrRrrrRrrO"
+BASS_332 = "R.rR.rR.R.rR.rO."
+
+
+def band(s):
+    """The parts every arcade track of the titan uses (stage 3 and the final minute)."""
+    p = {}
+    p["kit"] = Kit(s, gains={"kick": 0.5, "snare": 4.0, "hats": -4.0, "toms": 1.0, "cym": -1.0})
+    p["bass"] = s.add("synth bass", "synth_bass", gain=1.0, role="bass")
+    p["gl"] = s.add("guitar left", "dist_guitar", gain=-4.0, role="ostinato")
+    p["gr"] = s.add("guitar right", "dist_guitar_r", gain=-4.0, tune=-7.0, role="ostinato")
+    p["vln"] = s.add("violins sixteenths", "violins1_marc", gain=-5.0, role="ostinato")
+    p["saw"] = s.add("saw lead", "saw_lead", gain=2.0, role="melody")
+    p["sq"] = s.add("square lead, octave below", "square_lead", gain=-4.0, pan=-0.2, role="melody")
+    p["brass"] = s.add("brass section", "brass_section", gain=1.0, role="melody")
+    p["horns"] = s.add("horns", "horns", gain=-2.0, role="pad")
+    p["sop"] = s.add("sopranos", "sopranos", gain=-1.0, role="choir")
+    p["alt"] = s.add("altos", "altos", gain=-2.0, role="choir")
+    p["ten"] = s.add("tenors", "tenors", gain=-1.0, role="choir")
+    p["women"] = s.add("choir shouts, women", "women_hit", gain=-2.0, role="choir")
+    p["men"] = s.add("choir shouts, men", "men_hit", gain=-2.0, role="choir")
+    p["timp"] = s.add("timpani", "timpani", gain=0.0, role="perc")
+    p["taiko"] = s.add("taiko", "taiko", gain=-1.0, role="perc")
+    p["hit"] = s.add("orchestra hits", "orch_hit", gain=0.0, role="perc")
+    p["fx"] = s.add("swells", "reverse_cymbal", gain=-4.0, role="perc")
+    return p
+
+
+def guitars(p, harm: Harmony, rhythm: str, vel: int) -> None:
+    power(p["gl"], harm, rhythm, vel)
+    power(p["gr"], harm, rhythm, vel - 4)
+
+
+def shouts(p, harm: Harmony, rhythm: str, vel: int) -> None:
+    stabs(p["women"], harm, rhythm, vel, lo="A3", hi="F5")
+    stabs(p["men"], harm, rhythm, vel, lo="D3", hi="E4")
+
+
+def hook_band(p, bar: int, harm: Harmony, tr: int, ending: str, *, scale: float = 1.0) -> None:
+    """The chorus as the band, choir and orchestra play it: the hook's first 14 bars transposed
+    by `tr`, then a written 2-bar ending (not transposed)."""
+    kit = p["kit"]
+    groove(kit, bar, 8, "double", fill="toms4", crash_every=2, scale=scale)
+    groove(kit, bar + 8, 8, "double", fill="toms8", crash_every=2, scale=scale)
+    bass(p["bass"], harm, BASS_16, 92, lo="C1")
+    guitars(p, harm, HELD, 102)
+    arp(p["vln"], harm, 86, lo="A4", n=3, shape="pattern:0102")
+    for part, v, octave in ((p["saw"], 114, 0), (p["sq"], 104, -12), (p["brass"], 106, -12)):
+        part.line(bar, HOOK, v, gate=0.94, tr=tr + octave)
+        part.line(bar + 14, ending, v, gate=0.94, tr=octave)
+    pad(p["horns"], harm, 92, lo="F3", hi="D5")
+    pad(p["alt"], harm, 88, lo="A3", hi="D5", n=2)
+    for b in range(bar, bar + 16, 4):
+        # on the hook's own rhythm (long, short, long, long)
+        hits(p["hit"], Harmony(b, harm.at(B(b))), HOOK_HITS, 112)
+        hits(p["timp"], Harmony(b, harm.at(B(b))), HOOK_HITS, 108, lo="D2")
+        shouts(p, Harmony(b + 2, harm.at(B(b + 2))), "X.....x.........", 106)
 
 
 def build() -> Cue:
-    cue = Cue("stage3", 32, loop=True, group="stage3", title="Colossus over Port Meridian (stage 3, the titan)",
-              sections=[(1, "theme, dark (men, low brass)"), (9, "second strain"),
-                        (17, "theme at half speed in the bass, chorale"), (25, "theme, apotheosis")],
-              target_lufs=-15.0)
-    base = cue.stem("stage3_base")
-    combat = cue.stem("stage3_combat")
+    cue = Cue("stage3", 112, loop=True, bpm=BPM, title="Colossus Overdrive (stage 3, the titan)",
+              sections=[(1, "intro"), (9, "verse"), (25, "pre-chorus"), (33, "chorus"), (49, "theme"),
+                        (57, "second strain"), (65, "breakdown"), (73, "solo"), (89, "chorus, E flat minor"),
+                        (105, "outro")], target_lufs=-16.0)
+    s = cue.stem("stage3")
+    spb = cue.sec_per_beat
+    p = band(s)
+    kit = p["kit"]
+    solo = s.add("guitar solo", "od_guitar", gain=1.0, role="melody")
+    echo_p = s.add("echo", "saw_lead", gain=-3.0, pan=0.45, rev=0.35, role="melody")
+    ooh = s.add("choir ooh", "women_ooh", gain=0.0, role="choir")
 
-    # =========================== base ===========================================================
-    # ---- bass: basses, tuba, organ pedal; cellos hammer the roots in 3+3+2 ---------------------
-    # This is where the titan's weight comes from, and the samples do not give it away for free:
-    # the bowed basses have no fundamental below A1 and the organ's is weak. So the basses play
-    # in octaves wherever the lower one is on the instrument (C1 and up), and the organ pedal
-    # gets its 16-foot tone back with a low shelf (`sub`) and runs under the whole loop.
-    cb = base.add("basses", "basses", gain=4.0, sub=4.0, role="bass")
-    tuba = base.add("tuba", "tuba", gain=3.0, role="bass")
-    org = base.add("organ pedal", "organ_pedal", gain=7.0, sub=21.0, hp=20, role="bass")
-    vc = base.add("cellos hammer", "cellos_marc", gain=2.0, role="ostinato")
-    for bar, v in ((1, 100), (25, 110)):
-        hammer(cb, bar, octaves(bass(HARM_A, -1)), v, fill=False, dur=0.9)
-        hammer(vc, bar, bass(HARM_A), v - 4)
-        sustain(tuba, bar, bass(HARM_A, -1), v - 6, rearticulate=4, gate=0.92)
-        sustain(org, bar, bass(HARM_A, -2, "C1"), 90, gate=1.0)
-    cb.line(9, "G1:4_ | F1:4_ | Eb1+Eb2:4_ | A1:4", 94, gate=0.97)
-    hammer(cb, 13, bass(HARM_B, -1)[8:], 98, fill=False, dur=0.9, cresc=(94, 108))
-    hammer(vc, 9, bass(HARM_B), 86, cresc=(80, 104))
-    sustain(tuba, 13, bass(HARM_B, -1)[8:], 88, rearticulate=4, gate=0.92, cresc=(84, 100))
-    sustain(org, 9, bass(HARM_B, -2, "C1"), 86, gate=1.0)
-    cb.line(17, CANTUS, 108, tr=-12, gate=0.96)
-    cb.line(17, CANTUS_LOW, 100, tr=-24, gate=0.96)             # the cantus in octaves
-    tuba.line(17, CANTUS, 100, tr=-12, gate=0.94)
-    org.line(17, CANTUS, 92, tr=-24, gate=1.0)
-    hammer(vc, 17, bass(HARM_C), 94, cresc=(90, 106))
+    # ---- intro and outro: the 3+3+2 riff ----------------------------------------------------------
+    for bar in (1, 105):
+        h = Harmony(bar, INTRO)
+        for i in range(8):
+            kit.bar(bar + i, kick="XxxxXxxxXxxxXxxx" if i >= 4 else "X..X..X.X..X..X.",
+                    snare="....X.......X..." if i >= 4 else "......X.......X.",
+                    hats="x.x.x.x.x.x.x.x.", cym="C......." if i % 4 == 0 else "")
+        kit.bar(bar + 7, toms="............1234")
+        bass(p["bass"], h, BASS_332, 96, lo="C1")
+        guitars(p, h, RIFF_332, 104)
+        hits(p["hit"], h, ACCENTS, 104)
+        hits(p["timp"], h, "X..X..X.........", 104, lo="D2")
+        shouts(p, Harmony(bar + 4, "Dm | Dm Eb | Bb | A"), ACCENTS, 100)
+        stabs(p["brass"], Harmony(bar + 4, "Dm | Dm Eb | Bb | A"), ACCENTS, 100, lo="F4", hi="F5")
+    swell(p["fx"], B(105), spb, vel=80)
 
-    # ---- strings: the motor, and tremolo violins on top ------------------------------------------
-    v2 = base.add("violins 2 motor", "violins2_marc", gain=-3.0, role="ostinato")
-    va = base.add("violas motor", "violas_marc", gain=-2.0, role="ostinato")
-    motor(v2, 1, voices(HARM_A, (1, 2)), 78)
-    motor(va, 1, voices(HARM_A, (0, 1)), 80)
-    motor(va, 9, voice(HARM_B, 0), 76, cresc=(70, 92))
-    motor(v2, 13, voices(HARM_B, (1, 2))[8:], 78, cresc=(72, 94))
-    motor(v2, 17, voices(HARM_C, (1, 2)), 84, cresc=(80, 96))
-    motor(va, 17, voices(HARM_C, (0, 1)), 84, cresc=(80, 96))
-    motor(v2, 25, voices(HARM_A, (1, 2), 12), 92)
-    motor(va, 25, voices(HARM_A, (0, 1)), 92)
-    vt = base.add("violins tremolo", "violins_trem", gain=-4.0, role="pad")
-    sustain(vt, 1, voice(HARM_A, 2, 12), 84)
-    vt.line(17, CHORALE_S, 92, tr=12, gate=1.0)
-    v1 = base.add("violins 1", "violins1", gain=3.0, role="melody")
-    v1.line(9, STRAIN_B, 100, tr=12, gate=0.98, cresc=(94, 112))
-    v1.line(25, THEME, 112, tr=12, gate=0.98)
-    picc = base.add("piccolo", "piccolo", gain=-4.0, role="melody")
-    fl = base.add("flute", "flute", gain=-2.0, role="melody")
-    fl.line(9, STRAIN_B, 90, tr=12, gate=0.95, cresc=(86, 100))
-    picc.line(25, THEME, 96, tr=24, gate=0.94)
-    fl.line(25, THEME, 100, tr=12, gate=0.95)
+    # ---- verse ------------------------------------------------------------------------------------
+    hv = Harmony(9, VERSE)
+    groove(kit, 9, 8, "rock", fill="toms4")
+    groove(kit, 17, 8, "double", fill="toms8")
+    bass(p["bass"], hv, BASS_16, 90, lo="C1")
+    guitars(p, hv, CHUG8, 94)
+    for part, v, octave in ((p["saw"], 104, 0), (p["sq"], 98, -12)):
+        part.line(9, VERSE_MEL, v, gate=0.86, tr=octave)
+        part.line(17, VERSE_MEL.rsplit(" | ", 2)[0], v, gate=0.86, tr=octave)
+        part.line(23, VERSE_END, v, gate=0.86, tr=octave)
+    pad(p["horns"], Harmony(17, "Dm | Dm | Bb | Bb | Gm | Gm | Eb | A"), 84, lo="F3", hi="D5")
+    for b in (9, 13, 17, 21):
+        hits(p["taiko"], Harmony(b, "Dm"), "X.....X.........", 100, lo="D3")
 
-    # ---- brass -----------------------------------------------------------------------------------
-    tb = base.add("trombones", "trombones", gain=4.5, role="melody")
-    hn = base.add("horns", "horns", gain=2.0, role="melody")
-    tb.line(1, THEME, 108, tr=-12, gate=0.94)                   # the tune, dark
-    hn.line(1, THEME, 106, tr=-12, gate=0.95)
-    sustain(hn, 9, voice(HARM_B, 1), 90, rearticulate=4, gate=0.94, cresc=(84, 104))
-    tb.line(13, "G2+D3+G3:4 | Bb2+F3+Bb3:4 | G2+D3+G3:4 | A2+E3+A3:4", 84, cresc=(80, 100))
-    tb.line(17, CANTUS, 110, gate=0.95)                         # the cantus (tuba and basses below)
-    hn.line(17, CHORALE_T, 98, gate=0.96)
-    hn.line(25, THEME, 114, gate=0.95)
-    tbl = base.add("trombones low", "trombones", gain=0.0, role="pad")
-    tbl.line(25, LOW_BRASS, 100, gate=0.94)
-    tp = base.add("trumpets", "trumpets", gain=1.0, role="melody")
-    tp.line(25, THEME, 108, tr=12, gate=0.93)
+    # ---- pre-chorus -------------------------------------------------------------------------------
+    hp = Harmony(25, PRE)
+    groove(kit, 25, 4, "half", fill=None)
+    groove(kit, 29, 2, "rock", fill=None)
+    kit.bar(31, kick="XxXxXxXxXxXxXxXx", snare="X.x.X.x.X.x.X.x.", hats="x.x.x.x.x.x.x.x.")
+    kit.roll(B(32), 4, 74, 124)
+    kit.bar(32, kick="X...X...X...X...")
+    swell(p["fx"], B(33), spb)
+    bass(p["bass"], hp, "R-------R.r.R.r.", 92, lo="C1")
+    guitars(p, hp, HELD, 92)
+    p["saw"].line(25, PRE_MEL, 100, gate=0.96, cresc=(90, 116))
+    pad(p["sop"], hp, 84, lo="D4", hi="A5", n=2)
+    pad(p["ten"], hp, 84, lo="C3", hi="F4", n=2)
+    arp(p["vln"], hp, 84, lo="A4", n=3, shape="pattern:0102")
+    p["timp"].roll(B(31), 4, "Bb2", 60, 90, step=0.125, dur=0.2)
+    p["timp"].roll(B(32), 4, "A2", 92, 118, step=0.125, dur=0.2)
 
-    # ---- the choir -------------------------------------------------------------------------------
-    sop = base.add("sopranos", "sopranos", gain=1.0, role="melody")
-    alt = base.add("altos", "altos", gain=0.5, role="melody")
-    ten = base.add("tenors", "tenors", gain=1.0, role="melody")
-    chb = base.add("choir basses", "choir_basses", gain=1.0, role="melody")
-    men = base.add("men ooh", "men_ooh", gain=-1.0, role="melody")
-    wom = base.add("women ooh", "women_ooh", gain=-3.0, role="pad")
-    # 1-8: men carry the tune, women hold the harmony
-    for part in (ten, chb, men):
-        part.line(1, THEME, 106, tr=-12, gate=0.97)
-    sustain(sop, 1, voice(HARM_A, 2), 86, rearticulate=4, gate=0.96)
-    sustain(alt, 1, voice(HARM_A, 1), 86, rearticulate=4, gate=0.96)
-    # 9-16: women carry the strain, men the harmony
-    sop.line(9, STRAIN_B, 98, gate=0.97, cresc=(92, 110))
-    alt.line(9, B1 + " | Bb4:1.5 A4:.5 G4:2 | F4:1.5 F4:.5 F4:2 | G4:1.5 G4:.5 G4:2 | E4:1.5 E4:.5 G4:2",
-             98, gate=0.97, cresc=(92, 110))
-    sustain(ten, 9, voice(HARM_B, 0), 92, rearticulate=4, gate=0.95, cresc=(86, 104))
-    sustain(chb, 9, bass(HARM_B), 92, rearticulate=4, gate=0.95, cresc=(86, 104))
-    # 17-24: chorale over the cantus
-    sop.line(17, CHORALE_S, 104, gate=0.98, cresc=(98, 114))
-    alt.line(17, CHORALE_A, 102, gate=0.98, cresc=(96, 112))
-    ten.line(17, CHORALE_T, 102, gate=0.98, cresc=(96, 112))
-    chb.line(17, CANTUS, 108, gate=0.97)
-    men.line(17, CANTUS, 104, gate=0.97)
-    wom.line(17, CHORALE_S, 96, gate=0.98)
-    # 25-32: everyone on the tune, in octaves
-    for part in (sop, alt, wom):
-        part.line(25, THEME, 112, gate=0.97)
-    for part in (ten, chb, men):
-        part.line(25, THEME, 112, tr=-12, gate=0.97)
+    # ---- chorus -----------------------------------------------------------------------------------
+    hook_band(p, 33, Harmony(33, CHORUS), 0, HOOK_END)
+    pad(p["sop"], Harmony(33, CHORUS), 86, lo="D4", hi="A5", n=2)
 
-    # ---- bells -----------------------------------------------------------------------------------
-    bells = base.add("tubular bells", "tubular_bells", gain=1.0, role="perc")
-    big = base.add("church bell", "church_bell", gain=-3.0, role="perc")
-    for table, v in ((BELLS_A, 96), (BELLS_C, 104), (BELLS_Z, 110)):
-        for bar, n in table.items():
-            bells.note(B(bar), P(n), 3.5, v)
-    for bar in (1, 17, 21, 25, 29, 32):
-        big.note(B(bar), P("D3"), 6.0, 100 if bar >= 17 else 90)
+    # ---- Gragnor's theme, then its second strain --------------------------------------------------
+    ht = Harmony(49, THEME_H)
+    hs = Harmony(57, STRAIN_H)
+    groove(kit, 49, 8, "gallop", fill="toms8", crash_every=2)
+    groove(kit, 57, 8, "rock", fill="toms8", crash_every=4)
+    for h in (ht, hs):
+        bass(p["bass"], h, BASS_332, 94, lo="C1")
+    guitars(p, ht, "XmmXmmXmXmmXmmXm", 104)
+    guitars(p, hs, HELD, 96)
+    p["sop"].line(49, THEME, 100, gate=0.95)
+    p["alt"].line(49, THEME, 96, gate=0.95)
+    p["ten"].line(49, THEME, 98, gate=0.95, tr=-12)
+    p["brass"].line(49, THEME, 108, gate=0.95)
+    p["saw"].line(49, THEME, 106, gate=0.95, tr=12)
+    hits(p["hit"], ht, "X...............", 110)
+    hits(p["timp"], ht, "X.......X.......", 106, lo="D2")
+    p["sop"].line(57, STRAIN_B, 98, gate=0.95)
+    p["ten"].line(57, STRAIN_B, 94, gate=0.95, tr=-12)
+    p["saw"].line(57, STRAIN_B, 100, gate=0.95, tr=12)
+    p["horns"].line(57, STRAIN_B, 96, gate=0.95, tr=-12)
+    arp(p["vln"], hs, 84, lo="A4", n=3, shape="pattern:0102")
+    hits(p["timp"], hs, "X...............", 100, lo="D2")
 
-    # =========================== combat =========================================================
-    tm = combat.add("timpani", "timpani", gain=3.5, role="perc")
-    TIMP = {"D": "D2", "C": "C3", "Bb": "Bb2", "G": "G2", "A": "A2", "Eb": "Eb3", "F": "F2", "E": "E3"}
+    # ---- breakdown --------------------------------------------------------------------------------
+    hb = Harmony(65, BREAK)
+    for i in range(6):
+        kit.bar(65 + i, kick="X.......X.......", toms="5..5..6.5..5.6.." if i % 2 == 0 else "5..5..6.5...1.2.",
+                hats="o...o...o...o...", scale=0.9)
+    hits(p["taiko"], Harmony(65, "Dm | Dm | Bb | Bb | Gm | Gm"), ACCENTS, 100, lo="D3")
+    hits(p["timp"], Harmony(65, "Dm | Dm | Bb | Bb | Gm | Gm"), "X..X..X.........", 92, lo="D2")
+    kit.bar(65, cym="C")
+    kit.bar(71, kick="X.X.X.X.X.X.X.X.", snare="x.x.x.x.x.x.x.x.")
+    kit.roll(B(72), 4, 76, 124)
+    kit.bar(72, kick="X...X...X...X...")
+    swell(p["fx"], B(73), spb)
+    long_bass(p["bass"], hb, 92, lo="C1")
+    pad(ooh, hb, 92, lo="A3", hi="E5")
+    pad(p["horns"], hb, 82, lo="F3", hi="D5")
+    for bar in (65, 67, 69):
+        p["saw"].line(bar, HOOK_HEAD, 92, gate=0.9)
+    echo(p["saw"], echo_p, delay=0.75, scale=0.55, start=B(65), end=B(71), repeats=3)
+    arp(p["vln"], Harmony(69, "Gm | Gm | A | A"), 80, lo="A4", n=3, shape="pattern:0102")
 
-    def timp(first: int, harm: list, vel: int, bars: range = range(8)) -> None:
-        for i in bars:
-            r1 = TIMP[harm[2 * i][0][:-1]]
-            r2 = TIMP[harm[2 * i + 1][0][:-1]]
-            if i in (3, 7):
-                tm.line(first + i, f"{r1}:1.5> {r1}:1> {r2}:.5 {r2}:1/3 {r2}:1/3 {r2}:1/3", vel)
-            else:
-                tm.line(first + i, f"{r1}:1.5> {r1}:.5> r:.5 {r2}:.5 {r2}:.5> {r2}:.25 {r2}:.25", vel)
-    timp(1, HARM_A, 102)
-    # bars 9-12 (the strain starts quietly): the 3+3+2 goes on at reduced strength, so that the
-    # combat stem still says "fight" when it is faded in here
-    tm.line(9, "G2:1.5> G2:1.5> G2:1 | F2:1.5> F2:1.5> F2:1 | Eb3:1.5> Eb3:1.5> Eb3:1 | "
-               "A2:1.5> A2:1.5> A2:.5 A2:.5", 96)
-    timp(9, HARM_B, 100, range(4, 7))
-    tm.note(B(16), P("A2"), 0.9, 110)
-    tm.roll(B(16, 2), 3.0, "A2", 60, 120, step=0.125, dur=0.5, curve=1.4)
-    timp(17, HARM_C, 106, range(0, 7))
-    tm.note(B(24), P("E3"), 0.9, 112)
-    tm.roll(B(24, 2), 3.0, "E3", 64, 122, step=0.125, dur=0.5, curve=1.3)
-    timp(25, HARM_A, 112)
+    # ---- guitar solo ------------------------------------------------------------------------------
+    hsolo = Harmony(73, SOLO)
+    groove(kit, 73, 8, "rock", fill="toms8", crash_every=4)
+    groove(kit, 81, 8, "double", fill="toms8", crash_every=4)
+    bass(p["bass"], hsolo, BASS_332, 92, lo="C1")
+    guitars(p, hsolo, CHUG8, 90)
+    solo.line(73, SOLO_MEL, 106, gate=0.9)
+    stabs(p["brass"], hsolo, ACCENTS, 88, lo="F4", hi="F5")
+    pad(p["horns"], Harmony(81, "Gm | Bb | C | Dm | Eb | C | Bb | Bb"), 84, lo="F3", hi="D5")
 
-    bd = combat.add("bass drum", "bass_drum", gain=4.5, role="perc")
-    tk = combat.add("taiko", "percussion", gain=4.0, role="perc")
-    sn = combat.add("snare", "snare", gain=3.0, role="perc")
-    for bar in range(1, 33):
-        quiet = 9 <= bar <= 12
-        last = bar % 8 == 0
-        bd.hits(bar, "X.....X.....x...", BASS_DRUM, dur=0.5)
-        if quiet:
-            sn.hits(bar, "X.g.g.X.g.g.X.gg", SNARE, scale=1.05)
-            tk.hits(bar, "X.....x.....x...", TAIKO_LONG, dur=0.6)
-            continue
-        tk.hits(bar, "X..x..x.X..x..xx", TAIKO_LONG, dur=0.5)
-        tk.hits(bar, ".g..g..g.g..g...", TAIKO_SHORT, dur=0.3)
-        if last:
-            sn.hits(bar, "XggXggXgXggX....", SNARE)
-            sn.roll(B(bar, 4), 1.0, SNARE, 60, 124, curve=1.2, alt=SNARE_ALT)
-        else:
-            sn.hits(bar, "XggXggXgXggXggXx" if bar % 2 else "XggXggXgXgXgXXXX", SNARE)
-    sn.notes = [(st, d, SNARE_ALT if (i % 3 == 1 and v < 80) else p, v)
-                for i, (st, d, p, v) in enumerate(sorted(sn.notes))]
-
-    cy = combat.add("cymbals", "cymbals", gain=4.0, role="perc")
-    rc = combat.add("cymbal swell", "reverse_cymbal", gain=3.0, role="perc")
-    for bar, v in ((1, 112), (5, 92), (9, 96), (17, 112), (21, 96), (25, 120), (29, 100), (32, 108)):
-        cy.note(B(bar), CRASH, 4.0, v)
-    for bar in (1, 9, 17, 25):
-        swell_into(rc, B(bar) if bar > 1 else B(33), 104)
-
-    # ---- brass: trombone punches on the 3+3+2 accents, trumpet calls answering the tune ---------
-    tbs = combat.add("trombone punches", "trombones", gain=5.0, role="melody")
-    tp1 = combat.add("trumpets 1", "trumpets", gain=0.0, pan=0.14, role="melody")
-    tp2 = combat.add("trumpets 2", "trumpets", gain=-1.5, pan=0.26, role="melody")
-    for first, harm, v in ((1, HARM_A, 104), (13, HARM_B[8:], 100), (17, HARM_C, 106), (25, HARM_A, 114)):
-        roots = bass(harm)
-        for i, r in enumerate(roots):
-            chord = [r, r + 7]
-            if harm is HARM_A and i == 13:                       # A7 flat 5: root and seventh
-                chord = [r, r + 10]
-            if harm is HARM_C:
-                chord = [P(n) for n in DYADS_C[i].split()]
-            for pos in (0, 1.5) if i % 2 == 0 else (1.0,):
-                stab(tbs, B(first) + i * 2 + pos, chord, v + (6 if pos == 0 and i % 2 == 0 else 0), 0.4)
-    # bars 9-12: soft punches on the first two accents only (fifths, and an octave where the
-    # chord is D minor over F)
-    for i, dyad in enumerate(("G2 D3", "F2 F3", "Eb3 Bb3", "A2 E3")):
-        for pos, v in ((0, 88), (1.5, 82)):
-            stab(tbs, B(9 + i) + pos, [P(n) for n in dyad.split()], v, 0.4)
-    for first, v in ((1, 100), (25, 110)):
-        for i in range(1, 8):
-            bar = first + i - 1
-            for part, (lo, hi) in zip((tp1, tp2), CALL[i]):
-                t = B(bar, 3)
-                for k in range(3):                               # triplet pickup, then the long note
-                    part.note(t + k / 3, P(lo), 0.22, v - 6 + 3 * k)
-                part.note(t + 1, P(hi), 0.9, v + 8)
-        for part, n in ((tp1, "D5"), (tp2, "A4")):
-            part.line(first + 7, f"{n}:1.5> {n}:.5 {n}:2", v + 4, gate=0.8)
-    for i in range(4):                                           # the build at the end of the strain
-        for beat in (2.5, 4.5):
-            stab(tp1, B(13 + i, beat), [P(("D5", "D5", "E5", "E5")[i])], 98 + 4 * i, 0.3)
-            stab(tp2, B(13 + i, beat), [P(("Bb4", "Bb4", "Bb4", "C#5")[i])], 94 + 4 * i, 0.3)
-    for i, bar in enumerate(range(17, 25)):                      # over the cantus: octave calls
-        n = ("A4", "C5", "C5", "E5", "F5", "F5", "E5", "E5")[i]
-        for part, tr in ((tp1, 0), (tp2, -12 if P(n) - 12 >= P("E4") else 0)):
-            part.line(bar, f"r:2 {n}:1/3 {n}:1/3 {n}:1/3 {n}:1", 102 + i, tr=tr, gate=0.8)
-
-    # ---- choir shouts ----------------------------------------------------------------------------
-    wh = combat.add("women shout", "women_hit", gain=2.0, role="choir")
-    mh = combat.add("men shout", "men_hit", gain=2.0, role="choir")
-    for first, harm, bars, beats, v in ((1, HARM_A, (0, 2, 4, 6), (1,), 100), (13, HARM_B[8:], (0, 2), (1,), 100),
-                                        (17, HARM_C, (0, 2, 4, 6), (1, 2.5), 106),
-                                        (25, HARM_A, (0, 1, 2, 3, 4, 5, 6), (1, 2.5), 114)):
-        for i in bars:
-            hb = 2 * i
-            root = bass(harm)[hb]
-            low = [P(n) for n in DYADS_C[hb].split()] if harm is HARM_C else [root, root + 7]
-            for beat in beats:
-                stab(wh, B(first + i, beat), voices(harm, (0, 1, 2))[hb], v - (0 if beat == 1 else 8), 0.6)
-                stab(mh, B(first + i, beat), low, v - (0 if beat == 1 else 8), 0.6)
+    # ---- chorus in E flat minor ---------------------------------------------------------------------
+    h2 = Harmony(89, CHORUS).shifted(1)
+    h2.spans = [sp for sp in h2.spans if sp[0] < B(103)] + Harmony(103, "Bb | A").spans
+    hook_band(p, 89, h2, 1, HOOK2_END)
+    pad(p["sop"], h2, 88, lo="D4", hi="A5", n=2)
     return cue

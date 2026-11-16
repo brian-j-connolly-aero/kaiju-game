@@ -1,71 +1,92 @@
-# What to try at the next playtest
+# What to try at this afternoon's playtest (16 November)
 
-Everything below is new since the first multiplayer evening. Nobody has played it yet: the
-computer bots and the test scripts have, so your evening is the real test.
+Everything below is new since the second playtest. The computer bots and the test scripts have
+played it all; people have not. Your afternoon is the real test.
 
-## Starting a match (the same as last time)
+## Starting
 
-1. On your own computer, get the new version: double-click `host/update.cmd` (or unpack the new
-   zip over the old folder), then `host/start.cmd`. It shows the link for your friends and
-   checks it works. The full steps, and what to do if something goes wrong:
-   [HOSTING.md](HOSTING.md) (the [README](../README.md) points there too).
-2. Open http://localhost:2567 yourself, create a room, send the link (or the four-letter code).
-3. One player picks the monster, the others the army; the computer fills empty seats. Everyone
-   presses the tick, then you start the match. A match is about eight minutes (ten at most).
-4. Send your friends [PLAYING.md](PLAYING.md) first: the controls changed a lot. In the game, H
-   shows the controls card.
+1. Get the new version: double-click `host/update.cmd` (or unpack the new zip over the old
+   folder), then `host/start.cmd`. It shows the link for your friends and checks that it works.
+   Full steps and what to do if something goes wrong: [HOSTING.md](HOSTING.md).
+2. Open http://localhost:2567 yourself, create a room, send the link. Send your friends
+   [PLAYING.md](PLAYING.md) too: it now explains the communication rose and throwing.
+3. Talk on your own voice chat (Discord). The game has no voice chat of its own.
 
-## Both sides
+## What changed since last time
 
-- The view starts from behind your monster or soldier (V switches to through the eyes). Walking
-  on foot no longer pauses every few steps.
-- Matches are about a fifth shorter, and something new should happen every 20 to 25 seconds at
-  every stage: special buildings, supply crates, falling towers.
-- The starting neighborhoods are packed close: narrow streets, back lanes with garages,
-  bungalows, duplexes, a diner, a motel and a firehouse. Each district has its own roof color
-  (also on the map). Green hills ring the city, with the sea to the south.
-- New sounds for nearly everything (claws, hops, the tail, machine guns, the gas station going
-  up, a fire bell) and new radio and news lines. Nobody has listened to them yet: tell us what
-  sounds wrong.
+**Talking and restarting**
+- The automatic radio and news chatter is gone. The only line left: once per molt the
+  television news tells the monster's player the creature is ready to shed its skin.
+- **Hold Z** (d-pad down on a controller): a ring of pictures opens round your crosshair. Move
+  the mouse to one and let go. The army shouts a silly one-sentence 1950s monster-movie line
+  over the radio in its squad's voice, with a subtitle; the monster roars, snuffles, growls,
+  chomps, purrs or sings a little mating call. Everyone hears it; it changes nothing in the
+  game. One every two seconds. Let go in the middle to say nothing.
+- **Restart:** the host presses Escape, then the circular arrow twice (red after the first
+  press). Everyone starts over on the same sides.
 
-## The monster
+**The monster**
+- **Throwing on real arcs.** Holding something, you see a yellow arc from your hand, a tube that
+  widens with distance, and a ring where it can land. Look higher to throw farther or to lob
+  over a house; look lower to throw short and flat. It lands somewhere in the ring: a squad
+  standing still about five of your lengths away is hit about three times in four, twice as far
+  about once in four. The camera moves over your right shoulder while you hold something.
+- **What you can pick up glows** gold, brighter and pulsing within reach of your hand.
+- **Rage:** three claw marks round your crosshair heat up from a dark scar to white-hot, and throb
+  when the beam is ready.
+- **The power surge** now shows a big blue lightning badge with a ring that runs down, and every
+  hit flashes electric.
+- **The titan wades:** in the bay, the river and the moat it stands in the water up to its
+  thighs, with foam and a wake, and moves at 70% of its speed.
+- The fallen radio mast's top can be picked up and thrown at every size, and throws from beside
+  rubble fly over it instead of sticking.
 
-- One move per button: left swipes (or throws), right grabs (or eats), Space stomps, F sheds
-  your skin when the skyline offers it. At each molt you pick a new move from three picture
-  cards: first the beam, the roar or the charge; at the second molt one of the two you left, or
-  the brace or the tail sweep.
-- Small and in the starting streets: pick up a propane tank, a water tank, an antenna, a
-  fast-food sign or a garage door, and use it. Wreck the power substation (a power surge), the
-  gas station (a fireball) and the radio mast (the army's map goes to static). More of them
-  stand on the way downtown.
-- Every attack comes in two or three looks, with bright trails; your stripes glow with rage.
-  The little people in the street vanish in a cartoon puff under your feet, and a grab at an
-  empty bit of street next to them comes up with a handful you gulp down. Nothing gory, and it
-  changes nothing in the game.
-- If you wipe out every squad, the city collapses round you and you grow at once.
+**The army**
+- Squads on foot squeeze through the narrow gaps between houses; the other units follow.
+- A crate's weapon now changes the charged volley too: a hail of tracers (machine gun), heavy
+  shells (big cannon) or a flight of missiles (missile pod).
 
-## The army
+**Both sides**
+- The controls card (H) shows at most five big pictures: only what you can do right now.
+- Civilians no longer pop in and out of view.
+- The molt picture under the city bar lights up exactly when the bar reaches it.
+- New, faster match music, one track per stage, and a last-minute track with an alarm that ends
+  exactly as the clock runs out.
+- The snapping back through the tunnel: a connection stall of up to a second no longer pulls
+  your body back, and a few small jolts the game caused itself are fixed.
 
-- Two buttons: left fires, right held charges a volley (the big yellow diamond fills; let go to
-  fire together). Your other three units follow you and shoot by themselves. No more command
-  wheel. Two squads' charged volleys within five seconds stagger the monster.
-- From stage 2 you drive a real tank: W and S drive, A and D turn it, the turret follows your
-  mouse.
-- Supply crates come down by parachute (a cyan column of light): machine gun, big cannon,
-  missile pod, artillery radio or reinforcements. Drive onto one to take it. Artillery now only
-  comes from the radio: your next charged volleys call it, red smoke and a closing ring mark the
-  spot, and you see the shells fall.
-- Rubble stays as heaps that stop shots: fight from on top of one.
+## What to try
 
-## Known risks (tell us if you hit them)
+- **Monster:** throw cars at squads near and far; lob one over a house. Can you read at a glance
+  where it will land, by day and at night, and at the biggest size? Does the camera move over
+  the shoulder feel jumpy? Does the glow make the garage doors and propane tanks read as things
+  to pick up, or is a street of cars too busy?
+- **Army:** do the narrow gaps help or get you stuck? Does a thrown car feel dodgeable but
+  dangerous? Do the crate volleys feel worth it?
+- **Everyone:** use the rose a lot. Are the shouted lines understandable through the radio
+  crackle? Which squad voices sound too alike? Does the music get tiring, or drown the effects?
+  Try one restart.
 
-- In the packed starting streets and among rubble, the small monster can hide well, and the
-  squad's camera is pulled in close to walls more often. It may feel cramped.
-- Crates come down often at stages 2 and 3; they may feel like too many, or a distraction.
-- Bot squads sometimes never find a clear shot when the small monster stands still on a green
-  in the middle of a block (a person would walk onto the green), and now and then a tank's
-  squad-mate gets stuck in a courtyard.
-- Balance was only tried with bots (the monster won 22 of 40 bot matches). Four people may find
-  the army too strong, or too weak: that is the next round's job.
-- The pictures were only ever drawn by a computer without a graphics card here. If anything
-  looks broken or runs slowly on your computers, a screenshot helps.
+## If your character snaps back
+
+Press **`** (the key under Escape, left of 1). A small panel opens at the top left with the
+connection's numbers and a 30-second graph. Right after a snap, take a screenshot of the whole
+screen. After the session, double-click `host/logs.cmd` and copy the window. Send both, with who
+played which side and roughly when. In the graph a tall red bar is a snap, a blue spike with it
+means the connection stalled, and purple marks mean that computer froze for a moment. Press **`**
+again to close it. More in [HOSTING.md](HOSTING.md), section 6, item 9.
+
+## Known risks
+
+- **Nobody has heard the new sounds:** the rose lines, the monster's noises and the new music
+  were checked by measurement only (no speakers here). Tell us what sounds wrong or too loud.
+- Throwing was tuned with bots. The speed and accuracy may need another pass, the landing ring
+  is small on screen at the biggest size, and the arc does not show soldiers in the way.
+- Balance is from bot matches only: the monster won 8 of 20 (16 of 40 over a longer run). Four
+  people may find either side too strong; that is the next round's job.
+- If several squads talk at once their lines wait their turn; a line still waiting after four
+  seconds is dropped.
+- Connection stalls longer than a second still snap you back: that is the tunnel or the network.
+- In a narrow gap the squad's camera sits very close, and some soldiers drawn may overlap a wall.
+- The pictures here were drawn without a graphics card. If anything looks broken or runs
+  slowly, a screenshot helps.

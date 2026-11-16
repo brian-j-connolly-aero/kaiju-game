@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Rose, army: admiring the monster. A starry-eyed face with hearts for eyes and a grin. -->
+  <circle cx="32" cy="34" r="25"/>
+  <path fill="currentColor" stroke="none" d="M23 36L16.5 29.5Q13.5 26 16.5 23.5 20 21 23 25 26 21 29.5 23.5 32.5 26 29.5 29.5ZM41 36L34.5 29.5Q31.5 26 34.5 23.5 38 21 41 25 44 21 47.5 23.5 50.5 26 47.5 29.5Z"/>
+  <path d="M21 44Q32 54 43 44"/>
+</svg>

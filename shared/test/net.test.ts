@@ -493,8 +493,8 @@ describe('input validation', () => {
 
   it('lists every message type once', () => {
     expect(new Set(CLIENT_MESSAGE_TYPES).size).toBe(CLIENT_MESSAGE_TYPES.length);
-    expect(CLIENT_MESSAGE_TYPES).toEqual(expect.arrayContaining(['setName', 'setRole', 'setFaction', 'ready', 'start', 'input', 'draftPick', 'ping']));
-    expect(SERVER_MESSAGE_TYPES).toEqual(['welcome', 'lobby', 'snap', 'events', 'pong']);
+    expect(CLIENT_MESSAGE_TYPES).toEqual(expect.arrayContaining(['setName', 'setRole', 'setFaction', 'ready', 'start', 'restart', 'rose', 'input', 'draftPick', 'ping']));
+    expect(SERVER_MESSAGE_TYPES).toEqual(['welcome', 'lobby', 'snap', 'events', 'pong', 'rose']);
   });
 });
 

@@ -21,12 +21,16 @@
  */
 
 import {
+  aimThrowAt,
   angleDiff,
   BOT_RULES,
   boundsContains,
   clamp,
+  createThrowAim,
+  createThrowFlight,
   distToStructure,
   findRoadPath,
+  HAND_FORWARD,
   heldEdible,
   kaijuKindDef,
   kaijuMoveSlot,
@@ -38,6 +42,9 @@ import {
   roadAdjacency,
   setTankMove,
   strikeVerb,
+  throwClearance,
+  throwElevations,
+  throwFlight,
   unitTypeDef,
   volleyMeter,
   weaponDef,
@@ -110,6 +117,9 @@ export class Autopilot {
   private braceHold = 0;
   /** The unit a charge was aimed at (the head stays on it through the run). */
   private chargeTarget = -1;
+  /** Scratch for aiming a throw. */
+  private readonly flight = createThrowFlight();
+  private readonly aim = createThrowAim();
   /** When the molt cards now on offer were first seen (-1: none), and whether one was picked. */
   private offerSeen = -1;
   private cardPicked = false;
@@ -205,6 +215,21 @@ export class Autopilot {
       }
     }
     return best ? { unit: best, dist: bestD } : null;
+  }
+
+  /**
+   * The pitch that throws what the kaiju holds onto a unit: the low arc when the city leaves it a
+   * way, else the lob over what is in the way (`aimThrowAt`, as the monster bot aims); with
+   * neither, the low arc all the same (it lands on what is in the way), or the longest throw.
+   */
+  private throwPitch(session: MatchSession, k: SnapKaiju, u: SnapUnit): number {
+    if (!k.held) return 0;
+    const flight = throwFlight(k.kind, k.stage, k.held, this.flight);
+    if (aimThrowAt(session.mirror.query, k, flight, u.x, u.y, u.z, Math.max(3, unitTypeDef(u.type).radius), throwClearance(k), this.aim)) return this.aim.pitch;
+    const st = kaijuStageDef(k.kind, k.stage);
+    const d = Math.hypot(u.x - k.x, u.z - k.z) - st.bodyRadius * HAND_FORWARD;
+    const both = throwElevations(d, u.y - st.handHeight, flight.speed, flight.gravity);
+    return Math.min(both ? both[0] : Math.PI / 4, flight.maxElevation) - flight.lift;
   }
 
   /** Holds a button down for `seconds` (a tap by default): the server sees one press. */
@@ -353,6 +378,8 @@ export class Autopilot {
     if (k.held && threat) {
       aimX = threat.unit.x;
       aimZ = threat.unit.z;
+      // On the throw's real arc (sim/throwArc.ts): the low one, or the lob over a building in the way.
+      if (strikeVerb(k.held) === 'throw') aimPitch = this.throwPitch(session, k, threat.unit);
     }
 
     // Wreck the nearest building: swipe, then stomp, each on its own button.

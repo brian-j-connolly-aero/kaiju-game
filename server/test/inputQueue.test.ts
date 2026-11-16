@@ -277,11 +277,11 @@ describe('late inputs: a guess stands in, and nothing the player did is changed'
 
 describe('what no guess stood for', () => {
   it('catches up after a stall long enough for the unit to be stopped', () => {
-    // 24 silent ticks: the first STARVED_TICKS - 1 are guesses that stand in, the rest stand
-    // for nothing. Then all the late inputs arrive at once.
-    const line = stalled(24, 0);
-    line.send(...new Array<number>(25).fill(0));
-    // The fourteen the guesses stood for are dropped, and most of the rest skipped.
+    // STARVED_TICKS + 9 silent ticks: the first STARVED_TICKS - 1 are guesses that stand in, the
+    // rest stand for nothing. Then all the late inputs arrive at once.
+    const line = stalled(STARVED_TICKS + 9, 0);
+    line.send(...new Array<number>(STARVED_TICKS + 10).fill(0));
+    // The ones the guesses stood for are dropped, and most of the rest skipped.
     expect(line.q.dropped).toBeGreaterThanOrEqual(STARVED_TICKS - 1 + 8);
     expect(line.q.items.length).toBeLessThanOrEqual(INPUT_QUEUE_MAX);
     for (let i = 0; i < INPUT_QUEUE_MAX; i++) line.tick();

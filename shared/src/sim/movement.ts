@@ -16,6 +16,9 @@
  *   `moundSpeedMult` (units at half speed; the kaiju walks over them). Props never block.
  * - Water slows the body to `waterSpeedMult` unless it stands on a bridge deck.
  * - Nobody can leave the playable bounds.
+ * - Walls and the bounds see `MoveParams.bodyRadius` when it is set: a foot section moves as a
+ *   body about as wide as the soldiers drawn (it fits between packed houses), while what hits it
+ *   still reaches the whole section (`radius`).
  *
  * Steering ('aim', 'heading', 'free' and 'tank'): see `SteerModel` in defs/schema.ts. 'tank' is
  * the player's own vehicle at stages 2 and 3, real tank driving: the input's moveZ is the
@@ -85,6 +88,12 @@ export interface MoveParams {
   /** Speed multiplier while the body's middle is on a mound of rubble or a fallen structure (1: it walks over them). */
   moundSpeedMult: number;
   bounds: Bounds;
+  /**
+   * The radius walls and the bounds see, when it is not the body's own `radius`: a foot section
+   * moves as a narrow body (`UnitTypeDef.bodyRadius`) while its hit area stays the whole section.
+   * Undefined: the body's own radius (every kaiju).
+   */
+  bodyRadius?: number | undefined;
 }
 
 export interface MoveResult {
@@ -137,7 +146,7 @@ export function stepMovement(
   result.wading = false;
   result.onMound = false;
   const index = city.index;
-  const r = body.radius;
+  const r = params.bodyRadius ?? body.radius;
   const tank = params.steer === 'tank';
 
   // --- Intent: a world-space direction and a 0..1 throttle ----------------------------------
@@ -232,7 +241,7 @@ export function stepMovement(
   // --- Bounds and structures -----------------------------------------------------------------
   const b = params.bounds;
   for (let pass = 0; pass < COLLISION_PASSES; pass++) {
-    if (clampToBounds(body, b)) result.blocked = true;
+    if (clampToBounds(body, r, b)) result.blocked = true;
     let pushed = false;
     structuresInCircle(city, body.x, body.z, r, ids);
     for (let i = 0; i < ids.length; i++) {
@@ -261,7 +270,7 @@ export function stepMovement(
     else break;
   }
   // The bounds always win: a body squeezed between a wall and the line stays inside the line.
-  if (clampToBounds(body, b)) result.blocked = true;
+  if (clampToBounds(body, r, b)) result.blocked = true;
 
   result.inWater = wet(city, body.x, body.z);
   return result;
@@ -333,8 +342,7 @@ export function setTankMove(control: MoveInput, hullYaw: number, dirX: number, d
   control.moveZ = drive * k;
 }
 
-function clampToBounds(body: MoveBody, b: Bounds): boolean {
-  const r = body.radius;
+function clampToBounds(body: MoveBody, r: number, b: Bounds): boolean {
   let hit = false;
   // A body wider than the bounds (cannot happen with shipped data) is centered instead of oscillating.
   const minX = Math.min(b.minX + r, (b.minX + b.maxX) / 2);
@@ -427,6 +435,7 @@ export function kaijuMoveParams(k: KaijuMoveState, bounds: Bounds, mods?: Mods, 
   // It walks over rubble and fallen buildings.
   p.moundSpeedMult = 1;
   p.bounds = bounds;
+  p.bodyRadius = undefined;
   // Swimming: from wading toward its swimming speed as it goes under, with no water slowdown.
   const sub = k.submerge ?? 0;
   const swim = sub > 0 ? def.swim : undefined;
@@ -510,6 +519,8 @@ export function unitMoveParams(
   p.waterSpeedMult = def.body === 'aircraft' ? 1 : UNIT_WATER_SPEED_MULT;
   p.moundSpeedMult = def.body === 'aircraft' ? 1 : RUBBLE_RULES.unitSpeedMult;
   p.bounds = bounds;
+  // A foot section's narrow body (round 4); a vehicle's is its own radius.
+  p.bodyRadius = def.bodyRadius;
   return p;
 }
 

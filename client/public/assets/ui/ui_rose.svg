@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- The communication rose: a ring of wedges around a dot (hold the key, pick a wedge). -->
+  <circle cx="32" cy="32" r="5" fill="currentColor" stroke="none"/>
+  <path d="M32 6A26 26 0 0 1 52 15M57 26A26 26 0 0 1 54 44M46 53A26 26 0 0 1 28 58M17 53A26 26 0 0 1 7 38M7 26A26 26 0 0 1 22 8"/>
+</svg>

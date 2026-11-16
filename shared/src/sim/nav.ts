@@ -236,6 +236,14 @@ const ids: number[] = [];
 const segA: Vec3 = { x: 0, y: FEELER_HEIGHT, z: 0 };
 const segB: Vec3 = { x: 0, y: FEELER_HEIGHT, z: 0 };
 
+/**
+ * The width a unit finds its way with: the body it moves with (`UnitTypeDef.bodyRadius`), so a
+ * foot section takes the gaps between houses it fits through (round 4); a vehicle's is its radius.
+ */
+function navRadius(u: Unit): number {
+  return unitTypeDef(u.type).bodyRadius;
+}
+
 /** True when a standing structure that blocks bodies (not a bridge deck) overlaps the circle. */
 export function solidInCircle(q: CityQuery, x: number, z: number, r: number): boolean {
   structuresInCircle(q, x, z, r, ids);
@@ -548,9 +556,10 @@ function planRoute(world: World, u: Unit, gx: number, gz: number): void {
   nav.repath = SQUAD_RULES.repathInterval;
   // Where it stands it may be brushing a wall, so the way out is judged a little narrower than
   // the body; the way in to the goal has to take the whole body with room to spare.
-  if (!roadAccess(world, u.x, u.z, Math.max(0.5, u.radius - PROBE_SLACK), accessFrom)) return;
-  if (!roadAccess(world, gx, gz, u.radius + LEG_MARGIN, accessTo)) return;
-  if (!crossroadsBetween(world, accessFrom, accessTo, u.radius)) return;
+  const r = navRadius(u);
+  if (!roadAccess(world, u.x, u.z, Math.max(0.5, r - PROBE_SLACK), accessFrom)) return;
+  if (!roadAccess(world, gx, gz, r + LEG_MARGIN, accessTo)) return;
+  if (!crossroadsBetween(world, accessFrom, accessTo, r)) return;
   const nodes = world.city.roads.nodes;
   nav.path.push({ x: accessFrom.x, z: accessFrom.z });
   for (const id of routeNodes) nav.path.push({ x: nodes[id].x, z: nodes[id].z });
@@ -590,7 +599,7 @@ function wayClear(q: CityQuery, u: Unit, dirX: number, dirZ: number, angle: numb
 export function steerToward(world: World, u: Unit, gx: number, gz: number, tolerance: number, out: Steer): Steer {
   const nav = u.nav;
   const q = world.cityQuery;
-  const r = u.radius;
+  const r = navRadius(u);
   out.dirX = 0;
   out.dirZ = 0;
   out.throttle = 0;

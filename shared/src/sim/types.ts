@@ -412,6 +412,12 @@ export interface Projectile {
   /** A thrown city weapon (phase 2): how it lands; absent for everything else. */
   city?: ThrownCityWeapon;
   /**
+   * A kaiju's throw: meters of flight (along the ground) still to go before rubble and fallen
+   * buildings can stop it. It goes over the heaps within the kaiju's reach (round 4: a fallen
+   * mast's top thrown from beside the fallen mast stuck in it two meters away). Absent: none.
+   */
+  clearRubble?: number;
+  /**
    * Flight 'guided' (the missile pod): a constant acceleration, m/s², for `steer` more seconds
    * (a whole number of ticks), after which it flies straight on (`stepProjectile`). Absent or 0
    * for everything else.
@@ -652,8 +658,6 @@ export interface VoiceState {
   lowHpStage: number;
   /** How many marks `bar.near` has been called for (it is called once on the way to each mark). */
   barNearCalled: number;
-  /** The radio's own, stricter discipline (VOICE_SIDE_RULES.radio): its per-cue waits and budget. */
-  radio: { cooldowns: Partial<Record<VoiceCueId, number>>; tokens: number };
 }
 
 /** Inputs for one tick, indexed by PlayerId. A missing entry repeats that player's last input. */
@@ -720,6 +724,9 @@ export interface World {
   /** Events of the tick being stepped; step() returns this array and starts a new one next tick. */
   events: SimEvent[];
 
-  /** Advances the simulation by one tick (1/30 s) and returns that tick's events. */
-  step(inputs?: InputsByPlayer): SimEvent[];
+  /**
+   * Advances the simulation by one tick (1/30 s) and returns that tick's events. `mark`, when
+   * given, is called after every system (pipeline.ts, `SystemMark`: the server times them).
+   */
+  step(inputs?: InputsByPlayer, mark?: (system: number) => void): SimEvent[];
 }

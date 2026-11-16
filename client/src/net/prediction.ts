@@ -11,6 +11,10 @@
  * made after the server had already guessed its tick (the page stalled while the server played
  * on) is not predicted at all: its tick is in the body.
  *
+ * A state with a known end is counted down while replaying: a unit frozen by a stun stays frozen
+ * for as many ticks as the stun has left (`Hold`) and moves after that, as on the server, rather
+ * than for every input replayed from a snapshot that showed it stunned.
+ *
  * The body only moves on client ticks, 30 times a second; screens refresh faster. So the body is
  * DRAWN between the pose before its newest tick and the pose after it (`predictedPose` with the
  * fraction of a tick that has passed since), which makes its motion as smooth as the frame rate.
@@ -32,7 +36,7 @@ import {
 } from '@mb/shared';
 
 /** A correction larger than this is a relocation (new stage, takeover), not drift: snap. */
-const SNAP_DISTANCE = 12;
+export const SNAP_DISTANCE = 12;
 const MAX_PENDING = 90;
 /** The visible error halves about every 60 ms. */
 const ERROR_DECAY = 11;
@@ -48,6 +52,15 @@ export interface ServerBody {
    * the body steers like a tank ('tank' steering turns `MoveBody.aimYaw`), ignored otherwise.
    */
   aimYaw?: number;
+}
+
+/**
+ * Movement parameters that hold for a while and then give way: `ticks` more ticks from the
+ * snapshot's tick with the parameters passed alongside (a stunned unit's, frozen), then `free`.
+ */
+export interface Hold {
+  ticks: number;
+  free: MoveParams;
 }
 
 export interface Predictor {
@@ -70,8 +83,16 @@ export interface Predictor {
   ready: boolean;
   /** Inputs still to be made whose ticks the server has already played on a guess: not predicted. */
   covered: number;
-  /** Size of the most recent correction, meters (for the debug overlay). */
+  /** Ticks from the present on that the body is still held by the newest snapshot's `Hold`. */
+  held: number;
+  /** Size of the most recent correction, meters (for the debug overlay): how far the drawn body is from the prediction. */
   lastCorrection: number;
+  /**
+   * How far the most recent snapshot moved the prediction of the present, meters: the jump the
+   * drawn body then slides through (0 when it agreed, or for the first snapshot of a body). The
+   * network readout (ui/netReadout.ts) graphs it.
+   */
+  lastJump: number;
 }
 
 export function createPredictor(): Predictor {
@@ -88,7 +109,9 @@ export function createPredictor(): Predictor {
     errAim: 0,
     ready: false,
     covered: 0,
+    held: 0,
     lastCorrection: 0,
+    lastJump: 0,
   };
 }
 
@@ -123,13 +146,16 @@ export function resetPredictor(p: Predictor): void {
   p.body.aimYaw = undefined;
   p.ready = false;
   p.covered = 0;
+  p.held = 0;
   p.lastCorrection = 0;
+  p.lastJump = 0;
 }
 
 /**
  * One client tick: remembers the input that was just sent and, when `moving` (the match is
  * being played), applies it to the predicted body. `drive`: a kaiju's movement state (null for
- * a unit), which can override the stick as on the server (`kaijuMoveInput`).
+ * a unit), which can override the stick as on the server (`kaijuMoveInput`). `free`: the
+ * parameters once the newest snapshot's hold is over (`Hold.free`); `params` hold until then.
  */
 export function predictStep(
   p: Predictor,
@@ -138,6 +164,7 @@ export function predictStep(
   params: MoveParams,
   moving: boolean,
   drive: KaijuMoveState | null = null,
+  free: MoveParams = params,
 ): void {
   p.pending.push(input);
   if (p.pending.length > MAX_PENDING) p.pending.splice(0, p.pending.length - MAX_PENDING);
@@ -162,7 +189,10 @@ export function predictStep(
   const z = b.z;
   const yaw = b.yaw;
   const aim = b.aimYaw;
-  if (p.ready && moving) step(b, input, city, params, drive);
+  if (p.ready && moving) {
+    step(b, input, city, p.held > 0 ? params : free, drive);
+    if (p.held > 0) p.held--;
+  }
   p.stepX = b.x - x;
   p.stepZ = b.z - z;
   p.stepYaw = angleDiff(b.yaw, yaw);
@@ -173,7 +203,8 @@ export function predictStep(
  * A snapshot arrived: restart from the server's body, replay what it has not played (less the
  * inputs it will drop), and keep the picture continuous by moving the difference into the error
  * offset. `ackSeq` is the snapshot's acknowledgement as it came (`readAck`); `drive` as for
- * `predictStep`.
+ * `predictStep`; `hold`: `params` hold only for that many ticks after the snapshot's (a stun's
+ * end), then its `free` parameters apply.
  */
 export function reconcile(
   p: Predictor,
@@ -184,6 +215,7 @@ export function reconcile(
   params: MoveParams,
   moving: boolean,
   drive: KaijuMoveState | null = null,
+  hold: Hold | null = null,
 ): void {
   const { played, drops } = readAck(ackSeq);
   // The step of the newest tick is left alone: the drawn pose is "the body, less what is left of
@@ -194,6 +226,8 @@ export function reconcile(
   const beforeYaw = p.body.yaw + p.errYaw;
   const beforeAim = p.body.aimYaw !== undefined ? p.body.aimYaw + p.errAim : undefined;
   const wasReady = p.ready;
+  const oldErrX = p.errX;
+  const oldErrZ = p.errZ;
 
   let drop = 0;
   while (drop < p.pending.length && p.pending[drop].seq <= played) drop++;
@@ -209,12 +243,18 @@ export function reconcile(
   // A tank's turret turns at its own rate in stepMovement: predicted from the server's turret.
   b.aimYaw = params.steer === 'tank' && server.aimYaw !== undefined ? server.aimYaw : undefined;
   // The first `drops` of them will be dropped: the body already has their ticks (guesses).
+  let held = hold ? hold.ticks : 0;
   if (moving) {
-    for (let i = drops; i < p.pending.length; i++) step(b, p.pending[i], city, params, drive);
+    for (let i = drops; i < p.pending.length; i++) {
+      step(b, p.pending[i], city, held > 0 || !hold ? params : hold.free, drive);
+      if (held > 0) held--;
+    }
   }
+  p.held = held;
   p.covered = Math.max(0, drops - p.pending.length);
   p.ready = true;
 
+  p.lastJump = 0;
   if (!wasReady) {
     p.stepX = 0;
     p.stepZ = 0;
@@ -230,6 +270,7 @@ export function reconcile(
   const ez = beforeZ - b.z;
   const dist = Math.hypot(ex, ez);
   p.lastCorrection = dist;
+  p.lastJump = dist > SNAP_DISTANCE ? dist : Math.hypot(ex - oldErrX, ez - oldErrZ);
   if (dist > SNAP_DISTANCE) {
     p.stepX = 0;
     p.stepZ = 0;

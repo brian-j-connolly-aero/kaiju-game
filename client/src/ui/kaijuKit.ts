@@ -10,8 +10,10 @@
  *                      hand) and Grab shows the drop (a city weapon is never eaten)
  *   the shield         a garage door in the hand: the door, the front it covers and its strength
  *                      left
- *   the surge          a power surge (a substation wrecked): a bolt in a ring that runs down
- *                      over its 8 seconds, and the move slots flash
+ *   the surge          a power surge (a substation wrecked): a big lightning badge beside the
+ *                      crosshair (`badge`, which the HUD places) in a ring that runs down over
+ *                      its 8 seconds; as it starts every button snaps full with a crackle (the
+ *                      surge clears every cooldown), and the move slots flash while it lasts
  *   two move slots     what the molts put on the two move buttons. Empty: a faint locked egg.
  *                      Filled: the move's picture inside a ring that fills as the move comes
  *                      ready (its cooldown; for the beam, the rage it needs), bright when ready
@@ -97,8 +99,8 @@ export class KaijuKit {
   /** A garage door in the hand: the door over the front it covers, and its strength left. */
   private readonly shield: HTMLElement;
   private readonly shieldBar: HTMLElement;
-  /** The power surge: a bolt in a ring that runs down as it does. */
-  private readonly surge: HTMLElement;
+  /** The power surge: a big bolt in a ring that runs down as it does (the HUD puts it beside the crosshair). */
+  readonly badge: HTMLElement;
   private readonly surgeRing: HTMLElement;
   private lastShield = -1;
   private lastSurge = -1;
@@ -128,8 +130,8 @@ export class KaijuKit {
     this.shieldBar = el('div', 'kit-shield-fill');
     this.shield = el('div', 'kit-shield hidden', [el('div', 'kit-shield-arc'), icon('k_shield'), el('div', 'kit-shield-bar', [this.shieldBar])]);
     this.surgeRing = el('div', 'kit-surge-ring');
-    this.surge = el('div', 'kit-surge hidden', [this.surgeRing, icon('k_surge')]);
-    this.root = el('div', 'hints kaiju-kit', [this.surge, this.shield, this.strike.root, this.grab.root, this.stomp.root, this.slots[0].root, this.slots[1].root, this.molt.root, this.camera.root]);
+    this.badge = el('div', 'kit-surge hidden', [this.surgeRing, el('div', 'kit-surge-bolt', [icon('k_surge')])]);
+    this.root = el('div', 'hints kaiju-kit', [this.shield, this.strike.root, this.grab.root, this.stomp.root, this.slots[0].root, this.slots[1].root, this.molt.root, this.camera.root]);
   }
 
   /** Every tile's glyph for the device in use (call when the device or the keyboard's layout changes). */
@@ -216,13 +218,16 @@ export class KaijuKit {
     if (surge !== this.lastSurge) {
       const started = this.lastSurge < 0 && surge >= 0;
       this.lastSurge = surge;
-      setClass(this.surge, 'hidden', surge < 0);
+      setClass(this.badge, 'hidden', surge < 0);
       setClass(this.root, 'surging', surge >= 0);
       if (surge >= 0) this.surgeRing.style.setProperty('--fill', surge.toFixed(3));
       if (started) {
-        this.surge.classList.remove('start');
-        void this.surge.offsetWidth;
-        this.surge.classList.add('start');
+        // It pops in big, and every button snaps full with a crackle.
+        for (const node of [this.badge, this.root]) {
+          node.classList.remove('surge-in');
+          void node.offsetWidth;
+          node.classList.add('surge-in');
+        }
       }
     }
   }

@@ -18,65 +18,42 @@
       "bpm": 96,
       "duration": 20.5
     },
-    "stage1_base": {
-      "base": "audio/music/stage1_base",
+    "stage1": {
+      "base": "audio/music/stage1",
       "loop": [
         0.25,
-        80.25
+        153.85
       ],
-      "bpm": 96,
-      "group": "stage1",
-      "duration": 80.5
+      "bpm": 150,
+      "duration": 154.1
     },
-    "stage1_combat": {
-      "base": "audio/music/stage1_combat",
+    "stage2": {
+      "base": "audio/music/stage2",
       "loop": [
         0.25,
-        80.25
+        156.25
       ],
-      "bpm": 96,
-      "group": "stage1",
-      "duration": 80.5
+      "bpm": 160,
+      "duration": 156.5
     },
-    "stage2_base": {
-      "base": "audio/music/stage2_base",
+    "stage3": {
+      "base": "audio/music/stage3",
       "loop": [
         0.25,
-        80.25
+        160.25
       ],
-      "bpm": 96,
-      "group": "stage2",
-      "duration": 80.5
+      "bpm": 168,
+      "duration": 160.5
     },
-    "stage2_combat": {
-      "base": "audio/music/stage2_combat",
+    "final_minute": {
+      "base": "audio/music/final_minute",
       "loop": [
         0.25,
-        80.25
+        60.25
       ],
-      "bpm": 96,
-      "group": "stage2",
-      "duration": 80.5
-    },
-    "stage3_base": {
-      "base": "audio/music/stage3_base",
-      "loop": [
-        0.25,
-        80.25
-      ],
-      "bpm": 96,
-      "group": "stage3",
-      "duration": 80.5
-    },
-    "stage3_combat": {
-      "base": "audio/music/stage3_combat",
-      "loop": [
-        0.25,
-        80.25
-      ],
-      "bpm": 96,
-      "group": "stage3",
-      "duration": 80.5
+      "bpm": 168,
+      "duration": 60.5,
+      "mark": 60.25
     },
     "cocoon": {
       "base": "audio/music/cocoon",

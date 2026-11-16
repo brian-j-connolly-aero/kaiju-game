@@ -10,6 +10,12 @@
  * stripes that glow with rage (the models mark them; this view's own body material, its
  * `KaijuSkin`, lights them), and a handful of civilians lifted to the mouth (render/crowd.ts
  * holds them; this view poses the arm and says when they are gulped).
+ *
+ * Round 4 (docs/ROADMAP.md, "the titan wading"): a kaiju too big to swim (the titan) that stands
+ * in the bay, the river or the moat (the snapshot's `inWater`) is drawn sunk to its thighs, the
+ * opaque water hiding its legs, with a ring of foam lapping round it, a splash at each step and a
+ * wake behind it while it walks. Its own player's first-person view is left as it is (the claws
+ * keep their place before the eye).
  */
 
 import * as THREE from 'three';
@@ -82,8 +88,6 @@ export interface KaijuViewFrame {
   insideHead: boolean;
   /** Where the camera is (for the weak point's halo, drawn on the side facing it). */
   camera?: THREE.Vector3;
-  /** The local player's own kaiju (in either view): a javelin in its hand shows an aim line. */
-  local?: boolean;
   /**
    * The (fractional) server tick the frame shows (`FrameState.tick`): with the snapshot's phase
    * time it says the tick the phase began, which picks the attack's look.
@@ -101,6 +105,13 @@ const WEAK_GLOW = 0xc9a6ff;
 const SWIM_TILT = 0.35;
 const SWIM_SINK = 0.72;
 const SWIM_BACK = 0.1;
+/**
+ * Wading in deep water (a kaiju too big to swim): how deep it stands, as a share of its hips'
+ * height at rest (the water about two thirds of the way up its thighs), and how fast it eases
+ * in and out (per second).
+ */
+const WADE_DEPTH = 0.62;
+const WADE_EASE = 1.6;
 
 /**
  * The stripes' glow (linear colors, times the brightness): a deep ember red when rage is low,
@@ -188,6 +199,13 @@ export class KaijuView {
   /** Swimming, as drawn: eased toward the snapshot's `submerge` so it glides down and up. */
   private swim = 0;
   private wakeTimer = 0;
+  /** Standing in deep water, as drawn (0 on land, 1 sunk to its thighs: a kaiju too big to swim). */
+  private wade = 0;
+  private foamTimer = 0;
+  /** Where round the legs the next churn of white water goes (turned by the golden angle each time). */
+  private foamTurn = 0;
+  /** The hips' height at rest (the model's frame): how deep a wading kaiju stands. */
+  private hipsHeight = 0;
   /** Seconds to the next puff of the charge's dust. */
   private dustTimer = 0;
   private walkPhase = 0;
@@ -303,6 +321,7 @@ export class KaijuView {
   private findTips(rig: SceneRig): void {
     this.tips.clear();
     this.feet.clear();
+    this.hipsHeight = 0;
     const nodes = rig.model.nodes;
     nodes.forEach((node, i) => {
       if (node.name === 'hand_L' || node.name === 'hand_R' || node.name === 'tail_5') {
@@ -325,6 +344,11 @@ export class KaijuView {
         const at = new THREE.Vector3();
         for (let j = i; j >= 0; j = nodes[j].parent) at.add(nodes[j].position);
         this.feet.set(node.name, at.setY(0));
+      }
+      if (node.name === 'hips') {
+        let y = 0;
+        for (let j = i; j >= 0; j = nodes[j].parent) y += nodes[j].position.y;
+        this.hipsHeight = y;
       }
     });
   }
@@ -526,7 +550,13 @@ export class KaijuView {
         const fx = k.x + Math.cos(k.yaw) * side * stage.bodyRadius * 0.45;
         const fz = k.z - Math.sin(k.yaw) * side * stage.bodyRadius * 0.45;
         this.callbacks.onStep?.(k, fx, fz);
-        effects.dust(fx, 0.1, fz, stage.bodyRadius * 0.45, k.stage === 1 ? 2 : 4);
+        if (this.wade > 0.4) {
+          // Wading: each step throws up water and a ring of foam.
+          effects.splash(fx, fz, stage.bodyRadius * 0.32);
+          effects.ring(fx, fz, stage.bodyRadius * 0.8, 0xeaf6ff, 1.1, 0.8, Math.max(0.15, stage.bodyRadius * 0.04));
+        } else {
+          effects.dust(fx, 0.1, fz, stage.bodyRadius * 0.45, k.stage === 1 ? 2 : 4);
+        }
       }
     }
 
@@ -576,6 +606,7 @@ export class KaijuView {
 
     // --- swimming ------------------------------------------------------------------------------------
     this.updateSwim(k, dt, speed, effects);
+    this.updateWade(k, dt, speed, effects);
     this.chargeDust(k, action, phase, dt, effects);
 
     // Dead: topple over and sink a little.
@@ -594,7 +625,8 @@ export class KaijuView {
     } else {
       this.deadTime = 0;
       rig.root.rotation.set(0, 0, 0);
-      rig.root.position.set(0, 0, 0);
+      // Wading in deep water: sunk to its thighs (not in its own first-person view).
+      rig.root.position.set(0, assembly ? 0 : -this.wadeDepth(stage.height), 0);
     }
     this.applyPose(rig, this.current, this.hipsLift, k, assembly);
 
@@ -626,7 +658,7 @@ export class KaijuView {
     if (this.weapon.kind !== null || k.surge > 0 || this.surge.active) {
       this.group.updateMatrixWorld(true);
       const u = phaseDuration > 0 ? Math.min(1, phaseTime / phaseDuration) : 0;
-      this.weapon.update(k, { action, phase, u, variant: look }, dt, time, { firstPerson: assembly, local: view.local === true, camera: view.camera }, lines, this.ribbons);
+      this.weapon.update(k, { action, phase, u, variant: look }, dt, time, { firstPerson: assembly }, lines, this.ribbons);
       this.surge.update(k, rig, this.ember, this.skin, dt, lines, effects, rig.root.visible);
     }
 
@@ -782,6 +814,63 @@ export class KaijuView {
     } else {
       this.wakeTimer = 0.8;
       effects.ring(k.x, k.z, r * 0.9, 0xdff1ff, 1.4, 0.3, 0.13);
+    }
+  }
+
+  /** How far below the water a wading kaiju is drawn now (meters). */
+  private wadeDepth(height: number): number {
+    if (this.wade <= 0) return 0;
+    const s = this.wade * this.wade * (3 - 2 * this.wade);
+    return s * WADE_DEPTH * (this.hipsHeight > 0 ? this.hipsHeight : height * 0.4);
+  }
+
+  /** Standing in deep water, as drawn (0..1; playtests). */
+  get wading(): number {
+    return this.wade;
+  }
+
+  /**
+   * A kaiju too big to swim that stands in deep water (the snapshot's `inWater`): eases down to
+   * its thighs, with foam lapping round it while it stands and a wake behind it while it walks.
+   */
+  private updateWade(k: SnapKaiju, dt: number, speed: number, effects: Effects): void {
+    const swim = kaijuKindDef(k.kind).swim;
+    const tooBig = !swim || !swim.stages[k.stage - 1];
+    const target = tooBig && k.inWater && k.alive && k.phase !== 'cocoon' ? 1 : 0;
+    const before = this.wade;
+    this.wade += (target - this.wade) * (1 - Math.exp(-dt * WADE_EASE));
+    if (Math.abs(target - this.wade) < 0.003) this.wade = target;
+    const st = kaijuStageDef(k.kind, k.stage);
+    const r = st.bodyRadius;
+    // Stepping in: a big splash.
+    if (before < 0.15 && this.wade >= 0.15 && target === 1) effects.splash(k.x, k.z, r * 0.8);
+    if (this.wade < 0.3) {
+      this.foamTimer = 0;
+      return;
+    }
+    this.foamTimer -= dt;
+    if (this.foamTimer > 0) return;
+    const fx = Math.sin(k.yaw);
+    const fz = Math.cos(k.yaw);
+    const moving = speed > st.topSpeed * 0.1;
+    // Everything well outside the body (its own thighs hide foam closer in), and the rings a
+    // little above the water, which they would otherwise flicker against from far off.
+    const y = Math.max(0.15, r * 0.04);
+    if (moving) {
+      this.foamTimer = 0.18;
+      // A bow wave at the chest and a spreading wake behind: together they draw the V.
+      effects.ring(k.x + fx * r * 0.9, k.z + fz * r * 0.9, r * 1.4, 0xeef8ff, 0.9, 0.9, y);
+      effects.ring(k.x - fx * r * 1.6, k.z - fz * r * 1.6, r * 2.2, 0xdff1ff, 2, 0.75, y);
+    } else {
+      // Standing: foam lapping round its legs.
+      this.foamTimer = 0.4;
+      effects.ring(k.x, k.z, r * 1.7, 0xeef8ff, 1.6, 0.9, y);
+    }
+    // White water churning at the waterline, all round the legs (the renderer adds a collar of
+    // foam: render/gameRenderer.ts).
+    for (let i = 0; i < (moving ? 2 : 1); i++) {
+      const a = (this.foamTurn += 2.4);
+      effects.splash(k.x + Math.cos(a) * r * 1.05, k.z + Math.sin(a) * r * 1.05, r * 0.22);
     }
   }
 

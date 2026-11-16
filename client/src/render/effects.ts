@@ -371,6 +371,19 @@ export class Effects {
     if (y < s) this.ring(x, z, s * 0.9, 0xffffff, 0.3, 0.55);
   }
 
+  /**
+   * A blow of a monster in a power surge landing (docs/ROADMAP.md round 4: "its hits flash
+   * electric"): a blue-white flash and glow, a spray of sparks and a crackling ring. `size` is
+   * about the hit's width (meters).
+   */
+  electricHit(x: number, y: number, z: number, size: number): void {
+    const s = Math.max(1, size);
+    this.spawn('glow', this.anims.glow, x, y, z, s * 3.2, 0.22, 0x9cc8ff, 0.95);
+    this.spawn('burst', this.anims.flash, x, y, z, s * 1.6, 0.1, 0xdfeaff, 1);
+    this.sparks(x, y, z, s * 0.9, 9, 0xd8ecff, 0.4);
+    this.ring(x, z, s * 1.4, 0xbcd8ff, 0.3, 0.85, Math.max(0.2, y * 0.2));
+  }
+
   get count(): number {
     return this.particles.length;
   }

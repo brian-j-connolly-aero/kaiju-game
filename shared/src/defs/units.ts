@@ -31,6 +31,9 @@ export const UNIT_TYPES: Readonly<Record<UnitTypeId, UnitTypeDef>> = {
     speed: 9.8,
     accel: 40,
     radius: 3,
+    // Round 4: a 2 m wide body walks through the 2.5 m gaps between packed houses; shots and
+    // claws still reach the whole section, 6 m across (docs/ROADMAP.md, round 4).
+    bodyRadius: 1,
     height: 2,
     steer: 'free',
     turnRate: 720 * DEG,
@@ -51,6 +54,7 @@ export const UNIT_TYPES: Readonly<Record<UnitTypeId, UnitTypeDef>> = {
     speed: 16.1,
     accel: 12,
     radius: 4,
+    bodyRadius: 4,
     height: 3,
     steer: 'heading',
     turnRate: 110 * DEG,
@@ -72,6 +76,7 @@ export const UNIT_TYPES: Readonly<Record<UnitTypeId, UnitTypeDef>> = {
     speed: 25.3,
     accel: 12,
     radius: 9,
+    bodyRadius: 9,
     height: 3,
     steer: 'heading',
     turnRate: 110 * DEG,

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   allStageBounds,
   applyHit,
+  barDisplayFraction,
   beginStage,
   boundsContains,
   Btn,
@@ -422,6 +423,33 @@ describe('the molt: room for the new body', () => {
     }
     // A search that found no gap anywhere would prove nothing.
     expect(tried).toBeGreaterThan(0);
+  });
+});
+
+describe('the molt: the mark on the destruction bar', () => {
+  it('is offered on the very tick the fill reaches the mark on the bar, and not a point before (round 4)', () => {
+    const world = makeTestWorld({
+      marks: [100, 200, 1e6],
+      structures: [
+        { x: 150, z: 150, w: 10, d: 10, height: 20, hp: 100, value: 99 },
+        { x: -150, z: 150, w: 10, d: 10, height: 20, hp: 100, value: 1 },
+      ],
+    });
+    holdFire(world);
+    const k = world.kaijus[0];
+    world.structureHits.push({ id: 0, damage: Infinity, by: KAIJU_PLAYER, cause: 'swipe' });
+    expect(eventsOf(play(world, 1), 'moltAvailable')).toEqual([]);
+    expect(world.match.barPoints).toBeCloseTo(99, 9);
+    expect(barDisplayFraction(world.match.barPoints, world.match.marks)).toBeLessThan(MATCH_RULES.bar.display[0]);
+    expect(k.moltAvailable).toBe(false);
+    world.structureHits.push({ id: 1, damage: Infinity, by: KAIJU_PLAYER, cause: 'swipe' });
+    expect(eventsOf(play(world, 1), 'moltAvailable')).toEqual([expect.objectContaining({ kaiju: 0, mark: 1 })]);
+    expect(barDisplayFraction(world.match.barPoints, world.match.marks)).toBe(MATCH_RULES.bar.display[0]);
+    expect(k.moltAvailable).toBe(true);
+    // The snapshot says both at once.
+    const snap = decodeSnapshot(encodeSnapshot(snapshotOfWorld(world)));
+    expect(snap.kaijus[0].moltAvailable).toBe(true);
+    expect(barDisplayFraction(snap.match.barPoints, snap.match.marks)).toBe(MATCH_RULES.bar.display[0]);
   });
 });
 

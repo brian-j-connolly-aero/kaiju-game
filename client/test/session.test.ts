@@ -383,3 +383,86 @@ describe('the view when the driven unit dies', () => {
     expect(squadIsOut([], 3)).toBe(true);
   });
 });
+
+describe('the local unit through a stun and the molt blast (round 4: corrections the game made itself)', () => {
+  /** The biggest jump of the prediction (`Predictor.lastJump`) per snapshot while `seconds` run. */
+  function worstJump(rig: Rig, seconds: number): number {
+    let worst = 0;
+    let seen = rig.session.stats.snapshots;
+    rig.run(seconds, () => {
+      if (rig.session.stats.snapshots === seen) return;
+      seen = rig.session.stats.snapshots;
+      worst = Math.max(worst, rig.session.predictor.lastJump);
+    });
+    return worst;
+  }
+
+  it('lets the body walk on when the stun runs out, as the server does, instead of pulling it forward', () => {
+    const rig = new Rig({ role: 'human', roundTripMs: 160, openGround: true });
+    rig.control = { moveX: 0, moveZ: 1, aimYaw: 0.3, aimPitch: 0, buttons: 0 };
+    rig.run(1);
+    const leader = rig.world.units[rig.world.squads[rig.session.role.squadId].driven];
+    // A roar freezes the leader for 0.8 s while the player keeps walking.
+    rig.world.hits.push({
+      target: { entity: 'unit', id: leader.id },
+      hit: { damage: 0, nerve: 0, fromDir: { x: 0, z: 0 }, sourceId: 0, player: 0, kind: 'roar', atWill: false, stun: 0.8 },
+    });
+    // The stun itself is a surprise the page learns of a snapshot later; what follows is not.
+    rig.run(0.4);
+    expect(leader.stun).toBeGreaterThan(0);
+    const after = worstJump(rig, 1.6);
+    expect(leader.stun).toBe(0);
+    // Before, the page held the body frozen for every input it replayed from a snapshot that
+    // still showed the stun (rounded to 0.05 s), and was pulled forward at its end.
+    expect(after).toBeLessThan(0.02);
+  });
+
+  it("slides on with the molt blast's push in the intermission, as the server does", () => {
+    const rig = new Rig({ role: 'human', roundTripMs: 160, openGround: true });
+    rig.run(0.5);
+    const leader = rig.world.units[rig.world.squads[rig.session.role.squadId].driven];
+    // The molt's blast wave throws the leader, and the intermission begins (matchFlow.ts).
+    rig.world.match.phase = 'intermission';
+    rig.world.match.phaseTime = 5;
+    leader.vx = 24;
+    leader.vz = 12;
+    rig.run(0.3);
+    const after = worstJump(rig, 1.5);
+    expect(Math.hypot(leader.vx, leader.vz)).toBe(0);
+    // Before, the page held the body still outside play and caught up with it a snapshot at a
+    // time, two meters and more each.
+    expect(after).toBeLessThan(0.02);
+  });
+});
+
+describe("the local kaiju's own attacks (round 4: corrections the game made itself)", () => {
+  it('walks on through a swipe and a stomp exactly as the server moves it, from the press to the end', () => {
+    const rig = new Rig({ role: 'kaiju', roundTripMs: 160, openGround: true });
+    const walk = { moveX: 0, moveZ: 1, aimYaw: 0.4, aimPitch: 0, buttons: 0 };
+    rig.control = { ...walk };
+    rig.run(1);
+    let worst = 0;
+    let seen = rig.session.stats.snapshots;
+    const watch = (frame: FrameState, now: number): void => {
+      // As the match runtime does every frame: the hint lives as long as the drawn kaiju needs it.
+      if (frame.localKaiju) rig.session.hintFor(frame.localKaiju, now);
+      if (rig.session.stats.snapshots === seen) return;
+      seen = rig.session.stats.snapshots;
+      worst = Math.max(worst, rig.session.predictor.lastJump);
+    };
+    const actions = (): string[] => rig.emitted.flatMap((e) => (e.type === 'kaijuAction' ? [`${e.action}/${e.phase}`] : []));
+    for (const button of [Btn.strike, Btn.stomp]) {
+      // A tap while walking: one input tick with the button down.
+      rig.control = { ...walk, buttons: button };
+      rig.run(1 / 30, watch);
+      rig.control = { ...walk };
+      rig.run(2.5, watch);
+    }
+    expect(actions()).toContain('swipe/active');
+    expect(actions()).toContain('stomp/active');
+    // Before, the page moved the body at the attack's slower pace for every input it replayed
+    // from a snapshot taken during the attack, and at walking pace for those replayed before
+    // the server had the press: a correction of a third to half a meter at each end of it.
+    expect(worst).toBeLessThan(0.02);
+  });
+});

@@ -160,7 +160,7 @@ describe('supply crates', () => {
 });
 
 describe('pick-ups', () => {
-  it('scale the driven unit\'s own weapon with the stage, and leave the squad-mates\' alone', () => {
+  it('scale the driven unit\'s own weapon with the stage, and leave what the squad-mates fire on their own alone', () => {
     for (const weapon of Object.values(WEAPONS)) {
       const mg = pickupWeaponDef(weapon, 'machineGun');
       expect(mg).toMatchObject({ projectile: 'tracer', maxShots: weapon.maxShots, range: weapon.range });
@@ -276,6 +276,53 @@ describe('pick-ups', () => {
       expect(body.y).toBeLessThanOrEqual(1e-6);
       expect(Math.hypot(body.x - h.x, body.z - h.z)).toBeLessThan(1.5);
     }
+  });
+
+  it('go into the charged volley too: every planted squad-mate fires the pick-up, a burst, a heavy shell or half a pod (round 4)', () => {
+    const volleyOf = (pickup: 'none' | 'machineGun' | 'bigCannon' | 'missilePod') => {
+      const { world, squad, leader } = field();
+      squad.pickup = pickup;
+      const aim = { aimYaw: 0, aimPitch: -Math.atan2(UNIT_TYPES.army_rocket_infantry.eyeHeight, 150) };
+      lead(world, CHARGE_TICKS, { ...aim, buttons: Btn.volley });
+      const events = lead(world, 1, aim);
+      expect(eventsOf(events, 'volley').length).toBe(1);
+      const mates = world.projectiles.filter((p) => p.ownerId !== leader.id && p.owner === 'unit');
+      expect(mates.every((p) => p.volley)).toBe(true);
+      const cooldowns = [1, 2, 3].map((id) => world.units[id].cooldown);
+      return {
+        types: new Set(mates.map((p) => p.type)),
+        count: mates.length,
+        damage: mates.reduce((a, p) => a + p.damage, 0),
+        nerve: mates.reduce((a, p) => a + p.nerve, 0),
+        cooldowns,
+      };
+    };
+    const shots = shotsForMembers(ROCKETS, UNIT_TYPES.army_rocket_infantry.members);
+    const base = volleyOf('none');
+    expect([...base.types]).toEqual(['rocket']);
+    expect(base.count).toBe(3 * shots);
+
+    // The machine gun: a burst of five pulls of tracers from every gun, its reload as long as the gun's own.
+    const mg = volleyOf('machineGun');
+    expect([...mg.types]).toEqual(['tracer']);
+    expect(mg.count).toBe(3 * 5 * shots);
+    expect(mg.damage / base.damage).toBeCloseTo(5 / 3, 6);
+    expect(mg.nerve / base.nerve).toBeCloseTo(5 / 3, 6);
+    for (const c of mg.cooldowns) expect(c).toBeCloseTo(ROCKETS.cooldown, 6);
+
+    // The big cannon: a heavy shell from every gun.
+    const cannon = volleyOf('bigCannon');
+    expect([...cannon.types]).toEqual(['heavyShell']);
+    expect(cannon.count).toBe(3 * shots);
+    expect(cannon.damage / base.damage).toBeCloseTo(3.5, 6);
+    expect(cannon.nerve / base.nerve).toBeCloseTo(2, 6);
+
+    // The missile pod: half a salvo from every gun.
+    const pod = volleyOf('missilePod');
+    expect([...pod.types]).toEqual(['missile']);
+    expect(pod.count).toBe(3 * 3);
+    expect(pod.damage / base.damage).toBeCloseTo(1.8, 6);
+    expect(pod.nerve / base.nerve).toBeCloseTo(1.8, 6);
   });
 
   it('the artillery radio: each of the next three charged volleys calls a barrage where it lands, and nothing else does', () => {

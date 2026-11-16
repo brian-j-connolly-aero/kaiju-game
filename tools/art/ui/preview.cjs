@@ -123,7 +123,19 @@ const GROUPS = [
     id: 'settings',
     title: 'Settings and the drone',
     tint: 'plain',
-    icons: ['ui_settings', 'ui_controls', 'ui_invert', 'ui_fullscreen', 'ui_lowres', 'ui_rise', 'ui_sink'],
+    icons: ['ui_settings', 'ui_controls', 'ui_invert', 'ui_fullscreen', 'ui_lowres', 'ui_rise', 'ui_sink', 'ui_rose', 'ui_restart'],
+  },
+  {
+    id: 'rose_army',
+    title: "The army's communication rose",
+    tint: 'human',
+    icons: ['ro_panic', 'ro_bravado', 'ro_orders', 'ro_science', 'ro_home', 'ro_food', 'ro_retreat', 'ro_admire'],
+  },
+  {
+    id: 'rose_kaiju',
+    title: "The monster's communication rose",
+    tint: 'kaiju',
+    icons: ['ro_roar', 'ro_roarshort', 'ro_snuffle', 'ro_growl', 'ro_chomp', 'ro_rumble', 'ro_mating'],
   },
 ];
 

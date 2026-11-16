@@ -27,7 +27,7 @@ SR = 44100
 TABLE_PATH = Path(__file__).with_name("tuning_table.json")
 STRUCK = {47}                       # timpani: fit the principal partial only
 DECAYING = {45, 46, 6, 47, 8}       # plucked or struck: analyse the first half second
-SKIP = {14, 9, 116, 119}            # bells, glockenspiel, taiko, reverse cymbal
+SKIP = {14, 9, 116, 119, 55}        # bells, glockenspiel, taiko, reverse cymbal, orchestra hit
 _table: dict | None = None
 
 
@@ -104,8 +104,10 @@ def measure_patch(inst: Instrument, lo: int, hi: int, scratch: Path) -> dict[str
     return out
 
 
-def measure_all(scratch: Path) -> dict:
-    """Measure every pitched patch the orchestra uses, over the union of its instruments' ranges."""
+def measure_all(scratch: Path, only_new: bool = False) -> dict:
+    """Measure every pitched patch the orchestra uses, over the union of its instruments' ranges.
+    `only_new` measures only the patches the table does not have yet and keeps every entry it
+    already has (so adding instruments leaves the existing cues byte for byte as they were)."""
     patches: dict[str, tuple[Instrument, int, int]] = {}
     for inst in INSTRUMENTS.values():
         if inst.drums or not inst.pitched or inst.program in SKIP:
@@ -116,9 +118,10 @@ def measure_all(scratch: Path) -> dict:
             patches[key] = (inst, min(lo, inst.lo), max(hi, inst.hi))
         else:
             patches[key] = (inst, inst.lo, inst.hi)
-    table = {}
+    table = json.loads(TABLE_PATH.read_text()) if only_new and TABLE_PATH.exists() else {}
     for key, (inst, lo, hi) in sorted(patches.items()):
-        table[key] = measure_patch(inst, lo, hi, scratch)
+        if key not in table:
+            table[key] = measure_patch(inst, lo, hi, scratch)
     TABLE_PATH.write_text(json.dumps(table, indent=0, sort_keys=True) + "\n")
     global _table
     _table = table

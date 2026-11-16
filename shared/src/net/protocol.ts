@@ -14,9 +14,14 @@ import type { MatchConfig, PlayerId } from '../sim/config';
 import type { SimEvent } from '../sim/events';
 import type { PlayerInput } from './input';
 import type { LobbyState } from './lobby';
+import type { RoseMessage, RoseRequest } from './rose';
 
-/** Bump when a message or the snapshot layout changes incompatibly. Sent in `welcome`. */
-export const PROTOCOL_VERSION = 2;
+/**
+ * Bump when a message or the snapshot layout changes incompatibly. Sent in `welcome`.
+ * 3 (round 4): the communication rose (`rose`, both ways), the host's `restart`, and the network
+ * readout's optional fields on `pong`.
+ */
+export const PROTOCOL_VERSION = 3;
 
 /** Default port for the one process that serves both the page and the WebSocket. */
 export const DEFAULT_PORT = 2567;
@@ -92,6 +97,13 @@ export interface ClientMessages {
   start: Record<string, never>;
   /** End screen, host only: take the room back to the lobby. */
   toLobby: Record<string, never>;
+  /**
+   * Match or end screen, host only: start the match over at once, with the same people on the
+   * same sides (the room passes through the lobby: `lobby` with phase 'lobby', then a new match).
+   */
+  restart: Record<string, never>;
+  /** Match: a wedge of the communication rose was picked (rose.ts). At most one every 2 s. */
+  rose: RoseRequest;
   /** Match: one input sample, 30 per second. */
   input: PlayerInput;
   /** Tier 2: pick one of the three offered upgrade cards (0..2). */
@@ -138,6 +150,15 @@ export interface PongMessage {
   t: number;
   /** Server tick when the ping was handled. */
   tick: number;
+  /**
+   * How the server is handling this player's inputs, for the network readout (round 4; absent
+   * when the sender plays no slot in a running match): `wait`, inputs waiting to be played now;
+   * `guessed`, ticks played on a guess because the input was late, and `dropped`, inputs
+   * dropped or skipped, both counted since the player took the slot.
+   */
+  wait?: number;
+  guessed?: number;
+  dropped?: number;
 }
 
 export interface ServerMessages {
@@ -148,6 +169,8 @@ export interface ServerMessages {
   /** The simulation events since the previous `events` message, in order, each with its tick. */
   events: SimEvent[];
   pong: PongMessage;
+  /** Somebody in the match picked a wedge of the communication rose (rose.ts): play it. */
+  rose: RoseMessage;
 }
 
 export type ServerMessageType = keyof ServerMessages;
@@ -161,9 +184,11 @@ export const CLIENT_MESSAGE_TYPES: readonly ClientMessageType[] = [
   'setOptions',
   'start',
   'toLobby',
+  'restart',
+  'rose',
   'input',
   'draftPick',
   'ping',
 ];
 
-export const SERVER_MESSAGE_TYPES: readonly ServerMessageType[] = ['welcome', 'lobby', 'snap', 'events', 'pong'];
+export const SERVER_MESSAGE_TYPES: readonly ServerMessageType[] = ['welcome', 'lobby', 'snap', 'events', 'pong', 'rose'];

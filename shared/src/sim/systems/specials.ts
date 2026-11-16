@@ -15,7 +15,8 @@
  *   it never hurts a kaiju;
  * - radio mast: it falls over away from the kaiju (the army's falling buildings,
  *   `startStructureFall`, which also crush what it lands on); its top section comes to lie at
- *   the far end as a loose `mast` the hatchling can throw as a heavy javelin; and the humans'
+ *   the far end as a loose `mast` the monster can throw as a heavy javelin (at every stage since
+ *   round 4); and the humans'
  *   map shows static for `staticTime` seconds (`match.staticUntil`; spotting.ts then lets only
  *   what the units see put the kaiju on their map).
  */

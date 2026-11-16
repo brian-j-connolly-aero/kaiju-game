@@ -865,10 +865,10 @@ its place in the list, so a change in one neighborhood no longer reshuffles them
   gets the surge; a titan whose body reaches over a gas station takes nothing from its fireball
   (it never hurts a monster), while a troop beside it does; a radio mast falls away from a titan
   standing right beside it, its top lands clear of the titan's body, and the static comes.
-- **The fallen mast's top stays the hatchling's weapon only.** At stages 2 and 3 it lies where it
-  fell; the juvenile's hand leaves it and its feet crush it, like every city weapon. A bigger
-  monster's reward from a mast is the 20 s of static on the army's map and the fall itself, and
-  the city weapons stay "small monster first". Nothing in the rules changed for this.
+- **The fallen mast's top** was decided here to stay the hatchling's weapon only. Round 4
+  changed that: the owner tried to throw one at stage 2, so every size of monster can now pick it
+  up, and its feet spare it (`docs/DESIGN.md` section 4, "Mast"). The five street weapons stay
+  "small monster first".
 - **Measured** (20 bot matches, seeds 1 to 20, every start twice, the same matches on phase 2's
   city alongside): the monster got a special building's reward 43 / 41 / 32 times at stages 1 /
   2 / 3, at stage 2 one every 60 s of play and at stage 3 one every 119 s (phase 2's city: 41 /

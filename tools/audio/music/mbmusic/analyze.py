@@ -3,9 +3,9 @@
 For every .ogg and .mp3: decode with ffmpeg, check duration against the score, peak and true
 peak, silence, integrated loudness (EBU R128, ffmpeg ebur128). For loops: how well the audio
 repeats across the loop points, how large the step is at the splice compared with the steps
-around it, and a spectrogram of the last two seconds followed by the first two. For stage
-stems: the sum of base and combat is checked for clipping and loudness, and both stems are
-checked against the beat grid. Spectrograms of every cue go to docs/audio/music/.
+around it, and a spectrogram of the last two seconds followed by the first two. For a cue made
+of several stems, their sum is checked for clipping and loudness too. Loops are checked against
+the beat grid of their own tempo. Spectrograms of every cue go to docs/audio/music/.
 """
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from scipy import signal
 
 from . import dsp
 from .mixdown import LEAD_IN, MANIFEST, OUT_DIR, REPO
-from .score import BAR_SECONDS, SEC_PER_BEAT, Cue
+from .score import Cue
 from .synth import SCRATCH, SR
 
 DOCS = REPO / "docs/audio/music"
@@ -231,7 +231,7 @@ def _seam(x: np.ndarray, start: float, end: float, master: np.ndarray | None = N
     return out
 
 
-def _grid_offset_ms(x: np.ndarray, start: float) -> float:
+def _grid_offset_ms(x: np.ndarray, start: float, sec_per_beat: float) -> float:
     """Median distance of the strongest onsets from the nearest sixteenth-note grid line."""
     mono = dsp.highpass(x.mean(axis=1), 150.0)
     hop = 64
@@ -240,17 +240,17 @@ def _grid_offset_ms(x: np.ndarray, start: float) -> float:
     thr = np.percentile(flux, 99.5)
     peaks, _ = signal.find_peaks(flux, height=thr, distance=int(0.08 * SR / hop))
     t = peaks * hop / SR - start
-    step = SEC_PER_BEAT / 4
+    step = sec_per_beat / 4
     off = (t + step / 2) % step - step / 2
     return float(np.median(off) * 1000) if len(off) else float("nan")
 
 
-def _bar_levels(x: np.ndarray, start: float, bars: int) -> list[float]:
+def _bar_levels(x: np.ndarray, start: float, bars: int, bar_seconds: float) -> list[float]:
     xk = dsp.k_weight(x)
     out = []
     for b in range(bars):
-        a = int(round((start + b * BAR_SECONDS) * SR))
-        out.append(round(dsp.k_level(xk[a:a + int(BAR_SECONDS * SR)]), 1))
+        a = int(round((start + b * bar_seconds) * SR))
+        out.append(round(dsp.k_level(xk[a:a + int(bar_seconds * SR)]), 1))
     return out
 
 
@@ -322,14 +322,14 @@ def run(cues: list[Cue]) -> int:
                         problems.append(f"{m['file']}: loop seam {sm}")
             x = decoded[(stem.name, "ogg")]
             start = loop[0] if loop else 0.0
-            rec["bar_levels"] = _bar_levels(x, start, int(cue.bars))
+            rec["bar_levels"] = _bar_levels(x, start, int(cue.bars), cue.bar_seconds)
             rec["octave_bands_db"] = _octave_bands(x)
             if loop:
-                rec["grid_offset_ms"] = round(_grid_offset_ms(x, start), 2)
+                rec["grid_offset_ms"] = round(_grid_offset_ms(x, start, cue.sec_per_beat), 2)
             report[stem.name] = rec
             # pictures: the whole file, and for loops the splice
-            secs = [((b - 1) * BAR_SECONDS + start, lab) for b, lab in cue.sections]
-            sub = (f"{cue.title}  ·  {cue.bars:g} bars at 96 beats per minute  ·  "
+            secs = [((b - 1) * cue.bar_seconds + start, lab) for b, lab in cue.sections]
+            sub = (f"{cue.title}  ·  {cue.bars:g} bars at {cue.bpm:g} beats per minute  ·  "
                    f"{rec['ogg']['lufs']:.1f} LUFS, true peak {rec['ogg']['true_peak_db']:.1f} dBTP (.ogg)")
             spectrogram(x, DOCS / f"{stem.name}.png", f"{stem.name}", subtitle=sub, sections=secs)
             if loop:
@@ -360,15 +360,16 @@ def run(cues: list[Cue]) -> int:
                     problems.append(f"{cue.name} base+combat ({ext}): true peak {rec['true_peak_db']} dBTP")
             total = np.sum([decoded[(s.name, "ogg")][:n] for s in cue.stems], axis=0)
             loop = manifest[cue.stems[0].name]["loop"]
-            report[f"{cue.name}_sum"]["bar_levels"] = _bar_levels(total, loop[0], int(cue.bars))
+            report[f"{cue.name}_sum"]["bar_levels"] = _bar_levels(total, loop[0], int(cue.bars), cue.bar_seconds)
             report[f"{cue.name}_sum"]["octave_bands_db"] = _octave_bands(total)
-            secs = [((b - 1) * BAR_SECONDS + loop[0], lab) for b, lab in cue.sections]
-            spectrogram(total, DOCS / f"{cue.name}_sum.png", f"{cue.name}: base + combat",
-                        subtitle=f"{cue.title}  ·  both stems summed at full level  ·  "
+            secs = [((b - 1) * cue.bar_seconds + loop[0], lab) for b, lab in cue.sections]
+            spectrogram(total, DOCS / f"{cue.name}_sum.png", f"{cue.name}: all stems",
+                        subtitle=f"{cue.title}  ·  all stems summed at full level  ·  "
                                  f"{report[f'{cue.name}_sum']['ogg']['lufs']:.1f} LUFS, true peak "
                                  f"{report[f'{cue.name}_sum']['ogg']['true_peak_db']:.1f} dBTP", sections=secs)
     out = DOCS / "measurements.json"
     existing = json.loads(out.read_text()) if out.exists() else {}
+    existing = {k: v for k, v in existing.items() if k in ORDER}      # cues that no longer exist go
     existing.update(report)
     out.write_text(json.dumps(existing, indent=1, sort_keys=True) + "\n")
     write_markdown(existing)
@@ -408,8 +409,7 @@ def print_report(report: dict) -> None:
             print("    octave bands 31-16k: " + " ".join(f"{v:+.0f}" for v in rec["octave_bands_db"]))
 
 
-ORDER = ["lobby", "briefing", "stage1_base", "stage1_combat", "stage1_sum", "stage2_base", "stage2_combat",
-         "stage2_sum", "stage3_base", "stage3_combat", "stage3_sum", "cocoon", "intermission", "win_humans",
+ORDER = ["lobby", "briefing", "stage1", "stage2", "stage3", "final_minute", "cocoon", "intermission", "win_humans",
          "win_kaiju", "hearing"]
 
 
@@ -431,7 +431,7 @@ def write_markdown(report: dict) -> None:
         "  **step** is the sample step across the splice divided by the 99th percentile of the steps",
         "  within 50 ms of it (a click would be far above 1). **flux** is the onset energy at the splice",
         "  relative to the same moment played straight through into the pad (0 dB: the jump adds nothing).",
-        "- `*_sum` rows are the base and combat stems of a stage decoded and added at full level.",
+        "- `*_sum` rows (if a cue has more than one stem) are its stems decoded and added at full level.",
         "",
         "| file | seconds | length error ms | LUFS | LRA | true peak dBTP | kB | seam repeat dB | codec dB | step | flux dB |",
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",

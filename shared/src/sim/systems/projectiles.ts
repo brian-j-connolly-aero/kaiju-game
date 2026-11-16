@@ -20,7 +20,8 @@
  * Each tick the step segment is swept against, nearest first:
  * - standing structures (box prisms up to their height), bridge decks excepted, and the mounds
  *   of collapsed and fallen structures (up to the mound's height; a mound the step starts inside
- *   does not count: whoever fired from on top of it shoots over it);
+ *   does not count: whoever fired from on top of it shoots over it; nor does any mound while a
+ *   kaiju's throw is still within its reach, `clearRubble`);
  * - living kaiju (their hit volume: body, head and neck, tail; sim/kaijuBody.ts), except the
  *   kaiju that threw it;
  * - units, only for projectiles thrown by a kaiju: there is no friendly fire between human
@@ -262,8 +263,10 @@ function fly(world: World, p: Projectile): boolean {
   let target: ProjectileTarget = 'none';
   let targetId = -1;
 
-  // Rubble and fallen buildings stop it too (up to their height).
-  if (castSegment(world.cityQuery, segA, segB, cityHit, -1, true, true)) {
+  // Rubble and fallen buildings stop it too (up to their height), once a kaiju's throw is out of its reach.
+  const clearing = p.clearRubble !== undefined && p.clearRubble > 0;
+  if (clearing) p.clearRubble = (p.clearRubble ?? 0) - Math.hypot(segB.x - segA.x, segB.z - segA.z);
+  if (castSegment(world.cityQuery, segA, segB, cityHit, -1, true, !clearing)) {
     best = cityHit.t;
     target = 'structure';
     targetId = cityHit.structure;

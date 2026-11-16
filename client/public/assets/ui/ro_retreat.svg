@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Rose, army: retreat. A soldier running away to the left, speed lines behind, an arrow pointing back. -->
+  <g transform="matrix(0.8923 0 0 0.8923 3.45 3.45)">
+    <circle cx="27" cy="10" r="6.5" fill="currentColor" stroke="none"/>
+    <path d="M30 19L36 36 44 44 42 58M36 36L24 44 12 42M31 22L18 28 12 22M31 22L42 26 48 20"/>
+    <path d="M50 32H60M54 40H62M48 48H58"/>
+    <path d="M14 56H2M7 51L2 56 7 61"/>
+  </g>
+</svg>

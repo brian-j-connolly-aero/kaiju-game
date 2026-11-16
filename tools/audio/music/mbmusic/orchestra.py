@@ -120,6 +120,33 @@ _ALL = [
        human_ms=2.5, drums=True, pitched=False),
     _i("cymbals", 48, 27, 88, "perc", pan=0.1, width=0.8, rev=0.36, hp=250, trim=1.0, human_ms=2.5,
        drums=True, pitched=False),
+    # ---- the arcade band of the match tracks (round 4): rock kit, basses, synths, guitars ------
+    # trims bring a single note at velocity 100 to about the same loudness (K-weighted, measured
+    # one note at a time); the kit is the soundfont's "Power" kit (channel 10, program 16)
+    _i("kick", 16, 27, 88, "perc", pan=0.0, width=0.2, rev=0.05, hp=38, trim=-1.0, sub=2.0, human_ms=1.0,
+       drums=True, pitched=False),
+    _i("kit_snare", 16, 27, 88, "perc", pan=0.03, width=0.5, rev=0.2, hp=90, trim=0.0, human_ms=1.5,
+       drums=True, pitched=False),
+    _i("hats", 16, 27, 88, "perc", pan=0.3, width=0.4, rev=0.07, hp=350, trim=6.0, human_ms=1.5,
+       drums=True, pitched=False),
+    _i("toms", 16, 27, 88, "perc", pan=0.0, width=1.0, rev=0.18, hp=50, trim=0.0, human_ms=1.5,
+       drums=True, pitched=False),
+    _i("kit_cymbals", 16, 27, 88, "perc", pan=-0.1, width=1.0, rev=0.16, hp=280, trim=-3.0, human_ms=1.5,
+       drums=True, pitched=False),
+    _i("slap_bass", 36, "B0", "G4", "bass", pan=0.0, width=0.3, rev=0.03, hp=38, trim=1.0, human_ms=2.0),
+    _i("synth_bass", 38, "C1", "C4", "bass", pan=0.0, width=0.3, rev=0.02, hp=28, trim=0.0, human_ms=1.0),
+    _i("synth_bass2", 39, "C1", "C4", "bass", pan=0.0, width=0.3, rev=0.02, hp=28, trim=-6.0, human_ms=1.0),
+    _i("saw_lead", 81, "C3", "C7", "synth", pan=-0.06, width=0.5, rev=0.16, hp=140, trim=-1.0, human_ms=1.0),
+    _i("square_lead", 80, "C3", "C7", "synth", pan=0.12, width=0.5, rev=0.16, hp=140, trim=-3.0, human_ms=1.0),
+    _i("fifth_saw", 86, "C3", "C7", "synth", pan=-0.1, width=0.6, rev=0.16, hp=140, trim=4.0, human_ms=1.0),
+    _i("polysynth", 90, "C3", "C7", "synth", pan=-0.35, width=0.6, rev=0.14, hp=180, trim=0.0, human_ms=1.0),
+    _i("synth_brass", 62, "E2", "C6", "synth", pan=0.28, width=0.6, rev=0.18, hp=110, trim=-1.0, human_ms=1.5),
+    _i("synth_brass2", 63, "E2", "C6", "synth", pan=-0.28, width=0.6, rev=0.18, hp=110, trim=-1.0, human_ms=1.5),
+    _i("orch_hit", 55, "C3", "C6", "synth", pan=0.0, width=0.9, rev=0.3, hp=90, trim=0.0, human_ms=1.0),
+    _i("synth_strings", 50, "C3", "C7", "synth", pan=0.0, width=0.9, rev=0.3, hp=160, trim=0.0, human_ms=2.0),
+    _i("dist_guitar", 30, "D2", "E6", "guitar", pan=-0.55, width=0.3, rev=0.08, hp=80, trim=-4.0, human_ms=2.0),
+    _i("dist_guitar_r", 30, "D2", "E6", "guitar", pan=0.55, width=0.3, rev=0.08, hp=80, trim=-4.0, human_ms=2.5),
+    _i("od_guitar", 29, "D2", "E6", "guitar", pan=0.15, width=0.4, rev=0.2, hp=120, trim=-3.0, human_ms=2.0),
 ]
 
 INSTRUMENTS: dict[str, Instrument] = {i.key: i for i in _ALL}

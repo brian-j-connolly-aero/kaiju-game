@@ -93,6 +93,10 @@ the internet (to download the building blocks). Every later start takes seconds.
    on an ordinary home connection that takes a few seconds, and a bar shows how far it is.
    Sounds and voices follow in the background. If you update the game while friends still have
    the old page open, their page reloads itself when they next join.
+10. **To start a match over** (someone joined late, or you want a rematch at once): in the game,
+    press Escape and click the circular arrow twice (it turns red after the first click; the
+    second click within four seconds restarts). Only the room's host has this button. Everyone
+    starts the match again on the same sides.
 
 ## 4. Stopping
 
@@ -151,6 +155,26 @@ Read the last lines in the black window first: they say in plain words what the 
    - If one friend's connection is weak, a wired connection instead of Wi-Fi helps.
 8. **The link changes every time.** That is how the free quick tunnel works. If you want an
    address that never changes, use your own domain (section 7).
+9. **Your own soldier or monster snaps back** ("rubber banding": you walk, and every so often
+   your body is pulled back a few steps). The game has a hidden readout for this:
+   - In the game, press the **`** key (top left of the keyboard, under Escape, left of 1). A
+     small dark panel with numbers and a little moving graph opens at the top left; press **`**
+     again to close it. Anyone can open it on their own computer; it changes nothing in the game.
+   - Keep playing. When a snap happens, take a screenshot of the whole screen right away (on
+     Windows: the Windows key + Shift + S, or the Print Screen key) while the panel is open. The
+     graph shows the last 30 seconds: a tall red bar is a snap; a blue spike at the same moment
+     means the connection stalled; purple marks at the bottom mean that computer itself froze
+     for a moment.
+   - After the session, double-click **logs.cmd** and copy the window. The server now writes a
+     line whenever it stood still or was slow ("slow moment ... the server stood still for
+     ... ms"), and whenever a player's connection stalled ("seat 2's inputs stopped arriving
+     for 0.80 s ..."). Seat 0 is the first person who joined the room, seat 1 the second, and
+     so on.
+   - Send both (the screenshot and the log) to whoever gave you the game. Tell them who was
+     playing which side and roughly when it happened.
+   Since round 4 a stall of up to one second on the connection no longer pulls a walking body
+   back (before, anything over half a second did). Longer stalls still do: those are the tunnel
+   or the network, not the game.
 
 If none of this helps, double-click **logs.cmd**, select everything in the window, copy it and
 send it to whoever gave you the game.
@@ -253,7 +277,9 @@ If the computer has **Node.js 22** (a program that runs JavaScript) installed:
 ## 11. What was tested, and what was not
 
 Honest status of this hosting package, as of the release round before the first five-player
-playtest. It was tried on a Linux test machine, not on Windows.
+playtest. It was tried on a Linux test machine, not on Windows. (Since then the owner has hosted
+the playtests on their own computer through the quick tunnel, so the start files and the public
+link have been used for real.)
 
 **Tested there, and working:**
 

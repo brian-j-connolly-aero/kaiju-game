@@ -923,6 +923,153 @@
         "audio/sfx/relic_open"
       ],
       "gain": 1
+    },
+    "kaiju_rose_roar_s1": {
+      "variants": [
+        "audio/sfx/kaiju_rose_roar_s1_1",
+        "audio/sfx/kaiju_rose_roar_s1_2"
+      ],
+      "gain": 1
+    },
+    "kaiju_rose_roar_s2": {
+      "variants": [
+        "audio/sfx/kaiju_rose_roar_s2_1",
+        "audio/sfx/kaiju_rose_roar_s2_2"
+      ],
+      "gain": 1
+    },
+    "kaiju_rose_roar_s3": {
+      "variants": [
+        "audio/sfx/kaiju_rose_roar_s3_1",
+        "audio/sfx/kaiju_rose_roar_s3_2"
+      ],
+      "gain": 1
+    },
+    "kaiju_rose_roar_short_s1": {
+      "variants": [
+        "audio/sfx/kaiju_rose_roar_short_s1_1",
+        "audio/sfx/kaiju_rose_roar_short_s1_2"
+      ],
+      "gain": 1
+    },
+    "kaiju_rose_roar_short_s2": {
+      "variants": [
+        "audio/sfx/kaiju_rose_roar_short_s2_1",
+        "audio/sfx/kaiju_rose_roar_short_s2_2"
+      ],
+      "gain": 1
+    },
+    "kaiju_rose_roar_short_s3": {
+      "variants": [
+        "audio/sfx/kaiju_rose_roar_short_s3_1",
+        "audio/sfx/kaiju_rose_roar_short_s3_2"
+      ],
+      "gain": 1
+    },
+    "kaiju_rose_snuffle_s1": {
+      "variants": [
+        "audio/sfx/kaiju_rose_snuffle_s1_1",
+        "audio/sfx/kaiju_rose_snuffle_s1_2"
+      ],
+      "gain": 1
+    },
+    "kaiju_rose_snuffle_s2": {
+      "variants": [
+        "audio/sfx/kaiju_rose_snuffle_s2_1",
+        "audio/sfx/kaiju_rose_snuffle_s2_2"
+      ],
+      "gain": 1
+    },
+    "kaiju_rose_snuffle_s3": {
+      "variants": [
+        "audio/sfx/kaiju_rose_snuffle_s3_1",
+        "audio/sfx/kaiju_rose_snuffle_s3_2"
+      ],
+      "gain": 1
+    },
+    "kaiju_rose_growl_s1": {
+      "variants": [
+        "audio/sfx/kaiju_rose_growl_s1_1",
+        "audio/sfx/kaiju_rose_growl_s1_2"
+      ],
+      "gain": 1
+    },
+    "kaiju_rose_growl_s2": {
+      "variants": [
+        "audio/sfx/kaiju_rose_growl_s2_1",
+        "audio/sfx/kaiju_rose_growl_s2_2"
+      ],
+      "gain": 1
+    },
+    "kaiju_rose_growl_s3": {
+      "variants": [
+        "audio/sfx/kaiju_rose_growl_s3_1",
+        "audio/sfx/kaiju_rose_growl_s3_2"
+      ],
+      "gain": 1
+    },
+    "kaiju_rose_chomp_s1": {
+      "variants": [
+        "audio/sfx/kaiju_rose_chomp_s1_1",
+        "audio/sfx/kaiju_rose_chomp_s1_2"
+      ],
+      "gain": 1
+    },
+    "kaiju_rose_chomp_s2": {
+      "variants": [
+        "audio/sfx/kaiju_rose_chomp_s2_1",
+        "audio/sfx/kaiju_rose_chomp_s2_2"
+      ],
+      "gain": 1
+    },
+    "kaiju_rose_chomp_s3": {
+      "variants": [
+        "audio/sfx/kaiju_rose_chomp_s3_1",
+        "audio/sfx/kaiju_rose_chomp_s3_2"
+      ],
+      "gain": 1
+    },
+    "kaiju_rose_rumble_s1": {
+      "variants": [
+        "audio/sfx/kaiju_rose_rumble_s1_1",
+        "audio/sfx/kaiju_rose_rumble_s1_2"
+      ],
+      "gain": 1
+    },
+    "kaiju_rose_rumble_s2": {
+      "variants": [
+        "audio/sfx/kaiju_rose_rumble_s2_1",
+        "audio/sfx/kaiju_rose_rumble_s2_2"
+      ],
+      "gain": 1
+    },
+    "kaiju_rose_rumble_s3": {
+      "variants": [
+        "audio/sfx/kaiju_rose_rumble_s3_1",
+        "audio/sfx/kaiju_rose_rumble_s3_2"
+      ],
+      "gain": 1
+    },
+    "kaiju_rose_mating_s1": {
+      "variants": [
+        "audio/sfx/kaiju_rose_mating_s1_1",
+        "audio/sfx/kaiju_rose_mating_s1_2"
+      ],
+      "gain": 1
+    },
+    "kaiju_rose_mating_s2": {
+      "variants": [
+        "audio/sfx/kaiju_rose_mating_s2_1",
+        "audio/sfx/kaiju_rose_mating_s2_2"
+      ],
+      "gain": 1
+    },
+    "kaiju_rose_mating_s3": {
+      "variants": [
+        "audio/sfx/kaiju_rose_mating_s3_1",
+        "audio/sfx/kaiju_rose_mating_s3_2"
+      ],
+      "gain": 1
     }
   }
 }

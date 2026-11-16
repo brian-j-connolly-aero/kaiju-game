@@ -1,8 +1,9 @@
 /*
  * The monster's own pictures (docs/ROADMAP.md phase 1): its buttons on the HUD
- * (ui/kaijuKit.ts), the molt card picker (ui/moltCards.ts) and the controls card's pieces for
- * the move slots and the cards (ui/controlsCard.ts). Kept apart from styles.css, which holds
- * everything else; the same color language: kaiju orange, ready in yellow. No text.
+ * (ui/kaijuKit.ts), the molt card picker (ui/moltCards.ts), and round 4's flair round the
+ * crosshair: the rage meter, the hit slashes, the molt's burst and the power surge's badge
+ * (ui/kaijuFlair.ts). Kept apart from styles.css, which holds everything else; the same color
+ * language: kaiju orange, ready in yellow, the surge blue-white. No text.
  */
 
 /* --- the kit on the HUD ------------------------------------------------------------------------ */
@@ -190,44 +191,58 @@
   animation: pulse 0.5s infinite;
 }
 
-/* The power surge: a bolt in a blue-white ring that runs down; it pops in when the surge starts. */
+/*
+ * The power surge: a big lightning bolt in a blue-white ring that runs down over the surge,
+ * up and to the right of the crosshair (clear of the target and of the throw's arc coming in
+ * from the lower right). It pops in big when the surge starts and crackles while it lasts.
+ */
 .kit-surge {
-  position: relative;
-  width: 52px;
-  height: 52px;
-  margin-bottom: 30px;
+  --sb: clamp(76px, 15vmin, 140px);
+  position: absolute;
+  left: calc(50% + 15vmin);
+  top: calc(50% - 15vmin - var(--sb));
+  width: var(--sb);
+  height: var(--sb);
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: rgba(14, 18, 30, 0.75);
-  color: #dfe6ff;
-  font-size: 32px;
-  filter: drop-shadow(0 0 6px rgba(200, 212, 255, 0.9));
+  background: radial-gradient(circle, #8cc0ff 0%, #3a62e0 48%, rgba(20, 30, 90, 0.85) 72%);
+  border: 3px solid rgba(235, 243, 255, 0.9);
+  box-shadow: 0 0 22px rgba(140, 190, 255, 0.95), inset 0 0 14px rgba(255, 255, 255, 0.6);
+  color: #fff;
+  font-size: calc(var(--sb) * 0.7);
+  pointer-events: none;
 }
 
-.kit-surge .icon {
-  animation: kit-crackle 0.18s steps(2) infinite;
+.kit-surge-bolt {
+  display: flex;
+  filter: drop-shadow(0 0 6px #fff) drop-shadow(0 0 2px #1a2a80);
+  animation: kit-crackle 0.16s steps(2) infinite;
 }
 
+/* The time left: a thick white ring round the badge that runs down. */
 .kit-surge-ring {
   --fill: 1;
   position: absolute;
-  inset: -4px;
+  inset: -12px;
   border-radius: 50%;
-  background: conic-gradient(#e4ebff calc(var(--fill) * 1turn), rgba(255, 255, 255, 0.12) 0);
-  -webkit-mask: radial-gradient(circle, transparent 62%, #000 64%);
-  mask: radial-gradient(circle, transparent 62%, #000 64%);
+  background: conic-gradient(#f4f8ff calc(var(--fill) * 1turn), rgba(20, 30, 90, 0.6) 0);
+  -webkit-mask: radial-gradient(closest-side, transparent 79%, #000 81%);
+  mask: radial-gradient(closest-side, transparent 79%, #000 81%);
 }
 
-.kit-surge.start {
-  animation: kit-surge-in 0.7s ease-out;
+.kit-surge.surge-in {
+  animation: kit-surge-in 0.8s cubic-bezier(0.2, 0.9, 0.3, 1.2);
 }
 
 @keyframes kit-surge-in {
   0% {
-    transform: scale(2.4);
-    filter: drop-shadow(0 0 22px #fff);
+    transform: scale(3) rotate(-25deg);
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
   }
   100% {
     transform: scale(1);
@@ -236,12 +251,57 @@
 
 @keyframes kit-crackle {
   0% {
-    transform: translate(0, 0);
+    transform: translate(0, 0) rotate(0deg);
     opacity: 1;
   }
   100% {
-    transform: translate(1px, -1px);
-    opacity: 0.75;
+    transform: translate(2px, -2px) rotate(4deg);
+    opacity: 0.7;
+  }
+}
+
+/* The surge's start: every button snaps full, white, with a crackle (then flashes on with the rest). */
+.kaiju-kit.surging.surge-in .hint:not(.empty) .hint-icon {
+  animation: kit-snap 0.6s ease-out;
+}
+
+.kaiju-kit.surging.surge-in .kit-slot:not(.empty) .slot-box,
+.kaiju-kit.surging.surge-in .kit-strike .hint-icon,
+.kaiju-kit.surging.surge-in .kit-stomp .hint-icon {
+  animation: kit-snap 0.6s ease-out, kit-surge-flash 0.35s ease-in-out 0.6s infinite alternate;
+}
+
+@keyframes kit-snap {
+  0% {
+    transform: scale(1.35);
+    background: #e8efff;
+    color: #2a3a80;
+    box-shadow: 0 0 26px #fff;
+    border-color: #fff;
+  }
+  20% {
+    transform: scale(1.1) translate(-2px, 1px);
+  }
+  35% {
+    transform: scale(1.15) translate(2px, -1px);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* The screen's edges crackle blue-white while the surge lasts. */
+.surge-edge {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 6vmin rgba(150, 190, 255, 0.55), inset 0 0 1.2vmin rgba(235, 242, 255, 0.9);
+  animation: surge-edge 0.22s steps(2) infinite alternate;
+}
+
+@keyframes surge-edge {
+  100% {
+    opacity: 0.55;
   }
 }
 
@@ -263,9 +323,209 @@
   }
 }
 
+/* A button's picture punches out as its attack starts, in step with the attack's animation. */
+.kaiju-kit .hint.active .hint-icon {
+  animation: kit-punch 0.22s ease-out;
+}
+
+@keyframes kit-punch {
+  0% {
+    transform: scale(1.28);
+    box-shadow: 0 0 16px rgba(255, 122, 26, 0.9);
+  }
+  100% {
+    transform: none;
+  }
+}
+
 /* While the cards are up (the cocoon and the intermission) the kit stays on screen: it is where the pick lands. */
 .hud.cinematic.cards .hud-bottom-right {
   display: flex;
+}
+
+/* --- the rage meter round the crosshair (round 4) ---------------------------------------------- */
+
+/*
+ * Three claw gashes swirling round the crosshair, heated by rage (`--heat`, set from the rage):
+ * a dark scar while cold. The SVG's point (0, 0) is the middle of the screen.
+ */
+.rage-meter {
+  --rm: clamp(130px, 26vmin, 230px);
+  --heat: #ff3a10;
+  position: absolute;
+  left: calc(50% - var(--rm) / 2);
+  top: calc(50% - var(--rm) / 2);
+  width: var(--rm);
+  height: var(--rm);
+  pointer-events: none;
+}
+
+.rage-meter svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.rm-gashes {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  opacity: 0.85;
+}
+
+.rage-meter.low .rm-gashes {
+  opacity: 0.45;
+}
+
+.rm-scar {
+  fill: rgba(30, 12, 8, 0.45);
+  stroke: rgba(255, 140, 80, 0.4);
+  stroke-width: 0.8;
+}
+
+.rm-heat {
+  fill: var(--heat);
+}
+
+.rage-meter.hot .rm-gashes {
+  filter: drop-shadow(0 0 3px var(--heat));
+}
+
+/* The special is ready: the gashes throb white-hot and shed embers. */
+.rage-meter.ready .rm-gashes {
+  opacity: 1;
+  animation: rm-throb 0.9s ease-in-out infinite;
+}
+
+@keyframes rm-throb {
+  50% {
+    transform: scale(1.07);
+  }
+}
+
+.rm-ember {
+  display: none;
+  fill: #ffd27a;
+}
+
+.rage-meter.ready .rm-ember {
+  display: inline;
+  transform-box: fill-box;
+  animation: rm-ember 1.5s ease-out infinite;
+}
+
+@keyframes rm-ember {
+  0% {
+    transform: translate(0, 0);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(3px, -22px) scale(0.4);
+    opacity: 0;
+  }
+}
+
+/* Something in the hand: the throw's arc and where it lands are shown, so the gashes step back. */
+.rage-meter.holding .rm-gashes {
+  opacity: 0.22;
+}
+
+/* A hit landed: the gashes flare bright for a moment. */
+.rm-gashes.flare {
+  animation: rm-flare 0.3s ease-out;
+}
+
+.rage-meter.ready .rm-gashes.flare {
+  animation: rm-flare 0.3s ease-out, rm-throb 0.9s ease-in-out 0.3s infinite;
+}
+
+@keyframes rm-flare {
+  0% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+/* A hit landed: three claw slashes flash over the crosshair (blue-white in a surge). */
+.rm-hit {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 46px;
+  height: 46px;
+  margin: -23px 0 0 -23px;
+  color: #ffb050;
+  opacity: 0;
+  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.7));
+}
+
+.rage-meter.surging .rm-hit {
+  color: #e6efff;
+  filter: drop-shadow(0 0 6px #9cc8ff);
+}
+
+.rm-hit svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.rm-hit.on {
+  animation: rm-hit 0.28s ease-out;
+}
+
+@keyframes rm-hit {
+  0% {
+    opacity: 1;
+    transform: scale(0.6);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.3);
+  }
+}
+
+/* A new body: a hot ring bursts out from the crosshair. */
+.rm-burst {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 40px;
+  height: 40px;
+  margin: -20px 0 0 -20px;
+  border-radius: 50%;
+  border: 6px solid #ffd27a;
+  box-shadow: 0 0 20px #ff7a1a;
+  opacity: 0;
+}
+
+.rm-burst.on {
+  animation: rm-burst 1.1s ease-out;
+}
+
+@keyframes rm-burst {
+  0% {
+    opacity: 1;
+    transform: scale(0.5);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(14);
+    border-width: 1px;
+  }
+}
+
+.hud.cinematic .rage-meter,
+.hud.cinematic .kit-surge,
+.hud.cinematic .surge-edge {
+  display: none;
 }
 
 /* --- the molt card picker ---------------------------------------------------------------------- */
@@ -556,73 +816,6 @@
   width: 100%;
   background: var(--kaiju);
   border-radius: 4px;
-}
-
-/* --- the controls card's pieces ----------------------------------------------------------------- */
-
-/* Both move buttons in the HUD's slot frame: "on whichever button it landed". */
-.card-moves {
-  display: inline-flex;
-  gap: 2px;
-  padding: 2px 4px;
-  border: 2px dashed rgba(255, 122, 26, 0.7);
-  border-radius: 8px;
-  font-size: calc(var(--u) * 0.8);
-}
-
-.card-moves .card-glyph {
-  font-size: calc(var(--u) * 0.8);
-}
-
-/* One move button over its empty slot (a faint egg). */
-.card-slot {
-  display: inline-flex;
-  align-items: center;
-  gap: calc(var(--u) * 0.12);
-}
-
-.card-slot-box {
-  width: calc(var(--u) * 1.15);
-  height: calc(var(--u) * 1.15);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px dashed rgba(255, 255, 255, 0.35);
-  border-radius: 8px;
-  font-size: calc(var(--u) * 0.8);
-  color: rgba(255, 255, 255, 0.25);
-}
-
-/* Three small molt cards, each over the button that picks it. */
-.card-cards {
-  display: inline-flex;
-  align-items: flex-end;
-  gap: calc(var(--u) * 0.12);
-}
-
-.card-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 3px 3px 2px;
-  border: 2px solid rgba(255, 122, 26, 0.7);
-  border-radius: 6px;
-  background: rgba(255, 122, 26, 0.1);
-}
-
-.card-card-pic {
-  font-size: calc(var(--u) * 0.72);
-  color: var(--kaiju);
-}
-
-.card-card-glyph {
-  font-size: calc(var(--u) * 0.62);
-}
-
-.card-card-click {
-  font-size: calc(var(--u) * 0.72);
-  opacity: 0.75;
 }
 
 /* A narrow window: the kit gets smaller, so the monster in the middle of the chase view stays in sight. */

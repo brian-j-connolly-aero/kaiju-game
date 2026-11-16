@@ -22,12 +22,14 @@ def main() -> int:
                     help="measure the files that are already built (needs the masters in scratch)")
     ap.add_argument("--measure-tuning", action="store_true",
                     help="re-measure the soundfont's intonation (writes mbmusic/tuning_table.json) and stop")
+    ap.add_argument("--measure-tuning-new", action="store_true",
+                    help="measure only the patches the intonation table does not have yet, and stop")
     args = ap.parse_args()
 
-    if args.measure_tuning:
+    if args.measure_tuning or args.measure_tuning_new:
         from mbmusic import tuning
         from mbmusic.synth import SCRATCH
-        table = tuning.measure_all(SCRATCH / "tuning")
+        table = tuning.measure_all(SCRATCH / "tuning", only_new=args.measure_tuning_new)
         print(f"measured {sum(len(v) for v in table.values())} keys of {len(table)} patches -> {tuning.TABLE_PATH}")
         return 0
     cues = all_cues(args.cues or None)
@@ -43,7 +45,9 @@ def main() -> int:
     t0 = time.time()
     entries = {}
     if mixdown.MANIFEST.exists() and args.cues:
-        entries = json.loads(mixdown.MANIFEST.read_text()).get("music", {})
+        # keep the entries of the cues not being rebuilt, and only of cues that still exist
+        known = {stem.name for cue in all_cues() for stem in cue.stems}
+        entries = {k: v for k, v in json.loads(mixdown.MANIFEST.read_text()).get("music", {}).items() if k in known}
     for cue in cues:
         entries.update(mixdown.render_cue(cue, encode=not args.no_encode)["manifest"])
     if not args.no_encode:

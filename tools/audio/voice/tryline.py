@@ -2,7 +2,6 @@
 """Audition candidate wordings before they go into the script.
 
   tryline.py <Speaker> "candidate text" ["another candidate" ..]
-  tryline.py --cue nerve.break Overlord "An order." ..     (spoken as an order: the order speed)
   tryline.py --file candidates.json [--jobs 2] [--seeds 3] [--json out.json]
 
 Speaks each candidate with the speaker's own voice and chain (cast.json), exactly as the build
@@ -12,12 +11,11 @@ are random per line id, so each candidate is finished with several seeds (defaul
 errors are added up: a wording is only as good as its worst draw. Nothing is written to the
 repository.
 
-candidates.json is a list of { "speaker": "Granite", "tag": "anything", "texts": ["..", ".."] }
-(optionally with "cue").
+candidates.json is a list of { "speaker": "Granite", "tag": "anything", "texts": ["..", ".."] }.
 
 Use it when writing or rewording lines: prefer the candidate with no errors in the unprocessed
 speech and the fewest in the finished clip, and check the length against the window the line
-announces (docs/VOICE_SCRIPT.md, "Rules for writing new lines")."""
+should take (docs/VOICE_SCRIPT.md, "Rules for writing new lines")."""
 
 from __future__ import annotations
 
@@ -39,17 +37,15 @@ from mbvoice.script import load_cast  # noqa: E402
 _CAST = None
 
 
-def trial(job: tuple[str, str, str, int, str | None]) -> dict:
+def trial(job: tuple[str, str, str, int]) -> dict:
     global _CAST
-    speaker, tag, text, seeds, cue = job
+    speaker, tag, text, seeds = job
     if _CAST is None:
         _CAST = load_cast()
     line = {"id": "try_" + hashlib.sha256(f"{speaker}|{text}".encode()).hexdigest()[:10],
             "speaker": speaker, "text": text}
-    if cue:                               # e.g. nerve.break: spoken as an order, if the speaker has an order speed
-        line.update(cue=cue, audience="humans")
     plan = line_plan(line, _CAST, {"words": {}, "lines": {}})
-    raw = raw_speech(text, plan["voice"], plan["max_pause_ms"], plan["min_pause_ms"])
+    raw = raw_speech(plan["text"], plan["voice"], plan["max_pause_ms"], plan["min_pause_ms"])
     h_raw = asr.transcribe(raw, SR)
     e_raw, words = asr.word_errors(text, h_raw)
     finished = []
@@ -75,16 +71,14 @@ def main() -> int:
     ap.add_argument("--jobs", type=int, default=2)
     ap.add_argument("--seeds", type=int, default=3, help="noise draws per candidate (default 3)")
     ap.add_argument("--json", help="also write the results to this file")
-    ap.add_argument("--cue", help="the cue the line is for (nerve.break and kaiju.special lines of the humans are "
-                                  "orders, spoken at the speaker's order speed from cast.json)")
     args = ap.parse_args()
     jobs = []
     if args.file:
         for group in json.loads(Path(args.file).read_text()):
             for text in group["texts"]:
-                jobs.append((group["speaker"], group.get("tag", ""), text, args.seeds, group.get("cue", args.cue)))
+                jobs.append((group["speaker"], group.get("tag", ""), text, args.seeds))
     elif args.speaker and args.texts:
-        jobs = [(args.speaker, "", t, args.seeds, args.cue) for t in args.texts]
+        jobs = [(args.speaker, "", t, args.seeds) for t in args.texts]
     else:
         ap.error("give a speaker and candidate texts, or --file")
     from mbvoice.synth import split_threads

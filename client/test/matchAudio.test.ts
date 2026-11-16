@@ -1,10 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  ROSE_ARMY,
+  ROSE_KAIJU,
   TICK_RATE,
   VOICE_LINES,
-  VOICE_SIDE_RULES,
-  voiceLinesFor,
   type Bounds,
   type KaijuKindId,
   type SimEvent,
@@ -16,8 +16,8 @@ import {
 } from '@mb/shared';
 import { emptyManifest } from '../src/assets/manifest';
 import { AudioEngine } from '../src/audio/audioEngine';
-import { EVENT_CUES, EVENT_LINE_PROBLEMS, EVENT_LINES, eventLine } from '../src/audio/eventVoice';
-import { CHAIR_AT, chargeTone, HEARING_MUSIC_AT, isRadioLine, MatchAudio, voiceAheadIds, WHOOSH_PEAK, type MatchAudioSession } from '../src/audio/matchAudio';
+import { chargeTone, FINAL_MINUTE_AT, HEARING_MUSIC_AT, MatchAudio, voiceAheadIds, WHOOSH_PEAK, type MatchAudioSession } from '../src/audio/matchAudio';
+import { allRoseLineIds, ROSE_KAIJU_SOUNDS, ROSE_SOUND_VARIANTS, ROSE_VOICES, roseLineId, roseTexts } from '../src/audio/roseLines';
 import type { FrameState, LocalRole } from '../src/net/matchSession';
 import { attackVariant } from '../src/render/kaijuAnimator';
 import { FakeAudioContext, FakeGain, fakeFetch, type FakeFetch, type FakeSource } from './fakeAudio';
@@ -26,12 +26,10 @@ import { FakeAudioContext, FakeGain, fakeFetch, type FakeFetch, type FakeSource 
 const MUSIC: Record<string, { duration: number; loop?: [number, number]; mark?: number }> = {
   lobby: { duration: 80.5, loop: [0.25, 80.25] },
   briefing: { duration: 20.5, loop: [0.25, 20.25] },
-  stage1_base: { duration: 80.5, loop: [0.25, 80.25] },
-  stage1_combat: { duration: 80.5, loop: [0.25, 80.25] },
-  stage2_base: { duration: 80.5, loop: [0.25, 80.25] },
-  stage2_combat: { duration: 80.5, loop: [0.25, 80.25] },
-  stage3_base: { duration: 80.5, loop: [0.25, 80.25] },
-  stage3_combat: { duration: 80.5, loop: [0.25, 80.25] },
+  stage1: { duration: 154.1, loop: [0.25, 153.85] },
+  stage2: { duration: 156.5, loop: [0.25, 156.25] },
+  stage3: { duration: 160.5, loop: [0.25, 160.25] },
+  final_minute: { duration: 60.5, loop: [0.25, 60.25], mark: 60.25 },
   hearing: { duration: 30.5, loop: [0.25, 30.25] },
   cocoon: { duration: 12.5, mark: 10 },
   intermission: { duration: 23.5, mark: 20 },
@@ -116,9 +114,16 @@ function rig(role: Partial<LocalRole> = {}): Rig {
     manifest.sfx[id] = { variants: [`audio/sfx/${id}`], gain: 1, loop };
     ctx.durations.set(`audio/sfx/${id}.ogg`, loop[1] + 0.25);
   }
-  for (const l of [...VOICE_LINES, ...EVENT_LINES]) {
-    manifest.voice[l.id] = { base: `audio/voice/${l.id}`, duration: 2.2 };
-    ctx.durations.set(`audio/voice/${l.id}.ogg`, 2.2);
+  for (const id of [...VOICE_LINES.map((l) => l.id), ...allRoseLineIds()]) {
+    manifest.voice[id] = { base: `audio/voice/${id}`, duration: 2.2 };
+    ctx.durations.set(`audio/voice/${id}.ogg`, 2.2);
+  }
+  for (const base of Object.values(ROSE_KAIJU_SOUNDS)) {
+    for (const stage of [1, 2, 3]) {
+      const id = `${base}_s${stage}`;
+      manifest.sfx[id] = { variants: [1, 2].map((n) => `audio/sfx/${id}_${n}`), gain: 1 };
+      for (const n of [1, 2]) ctx.durations.set(`audio/sfx/${id}_${n}.ogg`, 1);
+    }
   }
   const engine = new AudioEngine({ manifest, hasManifest: true, audioUrl: (base) => `${base}.ogg` }, false, {
     // The fake has the parts of an audio context the engine uses.
@@ -160,11 +165,13 @@ function unit(over: Partial<SnapUnit> = {}): SnapUnit {
   return { id: 0, squad: 0, alive: true, laser: false, charge: 0, x: 0, y: 0, z: 0, ...over } as SnapUnit;
 }
 
-function frameOf(over: { tick?: number; phase?: SnapMatch['phase']; stage?: StageId; phaseTime?: number; kaiju?: Partial<SnapKaiju>; units?: SnapUnit[] } = {}): FrameState {
+function frameOf(
+  over: { tick?: number; phase?: SnapMatch['phase']; stage?: StageId; phaseTime?: number; clock?: number; kaiju?: Partial<SnapKaiju>; units?: SnapUnit[] } = {},
+): FrameState {
   const stage = over.stage ?? 1;
   return {
     tick: over.tick ?? 900,
-    match: { phase: over.phase ?? 'playing', stage, phaseTime: over.phaseTime ?? 0 } as SnapMatch,
+    match: { phase: over.phase ?? 'playing', stage, phaseTime: over.phaseTime ?? 0, clock: over.clock ?? 300 } as SnapMatch,
     kaijus: [kaiju({ stage, ...over.kaiju })],
     squads: [],
     units: over.units ?? [],
@@ -179,7 +186,7 @@ function voice(cue: VoiceCueId, tick: number, lines: { humans?: string[]; kaiju?
   return { type: 'voice', tick, cue, variant: 0, squad: -1, player: -1, lines: { humans: lines.humans ?? [], kaiju: lines.kaiju ?? [] } };
 }
 
-const firstLine = (cue: VoiceCueId, side: 'humans' | 'kaiju'): string => voiceLinesFor(cue, side)[0].id;
+const MOLT_LINE = VOICE_LINES[0].id;
 
 const gainOf = (src: FakeSource): FakeGain => src.outputs[0] as FakeGain;
 
@@ -195,167 +202,121 @@ afterEach(() => {
 });
 
 describe('voice lines', () => {
-  it('plays the lines the simulation chose for the listener, never its own pick', async () => {
+  it('plays the molt line the simulation chose, for the monster only, and nothing for a cue with no line', async () => {
+    const k = rig({ kind: 'kaiju', kaijuId: 0, squadId: -1, playerId: 0 });
+    const say = vi.spyOn(k.engine, 'say');
+    await k.frame(frameOf());
+    k.event(voice('molt.available', 900, { kaiju: [MOLT_LINE] }));
+    expect(say.mock.calls.map((c) => c[0].id)).toEqual([MOLT_LINE]);
+    expect(say.mock.calls[0][1]).toMatchObject({ priority: 2, radio: false });
+    k.event(voice('volley.fired', 900, {}));
+    expect(say).toHaveBeenCalledTimes(1);
+
     const humans = rig();
-    const say = vi.spyOn(humans.engine, 'say');
+    const sayH = vi.spyOn(humans.engine, 'say');
     await humans.frame(frameOf());
-    // The event names a line of another cue on purpose: the ids decide, not the cue.
-    const chosen = firstLine('crossfire', 'humans');
-    const forKaiju = firstLine('kaiju.roar', 'kaiju');
-    humans.event(voice('volley.fired', 900, { humans: [chosen], kaiju: [forKaiju] }));
-    expect(say.mock.calls.map((c) => c[0].id)).toEqual([chosen]);
+    humans.event(voice('molt.available', 900, { kaiju: [MOLT_LINE] }));
+    expect(sayH).not.toHaveBeenCalled();
+  });
+
+  it('loads the monster\'s molt line before the match, and no line for the squads', () => {
+    const k = rig({ kind: 'kaiju', kaijuId: 0, squadId: -1, playerId: 0 });
+    expect(voiceAheadIds('kaiju')).toContain(MOLT_LINE);
+    expect(k.fetcher.requests).toContain(`audio/voice/${MOLT_LINE}.ogg`);
+    expect(voiceAheadIds('humans')).toEqual([]);
+  });
+});
+
+describe('the communication rose', () => {
+  const granite = { role: 'human' as const, name: 'Rook', callsign: 'Granite' };
+  const beacon = { role: 'human' as const, name: 'Beacon', callsign: 'Beacon' };
+  const beast = { role: 'kaiju' as const, name: 'Mo', callsign: '' };
+
+  it('puts a squad\'s line on the radio in its own voice, with the player\'s name, the same line on every screen', async () => {
+    const lines: string[][] = [];
+    for (const role of [{}, { kind: 'kaiju' as const, kaijuId: 0, squadId: -1, playerId: 0 }]) {
+      const r = rig(role);
+      const say = vi.spyOn(r.engine, 'say');
+      await r.frame(frameOf());
+      const science = ROSE_ARMY.indexOf('science');
+      r.audio.rose({ player: 1, cat: science, pick: 7 }, granite);
+      r.audio.rose({ player: 2, cat: science, pick: 7 }, beacon);
+      expect(say.mock.calls.map((c) => c[1])).toEqual([
+        expect.objectContaining({ radio: true, priority: 1 }),
+        expect.objectContaining({ radio: true, priority: 1 }),
+      ]);
+      const n = 7 % roseTexts('science').length;
+      expect(say.mock.calls[0][0]).toEqual({ id: roseLineId('Granite', 'science', n), speaker: 'Rook', text: roseTexts('science')[n] });
+      expect(say.mock.calls[1][0].id).toBe(roseLineId('Beacon', 'science', n));
+      lines.push(say.mock.calls.map((c) => c[0].id));
+    }
+    expect(lines[1]).toEqual(lines[0]);
+  });
+
+  it('gives a squad whose callsign has no voice of its own the voice of its place in the order', async () => {
+    const r = rig();
+    const say = vi.spyOn(r.engine, 'say');
+    await r.frame(frameOf());
+    r.audio.rose({ player: 4, cat: 0, pick: 0 }, { role: 'human', name: 'Zed', callsign: 'Nobody' });
+    expect(say.mock.calls[0][0].id).toBe(roseLineId(ROSE_VOICES[3], ROSE_ARMY[0], 0));
+    // Not a wedge: nothing.
+    r.audio.rose({ player: 4, cat: ROSE_ARMY.length, pick: 0 }, granite);
+    r.audio.rose({ player: 4, cat: 0, pick: 0 }, undefined);
+    expect(say).toHaveBeenCalledTimes(1);
+  });
+
+  it('plays the monster\'s noise from the monster at its size, and at full level for the monster\'s own player', async () => {
+    const mating = ROSE_KAIJU.indexOf('mating');
+    const id = `${ROSE_KAIJU_SOUNDS.mating}_s2`;
+    const r = rig();
+    const play = vi.spyOn(r.engine, 'play');
+    await r.frame(frameOf({ stage: 2, kaiju: { x: 40, z: 10 } }));
+    r.audio.rose({ player: 0, cat: mating, pick: 3 }, beast);
+    expect(play).toHaveBeenCalledWith(id, expect.objectContaining({ x: 40, z: 10, variant: 3 % ROSE_SOUND_VARIANTS }));
 
     const k = rig({ kind: 'kaiju', kaijuId: 0, squadId: -1, playerId: 0 });
+    const playK = vi.spyOn(k.engine, 'play');
     const sayK = vi.spyOn(k.engine, 'say');
-    await k.frame(frameOf());
-    k.event(voice('volley.fired', 900, { humans: [chosen], kaiju: [forKaiju] }));
-    expect(sayK.mock.calls.map((c) => c[0].id)).toEqual([forKaiju]);
-    // Nothing chosen for this side: nothing is said.
-    k.event(voice('volley.ready', 900, { humans: [chosen] }));
-    expect(sayK).toHaveBeenCalledTimes(1);
+    await k.frame(frameOf({ stage: 2, kaiju: { x: 40, z: 10 } }));
+    k.audio.rose({ player: 0, cat: mating, pick: 3 }, beast);
+    const call = playK.mock.calls.find((c) => c[0] === id);
+    expect(call?.[1]).toMatchObject({ gain: 1, variant: 3 % ROSE_SOUND_VARIANTS });
+    expect(call?.[1]?.x).toBeUndefined();
+    // No words, no subtitle.
+    expect(sayK).not.toHaveBeenCalled();
   });
 
-  it('plays a briefing in order, never to be dropped', async () => {
-    const r = rig();
-    const say = vi.spyOn(r.engine, 'say');
-    await r.frame(frameOf({ phase: 'briefing', tick: 10 }));
-    const ids = voiceLinesFor('match.briefing', 'humans').map((l) => l.id);
-    expect(ids.length).toBeGreaterThan(1);
-    r.event(voice('match.briefing', 10, { humans: ids }));
-    expect(say.mock.calls.map((c) => c[0].id)).toEqual(ids);
-    for (const c of say.mock.calls) expect(c[1]?.priority).toBe(3);
-  });
-
-  it('treats radio as a property of the line, not of the listener', async () => {
-    const r = rig();
-    const say = vi.spyOn(r.engine, 'say');
-    await r.frame(frameOf());
-    r.event(voice('volley.fired', 900, { humans: [firstLine('volley.fired', 'humans')] }));
-    expect(say.mock.calls[0][1]?.radio).toBe(true);
-    // The news anchor and the committee chair are not on the radio, whoever hears them.
-    for (const l of VOICE_LINES) expect(isRadioLine(l), l.id).toBe(l.audience === 'humans');
-    expect(VOICE_LINES.some((l) => l.speaker === 'Chair' && isRadioLine(l))).toBe(false);
-  });
-
-  it('holds the hearing line for the end screen instead of queueing it', async () => {
-    const r = rig();
-    const say = vi.spyOn(r.engine, 'say');
-    await r.frame(frameOf());
-    const chair = firstLine('hearing.humans.win', 'humans');
-    r.event(voice('hearing.humans.win', 900, { humans: [chair], kaiju: [chair] }));
-    expect(say).not.toHaveBeenCalled();
-    expect(r.audio.takeHearing()?.id).toBe(chair);
-    expect(r.audio.takeHearing()).toBeNull();
-  });
-
-  it('sends an order to the front, lets it cut in, and lets it go stale fast', async () => {
-    const r = rig();
-    const say = vi.spyOn(r.engine, 'say');
-    await r.frame(frameOf());
-    r.event(voice('nerve.break', 900, { humans: [firstLine('nerve.break', 'humans')] }));
-    r.event(voice('kaiju.special', 900, { humans: [firstLine('kaiju.special', 'humans')] }));
-    r.event(voice('volley.fired', 900, { humans: [firstLine('volley.fired', 'humans')] }));
-    r.event(voice('end.kaiju', 900, { humans: [firstLine('end.kaiju', 'humans')] }));
-    expect(say.mock.calls[0][1]).toMatchObject({ priority: 2.5, staleAfter: 1.5, cutsIn: true, radio: true });
-    expect(say.mock.calls[1][1]).toMatchObject({ priority: 2.5, staleAfter: 1.5, cutsIn: true });
-    expect(say.mock.calls[2][1]).toMatchObject({ priority: 1, cutsIn: false });
-    expect(say.mock.calls[2][1]?.staleAfter).toBeUndefined();
-    // The last word on the match is never dropped.
-    expect(say.mock.calls[3][1]).toMatchObject({ priority: 3 });
-
-    // The same cues are news, not orders, for the kaiju player.
-    const k = rig({ kind: 'kaiju', kaijuId: 0, squadId: -1, playerId: 0 });
-    const sayK = vi.spyOn(k.engine, 'say');
-    await k.frame(frameOf());
-    k.event(voice('nerve.break', 900, { kaiju: [firstLine('nerve.break', 'kaiju')] }));
-    expect(sayK.mock.calls[0][1]).toMatchObject({ priority: 2, cutsIn: false, radio: false });
-  });
-
-  it('starts an order on a free radio at once, and within 1.5 s or not at all on a busy one', async () => {
-    const r = rig();
-    await r.frame(frameOf());
-    const order = firstLine('nerve.break', 'humans');
-    r.event(voice('nerve.break', 900, { humans: [order] }));
-    await r.frame(frameOf());
-    const src = r.ctx.startedFrom(`voice/${order}.`)[0];
-    expect(src.startedAt).toBeLessThan(0.3);
-    // It was loaded before the match: nothing was fetched when it was called for.
-    expect(r.fetcher.requests.filter((u) => u === `audio/voice/${order}.ogg`)).toHaveLength(1);
-    expect(voiceAheadIds('humans')).toContain(order);
-  });
-
-  it('loads the lines that must start at once before the match, for the side that hears them', () => {
-    const humans = rig();
-    const ahead = voiceAheadIds('humans');
-    expect(ahead.length).toBeGreaterThanOrEqual(12);
-    for (const id of ahead) expect(humans.fetcher.requests, id).toContain(`audio/voice/${id}.ogg`);
-    expect(humans.fetcher.requests.filter((u) => u.includes('/voice/'))).toHaveLength(ahead.length);
-    const k = rig({ kind: 'kaiju', kaijuId: 0, squadId: -1, playerId: 0 });
-    const aheadK = voiceAheadIds('kaiju');
-    expect(aheadK.length).toBeGreaterThan(0);
-    expect(k.fetcher.requests.filter((u) => u.includes('/voice/')).sort()).toEqual(aheadK.map((id) => `audio/voice/${id}.ogg`).sort());
-    expect(ahead.some((id) => aheadK.includes(id))).toBe(false);
-    // The news is not loaded for cues it no longer speaks for.
-    const byId = new Map(VOICE_LINES.map((l) => [l.id, l]));
-    for (const id of aheadK) expect(VOICE_SIDE_RULES.news.cues).toContain(byId.get(id)?.cue);
+  it('has a sound file for every army line in every voice, and every monster noise at every size', () => {
+    const shipped = JSON.parse(readFileSync(new URL('../public/assets/manifest.json', import.meta.url), 'utf8')) as {
+      voice: Record<string, unknown>;
+      sfx: Record<string, { variants: string[] }>;
+    };
+    expect(allRoseLineIds().filter((id) => !shipped.voice[id])).toEqual([]);
+    for (const cat of ROSE_ARMY) expect(roseTexts(cat).length, cat).toBeGreaterThanOrEqual(4);
+    for (const base of Object.values(ROSE_KAIJU_SOUNDS)) {
+      for (const stage of [1, 2, 3]) expect(shipped.sfx[`${base}_s${stage}`]?.variants.length, `${base}_s${stage}`).toBe(ROSE_SOUND_VARIANTS);
+    }
   });
 });
 
 describe('the end of the match', () => {
   const matchEnd = (tick: number, winner: 'kaiju' | 'humans'): object => ({ type: 'matchEnd', tick, winner, reason: winner === 'kaiju' ? 'bar' : 'clock', duration: 100, tallies: [] });
 
-  it('plays the win cue, then the hearing music, then the chair over it, once', async () => {
+  it('plays the win cue, then the hearing music, once', async () => {
     const r = rig();
-    const say = vi.spyOn(r.engine, 'say');
     await r.frame(frameOf({ stage: 3 }));
     const ended = frameOf({ stage: 3, phase: 'ended' });
     r.session.frame = ended;
-    const chair = firstLine('hearing.kaiju.win', 'humans');
     r.event(matchEnd(900, 'kaiju'));
-    r.event(voice('end.kaiju', 900, { humans: [firstLine('end.kaiju', 'humans')] }));
-    r.event(voice('hearing.kaiju.win', 900, { humans: [chair] }));
     await r.hold(ended, 1);
     expect(r.engine.music).toBe('win_kaiju');
     expect(r.ctx.startedFrom('win_kaiju')[0].loop).toBe(false);
-    expect(say).toHaveBeenCalledTimes(1);
     await r.hold(ended, HEARING_MUSIC_AT - 1 - 0.2);
     expect(r.engine.music).toBe('win_kaiju');
     await r.hold(ended, 0.4);
     expect(r.engine.music).toBe('hearing');
-    expect(r.ctx.startedFrom('music/hearing')).toHaveLength(1);
-    expect(say).toHaveBeenCalledTimes(1);
-    await r.hold(ended, CHAIR_AT - HEARING_MUSIC_AT);
-    expect(say).toHaveBeenCalledTimes(2);
-    expect(say.mock.calls[1][0].id).toBe(chair);
-    expect(say.mock.calls[1][1]).toMatchObject({ priority: 3, radio: false });
-    const spoken = r.ctx.startedFrom(`voice/${chair}.`)[0];
-    expect(spoken.startedAt).toBeGreaterThan(CHAIR_AT - 0.1);
-    expect(spoken.startedAt).toBeLessThan(CHAIR_AT + 0.4);
     await r.hold(ended, 10);
-    expect(say).toHaveBeenCalledTimes(2);
     expect(r.ctx.startedFrom('music/hearing')).toHaveLength(1);
-  });
-
-  it('gives someone who arrived after the end a chair line as well, and leaves it to whoever took it first', async () => {
-    const late = rig({ kind: 'spectator', squadId: -1, playerId: -1 });
-    const say = vi.spyOn(late.engine, 'say');
-    const ended = frameOf({ stage: 2, phase: 'ended' });
-    late.session.frame = ended;
-    late.event(matchEnd(900, 'humans'));
-    await late.hold(ended, CHAIR_AT + 0.3);
-    expect(say).toHaveBeenCalledTimes(1);
-    expect(VOICE_LINES.find((l) => l.id === say.mock.calls[0][0].id)?.cue).toBe('hearing.humans.win');
-
-    const taken = rig();
-    const sayT = vi.spyOn(taken.engine, 'say');
-    ended.tick = 900;
-    taken.session.frame = ended;
-    taken.event(matchEnd(900, 'humans'));
-    taken.event(voice('hearing.humans.win', 900, { humans: [firstLine('hearing.humans.win', 'humans')] }));
-    await taken.hold(ended, 1);
-    expect(taken.audio.takeHearing()).not.toBeNull();
-    await taken.hold(ended, CHAIR_AT + 2);
-    expect(sayT).not.toHaveBeenCalled();
   });
 });
 
@@ -499,7 +460,7 @@ describe('music through a match', () => {
   it('starts the intermission late so that its hit lands as the stage begins, then lets it ring', async () => {
     const r = rig();
     await r.hold(frameOf({ stage: 1 }), 0.2);
-    expect(r.engine.music).toBe('stage1_base+stage1_combat');
+    expect(r.engine.music).toBe('stage1');
     const inter = frameOf({ tick: 1200, stage: 1, phase: 'intermission', kaiju: { stage: 2 } });
     r.session.frame = inter;
     const startedAt = r.ctx.currentTime;
@@ -515,13 +476,14 @@ describe('music through a match', () => {
     r.session.frame = playing;
     r.event({ type: 'matchPhase', tick: playing.tick, phase: 'playing', stage: 2, duration: 0 });
     await r.hold(playing, 0.2);
-    expect(r.engine.music).toBe('stage2_base+stage2_combat');
+    expect(r.engine.music).toBe('stage2');
     expect(gainOf(build).gain.last).toMatchObject({ kind: 'target', value: 0 });
     expect(gainOf(build).gain.last?.timeConstant).toBeCloseTo(2.5 / 3, 3);
-    const stem = r.ctx.startedFrom('stage2_base')[0];
-    expect(gainOf(stem).gain.events.find((e) => e.kind === 'target')?.timeConstant).toBeCloseTo(0.1, 3);
-    // The stems were announced while the build played: they start within a frame of the hit.
-    expect((stem.startedAt as number) - (startedAt + 8)).toBeLessThan(0.2);
+    const track = r.ctx.startedFrom('music/stage2')[0];
+    expect(track.loop).toBe(true);
+    expect(gainOf(track).gain.events.find((e) => e.kind === 'target')?.timeConstant).toBeCloseTo(0.1, 3);
+    // The track was announced while the build played: it starts within a frame of the hit.
+    expect((track.startedAt as number) - (startedAt + 8)).toBeLessThan(0.2);
   });
 
   it('gives someone who arrives in the middle of a briefing or an intermission its music, timed by what is left', async () => {
@@ -542,10 +504,9 @@ describe('music through a match', () => {
   it('loads the coming stage in an intermission from the kaiju, whose stage is already the new one', async () => {
     const r = rig({ kind: 'spectator', squadId: -1, playerId: -1 });
     await r.frame(frameOf({ stage: 1, phase: 'intermission', kaiju: { stage: 2, kind: 'crab' as KaijuKindId } }));
-    expect(r.fetcher.requests).toContain('audio/music/stage2_base.ogg');
-    expect(r.fetcher.requests).toContain('audio/music/stage2_combat.ogg');
+    expect(r.fetcher.requests).toContain('audio/music/stage2.ogg');
     expect(r.fetcher.requests).toContain('audio/sfx/kaiju_roar_crab_s2.ogg');
-    expect(r.fetcher.requests).not.toContain('audio/music/stage1_base.ogg');
+    expect(r.fetcher.requests).not.toContain('audio/music/stage1.ogg');
   });
 
   it('loads the roar of the kaiju that is in the match', async () => {
@@ -553,6 +514,33 @@ describe('music through a match', () => {
     await r.frame(frameOf({ stage: 1, kaiju: { kind: 'crab' as KaijuKindId } }));
     expect(r.fetcher.requests).toContain('audio/sfx/kaiju_roar_crab_s1.ogg');
     expect(r.fetcher.requests).not.toContain('audio/sfx/kaiju_roar_lizard_s1.ogg');
+  });
+
+  it('plays the final-minute track in the last minute on the clock, its end landing as the clock runs out', async () => {
+    const r = rig();
+    await r.hold(frameOf({ stage: 2, clock: FINAL_MINUTE_AT + 30 }), 0.2);
+    expect(r.engine.music).toBe('stage2');
+    expect(r.fetcher.requests).not.toContain('audio/music/final_minute.ogg');
+    // Loaded a little ahead, while the stage's track plays on.
+    await r.hold(frameOf({ stage: 2, clock: FINAL_MINUTE_AT + 15 }), 0.2);
+    expect(r.fetcher.requests).toContain('audio/music/final_minute.ogg');
+    expect(r.engine.music).toBe('stage2');
+    // The clock shows 45 s (a late join, say): the track starts 15 s in, so that the end of its
+    // build (60.25 s into the file) comes as the clock reaches zero.
+    const at = r.ctx.currentTime;
+    await r.hold(frameOf({ stage: 2, clock: 45 }), 0.2);
+    expect(r.engine.music).toBe('final_minute');
+    const track = r.ctx.startedFrom('music/final_minute')[0];
+    expect(track.loop).toBe(true);
+    expect(track.offset).toBeCloseTo(15.25, 1);
+    expect((track.startedAt as number) + (60.25 - track.offset) - at).toBeCloseTo(45, 1);
+    // A molt in the last minute: after the intermission the next stage goes on with the final minute.
+    const inter = frameOf({ stage: 2, phase: 'intermission', phaseTime: 8, clock: 30, kaiju: { stage: 3 } });
+    await r.hold(inter, 0.5);
+    expect(r.engine.music).toBe('intermission');
+    await r.hold(frameOf({ stage: 3, clock: 30 }), 0.2);
+    expect(r.engine.music).toBe('final_minute');
+    expect(r.ctx.startedFrom('music/final_minute')).toHaveLength(2);
   });
 
   it('holds a fraction of the music in memory at any moment of a whole match', async () => {
@@ -607,14 +595,15 @@ describe('music through a match', () => {
     await watch('lobby again', ended, 1);
     const megabytes = (seconds: number): number => (seconds * 48000 * 2 * 4) / 1e6;
     const music = (): number => [...r.ctx.decoded.keys()].filter((u) => u.includes('/music/')).length;
-    // Every track was played: all thirteen were decoded at some point (lobby twice).
-    expect(music()).toBe(13);
-    // Before: everything stayed, 261 MB of music. Now the most at once is in the briefing
-    // (94.8 MB: its own track, the first stage's two stems and the four short cues).
+    // Every track of a match that ran out of time was played: all ten were decoded at some
+    // point (lobby twice; the final minute never came, its clock stayed long).
+    expect(music()).toBe(10);
+    // Kept, it would be all of it, 280 MB of music. The most at once is in the briefing (92 MB:
+    // its own track, the first stage's track and the four short cues).
     const all = megabytes(Object.values(MUSIC).reduce((s, m) => s + m.duration, 0));
-    expect(all).toBeGreaterThan(255);
+    expect(all).toBeGreaterThan(275);
     expect(peak, `peak during ${at}`).toBeLessThan(100);
-    expect(peak, `peak during ${at}`).toBeGreaterThan(megabytes(161));
+    expect(peak, `peak during ${at}`).toBeGreaterThan(megabytes(154.1 + 65.4));
     // Back in the lobby: the lobby track and nothing else of the music.
     expect(r.engine.stats().musicMegabytes).toBeCloseTo(megabytes(80.5), 1);
     expect(r.ctx.decoded.get('audio/music/lobby.ogg')).toBe(2);
@@ -637,7 +626,7 @@ describe('events that arrive long after they happened', () => {
       r.event({ type: 'projectileHit', tick, id: i, target: 'kaiju', x: 0, y: 1, z: 0, splash: 5 });
       r.event({ type: 'kaijuHit', tick, kaiju: 0, damage: 5 });
     }
-    r.event(voice('volley.fired', 1500, { humans: [firstLine('volley.fired', 'humans')] }));
+    r.event(voice('volley.fired', 1500, { humans: [MOLT_LINE] }));
     r.event({ type: 'cocoon', tick: 1500, kaiju: 0, x: 0, z: 0, duration: 10 });
     r.event({ type: 'moltBlast', tick: 1800, kaiju: 0, x: 0, z: 0, killRadius: 30, shoveRadius: 60 });
     r.event({ type: 'matchPhase', tick: 1800, phase: 'intermission', stage: 1, duration: 8, nextStage: 2 });
@@ -650,8 +639,8 @@ describe('events that arrive long after they happened', () => {
     // The cues whose moment has passed never started; the stage that is on did.
     expect(r.ctx.startedFrom('music/cocoon')).toHaveLength(0);
     expect(r.ctx.startedFrom('music/intermission')).toHaveLength(0);
-    expect(r.engine.music).toBe('stage2_base+stage2_combat');
-    expect(r.ctx.startedFrom('stage2_base')).toHaveLength(1);
+    expect(r.engine.music).toBe('stage2');
+    expect(r.ctx.startedFrom('music/stage2')).toHaveLength(1);
   });
 
   it('still plays what happened within the last second, held to the voice limits', async () => {
@@ -672,7 +661,7 @@ describe('events that arrive long after they happened', () => {
     r.session.frame = f;
     r.session.catchingUp = true;
     for (let i = 0; i < 10; i++) r.event({ type: 'projectileSpawn', tick: 904, id: i, projectile: 'shell', x: 0, y: 1, z: 0 });
-    r.event(voice('volley.fired', 904, { humans: [firstLine('volley.fired', 'humans')] }));
+    r.event(voice('volley.fired', 904, { humans: [MOLT_LINE] }));
     expect(r.ctx.startedFrom('tank_fire')).toHaveLength(0);
     expect(say).not.toHaveBeenCalled();
     r.session.catchingUp = false;
@@ -721,7 +710,7 @@ describe('small things', () => {
     const cocooned = frameOf({ kaiju: { action: 'molt', phase: 'cocoon', phaseDuration: 10 }, units: [unit({ laser: true, charge: 0.5 })] });
     r.session.frame = cocooned;
     r.event({ type: 'cocoon', tick: 900, kaiju: 0, x: 0, z: 0, duration: 10 });
-    r.event(voice('volley.fired', 900, { humans: [firstLine('volley.fired', 'humans')] }));
+    r.event(voice('volley.fired', 900, { humans: [MOLT_LINE] }));
     await r.hold(cocooned, 1);
     const loops = r.ctx.started.filter((s) => s.loop && s.buffer?.url.includes('/sfx/'));
     expect(loops.map((s) => s.buffer?.url.split('/').pop()).sort()).toEqual(['amb_day_loop.ogg', 'kaiju_heartbeat_loop.ogg', 'laser_charge_loop.ogg']);
@@ -798,49 +787,5 @@ describe('the moves of phases 1 and 3', () => {
     expect(r.ctx.startedFrom('shaken')).toHaveLength(0);
     await r.hold(f, 2);
     expect(r.ctx.startedFrom('shaken')).toHaveLength(1);
-  });
-});
-
-describe('event lines: what the radio and the news say for phases 2 and 3', () => {
-  const said = (r: Rig): string[] => r.ctx.startedFrom('audio/voice/').map((s) => (s.buffer?.url ?? '').split('/').pop()?.replace('.ogg', '') ?? '');
-
-  it('is a valid script whose every line has its sound file, no id shared with the simulation, every cue spoken', () => {
-    expect(EVENT_LINE_PROBLEMS).toEqual([]);
-    const shipped = (JSON.parse(readFileSync(new URL('../public/assets/manifest.json', import.meta.url), 'utf8')) as { voice: Record<string, unknown> }).voice;
-    expect(EVENT_LINES.filter((l) => !shipped[l.id]).map((l) => l.id)).toEqual([]);
-    expect(EVENT_LINES.filter((l) => VOICE_LINES.some((v) => v.id === l.id)).map((l) => l.id)).toEqual([]);
-    expect(Object.keys(EVENT_CUES).filter((c) => !EVENT_LINES.some((l) => l.cue === c))).toEqual([]);
-  });
-
-  it("tells a squad its crate is coming and, once, that it lies untouched; another squad's crate is not its business", async () => {
-    const r = rig();
-    const f = frameOf();
-    await r.frame(f);
-    const tick = f.tick;
-    const crate = (id: number, phase: string, squad: number): object => ({ type: 'crate', tick: f.tick, id, kind: 'machineGun', x: 0, z: 0, phase, squad, unit: -1, player: -1, duration: 4, height: 90 });
-    r.event(crate(7, 'drop', 0));
-    r.event(crate(8, 'drop', 2));
-    await r.hold(f, 5);
-    r.event(crate(7, 'land', -1));
-    r.event(crate(8, 'land', -1));
-    await r.hold(f, 8);
-    const lines = said(r);
-    expect(lines[0]).toBe(eventLine('crate.drop', 'humans', tick + 7)?.id);
-    expect(lines.slice(1)).toEqual([expect.stringMatching(/^v_crate_land_\d$/)]);
-  });
-
-  it('gives the radio and the news each their own line for a fallen mast, picked by its tick, and not again within its gap', async () => {
-    for (const side of ['humans', 'kaiju'] as const) {
-      const r = rig(side === 'kaiju' ? { kind: 'kaiju', kaijuId: 0, squadId: -1, playerId: 0 } : {});
-      const f = frameOf();
-      await r.frame(f);
-      const fall = (tick: number): object => ({ type: 'mastFall', tick, structure: 3, x: 0, z: 0, yaw: 0, length: 24, duration: 2, topId: 1, topX: 0, topZ: 24, staticUntil: tick + 300, staticTime: 10, by: -1 });
-      const first = f.tick;
-      r.event(fall(f.tick));
-      await r.hold(f, 6);
-      r.event(fall(f.tick));
-      await r.hold(f, 6);
-      expect(said(r)).toEqual([eventLine('mast.down', side, first)?.id]);
-    }
   });
 });

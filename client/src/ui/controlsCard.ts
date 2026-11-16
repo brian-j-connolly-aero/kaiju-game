@@ -1,237 +1,192 @@
 /**
- * The controls card: every control of the player's role, as pictures (DESIGN.md section 8: no
- * words but names). Each tile is the button (in the glyph of the device in use: keycaps and
- * mouse buttons, or the controller's buttons) followed by a picture of what it does. A ring
- * around a glyph means "hold it"; a small arrow between pictures means "then".
+ * The controls card (H): what the player can do right now, as five big pictures at most, each
+ * over the button that does it (docs/ROADMAP.md round 4: "five things at most per side, big
+ * pictures"; DESIGN.md section 8: no words but names). The buttons are drawn in the glyphs of
+ * the device in use (keycaps and mouse buttons, or the controller's). A ring around a glyph
+ * means "hold it". In the header, small, the communication rose's key.
  *
- * The kaiju's tiles (docs/ROADMAP.md phase 1: one move per button): the starting kit (swipe or
- * throw, grab or eat, stomp), the city weapons at stage 1 (phase 2: the sign swung, an antenna
- * thrown as a javelin, the door held up as a shield, Grab dropping one), the molt with its three
- * cards, the two move buttons as empty slots
- * that the molts fill, then every move a card can give, on whichever move button it lands on
- * (the brace held), and swimming. Stages a control is limited to show as the HUD's three growing
- * triangles. The squad's tiles (docs/ROADMAP.md phase 1: two buttons): moving, aiming, Fire,
- * Volley (held: the squad-mates charge and the meter fills past its notch; let go: they all
- * fire; let go before the notch: a weak shot), the tank's driving at stages 2 and 3 (W and S
- * drive, A and D turn the hull, the turret follows the mouse), the camera, the map and the news
- * drone for after the squad is gone. `ACTION_USERS` in
- * game/input/actions.ts says who presses what, and client/test/controlsCard.test.ts fails when a
- * pressable action is missing from a card.
+ * Only what can be done now is shown, so the card changes as the match does (`CardState`, fed
+ * by the match screen every frame):
  *
- * Where it shows: a button in the lobby and on the briefing screen; open by itself for the whole
- * briefing; in a match the `controls` action (H, or a click of the left stick) opens and closes
- * it. In a match it takes no mouse input at all (the pointer stays captured and the game keeps
- * running behind it); in the menus a click on it closes it.
+ *   the monster   walk and look; Strike (a swipe, or with something in the hand its throw, the
+ *                 sign's swing, the antenna's javelin); Grab (a grab, or with something in the
+ *                 hand eating it, or dropping a city weapon); Stomp; the moves its molts have
+ *                 picked, each on its own button (only once picked); the molt, while the bar
+ *                 offers one. With all of these, walking is left out (it is the one every player
+ *                 finds alone).
+ *   a squad       on foot (stage 1) moving and looking; in a tank (stages 2 and 3) driving and
+ *                 the turret; Fire (the crate's weapon while the squad has one); Volley (held;
+ *                 with a crate's weapon its picture, with the artillery radio the radio); the map.
+ *   the drone     (the squad is gone) flying, looking, up, down, the map.
+ *
+ * Where it shows: a button in the lobby and on the briefing screen (the starting state); open by
+ * itself for the whole briefing; in a match the `controls` action (H, or a click of the left
+ * stick) opens and closes it. In a match it takes no mouse input at all (the pointer stays
+ * captured and the game keeps running behind it); in the menus a click on it closes it.
  */
 
-import { kaijuKindDef, kaijuMoveVerb, type KaijuActionSet, type KaijuKindId, type KaijuMove, type StageId } from '@mb/shared';
-import { glyphFor, keyGlyph, keyLayoutVersion, type Bindings, type ButtonAction, type Glyph, type InputDevice } from '../game/input/actions';
+import { kaijuKindDef, kaijuMoveVerb, LAST_STAGE, type HeldObject, type KaijuKindId, type KaijuMoveId, type PickupId, type SnapKaiju, type SnapSquad, type StageId } from '@mb/shared';
+import { pickupIcon } from '../assets/iconRaster';
+import { glyphFor, keyLayoutVersion, type Bindings, type ButtonAction, type Glyph, type InputDevice } from '../game/input/actions';
 import { el, glyph, icon } from './icons';
-import { MOVE_ICON } from './kaijuKit';
+import { grabIcon, MOVE_ICON, strikeIcon } from './kaijuKit';
 
 export type CardRole = 'kaiju' | 'squad';
 
-/** One piece of a tile, left to right. */
+/** How a picture is colored: the monster's orange, the army's cyan, the volley's yellow, or dimmed. */
+export type CardTone = 'kaiju' | 'human' | 'volley' | 'dim';
+
+/** One glyph or picture. */
 export type CardPart =
   /** The movement keys (a cross of four keycaps) or the left stick. */
   | { kind: 'move' }
   /** The mouse moving, or the right stick. */
   | { kind: 'look' }
-  /**
-   * A button. `hold`: held down (a ring around the glyph). `mouse`: on keyboard and mouse,
-   * show this key or mouse button instead of the action's own binding (the map is clicked).
-   */
-  | { kind: 'button'; action: ButtonAction; hold?: boolean; mouse?: string }
-  /** A picture of what happens. `tone` colors it (kaiju, human, volley). */
-  | { kind: 'picture'; icon: string; tone?: 'kaiju' | 'human' | 'volley' | 'dim' }
-  /** "Then": a small arrow. */
-  | { kind: 'then' }
-  /**
-   * Squad: one axis of the movement keys or the left stick: W over S (or the stick tilted up
-   * and down) for a tank's throttle, A beside D (or the stick tilted sideways) for its turn.
-   */
-  | { kind: 'axis'; axis: 'throttle' | 'turn' }
-  /** The stages what stands just before is limited to (the HUD's three growing triangles). */
-  | { kind: 'stages'; stages: StageId[] }
-  /**
-   * Kaiju: "on its move button", for a move a molt card gives: both move buttons' glyphs in the
-   * HUD's slot frame (it lands on the first empty one). `hold`: held down (the brace).
-   */
-  | { kind: 'moves'; hold?: boolean }
-  /** Kaiju: one move button over its empty slot (a faint egg), and the stages from which it is filled. */
-  | { kind: 'slot'; action: 'move1' | 'move2'; stages: StageId[] }
-  /** Kaiju: three molt cards with these moves, each over the button that picks it (or a click). */
-  | { kind: 'cards'; moves: readonly KaijuMove[] };
+  /** A button; `hold`: held down (a ring around the glyph). */
+  | { kind: 'button'; action: ButtonAction; hold?: boolean }
+  /** A picture of what happens. */
+  | { kind: 'picture'; icon: string; tone?: CardTone };
+
+/** Big pictures over the buttons that do them. */
+export interface CardPair {
+  pics: CardPart[];
+  keys: CardPart[];
+}
 
 export interface CardTile {
   /** Stable name for tests and styling. */
   id: string;
-  group: 'move' | 'verbs' | 'squad' | 'view';
-  parts: CardPart[];
-  /** The stages this applies at, when not all three. */
-  stages?: StageId[];
-  /** The kaiju verb this tile shows. */
-  verb?: keyof KaijuActionSet;
-  /** Takes two columns. */
-  wide?: boolean;
+  /** Side by side (the monster's two move buttons are two pairs in one tile). */
+  pairs: CardPair[];
+  /** Lit and pulsing: do this now (the molt on offer). */
+  glow?: boolean;
 }
 
-/**
- * The control a kaiju verb is on (net/input.ts, one move per button) and whether it is held:
- * the starting kit's own buttons, or `slot` for a move a molt card gives (it lands on the first
- * empty move button, so the card shows both). Only the brace is held.
- */
-export function cardButton(verb: keyof KaijuActionSet): { action: ButtonAction; hold: boolean; slot: boolean } {
-  switch (verb) {
-    case 'swipe':
-    case 'throw':
-    case 'club':
-      return { action: 'strike', hold: false, slot: false };
-    case 'grab':
-    case 'eat':
-      return { action: 'grab', hold: false, slot: false };
-    case 'stomp':
-      return { action: 'stomp', hold: false, slot: false };
-    case 'molt':
-      return { action: 'molt', hold: false, slot: false };
-    default:
-      return { action: 'move1', hold: verb === 'brace', slot: true };
-  }
+/** What the player has right now: the card shows only what can be done with it. */
+export interface CardState {
+  stage: StageId;
+  /** The monster: the moves its molts have put on its two move buttons. */
+  moves: readonly [KaijuMoveId, KaijuMoveId];
+  /** The monster: what is in its hand. */
+  held: HeldObject | null;
+  /** The monster: the bar offers a molt. */
+  moltOffered: boolean;
+  /** A squad: the crate weapon it fires ('none': its own). */
+  pickup: PickupId;
+  /** A squad: the artillery radio's barrages left (0: no radio). */
+  barrages: number;
+  /** The squad is gone: the player flies the news drone. */
+  drone: boolean;
 }
 
-const ALL_STAGES: StageId[] = [1, 2, 3];
+/** The start of a match (the lobby and the briefing show this). */
+export const START_STATE: CardState = { stage: 1, moves: ['none', 'none'], held: null, moltOffered: false, pickup: 'none', barrages: 0, drone: false };
 
-/** The buttons that pick the first, second and third molt card. */
-export const CARD_ACTIONS = ['card1', 'card2', 'card3'] as const satisfies readonly ButtonAction[];
+/** The most big pictures a card shows (round 4). */
+export const MAX_TILES = 5;
+
+/** The card's state from the frame: the local kaiju's, or the player's squad's. */
+export function cardState(stage: StageId, kaiju: SnapKaiju | null, squad: SnapSquad | undefined, drone: boolean): CardState {
+  return {
+    stage,
+    moves: kaiju ? kaiju.moves : START_STATE.moves,
+    held: kaiju ? kaiju.held : null,
+    moltOffered: !!kaiju && kaiju.moltAvailable && kaiju.stage < LAST_STAGE,
+    pickup: squad ? squad.pickup : 'none',
+    barrages: squad ? squad.barrages : 0,
+    drone,
+  };
+}
+
+/** A short key that changes whenever the card would show something else. */
+export function stateKey(s: CardState): string {
+  const held = s.held ? `${s.held.kind}:${s.held.kind === 'prop' ? s.held.prop : ''}` : '';
+  return `${s.stage}|${s.moves[0]}|${s.moves[1]}|${held}|${s.moltOffered ? 1 : 0}|${s.pickup}|${s.barrages > 0 ? 1 : 0}|${s.drone ? 1 : 0}`;
+}
 
 const button = (action: ButtonAction, hold = false): CardPart => ({ kind: 'button', action, hold });
-const picture = (id: string, tone?: 'kaiju' | 'human' | 'volley' | 'dim'): CardPart => ({ kind: 'picture', icon: id, tone });
-const then: CardPart = { kind: 'then' };
+const picture = (id: string, tone?: CardTone): CardPart => ({ kind: 'picture', icon: id, tone });
+const pair = (keys: CardPart[], pics: CardPart[]): CardPair => ({ keys, pics });
 
-/** The view and menu tiles every role has. */
-function viewTiles(): CardTile[] {
-  return [
-    { id: 'camera', group: 'view', parts: [button('camera'), picture('st_camera')] },
-    { id: 'settings', group: 'view', parts: [button('menu'), picture('ui_settings')] },
-    { id: 'controls', group: 'view', parts: [button('controls'), picture('ui_controls')] },
-  ];
+/** The communication rose: held, pick a wedge, let go to say it (small, in the card's header). */
+export function roseTile(): CardTile {
+  return { id: 'rose', pairs: [pair([button('rose', true)], [picture('ui_rose')])] };
 }
 
-/** The kaiju's card, from its kind's action table. */
-export function kaijuTiles(kind: KaijuKindId): CardTile[] {
+/** The monster's card for what it has now. */
+export function kaijuTiles(kind: KaijuKindId, state: CardState = START_STATE): CardTile[] {
   const def = kaijuKindDef(kind);
-  const stageCount = def.stages.length as number;
-  const actions = def.actions;
-  const stagesFrom = (from: number): StageId[] => ALL_STAGES.filter((s) => s >= from && s <= stageCount);
-  // A molt is there to take before every stage but the last; the first fills the first move
-  // button for the stages after it, the second the second.
-  const molts = ALL_STAGES.filter((s) => s < stageCount);
+  const held = state.held;
+  // Grab with an empty hand: the car shows what the hand can close on (they glow in the street).
+  const grabPics = held ? [picture(grabIcon(held), 'kaiju')] : [picture('k_grab', 'kaiju'), picture('tl_car')];
+  // Something edible in the hand heals.
+  if (grabIcon(held) === 'k_eat') grabPics.push(picture('st_health'));
   const tiles: CardTile[] = [
-    { id: 'move', group: 'move', parts: [{ kind: 'move' }, picture('lb_kaiju', 'kaiju')] },
-    { id: 'look', group: 'move', parts: [{ kind: 'look' }, picture('st_spotted')] },
-    // The starting kit: one move per button.
-    { id: 'swipe', group: 'verbs', verb: 'swipe', parts: [button('strike'), picture('k_swipe', 'kaiju')] },
-    { id: 'stomp', group: 'verbs', verb: 'stomp', parts: [button('stomp'), picture('k_stomp', 'kaiju')] },
-    // A car at every stage; from the stage the definition names, tanks and pieces of buildings too.
-    { id: 'grab', group: 'verbs', verb: 'grab', parts: [button('grab'), picture('k_grab', 'kaiju'), picture('tl_car')] },
+    { id: 'walk', pairs: [pair([{ kind: 'move' }, { kind: 'look' }], [picture('lb_kaiju', 'kaiju')])] },
+    { id: 'strike', pairs: [pair([button('strike')], [picture(strikeIcon(held), 'kaiju')])] },
+    { id: 'grab', pairs: [pair([button('grab')], grabPics)] },
+    { id: 'stomp', pairs: [pair([button('stomp')], [picture('k_stomp', 'kaiju')])] },
   ];
-  const from = Math.min(actions.grab.vehicleFromStage, actions.grab.chunkFromStage);
-  if (from <= stageCount) {
-    tiles.push({ id: 'grab-big', group: 'verbs', verb: 'grab', parts: [button('grab'), picture('k_grab', 'kaiju'), picture('fac_army'), picture('tl_office')], stages: stagesFrom(from) });
-  }
-  tiles.push(
-    // With something in the hand the same two buttons throw it, or eat it (it heals).
-    { id: 'throw', group: 'verbs', verb: 'throw', parts: [picture('k_grab', 'dim'), then, button('strike'), picture('k_throw', 'kaiju')] },
-    { id: 'eat', group: 'verbs', verb: 'eat', parts: [picture('k_grab', 'dim'), then, button('grab'), picture('k_eat', 'kaiju'), picture('st_health')] },
-    // Nothing to pick up, but a kiosk in reach: the grab button eats that.
-    { id: 'eat-kiosk', group: 'verbs', verb: 'eat', parts: [picture('tl_kiosk', 'dim'), then, button('grab'), picture('k_eat', 'kaiju')] },
-  );
-  // Phase 2, the city as a weapon (the hatchling only): a fast-food sign in the hand is swung, an
-  // antenna or a mast's top thrown as a javelin, a garage door held up as a shield (no button:
-  // it takes the shots from the front by itself), and Grab drops a city weapon (never eaten).
-  const small = stagesFrom(1).filter((s) => s <= def.cityWeapons.grabStage);
-  tiles.push(
-    { id: 'club', group: 'verbs', verb: 'club', parts: [picture('k_grab', 'dim'), then, button('strike'), picture('k_club', 'kaiju')], stages: small },
-    { id: 'javelin', group: 'verbs', parts: [picture('k_grab', 'dim'), then, button('strike'), picture('k_javelin', 'kaiju')], stages: small },
-    { id: 'shield', group: 'verbs', parts: [picture('k_grab', 'dim'), then, picture('k_shield', 'kaiju')], stages: small },
-    { id: 'drop', group: 'verbs', parts: [picture('k_grab', 'dim'), then, button('grab'), picture('k_drop', 'kaiju')], stages: small },
-  );
-  // Swimming (sim/swim.ts) has no button: walk into deep water and stand, and it goes under.
-  if (def.swim) {
-    const swim = def.swim;
-    const stages = ALL_STAGES.filter((s) => s <= stageCount && swim.stages[s - 1]);
-    if (stages.length > 0) tiles.push({ id: 'swim', group: 'verbs', parts: [{ kind: 'move' }, then, picture('k_swim', 'kaiju')], stages });
-  }
-  tiles.push(
-    // The molt: one press when the bar offers it; in the cocoon, one of three cards.
-    { id: 'molt', group: 'verbs', verb: 'molt', wide: true, parts: [button('molt'), picture('k_molt', 'kaiju'), then, { kind: 'cards', moves: def.cards.first }], stages: molts },
-    // The two move buttons, empty until the molts fill them.
-    { id: 'slots', group: 'verbs', wide: true, parts: [{ kind: 'slot', action: 'move1', stages: stagesFrom(2) }, { kind: 'slot', action: 'move2', stages: stagesFrom(3) }] },
-  );
-  // What the cards can give, each on the move button it lands on: the beam once the rage is
-  // full, the roar dazes, the brace is held. Offered first at the molt its stage pips show.
-  for (const move of [...def.cards.first, ...def.cards.second]) {
+  // The moves the molts picked, each on its own button (the brace is held).
+  const moves: CardPair[] = [];
+  state.moves.forEach((move, i) => {
+    if (move === 'none') return;
     const verb = kaijuMoveVerb(move);
-    if (verb === 'none' || tiles.some((t) => t.id === move)) continue;
-    const action = actions[verb];
-    const parts: CardPart[] = action.rageCost > 0 ? [picture('st_rage', 'kaiju'), then] : [];
-    parts.push({ kind: 'moves', hold: action.whileHeld }, picture(MOVE_ICON[move], 'kaiju'));
-    if (verb === 'roar') parts.push(then, picture('st_nerve', 'volley'));
-    tiles.push({ id: move, group: 'verbs', verb, parts, stages: stagesFrom(def.cards.first.includes(move) ? 2 : 3) });
+    const hold = verb !== 'none' && def.actions[verb].whileHeld;
+    moves.push(pair([button(i === 0 ? 'move1' : 'move2', hold)], [picture(MOVE_ICON[move], 'kaiju')]));
+  });
+  if (moves.length > 0) tiles.push({ id: 'moves', pairs: moves });
+  if (state.moltOffered) tiles.push({ id: 'molt', glow: true, pairs: [pair([button('molt')], [picture('k_molt', 'kaiju')])] });
+  // Five at most: walking goes first.
+  return tiles.length > MAX_TILES ? tiles.filter((t) => t.id !== 'walk') : tiles;
+}
+
+/** A squad leader's card for what it has now (or the news drone's, once the squad is gone). */
+export function squadTiles(state: CardState = START_STATE): CardTile[] {
+  const map: CardTile = { id: 'map', pairs: [pair([button('map')], [picture('st_map')])] };
+  if (state.drone) {
+    return [
+      { id: 'fly', pairs: [pair([{ kind: 'move' }, { kind: 'look' }], [picture('st_camera', 'human')])] },
+      { id: 'rise', pairs: [pair([button('rise')], [picture('ui_rise', 'human')])] },
+      { id: 'sink', pairs: [pair([button('sink')], [picture('ui_sink', 'human')])] },
+      map,
+    ];
   }
-  tiles.push({ id: 'map', group: 'view', parts: [button('map'), picture('st_map')] }, ...viewTiles());
+  const weapon = state.pickup !== 'none' && state.pickup !== 'artilleryRadio' && state.pickup !== 'reinforcements' ? pickupIcon(state.pickup) : null;
+  const tiles: CardTile[] = [];
+  if (state.stage === 1) {
+    // On foot the keys move relative to the view.
+    tiles.push({ id: 'walk', pairs: [pair([{ kind: 'move' }, { kind: 'look' }], [picture('sq_foot', 'human')])] });
+  } else {
+    // A tank: W and S drive, A and D turn the hull; the turret follows the mouse at its own pace.
+    tiles.push(
+      { id: 'drive', pairs: [pair([{ kind: 'move' }], [picture('sq_drive', 'human'), picture('sq_turn', 'human')])] },
+      { id: 'turret', pairs: [pair([{ kind: 'look' }], [picture('sq_turret', 'human')])] },
+    );
+  }
+  // Fire: the unit's own shot, or the crate's weapon while the squad has one.
+  tiles.push({ id: 'fire', pairs: [pair([button('fire')], [picture(weapon ?? 'st_reload', weapon ? 'volley' : 'human')])] });
+  // Volley, held: the squad-mates plant and charge, let go and they all fire (the crate's weapon
+  // too; with the artillery radio the volley calls a barrage).
+  const volley = [picture('sq_charge', 'volley'), picture(state.barrages > 0 ? 'pk_artilleryradio' : (weapon ?? 'sq_burst'), 'volley')];
+  tiles.push({ id: 'volley', pairs: [pair([button('volley', true)], volley)] });
+  tiles.push(map);
   return tiles;
 }
 
-/** The squad leader's card (and the drone's, for after the squad is gone). */
-export function squadTiles(): CardTile[] {
-  const [camera, settings, controls] = viewTiles();
-  // Five columns: moving, aiming and the two buttons; the weak volley and the tank's driving;
-  // the view, the drone and the menus.
-  return [
-    // On foot (stage 1) the keys move relative to the view.
-    { id: 'move', group: 'move', parts: [{ kind: 'move' }, picture('sq_foot', 'human')], stages: [1] },
-    { id: 'look', group: 'move', parts: [{ kind: 'look' }, picture('st_spotted')] },
-    { id: 'fire', group: 'verbs', parts: [button('fire'), picture('st_reload', 'human')] },
-    // The volley: hold, and the three squad-mates plant and charge while the meter fills past
-    // its notch; let go and they all fire at the crosshair.
-    {
-      id: 'volley',
-      group: 'squad',
-      wide: true,
-      parts: [button('volley', true), picture('sq_charge', 'volley'), then, picture('sq_meter', 'volley'), then, picture('sq_burst', 'volley')],
-    },
-    // Let go before the notch: a weak, ragged shot.
-    { id: 'volleyEarly', group: 'squad', parts: [picture('sq_meter_low', 'dim'), then, picture('sq_burst', 'dim')] },
-    // At stages 2 and 3 the unit is a tank: W and S drive it, A and D turn the hull, and the
-    // turret swings toward where the mouse looks at its own pace.
-    { id: 'drive', group: 'move', parts: [{ kind: 'axis', axis: 'throttle' }, picture('sq_drive', 'human')], stages: [2, 3] },
-    { id: 'turn', group: 'move', parts: [{ kind: 'axis', axis: 'turn' }, picture('sq_turn', 'human')], stages: [2, 3] },
-    { id: 'turret', group: 'move', parts: [{ kind: 'look' }, picture('sq_turret', 'human')], stages: [2, 3] },
-    { id: 'map', group: 'view', parts: [button('map'), picture('st_map')] },
-    camera,
-    // Squad gone: the news drone flies until the next molt.
-    { id: 'drone', group: 'view', wide: true, parts: [picture('ui_skull', 'dim'), then, button('rise'), picture('ui_rise'), button('sink'), picture('ui_sink')] },
-    settings,
-    controls,
-  ];
-}
-
-export function cardTiles(role: CardRole, kind: KaijuKindId): CardTile[] {
-  return role === 'kaiju' ? kaijuTiles(kind) : squadTiles();
+export function cardTiles(role: CardRole, kind: KaijuKindId, state: CardState = START_STATE): CardTile[] {
+  return role === 'kaiju' ? kaijuTiles(kind, state) : squadTiles(state);
 }
 
 /** Every action a card shows a button for (the movement keys count as the four move actions). */
 export function cardActions(tiles: CardTile[]): Set<ButtonAction> {
   const out = new Set<ButtonAction>();
   for (const tile of tiles) {
-    for (const part of tile.parts) {
-      if (part.kind === 'button') out.add(part.action);
-      else if (part.kind === 'move') for (const a of ['moveForward', 'moveBack', 'moveLeft', 'moveRight'] as const) out.add(a);
-      else if (part.kind === 'axis') for (const a of part.axis === 'throttle' ? (['moveForward', 'moveBack'] as const) : (['moveLeft', 'moveRight'] as const)) out.add(a);
-      else if (part.kind === 'moves') for (const a of ['move1', 'move2'] as const) out.add(a);
-      else if (part.kind === 'slot') out.add(part.action);
-      else if (part.kind === 'cards') part.moves.forEach((_, i) => out.add(CARD_ACTIONS[i]));
+    for (const p of tile.pairs) {
+      for (const part of p.keys) {
+        if (part.kind === 'button') out.add(part.action);
+        else if (part.kind === 'move') for (const a of ['moveForward', 'moveBack', 'moveLeft', 'moveRight'] as const) out.add(a);
+      }
     }
   }
   return out;
@@ -239,16 +194,7 @@ export function cardActions(tiles: CardTile[]): Set<ButtonAction> {
 
 /** The glyph a button part shows on a device, or null when it is unbound there. */
 export function partGlyph(part: Extract<CardPart, { kind: 'button' }>, bindings: Bindings, device: InputDevice): Glyph | null {
-  if (device === 'keyboard' && part.mouse) return keyGlyph(part.mouse);
   return glyphFor(bindings, part.action, device);
-}
-
-function stagePips(stages: StageId[]): HTMLElement {
-  return el(
-    'div',
-    'card-stages',
-    ALL_STAGES.map((s) => el('div', `card-stage card-stage-${s}${stages.includes(s) ? ' on' : ''}`, [icon('lb_kaiju')])),
-  );
 }
 
 export class ControlsCard {
@@ -262,6 +208,7 @@ export class ControlsCard {
   private role: CardRole | null = null;
   private kind: KaijuKindId | null = null;
   private name = '';
+  private state: CardState = START_STATE;
   private shown = '';
   private bindings: Bindings | null = null;
   private device: InputDevice = 'keyboard';
@@ -281,14 +228,27 @@ export class ControlsCard {
     this.root.classList.toggle('passive', passive);
   }
 
-  /** Which card to show: the role, the kaiju's kind, and the name in its header (the kaiju's or the faction's). */
+  /**
+   * Which card to show: the role, the kaiju's kind, and the name in its header (the kaiju's or
+   * the faction's). The card goes back to the start of a match (the match screen then feeds it).
+   */
   setRole(role: CardRole, kind: KaijuKindId, name: string): void {
-    if (this.role === role && this.kind === kind && this.name === name) return;
+    this.state = START_STATE;
+    if (this.role === role && this.kind === kind && this.name === name) {
+      if (this.open) this.render();
+      return;
+    }
     this.role = role;
     this.kind = kind;
     this.name = name;
     this.shown = '';
     this.render();
+  }
+
+  /** What the player has right now (the match screen, every frame): the card follows it. */
+  setState(state: CardState): void {
+    this.state = state;
+    if (this.open) this.render();
   }
 
   toggle(): void {
@@ -321,32 +281,39 @@ export class ControlsCard {
     return this.device;
   }
 
+  /** The tiles shown now (for the debug hooks and playtests). */
+  get tiles(): CardTile[] {
+    return this.role && this.kind ? cardTiles(this.role, this.kind, this.state) : [];
+  }
+
   private render(): void {
     const role = this.role;
     const kind = this.kind;
     const bindings = this.bindings;
     if (!role || !kind || !bindings) return;
     // (The window's size too: the card is fitted to it.)
-    const key = `${role}:${kind}:${this.name}:${this.device}:${keyLayoutVersion()}:${window.innerWidth}x${window.innerHeight}`;
+    const key = `${role}:${kind}:${this.name}:${this.device}:${keyLayoutVersion()}:${stateKey(this.state)}:${window.innerWidth}x${window.innerHeight}`;
     if (key === this.shown) return;
     this.shown = key;
     const device = this.device;
     const tone = role === 'kaiju' ? 'kaiju' : 'human';
 
+    const tile = (t: CardTile, extra = ''): HTMLElement => {
+      const pairs = t.pairs.map((p) =>
+        el('div', 'card-pair', [el('div', 'card-pics', p.pics.map((part) => this.part(part, bindings, device))), el('div', 'card-keys', p.keys.map((part) => this.part(part, bindings, device)))]),
+      );
+      const node = el('div', `card-tile${t.glow ? ' glow' : ''}${extra}`, pairs);
+      node.dataset.tile = t.id;
+      return node;
+    };
+    // The header: who, then the communication rose's key (small), then the card's own key.
     const head = el('div', 'card-head', [
       icon(role === 'kaiju' ? 'lb_kaiju' : 'fac_army', `card-role ${tone}`),
       el('div', `card-name ${tone}`, [this.name]),
-      el('div', 'card-device', device === 'gamepad' ? [icon('gp_dpad'), icon('gp_a')] : [icon('kb_key'), icon('ms_move')]),
+      tile(roseTile(), ' card-small'),
       el('div', 'card-close', [glyph(glyphFor(bindings, 'controls', device), 'card-glyph'), icon('ui_controls')]),
     ]);
-
-    const tiles = cardTiles(role, kind).map((tile) => {
-      const parts = tile.parts.map((part) => this.part(part, bindings, device));
-      if (tile.stages && tile.stages.length < 3) parts.push(stagePips(tile.stages));
-      const node = el('div', `card-tile card-${tile.group}${tile.wide ? ' wide' : ''}`, [el('div', 'card-parts', parts)]);
-      node.dataset.tile = tile.id;
-      return node;
-    });
+    const tiles = cardTiles(role, kind, this.state).map((t) => tile(t));
     this.card.className = `controls-card role-${role}`;
     this.card.dataset.device = device;
     this.card.replaceChildren(head, el('div', 'card-grid', tiles));
@@ -354,9 +321,8 @@ export class ControlsCard {
   }
 
   /**
-   * Shrinks the card's unit (`--u`, styles.css) until the whole card fits its sheet: the
-   * monster's card has six rows of tiles, more than a small window holds at full size, and the
-   * sheet would cut the last row off.
+   * Shrinks the card's unit (`--u`, styles.css) until the whole card fits its sheet (a small
+   * window would cut its bottom off).
    */
   private fit(): void {
     const card = this.card;
@@ -364,11 +330,14 @@ export class ControlsCard {
     for (let i = 0; i < 3; i++) {
       const room = card.clientHeight;
       const need = card.scrollHeight;
-      if (room <= 0 || need <= room + 1) return;
-      const parts = card.querySelector('.card-parts');
-      const u = parts ? parseFloat(getComputedStyle(parts).fontSize) : NaN;
+      const wide = card.scrollWidth > card.clientWidth + 1;
+      if (room <= 0 || (need <= room + 1 && !wide)) return;
+      // (The keys' row is one unit high: styles.css.)
+      const keys = card.querySelector('.card-keys');
+      const u = keys ? parseFloat(getComputedStyle(keys).fontSize) : NaN;
       if (!(u > 0)) return;
-      card.style.setProperty('--u', `${Math.max(12, Math.floor(u * (room / need) * 0.98))}px`);
+      const share = Math.min(room / need, wide ? card.clientWidth / card.scrollWidth : 1);
+      card.style.setProperty('--u', `${Math.max(12, Math.floor(u * share * 0.98))}px`);
     }
   }
 
@@ -389,33 +358,6 @@ export class ControlsCard {
       }
       case 'picture':
         return icon(part.icon, `card-pic${part.tone ? ` ${part.tone}` : ''}`);
-      case 'then':
-        return el('div', 'card-then');
-      case 'axis': {
-        // A stick tilted one way only (two small arrows), or the two keys of that axis as they sit.
-        const throttle = part.axis === 'throttle';
-        if (device === 'gamepad') return el('div', `card-tilt ${throttle ? 'card-tilt-v' : 'card-tilt-h'}`, [glyph({ icon: 'gp_ls', label: '' }, 'card-glyph card-stick')]);
-        const key = (a: ButtonAction): HTMLElement => glyph(glyphFor(bindings, a, 'keyboard'), 'card-key');
-        return throttle
-          ? el('div', 'card-move', [el('div', 'card-move-row', [key('moveForward')]), el('div', 'card-move-row', [key('moveBack')])])
-          : el('div', 'card-move', [el('div', 'card-move-row', [key('moveLeft'), key('moveRight')])]);
-      }
-      case 'stages':
-        return stagePips(part.stages);
-      case 'moves': {
-        // Both move buttons in the HUD's slot frame: "on whichever button it landed on".
-        const frame = el('div', 'card-moves', [glyph(glyphFor(bindings, 'move1', device), 'card-glyph'), glyph(glyphFor(bindings, 'move2', device), 'card-glyph')]);
-        return part.hold ? el('div', 'card-hold', [frame]) : frame;
-      }
-      case 'slot':
-        // A move button over its empty slot (the HUD's faint egg), and the stages it is filled at.
-        return el('div', 'card-slot', [glyph(glyphFor(bindings, part.action, device), 'card-glyph'), el('div', 'card-slot-box', [icon('k_molt', 'card-slot-egg')]), stagePips(part.stages)]);
-      case 'cards': {
-        // The cards as the picker shows them, each over the button that picks it; or a click.
-        const cards: HTMLElement[] = part.moves.map((move, i) => el('div', 'card-card', [icon(MOVE_ICON[move], 'card-card-pic'), glyph(glyphFor(bindings, CARD_ACTIONS[i], device), 'card-card-glyph')]));
-        if (device === 'keyboard') cards.push(glyph(keyGlyph('Mouse0'), 'card-glyph card-card-click'));
-        return el('div', 'card-cards', cards);
-      }
     }
   }
 }

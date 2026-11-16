@@ -6,7 +6,7 @@
 #
 #   tools/audio/voice/build.sh                  build the lines whose text, voice or chain changed,
 #                                               then verify and regenerate the docs
-#   tools/audio/voice/build.sh 'v_clock_*'      only the line ids that match (still only if changed)
+#   tools/audio/voice/build.sh 'rose_granite_*' only the line ids that match (still only if changed)
 #   tools/audio/voice/build.sh --force          rebuild every line
 #   tools/audio/voice/build.sh --no-verify      skip measurements, pictures and docs
 #   tools/audio/voice/build.sh --verify-only    measure and document the files already built

@@ -16,6 +16,7 @@ import {
   PROTOCOL_VERSION,
   SNAPSHOT_RATE,
   TICK_RATE,
+  type PlayerInput,
 } from '@mb/shared';
 import { describe, expect, it } from 'vitest';
 import { MAX_CATCH_UP_STEPS, STARVED_BUTTON_TICKS, STARVED_TICKS } from '../src/room/match';
@@ -225,7 +226,17 @@ describe('lobby', () => {
     startMatch(room, peers);
     run(1);
     room.message('p0', 'ping', { t: 7 });
-    expect(peers[0].last('pong')).toEqual({ t: 7, tick: TICK_RATE });
+    // In a match it also says how the server handles this player's inputs (the network readout):
+    // none has come yet, so nothing waits and nothing was guessed or dropped.
+    expect(peers[0].last('pong')).toEqual({ t: 7, tick: TICK_RATE, wait: 0, guessed: 0, dropped: 0 });
+    room.message('p0', 'input', input(1, { moveZ: 1 }));
+    room.message('p0', 'input', input(2, { moveZ: 1 }));
+    room.message('p0', 'ping', { t: 8 });
+    expect(peers[0].last('pong')).toMatchObject({ t: 8, wait: 2 });
+    // The cushion's tick, then input 1; then nothing comes for three ticks after input 2.
+    run(6 / TICK_RATE);
+    room.message('p0', 'ping', { t: 9 });
+    expect(peers[0].last('pong')).toMatchObject({ t: 9, wait: 0, guessed: 4, dropped: 0 });
   });
 
   it('passes the host role on when the host leaves', () => {
@@ -500,17 +511,20 @@ describe('match loop', () => {
       }
     });
 
-    it('keeps a brace a brace through a stall longer than half a second', () => {
+    it('keeps a brace a brace through a stall longer than the second after which the body stops', () => {
       const { tick, actions, world, room } = kaijuRoom();
       // The brace is a move picked at a molt, held on its move button (net/input.ts).
       world.kaijus[0].moves = ['brace', 'none'];
       tick(Btn.move1);
       tick(Btn.move1);
-      // 0.8 s with nothing arriving (more than the half second after which the kaiju stops
-      // walking), then the late inputs: the player held the button all along.
-      for (let i = 0; i < 24; i++) tick();
+      // 1.3 s with nothing arriving (more than the second after which the kaiju stops walking,
+      // less than the second and a half after which its buttons are let go), then the late
+      // inputs: the player held the button all along.
+      const stall = STARVED_TICKS + 9;
+      expect(stall).toBeLessThan(STARVED_BUTTON_TICKS);
+      for (let i = 0; i < stall; i++) tick();
       expect(world.kaijus[0].phase).toBe('brace');
-      tick(...new Array<number>(25).fill(Btn.move1));
+      tick(...new Array<number>(stall + 1).fill(Btn.move1));
       for (let i = 0; i < 5; i++) tick(Btn.move1);
       expect(world.kaijus[0].phase).toBe('brace');
       for (let i = 0; i < 10; i++) tick(0);
@@ -534,6 +548,39 @@ describe('match loop', () => {
       for (let i = 0; i < 80; i++) tick(0);
       expect(actions()).toContain('eat/eat');
       expect(actions().filter((a) => a.startsWith('throw'))).toEqual([]);
+    });
+
+    it('walks on through a stall of almost a second as if nothing had happened (round 4)', () => {
+      // The same match twice: once on a steady line, once on a line that stalls for 0.9 s and
+      // then delivers the late inputs at once, as a tunnel did at the second playtest.
+      const finalPlace = (stalls: boolean): { x: number; z: number; slowest: number } => {
+        const { room, world, run } = kaijuRoom();
+        let seq = 1000;
+        const walk = (): PlayerInput => input(++seq, { moveZ: 1, aimYaw: 0.6 });
+        const k = world.kaijus[0];
+        let slowest = Number.POSITIVE_INFINITY;
+        const step = (inputs: PlayerInput[]): void => {
+          for (const it of inputs) room.message('p0', 'input', it);
+          run(TICK_MS / 1000);
+        };
+        for (let i = 0; i < 30; i++) step([walk()]);
+        const late: PlayerInput[] = [];
+        for (let i = 0; i < 27; i++) {
+          if (stalls) late.push(walk());
+          step(stalls ? [] : [walk()]);
+          slowest = Math.min(slowest, Math.hypot(k.vx, k.vz));
+        }
+        step([...late, walk()]);
+        for (let i = 0; i < 30; i++) step([walk()]);
+        return { x: k.x, z: k.z, slowest };
+      };
+      const steady = finalPlace(false);
+      const stalled = finalPlace(true);
+      // The body never stopped (until round 4 it was stopped after half a second, and the
+      // player's screen, which had walked on, snapped back by the difference)...
+      expect(stalled.slowest).toBeGreaterThan(1);
+      // ...and it ends exactly where the steady line put it: nothing for the page to correct.
+      expect(Math.hypot(stalled.x - steady.x, stalled.z - steady.z)).toBeLessThan(0.01);
     });
 
     it('lets go of a held button as soon as the late inputs show it was released', () => {

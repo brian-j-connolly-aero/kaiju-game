@@ -1,0 +1,61 @@
+{
+  "voices": ["Granite", "Beacon", "Tempest", "Anvil"],
+  "army": {
+    "panic": [
+      "It is coming right for us, everybody stay calm!",
+      "Great Scott, it is as big as a department store!",
+      "Somebody do something, it is looking right at me!",
+      "Mayday, mayday, the monster sat on my jeep!",
+      "This is not in the manual, sergeant!"
+    ],
+    "bravado": [
+      "Ha, it is nothing but a big lizard with an attitude!",
+      "Nobody tramples my city and gets away with it!",
+      "Hold my canteen, I am going in!",
+      "I have seen bigger lizards in my garden back home!",
+      "Come on, you overgrown salamander, try me!"
+    ],
+    "orders": [
+      "Squad, form a line and look brave!",
+      "Aim for the scales, the shiny scales!",
+      "Everybody fire everything at the big one!",
+      "Hold the line, and somebody find my binoculars!",
+      "Charge, and do not step on the flower beds!"
+    ],
+    "science": [
+      "Somebody call the professor, and tell him to hurry!",
+      "Get the professor on the radio, he will know what to do!",
+      "The professor says it is radioactive and also very cranky!",
+      "Science has no answer for this, sir!",
+      "Quick, somebody fetch a scientist with a clipboard!"
+    ],
+    "home": [
+      "Watch it, my mother has an apartment on this street!",
+      "That is my favorite diner, you monster!",
+      "Not the bowling alley, we have league night on Thursday!",
+      "My car is parked right there, I just washed it!",
+      "Careful, that is my barbershop, I owe them money!"
+    ],
+    "food": [
+      "Does anybody have a sandwich, I am starving!",
+      "Somebody save the pie shop, it has the good cherry pie!",
+      "My lunch was in that jeep, and now the jeep is gone!",
+      "Maybe it is just hungry, throw it a meatloaf!",
+      "Hot coffee, I need hot coffee right now!"
+    ],
+    "retreat": [
+      "Fall back, fall back, it is too big!",
+      "Strategic withdrawal, everybody run!",
+      "Retreat to the drugstore and regroup!",
+      "Back up, back up, it is turning around!",
+      "Run for the hills, the actual hills!"
+    ],
+    "admire": [
+      "Golly, look at the size of that thing!",
+      "You have to admit, it has very nice teeth!",
+      "What a magnificent tail, I mean, open fire!",
+      "It is kind of beautiful when it smashes things!",
+      "I think it waved at me, how nice!"
+    ]
+  }
+}

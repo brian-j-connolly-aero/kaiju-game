@@ -7,8 +7,8 @@
  *     after it was due; a tick with nothing queued is played on a guess (the previous input
  *     again, held buttons included), and the queue is told: the guess stands in for the input
  *     that is late, and an input with nothing new in it is dropped in its place (inputQueue.ts).
- *     A player who stays silent is brought to a stop rather than left walking (after 0.5 s), and
- *     lets go of held buttons after 1 s;
+ *     A player who stays silent is brought to a stop rather than left walking (after 1 s), and
+ *     lets go of held buttons after 1.5 s;
  *   - per slot, the acknowledgement for the snapshots (`ackFor`): the inputs played or dropped,
  *     and how many more the server will drop (`packedAck` in inputQueue.ts);
  *   - the events since the last flush, sent together with each snapshot;
@@ -34,6 +34,7 @@ import {
   type PlayerId,
   type PlayerInput,
   type SimEvent,
+  type SystemMark,
   type World,
 } from '@mb/shared';
 import { createFixedStep, dueSteps, type FixedStep, type FixedStepOptions } from './fixedStep';
@@ -47,19 +48,41 @@ export const MAX_FRAME_MS = 250;
 /** How early a tick may run, milliseconds (timers are only accurate to about a millisecond). */
 export const STEP_SLOP_MS = 2;
 /**
- * Ticks without a fresh input after which a connected player's unit stops moving (0.5 s). Up to
+ * Ticks without a fresh input after which a connected player's unit stops moving (1 s). Up to
  * then a guessed tick repeats the last input and stands in for the late one (inputQueue.ts).
+ * It was 0.5 s until round 4: a tunnel that stalls for 0.6 to 1 s now and then (the second
+ * playtest) then stopped the body on the server while the player's screen walked on, and when
+ * the inputs came again the body snapped back by up to 3.5 m (docs/STATUS.md, round 4, the
+ * stutter through the tunnel). A stall up to 1 s is now played on as guesses, which the late
+ * inputs stand for when they come: nothing to correct unless the player turned meanwhile.
  */
-export const STARVED_TICKS = 15;
+export const STARVED_TICKS = 30;
 /**
  * Ticks without a fresh input after which a connected player's held buttons are let go too
- * (1 s). Buttons are kept longer than movement so that a hiccup on the line in the middle of a
+ * (1.5 s). Buttons are kept longer than movement so that a hiccup on the line in the middle of a
  * hold (a brace, a volley's charge) does not cut the hold short and then start it again when the
  * late inputs arrive.
  */
-export const STARVED_BUTTON_TICKS = 30;
+export const STARVED_BUTTON_TICKS = 45;
 /** Slower than this a body counts as standing still (meters per second). */
 const STILL_SPEED = 0.05;
+/** Inputs that stop for this many ticks or more are reported as a stall (`MatchSession.stalls`). */
+export const STALL_REPORT_TICKS = 9;
+
+/** Times the simulation systems of each tick (slowLog.ts). */
+export interface TickTimer {
+  beginTick(): void;
+  mark: SystemMark;
+}
+
+/** A player's inputs stopped for a while and have come again (for the server's log). */
+export interface InputStall {
+  slot: PlayerId;
+  /** Ticks played without an input from them. */
+  ticks: number;
+  /** Their body was brought to a stop meanwhile (STARVED_TICKS). */
+  stopped: boolean;
+}
 
 export interface MatchSession {
   world: World;
@@ -79,6 +102,10 @@ export interface MatchSession {
   ended: MatchEndEvent | null;
   /** Reused every tick. */
   scratch: Array<PlayerInput | undefined>;
+  /** Times each tick's systems, or null (tests, tools). */
+  timer: TickTimer | null;
+  /** Stalls of players' inputs since the room last took them (STALL_REPORT_TICKS). */
+  stalls: InputStall[];
 }
 
 export interface MatchSessionOptions {
@@ -115,6 +142,8 @@ export function createMatchSession(options: MatchSessionOptions): MatchSession {
     lastSnapshotTick: 0,
     ended: null,
     scratch: new Array<PlayerInput | undefined>(n),
+    timer: null,
+    stalls: [],
   };
 }
 
@@ -165,6 +194,8 @@ export function stepMatch(m: MatchSession): void {
     const next = takeInput(m.queues[slot], standsStill(world, slot));
     if (next) {
       inputs[slot] = next;
+      const gap = m.starved[slot];
+      if (gap >= STALL_REPORT_TICKS && m.stalls.length < 16) m.stalls.push({ slot, ticks: gap, stopped: gap >= STARVED_TICKS });
       m.starved[slot] = 0;
       continue;
     }
@@ -186,7 +217,9 @@ export function stepMatch(m: MatchSession): void {
     // on the player is away, not late.
     noteGuessedTick(m.queues[slot], buttons, starved < STARVED_TICKS);
   }
-  const events = world.step(inputs);
+  const timer = m.timer;
+  timer?.beginTick();
+  const events = world.step(inputs, timer?.mark);
   for (const e of events) {
     m.events.push(e);
     if (e.type === 'matchEnd') m.ended = e;

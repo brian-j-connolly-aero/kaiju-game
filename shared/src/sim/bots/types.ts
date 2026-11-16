@@ -100,6 +100,14 @@ export interface BotState {
   braceRest: number;
   /** Seconds until it throws again. */
   throwTimer: number;
+  /**
+   * The aim for what is in the hand (sim/throwArc.ts `aimThrowAt`), worked out again every few
+   * ticks: the unit it is for (-1: none), the tick it was worked out, and the heading and pitch.
+   */
+  throwAimUnit: number;
+  throwAimTick: number;
+  throwYaw: number;
+  throwPitch: number;
   /** Where the beam is being walked to. */
   beamX: number;
   beamY: number;
@@ -179,6 +187,10 @@ export function createBotState(): BotState {
     bracing: 0,
     braceRest: 0,
     throwTimer: 0,
+    throwAimUnit: -1,
+    throwAimTick: -1,
+    throwYaw: 0,
+    throwPitch: 0,
     beamX: 0,
     beamY: 0,
     beamZ: 0,

@@ -13,7 +13,6 @@ from scipy import signal
 
 from . import DOC_DIR, OUT_DIR, SCRATCH, SR, asr, asr2, dsp
 from .pipeline import CEILING_DBTP, TARGET_LUFS, decode, render
-from .scriptdoc import BRIEFING_BUDGET, BRIEFING_SECONDS, WINDOW_SECONDS
 
 MEASUREMENTS = DOC_DIR / "measurements.json"
 
@@ -21,7 +20,8 @@ MEASUREMENTS = DOC_DIR / "measurements.json"
 LUFS_TOLERANCE = 0.8            # loudness within this of the target
 PEAK_LIMIT_DBTP = -0.5          # lossy encoding overshoots the -1.5 master ceiling a little
 MAX_SECONDS = 8.0               # radio and anchor lines (12 words at most)
-MAX_SECONDS_HALL = 13.0         # hearing lines (20 words at most, plus the room's ring)
+MAX_SECONDS_HALL = 13.0         # a line in the hall chain (none in the script since round 4)
+MAX_SECONDS_ROSE = 4.5          # a shouted rose line: the radio is one channel for four squads
 MAX_SECONDS_PER_WORD = 1.1      # anything slower than this is a synthesizer accident
 EDGE_DB = -35.0                 # first and last millisecond, relative to the peak
 BAND_LOW, BAND_HIGH = 0.67, 1.3  # radio lines: almost nothing below 0.67 x and above 1.3 x the band corners
@@ -101,7 +101,7 @@ def measure_line(job: tuple[dict, dict, dict]) -> dict:
         if plan["chain"] == "radio" and (m["share_below_band"] > BAND_SHARE or m["share_above_band"] > BAND_SHARE):
             fail.append(f"{i}.{ext}: radio line is not band-limited ({100 * m['share_below_band']:.1f}% of the "
                         f"energy below {lo * BAND_LOW:.0f} Hz, {100 * m['share_above_band']:.1f}% above {hi * BAND_HIGH:.0f} Hz)")
-    limit = MAX_SECONDS_HALL if plan["chain"] == "hall" else MAX_SECONDS
+    limit = MAX_SECONDS_HALL if plan["chain"] == "hall" else MAX_SECONDS_ROSE if line["cue"].startswith("rose.") else MAX_SECONDS
     if rec["duration"] > limit:
         fail.append(f"{i}: {rec['duration']} s is longer than the {limit} s limit")
     speech = rec["speech"][1] - rec["speech"][0]
@@ -148,8 +148,6 @@ def verify(lines: list[dict], cast: dict, state: dict, plans: dict, jobs: int = 
     ordered = [results[l["id"]] for l in lines]
     failures = [f for m in ordered for f in m["failures"]]
 
-    failures += timing_failures(lines, state)
-
     # the script itself: every id must have files and nothing else may be in the folder
     ids = {l["id"] for l in lines}
     extra = sorted(f.name for f in OUT_DIR.iterdir() if f.stem not in ids) if OUT_DIR.exists() else []
@@ -186,24 +184,6 @@ def radio_voice_prints(lines: list[dict], state: dict, plans: dict) -> dict:
             np.save(f, p)
         prints.setdefault(l["speaker"], []).append(p)
     return speakers.similarity_table(prints) if len(prints) > 1 else {}
-
-
-def timing_failures(lines: list[dict], state: dict) -> list[str]:
-    """Lines that have to fit the moment they announce: the humans' lines for a nerve break and
-    for the signature attack are orders for a window of a few seconds, and the three briefing
-    lines of one side play back to back inside the briefing."""
-    out = []
-    dur = {i: rec["duration"] for i, rec in state["lines"].items()}
-    for l in lines:
-        limit = WINDOW_SECONDS.get(l["cue"])
-        if limit and l["audience"] == "humans" and dur.get(l["id"], 0) > limit:
-            out.append(f"{l['id']}: {dur[l['id']]} s, but an order for `{l['cue']}` must fit in {limit} s")
-    for side in ("humans", "kaiju"):
-        total = sum(dur.get(l["id"], 0) for l in lines if l["cue"] == "match.briefing" and l["audience"] == side)
-        if total > BRIEFING_BUDGET:
-            out.append(f"match.briefing ({side}): the lines add up to {total:.2f} s; the briefing lasts "
-                       f"{BRIEFING_SECONDS:g} s and they must fit in {BRIEFING_BUDGET} s")
-    return out
 
 
 def _rate(errs: int, words: int) -> float:

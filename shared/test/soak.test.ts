@@ -18,6 +18,7 @@ import {
   structuresInCircle,
   type PlayerInput,
   type World,
+  UNIT_TYPES,
 } from '../src/index';
 
 /**
@@ -52,12 +53,14 @@ describe('simulation soak with random inputs', () => {
     const ids: number[] = [];
     for (const u of world.units) {
       for (const v of [u.x, u.z, u.yaw, u.vx, u.vz, u.hp, u.aimYaw, u.aimPitch]) expect(Number.isFinite(v)).toBe(true);
-      expect(boundsContains(b, u.x, u.z, u.radius - 1e-6)).toBe(true);
+      // By the body it moves with (a foot section's is narrower than its hit area).
+      const body = UNIT_TYPES[u.type].bodyRadius;
+      expect(boundsContains(b, u.x, u.z, body - 1e-6)).toBe(true);
       // Units never trample: they may touch a wall but not sink into it.
-      structuresInCircle(world.cityQuery, u.x, u.z, u.radius - 0.3, ids);
+      structuresInCircle(world.cityQuery, u.x, u.z, body - 0.3, ids);
       for (const id of ids) {
         if (world.cityIndex.spassable[id] === 1) continue;
-        expect(structureContact(world.cityIndex, id, u.x, u.z, u.radius - 0.3)).toBe(false);
+        expect(structureContact(world.cityIndex, id, u.x, u.z, body - 0.3)).toBe(false);
       }
     }
     expect(world.match.barPoints).toBeGreaterThanOrEqual(lastBar);

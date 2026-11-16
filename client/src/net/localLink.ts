@@ -8,11 +8,13 @@
 
 import {
   beginStage,
+  cleanRoseCategory,
   createLobbyState,
   createMatchConfig,
   createWorld,
   DT,
   encodeSnapshot,
+  ROSE_PICK_RANGE,
   sanitizeInput,
   SNAPSHOT_EVERY_TICKS,
   snapshotOfWorld,
@@ -69,7 +71,7 @@ const MAX_CATCH_UP_TICKS = 4;
  * the same as over a socket.
  */
 export function createLocalLink(options: LocalMatchOptions, subscribe: (link: RoomLink) => void): { link: RoomLink; control: LocalMatchControl } {
-  const handlers: Handlers = { welcome: [], lobby: [], snap: [], events: [], pong: [] };
+  const handlers: Handlers = { welcome: [], lobby: [], snap: [], events: [], pong: [], rose: [] };
   const emit = <K extends ServerMessageType>(type: K, payload: ServerMessages[K]): void => {
     for (const handler of handlers[type]) handler(payload);
   };
@@ -173,6 +175,11 @@ export function createLocalLink(options: LocalMatchOptions, subscribe: (link: Ro
       } else if (type === 'ping') {
         const t = (payload as ClientMessages['ping']).t;
         setTimeout(() => emit('pong', { t, tick: world.tick }), 0);
+      } else if (type === 'rose') {
+        // The communication rose: the sandbox's one player hears their own pick, as from a room.
+        const cat = cleanRoseCategory(options.role === 'kaiju' ? 'kaiju' : 'army', (payload as ClientMessages['rose']).cat);
+        const pick = Math.floor(Math.random() * ROSE_PICK_RANGE);
+        if (cat >= 0) setTimeout(() => emit('rose', { player: playerId, cat, pick }), 0);
       }
       // Lobby actions have nothing to act on here: the sandbox is always one match.
     },

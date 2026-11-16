@@ -5,12 +5,16 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  aimThrowAt,
   armHeld,
   beginStage,
   bitGet,
   Btn,
+  createThrowAim,
+  createThrowFlight,
   LIZARD,
   spawnProjectile,
+  throwFlight,
   TICK_RATE,
   type PlayerInput,
   type PropKindId,
@@ -248,12 +252,16 @@ describe('the water tank', () => {
 });
 
 describe('the javelins', () => {
-  it('a thrown antenna flies straight through three units and stops in the building behind them', () => {
+  it('a thrown antenna flies fast and nearly flat through three units and stops in the building behind them', () => {
     const world = arena({ structures: [{ x: 0, z: 50, w: 20, d: 10, height: 8, hp: 1000 }] });
     const line = [10, 13, 16, 19].map((z, i) => target(world, i + 1, 0, z));
     hold(world, 'antenna');
-    // The crosshair on the foot of the building's face, 45 m out.
-    const pitch = -Math.atan2(ST.eyeHeight - 1, 45 - ST.eyeForward);
+    // Aimed at the middle of the building's face, 45 m out, on the javelin's arc.
+    const flight = throwFlight('lizard', 1, { kind: 'prop', prop: 'antenna' }, createThrowFlight());
+    const aim = createThrowAim();
+    expect(aimThrowAt(world.cityQuery, world.kaijus[0], flight, 0, 3, 45, 1, 0, aim)).toBe(true);
+    expect(aim.high).toBe(false);
+    const pitch = aim.pitch;
     const events = tap(world, Btn.strike, { aimPitch: pitch });
     for (let i = 0; i < 60 && eventsOf(events, 'projectileHit').length === 0; i++) events.push(...play(world, 1, { aimPitch: pitch }));
     events.push(...play(world, 1));
@@ -264,10 +272,13 @@ describe('the javelins', () => {
     expect(line[3].hp).toBe(10000);
     expect(eventsOf(events, 'projectileHit')).toEqual([expect.objectContaining({ target: 'structure', targetId: 0 })]);
     expect(world.structureHp[0]).toBeCloseTo(1000 - W.antenna.structureDamage, 4);
-    // It flew nearly flat and fast: well under a second to 45 m.
+    // It flew nearly flat and fast (twice a car's speed), under the throw's gravity, and steadier than a car.
     const spawn = eventsOf(events, 'projectileSpawn')[0];
-    expect(Math.hypot(spawn.vx, spawn.vy, spawn.vz)).toBeCloseTo(W.antenna.speed, 6);
-    expect(spawn.gravity).toBe(W.antenna.gravity);
+    const slack = W.antenna.speed * Math.tan(LIZARD.actions.throw.spread[0] * W.antenna.spreadMult);
+    expect(Math.abs(Math.hypot(spawn.vx, spawn.vy, spawn.vz) - W.antenna.speed)).toBeLessThanOrEqual(slack + 1e-9);
+    expect(W.antenna.speed).toBeGreaterThanOrEqual(LIZARD.actions.throw.speed[0] * 2);
+    expect(spawn.gravity).toBe(LIZARD.actions.throw.gravity[0]);
+    expect(flight.maxElevation).toBeLessThan(15 * Math.PI / 180);
   });
 });
 

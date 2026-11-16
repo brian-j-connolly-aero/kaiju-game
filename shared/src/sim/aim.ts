@@ -1,8 +1,9 @@
 /**
  * Where an aim ray lands. Used for the volley aim point ("where the player's aim ray lands"),
- * for the artillery radio's barrages (`resolveMarkerPoint`), and for the kaiju's throw and
- * beam targets. An aim ray stops at standing structures and at the mounds of collapsed and
- * fallen ones (docs/ROADMAP.md, phase 2: rubble blocks shots and sight up to its height).
+ * for the artillery radio's barrages (`resolveMarkerPoint`), and for the kaiju player's
+ * crosshair in third person (the beam's aim). An aim ray stops at standing structures and at
+ * the mounds of collapsed and fallen ones (docs/ROADMAP.md, phase 2: rubble blocks shots and
+ * sight up to its height).
  */
 
 import { castRay, createCityCastHit, type CityQuery } from '../city/spatialIndex';

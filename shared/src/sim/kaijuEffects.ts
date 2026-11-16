@@ -29,16 +29,17 @@ import { projectileTypeDef } from '../defs/weapons';
 import { PI } from '../math/angle';
 import { bitGet } from '../math/bits';
 import { circleInArc, obbInArc } from '../math/geom';
+import { hash32 } from '../math/rng';
 import { lerp } from '../math/scalar';
-import { createAimPoint, kaijuEyePoint, resolveAimPoint } from './aim';
 import { beamPath, beamTouches, createBeamPath } from './beam';
-import { armHeld, canPickUp, cityThrow, emptyHand, HAND_FORWARD, heldCityWeapon, heldEdible, sparedByKaiju, takeLoose } from './cityWeapons';
+import { armHeld, canPickUp, cityThrow, emptyHand, heldCityWeapon, heldEdible, sparedByKaiju, takeLoose } from './cityWeapons';
 import type { HeldObject, HeldSource } from './events';
 import { noteKaijuNoise } from './spotting';
 import { takeProp, takePropWreck } from './systems/cityDamage';
 import { applyHit, healKaiju } from './systems/damage';
 import { spawnProjectile } from './systems/projectiles';
 import { kaijuShownHeight, kaijuShownRadius } from './swim';
+import { createThrowFlight, createThrowLaunch, throwError, throwFlight, throwLaunch } from './throwArc';
 import type { Hit, Kaiju, Unit, World } from './types';
 import { emit } from './worldOps';
 
@@ -46,12 +47,13 @@ import { emit } from './worldOps';
 const BEAM_PROP_MARGIN = 1;
 const BEAM_PROP_HEIGHT = 10;
 
+/** Mixed into a throw's seed, so it draws numbers of its own. */
+const THROW_SALT = 0x7417;
+
 /** Hp taken beyond one member's share when a vehicle is lifted, so rounding never leaves it standing. */
 const GRAB_HP_SLACK = 1e-6;
 
 const ids: number[] = [];
-const aim = createAimPoint();
-const eyePoint = { x: 0, y: 0, z: 0 };
 const beam = createBeamPath();
 
 /** A hit dealt by a kaiju's own body or breath, in raw numbers; `fromDir` points from the target to the kaiju. */
@@ -486,75 +488,39 @@ export function grabEffect(world: World, k: Kaiju, def: KaijuKindDef): void {
   emit(world, { type: 'kaijuHeld', kaiju: k.id, held, reason: 'grab', source: target.source, sourceId: target.id });
 }
 
-/**
- * Launch angle (radians above the horizon) that lands a throw of speed `v` on a point `d` meters
- * away and `dy` meters above the hand, on the flat arc. Out of reach: 45 degrees, the longest throw.
- */
-export function throwAngle(d: number, dy: number, v: number, g: number): number {
-  const v2 = v * v;
-  const disc = v2 * v2 - g * (g * d * d + 2 * dy * v2);
-  if (disc < 0) return PI / 4;
-  return Math.atan2(v2 - Math.sqrt(disc), g * d);
-}
+const flight = createThrowFlight();
+const launch = createThrowLaunch();
 
 /**
- * Throw: the held object leaves the hand toward the aim point as a ballistic projectile. A city
- * weapon flies its own way (sim/cityWeapons.ts `cityThrow`): the propane and water tanks on the
- * throw's arc at their own speed, a javelin (the antenna, the mast) fast and nearly straight, the
- * garage door flat; each does its own thing where it lands.
+ * Throw: the held object leaves the hand on a real ballistic arc (sim/throwArc.ts): along the
+ * aim's heading, at the aim's pitch plus the throw's lift, at the speed its weight and the stage
+ * give it, under the stage's gravity, each throw a little off by its own seeded error. Aimed
+ * higher it lobs over what stands in the way. A city weapon flies its own way (a javelin fast and
+ * flat, the garage door floating; `throwFlight`) and does its own thing where it lands
+ * (sim/cityWeapons.ts `cityThrow`). Whatever it is, rubble and fallen buildings within the
+ * kaiju's grab reach do not stop it (`clearRubble`); standing walls do.
  */
 export function throwEffect(world: World, k: Kaiju, def: KaijuKindDef): void {
   const payload = k.held;
   if (!payload) return;
   const a = def.actions.throw;
-  const st = kaijuStageDef(k.kind, k.stage);
-  const type = projectileTypeDef('thrown');
   const city = cityThrow(k, heldCityWeapon(payload), surgeMult(k));
-  const speed = city ? city.speed : perStage(a.speed, k.stage);
-  const g = city ? city.gravity : type.gravity;
-
-  const hx = k.x + Math.sin(k.aimYaw) * k.radius * HAND_FORWARD;
-  const hy = st.handHeight;
-  const hz = k.z + Math.cos(k.aimYaw) * k.radius * HAND_FORWARD;
-
-  // What the crosshair is on, out to well past the longest possible throw (or the javelin's flight).
-  const flight = city ? city.speed * city.ttl : (speed * speed) / Math.max(g, 0.01);
-  const reach = flight + st.eyeHeight * 2 + 50;
-  kaijuEyePoint(k, eyePoint);
-  resolveAimPoint(world.cityQuery, eyePoint.x, eyePoint.y, eyePoint.z, k.aimYaw, k.aimPitch, reach, aim);
-
-  let dirX = Math.sin(k.aimYaw);
-  let dirZ = Math.cos(k.aimYaw);
-  let angle: number;
-  if (aim.on === 'none') {
-    // Looking at the sky or the horizon: it flies where the head points.
-    angle = k.aimPitch;
-  } else {
-    const dx = aim.x - hx;
-    const dz = aim.z - hz;
-    const d = Math.hypot(dx, dz);
-    if (d > 1e-6) {
-      dirX = dx / d;
-      dirZ = dz / d;
-    }
-    angle = throwAngle(d, aim.y - hy, speed, g);
-  }
-  const horizontal = Math.cos(angle) * speed;
-
+  throwLaunch(k, throwFlight(k.kind, k.stage, payload, flight), launch);
+  throwError(launch, hash32(world.seed, world.tick, k.id, THROW_SALT));
   spawnProjectile(world, {
     type: 'thrown',
-    flight: type.flight,
+    flight: projectileTypeDef('thrown').flight,
     owner: 'kaiju',
     ownerId: k.id,
     player: k.player,
-    x: hx,
-    y: hy,
-    z: hz,
-    vx: dirX * horizontal,
-    vy: Math.sin(angle) * speed,
-    vz: dirZ * horizontal,
-    gravity: g,
-    ttl: city ? city.ttl : type.ttl,
+    x: launch.x,
+    y: launch.y,
+    z: launch.z,
+    vx: launch.vx,
+    vy: launch.vy,
+    vz: launch.vz,
+    gravity: launch.gravity,
+    ttl: launch.ttl,
     damage: city ? city.damage : a.unitDamage * attackMult(k, 'unitDamage'),
     nerve: city ? city.nerve : a.unitNerve * modMult(k.mods, 'nerveDamage'),
     splash: city ? city.splash : perStage(a.impactRadius, k.stage),
@@ -564,9 +530,16 @@ export function throwEffect(world: World, k: Kaiju, def: KaijuKindDef): void {
     atWill: false,
     payload,
     ...(city ? { city: city.city } : {}),
+    // It goes over the rubble within the kaiju's reach (the heap it stands by, a fallen mast's own lattice).
+    clearRubble: throwClearance(k, def),
   });
   emptyHand(k);
   emit(world, { type: 'kaijuHeld', kaiju: k.id, held: null, reason: 'throw', source: 'none', sourceId: -1 });
+}
+
+/** Meters of a throw's flight (over the ground) in which rubble and fallen buildings do not stop it: the grab reach. */
+export function throwClearance(k: { kind: Kaiju['kind']; stage: Kaiju['stage'] }, def: KaijuKindDef = kaijuKindDef(k.kind)): number {
+  return def.actions.grab.reach * kaijuStageDef(k.kind, k.stage).bodyRadius;
 }
 
 /** Lets go of whatever is in the hand (the cocoon closes over it). */

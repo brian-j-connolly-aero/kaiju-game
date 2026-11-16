@@ -1,7 +1,7 @@
 /**
  * Briefing: the few seconds before play. The camera circles down onto the starting
- * neighborhood, the player's side is shown as a portrait with the names of everyone in the
- * match, and the voiced briefing plays with subtitles (the simulation sends it as a voice cue).
+ * neighborhood, and the player's side is shown as a portrait with the names of everyone in the
+ * match. (Since round 4 nothing is said here: the automatic voice lines are gone.)
  */
 
 import { factionDef, kaijuKindDef } from '@mb/shared';
