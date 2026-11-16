@@ -121,3 +121,47 @@ file is the newer intent: change `DESIGN.md` to match as each piece is built.
 - Hills on the horizon. Hills inside the city wait: every rule assumes flat ground.
 - The monster can squash and eat civilians (a puff, no gore).
 - Final pacing pass, then the slide deck.
+
+## Round 4: after the second playtest (16 November 2026)
+
+The owner hosted on their own computer and played through the tunnel. Verdict: "much improved,
+it's fun": the monster's molt picks, the army's charged volley and the rubble all worked, and the
+old stutter on foot is gone. The owner plays again on 16 November in the afternoon, a live
+multiplayer game (the players talk on a voice chat of their own, so the game needs no voice
+chat).
+
+The owner's decisions for this round:
+
+- **Stutter through the tunnel.** Every 20 seconds or so the player's own body snaps back
+  ("rubber banding"). Find out why with a small hidden on-screen readout and a log of slow
+  server moments, reproduce it here with a slow, jittery connection, and fix it if it is the
+  game's own fault. If it is only the tunnel, say so and stop: no big network project.
+- **Voice lines: the automatic lines go.** Every automatic radio and news line goes, the news
+  anchor included, except the one that says the monster is ready to molt. In their place a
+  **communication rose**: a player holds a key, picks a wedge, and their character says
+  something. The army's lines are inane schlocky monster-movie radio nonsense, one sentence
+  each, shouted (lots of exclamation marks), through a radio filter. The monster gets roars,
+  snuffles and a little musical mating call. None of it changes the game. A later voice pass
+  with a commercial voice service will redo the lines.
+- **The destruction bar** filled past the molt marker a little before the molt was offered:
+  the marker and the moment must match.
+- **Restart** from the Escape menu.
+- **Controls card (H):** five things at most per side, big pictures.
+- **The titan wading:** at stage 3 it showed no sign of being in water, because the water has no
+  depth. It must visibly stand in deep water (and wade).
+- **Throwing** is the monster's main answer to the army, and it is clumsy. Throws follow real
+  ballistic arcs (they can lob over buildings), aimed where the monster looks, with no aiming
+  delay: monsters throw fast. The arc is shown as a tube whose round cross-section grows with
+  distance, so the player reads at a glance where it can land. Not too accurate: an unmoving
+  squad about five monster lengths away is hit most of the time; farther, less often.
+- **Army pick-ups** replace the main weapon's icon (as now) and change both the normal fire and
+  the charged volley.
+- **Civilians** popped in and out every few seconds: they must not.
+- **Grabbable things glow** on the monster's screen, brighter when in reach.
+- **Music:** longer, faster, more of it: pulse-pounding late-1990s high-end arcade style, a few
+  tracks. The molt and upgrade music stays.
+- Also agreed: foot squads must fit through the gaps between houses (their body is far wider
+  than the soldiers drawn); the power surge must say what it does; the monster's screen gets the
+  same kind of flair as its new attack animations, with a charge-up style rage meter of its own
+  (styled differently from the army's diamond); the fallen radio mast's top got stuck when the
+  owner tried to throw it.
