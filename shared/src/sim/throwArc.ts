@@ -359,14 +359,23 @@ export function createLandingSpread(): LandingSpread {
 /**
  * The longest the landing ellipse is, in times its width. A throw skimming the ground can stray
  * farther along its flight than that, but seldom: the error is thickest in the middle of its ball.
+ * (Round 5: 4, was 2. With 2, one stage 1 flat throw in four came down outside the ring drawn.)
  */
-const MAX_ELONGATION = 2;
+const MAX_ELONGATION = 4;
 
 /**
  * Where a traced throw can come down: the ball its error spreads it over by then (radius
  * `spreadAt`), seen along its flight on the surface it ends on. On the ground or a roof that is
  * an ellipse, as wide as the ball across the flight and longer along it the flatter the throw
  * comes in; on a wall it is the ball's own circle.
+ *
+ * Along the flight the ball's shadow alone (1 / steepness) is too short for a flat throw: a big
+ * error changes the angle it comes in at too, and a throw that leaves a little high skims on
+ * farther. So the length grows half as fast again as the shadow (1.5 / steepness - 0.5: a lob,
+ * coming down steeply, stays round), up to MAX_ELONGATION. Measured (round 5, 1000 seeds a case,
+ * flat open ground): flat throws at 3 / 5 / 7 monster lengths land outside it 10 / 3 / 1% of the
+ * time at stage 1 (36 / 28 / 15% with the round 4 ring), 0% at stages 2 and 3; lobs under 1%.
+ * Only the preview reads it: nothing in the simulation does.
  */
 export function landingSpread(launch: ThrowLaunch, trace: ThrowTrace, out: LandingSpread): LandingSpread {
   const r = spreadAt(launch, trace.time);
@@ -377,7 +386,7 @@ export function landingSpread(launch: ThrowLaunch, trace: ThrowTrace, out: Landi
   if (trace.ny > 0.5) {
     const speed = Math.hypot(flat, trace.vy);
     const steep = speed > 1e-6 ? Math.abs(trace.vy) / speed : 1;
-    out.along = r * Math.min(MAX_ELONGATION, 1 / Math.max(1e-6, steep));
+    out.along = r * Math.min(MAX_ELONGATION, 1.5 / Math.max(1e-6, steep) - 0.5);
   } else {
     out.along = r;
   }
@@ -461,4 +470,150 @@ export function aimThrowAt(
     return true;
   }
   return false;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Aiming a throw at the crosshair's point (the monster player, round 5)
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * What a throw aimed at a point does: 'on' it comes down there; 'short' the point is beyond the
+ * throw's reach (it goes as far as it can that way); 'blocked' the point is in reach but every
+ * arc meets something first; 'close' the point is beside or under the monster, where the head
+ * cannot turn or the hand cannot throw that steeply down.
+ */
+export type ThrowReach = 'on' | 'short' | 'blocked' | 'close';
+
+/** The answer of `aimThrowAtPoint`. */
+export interface PointThrowAim extends ThrowAim {
+  reach: ThrowReach;
+}
+
+export function createPointThrowAim(): PointThrowAim {
+  return { yaw: 0, pitch: 0, high: false, time: 0, reach: 'on' };
+}
+
+/** How far a structure target lets the arc land from the crosshair's point, in tolerances (on the same roof or wall). */
+const SAME_STRUCTURE_SLACK = 4;
+
+const pointLaunch = createThrowLaunch();
+const pointTrace = createThrowTrace();
+const pointSource: ThrowSource = { kind: 'lizard', stage: 1, x: 0, z: 0, aimYaw: 0, aimPitch: 0 };
+const pointHand: Vec3 = { x: 0, y: 0, z: 0 };
+
+/**
+ * The elevation that carries a throw of speed `v` under gravity `g` farthest over ground `h`
+ * meters below the hand: 45 degrees from the ground, flatter from higher up.
+ */
+export function farthestElevation(v: number, g: number, h: number): number {
+  return Math.asin(v / Math.sqrt(Math.max(1e-9, 2 * (v * v + g * Math.max(0, h)))));
+}
+
+/** Flies `pointSource` at elevation `e` against the city into `pointTrace`. */
+function tracePoint(city: CityQuery, flight: ThrowFlight, e: number, clearRubble: number): void {
+  pointSource.aimPitch = e - flight.lift;
+  throwLaunch(pointSource, flight, pointLaunch);
+  traceThrow(city, pointLaunch, clearRubble, pointTrace);
+}
+
+/**
+ * The aim that throws `flight` from a kaiju onto the point the player's crosshair is on
+ * (tx, ty, tz): the game picks the arc. The heading runs toward the point, no farther round than
+ * `maxLead` from the body's `yaw` (the head's reach; the server clamps the same way). Then the flat
+ * arc when it gets there, else the lob over whatever stands in the way (`preferHigh` tries the lob
+ * first: the last frame's choice, so the arc does not flip between the two on a roof's edge). An
+ * arc gets there when it comes down within `tolerance` meters of the point (over the ground), or
+ * on the structure `structure` (the roof or wall the crosshair is on) within a few tolerances.
+ *
+ * When none gets there: beyond reach it goes as far as it can along the heading ('short'); in
+ * reach but blocked, the arc that comes down nearest the point ('blocked'); too steep down or
+ * beyond the head's turn, what it can ('close'). `out.yaw` and `out.pitch` are the aim to send
+ * (the server flies exactly this arc), set in every case. Costs two traces at most.
+ */
+export function aimThrowAtPoint(
+  city: CityQuery,
+  src: Pick<ThrowSource, 'kind' | 'stage' | 'x' | 'z'> & { yaw: number },
+  flight: ThrowFlight,
+  tx: number,
+  ty: number,
+  tz: number,
+  tolerance: number,
+  structure: number,
+  maxLead: number,
+  clearRubble: number,
+  out: PointThrowAim,
+  preferHigh = false,
+): PointThrowAim {
+  pointSource.kind = src.kind;
+  pointSource.stage = src.stage;
+  pointSource.x = src.x;
+  pointSource.z = src.z;
+  // The heading, no farther round than the head reaches (a point beside the monster: the
+  // farthest heading it can turn to).
+  let yaw = Math.atan2(tx - src.x, tz - src.z);
+  let d = yaw - src.yaw;
+  d = Math.atan2(Math.sin(d), Math.cos(d));
+  const turned = Math.abs(d) > maxLead + 1e-6;
+  if (turned) yaw = src.yaw + Math.sign(d) * maxLead;
+  pointSource.aimYaw = yaw;
+  throwHand(pointSource, pointHand);
+  // The point, on that heading at the same distance from the body, and a meter beyond the hand at least.
+  const handOut = Math.hypot(pointHand.x - src.x, pointHand.z - src.z);
+  const far = Math.max(Math.hypot(tx - src.x, tz - src.z), handOut + 1);
+  const px = src.x + Math.sin(yaw) * far;
+  const pz = src.z + Math.cos(yaw) * far;
+  const dist = far - handOut;
+  out.yaw = yaw;
+  out.high = false;
+  const both = throwElevations(dist, ty - pointHand.y, flight.speed, flight.gravity);
+  if (both !== null && both[0] < flight.minElevation - 1e-9) {
+    // Too steep down for the hand (right under the snout): as steep as it goes.
+    tracePoint(city, flight, flight.minElevation, clearRubble);
+    out.pitch = pointSource.aimPitch;
+    out.time = pointTrace.time;
+    out.reach = 'close';
+    return out;
+  }
+  const inReach = both !== null && both[0] <= flight.maxElevation + 1e-9;
+  if (inReach) {
+    let bestPitch = 0;
+    let bestMiss = Infinity;
+    let bestHigh = false;
+    let bestTime = 0;
+    for (let n = 0; n < 2; n++) {
+      const i = preferHigh ? 1 - n : n;
+      const e = both[i];
+      if (e > flight.maxElevation + 1e-9) continue;
+      tracePoint(city, flight, e, clearRubble);
+      const miss = pointTrace.end === 'none' ? Infinity : Math.hypot(pointTrace.x - px, pointTrace.z - pz);
+      const there =
+        miss <= tolerance || (structure >= 0 && pointTrace.end === 'structure' && pointTrace.structure === structure && miss <= tolerance * SAME_STRUCTURE_SLACK);
+      if (there) {
+        out.pitch = pointSource.aimPitch;
+        out.high = i === 1;
+        out.time = pointTrace.time;
+        out.reach = turned ? 'close' : 'on';
+        return out;
+      }
+      if (miss < bestMiss) {
+        bestMiss = miss;
+        bestPitch = pointSource.aimPitch;
+        bestHigh = i === 1;
+        bestTime = pointTrace.time;
+      }
+    }
+    if (bestMiss < Infinity) {
+      out.pitch = bestPitch;
+      out.high = bestHigh;
+      out.time = bestTime;
+      out.reach = turned ? 'close' : 'blocked';
+      return out;
+    }
+  }
+  // Beyond reach (or both arcs fly out of the city): as far as it goes along the heading.
+  tracePoint(city, flight, Math.min(flight.maxElevation, farthestElevation(flight.speed, flight.gravity, pointHand.y - Math.max(0, ty))), clearRubble);
+  out.pitch = pointSource.aimPitch;
+  out.time = pointTrace.time;
+  out.reach = turned ? 'close' : inReach ? 'blocked' : 'short';
+  return out;
 }
