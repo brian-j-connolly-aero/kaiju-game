@@ -167,3 +167,35 @@ The owner's decisions for this round:
   same kind of flair as its new attack animations, with a charge-up style rage meter of its own
   (styled differently from the army's diamond); the fallen radio mast's top got stuck when the
   owner tried to throw it.
+
+## Round 5: after the third playtest (17 November 2026)
+
+The first live multiplayer game: five players, each from home, the owner hosting. Verdict: the
+game was well balanced and the army almost won. The owner's notes, and the decisions for this
+round:
+
+- **Terrible lag.** The top problem. Find out why with five remote players (the last check had
+  one), and fix whatever is the game's fault: slow response to the keys, snapping back, a low
+  frame rate, other players jumping about. Also give the host a way to save the whole game log
+  to a file after a session, so the next playtest brings evidence home.
+- **Throwing was confusing**, and the monster's player found the cone hard to see. Decision: a
+  throw lands where the crosshair points (the street, a roof, a squad), and the game picks the
+  arc itself: the flat one when the way is clear, a lob over whatever stands in the way. Beyond
+  the throw's reach the marker stops at the farthest point and shows it. Real ballistic arcs and
+  the not-too-accurate spread stay as they are. The preview must be impossible to miss by day
+  and by night: a bold landing marker, a bold arc, a clearly visible widening tube. The camera
+  tricks added for the old aiming (the shift over the shoulder, the view that stops tilting) go
+  unless they still help.
+- **The army's machine gun** fired one shot at a time, and its charged volley did not work. Fix
+  both, and check every pick-up's normal fire and volley the same way.
+- **Army shooting in general:** players could not tell when they could charge, and "the weird
+  yellow circle" kept refreshing. At every moment the squad's screen must show whether it can
+  charge (and if not, why), how far the charge has come, and when to let go. The yellow circle
+  either earns its place in a way players understand, or goes.
+- **Line of sight** was confusing: when a shot, a volley or an attack cannot reach because
+  something is in the way, the screen must say so.
+- **Labels of one or two words.** Players were confused by pictures alone. This relaxes the
+  no-reading rule: in-game text may now also be short labels of one or two plain words beside
+  the pictures (buttons, controls card, rose wedges, molt cards, pick-ups, charge states,
+  menus). Still no sentences or instructions to read; names and subtitles stay as before.
+- **Keep the balance.** It felt right: nothing in this round should shift it.
