@@ -1,20 +1,57 @@
 /**
  * The player cameras: first and third person look the same way, with the same limits, so the
- * view toggle (V) changes where the camera sits and never what the player is looking at.
+ * view toggle (V) changes where the camera sits and never what the player is looking at. With
+ * something to throw (round 5), the monster's throw lands where the crosshair points.
  */
 
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { CITY_SEED, createCityQuery, createCityState, getCity, kaijuKindDef, wrapAngle, type SnapKaiju, type SnapUnit } from '@mb/shared';
+import {
+  aimThrowAtPoint,
+  buildCityIndex,
+  CITY_HALF,
+  CITY_SEED,
+  createCityQuery,
+  createCityState,
+  createPointThrowAim,
+  createThrowFlight,
+  createThrowLaunch,
+  createThrowTrace,
+  getCity,
+  kaijuKindDef,
+  throwClearance,
+  throwFlight,
+  throwLaunch,
+  traceThrow,
+  wrapAngle,
+  type CityData,
+  type CityQuery,
+  type SnapKaiju,
+  type SnapUnit,
+} from '@mb/shared';
 import { createActionState, type ActionState, type ButtonAction } from '../src/game/input/actions';
 import { HUMAN_PITCH_LIMIT, HumanController } from '../src/game/controllers/humanController';
-import { KAIJU_PITCH_LIMIT, KaijuController, THROW_VIEW_UP } from '../src/game/controllers/kaijuController';
+import { KAIJU_PITCH_LIMIT, KaijuController } from '../src/game/controllers/kaijuController';
 import type { ControlContext } from '../src/game/controllers/types';
 
 const { city, index } = getCity(CITY_SEED);
 const query = createCityQuery(index, createCityState(city));
 // Far outside the city: nothing in the way of either camera.
 const FAR = 20000;
+
+/** An empty city (a throw's arc is followed only inside the city: the far field would not do). */
+const EMPTY: CityData = {
+  seed: 1,
+  half: CITY_HALF,
+  structures: [],
+  props: [],
+  roads: { nodes: [], edges: [] },
+  areas: [],
+  districts: [],
+  anchors: [{ id: 0, name: 'Anchor', x: 0, z: 0 }],
+  downtown: { x: 0, z: 0 },
+};
+const emptyQuery = createCityQuery(buildCityIndex(EMPTY), createCityState(EMPTY));
 
 function kaiju(over: Partial<SnapKaiju> = {}): SnapKaiju {
   return {
@@ -90,7 +127,7 @@ function unit(over: Partial<SnapUnit> = {}): SnapUnit {
   };
 }
 
-function context(input: ActionState, body: { k?: SnapKaiju; u?: SnapUnit }): ControlContext {
+function context(input: ActionState, body: { k?: SnapKaiju; u?: SnapUnit }, where: { query: CityQuery; city: CityData } = { query, city }): ControlContext {
   const frame = {
     localKaiju: body.k ?? null,
     localUnit: body.u ?? null,
@@ -101,7 +138,7 @@ function context(input: ActionState, body: { k?: SnapKaiju; u?: SnapUnit }): Con
     bounds: { minX: FAR - 500, maxX: FAR + 500, minZ: FAR - 500, maxZ: FAR + 500 },
   };
   return {
-    session: { mirror: { query, city }, aimYaw: 0, aimPitch: 0 },
+    session: { mirror: where, aimYaw: 0, aimPitch: 0 },
     renderer: { kaijuCamAnchor: () => null },
     input,
     frame,
@@ -221,29 +258,104 @@ describe('kaiju cameras', () => {
     }
   });
 
-  it('with something to throw, send where the view looks and stop the view a little above level while the aim goes on up (round 4)', () => {
+  it('with something to throw, send the aim whose arc lands where the crosshair points (round 5)', () => {
+    const empty = { query: emptyQuery, city: EMPTY };
     for (const third of [false, true]) {
       const input = createActionState();
-      const k = kaiju({ yaw: 0.3, held: { kind: 'prop', prop: 'car_sedan' } });
+      const k = kaiju({ x: 0, z: 0, yaw: 0.3, held: { kind: 'prop', prop: 'car_sedan' } });
       const c = new KaijuController(third);
       const camera = new THREE.PerspectiveCamera();
-      // A little down: the aim sent is the view's own (no crosshair target in third person either).
-      c.update(context(frameInput(input, { y: -0.2 }), { k }));
-      c.applyCamera(context(input, { k }), camera);
-      expect(c.sendPitch, `third person: ${third}`).toBeCloseTo(-0.2, 9);
-      expectSameDirection(cameraDirection(camera), { yaw: c.sendYaw, pitch: -0.2 });
-      // Far up, to lob: the aim goes to its limit, the view stops just above the horizon.
-      c.update(context(frameInput(input, { y: 5 }), { k }));
-      c.applyCamera(context(input, { k }), camera);
-      expect(c.sendPitch, `third person: ${third}`).toBeCloseTo(KAIJU_PITCH_LIMIT, 9);
-      expect(cameraDirection(camera).pitch, `third person: ${third}`).toBeCloseTo(THROW_VIEW_UP, 4);
-      // Thrown: the aim comes back down to where the view stopped, and the view does not leap up.
-      k.held = null;
-      c.update(context(frameInput(input), { k }));
-      c.applyCamera(context(input, { k }), camera);
-      expect(c.aimPitch, `third person: ${third}`).toBeCloseTo(THROW_VIEW_UP, 9);
-      expect(cameraDirection(camera).pitch, `third person: ${third}`).toBeCloseTo(THROW_VIEW_UP, 4);
+      // Look a little down at the street, then hold still for a frame.
+      c.update(context(frameInput(input, { y: -0.25 }), { k }, empty));
+      c.applyCamera(context(input, { k }, empty), camera);
+      c.update(context(frameInput(input), { k }, empty));
+      c.applyCamera(context(input, { k }, empty), camera);
+      // Where the crosshair (the camera's center ray) meets the street.
+      const d = camera.getWorldDirection(new THREE.Vector3());
+      const t = -camera.position.y / d.y;
+      const px = camera.position.x + d.x * t;
+      const pz = camera.position.z + d.z * t;
+      // The aim sent is the crosshair throw's answer...
+      const flight = throwFlight(k.kind, k.stage, k.held ?? { kind: 'prop', prop: 'car_sedan' }, createThrowFlight());
+      const tolerance = kaijuKindDef('lizard').actions.throw.impactRadius[0] * 0.25;
+      const want = aimThrowAtPoint(emptyQuery, k, flight, px, 0, pz, tolerance, -1, kaijuKindDef('lizard').headLeadMax, throwClearance(k), createPointThrowAim());
+      expect(want.reach, `third person: ${third}`).toBe('on');
+      expect(c.sendYaw, `third person: ${third}`).toBeCloseTo(want.yaw, 6);
+      expect(c.sendPitch, `third person: ${third}`).toBeCloseTo(want.pitch, 6);
+      expect(c.aim.throw?.reach).toBe('on');
+      expect(c.aim.warning).toBeNull();
+      // ... and the server, flying that aim, lands it at the crosshair.
+      const launch = throwLaunch({ ...k, aimYaw: c.sendYaw, aimPitch: c.sendPitch }, flight, createThrowLaunch());
+      const trace = traceThrow(emptyQuery, launch, throwClearance(k), createThrowTrace());
+      expect(trace.end).toBe('ground');
+      expect(Math.hypot(trace.x - px, trace.z - pz), `third person: ${third}`).toBeLessThanOrEqual(tolerance);
+      // The view is where the mouse put it: the aim sent is not the view.
+      expectSameDirection(cameraDirection(camera), { yaw: c.viewYaw, pitch: -0.25 });
     }
+  });
+
+  it('with something to throw, let the view look up freely and keep it there after the throw (round 5)', () => {
+    for (const third of [false, true]) {
+      const input = createActionState();
+      const k = kaiju({ x: 0, z: 0, held: { kind: 'prop', prop: 'car_sedan' } });
+      const c = new KaijuController(third);
+      const camera = new THREE.PerspectiveCamera();
+      const empty = { query: emptyQuery, city: EMPTY };
+      c.update(context(frameInput(input, { y: 0.6 }), { k }, empty));
+      c.applyCamera(context(input, { k }, empty), camera);
+      expect(cameraDirection(camera).pitch, `third person: ${third}`).toBeCloseTo(0.6, 4);
+      // On the sky: the farthest throw that way, and the screen says it is too far.
+      expect(c.aim.throw?.reach).toBe('short');
+      expect(c.aim.warning?.word).toBe('Too far');
+      k.held = null;
+      c.update(context(frameInput(input), { k }, empty));
+      c.applyCamera(context(input, { k }, empty), camera);
+      expect(c.aimPitch, `third person: ${third}`).toBeCloseTo(0.6, 9);
+      expect(cameraDirection(camera).pitch, `third person: ${third}`).toBeCloseTo(0.6, 4);
+      expect(c.aim.throw).toBeNull();
+    }
+  });
+
+  it('with something to throw, lob over a house in the way, and throw flat again once the crosshair leaves it (round 5)', () => {
+    // A low wall of a house 14 m ahead, the street behind it.
+    const walled: CityData = {
+      ...EMPTY,
+      structures: [{ id: 0, archetype: 'house_a', x: 0, z: 14, hx: 6, hz: 1.5, yaw: 0, height: 3, cls: 'house', hp: 100, value: 10, landmark: null, passable: false }],
+    };
+    const where = { query: createCityQuery(buildCityIndex(walled), createCityState(walled)), city: walled };
+    const input = createActionState();
+    const k = kaiju({ x: 0, z: 0, yaw: 0, held: { kind: 'prop', prop: 'car_sedan' } });
+    const c = new KaijuController(true);
+    const camera = new THREE.PerspectiveCamera();
+    /** Puts the crosshair on (x, y, z), a few frames for the camera to settle. */
+    const lookAt = (x: number, y: number, z: number): void => {
+      for (let i = 0; i < 6; i++) {
+        const p = camera.position;
+        c.aimYaw = Math.atan2(x - p.x, z - p.z);
+        c.aimPitch = Math.atan2(y - p.y, Math.hypot(x - p.x, z - p.z));
+        c.update(context(frameInput(input), { k }, where));
+        c.applyCamera(context(input, { k }, where), camera);
+      }
+    };
+    lookAt(0, 0, 30);
+    expect(c.aim.throw).toMatchObject({ on: 'ground', reach: 'on', high: true });
+    // A step along the street behind the house: still the lob (no flipping at its edge).
+    lookAt(2, 0, 30);
+    expect(c.aim.throw).toMatchObject({ reach: 'on', high: true });
+    // Open street clear of the house: the flat arc again.
+    lookAt(16, 0, 30);
+    expect(c.aim.throw).toMatchObject({ on: 'ground', reach: 'on', high: false });
+  });
+
+  it('let the autopilot aim its own throw, crosshair or not', () => {
+    const input = createActionState();
+    const k = kaiju({ x: 0, z: 0, held: { kind: 'prop', prop: 'car_sedan' } });
+    const c = new KaijuController(true);
+    input.aimOverride = { yaw: 0.2, pitch: 0.1 };
+    c.update(context(frameInput(input), { k }, { query: emptyQuery, city: EMPTY }));
+    expect(c.sendYaw).toBeCloseTo(0.2, 9);
+    expect(c.sendPitch).toBeCloseTo(0.1, 9);
+    expect(c.aim.throw).toBeNull();
   });
 });
 

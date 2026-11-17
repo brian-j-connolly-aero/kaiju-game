@@ -45,10 +45,10 @@ class Line {
     for (const b of buttons) this.deliver(this.make(b));
   }
 
-  tick(still = false): void {
+  tick(still = false, catchingUp = false): void {
     // Ticks before the player's first input stand for nothing: not counted.
     if (this.q.started) this.ticks++;
-    const next = takeInput(this.q, still);
+    const next = takeInput(this.q, still, catchingUp);
     if (next) {
       this.last = next.buttons;
       this.silent = 0;
@@ -196,7 +196,10 @@ describe('late inputs: a guess stands in, and nothing the player did is changed'
         inFlight.push({ at: arrive, it: line.make(buttons) });
         while (inFlight.length > 0 && inFlight[0].at <= t) line.deliver((inFlight.shift() as { it: PlayerInput }).it);
         line.tick();
-        if (line.ticks > 1) expect(line.extra, `up to ${maxLate} ticks late, tick ${t}`).toBe(INPUT_CUSHION);
+        // Since round 5 a backlog left behind by a very late line (4 or more waiting for a
+        // second) is trimmed while the body moves too, one input at a time: each costs the body
+        // one tick the client had counted (a small correction), never a tick more.
+        if (line.ticks > 1) expect(line.extra + line.q.trimmed, `up to ${maxLate} ticks late, tick ${t}`).toBe(INPUT_CUSHION);
       }
       for (let t = 0; t < 30; t++) line.tick();
       // Every press arrived, and the player is back in the present.
@@ -288,24 +291,88 @@ describe('what no guess stood for', () => {
     expect(line.q.items).toEqual([]);
   });
 
-  it('trims inputs that keep waiting, but only while the body stands still', () => {
+  /** A line with a standing backlog: `waiting` inputs left after every tick for a second, the flag up. */
+  function backlog(waiting: number, make: (line: Line) => PlayerInput): Line {
     const line = new Line();
-    // A standing backlog: four inputs waiting after every tick, for good. The player has let go of
-    // the stick (a body still coasting counts as moving).
-    const idle = (): PlayerInput => line.make(0, { moveZ: 0 });
-    line.deliver(idle(), idle(), idle(), idle());
-    line.tick();
+    for (let i = 0; i < waiting; i++) line.deliver(make(line));
+    line.tick(); // the cushion (a guess: the first window does not count)
     for (let t = 0; t < 2 * INPUT_BACKLOG_TICKS; t++) {
-      line.deliver(idle());
-      line.tick(false);
+      line.deliver(make(line));
+      line.tick();
     }
-    // Moving: nothing is skipped however long the backlog stays.
-    expect(line.q.items.length).toBe(4);
+    expect(line.q.items.length).toBe(waiting);
+    expect(line.q.trim).toBe(true);
+    return line;
+  }
+
+  it('trims inputs that keep waiting one at a time, standing still or (round 5) moving', () => {
+    // Standing still: an input with no stick and no buttons goes (nobody can see it go).
+    const idle = backlog(4, (l) => l.make(0, { moveZ: 0 }));
+    let played = idle.ack.played;
+    idle.deliver(idle.make(0, { moveZ: 0 }));
+    idle.tick(true);
+    expect(idle.q.items.length).toBe(3);
+    expect(idle.ack.played).toBe(played + 2);
+    // Moving (rule changed in round 5: before, a moving player kept a backlog for good, which
+    // after the server stood still meant every input of theirs waited longer for the rest of the
+    // match): an input that changes no button and holds none goes too, one tick of movement.
+    const walking = backlog(4, (l) => l.make(0));
+    played = walking.ack.played;
+    walking.send(0);
+    walking.tick(false);
+    expect(walking.q.items.length).toBe(3);
+    expect(walking.ack.played).toBe(played + 2);
+    // One at a time: the next window has to see the backlog again.
+    walking.send(0);
+    walking.tick(false);
+    expect(walking.q.items.length).toBe(3);
+  });
+
+  it('never trims a press, a release or a held button while moving', () => {
+    // A held volley: its length is what charges the squad.
+    const held = backlog(4, (l) => l.make(S));
+    for (let t = 0; t < 3 * INPUT_BACKLOG_TICKS; t++) {
+      held.send(S);
+      held.tick(false);
+    }
+    expect(held.q.items.length).toBe(4);
+    // A press at the head of the queue when the flag is up is played, not skipped.
+    const firing = backlog(4, (l) => l.make(0));
+    firing.q.items[0].buttons = F;
+    const played = firing.ack.played;
+    firing.send(0);
+    firing.tick(false);
+    expect(firing.seen[firing.seen.length - 1]).toBe(F);
+    expect(firing.ack.played).toBe(played + 1);
+  });
+
+  it('neither trims nor counts a backlog on the ticks run to catch up after the server stood still', () => {
+    const line = backlog(4, (l) => l.make(0));
+    // The server stood still: eight more inputs came meanwhile, and four ticks run at once.
+    line.send(0, 0, 0, 0, 0, 0, 0, 0);
     const played = line.ack.played;
-    line.deliver(idle());
-    line.tick(true);
-    // Standing still: one input is skipped (no stick, no buttons: nobody can see it go).
-    expect(line.q.items.length).toBe(3);
-    expect(line.ack.played).toBe(played + 2);
+    for (let i = 0; i < 4; i++) line.tick(false, true);
+    expect(line.ack.played).toBe(played + 4);
+    expect(line.q.dropped).toBe(0);
+  });
+
+  it('forgets a backlog once it is gone, so a flag left over never eats the cushion', () => {
+    // Round 5, found checking the catch-up: the flag stayed up after the catch-up had emptied the
+    // queue, skipped an input at the next still moment, and from then on every input of that
+    // player came a tick too late and was thrown away against a guess.
+    const line = backlog(4, (l) => l.make(0, { moveZ: 0 }));
+    // Catch-up ticks with nothing new arriving play the backlog down to one waiting.
+    for (let i = 0; i < 3; i++) line.tick(false, true);
+    expect(line.q.items.length).toBe(1);
+    expect(line.q.trim).toBe(false);
+    // Back to normal: one input a tick, the player standing still. Nothing is skipped.
+    const played = line.ack.played;
+    for (let i = 0; i < 5; i++) {
+      line.deliver(line.make(0, { moveZ: 0 }));
+      line.tick(true);
+      expect(line.q.items.length).toBe(1);
+    }
+    expect(line.ack.played).toBe(played + 5);
+    expect(line.q.dropped).toBe(0);
   });
 });

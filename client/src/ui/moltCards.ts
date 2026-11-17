@@ -2,9 +2,10 @@
  * The molt card picker (docs/ROADMAP.md phase 1; DESIGN.md section 4, "Molt cards"). When the
  * cocoon starts, the monster is offered three moves: three big cards come up in the middle of
  * the screen, each the move's picture moving the way the move does (CSS), over the button that
- * picks it (1, 2, 3, or the d-pad's left, up and right). Above them, the move button the pick
- * will go on. No text. A bar under the cards runs down to the end of the intermission, when the
- * server picks one at random.
+ * picks it (1, 2, 3, or the d-pad's left, up and right), with the move's name between them
+ * (round 5: a label of one or two words, ui/labels.ts). Above them, the move button the pick will
+ * go on. A bar under the cards runs down to the end of the intermission, when the server picks
+ * one at random.
  *
  * The mouse picks too. While the cards wait the match screen lets the pointer go (`waiting`), so
  * a plain click on a card picks it (and takes the pointer back: the click is the gesture a
@@ -19,6 +20,7 @@ import { type KaijuMove, type KaijuMoveId, type MatchTuning, type MoltPickEvent,
 import { glyphFor, keyLayoutVersion, type ActionState, type Bindings, type InputDevice } from '../game/input/actions';
 import { el, glyph, icon, setGlyph } from './icons';
 import { MOVE_ICON, slotAction } from './kaijuKit';
+import { label, moveLabel } from './labels';
 
 /** The buttons of the first, second and third card. */
 const CARD_KEYS = ['card1', 'card2', 'card3'] as const;
@@ -167,7 +169,7 @@ export class MoltCardPicker {
       const g = glyph(glyphFor(bindings, CARD_KEYS[i], device), 'molt-card-glyph');
       this.glyphs.push(g);
       const pic = el('div', 'molt-card-pic', [icon(move === 'none' ? 'k_molt' : MOVE_ICON[move as KaijuMove])]);
-      const card = el('div', 'molt-card', [pic, g]);
+      const card = el('div', 'molt-card', [pic, label(moveLabel(move), 'molt-card-label'), g]);
       card.dataset.move = move;
       card.dataset.card = String(i + 1);
       card.style.setProperty('--i', String(i));
@@ -211,7 +213,7 @@ export class MoltCardPicker {
     this.slot = slot;
     this.moves = [move];
     const pic = el('div', 'molt-card-pic', [icon(move === 'none' ? 'k_molt' : MOVE_ICON[move as KaijuMove])]);
-    const card = el('div', 'molt-card', [pic]);
+    const card = el('div', 'molt-card', [pic, label(moveLabel(move), 'molt-card-label')]);
     card.dataset.move = move;
     this.cards = [card];
     this.glyphs = [];

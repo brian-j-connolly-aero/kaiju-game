@@ -2,8 +2,9 @@
  * Throws on real ballistic arcs (docs/ROADMAP.md, round 4: "real trajectory physics, could angle
  * over buildings"; DESIGN.md section 4, "Throw"). One place for the physics, used by the
  * simulation (the kaiju's throw: sim/kaijuEffects.ts `throwEffect`), the bots (the monster bot
- * and the client's autopilot aim with `aimThrowAt`) and the trajectory preview on the monster
- * player's screen, so the arc drawn is the arc flown.
+ * and the client's autopilot aim with `aimThrowAt`), the monster player's crosshair (round 5:
+ * `aimThrowAtPoint`, the throw lands where the crosshair points and the arc is picked for it) and
+ * the trajectory preview on the monster player's screen, so the arc drawn is the arc flown.
  *
  * - Launch (`throwFlight`, `throwLaunch`): from the hand (HAND_FORWARD body radii ahead of the
  *   body's axis along the aim, at the stage's hand height), along the aim's heading, at the aim's
@@ -487,10 +488,14 @@ export type ThrowReach = 'on' | 'short' | 'blocked' | 'close';
 /** The answer of `aimThrowAtPoint`. */
 export interface PointThrowAim extends ThrowAim {
   reach: ThrowReach;
+  /** Where the aimed arc it picked comes down (or where its trace stops). */
+  x: number;
+  y: number;
+  z: number;
 }
 
 export function createPointThrowAim(): PointThrowAim {
-  return { yaw: 0, pitch: 0, high: false, time: 0, reach: 'on' };
+  return { yaw: 0, pitch: 0, high: false, time: 0, reach: 'on', x: 0, y: 0, z: 0 };
 }
 
 /** How far a structure target lets the arc land from the crosshair's point, in tolerances (on the same roof or wall). */
@@ -514,6 +519,18 @@ function tracePoint(city: CityQuery, flight: ThrowFlight, e: number, clearRubble
   pointSource.aimPitch = e - flight.lift;
   throwLaunch(pointSource, flight, pointLaunch);
   traceThrow(city, pointLaunch, clearRubble, pointTrace);
+}
+
+/** Copies the last `tracePoint` into the answer. */
+function takePoint(out: PointThrowAim, high: boolean, reach: ThrowReach): PointThrowAim {
+  out.pitch = pointSource.aimPitch;
+  out.high = high;
+  out.time = pointTrace.time;
+  out.x = pointTrace.x;
+  out.y = pointTrace.y;
+  out.z = pointTrace.z;
+  out.reach = reach;
+  return out;
 }
 
 /**
@@ -564,22 +581,15 @@ export function aimThrowAtPoint(
   const pz = src.z + Math.cos(yaw) * far;
   const dist = far - handOut;
   out.yaw = yaw;
-  out.high = false;
   const both = throwElevations(dist, ty - pointHand.y, flight.speed, flight.gravity);
   if (both !== null && both[0] < flight.minElevation - 1e-9) {
     // Too steep down for the hand (right under the snout): as steep as it goes.
     tracePoint(city, flight, flight.minElevation, clearRubble);
-    out.pitch = pointSource.aimPitch;
-    out.time = pointTrace.time;
-    out.reach = 'close';
-    return out;
+    return takePoint(out, false, 'close');
   }
   const inReach = both !== null && both[0] <= flight.maxElevation + 1e-9;
   if (inReach) {
-    let bestPitch = 0;
     let bestMiss = Infinity;
-    let bestHigh = false;
-    let bestTime = 0;
     for (let n = 0; n < 2; n++) {
       const i = preferHigh ? 1 - n : n;
       const e = both[i];
@@ -588,32 +598,16 @@ export function aimThrowAtPoint(
       const miss = pointTrace.end === 'none' ? Infinity : Math.hypot(pointTrace.x - px, pointTrace.z - pz);
       const there =
         miss <= tolerance || (structure >= 0 && pointTrace.end === 'structure' && pointTrace.structure === structure && miss <= tolerance * SAME_STRUCTURE_SLACK);
-      if (there) {
-        out.pitch = pointSource.aimPitch;
-        out.high = i === 1;
-        out.time = pointTrace.time;
-        out.reach = turned ? 'close' : 'on';
-        return out;
-      }
+      if (there) return takePoint(out, i === 1, turned ? 'close' : 'on');
+      // Blocked so far: keep the arc that comes down nearest the point.
       if (miss < bestMiss) {
         bestMiss = miss;
-        bestPitch = pointSource.aimPitch;
-        bestHigh = i === 1;
-        bestTime = pointTrace.time;
+        takePoint(out, i === 1, turned ? 'close' : 'blocked');
       }
     }
-    if (bestMiss < Infinity) {
-      out.pitch = bestPitch;
-      out.high = bestHigh;
-      out.time = bestTime;
-      out.reach = turned ? 'close' : 'blocked';
-      return out;
-    }
+    if (bestMiss < Infinity) return out;
   }
   // Beyond reach (or both arcs fly out of the city): as far as it goes along the heading.
   tracePoint(city, flight, Math.min(flight.maxElevation, farthestElevation(flight.speed, flight.gravity, pointHand.y - Math.max(0, ty))), clearRubble);
-  out.pitch = pointSource.aimPitch;
-  out.time = pointTrace.time;
-  out.reach = turned ? 'close' : inReach ? 'blocked' : 'short';
-  return out;
+  return takePoint(out, false, turned ? 'close' : inReach ? 'blocked' : 'short');
 }

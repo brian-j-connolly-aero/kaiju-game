@@ -8,7 +8,7 @@
  * cinematic one.
  */
 
-import { kaijuStageDef, unitTypeDef, weaponDef, type MatchEndEvent, type RoseMessage, type SimEvent, type SnapKaiju } from '@mb/shared';
+import { kaijuStageDef, SQUAD_RULES, unitTypeDef, weaponDef, type MatchEndEvent, type RoseMessage, type SimEvent, type SnapKaiju } from '@mb/shared';
 import type { AudioEngine } from '../audio/audioEngine';
 import { MatchAudio } from '../audio/matchAudio';
 import type { Autopilot } from '../game/autoplay';
@@ -317,12 +317,15 @@ export class MatchRuntime {
     const frame = this.frame;
     let inRange = true;
     if (human && frame?.localUnit) {
-      const range = weaponDef(unitTypeDef(frame.localUnit.type).weapon).range;
-      inRange = human.aimPoint.on !== 'none' && human.aimPoint.dist <= range;
+      // From the unit, where its shot really goes (not the camera's point): it gives out after
+      // the weapon's range times the slack (round 5).
+      const range = weaponDef(unitTypeDef(frame.localUnit.type).weapon).range * SQUAD_RULES.rangeSlack;
+      inRange = human.shotPoint.on !== 'none' && human.shotPoint.dist <= range;
     }
     return {
       aimOn: human ? human.aimPoint.on : 'none',
       inRange,
+      shotBlocked: !!human && human.shotBlocked,
       thirdPerson: this.controller.thirdPerson,
       recoil: human ? human.recoil : 0,
       mapOpen: this.mapOpen,
@@ -373,8 +376,10 @@ export class MatchRuntime {
     // still hears from this client. Buttons are read from the latch (`input.held`), which is
     // started again after every sample, so a click between two ticks is in exactly one of them.
     // A molt card picked during the intermission still goes out (it counts until the
-    // intermission ends: sim/moltCards.ts).
-    const ticks = this.ticker.advance(dt);
+    // intermission ends: sim/moltCards.ts). The ticks follow the real time since the last frame,
+    // not `dt` (which stops at a quarter second): after the page froze it sends every input it
+    // owes, so its inputs are not late at the server for the rest of the match (round 5).
+    const ticks = this.ticker.advanceTo(now, dt);
     for (let i = 0; i < ticks; i++) {
       const sample = controller.sample(ctx);
       input.sampleTaken();
@@ -400,6 +405,7 @@ export class MatchRuntime {
       seesKaiju: session.role.kind !== 'human' || controller.kind === 'drone',
       hint: frame.localKaiju ? session.hintFor(frame.localKaiju, now) : null,
       now,
+      kaijuAim: !cinematic && controller instanceof KaijuController ? controller.aim : null,
     };
     const t1 = performance.now();
     renderer.update(frame, dt, view);

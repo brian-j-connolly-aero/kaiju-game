@@ -50,8 +50,12 @@ export const CRATE_RULES = {
  * new one replaces the old. Squad-mates firing on their own keep their own weapons.
  *
  * - Machine gun: five times the rate of fire at a third of the damage, nerve and structure damage
- *   per shot (1.67 times as much over time), with a slight spread, a person's own shots included.
- *   In a volley every gun fires a burst of five pulls of tracers: 1.67 times a volley.
+ *   per shot (1.67 times as much over time). On Fire it streams (round 5: "could only shoot one
+ *   at a time"): one tracer every sixth of a second for as long as Fire is held, from the unit's
+ *   launchers or tanks in turn, each carrying its share of that rate, with a hair of spread for
+ *   the look (round 4's 1.5 degrees made most tracers miss the hatchling: weaker than no pick-up).
+ *   In a volley every gun fires a burst of five pulls of tracers at once, with the volley's own aim
+ *   and no spread: 1.67 times a volley.
  * - Big cannon: 2.5 times the reload for 3.5 times the damage, twice the nerve, and a wider splash.
  *   In a volley every gun fires one heavy shell: 3.5 times a volley's damage, twice its nerve.
  * - Missile pod: a salvo of 6 missiles that fan out and curve onto the aim point, each worth 0.6
@@ -68,10 +72,11 @@ export const PICKUP_WEAPONS: Readonly<Record<WeaponPickupId, PickupWeaponDef>> =
     structureMult: 1 / 3,
     splashMult: 0.3,
     salvo: 0,
-    spread: 1.5 * DEG,
+    spread: 0.3 * DEG,
     fan: 0,
     loft: 0,
     volleyPulls: 5,
+    stream: 1 / 6,
   },
   bigCannon: {
     id: 'bigCannon',
@@ -137,6 +142,7 @@ export function pickupWeaponDef(base: WeaponDef, pickup: PickupId): WeaponDef {
       spread: p.spread,
       fan: p.fan,
       loft: p.loft,
+      ...(p.stream ? { stream: p.stream } : {}),
     };
     derived.set(key, def);
   }

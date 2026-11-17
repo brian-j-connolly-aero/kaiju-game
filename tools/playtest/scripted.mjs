@@ -33,8 +33,8 @@
  *           (Q, 1 to 4, G, R, E) doing nothing, the map (the unit idles; nothing to place on
  *           it), the view toggle and the controls card. After that the player lets go and the
  *           match runs to its end; meanwhile, when another squad's charged volley lands on the
- *           kaiju, the volley meter must show its five-second ring. (On Port Meridian the
- *           practice bot kaiju molts within a minute of a fast match, and every molt redeploys the
+ *           kaiju with its nerve high, Team up must show by its nerve bar (round 5). (On Port
+ *           Meridian the practice bot kaiju molts within a minute of a fast match, and every molt redeploys the
  *           squads, which undid the human checks half way through: an idle kaiju keeps the
  *           match at stage 1.)
  *   weapons phase 2's city weapons and pick-ups, in the sandbox with real inputs (scriptedWeapons.mjs):
@@ -1067,6 +1067,13 @@ function installMeterLog() {
     window.__mbMeterLog.push(m.className);
     if (!window.__mbMeterSeen.includes(m.className)) window.__mbMeterSeen += ` ${m.className}`;
   }).observe(m, { attributes: true, attributeFilter: ['class'] });
+  // Round 5: the team-up window shows beside the monster's nerve bar while the button is up.
+  const w = document.querySelector('.boss-word');
+  if (w) {
+    new MutationObserver(() => {
+      if (w.classList.contains('w-team') && !window.__mbMeterSeen.includes('team-up')) window.__mbMeterSeen += ' team-up';
+    }).observe(w, { attributes: true, attributeFilter: ['class'] });
+  }
 }
 
 async function playHuman(origin, opts, errors) {
@@ -1308,16 +1315,19 @@ async function playHumanChecks(page, driver, report, opts, shot) {
       console.log(`  [human] hands off; waiting up to ${opts.finish} s for the match to end...`);
       let maxStage = 1;
       // Meanwhile: the other squads' charged volleys that hit the kaiju while this page's player
-      // drove a living unit of its own (the meter shows only then), for the countdown check below.
+      // drove a living unit of its own (the meter shows only then) and the monster's nerve was
+      // high enough for a pair to break it (round 5: team up shows only then: half of its 100,
+      // not staggered, not immune), for the team-up check below.
       const volleyShots = new Map();
       let seenEvents = driver.events.length;
       const ended = await driver.until((q) => {
         if (q.match) maxStage = Math.max(maxStage, q.match.stage);
         const driving = q.controller === 'human' && q.me?.alive && !q.mapOpen && q.match?.phase === 'playing';
+        const breakable = !!q.kaiju && q.kaiju.nerve >= 55 && q.kaiju.nerveImmune <= 0 && q.kaiju.phase !== 'stagger';
         for (; seenEvents < driver.events.length; seenEvents++) {
           const e = driver.events[seenEvents];
           if (e.type === 'projectileSpawn' && e.volley && e.owner === 'unit') volleyShots.set(e.id, Math.floor(e.ownerId / 4));
-          else if (e.type === 'projectileHit' && e.target === 'kaiju' && volleyShots.has(e.id) && volleyShots.get(e.id) !== ownSquad && driving) landedWhileDriving++;
+          else if (e.type === 'projectileHit' && e.target === 'kaiju' && volleyShots.has(e.id) && volleyShots.get(e.id) !== ownSquad && driving && breakable) landedWhileDriving++;
         }
         return q.matchesEnded >= 1 ? q : null;
       }, opts.finish * 1000, 1000);
@@ -1335,14 +1345,16 @@ async function playHumanChecks(page, driver, report, opts, shot) {
         else report.fail('the match ends', `matchEnd event ${end ? 'seen' : 'NOT seen'}; screen is "${screen}"`);
       }
     }
-    // --- two squads within five seconds: the countdown ring ------------------------------------------
+    // --- two squads within five seconds: team up -------------------------------------------------
     // Over the whole session the bot squads fire charged volleys at the kaiju. When another
-    // squad's lands, the meter round the crosshair counts this squad's five seconds down.
+    // squad's lands with the monster's nerve high, the page counts this squad's five seconds
+    // down: "Team up" by the nerve bar (button up), or the ring round the diamond (held).
     {
-      const sawRing = (await page.evaluate(() => window.__mbMeterSeen ?? '')).includes('countdown');
-      if (landedWhileDriving === 0) report.skip('countdown ring after another squad\'s volley', 'no other squad\'s charged volley hit the kaiju while this page drove a unit of its own');
-      else if (sawRing) report.pass('countdown ring after another squad\'s volley', `the server sent ${landedWhileDriving} hit(s) on the kaiju from other squads' charged volleys while this page drove its unit; the meter showed its five-second ring (client-side)`);
-      else report.fail('countdown ring after another squad\'s volley', `${landedWhileDriving} other-squad volley hit(s) on the kaiju while driving; the meter never showed its ring`);
+      const seen = await page.evaluate(() => window.__mbMeterSeen ?? '');
+      const sawTeam = seen.includes('team-up') || seen.includes('countdown');
+      if (landedWhileDriving === 0) report.skip('team up after another squad\'s volley', 'no other squad\'s charged volley hit the kaiju with its nerve high while this page drove a unit of its own');
+      else if (sawTeam) report.pass('team up after another squad\'s volley', `the server sent ${landedWhileDriving} hit(s) on the kaiju from other squads' charged volleys, its nerve high, while this page drove its unit; the page showed team up (client-side)`);
+      else report.fail('team up after another squad\'s volley', `${landedWhileDriving} other-squad volley hit(s) on the kaiju with its nerve high while driving; the page never showed team up`);
     }
     p = await driver.probe();
     report.final = { fps: p.fps, pageErrors: p.errors };

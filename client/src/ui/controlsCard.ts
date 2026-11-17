@@ -1,9 +1,11 @@
 /**
  * The controls card (H): what the player can do right now, as five big pictures at most, each
  * over the button that does it (docs/ROADMAP.md round 4: "five things at most per side, big
- * pictures"; DESIGN.md section 8: no words but names). The buttons are drawn in the glyphs of
- * the device in use (keycaps and mouse buttons, or the controller's). A ring around a glyph
- * means "hold it". In the header, small, the communication rose's key.
+ * pictures"), and since round 5 ("players were confused by just pictures") each with its label
+ * of one or two words between the picture and the button (ui/labels.ts, the same words as the
+ * buttons at the bottom of the screen). The buttons are drawn in the glyphs of the device in use
+ * (keycaps and mouse buttons, or the controller's). A ring around a glyph means "hold it". In the
+ * header, small, the communication rose's key ("Talk") and the card's own ("Close").
  *
  * Only what can be done now is shown, so the card changes as the match does (`CardState`, fed
  * by the match screen every frame):
@@ -30,6 +32,7 @@ import { pickupIcon } from '../assets/iconRaster';
 import { glyphFor, keyLayoutVersion, type Bindings, type ButtonAction, type Glyph, type InputDevice } from '../game/input/actions';
 import { el, glyph, icon } from './icons';
 import { grabIcon, MOVE_ICON, strikeIcon } from './kaijuKit';
+import { fireLabel, grabLabel, label, LABELS, moveLabel, strikeLabel, volleyLabel } from './labels';
 
 export type CardRole = 'kaiju' | 'squad';
 
@@ -47,10 +50,11 @@ export type CardPart =
   /** A picture of what happens. */
   | { kind: 'picture'; icon: string; tone?: CardTone };
 
-/** Big pictures over the buttons that do them. */
+/** Big pictures over the buttons that do them, with their label (one or two words) between. */
 export interface CardPair {
   pics: CardPart[];
   keys: CardPart[];
+  label: string;
 }
 
 export interface CardTile {
@@ -106,11 +110,11 @@ export function stateKey(s: CardState): string {
 
 const button = (action: ButtonAction, hold = false): CardPart => ({ kind: 'button', action, hold });
 const picture = (id: string, tone?: CardTone): CardPart => ({ kind: 'picture', icon: id, tone });
-const pair = (keys: CardPart[], pics: CardPart[]): CardPair => ({ keys, pics });
+const pair = (keys: CardPart[], pics: CardPart[], word: string): CardPair => ({ keys, pics, label: word });
 
 /** The communication rose: held, pick a wedge, let go to say it (small, in the card's header). */
 export function roseTile(): CardTile {
-  return { id: 'rose', pairs: [pair([button('rose', true)], [picture('ui_rose')])] };
+  return { id: 'rose', pairs: [pair([button('rose', true)], [picture('ui_rose')], LABELS.common.talk)] };
 }
 
 /** The monster's card for what it has now. */
@@ -122,10 +126,10 @@ export function kaijuTiles(kind: KaijuKindId, state: CardState = START_STATE): C
   // Something edible in the hand heals.
   if (grabIcon(held) === 'k_eat') grabPics.push(picture('st_health'));
   const tiles: CardTile[] = [
-    { id: 'walk', pairs: [pair([{ kind: 'move' }, { kind: 'look' }], [picture('lb_kaiju', 'kaiju')])] },
-    { id: 'strike', pairs: [pair([button('strike')], [picture(strikeIcon(held), 'kaiju')])] },
-    { id: 'grab', pairs: [pair([button('grab')], grabPics)] },
-    { id: 'stomp', pairs: [pair([button('stomp')], [picture('k_stomp', 'kaiju')])] },
+    { id: 'walk', pairs: [pair([{ kind: 'move' }, { kind: 'look' }], [picture('lb_kaiju', 'kaiju')], LABELS.kaiju.walk)] },
+    { id: 'strike', pairs: [pair([button('strike')], [picture(strikeIcon(held), 'kaiju')], strikeLabel(held))] },
+    { id: 'grab', pairs: [pair([button('grab')], grabPics, grabLabel(held))] },
+    { id: 'stomp', pairs: [pair([button('stomp')], [picture('k_stomp', 'kaiju')], LABELS.kaiju.stomp)] },
   ];
   // The moves the molts picked, each on its own button (the brace is held).
   const moves: CardPair[] = [];
@@ -133,22 +137,23 @@ export function kaijuTiles(kind: KaijuKindId, state: CardState = START_STATE): C
     if (move === 'none') return;
     const verb = kaijuMoveVerb(move);
     const hold = verb !== 'none' && def.actions[verb].whileHeld;
-    moves.push(pair([button(i === 0 ? 'move1' : 'move2', hold)], [picture(MOVE_ICON[move], 'kaiju')]));
+    moves.push(pair([button(i === 0 ? 'move1' : 'move2', hold)], [picture(MOVE_ICON[move], 'kaiju')], moveLabel(move)));
   });
   if (moves.length > 0) tiles.push({ id: 'moves', pairs: moves });
-  if (state.moltOffered) tiles.push({ id: 'molt', glow: true, pairs: [pair([button('molt')], [picture('k_molt', 'kaiju')])] });
+  if (state.moltOffered) tiles.push({ id: 'molt', glow: true, pairs: [pair([button('molt')], [picture('k_molt', 'kaiju')], LABELS.kaiju.molt)] });
   // Five at most: walking goes first.
   return tiles.length > MAX_TILES ? tiles.filter((t) => t.id !== 'walk') : tiles;
 }
 
 /** A squad leader's card for what it has now (or the news drone's, once the squad is gone). */
 export function squadTiles(state: CardState = START_STATE): CardTile[] {
-  const map: CardTile = { id: 'map', pairs: [pair([button('map')], [picture('st_map')])] };
+  const sq = LABELS.squad;
+  const map: CardTile = { id: 'map', pairs: [pair([button('map')], [picture('st_map')], sq.map)] };
   if (state.drone) {
     return [
-      { id: 'fly', pairs: [pair([{ kind: 'move' }, { kind: 'look' }], [picture('st_camera', 'human')])] },
-      { id: 'rise', pairs: [pair([button('rise')], [picture('ui_rise', 'human')])] },
-      { id: 'sink', pairs: [pair([button('sink')], [picture('ui_sink', 'human')])] },
+      { id: 'fly', pairs: [pair([{ kind: 'move' }, { kind: 'look' }], [picture('st_camera', 'human')], sq.fly)] },
+      { id: 'rise', pairs: [pair([button('rise')], [picture('ui_rise', 'human')], sq.up)] },
+      { id: 'sink', pairs: [pair([button('sink')], [picture('ui_sink', 'human')], sq.down)] },
       map,
     ];
   }
@@ -156,20 +161,20 @@ export function squadTiles(state: CardState = START_STATE): CardTile[] {
   const tiles: CardTile[] = [];
   if (state.stage === 1) {
     // On foot the keys move relative to the view.
-    tiles.push({ id: 'walk', pairs: [pair([{ kind: 'move' }, { kind: 'look' }], [picture('sq_foot', 'human')])] });
+    tiles.push({ id: 'walk', pairs: [pair([{ kind: 'move' }, { kind: 'look' }], [picture('sq_foot', 'human')], sq.walk)] });
   } else {
     // A tank: W and S drive, A and D turn the hull; the turret follows the mouse at its own pace.
     tiles.push(
-      { id: 'drive', pairs: [pair([{ kind: 'move' }], [picture('sq_drive', 'human'), picture('sq_turn', 'human')])] },
-      { id: 'turret', pairs: [pair([{ kind: 'look' }], [picture('sq_turret', 'human')])] },
+      { id: 'drive', pairs: [pair([{ kind: 'move' }], [picture('sq_drive', 'human'), picture('sq_turn', 'human')], sq.drive)] },
+      { id: 'turret', pairs: [pair([{ kind: 'look' }], [picture('sq_turret', 'human')], sq.turret)] },
     );
   }
   // Fire: the unit's own shot, or the crate's weapon while the squad has one.
-  tiles.push({ id: 'fire', pairs: [pair([button('fire')], [picture(weapon ?? 'st_reload', weapon ? 'volley' : 'human')])] });
+  tiles.push({ id: 'fire', pairs: [pair([button('fire')], [picture(weapon ?? 'st_reload', weapon ? 'volley' : 'human')], fireLabel(state.pickup))] });
   // Volley, held: the squad-mates plant and charge, let go and they all fire (the crate's weapon
   // too; with the artillery radio the volley calls a barrage).
   const volley = [picture('sq_charge', 'volley'), picture(state.barrages > 0 ? 'pk_artilleryradio' : (weapon ?? 'sq_burst'), 'volley')];
-  tiles.push({ id: 'volley', pairs: [pair([button('volley', true)], volley)] });
+  tiles.push({ id: 'volley', pairs: [pair([button('volley', true)], volley, volleyLabel(state.barrages))] });
   tiles.push(map);
   return tiles;
 }
@@ -300,7 +305,11 @@ export class ControlsCard {
 
     const tile = (t: CardTile, extra = ''): HTMLElement => {
       const pairs = t.pairs.map((p) =>
-        el('div', 'card-pair', [el('div', 'card-pics', p.pics.map((part) => this.part(part, bindings, device))), el('div', 'card-keys', p.keys.map((part) => this.part(part, bindings, device)))]),
+        el('div', 'card-pair', [
+          el('div', 'card-pics', p.pics.map((part) => this.part(part, bindings, device))),
+          label(p.label, 'card-label'),
+          el('div', 'card-keys', p.keys.map((part) => this.part(part, bindings, device))),
+        ]),
       );
       const node = el('div', `card-tile${t.glow ? ' glow' : ''}${extra}`, pairs);
       node.dataset.tile = t.id;
@@ -311,7 +320,7 @@ export class ControlsCard {
       icon(role === 'kaiju' ? 'lb_kaiju' : 'fac_army', `card-role ${tone}`),
       el('div', `card-name ${tone}`, [this.name]),
       tile(roseTile(), ' card-small'),
-      el('div', 'card-close', [glyph(glyphFor(bindings, 'controls', device), 'card-glyph'), icon('ui_controls')]),
+      el('div', 'card-close', [glyph(glyphFor(bindings, 'controls', device), 'card-glyph'), icon('ui_controls'), label(LABELS.common.close, 'card-label')]),
     ]);
     const tiles = cardTiles(role, kind, this.state).map((t) => tile(t));
     this.card.className = `controls-card role-${role}`;

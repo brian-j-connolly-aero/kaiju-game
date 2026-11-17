@@ -5,6 +5,9 @@
 #   host/mb.sh stop      stop everything
 #   host/mb.sh update    get the newest copy of the game (git), then start again
 #   host/mb.sh logs      show the most recent messages from the game and the tunnel
+#   host/mb.sh savelog   save everything the game and the tunnel wrote since they started into one
+#                        dated text file in logs/ in the game folder (stop and update save one
+#                        first too, because stopping throws the messages away)
 #   host/mb.sh link      print the links again
 #
 # Uses Podman if it works and has a compose program ("podman compose", or the separate
@@ -214,6 +217,74 @@ current_link() {
   if [ -n "$TOKEN" ]; then printf '%s' "$PUBLIC_URL"; else quick_link; fi
 }
 
+# ---- saving the log -------------------------------------------------------------------------
+service_log() {
+  # Everything one part wrote since it started, each line with its time. Older compose programs
+  # may not know the two options; then it asks again without them.
+  compose "$@" --no-color --timestamps 2>&1 || compose "$@" 2>&1
+}
+
+save_logs() {
+  # Writes everything the game and the tunnel wrote since they started, with a few facts about
+  # this computer, into one dated text file in logs/; prints its path. Fails when there is no
+  # game log (only a real one starts with the server's own first line).
+  local game dir file vm
+  game="$(service_log logs game)"
+  case "$game" in *"Monster Battle 9001 server on port"*) ;; *) return 1 ;; esac
+  dir="$ROOT/logs"
+  mkdir -p "$dir" || return 1
+  file="$dir/monster-battle-log_$(date +%Y-%m-%d_%H-%M-%S).txt"
+  if [ "$ENGINE" = podman ]; then
+    vm="$(podman info --format '{{.Host.CPUs}} processors, {{.Host.MemTotal}} bytes of memory' 2>&1)"
+  else
+    vm="$(docker info --format '{{.NCPU}} processors, {{.MemTotal}} bytes of memory' 2>&1)"
+  fi
+  {
+    say "Monster Battle 9001: the game's log, saved $(date '+%Y-%m-%d %H:%M:%S') (this computer's clock)"
+    say ""
+    say "---- This computer ----"
+    say "System: $(uname -srm 2>/dev/null)"
+    say "Processors: $(nproc 2>/dev/null || echo '?'), memory: $(awk '/MemTotal/ {printf "%.1f GB", $2 / 1048576}' /proc/meminfo 2>/dev/null)"
+    say "Container program: $ENGINE (${COMPOSE[*]})"
+    say "Where it runs: $vm"
+    say ""
+    say "---- Running now ----"
+    compose --profile named ps -a 2>&1
+    if command -v curl >/dev/null 2>&1; then
+      say "Health and timing: $(curl -fsS -m 3 "$LOCAL_URL/healthz" 2>&1)"
+    fi
+    say ""
+    say "---- The game ----"
+    say "$game"
+    say ""
+    say "---- The quick tunnel ----"
+    service_log logs tunnel
+    say ""
+    say "---- The named tunnel ----"
+    service_log --profile named logs named-tunnel
+  } > "$file" 2>&1 || return 1
+  printf '%s' "$file"
+}
+
+do_savelog() {
+  find_engine
+  say "Saving everything the game and the tunnel wrote since they started ..."
+  local file
+  file="$(save_logs)" || fail "There is nothing to save: the game is not running, or it was stopped (stopping throws its
+messages away; host/stop.sh saves them first, into logs/ in the game folder)."
+  say ""
+  say "=================================================================="
+  say "  THE GAME LOG IS SAVED"
+  say ""
+  say "  It is this file:"
+  say "      $file"
+  say ""
+  say "  Send it to whoever gave you the game, with who played which side."
+  say "  The game keeps running; saving again later saves everything again."
+  say "=================================================================="
+  say ""
+}
+
 # ---- actions --------------------------------------------------------------------------------
 do_start() {
   find_engine
@@ -249,12 +320,19 @@ If they mention the port, another program uses port $PORT: see docs/HOSTING.md."
 
 do_stop() {
   find_engine
+  # Stopping throws the game's messages away: keep them first.
+  local file
+  if file="$(save_logs)"; then say "Saved the game's log first: $file"; fi
   say "Stopping Monster Battle 9001 ..."
   compose --profile named down --remove-orphans || fail "Could not stop everything. The messages above say why."
   say "Stopped. Nothing is running any more."
 }
 
 do_update() {
+  # A newer game replaces the running one and its messages: keep them first.
+  find_engine
+  local file
+  if file="$(save_logs)"; then say "Saved the game's log first: $file"; fi
   if [ -d "$ROOT/.git" ] && command -v git >/dev/null 2>&1; then
     say "Getting the newest copy of the game ..."
     git -C "$ROOT" pull --ff-only || fail "Could not get the newest copy (git pull failed). The messages above say why."
@@ -282,6 +360,7 @@ case "${1:-start}" in
   stop)   do_stop ;;
   update) do_update ;;
   logs)   do_logs ;;
+  savelog) do_savelog ;;
   link)   do_link ;;
-  *) say "Usage: host/mb.sh start | stop | update | logs | link"; exit 2 ;;
+  *) say "Usage: host/mb.sh start | stop | update | logs | savelog | link"; exit 2 ;;
 esac

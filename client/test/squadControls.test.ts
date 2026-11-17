@@ -316,7 +316,7 @@ describe('the volley meter', () => {
     expect(shownCharge(mates([0, 0, 0], { rooted: false, laser: false }), 1, true, 0.2)).toBe(0);
   });
 
-  it('pictures each squad-mate: charging, following, unable to charge, gone', () => {
+  it('pictures each squad-mate: charging, following, stunned, gone (round 5 tells stunned from shaken)', () => {
     const units = [
       unit({ id: 4, squad: 1, driven: true }),
       unit({ id: 5, squad: 1, driven: false, rooted: true, laser: true, charge: 0.5 }),
@@ -324,7 +324,7 @@ describe('the volley meter', () => {
       unit({ id: 7, squad: 1, driven: false, stun: 1.2, stunned: true }),
       unit({ id: 8, squad: 2, driven: false, alive: false }),
     ];
-    expect(mateLooks(units, 1)).toEqual(['charging', 'ready', 'out']);
+    expect(mateLooks(units, 1)).toEqual(['charging', 'ready', 'stunned']);
     expect(mateLooks([...units.slice(0, 3), unit({ id: 7, squad: 1, driven: false, alive: false })], 1)).toEqual(['charging', 'ready', 'dead']);
   });
 

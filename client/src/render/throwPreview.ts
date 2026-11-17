@@ -1,25 +1,35 @@
 /**
- * The throw's trajectory preview (docs/ROADMAP.md, round 4: "a tube whose round cross-section
- * grows with distance, so the player reads at a glance where it can land"), on the monster
- * player's own screen only, whenever its hand holds something to throw.
+ * The monster's aim on its own screen (docs/ROADMAP.md, round 5: "the preview must be impossible
+ * to miss by day and by night: a bold landing marker, a bold arc, a clearly visible widening
+ * tube"), on the monster player's own screen only.
  *
- * Every frame it works out the throw the server would make with this aim (the predicted body and
- * the aim the client sends; the same physics, sim/throwArc.ts) and draws:
+ * Whenever its hand holds something to throw, every frame it works out the throw the server would
+ * make with this aim (the predicted body and the aim the client sends: the crosshair's throw,
+ * game/controllers/kaijuController.ts; the same physics, sim/throwArc.ts) and draws:
  *
- *   the arc     the aimed arc from the hand to where it meets the city: a bright line.
+ *   the arc     the aimed arc from the hand to where it meets the city: a thick ribbon with an
+ *               ink edge, marks running along it toward where it lands. Faint near the hand
+ *               (from behind the monster that part is all in front of the camera).
  *   the tube    round it, the throw's spread at each point of its flight (`spreadAt`): its
- *               outline as the camera sees it (two lines either side of the arc, as far out as
- *               the spread there) and a few of its round cross-sections, faint. Seen from behind
- *               the monster a solid tube would be a blot over everything; drawn as an outline it
- *               reads as a tube widening toward where it lands, and what it passes over stays in
- *               view.
- *   the ring    where it can come down: the spread's ellipse on the ground or a roof (round for a
- *               lob, long for a flat throw; `landingSpread`), or its circle on a wall, with a
- *               faint fill and a dot where the aimed arc lands.
+ *               outline as the camera sees it, widening toward where it lands (third person); in
+ *               first person, where the outline would read as goalposts, two rings across it near
+ *               the end instead.
+ *   landing     the blast's disc, filled, with a bold rim; the spread's ellipse round it, dashed
+ *               (round for a lob, long for a flat throw; `landingSpread`), or its circle on a wall;
+ *               a dot where the aimed arc lands; four brackets facing the camera round it, never
+ *               under 34 pixels out (so a titan's throw 700 m away still reads); and a post of
+ *               light standing up from it, seen over the roofs.
  *
- * Every line is a warm yellow with a dark edge, so it reads on a bright street or sky by day and
- * on the dark city at night; where a building stands in front of it, it shows through, fainter.
- * Nothing of it is the humans' cyan.
+ * Every width is in pixels on a 720-line screen, so it reads the same at every stage. A deep
+ * orange with a near-black ink edge reads on a bright street or sky by day and on the dark city
+ * at night; where a building stands in front of it, it shows through, fainter. When the throw
+ * cannot get to the crosshair's point (`ThrowAimView.reach`: too far, blocked, too close) it all
+ * turns red, and the screen says why in a word or two (ui/kaijuSight.ts). Nothing of it is the
+ * humans' cyan.
+ *
+ * In a charge's wind-up and run it also draws the charge's lane on the ground, as wide as the body
+ * and as long as the run, and outlines in red the first building in it too tall to smash (the
+ * controller finds it; the word 'Too tall' is the HUD's).
  */
 
 import * as THREE from 'three';
@@ -28,8 +38,10 @@ import {
   createThrowFlight,
   createThrowLaunch,
   createThrowTrace,
+  kaijuKindDef,
   kaijuStageDef,
   landingSpread,
+  perStage,
   spreadAt,
   strikeVerb,
   throwClearance,
@@ -38,15 +50,74 @@ import {
   traceThrow,
   type CityQuery,
   type SnapKaiju,
+  type ThrowReach,
 } from '@mb/shared';
+import type { AimWord } from '../ui/labels';
 
-/** Points along the arc's line, cross-section circles along it, and segments round each circle and the landing ring. */
+/** What the crosshair is on for a throw, and what the throw does there (the controller's `aim.throw`). */
+export interface ThrowAimView {
+  /** Where the crosshair points: the ground, a roof or wall, a unit (its feet), or nothing (the sky). */
+  on: 'ground' | 'structure' | 'unit' | 'none';
+  /** The crosshair's point (on the sky: the point far out along the view the throw was aimed at). */
+  x: number;
+  y: number;
+  z: number;
+  /** Whether the throw gets there ('on'), and if not why (sim/throwArc.ts `ThrowReach`). */
+  reach: ThrowReach;
+  /** The game picked the lob. */
+  high: boolean;
+  /** Where the picked arc comes down. */
+  landX: number;
+  landY: number;
+  landZ: number;
+}
+
+/** A charge's lane ahead of the monster, in its wind-up and run (the controller's `aim.lane`). */
+export interface ChargeLaneView {
+  /** The body when it was worked out, and its heading. */
+  x: number;
+  z: number;
+  yaw: number;
+  /** Half the lane's width (the body's radius). */
+  half: number;
+  /** How far the run goes along it (to the run's end, or to where something stops it). */
+  length: number;
+  /** The first building in it too tall to smash, or -1. */
+  blocker: number;
+}
+
+/** The one- or two-word labels the monster's screen shows beside what cannot be reached (ui/labels.ts). */
+export type { AimWord };
+
+/** Something the monster aims at that it cannot reach: the word, and the point it goes under. */
+export interface AimWarning {
+  word: AimWord;
+  x: number;
+  y: number;
+  z: number;
+  /** What the crosshair is on cannot be reached (a throw, the beam): the crosshair says so too. */
+  crosshair: boolean;
+}
+
+/** The local monster's aim as its controller has it this frame (`RenderView.kaijuAim`). */
+export interface KaijuAimView {
+  /** Where the view looks (the head carries the first-person camera and follows it). */
+  yaw: number;
+  pitch: number;
+  /** A throw aimed with the crosshair, or null (nothing to throw, or the autopilot aims). */
+  throw: ThrowAimView | null;
+  /** A charge's lane, or null. */
+  lane: ChargeLaneView | null;
+  /** What cannot be reached right now, or null. */
+  warning: AimWarning | null;
+}
+
+/** Points along the arc, segments round a ring across the tube, round the landing marks. */
 const ARC_POINTS = 48;
-const CIRCLES = 2;
-const CIRCLE_SIDES = 24;
+const CIRCLE_SIDES = 28;
 const ROUND = 64;
-/** Line pieces the batch holds: the arc, its two outline edges, the circles, the landing ring; each drawn twice (edge and core). */
-const CAPACITY = 2 * (ARC_POINTS * 3 + CIRCLES * CIRCLE_SIDES + ROUND);
+/** Ribbon pieces the batch holds: everything above, each drawn twice (ink and core), with room to spare. */
+const CAPACITY = 1400;
 
 const VERTEX = /* glsl */ `
 attribute vec3 iStart;
@@ -65,6 +136,9 @@ void main() {
   float len = length(side);
   side = len > 0.00001 ? side / len : vec3(1.0, 0.0, 0.0);
   p += side * (position.x * iWidth);
+  // Half a width past each end, so the pieces of a curve join without gaps.
+  float dl = length(dir);
+  if (dl > 0.00001) p += dir / dl * (position.y * iWidth);
   gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
 }
 `;
@@ -75,7 +149,7 @@ varying vec2 vUv;
 varying vec4 vColor;
 void main() {
   float across = 1.0 - abs(vUv.x * 2.0 - 1.0);
-  float soft = smoothstep(0.0, 0.35, across);
+  float soft = smoothstep(0.0, 0.12, across);
   gl_FragColor = vec4(vColor.rgb, vColor.a * soft * uOpacity);
   #include <colorspace_fragment>
 }
@@ -120,7 +194,11 @@ class Ribbons {
     this.count = 0;
   }
 
-  push(a: THREE.Vector3, b: THREE.Vector3, width: number, r: number, g: number, bl: number, alpha: number): void {
+  get size(): number {
+    return this.count;
+  }
+
+  push(a: THREE.Vector3, b: THREE.Vector3, width: number, c: THREE.Color, alpha: number): void {
     if (this.count >= CAPACITY) return;
     const d = this.data;
     const o = this.count * FLOATS;
@@ -131,9 +209,9 @@ class Ribbons {
     d[o + 4] = b.y;
     d[o + 5] = b.z;
     d[o + 6] = width;
-    d[o + 7] = r;
-    d[o + 8] = g;
-    d[o + 9] = bl;
+    d[o + 7] = c.r;
+    d[o + 8] = c.g;
+    d[o + 9] = c.b;
     d[o + 10] = alpha;
     this.count++;
   }
@@ -146,10 +224,18 @@ class Ribbons {
   }
 }
 
-/** The core's color and the dark edge under it (linear). */
-const CORE = new THREE.Color(1.0, 0.72, 0.12);
-const EDGE = new THREE.Color(0.16, 0.07, 0.0);
-const FILL = new THREE.Color(1.0, 0.75, 0.25);
+/** Colors (linear): a deep orange with a pale highlight; red with a pink one when it cannot get there; the ink under everything. */
+const GOLD = new THREE.Color(1.0, 0.42, 0.015);
+const GOLD_HI = new THREE.Color(1.0, 0.86, 0.45);
+const RED = new THREE.Color(1.0, 0.05, 0.03);
+const RED_HI = new THREE.Color(1.0, 0.55, 0.45);
+const INK = new THREE.Color(0.012, 0.006, 0.0);
+const INK_ALPHA = 0.92;
+/** The landing disc's fill, and the spread's. */
+const DISC_FILL = 0.38;
+const SPREAD_FILL = 0.12;
+/** Opacity of the pass drawn through whatever stands in front. */
+const THROUGH = 0.38;
 
 const tangent = new THREE.Vector3();
 const across = new THREE.Vector3();
@@ -162,6 +248,8 @@ const p0 = new THREE.Vector3();
 const p1 = new THREE.Vector3();
 const q0 = new THREE.Vector3();
 const q1 = new THREE.Vector3();
+const ringCenter = new THREE.Vector3();
+const mark = new THREE.Color();
 
 /** The point of the traced arc at time `t` (straight between ticks: a tick is a thirtieth of a second). */
 function pointAt(points: Float64Array, count: number, t: number, out: THREE.Vector3): THREE.Vector3 {
@@ -184,45 +272,52 @@ function pointAt(points: Float64Array, count: number, t: number, out: THREE.Vect
   );
 }
 
+/** A filled fan of ROUND triangles about a middle point (the landing disc, the spread's fill). */
+function fanGeometry(): THREE.BufferGeometry {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array((ROUND + 2) * 3), 3).setUsage(THREE.DynamicDrawUsage));
+  const index: number[] = [];
+  for (let i = 0; i < ROUND; i++) index.push(0, i + 1, i + 2);
+  g.setIndex(index);
+  return g;
+}
+
 export class ThrowPreview {
   readonly group = new THREE.Group();
   private readonly lines = new Ribbons();
-  private readonly fill: THREE.Mesh;
-  private readonly fillGeometry = new THREE.BufferGeometry();
-  private readonly dot: THREE.Mesh;
-  private readonly dotGeometry = new THREE.BufferGeometry();
+  private readonly discGeometry = fanGeometry();
+  private readonly spreadGeometry = fanGeometry();
+  private readonly disc: THREE.Mesh;
+  private readonly spreadFill: THREE.Mesh;
+  private readonly discMat: THREE.MeshBasicMaterial;
+  private readonly spreadMat: THREE.MeshBasicMaterial;
   private readonly materials: THREE.Material[] = [];
   private readonly flight = createThrowFlight();
   private readonly launch = createThrowLaunch();
   /** The aimed arc as last traced (scripts read where it ends). */
   readonly trace = createThrowTrace();
   private readonly spread = createLandingSpread();
-  /** Meters per pixel at one meter from the camera (set from the camera each frame). */
+  /** Meters per pixel at one meter from the camera, on a 720-line screen (set from the camera each frame). */
   private pixel = 0.0016;
   private readonly camera = new THREE.Vector3();
+  /** Whether the throw's landing marks were drawn this frame (scripts and tests). */
+  shown = false;
 
   constructor() {
-    // The lines: once where nothing stands in front of them, and once more, faint, through whatever does.
-    const shown = this.lines.material(1, true);
-    const behind = this.lines.material(0.28, false);
-    const front = new THREE.Mesh(this.lines.geometry, shown);
-    const through = new THREE.Mesh(this.lines.geometry, behind);
+    // The ribbons: once where nothing stands in front of them, and once more, fainter, through whatever does.
+    const front = new THREE.Mesh(this.lines.geometry, this.lines.material(1, true));
+    const through = new THREE.Mesh(this.lines.geometry, this.lines.material(THROUGH, false));
     front.renderOrder = 23;
     through.renderOrder = 22;
-    // The landing ring's faint fill and the dot where the aimed arc lands.
-    this.fillGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array((ROUND + 2) * 3), 3).setUsage(THREE.DynamicDrawUsage));
-    const fillIndex: number[] = [];
-    for (let i = 0; i < ROUND; i++) fillIndex.push(0, i + 1, i + 2);
-    this.fillGeometry.setIndex(fillIndex);
-    this.dotGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array((ROUND + 2) * 3), 3).setUsage(THREE.DynamicDrawUsage));
-    this.dotGeometry.setIndex(fillIndex);
     const flat = (opacity: number): THREE.MeshBasicMaterial =>
-      new THREE.MeshBasicMaterial({ color: FILL, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
-    this.fill = new THREE.Mesh(this.fillGeometry, flat(0.2));
-    this.dot = new THREE.Mesh(this.dotGeometry, flat(0.9));
-    this.fill.renderOrder = 21;
-    this.dot.renderOrder = 24;
-    for (const m of [front, through, this.fill, this.dot]) {
+      new THREE.MeshBasicMaterial({ color: GOLD, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+    this.discMat = flat(DISC_FILL);
+    this.spreadMat = flat(SPREAD_FILL);
+    this.disc = new THREE.Mesh(this.discGeometry, this.discMat);
+    this.spreadFill = new THREE.Mesh(this.spreadGeometry, this.spreadMat);
+    this.disc.renderOrder = 21;
+    this.spreadFill.renderOrder = 20;
+    for (const m of [front, through, this.disc, this.spreadFill]) {
       m.frustumCulled = false;
       this.materials.push(m.material as THREE.Material);
       this.group.add(m);
@@ -233,14 +328,18 @@ export class ThrowPreview {
   /**
    * Draws the preview for the local kaiju `k` (predicted, its aim the one being sent), or hides
    * it: nothing to throw in the hand (or a sign, which is swung), swimming, helpless, or no city.
-   * `firstPerson`: the camera is in the head (the arc starts a little out from the hand).
-   * `night`: 0 by day to 1 at night.
+   * `firstPerson`: the camera is in the head. `aim`: the controller's aim this frame (the throw's
+   * reach turns it red; a charge's lane), or null. `now`: seconds, for the marks running along
+   * the arc. The same colors serve by day and at night: the ink edge reads on both.
    */
-  update(k: SnapKaiju | null, city: CityQuery | null, camera: THREE.PerspectiveCamera, firstPerson: boolean, night: number): void {
-    const show =
-      k !== null &&
-      city !== null &&
-      k.alive &&
+  update(k: SnapKaiju | null, city: CityQuery | null, camera: THREE.PerspectiveCamera, firstPerson: boolean, aim: KaijuAimView | null, now: number): void {
+    this.shown = false;
+    this.group.visible = false;
+    if (!k || !city || !k.alive) return;
+    this.camera.copy(camera.position);
+    this.pixel = (2 * Math.tan((camera.fov * Math.PI) / 360)) / 720;
+    this.lines.begin();
+    const throwing =
       k.held !== null &&
       strikeVerb(k.held) === 'throw' &&
       k.submerge <= 0 &&
@@ -248,79 +347,88 @@ export class ThrowPreview {
       k.phase !== 'stagger' &&
       k.phase !== 'dead' &&
       !(k.action === 'throw' && k.phase !== 'windup' && k.phase !== 'idle');
-    this.group.visible = show;
-    if (!show || !k || !city || !k.held) return;
-    const st = kaijuStageDef(k.kind, k.stage);
-    throwFlight(k.kind, k.stage, k.held, this.flight);
-    const launch = throwLaunch(k, this.flight, this.launch);
-    const trace = traceThrow(city, launch, throwClearance(k), this.trace);
-    if (trace.count < 2) {
-      this.group.visible = false;
-      return;
+    this.disc.visible = false;
+    this.spreadFill.visible = false;
+    if (throwing && k.held) {
+      const st = kaijuStageDef(k.kind, k.stage);
+      throwFlight(k.kind, k.stage, k.held, this.flight);
+      const launch = throwLaunch(k, this.flight, this.launch);
+      const trace = traceThrow(city, launch, throwClearance(k), this.trace);
+      if (trace.count >= 2) {
+        const bad = aim?.throw ? aim.throw.reach !== 'on' : false;
+        const core = bad ? RED : GOLD;
+        const hi = bad ? RED_HI : GOLD_HI;
+        this.drawArc(st.height, firstPerson, core, hi, now);
+        this.drawLanding(st.height, perStage(kaijuKindDef(k.kind).actions.throw.impactRadius, k.stage), core, hi);
+        this.shown = true;
+      }
     }
-    this.camera.copy(camera.position);
-    this.pixel = (2 * Math.tan((camera.fov * Math.PI) / 360)) / 720;
-    // A touch heavier by day, when the city behind it is bright.
-    const day = 1 - Math.max(0, Math.min(1, night));
-    this.lines.begin();
-    this.drawTube(launch.gravity, st.height, trace.time, firstPerson, day);
-    this.drawRing(st.height, st.bodyRadius, day);
+    if (aim?.lane && k.action === 'charge') this.drawLane(k, aim.lane, city);
     this.lines.end();
+    this.group.visible = this.lines.size > 0;
   }
 
-  /** Width on screen in pixels, as meters at point `p` (never thinner than `least`). */
-  private width(p: THREE.Vector3, pixels: number, least: number): number {
-    return Math.max(least, p.distanceTo(this.camera) * this.pixel * pixels);
+  /** Width on screen in pixels (720 lines), as meters at point `p`. */
+  private width(p: THREE.Vector3, pixels: number): number {
+    return p.distanceTo(this.camera) * this.pixel * pixels;
   }
 
-  /** One line piece: its dark edge, then its bright core. */
-  private piece(a: THREE.Vector3, b: THREE.Vector3, pixels: number, least: number, alpha: number, day: number): void {
-    const w = this.width(a, pixels, least);
-    this.lines.push(a, b, w * 2.1, EDGE.r, EDGE.g, EDGE.b, alpha * (0.35 + 0.3 * day));
-    this.lines.push(a, b, w, CORE.r, CORE.g, CORE.b, alpha);
+  /** A line piece: a dark ink edge (`ink` pixels wider) under a colored core `pixels` wide. */
+  private inked(a: THREE.Vector3, b: THREE.Vector3, pixels: number, ink: number, c: THREE.Color, alpha: number): void {
+    const w = this.width(a, pixels);
+    this.lines.push(a, b, w + this.width(a, ink), INK, alpha * INK_ALPHA);
+    this.lines.push(a, b, w, c, alpha);
   }
 
-  private drawTube(gravity: number, height: number, time: number, firstPerson: boolean, day: number): void {
+  private drawArc(height: number, firstPerson: boolean, core: THREE.Color, hi: THREE.Color, now: number): void {
     const trace = this.trace;
     const launch = this.launch;
-    const least = Math.max(0.02, height * 0.004);
+    const time = trace.time;
+    const g = launch.gravity;
     // In first person the hand is right under the camera: the line starts a little way out.
     const start = firstPerson ? Math.min(0.25, 0.12 + (height * 0.02) / Math.max(1, launch.speed)) : 0.02;
-    // The aimed arc.
+    // The arc: a thick ribbon, marks running along it toward where it lands.
     for (let i = 0; i < ARC_POINTS - 1; i++) {
       const u0 = i / (ARC_POINTS - 1);
       const u1 = (i + 1) / (ARC_POINTS - 1);
       if (u1 < start) continue;
       pointAt(trace.points, trace.count, time * Math.max(u0, start), p0);
       pointAt(trace.points, trace.count, time * u1, p1);
-      const fade = Math.min(1, (u0 - start) / 0.1 + 0.25);
-      this.piece(p0, p1, 3.5, least, fade, day);
+      const run = u0 * 9 - now * 1.2;
+      mark.copy(run - Math.floor(run) < 0.4 ? hi : core);
+      // Faint near the hand, full from 30% of the flight on.
+      const fade = Math.min(1, Math.max(0.15, (u0 - start) / 0.3));
+      this.inked(p0, p1, 8, 6, mark, fade);
     }
-    // The tube's outline as the camera sees it: its two edges, either side of the arc square to
-    // the line of sight (from behind the monster, a funnel opening toward where it lands).
-    for (let i = 0; i < ARC_POINTS - 1; i++) {
-      const u0 = i / (ARC_POINTS - 1);
-      const u1 = (i + 1) / (ARC_POINTS - 1);
-      if (u0 < start) continue;
-      for (const sign of [-1, 1]) {
-        this.edgeAt(gravity, time * u0, sign, q0);
-        this.edgeAt(gravity, time * u1, sign, q1);
-        this.piece(q0, q1, 1.8, least, 0.55, day);
+    if (!firstPerson) {
+      // The tube's outline as the camera sees it: its two edges, either side of the arc square to
+      // the line of sight (from behind the monster, a funnel opening toward where it lands).
+      for (let i = 0; i < ARC_POINTS - 1; i++) {
+        const u0 = i / (ARC_POINTS - 1);
+        const u1 = (i + 1) / (ARC_POINTS - 1);
+        if (u0 < Math.max(start, 0.25)) continue;
+        for (const sign of [-1, 1]) {
+          this.edgeAt(g, time * u0, sign, q0);
+          this.edgeAt(g, time * u1, sign, q1);
+          this.inked(q0, q1, 3, 4, core, Math.min(0.85, (u0 - 0.25) / 0.25));
+        }
       }
+    } else {
+      // From inside the head the outline reads as goalposts: two thin rings across the tube near
+      // the end instead (bolder, they would frame the target like a gunsight and hide it).
+      for (const u of [0.8, 0.92]) this.ringAcross(g, time * u, core);
     }
-    // A few of its round cross-sections, faint (where it lands, the ring shows it).
-    for (let c = 1; c <= CIRCLES; c++) {
-      const u = c / (CIRCLES + 1);
-      if (u < start + 0.1) continue;
-      const t = time * u;
-      this.frameAt(gravity, t);
-      pointAt(trace.points, trace.count, t, p0);
-      const r = Math.max(least, spreadAt(launch, t));
-      for (let j = 0; j < CIRCLE_SIDES; j++) {
-        this.onCircle(p0, r, j / CIRCLE_SIDES, q0);
-        this.onCircle(p0, r, (j + 1) / CIRCLE_SIDES, q1);
-        this.piece(q0, q1, 1.2, least, 0.2 + 0.25 * u, day);
-      }
+  }
+
+  /** A ring across the tube at time `t` (its spread there). */
+  private ringAcross(gravity: number, t: number, c: THREE.Color): void {
+    this.frameAt(gravity, t);
+    const center = pointAt(this.trace.points, this.trace.count, t, ringCenter);
+    const r = spreadAt(this.launch, t);
+    for (let j = 0; j < CIRCLE_SIDES; j++) {
+      this.onCircle(center, r, j / CIRCLE_SIDES, q0);
+      this.onCircle(center, r, (j + 1) / CIRCLE_SIDES, q1);
+      this.inked(q0, q1, 3, 3, c, 0.5);
     }
   }
 
@@ -355,16 +463,16 @@ export class ThrowPreview {
     return out.set(center.x + across.x * c + upward.x * s, center.y + across.y * c + upward.y * s, center.z + across.z * c + upward.z * s);
   }
 
-  private drawRing(height: number, bodyRadius: number, day: number): void {
+  /** Where it lands: the blast's disc with a bold rim, the spread's ellipse dashed, a dot, brackets and a post of light. */
+  private drawLanding(height: number, impact: number, core: THREE.Color, hi: THREE.Color): void {
     const trace = this.trace;
     const spread = landingSpread(this.launch, trace, this.spread);
-    const least = bodyRadius * 0.35;
-    let along = Math.max(least, spread.along);
-    const side = Math.max(least, spread.across);
     // The plane it is drawn in: the ground or a roof, along the flight; a wall, square to it.
     normal.set(trace.nx, trace.ny, trace.nz);
     if (normal.lengthSq() < 1e-8) normal.set(0, 1, 0);
     normal.normalize();
+    let along = spread.along;
+    const side = spread.across;
     if (normal.y > 0.5) {
       axisA.set(spread.dirX, 0, spread.dirZ);
       axisB.set(spread.dirZ, 0, -spread.dirX);
@@ -374,46 +482,155 @@ export class ThrowPreview {
       along = side;
     }
     const lift = Math.max(0.05, height * 0.008);
-    const cx = trace.x + normal.x * lift;
-    const cy = Math.max(lift, trace.y + normal.y * lift);
-    const cz = trace.z + normal.z * lift;
-    const fill = (this.fillGeometry.getAttribute('position') as THREE.BufferAttribute).array as Float32Array;
-    const dot = (this.dotGeometry.getAttribute('position') as THREE.BufferAttribute).array as Float32Array;
-    const center = p0.set(cx, cy, cz);
-    const dotR = Math.max(this.width(center, 7, lift * 2), Math.min(along, side) * 0.07);
-    fill[0] = cx;
-    fill[1] = cy;
-    fill[2] = cz;
-    dot[0] = cx;
-    dot[1] = cy;
-    dot[2] = cz;
+    const center = p0.set(trace.x + normal.x * lift, Math.max(lift, trace.y + normal.y * lift), trace.z + normal.z * lift);
+    const cx = center.x;
+    const cy = center.y;
+    const cz = center.z;
+    // The blast, never smaller on screen than 22 pixels in radius; the spread never smaller than it.
+    const blast = Math.max(impact, this.width(center, 22));
+    const sAlong = Math.max(along, blast);
+    const sSide = Math.max(side, blast);
+    const disc = (this.discGeometry.getAttribute('position') as THREE.BufferAttribute).array as Float32Array;
+    const fill = (this.spreadGeometry.getAttribute('position') as THREE.BufferAttribute).array as Float32Array;
+    disc[0] = fill[0] = cx;
+    disc[1] = fill[1] = cy;
+    disc[2] = fill[2] = cz;
     for (let i = 0; i <= ROUND; i++) {
       const a = (i / ROUND) * Math.PI * 2;
       const c = Math.cos(a);
       const s = Math.sin(a);
-      const ox = axisA.x * c * along + axisB.x * s * side;
-      const oy = axisA.y * c * along + axisB.y * s * side;
-      const oz = axisA.z * c * along + axisB.z * s * side;
       const f = (i + 1) * 3;
-      fill[f] = cx + ox;
-      fill[f + 1] = cy + oy;
-      fill[f + 2] = cz + oz;
-      dot[f] = cx + (axisA.x * c + axisB.x * s) * dotR;
-      dot[f + 1] = cy + (axisA.y * c + axisB.y * s) * dotR;
-      dot[f + 2] = cz + (axisA.z * c + axisB.z * s) * dotR;
-      if (i > 0) {
+      disc[f] = cx + (axisA.x * c + axisB.x * s) * blast;
+      disc[f + 1] = cy + (axisA.y * c + axisB.y * s) * blast;
+      disc[f + 2] = cz + (axisA.z * c + axisB.z * s) * blast;
+      fill[f] = cx + axisA.x * c * sAlong + axisB.x * s * sSide;
+      fill[f + 1] = cy + axisA.y * c * sAlong + axisB.y * s * sSide;
+      fill[f + 2] = cz + axisA.z * c * sAlong + axisB.z * s * sSide;
+      if (i === 0) continue;
+      // The blast's rim: bold.
+      q0.set(disc[f - 3], disc[f - 2], disc[f - 1]);
+      q1.set(disc[f], disc[f + 1], disc[f + 2]);
+      this.inked(q0, q1, 7, 6, core, 1);
+      // The spread's ellipse: dashed, two pieces drawn of every four.
+      if (i % 4 < 2) {
         q0.set(fill[f - 3], fill[f - 2], fill[f - 1]);
         q1.set(fill[f], fill[f + 1], fill[f + 2]);
-        this.piece(q0, q1, 6, lift, 1, day);
+        this.inked(q0, q1, 4, 5, hi, 0.95);
       }
     }
-    for (const g of [this.fillGeometry, this.dotGeometry]) (g.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+    // The dot where the aimed arc lands.
+    const dotR = this.width(center, 5);
+    for (let j = 0; j < 12; j++) {
+      const a0 = (j / 12) * Math.PI * 2;
+      const a1 = ((j + 1) / 12) * Math.PI * 2;
+      q0.set(cx + (axisA.x * Math.cos(a0) + axisB.x * Math.sin(a0)) * dotR, cy + (axisA.y * Math.cos(a0) + axisB.y * Math.sin(a0)) * dotR, cz + (axisA.z * Math.cos(a0) + axisB.z * Math.sin(a0)) * dotR);
+      q1.set(cx + (axisA.x * Math.cos(a1) + axisB.x * Math.sin(a1)) * dotR, cy + (axisA.y * Math.cos(a1) + axisB.y * Math.sin(a1)) * dotR, cz + (axisA.z * Math.cos(a1) + axisB.z * Math.sin(a1)) * dotR);
+      this.inked(q0, q1, 6, 4, hi, 1);
+    }
+    // Four brackets facing the camera round where it lands, 34 pixels out at least: seen at any distance.
+    upward.subVectors(this.camera, center).normalize();
+    across.crossVectors(upward, UP);
+    if (across.lengthSq() < 1e-8) across.set(1, 0, 0);
+    across.normalize();
+    tangent.crossVectors(across, upward).normalize();
+    const rr = Math.max(this.width(center, 34), blast * 1.25);
+    for (let b = 0; b < 4; b++) {
+      const mid = Math.PI / 4 + (b * Math.PI) / 2;
+      for (let j = -2; j < 2; j++) {
+        const a0 = mid + j * 0.16;
+        const a1 = mid + (j + 1) * 0.16;
+        q0.set(cx + (across.x * Math.cos(a0) + tangent.x * Math.sin(a0)) * rr, cy + (across.y * Math.cos(a0) + tangent.y * Math.sin(a0)) * rr, cz + (across.z * Math.cos(a0) + tangent.z * Math.sin(a0)) * rr);
+        q1.set(cx + (across.x * Math.cos(a1) + tangent.x * Math.sin(a1)) * rr, cy + (across.y * Math.cos(a1) + tangent.y * Math.sin(a1)) * rr, cz + (across.z * Math.cos(a1) + tangent.z * Math.sin(a1)) * rr);
+        this.inked(q0, q1, 6, 5, hi, 1);
+      }
+    }
+    // A post of light standing up from where it lands (seen over roofs and from far off), fading to the top.
+    const top = height * 1.6;
+    for (let i = 0; i < 8; i++) {
+      q0.set(cx, cy + (top * i) / 8, cz);
+      q1.set(cx, cy + (top * (i + 1)) / 8, cz);
+      this.inked(q0, q1, 5, 4, core, 1 - i / 9);
+    }
+    this.discMat.color.copy(core);
+    this.spreadMat.color.copy(core);
+    this.disc.visible = true;
+    this.spreadFill.visible = true;
+    for (const g of [this.discGeometry, this.spreadGeometry]) (g.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+  }
+
+  /**
+   * A charge's lane on the ground, from the body (as predicted now) to where the run ends: its two
+   * edges and chevrons pointing along it; red at its end, with the building that stops it
+   * outlined, when one does.
+   */
+  private drawLane(k: SnapKaiju, lane: ChargeLaneView, city: CityQuery): void {
+    const height = kaijuStageDef(k.kind, k.stage).height;
+    const dx = Math.sin(lane.yaw);
+    const dz = Math.cos(lane.yaw);
+    // The end stays where the controller found it; the start rides the body as drawn.
+    const ex = lane.x + dx * lane.length;
+    const ez = lane.z + dz * lane.length;
+    const startAlong = (k.x - lane.x) * dx + (k.z - lane.z) * dz + lane.half;
+    const length = lane.length - startAlong;
+    if (length <= 0) return;
+    const y = Math.max(0.08, height * 0.01);
+    const blocked = lane.blocker >= 0;
+    const rx = -dz;
+    const rz = dx;
+    const sx = lane.x + dx * startAlong;
+    const sz = lane.z + dz * startAlong;
+    for (const sign of [-1, 1]) {
+      p0.set(sx + rx * lane.half * sign, y, sz + rz * lane.half * sign);
+      p1.set(ex + rx * lane.half * sign, y, ez + rz * lane.half * sign);
+      this.inked(p0, p1, 4, 4, GOLD, 0.9);
+    }
+    // Chevrons along it, pointing the way it runs.
+    const count = Math.max(2, Math.min(8, Math.round(length / (lane.half * 3))));
+    for (let i = 1; i <= count; i++) {
+      const d = (length * i) / (count + 1);
+      const mx = sx + dx * d;
+      const mz = sz + dz * d;
+      const back = lane.half * 0.6;
+      for (const sign of [-1, 1]) {
+        p0.set(mx + rx * lane.half * 0.7 * sign - dx * back, y, mz + rz * lane.half * 0.7 * sign - dz * back);
+        p1.set(mx, y, mz);
+        this.inked(p0, p1, 4, 4, GOLD_HI, 0.8);
+      }
+    }
+    // Its end: a bar across, red where something stops it.
+    p0.set(ex + rx * lane.half * 1.2, y, ez + rz * lane.half * 1.2);
+    p1.set(ex - rx * lane.half * 1.2, y, ez - rz * lane.half * 1.2);
+    this.inked(p0, p1, blocked ? 7 : 5, 5, blocked ? RED : GOLD, 1);
+    if (!blocked) return;
+    // The building too tall to smash: its outline, at the ground and at the roof, and its corners.
+    const idx = city.index;
+    const id = lane.blocker;
+    const top = idx.sheight[id];
+    for (let c = 0; c < 4; c++) {
+      this.corner(idx.sx[id], idx.sz[id], idx.shx[id], idx.shz[id], idx.scos[id], idx.ssin[id], c, q0);
+      this.corner(idx.sx[id], idx.sz[id], idx.shx[id], idx.shz[id], idx.scos[id], idx.ssin[id], c + 1, q1);
+      p0.set(q0.x, y, q0.z);
+      p1.set(q1.x, y, q1.z);
+      this.inked(p0, p1, 6, 5, RED, 1);
+      p0.y = p1.y = top;
+      this.inked(p0, p1, 6, 5, RED, 1);
+      p1.set(q0.x, y, q0.z);
+      this.inked(p0.set(q0.x, top, q0.z), p1, 5, 5, RED, 1);
+    }
+  }
+
+  /** Corner `c` (0..3, round the box) of a structure's footprint, into `out` (x, z). */
+  private corner(x: number, z: number, hx: number, hz: number, cos: number, sin: number, c: number, out: THREE.Vector3): THREE.Vector3 {
+    const i = c % 4;
+    const lx = (i === 0 || i === 3 ? -1 : 1) * hx;
+    const lz = (i < 2 ? -1 : 1) * hz;
+    return out.set(x + lx * cos + lz * sin, 0, z - lx * sin + lz * cos);
   }
 
   dispose(): void {
     this.lines.geometry.dispose();
-    this.fillGeometry.dispose();
-    this.dotGeometry.dispose();
+    this.discGeometry.dispose();
+    this.spreadGeometry.dispose();
     for (const m of this.materials) m.dispose();
   }
 }

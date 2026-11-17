@@ -10,11 +10,13 @@
  *   person only: third person sees the lasers themselves) it sits over the guns;
  * - it grows with the squad's charge, and from the charge at which a volley counts (60%) it is
  *   lit and pulses fast: that one is about to hurt;
- * - when a squad fires a volley its diamond flashes for a moment.
+ * - when a squad fires a volley its diamond flashes for a moment;
+ * - under each diamond its label, "Volley" (round 5, ui/labels.ts: the army's word for it).
  */
 
 import { COMBAT_RULES, kaijuStageDef, unitTypeDef, weaponDef, wrapAngle, type SnapKaiju, type SnapUnit } from '@mb/shared';
 import { el, icon } from './icons';
+import { label, LABELS } from './labels';
 
 /** One squad's guns charging at the kaiju. */
 export interface SquadThreat {
@@ -134,7 +136,7 @@ export class ThreatRing {
 
   constructor() {
     for (let i = 0; i < POOL; i++) {
-      const root = el('div', 'threat hidden', [el('div', 'threat-arrow'), icon('st_charge', 'threat-icon')]);
+      const root = el('div', 'threat hidden', [el('div', 'threat-arrow'), icon('st_charge', 'threat-icon'), label(LABELS.status.volley, 'threat-label')]);
       this.markers.push({ root, key: '' });
       this.root.append(root);
     }

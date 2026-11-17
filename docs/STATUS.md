@@ -4,7 +4,11 @@ Living status file. Keep it short and true: when you finish a task, update what 
 the stubs you filled in, and add any decision the docs left open. Contracts live in
 `ARCHITECTURE.md`; numbers live in `DESIGN.md` and `shared/src/defs/`.
 
-Last updated by: the round 4 integration (the last section: the six round 4 builders' work run
+Last updated by: the round 5 integration (the last section: the four round 5 builders' work run
+together after the third playtest, `docs/ROADMAP.md` "Round 5": the lag, the army's shooting, the
+monster's throw at the crosshair and its line of sight, a word beside every picture; checked,
+played end to end, the lag measured against the third playtest's version, and made ready for
+the next live playtest). Before it: the round 4 integration (the six round 4 builders' work run
 together after the second playtest, `docs/ROADMAP.md` "Round 4": the simulation fixes, real
 throwing arcs, the stutter through the tunnel, the communication rose and restart, the clarity
 and flair pass, the new music; checked, played end to end and made ready for the owner's live
@@ -47,7 +51,7 @@ last fixes before the first playtest (section 14); the rest is from the scaffold
 | `npx vitest run server/test` | Only the server tests: 115 tests, about 18 seconds (four files start a real server on a free port and connect real clients; `process.test.ts` starts the entry point as a process of its own). `MB_TEST_SPEED=1 npx vitest run server/test/lifecycle.test.ts` plays the full five-client match in real time (about 3 minutes). |
 | `npm run dev` | Starts the server (`tsx watch`, port 2567) and the client (Vite, port 5173) side by side with hot reload; open the Vite address. Vite forwards matchmaking and the WebSocket to the server, so the page talks to its own origin exactly as in production. |
 | `npm run build`, `npm start` | Bundles the server to `server/dist/index.js`, builds the client to `client/dist` (and writes a gzip copy, `<file>.gz`, of every model, script, style sheet, data file and vector icon there: `scripts/precompress.mjs`; the server sends it to browsers that accept gzip); `npm start` runs the bundle, which serves the built client and the game on one port (`PORT`, default 2567). Environment variables: `ARCHITECTURE.md` section 4.4. |
-| Hosting (`host/start.cmd`, `host/start.sh`, `npm run host`) | Self-hosting for playtests: `Containerfile` and `compose.yaml` (game plus a Cloudflare Tunnel) at the root, one-command start, stop, update and logs scripts in `host/`, and `npm run host` (build, then start) without containers. The start scripts check the public link through the tunnel, which also tells the server its public address; the lobby's link button then copies an invite that works for friends even when the host plays on localhost (`MB_PUBLIC_URL` for a named tunnel; `ARCHITECTURE.md` section 4.4). The owner's guide: `docs/HOSTING.md`. |
+| Hosting (`host/start.cmd`, `host/start.sh`, `npm run host`) | Self-hosting for playtests: `Containerfile` and `compose.yaml` (game plus a Cloudflare Tunnel) at the root, one-command start, stop, update, logs and savelog scripts in `host/` (savelog, and stop and update before they throw the container's messages away, write the whole log into one dated text file: round 5), and `npm run host` (build, then start) without containers. The start scripts check the public link through the tunnel, which also tells the server its public address; the lobby's link button then copies an invite that works for friends even when the host plays on localhost (`MB_PUBLIC_URL` for a named tunnel; `ARCHITECTURE.md` section 4.4). The owner's guide: `docs/HOSTING.md`. |
 | Player guide, readme | `README.md` at the root (what this is, where to start); `docs/PLAYING.md`, the guide the host sends to friends (joining, both sides, the controls from `actions.ts`, the pictures on screen, tips). Keep its controls tables in step with `actions.ts` and `DESIGN.md` section 8. |
 | `npm run export:defs` | Rewrites `tools/art/data/archetypes.json` from the code (`-- --check` only verifies). A test fails when the file is stale. |
 | `npm run assets:manifest` | `tools/build-manifest.mjs`: merges `client/public/assets/manifest.*.json` into `manifest.json`, lists the files in `ui/`, and leaves out (and reports) entries whose files are missing. `-- --check` only says whether the file is stale. The client build runs it first. |
@@ -55,7 +59,7 @@ last fixes before the first playtest (section 14); the rest is from the scaffold
 | `node tools/playtest/smoke.mjs` | The browser smoke playtest: starts the server with `MB_FAST=1` on a free port against the production build, opens 5 headless Chromium pages on autoplay (one creates a room, four join by code), plays one match to its end, fails on any console error or page crash, saves screenshots to `/tmp/mb-scratch/playtest/` and prints, per page, draw calls and triangles (peak, and peak at stage 3), bytes over the WebSocket, snapshot size, a smoothness probe, and the server's own timing from `/healthz`. About 4 minutes on this machine. Options in the file header (`--url URL` plays against a server that is already running, such as the game container started with `MB_FAST=1`, and starts nothing; `--players N`, `--role human`, `--no-assets`, `--reconnect`, `--debug`, `--idle-humans`, `--expect kaiju\|humans`, `--expect-stage N`). Five software-rendered pages take the whole machine: the server then runs at about 21 ticks a second, so this run's timing and bandwidth figures describe the test rig, not the game (section 8.3). |
 | `node tools/playtest/scripted.mjs` | The scripted playtest with real inputs: no autopilot. One headless page plays the kaiju, then another plays a squad in a practice match, then a third drives a tank at stage 2 in the sandbox, with real key presses, mouse buttons, mouse movement and clicks on the real lobby buttons (`tools/playtest/driver.mjs`). Each action is judged only by what the server (for the tank, the sandbox's own simulation) sent back (its newest snapshot and its events) and ends as pass, FAIL or not attempted; the run passes only if everything was attempted and confirmed. Screenshots and `report.json` in `/tmp/mb-scratch/playtest/scripted/`. About 5 to 10 minutes, plus about 6 for the phase 2 sessions (every city weapon picked up, dropped and used; a crate of each kind taken; each weapon pick-up fired; an artillery barrage called; reinforcements), which run in the sandbox. `--only kaiju\|human\|tank\|weapons` (human runs the squad and the tank; tank the tank alone; weapons the two phase 2 sessions alone), `--out DIR`. It switches pointer lock off (headless Chromium reports garbage mouse movement under it), so mouse look under pointer lock is NOT covered by it. |
 | `npx tsx tools/playtest/netprobe.ts` | The network probe (round 4): the real server, a slow and stalling relay in front of it (`tools/playtest/relay.mjs`, also usable alone in front of a running server for a browser), and headless players running the client's own network code and prediction, walking about; prints the corrections of each player's body, second by second, with what was going on. Options in the file header (`--kaiju`, `--stall-every`, `--freeze-every`, `--server-pause-every`, `--relay none`). About 3 minutes. |
-| `node tools/playtest/shots.mjs` | Stage screenshots with no server: opens the built client in sandbox mode (`?sandbox=<stage>`, the simulation runs in the page) for stages 1 to 3 on both sides, plus scripted extras (the squad's volley meter from empty to full and its countdown ring, the tank's third-person view with both reticles, the monster's kit, molt cards and moves, the beam, a stagger, swimming; phase 2's city weapons, power surge, crates, pick-up weapons, artillery and reinforcements: `--only x-weapons,x-pickups`). Pictures in `/tmp/mb-scratch/playtest/shots/`; fails on console errors. |
+| `node tools/playtest/shots.mjs` | Stage screenshots with no server: opens the built client in sandbox mode (`?sandbox=<stage>`, the simulation runs in the page) for stages 1 to 3 on both sides, plus scripted extras (the squad's volley meter from empty to full and, since round 5, Team up by the monster's nerve bar, the tank's third-person view with both reticles, the monster's kit, molt cards and moves, the beam, a stagger, swimming; phase 2's city weapons, power surge, crates, pick-up weapons, artillery and reinforcements: `--only x-weapons,x-pickups`). Pictures in `/tmp/mb-scratch/playtest/shots/`; fails on console errors. |
 
 ## 2. What exists
 
@@ -5110,3 +5114,548 @@ fields).
   tunnel: stalls over a second still snap back by design.
 - The rose's deletion of `client/src/audio/eventVoice.ts` and `eventLines.json` is already
   staged in git (the rose task ran `git rm`); everything else is unstaged for the coordinator.
+
+## Round 5: the monster's throw lands where the crosshair points, a bold preview, and its line of sight (17 November, the monster throwing task)
+
+`docs/ROADMAP.md` round 5: "Throwing was confusing, and the monster's player found the cone hard
+to see. Decision: a throw lands where the crosshair points ... and the game picks the arc
+itself"; "Line of sight was confusing: when ... an attack cannot reach because something is in
+the way, the screen must say so." Built from the throwing investigator's prototype and build
+spec. No bytes on the wire changed (the client still sends a heading and a pitch):
+`PROTOCOL_VERSION` and `SNAPSHOT_VERSION` are untouched by this task. The bots, the server and
+the flight of a throw (speeds, gravity, spread) are unchanged. An earlier attempt at this task,
+cut off by a restart, had added the shared solver; I checked it, kept it, and finished it.
+
+**What changed**
+
+- **The throw lands at the crosshair** (`shared/src/sim/throwArc.ts` `aimThrowAtPoint`,
+  `client/src/game/controllers/kaijuController.ts`). The camera's center ray finds the point (a
+  squad's feet, the street, a roof, a wall); the solver turns the head toward it and picks the
+  flat arc, else the lob; beyond reach, the farthest throw that way. Its heading and pitch go
+  out as the aim. A word when it cannot get there: "Too far", "Blocked", "Too close". The lob is
+  tried first only while the crosshair stays within a blast's radius of where the flat arc last
+  failed (the prototype's "prefer the last choice" kept a lob for good once it was picked: in my
+  first screenshots a titan lobbed at an open street for 5.6 s; a test now catches that). Each
+  squad counts as a dome as wide as the squad and as tall as its men (the prototype's upright
+  capsule reached 5 m over a foot squad's heads, and caught the crosshair well above them).
+- **Gone:** round 4's view that stopped tilting at 8° and the snap down after a throw
+  (`THROW_VIEW_UP`). **Kept:** the over-the-shoulder camera while holding something.
+- **First person:** the head, which carries the camera, follows the view, not a lob's aim
+  (`KaijuViewFrame.look` in `client/src/render/kaijuView.ts`; the camera used to end up inside
+  the head).
+- **The bold preview** (`client/src/render/throwPreview.ts`, the investigator's look "A"): a thick
+  deep-orange ribbon with an ink edge and marks running toward the target, the tube's outline (in
+  first person two thin rings across it instead), a filled blast disc with a bold rim, the dashed
+  spread ring, a dot, four camera-facing brackets at least 34 pixels out, and a post of light.
+  All red when it cannot get there. The spread ring is longer for flat throws (up to four times
+  its width, was two; preview only).
+- **The monster's line of sight** (new `client/src/ui/kaijuSight.ts`, styles in
+  `client/src/kaiju.css`, wired in `client/src/app/screens/match.ts`): the word under the point
+  and a red ring with a bar round the crosshair; "Blocked" when the beam stops on a building short
+  of the crosshair; a charge's lane on the ground with the first building too tall to smash
+  outlined in red and "Too tall" where the run stops (drawn by the preview module); a red ring for
+  two seconds round each squad that shot the monster, through buildings, or a red wedge on the
+  screen's edge pointing at it; stars over stunned squads hidden behind buildings.
+- **Contracts** (`docs/ARCHITECTURE.md`): `aimThrowAtPoint`, `PointThrowAim`, `ThrowReach`,
+  `farthestElevation` (shared); `KaijuController.aim` (a `KaijuAimView`, types in
+  `throwPreview.ts`), `RenderView.kaijuAim`, `KaijuViewFrame.look`, `ThrowPreview.update`'s new
+  arguments, `HitLog` and `KaijuSight` (client).
+- **Tests.** New in `shared/test/throwArc.test.ts`: the crosshair's throw on open ground, a lob
+  over a house, a roof, beyond reach (it goes farthest), blocked, beyond the head's turn, the lob
+  kept while it was the last choice, the hit rate with the crosshair on a squad's feet, and at
+  most 8% of 400 flat stage 1 throws five lengths out landing outside the ring (28% with round
+  4's ring). `client/test/cameraViews.test.ts`: **round 4's rule changed on purpose**, so its
+  test ("stop the view a little above level while the aim goes on up") is replaced by: the aim
+  sent is the crosshair throw's answer and lands within a quarter blast of the crosshair's
+  point, in both views; the view looks up freely and stays there after the throw; the lob over a
+  house, then flat again once the crosshair leaves it; the autopilot keeps its own aim.
+  `client/test/monsterLooks.test.ts`: the first-person head follows the view. New
+  `client/test/kaijuSight.test.ts`: the beam's "Blocked", the charge's lane and "Too tall", and
+  the hit marks (one per shooter, two seconds, only army shots that hit this monster).
+
+**Measured**
+
+- Hit rate five monster lengths away, a squad leader standing still, 300 throws a stage, the
+  crosshair on its feet against the bots' own aim: 80 / 75 / 73% both ways (stage 1 / 2 / 3).
+  No lead on a running squad (the throw lands where the crosshair is): the investigator measured
+  0% on a squad running across at full speed without lead and 72 to 79% with it; leading it
+  would shift the balance, so that is left as an owner decision.
+- In the sandbox with real mouse clicks (`/tmp/mb-scratch/r5-throw-build/throw-e2e.mjs`, 16
+  throws at stages 1 and 3, flat and lobbed): the aim the simulation flew was the aim sent within
+  0.006 rad every time; the flown arc ended within 0.4 m of the preview's end in 15 of 16 (1.7 m
+  in one, a stage 3 throw 583 m out whose aim moved a little in the 0.3 s wind-up); every throw
+  came down inside 1.08 of the ring.
+- Screenshots of the build (`/tmp/mb-scratch/r5-throw-build/shots/`, from `shots.mjs` and
+  `los.mjs`): every stage, by day and at night, first and third person, the street, a park, a
+  roof, a wall, a squad, a lob, one length away, the sky and beyond reach; the beam blocked at
+  stages 2 and 3; the charge's lane at stages 1 and 2; the hit marks with the squads firing. In
+  all of them the throw's landing point sat on the crosshair's point (0.00 to 0.03 m).
+- Balance: `npx tsx shared/scripts/sim.ts --seeds 10 --every-anchor` on the committed tree and on
+  the same tree with this task's `throwArc.ts`: identical output (stage times 1:54 / 2:16 / 3:16,
+  the monster won 6 of 10). The bots never call the new code.
+- `node tools/playtest/scripted.mjs --only kaiju` on a scratch copy of this tree with a real
+  server: 32 of 32 confirmed, 0 failed, no console errors (the grab and the throw included).
+
+**Still open**
+
+- People have not played it. A human monster who can now aim may be stronger than in the third
+  playtest, where throwing confused them; the bots and the hit rates say nothing moved, but the
+  next playtest should watch the balance.
+- No lead on running squads (above): an owner decision.
+- Lobs stay slow and loose (5 s and a 22 m ring at stage 1, as before), so they rarely hit a squad.
+- The hit marks: in a big fight four squads can mark at once; a wedge pinned to the bottom edge
+  can sit over the move buttons. The roar's stars behind walls and the beam's "Blocked" were
+  only seen in scripted scenes and bot matches, which use the beam and the charge unlike people.
+- For the army's own "can't reach" words (being built at the same time): the monster's word is
+  `.sight-word` in `client/src/kaiju.css` (white on #ff3f30, a dark edge, the words "Blocked",
+  "Too far"); the two should look the same, so that "Blocked" means one thing everywhere.
+
+## Round 5: the army's shooting: the machine gun streams, no charge thrown away, a word for every volley state, "Blocked" (17 November, the army builder)
+
+`docs/ROADMAP.md` round 5, the owner's notes: "army machine gun bugged, could only shoot one at a
+time and charged shots didn't work. Army shooting generally bugged, not sure when could charge,
+and had the weird yellow circle constantly refreshing. LOS issues/confusion. 1-2 word
+descriptions needed." Built on the round 5 army investigation and its checker
+(`/tmp/mb-scratch/r5-army/`, `/tmp/mb-scratch/r5-army-check/`). Rules as built: `DESIGN.md`
+section 5 (the machine gun, the volley) and section 8 ("The squad's screen"); for players
+`PLAYING.md`; what to try `PLAYTEST.md`; contracts `ARCHITECTURE.md` section 3. **Nothing on the
+wire changed**: `PROTOCOL_VERSION` and `SNAPSHOT_VERSION` are untouched by this task (the screen
+uses what the snapshot already carried: cooldowns, charge, stun, height, the monster's nerve
+immunity).
+
+**Is the tree green?** Yes: `npm run check` passes (types, lint, 82 test files, 997 tests) with
+the monster builder's finished work and the network builder's work in progress in the same tree
+(one of the network builder's tests failed once while they were mid-edit and passed minutes
+later).
+
+**What changed**
+
+- **The machine gun streams** (`defs/pickups.ts` `stream: 1/6`, `defs/schema.ts`
+  `WeaponDef.stream`, `sim/systems/weapons.ts`). Fire held: one tracer every sixth of a second
+  from the unit's launchers or tanks in turn, each worth its share of the gun's designed rate
+  (1.67 times the plain weapon's damage over time, as before), with a 0.3° spread for the look
+  instead of 1.5°. Round 4 put all of a pull's tracers out on one tick every 0.53 s (0.67 s in a
+  tank; a stage 2 tank fired one tracer) and the 1.5° spread made most of them miss the
+  hatchling: it dealt 0.66 times the plain launchers' damage at 60% of range. The tracers'
+  clatter starts at most every 0.7 s per gun (`client/src/audio/matchAudio.ts`), so the stream
+  sounds like a gun firing on, not a pile of bursts.
+- **The machine gun's volley works**: no gun spread on a volley, only the volley's own aim error.
+  A volley still fires five whole pulls at once (the optional "burst over 0.4 s" look was not
+  built).
+- **A charge is never thrown away** (`sim/systems/unitOrders.ts` `chargeCap`): a squad-mate still
+  reloading charges only to just under the 60% notch, then on once loaded (the checker's
+  "notch" variant). The squad bot lets go when every loaded gun is full (`loadedCharge` in
+  `sim/bots/squadBot.ts`), the moment it let go in round 4.
+- **The volley through cover** (`sim/squads.ts` `volleyPoint`, used by `volleyAim`; the artillery
+  radio's barrage too): when the leader's eye ray stops on a building, a heap or the ground but,
+  carried on, passes through the monster's body, the squad-mates fire at the monster. The
+  leader's own shot stays blocked.
+- **Volley held through a stall** (`server/src/room/match.ts`, one line, in the network builder's
+  file): after 1.5 s without input the server let go of every held button, which fired the
+  volley early and restarted the charge; Volley now stays held. And opening the map or the
+  settings panel no longer lets go of it (`humanController.ts`).
+- **The squad's screen** (`client/src/ui/volleyMeter.ts`, rewritten; `ui/hud.ts`;
+  `styles.css`): the always-on volley chip with one- or two-word states and a picture per
+  squad-mate; the big diamond while held, 25% smaller, with Charging / Ready / Fire!; the release
+  answered by the server (Volley!, Immune, Weak, No shot); Team up instead of the yellow circle,
+  shown only when it matters and never round the crosshair unless held; Stagger / Immune /
+  Hidden by the monster's nerve bar; the crosshair's Blocked and Too far, from the unit's own
+  shot (`HumanController.shotPoint`, `shotBlocked`, `volleyAt`); words over every button and
+  under a crate taken; the tank's gun reticle reloading with the pick-up (`reloadShare` in
+  `hud.ts`, shared with the HUD). Red means "cannot", the same red and words as the monster's.
+- **Tests** (each fails on the round 4 code; checked on an archive of it):
+  `shared/test/armyShooting.test.ts` (the stream, the machine gun worth having on Fire and in a
+  volley over five seeds, no charge spent for nothing, the notch, the volley and the barrage from
+  behind a garage), `server/test/volleyStall.test.ts` (stalls of 2 and 3 s fire one volley),
+  `client/test/armyScreen.test.ts` (94 garage placements: the screen says Blocked exactly when
+  the shot hits the garage, and the volley still goes at the monster; every chip word; the
+  lines; the charge under lag; Team up; the reload share). Changed on purpose:
+  `pickups.test.ts` (the machine gun streams, at most 0.3° spread), `squadControls.test.ts`
+  (stunned has its own picture), `bots.test.ts` (the brace test's charging squad gets loaded
+  guns: with `holdFire`'s never-loading guns a squad-mate can no longer charge past the notch).
+
+**Measured**
+
+- Simulation, against round 4 (`armyShooting.test.ts`): the machine gun on Fire 1.3 to 1.5 times
+  the plain weapon at 60 and 90% of range (round 4: 0.66 and 0.29 at stage 1); a full volley
+  1.4 to 1.6 times a plain one (round 4: 0.64 and 0.40). Stream: 6 tracers a second at every
+  stage, one per tick at most (round 4: 5.6 on foot, 1.5 in a stage 2 tank, 4.5 in a troop):
+  about the same event traffic on foot, up to four times more in a stage 2 tank holding Fire.
+- Live server (production build, real mouse, practice match against bots): Fire held 5 s with a
+  machine-gun crate: 47 tracers, 5 ticks apart; a full volley: 15 tracers from each squad-mate,
+  all flagged volley. 150 s with nothing pressed: the ring round the crosshair 0% of the time
+  (round 4: 17.7%), Team up beside the nerve bar 2.7% (one window), no console errors.
+- The screen against the result, 6 whole bot matches, volleys at the monster: squad-mates the
+  chip shows clear put 89% of their shots on the monster (7% on buildings); those it shows with
+  no line put 66% into buildings and 25% on the monster (their muzzles sit across the unit and get
+  round corners).
+- Sandbox, every state looked at (1280 by 720, stage 1 by day, stage 2 at sunset, stage 3 at
+  night): Ready, Charging, Ready past the notch, Fire!, Volley!, Weak, Reload idle and held (the
+  fill stops at the notch), Team up idle (nerve bar) and held (ring), Immune, Shaken, Stunned, No
+  squad, Too far (crosshair and chip), Blocked behind a garage (stage 1, all three rockets on the
+  garage) and a house (stage 2). The tank reticle's ring now matches the HUD's reload bar with a
+  big cannon (18% and 18%) and a missile pod.
+- Balance, the same seeds on round 4's code and this task's simulation changes, 240 whole bot
+  matches each (`--every-anchor`, seeds 1 to 240): the monster won 116 of 240 (48%) on round 4's
+  code and 129 of 240 (54%) with this task's changes; on seeds 121 to 240 alone 59 against 59.
+  The difference is about one standard error (about 4.6 points): small and not certain, leaning
+  to the monster, mostly at stage 3 on the first half of the seeds. Stage times unchanged (both
+  about 1:57 / 2:18 / 3:03). Runs of 20 move by 3 wins on
+  unchanged code, so the usual 20-match check cannot see a change this size: on the working tree
+  it gives 9 of 20, 1:56 / 2:20 / 3:22 (`docs/BALANCE.md` section 12: 8 of 20, 1:54 / 2:16 /
+  3:13). No number was tuned.
+
+**Still open**
+
+- Nobody has held the new machine gun or read the chip in a real fight; the words were judged
+  on screenshots. The squad-mate pictures are small at 720p (about 15 px).
+- The controls card (H) and the rose's wedges have no words yet (not this task's files).
+- Losing the mouse capture (Escape, alt-tab) still lets go of a held Volley: the input manager
+  drops the buttons (`client/src/game/input/inputManager.ts`, not this task's).
+- The machine-gun volley still leaves on one tick (five tracers from one point in a stage 2
+  tank); the burst over 0.4 s was optional and not built.
+- The network builder owns `server/src/room/match.ts`; the one-line Volley change there should
+  survive their catch-up work (its test is `server/test/volleyStall.test.ts`).
+
+## Round 5: the lag (17 November, the lag fixer)
+
+`docs/ROADMAP.md` round 5, the owner's note: "terrible lag". Built on the round 5 lag
+investigation and its checker (`/tmp/mb-scratch/r5-lag/`, `/tmp/mb-scratch/r5-lag-check/`). No
+evidence came from the owner (`/tmp/mb-scratch/round5/owner-evidence/` was empty at the start and
+at the end), so what follows fixes what the reproductions showed, and makes sure the next
+playtest's log will show what really happened.
+
+**What it was.** Two rules of the game turned short hiccups into lag that lasted:
+1. When the server stood still for over about 0.17 s (a busy host computer, the container's
+   virtual machine), it dropped the time it missed instead of catching up. The players kept
+   sending 30 inputs a second, so every dropped tick was one more input waiting in every queue,
+   and a moving player's queue was never trimmed: everybody's keys reached the game later and
+   later through a match (in the reproduction from 0.13 s to 1.5 s).
+2. When a player's page froze for over a quarter second, it sent only a quarter second of inputs
+   when it came back. From then on each of its inputs reached the server after its tick had been
+   played on a guess and was thrown away (movement and aim lost), and the body was stopped after
+   a second and snapped back. A browser drawing under about 4 frames a second (no graphics chip)
+   was in that state all the time. The server's log called all of this "their connection
+   stalled".
+
+**What changed**
+- **The server catches up** (`server/src/room/fixedStep.ts`, `match.ts` `MAX_OWED_MS` 1000): up
+  to a second of owed time is played back, at most 4 ticks per update (the world runs up to four
+  times as fast for a moment); only a stall over a second still drops the rest.
+- **The page sends every input it owes** (`client/src/game/input/inputTicker.ts` `advanceTo`,
+  `MAX_TICKS_PER_FRAME` 8 → 45; `client/src/app/matchRuntime.ts` one line): input ticks follow
+  the real clock, up to 1.5 s in one frame, while the page still plays at most a quarter second
+  a frame.
+- **Backlogs** (`server/src/room/inputQueue.ts`): the backlog flag is cleared as soon as fewer
+  than 2 inputs wait, catch-up ticks neither trim nor count, a trim always leaves one input
+  waiting, and a backlog of 3 or more (`INPUT_BACKLOG_MOVING`) is now trimmed while the body
+  moves too, one input a second, if it changes no button, holds none and no drop is owed (one
+  tick of movement each, a small correction). Rule changed on purpose: before, a moving player
+  kept a backlog for good.
+- **The log** (`server/src/room/slowLog.ts`, `gameRoom.ts`): the stand-still line says "and
+  caught up"; a player's stall reads "stopped arriving ... (their connection stalled, or their
+  page froze)" or, new, "kept arriving but too late for their ticks ... (their page or computer
+  fell behind, not the connection)"; and every minute of a match, and at its end, one line for
+  the server and one per player (input delay, queue, inputs arrived, guesses, drops and trims,
+  and from the page: round trip, snapping back, frames that froze). For that the page's `ping`
+  now carries a small report (`PageReport`: `rtt`, `snaps`, `snapMax`, `freezes`, `frameMax`),
+  which the server clamps: **`PROTOCOL_VERSION` 3 → 4**; the snapshot is unchanged
+  (`SNAPSHOT_VERSION` stays 4).
+- **Saving the log** (`host/savelog.cmd`, `host/savelog.sh`, `mb.ps1` / `mb.sh` action
+  `savelog`): everything the game and the tunnel wrote since they started, with the computer's
+  processors and memory and the container machine's, into one dated text file: on Windows in
+  "Monster Battle logs" on the desktop (the folder opens with the file selected; the window
+  prints the full name), on Linux in `logs/` in the game folder. stop and update save one first,
+  because `compose down` throws the messages away. `/logs/` is kept out of git and the image.
+- `tools/playtest/netprobe.ts` drives its ticker as the page now does.
+
+**Measured** (the investigator's five-player reproduction, `tools/rerun.sh` in
+`/tmp/mb-scratch/r5-net/tools/`: the real server bundle, four squads each on their own
+tunnel-like relay of 40 to 120 ms each way with jitter and short stalls, the monster on the host's
+direct line; "before" is the working tree at the start of this task, "after" the same tree with
+only this task's files; one run each, same seeds; the machine was shared with another agent, so
+small differences are noise; reports in `/tmp/mb-scratch/r5-net/runs/*.report.txt`):
+
+| What was tried | | Input delay, worst half-minute (monster / worst squad) | Match time skipped | Body stopped after a page freeze | Ticks played on a guess, a minute (monster / squads) | Monster's snap-backs over 15 cm, a minute (largest) |
+| --- | --- | --- | --- | --- | --- | --- |
+| Server pauses: 14 pauses of 0.1 to 0.4 s in 3 minutes | before | 1463 / 1606 ms, climbing all match | 1960 ms | - | 8 / 11 to 61 | 33.0 (9.3 m) |
+| | after | 133 / 177 ms, flat | 0 | - | 26 / 26 to 40 | 15.1 (1.4 m) |
+| Page freezes: 0.3 to 0.5 s about every 30 s, every player | before | 50 / 150 ms, but 383 to 893 inputs per player never played | 0 | 25 of 26 | 156 / 202 to 350 | 56.0 (1.1 m) |
+| | after | 46 / 174 ms, 65 to 135 never played | 0 | 0 of 25 | 23 / 36 to 48 | 8.2 (1.4 m) |
+| A bad evening: both of the above | before | 748 / 489 ms, climbing | 1163 ms | 7 of 24 | 17 / 33 to 138 | 24.8 (4.8 m) |
+| | after | 76 / 168 ms, flat | 0 | 0 of 21 | 22 / 40 to 49 | 13.5 (1.1 m) |
+| A clean evening: no pauses, no freezes | before | 142 / 154 ms | 0 | - | 14 / 14 to 27 | 16.2 (2.0 m) |
+| | after | 120 / 182 ms | 0 | - | 23 / 17 to 65 | 15.6 (4.5 m) |
+| The host's own browser plays the monster (drawn without a graphics chip, about 4 frames a second) | before | squads 314 ms | 168 ms | its body stopped 13 times (runs of guesses up to 4.8 s) | 1546 (86% of its ticks) / 21 to 42 | - |
+| | after | squads 180 ms | 0 | 3 times (frames over 1.5 s) | 903 / 13 to 23 | - |
+
+Other units' jumps (a squad's view of everyone else) did not change: 0 to 9.6 a minute before and
+0.4 to 9.3 after on the clean line, nearly all at the moment a relay stall ends (L4, the line).
+The server's own work stayed at 0.4 to 0.6 ms per update. Frame time could not be judged here:
+the browser draws without a graphics chip at 4.0 (before) and 4.6 (after) frames a second.
+In the clean "after" run one squad on the slowest line (90 to 120 ms each way) spent 13 seconds
+near the end with most ticks guessed (its inputs a tick late) and then recovered by itself: no
+trim or stall came before it, and the checker saw the same on that line with the old code (a
+line whose jitter is wider than the one-tick cushion); it is the reason for its 65 a minute.
+
+Two things the numbers do not say at first sight: before, a page in the stuck state showed a
+*lower* input delay, because its late inputs were thrown away and never played (the "never
+played" column); and the largest corrections (4 to 10 m) are game events at stage 3 (units
+thrown, a squad's driven unit changing), present before and after, not lag.
+
+**Tests.** Rewritten to the new rules (not weakened): `fixedStep.test.ts` (catches up 0.17 to
+0.95 s stalls with nothing dropped, at most 4 per call, at most a second owed, a 3 s stall drops
+2 s); `gameRoom.test.ts` "never spirals" (a 30 s stall: at most 4 ticks and one snapshot per
+update, one second caught up, 29 dropped) and the late-link test (now checks the player's own
+queue: it looked at the bot monster's slot, which hid that a walking player whose line had been
+4 to 8 ticks late kept 5 to 9 inputs waiting for good; trims counted). New: a walking player
+through a 0.4 s server pause keeps no backlog (`gameRoom.test.ts`); trims while moving, never a
+press or a hold, none on catch-up ticks, and the stale-flag regression (`inputQueue.test.ts`);
+the ticker owes real time (`input.test.ts`); a 0.5 s page freeze sends 15 inputs on the next
+frame, and 3.6 frames a second still send 30 a second (`session.test.ts`); the late-page line,
+the 3 s stall line and the lines a minute with nonsense reports clamped (`slowLog.test.ts`). All
+of them fail on the old code.
+
+**Still open**
+- Nothing from the owner's playtest has been seen; the next playtest's saved log will say which
+  of these it was, and whether the host computer stalls at all (L3 in the investigation).
+- The hosting advice in `HOSTING.md` (processors for the container program, power mode, no
+  screen sharing) is sensible but unmeasured on Windows. `savelog.cmd` and the save in
+  `stop.cmd` / `update.cmd` were checked line by line, not run on Windows; the Linux version ran
+  against a stand-in for Podman.
+- A page drawing at about 4 frames a second still has half its ticks played on a guess (its
+  inputs come in bursts, too late to be played ahead); it is no longer late for good and is not
+  stopped unless a frame takes over 1.5 s. The fix there is the browser's graphics acceleration
+  (`PLAYING.md`, `HOSTING.md`).
+- Not done (optional in the checker's list): compiling the effect shaders during loading
+  (`renderer.compileAsync`), and a server rule that rebuilds a lost cushion (it would need the
+  queue's invariant test rewritten on purpose). Tunnel stalls still make other units jump once
+  when they end (L4, the line's).
+- The network readout (` key) is unchanged and still works; it does not show the new numbers
+  of the lines a minute.
+
+## Round 5: a word beside every picture (17 November, the labels builder)
+
+`docs/ROADMAP.md` round 5: "Labels of one or two words. Players were confused by pictures alone.
+This relaxes the no-reading rule: in-game text may now also be short labels of one or two plain
+words beside the pictures (buttons, controls card, rose wedges, molt cards, pick-ups, charge
+states, menus)." Client and docs only: no rule of the game changed, nothing on the wire changed
+(`PROTOCOL_VERSION` and `SNAPSHOT_VERSION` untouched), no number of the balance moved.
+
+**Is the tree green?** Yes: `npm run check` passes (types, lint 306 files, 83 test files, 1002
+tests) with the army, monster and lag builders' work in the same tree.
+
+**What changed**
+
+- **One table of words** (`client/src/ui/labels.ts`, new): every label in the game, grouped by
+  where it shows, with the helpers for the words that follow the state (`strikeLabel`,
+  `grabLabel`, `moveLabel`, `fireLabel`, `volleyLabel`, `roseLabels`) and the rule (at most two
+  words and 14 characters, no sentence: `labelProblem`). The army builder's and the monster
+  builder's new words moved into it unchanged (the volley chip's, the crosshair's, the nerve
+  bar's, "Too far", "Blocked", "Too close", "Too tall", the crate names); their code now reads
+  them from the table (`ui/volleyMeter.ts`, `ui/hud.ts`, `render/throwPreview.ts`,
+  `game/controllers/kaijuController.ts`, `ui/kaijuSight.ts`).
+- **One style** (`.lbl`, `client/src/styles.css`): capitals, the game's display font (the
+  title's) at its heaviest, white with a dark edge, about 11 pixels at 1280 by 720 and 15 at 1920
+  by 1080 (bigger on menu buttons, the controls card, the molt cards). The army's and the
+  monster's words take the same type. A button's label sits under its picture, over its key.
+- **Where** (the full list is `DESIGN.md` section 8, "Labels"): the monster's buttons (Strike or
+  Throw or Swing, Grab or Eat or Drop, Stomp, the moves or Locked, Molt, View, Shield, Power
+  surge), the squad's and the drone's (the army builder's, moved under the pictures), Menu and
+  Controls; the controls card (each picture, Talk, Close); the rose's 15 wedges; the molt cards;
+  the meters, the clock (Time left), the destruction bar's marks (Molt, Molt, Monster wins),
+  Stage, Squads; the status pictures over the middle (Crossfire, Spotted, Shaken, Underwater,
+  Nerve broken, Volley, Incoming, Reconnecting, Squad lost) and Click; the monster's claw meter
+  (Rage, outside it), its warning diamonds (Volley, on the inner side when on the screen's edge);
+  the tank's second reticle (Gun, only while apart from the crosshair); home (Create, Join, the
+  fields' Name and Code, the problems: No room, Room full, Old version, Offline, Other tab); the
+  lobby (Leave, Invite then Copied, Controls, Settings, Monster or Squad, Ready, Start, Bot
+  monster, the seats' Host, Ready, Asleep, Offline, Bot); the briefing (Monster, Squads); the
+  settings (Volume, Mouse speed, Invert, Full screen, Low detail, Restart then Confirm, Done); the
+  end screen (Monster wins or Squads win; City flattened, Monster down or Time up; Lobby).
+- **Room for them:** the squads' list moved down 8 px (clear of Stage and Menu), the bottom-left
+  meters are 40 px wider, the buttons 2 px further apart, the rose 14% bigger (two-word labels on
+  two lines), and the controls card's unit 5.1 instead of 5.6 hundredths of the window's height
+  with tighter gaps, so it still ends above the crosshair (at 960 by 540 too). "Monster wins"
+  sits to the left of the skyline's last mark (to its right it ran into the stage and the menu in
+  a small window); "Stage" is left out under 900 px wide; the "click" circle moved down from 57%
+  to 69% of the height (it covered the squad's volley chip). A rule that sized the rose's own
+  drawing (`.rose svg`) also caught the pictures in it once they had labels; it is `.rose > svg`
+  now.
+- **Tests** (`client/test/labels.test.ts`, new, 5 tests): every word in the table keeps the rule;
+  every picture of the controls card in every state of both sides (every kaiju kind, stage, hand,
+  pair of moves, molt, crate, the drone) has a label; every button of the HUD has one (the
+  monster's in every hand and with every move, through `kitLabels` and `KIT_ACTIONS` in
+  `ui/kaijuKit.ts`; the squad's, the drone's, Menu, Controls through `HUD_BUTTONS` in
+  `ui/hud.ts`; Fire with every crate); every wedge of the rose, in wire order; the HUD and the
+  card say the same word for the same button. No other test changed.
+
+**Measured**
+
+- Screenshots of every screen at 1280 by 720 and 1920 by 1080, each looked at
+  (`/tmp/mb-scratch/r5-labels/shots/`; scripts `sandbox.mjs`, `live.mjs` there): the monster at
+  stage 1 (start, moves and rage, a car, the fast-food sign, the garage door with a power surge,
+  the molt offered, the controls card, the rose, the settings, the molt cards, the warning
+  diamonds), stage 3 at night; the squad at stage 1 (start, crates, card, rose, status pictures,
+  map, settings), stage 2 in a tank at sunset with the gun reticle apart, the drone; the end
+  screen; with a real server home (and No room), the lobby as host and guest, the card and the
+  settings in the lobby, the briefing with and without the card, the match's settings with
+  Restart and Confirm. A check in the scripts lists every label's box: no two labels overlap on
+  any screen (the one hit is a lobby seat's Bot under the settings panel, which hides it). No
+  console errors (one expected 404 for the No room join).
+- `docs/progress/controls-kaiju.png` and `controls-squad.png` retaken (960 by 540, as before).
+- The repository's scripted playtests on this build with a real server (a scratch copy of the
+  tree): the squad's 32 confirmed, 0 failed, 1 not attempted ("team up after another squad's
+  volley": no other squad's charged volley happened to hit the monster with its nerve high, which
+  depends on the bots), no console errors; the monster's, first run 31 confirmed and 1 failed
+  (the throw wound up but no thrown object came within 4 s, with the machine fully loaded; my
+  change to that controller only swapped its words for the table's), second run 32 of 32
+  confirmed, no console errors. The molt cards were clicked through their new labels.
+
+**Still open**
+
+- Nobody has read them in a real match yet; the words were judged on screenshots drawn without a
+  graphics card. At 1920 by 1080 the HUD's pictures do not grow with the screen while the words
+  do a little, so the words look big beside them on a television.
+- Not labelled: the crates' floating pictures in the world (the name shows when one is taken,
+  and on the Fire button), the map's markers, the monster's red hit rings, the squad-mates'
+  small pictures in the volley chip (the chip's word sums them up), the tally's pictograms and
+  the newspaper on the end screen.
+- There is no Leave button in the settings panel: a player leaves a match by closing the page.
+- `docs/requirements.md` (the owner's document) still states the old rule; `ROADMAP.md` round 5
+  is newer.
+- A warning diamond pinned to the bottom edge still sits over the monster's buttons (its label
+  now sits on its inner side, clear of them).
+
+## Round 5 integration: everything together, the lag measured against the last playtest's version, ready for the next live playtest (17 November, the integration task)
+
+The four round 5 builders' work (the lag, the army's shooting, the monster's throw at the
+crosshair and its line of sight, a word beside every picture) was run together, checked, played
+end to end in the browser and measured. For the owner: `docs/PLAYTEST.md`, rewritten as one page
+for the next playtest, linked from `README.md`. No evidence came from the owner's machine
+(`/tmp/mb-scratch/round5/owner-evidence/` was empty at the start and at the end).
+
+**Is the tree green? Yes.** `npm run check` passes: type checks in all three workspaces, lint
+(306 files clean, one `STUB(server)`), 1002 tests in 83 files, as the builders left it; nothing
+had to be fixed where their work meets. On the wire: `PROTOCOL_VERSION` 4 (`origin/main` has 3:
+one bump, by the lag fixer, for the page's report on `ping`), `SNAPSHOT_VERSION` 4 (unchanged,
+as on `origin/main`). The protocol header and `docs/ARCHITECTURE.md` section 4.2 describe it.
+
+**Art, sound and data:** `npm run export:defs -- --check` up to date; `tools/art/validate.py
+--all -q` 82 models, 0 failed, the 5 old warnings; `node tools/art/ui/preview.cjs --check` 125 of
+125 icons; `npm run assets:manifest -- --check` up to date (82 models, 31 sprites, 11 textures,
+11 music, 150 sound effects, 162 voice, 127 pictures).
+
+**Played for real** (headless Chromium drawing in software on this 4-core machine)
+- `npm run build`: passes (the old warning that the main script is over 1,500 kB stays).
+- `node tools/playtest/smoke.mjs`: PASSED. Five pages, a whole fast match to stage 3, the
+  humans won on the clock; no console errors or warnings; 883-byte snapshots, about 57 kbit/s
+  down per page (51 in round 4: the machine gun's stream and the page's ping report), at most
+  159 draw calls and 593,000 triangles. `--reconnect --players 3`: PASSED (the dropped page came
+  back; the humans won on the clock at stage 3).
+- `node tools/playtest/scripted.mjs` (every session): 110 confirmed, 1 failed, 1 not attempted,
+  no console errors. The failure: a propane tank set off in the monster's hand by the squads'
+  fire gave the blast but no flinch, which is the rule when the monster is already staggered
+  (the bot squads fire volleys too); it passed in both reruns of the weapons sessions. In those
+  reruns the garage door check failed instead (1 and 2 shots on the door in 25 s, it wants 3).
+  The same sessions on `origin/main`'s build (git archive, built in scratch): the door passed
+  once and failed once (1 shot). A headless copy of that scene gives the same shots, seed for
+  seed, on both versions (3 or more door hits in 2 of 10 seeds in 25 s, 7 of 10 in 45 s): the
+  bot squads come from 200 m away and from the sides. This check was already flaky before
+  round 5; it was not changed. Not attempted: "team up after another squad's volley" (the bots
+  never set it up in that run; the army builder's run passed it, and the sandbox pictures show
+  Team up by the nerve bar).
+- `node tools/playtest/shots.mjs`: every stage and every extra drew with no console errors. One
+  extra (`x-monster-looks-s1`) was cut short by this task's own 25-minute time limit on the
+  command (the whole run takes about 28 minutes here); run again alone it passed.
+
+**The owner's complaints, checked as a player would** (scratch scripts in
+`/tmp/mb-scratch/r5-integrate/scripts/`, pictures in `/tmp/mb-scratch/r5-integrate/shots/`)
+- **"Army machine gun bugged, could only shoot one at a time and charged shots didn't work."**
+  Live server (a scratch copy whose crates all hold machine guns), real mouse: Fire held 5 s
+  fired 59 tracers, one every 5 ticks (six a second); a full volley fired 15 tracers from each
+  of the three squad-mates plus the leader's, all marked as the volley. Gone.
+- **"Not sure when could charge."** The word under the crosshair, at 1920 by 1080: READY with
+  nothing pressed, CHARGING, READY past the notch, FIRE! when full, VOLLEY! when the server says
+  they fired (WEAK when let go early); NO LINE in red at stage 2 with houses in the way; RELOAD
+  and the others in the army builder's pictures. In a 2-minute live practice match the chip
+  showed a word in every one of 1,175 samples.
+- **"The weird yellow circle constantly refreshing."** Live practice match, 2 minutes, nothing
+  pressed: the ring round the crosshair showed in 0 of 1,175 samples (round 4: about a fifth of
+  the time). Team up by the nerve bar shows instead (sandbox pictures).
+- **"Monster throwing was confusing, the cone hard to see."** Sandbox, real clicks, 10 throws at
+  stages 1 and 3: the aim the game flew matched the aim sent within 0.02 radians, the flown arc
+  ended within 0.6 m of where the preview showed (under 0.1 m in 7 of 10), and every throw came down
+  inside the dashed ring (one just on its edge, 1.05). Pictures by day and at stage 3 at night:
+  the landing at the crosshair, bold.
+- **"LOS issues."** BLOCKED in red on the crosshair with the squad leader behind a garage (its
+  shots hit the garage; the volley still went at the monster from the squad-mates with a line);
+  the monster's TOO FAR on a throw out of reach.
+- **"1-2 word descriptions needed."** Every button, the controls card, the rose and the molt
+  cards carry their words at 1920 by 1080 and at 960 by 540 (the labels builder's checks list no
+  overlapping labels).
+
+**Lag: the third playtest's version against this one.** The lag fixer's five-player reproduction
+(`/tmp/mb-scratch/r5-integrate/net/`: the real server bundle of each version, four squads on
+tunnel-like lines of 40 to 120 ms each way with jitter and short stalls, the monster on the
+host's line; "main" is `origin/main`, the version played at the third playtest, "now" is this
+tree; same seeds, run side by side, one after the other, on a quiet machine). Input delay is how
+late a key press reaches the game, the worst half-minute of the match:
+
+| What was tried | | Input delay (monster / worst squad) | Match time skipped | Body stopped after a page freeze | Ticks played on a guess, a minute (monster / squads) |
+| --- | --- | --- | --- | --- | --- |
+| Host stalls: 0.1 to 0.4 s every 10 s (seed 1) | main | 1237 / 1142 ms, climbing | 1407 ms | - | 30 / 11 to 20 |
+| | now | 132 / 163 ms, flat | 0 | - | 37 / 30 to 80 |
+| The same, seed 5 | main | 1296 / 1690 ms, climbing | 2205 ms | - | 9 / 1 to 7 |
+| | now | 101 / 156 ms, flat | 0 | - | 46 / 26 to 88 |
+| Page freezes: 0.3 to 0.5 s every 30 s (seed 1) | main | 22 / 166 ms | 0 | 17 of 20 | 319 / 138 to 445 |
+| | now | 46 / 161 ms | 0 | 0 of 26 | 21 / 36 to 46 |
+| The same, seed 11 | main | 23 / 153 ms | 0 | 20 of 24 | 186 / 144 to 367 |
+| | now | 51 / 174 ms | 0 | 0 of 25 | 19 / 33 to 77 |
+| A bad evening: both together | main | 536 / 672 ms, climbing | 1361 ms | 11 of 25 | 23 / 18 to 112 |
+| | now | 73 / 155 ms, flat | 0 | 0 of 22 | 29 / 39 to 49 |
+| A clean evening | main | 126 / 172 ms | 0 | - | 16 / 16 to 106 |
+| | now | 103 / 157 ms | 0 | - | 17 / 15 to 21 |
+
+(With page freezes the old version's low delay is misleading: its late inputs were thrown away,
+not played: 282 to 924 inputs per player never played, against 54 to 205 now.) The monster's
+own snap-backs over 15 cm went from 24 to 42 a minute with host stalls to 15 to 18, and from 43
+to 114 with page freezes to about 9; on a clean line they are about 15 a minute in both versions
+(game events, not lag).
+
+What this machine cannot say: whether the owner's computer stalled, whether a player's browser
+froze, or whether the tunnel stalled at the third playtest. The stalls and freezes here are made
+on purpose. Without the owner's log, "terrible lag" may have had a cause these runs do not cover
+(a slow or overloaded host, a player drawing without a graphics chip, the tunnel itself). The
+next playtest's saved log (`host/savelog.cmd`) will say which.
+
+**Balance** (`docs/BALANCE.md` section 13): `npm run sim -- --seeds 20 --every-anchor`: stages
+1:56 / 2:22 / 3:07, the monster won 8 of 20 (round 4: 1:54 / 2:16 / 3:13, 8 of 20); seeds 1 to
+40: 1:55 / 2:25 / 2:59, 22 of 40 (round 4: 16 of 40). Inside the bounds (25 to 60%, stage times
+within a tenth), so nothing was retuned.
+
+**What changed in this task:** docs only, plus one comment. `docs/PLAYTEST.md` (rewritten),
+`README.md`, `docs/ROADMAP.md` (round 5 marked built), `docs/BALANCE.md` (section 13),
+`docs/PLAYING.md` (three pictures retaken to show round 5's screen: `squad-volley-meter.png`,
+`art-wired-squad-view.png`, `monster-molt-cards.png`, and their captions; the old squad view
+showed the yellow ring and a radio subtitle that are gone), this file (the header, the shots
+row of section 1), and the header of `tools/playtest/scripted.mjs` (its "five-second ring"
+check is Team up now).
+
+Slide pictures, 1920 by 1080, in `docs/progress/`: `round5-lag-chart.jpg`,
+`round5-charge-states.jpg`, `round5-blocked-shot.jpg`, `round5-throw-preview.jpg`,
+`round5-labels-monster.jpg`, `round5-labels-squad.jpg` (147 to 452 KB each).
+
+**Still open**
+- Nobody has played round 5 with people. Every picture was drawn in software without a graphics
+  card; the words were judged that way.
+- The Windows side of saving the log (`savelog.cmd`, and the save in `stop.cmd` and
+  `update.cmd`) has never run on Windows. `docs/PLAYTEST.md` says to fall back to `logs.cmd`.
+  This machine has the Docker program but no Docker service, so the container and the Linux
+  `savelog.sh` were not tried against a real game container either.
+- With a throw out of reach (TOO FAR) at a steep angle, the widening tube's outline draws a
+  loop beside the arc: busy, though the red and the word read clearly (the throwing builder's
+  pictures show the same).
+- The scripted garage-door check is flaky on both versions (above); the throw's lead on a
+  running squad is still the owner's decision; the balance leans a little to the monster in the
+  second 20 seeds (watch it).

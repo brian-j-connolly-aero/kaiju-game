@@ -17,17 +17,19 @@
  * view holds still, and a pick goes to the server as a `rose` message.
  */
 
-import { kaijuStageDef, unitTypeDef, weaponDef, type SimEvent } from '@mb/shared';
+import { kaijuStageDef, SQUAD_RULES, unitTypeDef, weaponDef, type SimEvent } from '@mb/shared';
 import { iconImage, pickupIcon } from '../../assets/iconRaster';
 import { cardState } from '../../ui/controlsCard';
+import { KaijuController } from '../../game/controllers/kaijuController';
 import { MOUSE_SENSITIVITY } from '../../game/input/inputManager';
 import { GunReticle } from '../../ui/gunReticle';
-import { Hud } from '../../ui/hud';
+import { Hud, nextReloadPeak, reloadShare } from '../../ui/hud';
 import { el } from '../../ui/icons';
 import { MapView } from '../../ui/mapView';
 import { MoltCardPicker } from '../../ui/moltCards';
 import { CommRose } from '../../ui/rose';
 import { ThreatRing } from '../../ui/threats';
+import { KaijuSight } from '../../ui/kaijuSight';
 import { VolleyMeter } from '../../ui/volleyMeter';
 import type { AppContext, Screen } from '../context';
 import { cardForMatch } from './briefing';
@@ -39,9 +41,13 @@ export class MatchScreen implements Screen {
   private map: MapView | null = null;
   /** The kaiju's warnings of guns charging at it (in first person above all). */
   private threats: ThreatRing | null = null;
+  /** The monster's line of sight: what it cannot reach, who hit it, stunned squads behind walls (round 5). */
+  private sight: KaijuSight | null = null;
   /** The squad's volley meter round the crosshair, and the tank's gun reticle. */
   private volley: VolleyMeter | null = null;
   private gun: GunReticle | null = null;
+  /** The longest reload the gun reticle has seen since the gun was last ready (`reloadShare`). */
+  private gunPeak = 0;
   /** The kaiju's molt cards (ui/moltCards.ts): while they wait for a pick the pointer is free. */
   private cards: MoltCardPicker | null = null;
   private cardsWaiting = false;
@@ -61,6 +67,7 @@ export class MatchScreen implements Screen {
     this.hud = new Hud();
     this.map = new MapView();
     this.threats = new ThreatRing();
+    this.sight = new KaijuSight();
     this.volley = new VolleyMeter(runtime.session.role.squadId);
     this.gun = new GunReticle();
     this.map.setCity(runtime.session.mirror.city);
@@ -83,7 +90,7 @@ export class MatchScreen implements Screen {
       if (this.cardsTookPointer || byClick) ctx.input.lockPointer();
       this.cardsTookPointer = false;
     };
-    this.root = el('div', 'screen match', [this.threats.root, this.volley.root, this.gun.root, this.hud.root, this.map.root, cards.root]);
+    this.root = el('div', 'screen match', [this.threats.root, this.sight.root, this.volley.root, this.gun.root, this.hud.root, this.map.root, cards.root]);
     this.startRose(ctx);
     // The gun reticle is placed once the camera is where this frame's picture is drawn from.
     runtime.onCamera = () => this.placeGun(ctx);
@@ -165,6 +172,7 @@ export class MatchScreen implements Screen {
     const now = ctx.now();
     this.volley?.onEvent(e, now);
     hud.onEvent(e, now, ctx.runtime?.session.role.kind === 'kaiju');
+    if (ctx.runtime?.session.role.kind === 'kaiju') this.sight?.onEvent(e, now, ctx.runtime.session.role.kaijuId);
     if (e.type === 'moltPick' && e.kaiju === ctx.runtime?.session.role.kaijuId) this.cards?.picked(e);
     if (e.type === 'crossfire') hud.flash('crossfire', now);
     else if (e.type === 'nerveBreak') hud.flash('nerveBreak', now, 2.5);
@@ -194,13 +202,16 @@ export class MatchScreen implements Screen {
     }
     const weapon = weaponDef(unitTypeDef(u.type).weapon);
     const p = human.gunPoint;
+    // The squad's weapon pick-up reloads at its own pace (round 5: the reticle used the tank's own gun's).
+    const pickup = runtime.frame?.squads[runtime.session.role.squadId]?.pickup ?? 'none';
+    this.gunPeak = nextReloadPeak(u.cooldown, this.gunPeak);
     gun.place(renderer.camera, {
       x: p.x,
       y: p.y,
       z: p.z,
       onKaiju: p.on === 'kaiju',
-      inRange: p.on !== 'none' && p.dist <= weapon.range,
-      ready: 1 - Math.min(1, u.cooldown / Math.max(0.01, weapon.cooldown)),
+      inRange: p.on !== 'none' && p.dist <= weapon.range * SQUAD_RULES.rangeSlack,
+      ready: reloadShare(u.cooldown, u.type, pickup, this.gunPeak),
     });
   }
 
@@ -294,8 +305,11 @@ export class MatchScreen implements Screen {
     if (threats && lk && lk.alive && renderer && runtime.shot === null && frame.match.phase === 'playing' && !runtime.mapOpen) {
       renderer.camera.updateMatrixWorld();
       threats.update(lk, frame.units, renderer.camera, !runtime.controller.thirdPerson, now);
+      const controller = runtime.controller;
+      this.sight?.update(frame.units, renderer.camera, controller instanceof KaijuController ? controller.aim.warning : null, runtime.session.mirror.query, now);
     } else {
       threats?.hide();
+      this.sight?.hide();
     }
 
     // The squad's volley meter round the crosshair, from the newest snapshot (not the view's,
@@ -304,13 +318,22 @@ export class MatchScreen implements Screen {
     const session = runtime.session;
     const volley = this.volley;
     if (volley) {
+      const latest = session.latest ?? frame;
       volley.update({
-        units: session.latest?.units ?? frame.units,
+        units: latest.units,
         sinceSnapshot: now - session.stats.lastSnapshotAt,
         held: !!human && human.volleyHeld,
         visible: !!human && !!frame.localUnit && frame.localUnit.alive && runtime.shot === null && !runtime.mapOpen && frame.match.phase === 'playing',
         now,
+        pickup: frame.squads[session.role.squadId]?.pickup ?? 'none',
+        boss: latest.kaijus[0],
+        target: human ? human.volleyMates : null,
+        atKaiju: !!human && human.volleyKaiju >= 0,
+        query: session.mirror.query,
+        roundTrip: ctx.client.ping / 1000,
       });
+      // The team-up window goes on the monster's nerve bar while the button is up (ui/hud.ts).
+      hud.setTeamUp(volley.teamUp);
     }
   }
 
@@ -335,6 +358,7 @@ export class MatchScreen implements Screen {
     this.hud = null;
     this.map = null;
     this.threats = null;
+    this.sight = null;
     this.volley = null;
     this.gun = null;
     this.cards = null;

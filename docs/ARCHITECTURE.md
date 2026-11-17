@@ -87,7 +87,7 @@ tools/playtest/           Playwright scripts: smoke.mjs (multi-client match on a
 tools/build-manifest.mjs  the `assets:manifest` script: merges partial manifests, checks files
 Containerfile             the container image (self-hosting; owner's guide: docs/HOSTING.md)
 compose.yaml              the game + Cloudflare Tunnel services; settings in .env (.env.example)
-host/                     one-command start, stop, update, logs: .cmd + .ps1 for Windows, .sh for Linux and WSL
+host/                     one-command start, stop, update, logs, savelog: .cmd + .ps1 for Windows, .sh for Linux and WSL
 docs/                     requirements.md, DESIGN.md, ARCHITECTURE.md, ASSETS.md, art previews
 ```
 
@@ -300,7 +300,9 @@ How the human side is put together (`DESIGN.md` section 5 has the rules):
   `control` here each tick, in this order: stunned by the roar (stand still, unplanted, charge
   gone); shaken (back off, unplanted, charge gone); the player holding the volley button
   (`volleyHeld`: plant, turn the weapon toward the point the leader's aim ray lands on,
-  `volleyAim` in `sim/squads.ts`, and charge from 0 to 1 over `COMBAT_RULES.chargeTime`); else
+  `volleyAim` in `sim/squads.ts`, and charge from 0 to 1 over `COMBAT_RULES.chargeTime`, only to
+  just under the 60% notch while its weapon is still reloading: `chargeCap(cooldown)`, exported
+  for the client, round 5); else
   follow the swarm and fire at will. The swarm is a loose group around and behind the leader:
   places measured back along the leader's trail (`swarmSlot`, three across or single file where
   a street is too narrow, `swarmWidth`), a speed that brakes in time to stop at the place and
@@ -311,7 +313,12 @@ How the human side is put together (`DESIGN.md` section 5 has the rules):
   flag reports). Squad helpers that bots and clients can use are in `sim/squads.ts`:
   `volleyMeter` (the squad's charge from snapshot units), `scatterMult` and `kaijuIsSlowed` (both
   work on snapshot data), `volleyAim`, `laserOnKaiju` / `lasersOnKaiju`, `squadCharge`,
-  `markVeterans`.
+  `markVeterans`, and since round 5 `volleyPoint(city, kaijus, ox, oy, oz, yaw, pitch, out,
+  mates)`: where a volley goes from an aim ray, pure, on snapshot kaijus and the client's mirrored
+  city too (the server's `volleyAim` calls it from the leader's eye; the squad's screen calls it
+  with the aim it sends, so its "No line" pictures use the very point the squad-mates will fire
+  at). It returns `{ index, through }`: the kaiju the volley is at, and whether the aim ray reached
+  it only through a building, a heap or the ground in front (the volley still goes at it).
 - **Navigation** (`sim/nav.ts`). `steerToward(world, unit, x, z, tolerance, out)` answers with
   a direction and a throttle: the straight line when the unit's whole width fits
   (`corridorClear`), otherwise along the road graph (onto the nearest street it can reach,
@@ -331,8 +338,12 @@ How the human side is put together (`DESIGN.md` section 5 has the rules):
   for `SQUAD_RULES.rangeSlack` times its weapon's range (`ttl`), which is how range limits
   every shot. Aim error is added per projectile from the world's generator. The driven unit
   fires `unitWeapon(squad, unit)`: its own weapon, or the squad's weapon pick-up made from it
-  (`pickupWeaponDef` in `defs/pickups.ts`: the machine gun's tracers with a spread, the big
-  cannon's heavy shells, the missile pod's guided salvo); squad-mates always fire their own.
+  (`pickupWeaponDef` in `defs/pickups.ts`: the machine gun's tracers, the big cannon's heavy
+  shells, the missile pod's guided salvo); squad-mates fire their own, and in a volley the
+  pick-up's `volleyPulls` whole pulls. A weapon with `stream` (defs schema, round 5: the machine
+  gun) fires the leader's shots one projectile at a time, every `stream` seconds, from its
+  muzzles in turn, each worth `stream / cooldown` of a whole pull's projectiles; its `spread` is
+  added to the leader's shots only, never to a volley.
   Call-in missions live in `world.callIns` and release their shells here; the artillery radio
   starts one (`startCallIn(world, squad, callIn, x, z)`) with each charged volley while the
   squad has barrages left.
@@ -432,8 +443,16 @@ How the kaiju's action state machine, the damage rules and the molt hand over to
   the projectile system does, against the city and the ground, not units), `spreadAt` and
   `landingSpread` (the tube's radius after t seconds, the ellipse where it ends) and
   `aimThrowAt(cityQuery, source, flight, x, y, z, tolerance, clearRubble, out)` (the bots' aim:
-  the low arc when it gets there, else the lob). The numbers are the kind's `actions.throw`
-  (`speed`, `gravity`, `lift`, `maxElevation`, `spread`, `heavyMult` per stage where it says) and
+  the low arc when it gets there, else the lob) and, round 5,
+  `aimThrowAtPoint(cityQuery, source, flight, x, y, z, tolerance, structure, maxLead,
+  clearRubble, out, preferHigh?)` (the monster player's crosshair: the heading toward the point
+  within `maxLead` of the body, the flat arc or else the lob that comes down within `tolerance`
+  of it, or on the roof or wall `structure` within four times that; `out.reach` 'on', 'short'
+  (beyond reach: the farthest throw that way), 'blocked' (the arc landing nearest) or 'close';
+  `out.x/y/z` where the arc picked comes down; `farthestElevation` is its helper). The client
+  sends the answer's heading and pitch as the input's aim, so the server needs nothing new.
+  The numbers are the kind's `actions.throw` (`speed`, `gravity`, `lift`, `maxElevation`,
+  `spread`, `heavyMult` per stage where it says) and
   `cityWeapons` (`JavelinDef.lift`, `range`, `spreadMult`; the garage door's `gravity`, `lift`,
   `range`, `spreadMult`). No new message: the throw's velocity and gravity go out in
   `projectileSpawn` as before, and the input's `aimPitch` was already there.
@@ -596,7 +615,11 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
   most one per player every 2 s, less 0.3 s for the network's jitter, and only from somebody
   who plays a slot) and `input` (30 Hz):
   `{ seq, moveX, moveZ, aimYaw, aimPitch, buttons, card? }`; any time
-  `ping { t }`. `draftPick { card }` is accepted and ignored until
+  `ping { t, rtt?, snaps?, snapMax?, freezes?, frameMax? }` (round 5: in a match the page adds
+  its report since its previous ping, `PageReport`: its newest round trip in milliseconds, the
+  corrections of its own body of 15 cm or more and the largest in centimeters, the frames of
+  100 ms or more and the longest in milliseconds; the server clamps each and writes them into
+  its lines a minute, section 4.3). `draftPick { card }` is accepted and ignored until
   drafts exist. Payload types: `ClientMessages` in `shared/src/net/protocol.ts`. The server
   ignores anything malformed, unknown or out of turn; it never answers with an error.
 - Server → client: `lobby` `{ lobby, you }` (on joining and on every change), `welcome` (seed,
@@ -650,6 +673,8 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
 - `PROTOCOL_VERSION` 3 (round 4): the `rose` messages, `restart`, and the optional `wait`,
   `guessed` and `dropped` fields on `pong` (the network readout). The snapshot is unchanged
   (`SNAPSHOT_VERSION` stays 4).
+- `PROTOCOL_VERSION` 4 (round 5): the page's report on `ping` (`PageReport`). The snapshot is
+  unchanged by it.
 - Snapshot version 2 (polish pass 2) added the kaiju's `marked` flag, each squad's smoke and
   mark cooldowns, and the smoke clouds standing; version 3 took them out again with smoke and
   mark themselves. The layout is in the header of `shared/src/net/snapshot.ts`.
@@ -714,9 +739,15 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
 ### 4.3 The server loop (`server/src/room`)
 
 - One timer per room aims at absolute 30 Hz deadlines and calls `GameRoom.update()`. The
-  accumulator (`fixedStep.ts`) turns elapsed time into ticks and cannot spiral: a gap counts for
-  at most 250 ms, one update runs at most 4 ticks, and anything owed beyond that is dropped (the
-  match runs slow for a moment instead of catching up forever).
+  accumulator (`fixedStep.ts`) turns elapsed time into ticks and cannot spiral: one update runs
+  at most 4 ticks, and at most a second is owed (`MAX_OWED_MS`); a longer stall drops the rest.
+  **After the server stood still it catches up** (round 5): a stall of 0.4 s is played back
+  within about four updates, the world running up to four times as fast for a moment, so the
+  players' inputs, which kept coming 30 a second meanwhile, do not wait longer afterwards.
+  (Until round 5 a gap counted for at most 250 ms and anything owed beyond 4 ticks was dropped:
+  after every stall of about 0.17 s or more each player's inputs waited that much longer for the
+  rest of the match, which is how the third playtest's delay climbed to over a second.) The ticks
+  of a catch-up neither trim nor count a backlog (below). Snapshots stay at one per update.
 - **One input per tick, one tick late.** Each tick plays one input per connected player, in
   order, from that player's short queue (`inputQueue.ts`). The client predicts its body as "the
   body in the newest snapshot plus one tick for every input since", so the rule is that every
@@ -749,17 +780,34 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
   its own byte.)
 - **A silent player.** After 30 guessed ticks (1 s; 0.5 s until round 4, when tunnel stalls of
   0.6 to 1 s turned into pull-backs of up to 3.5 m) a connected but silent player is brought
-  to a stop, and after 45 (1.5 s) their held buttons are let go too, so a hiccup in the middle of
-  a brace or a volley does not cut it short. Only the guesses before the stop stand in for late
+  to a stop, and after 45 (1.5 s) their held buttons are let go too, all but Volley (round 5:
+  letting go of Volley fires the squad's volley, so a stall of 1.5 s or more fired it early and
+  the late inputs started the charge again from nothing; it now stays held until inputs come
+  again or a bot takes the seat), so a hiccup in the middle of a brace or a volley does not cut
+  it short. Only the guesses before the stop stand in for late
   inputs; the ticks after it stand for nothing (the player is away, not late). If that player's
   inputs then arrive all at once and the queue holds more than 5, it skips up to that many that
   carry no news, down to 2, to bring the player back to the present; the client is not told in
   advance and is corrected (after a stall that long it would be anyway).
 - **Backlogs.** Inputs that keep waiting (two or more after every tick for a second, as when
-  the cushion was built while the link was slow) are trimmed one at a time, and only while the
-  player's body stands still or nothing moves (the briefing), when skipping an input cannot be
-  seen. A queue of more than 48 is cut back regardless; a press among what is cut is carried
-  over.
+  the cushion was built while the link was slow) are trimmed one at a time, never below one
+  waiting behind the one played: while the player's body stands still or nothing moves (the
+  briefing), when skipping an input cannot be seen, and since round 5 while it moves too when
+  three or more have waited after every tick for a second (`INPUT_BACKLOG_MOVING`) and the input
+  skipped changes no button, holds none and no drop is owed: it costs the body one tick of
+  movement the client had counted (a small correction), where before a moving player kept the
+  delay for good (a line that had been 4 to 8 ticks late left 5 to 9 inputs waiting for the rest
+  of the match). The backlog is over as soon as fewer than two wait after a tick, so a flag left
+  over from it never skips the cushion later. `InputQueue.trimmed` counts the skipped inputs. A
+  queue of more than 48 is cut back regardless; a press among what is cut is carried over.
+- **The page owes its inputs by the real clock** (round 5, `client/src/game/input/inputTicker.ts`
+  `advanceTo`): after it froze, or while it draws only a few frames a second, it sends every
+  input tick of the time that passed, up to 45 (1.5 s) in one frame, while the rest of the page
+  plays at most a quarter second a frame. Before, it sent at most 8, so a page that froze for
+  over a quarter second sent fewer inputs than the server played and stayed late for good: every
+  input arrived after its tick had been played on a guess and was thrown away (its movement and
+  aim lost), and the body was stopped after a second. A page drawing under about 4 frames a
+  second was in that state all the time.
 - What this cannot mend: a release that arrives late was guessed as still held, so the hold
   lasts longer by the ticks guessed after it; behind a stall of about 0.4 s or more a tap can
   become a hold (`docs/STATUS.md`, known risks).
@@ -769,9 +817,25 @@ kaiju or faction is adding definitions plus, at most, one behavior module.
   `server/src/room/slowLog.ts`, round 4), at most one line per room every 5 s: an update that
   took over 30 ms (with the three systems that took the most, timed through the optional
   `mark` of `World.step` / `stepWorld`, the snapshot and sending, and garbage collection
-  pauses), the loop standing still for over 100 ms or dropping simulation time
-  (`FixedStep.dropped`), and a player whose inputs stopped for 0.3 s or more (written when they
-  come again, with whether the body was stopped).
+  pauses), the loop standing still for over 100 ms ("and caught up", or since round 5 only for a
+  stall over a second, how much of the match it skipped: `FixedStep.dropped`), and a player
+  whose inputs did not reach their ticks for 0.3 s or more (written when they come again, with
+  whether the body was stopped). Round 5 tells the two kinds of that apart (`InputStall.late`):
+  "stopped arriving ... (their connection stalled, or their page froze)" when nothing came (the
+  server cannot tell those two apart; the page's report in the lines a minute can), "kept arriving but too
+  late for their ticks ... (their page or computer fell behind, not the connection)" when inputs
+  kept coming at most of those ticks, each after its tick.
+- **Lines a minute** (round 5, unrationed, also printed whatever `MB_QUIET` says): while a match
+  runs, every minute and at its end, one line for the server (steps run, updates, their mean and
+  longest time, the longest wait between updates, how often it stood still, time skipped:
+  `SlowWatch.minute`) and one per person playing a slot (`SeatMinute`: input delay, which is
+  half the page's round trip plus the wait at the server, the queue's mean and most, inputs
+  arrived, ticks guessed and how many of those with the input late, the longest run of guesses,
+  inputs dropped and skipped, and from the page's report its round trip, corrections over
+  15 cm and frames over 0.1 s). The match keeps the per-slot counts in `MatchSession.tally`
+  (`SlotTally`); the queue counts `arrived` and `trimmed`. `host/savelog.cmd` (and `.sh`, and
+  `stop` and `update` before they throw the container's messages away) saves the whole log into
+  one dated text file (`docs/HOSTING.md`).
 - The end screen returns to the lobby when the host sends `toLobby`, or by itself after 120 s
   (20 s with `MB_FAST`, `MB_END_SCREEN` to change, 0 to wait for the host).
 
@@ -964,7 +1028,9 @@ layout, requires bumping `SNAPSHOT_VERSION` / `PROTOCOL_VERSION`.
 - Kaiju and vehicles are rigid segmented models (named nodes, see `ASSETS.md`) animated in code:
   walk cycles, wind-ups and recoveries are procedural, driven by the action state and timers.
   The kaiju's arms blend toward the pose targets the manifest gives each model (`poses`); in the
-  player's own first-person view the head is locked to the aim and the arms ride on it, so
+  player's own first-person view the head is locked to the view (`KaijuViewFrame.look`, the
+  controller's look direction; round 5: not the aim sent, which for a lob points far above the
+  view) and the arms ride on it, so
   snout and claws stay in one place on screen (`docs/art/client-notes-kaiju-lizard.md`). Each
   attack has two or three looks, a hash of the tick it began (a snapshot's tick less its phase
   time), so every screen shows the same one; each kaiju view draws its body with its own
@@ -1002,7 +1068,20 @@ layout, requires bumping `SNAPSHOT_VERSION` / `PROTOCOL_VERSION`.
   distance they take a capped share of the fog's color, their feet all of it); the open sea to
   the south, a headland far to the south-west and the River Wend's way north are water
   triangles in the ground's water mesh. Nothing in the simulation knows they are there.
-- UI is DOM over the canvas. The no-reading rule in `DESIGN.md` §8 is binding. A HUD picture
+- UI is DOM over the canvas. The no-reading rule in `DESIGN.md` §8 is binding. Since round 5
+  every word on the screens comes from one table, `client/src/ui/labels.ts` (`LABELS`, grouped
+  by where the words show; `strikeLabel`, `grabLabel`, `moveLabel`, `fireLabel`, `volleyLabel`,
+  `roseLabels` for the words that follow the state; the types `VolleyWord` and `AimWord`, which
+  `ui/volleyMeter.ts` and `render/throwPreview.ts` re-export), at most `LABEL_MAX_WORDS` (2) words
+  and `LABEL_MAX_CHARS` (14) characters each (`labelProblem`; `client/test/labels.test.ts` walks
+  the table). A label element is `label(text, className)`, class `lbl`: one style in
+  `styles.css` (capitals, the display font `--display-font`, sizes `--label` and `--label-big`).
+  The data the test reads: `CardPair.label` (each picture of the controls card,
+  `ui/controlsCard.ts`), `HUD_BUTTONS` (the squad's, the drone's, the menu's and the controls
+  card's buttons, `ui/hud.ts`) and `kitLabels(held, moves)` with `KIT_ACTIONS` (the monster's
+  buttons, `ui/kaijuKit.ts`). DOM classes the playtest tools read are unchanged (`.hint-word`,
+  `.vm-word`, `.boss-word`, `.crosshair-word`, `.sight-word` keep their names, now also `lbl`;
+  `.hint-word` moved from over the picture to under it). A HUD picture
   pinned to a point in the world (the tank's gun reticle) is placed from `MatchRuntime.onCamera`,
   which runs once the frame's camera is in place (shake included) and before the frame is drawn,
   so that it moves with the picture. (The screens' own `frame` runs before the camera moves: a
@@ -1054,6 +1133,17 @@ layout, requires bumping `SNAPSHOT_VERSION` / `PROTOCOL_VERSION`.
   takes a picture (`pause(on)`; the page keeps drawing the newest snapshot); the phase 2
   playtests use both (`tools/playtest/scriptedWeapons.mjs`, `shotsWeapons.mjs`). All page flags
   are listed in `client/src/app/params.ts`.
+- The monster's aim on its own screen (round 5): `KaijuController.aim` (a `KaijuAimView`,
+  types in `client/src/render/throwPreview.ts`) is rebuilt every frame: the view's yaw and pitch,
+  `throw` (what the crosshair is on, the throw's `reach`, whether it lobs, where it lands),
+  `lane` (a charge's lane and the building too tall to smash in it, or -1) and `warning` (an
+  `AimWord`: 'Too far', 'Blocked', 'Too close' or 'Too tall', the world point it goes under, and
+  whether the crosshair turns red too). The match runtime hands it to the renderer as
+  `RenderView.kaijuAim` (the throw's preview, the lane, the first-person head) and the match
+  screen hands its `warning` to `ui/kaijuSight.ts` (the word, the red crosshair ring, the hit
+  marks read from `projectileSpawn` / `projectileHit` events, stunned squads behind walls). The
+  word's look (white on #ff3f30 with a dark edge, `.sight-word` in `kaiju.css`) is meant to be
+  shared with the army's own "can't reach" words.
 - Client layout and data flow: `docs/STATUS.md` section 7. The rule that keeps it in pieces:
   `net/` knows nothing of three.js or the DOM beyond timers, `render/` knows nothing of the
   network or the HUD (it draws a `FrameState` and is handed events), `ui/` is DOM only, and the

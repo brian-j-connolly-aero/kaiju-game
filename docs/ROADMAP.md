@@ -170,6 +170,8 @@ The owner's decisions for this round:
 
 ## Round 5: after the third playtest (17 November 2026)
 
+**Built** (17 November 2026; `docs/STATUS.md`, the round 5 sections at its end; what to try next time and how to save the log: `docs/PLAYTEST.md`). In bot matches the stages take about 1:56 / 2:22 / 3:07 and the monster wins 8 of 20 (`docs/BALANCE.md` section 13).
+
 The first live multiplayer game: five players, each from home, the owner hosting. Verdict: the
 game was well balanced and the army almost won. The owner's notes, and the decisions for this
 round:

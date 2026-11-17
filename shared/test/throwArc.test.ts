@@ -2,15 +2,21 @@
  * Throws on real ballistic arcs (round 4; sim/throwArc.ts): the arc the preview draws is the arc
  * flown, the error is the seed's alone, a lob goes over a building, and the spread lets a throw
  * hit a squad standing still five monster lengths away most of the time and less often farther.
+ * Round 5: the throw lands where the crosshair points (`aimThrowAtPoint` picks the arc), and the
+ * landing ring drawn holds nearly every flat throw.
  */
 
 import { describe, expect, it } from 'vitest';
 import {
   aimThrowAt,
+  aimThrowAtPoint,
+  createLandingSpread,
+  createPointThrowAim,
   createThrowAim,
   createThrowFlight,
   createThrowLaunch,
   createThrowTrace,
+  landingSpread,
   LIZARD,
   spawnProjectile,
   throwClearance,
@@ -20,7 +26,10 @@ import {
   throwLaunch,
   traceThrow,
   type HeldObject,
+  type PointThrowAim,
   type SimEvent,
+  type ThrowFlight,
+  type ThrowTrace,
   type World,
 } from '../src/index';
 import { throwEffect } from '../src/sim/kaijuEffects';
@@ -170,8 +179,11 @@ describe('lobbing', () => {
 });
 
 describe('the spread at range', () => {
-  /** Share of `n` throws, aimed by the bots' aim, that hit a squad standing still `d` meters away. */
-  function hitRate(d: number, n: number): number {
+  /**
+   * Share of `n` throws that hit a squad standing still `d` meters away: aimed by the bots' aim,
+   * or (`crosshair`) by the monster player's crosshair on the squad's feet.
+   */
+  function hitRate(d: number, n: number, crosshair = false): number {
     let hits = 0;
     let world = arena({}, 1);
     for (let i = 0; i < n; i++) {
@@ -181,8 +193,14 @@ describe('the spread at range', () => {
       const k = world.kaijus[0];
       const u = placeUnit(world, 0, 0, d);
       u.hp = u.maxHp = 1e6;
-      const aim = createThrowAim();
-      expect(aimThrowAt(world.cityQuery, k, throwFlight(k.kind, k.stage, CAR, createThrowFlight()), u.x, 0, u.z, 5, 0, aim)).toBe(true);
+      const flight = throwFlight(k.kind, k.stage, CAR, createThrowFlight());
+      const aim = createPointThrowAim();
+      if (crosshair) {
+        aimThrowAtPoint(world.cityQuery, k, flight, u.x, u.y, u.z, A.impactRadius[0] * 0.25, -1, LIZARD.headLeadMax, throwClearance(k), aim);
+        expect(aim.reach).toBe('on');
+      } else {
+        expect(aimThrowAt(world.cityQuery, k, flight, u.x, 0, u.z, 5, 0, aim)).toBe(true);
+      }
       k.held = CAR;
       k.aimYaw = aim.yaw;
       k.aimPitch = aim.pitch;
@@ -201,5 +219,109 @@ describe('the spread at range', () => {
     expect(near).toBeLessThanOrEqual(0.92);
     expect(far).toBeLessThan(near - 0.25);
     expect(far).toBeGreaterThan(0);
+  });
+
+  it('hits it as often with the crosshair on its feet (round 5: the balance stays)', () => {
+    const near = hitRate(5 * HATCHLING_LENGTH, 80, true);
+    expect(near).toBeGreaterThanOrEqual(0.65);
+    expect(near).toBeLessThanOrEqual(0.92);
+  });
+
+  it('lands inside the ring drawn nearly every time, flat throws too (round 5: one in four fell outside)', () => {
+    const flight = throwFlight('lizard', 1, CAR, createThrowFlight());
+    const world = arena();
+    const k = world.kaijus[0];
+    const aim = createThrowAim();
+    expect(aimThrowAt(world.cityQuery, k, flight, 0, 0, 5 * HATCHLING_LENGTH, 1, 0, aim)).toBe(true);
+    expect(aim.high).toBe(false);
+    const src = { kind: k.kind, stage: k.stage, x: 0, z: 0, aimYaw: aim.yaw, aimPitch: aim.pitch };
+    const launch = throwLaunch(src, flight, createThrowLaunch());
+    const aimed = traceThrow(world.cityQuery, launch, 0, createThrowTrace());
+    const ring = landingSpread(launch, aimed, createLandingSpread());
+    const trace = createThrowTrace();
+    let outside = 0;
+    const n = 400;
+    for (let seed = 0; seed < n; seed++) {
+      traceThrow(world.cityQuery, throwError(throwLaunch(src, flight, createThrowLaunch()), 1000 + seed * 7919), 0, trace);
+      const dx = trace.x - aimed.x;
+      const dz = trace.z - aimed.z;
+      const along = dx * ring.dirX + dz * ring.dirZ;
+      const across = dx * ring.dirZ - dz * ring.dirX;
+      if ((along / ring.along) ** 2 + (across / ring.across) ** 2 > 1) outside++;
+    }
+    expect(outside / n).toBeLessThanOrEqual(0.08);
+  });
+});
+
+describe('aiming at the crosshair’s point (round 5)', () => {
+  const TOLERANCE = A.impactRadius[0] * 0.25;
+
+  /** The monster's throw at (tx, ty, tz) from the origin, facing +z, and the arc it flies. */
+  function aimAt(world: World, tx: number, ty: number, tz: number, structure = -1, preferHigh = false): { aim: PointThrowAim; flight: ThrowFlight; trace: ThrowTrace } {
+    const k = world.kaijus[0];
+    const flight = throwFlight(k.kind, k.stage, CAR, createThrowFlight());
+    const aim = aimThrowAtPoint(world.cityQuery, k, flight, tx, ty, tz, TOLERANCE, structure, LIZARD.headLeadMax, throwClearance(k), createPointThrowAim(), preferHigh);
+    const launch = throwLaunch({ kind: k.kind, stage: k.stage, x: k.x, z: k.z, aimYaw: aim.yaw, aimPitch: aim.pitch }, flight, createThrowLaunch());
+    const trace = traceThrow(world.cityQuery, launch, throwClearance(k), createThrowTrace());
+    // The answer says where its arc comes down: exactly where the arc flown with its aim does.
+    expect(Math.hypot(aim.x - trace.x, aim.y - trace.y, aim.z - trace.z)).toBeLessThan(1e-9);
+    return { aim, flight, trace };
+  }
+
+  it('lands on open ground where the crosshair points, on the flat arc', () => {
+    const { aim, trace } = aimAt(arena(), 6, 0, 24);
+    expect(aim.reach).toBe('on');
+    expect(aim.high).toBe(false);
+    expect(trace.end).toBe('ground');
+    expect(Math.hypot(trace.x - 6, trace.z - 24)).toBeLessThanOrEqual(TOLERANCE);
+  });
+
+  it('lobs over a house in the way, and comes down beyond it', () => {
+    const { aim, trace } = aimAt(arena({ structures: [{ x: 0, z: 11, w: 12, d: 6, height: 9, hp: 1e6 }] }), 0, 0, 30);
+    expect(aim.reach).toBe('on');
+    expect(aim.high).toBe(true);
+    expect(trace.end).toBe('ground');
+    expect(Math.hypot(trace.x, trace.z - 30)).toBeLessThanOrEqual(TOLERANCE);
+  });
+
+  it('keeps the lob while it was the last choice and still gets there (no flicker), else takes the flat arc', () => {
+    const world = arena();
+    expect(aimAt(world, 0, 0, 30, -1, true).aim).toMatchObject({ reach: 'on', high: true });
+    expect(aimAt(world, 0, 0, 30, -1, false).aim).toMatchObject({ reach: 'on', high: false });
+  });
+
+  it('lands on the roof the crosshair is on', () => {
+    const world = arena({ structures: [{ x: 0, z: 30, w: 14, d: 14, height: 8, hp: 1e6 }] });
+    const { aim, trace } = aimAt(world, 1, 8, 31, 0);
+    expect(aim.reach).toBe('on');
+    expect(trace.end).toBe('structure');
+    expect(trace.structure).toBe(0);
+    expect(trace.ny).toBeGreaterThan(0.5);
+  });
+
+  it('beyond reach, goes as far as any throw can that way, and says so', () => {
+    const world = arena();
+    const { aim, flight, trace } = aimAt(world, 0, 0, 200);
+    expect(aim.reach).toBe('short');
+    expect(trace.end).toBe('ground');
+    const k = world.kaijus[0];
+    const other = createThrowTrace();
+    for (let pitch = -0.6; pitch <= 1.2; pitch += 0.05) {
+      traceThrow(world.cityQuery, throwLaunch({ kind: k.kind, stage: k.stage, x: 0, z: 0, aimYaw: 0, aimPitch: pitch }, flight, createThrowLaunch()), 0, other);
+      expect(other.z).toBeLessThanOrEqual(trace.z + 0.5);
+    }
+  });
+
+  it('says when a house stands in the way of every arc', () => {
+    // A tall block right in front: neither arc gets to the street behind it.
+    const { aim } = aimAt(arena({ structures: [{ x: 0, z: 12, w: 30, d: 6, height: 60, hp: 1e6 }] }), 0, 0, 30);
+    expect(aim.reach).toBe('blocked');
+  });
+
+  it('beside the monster, beyond the head’s turn: as far round as it turns, and says so', () => {
+    const off = 80 * (Math.PI / 180);
+    const { aim } = aimAt(arena(), Math.sin(off) * 25, 0, Math.cos(off) * 25);
+    expect(aim.reach).toBe('close');
+    expect(aim.yaw).toBeCloseTo(LIZARD.headLeadMax, 9);
   });
 });

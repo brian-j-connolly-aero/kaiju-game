@@ -47,6 +47,8 @@ class Rig {
   /** Every event the server's world produced, in order. */
   readonly emitted: SimEvent[] = [];
   frame: FrameState | null = null;
+  /** Input ticks the newest frame sent. */
+  ticksLastFrame = 0;
 
   private readonly ticker = new InputTicker();
   private readonly toServer: Array<{ at: number; input: PlayerInput }> = [];
@@ -132,7 +134,9 @@ class Rig {
         const frame = this.session.sample(this.now, dt);
         this.frame = frame;
         if (!frame) continue;
-        const ticks = this.ticker.advance(dt);
+        // As MatchRuntime.update: the input ticks follow the real clock, not the clamped `dt`.
+        const ticks = this.ticker.advanceTo(this.now, dt);
+        this.ticksLastFrame = ticks;
         for (let t = 0; t < ticks; t++) this.session.tickInput(this.control, this.now);
         this.session.refreshLocal(this.ticker.alpha);
         onFrame?.(frame, this.now, dt);
@@ -297,6 +301,34 @@ describe("the local kaiju's own wind-up", () => {
     expect(lastWindup).toBeLessThan(0.1 + roundTripMs / 1000 + 4 * DT + 0.05);
     expect(rig.session.hint).toBeNull();
     expect(rig.world.kaijus[0].phase).toBe('idle');
+  });
+});
+
+describe('a page that freezes or draws slowly', () => {
+  it('sends every input it owes on the first frame after a freeze, so its inputs are not late for good', () => {
+    // Round 5, the third playtest: a page that froze for 0.5 s sent only 8 inputs (a quarter
+    // second) on its next frame, so every later input reached the server a few ticks after its
+    // tick: played as a guess and thrown away, and the body stopped and snapped back.
+    const rig = new Rig({ role: 'human', stage: 1, roundTripMs: 60 });
+    rig.run(1);
+    const sent = rig.session.stats.inputs;
+    rig.run(0.5, null, false);
+    expect(rig.session.stats.inputs).toBe(sent);
+    rig.run(1 / 60 + 0.002);
+    expect(rig.ticksLastFrame).toBeGreaterThanOrEqual(15);
+    expect(rig.ticksLastFrame).toBeLessThanOrEqual(16);
+    // Over the whole stretch the page sent one input per tick of time.
+    const elapsed = 0.5 + 1 / 60 + 0.002;
+    expect(Math.abs(rig.session.stats.inputs - sent - elapsed / DT)).toBeLessThanOrEqual(1);
+  });
+
+  it('keeps sending thirty inputs a second at three frames a second', () => {
+    // A browser drawing without its graphics card: frames of 0.28 s, which play as 0.25 s.
+    const rig = new Rig({ role: 'human', stage: 1, roundTripMs: 60, fps: 3.6 });
+    rig.run(1);
+    const sent = rig.session.stats.inputs;
+    rig.run(10);
+    expect(Math.abs(rig.session.stats.inputs - sent - 10 / DT)).toBeLessThanOrEqual(2);
   });
 });
 

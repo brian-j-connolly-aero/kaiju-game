@@ -1,92 +1,97 @@
-# What to try at this afternoon's playtest (16 November)
+# What to try at the next playtest (round 5)
 
-Everything below is new since the second playtest. The computer bots and the test scripts have
-played it all; people have not. Your afternoon is the real test.
+Everything below is new since the third playtest (the first live game, five players from home).
+The bots and the test scripts have played it all; people have not. Your evening is the real test.
 
 ## Starting
 
 1. Get the new version: double-click `host/update.cmd` (or unpack the new zip over the old
    folder), then `host/start.cmd`. It shows the link for your friends and checks that it works.
-   Full steps and what to do if something goes wrong: [HOSTING.md](HOSTING.md).
-2. Open http://localhost:2567 yourself, create a room, send the link. Send your friends
-   [PLAYING.md](PLAYING.md) too: it now explains the communication rose and throwing.
-3. Talk on your own voice chat (Discord). The game has no voice chat of its own.
+   Full steps: [HOSTING.md](HOSTING.md).
+2. Before you start, worth trying on the host computer (sensible, not yet measured on Windows):
+   close heavy programs, do not share your screen in the voice chat, plug a laptop in and pick
+   the **Best performance** power mode, and give Docker or Podman at least **2 processors**
+   ([HOSTING.md](HOSTING.md) section 6, item 7).
+3. Send your friends [PLAYING.md](PLAYING.md). Everyone: if the game shows only a few pictures a
+   second, turn on **Use graphics acceleration when available** in the browser and restart it.
 
 ## What changed since last time
 
-**Talking and restarting**
-- The automatic radio and news chatter is gone. The only line left: once per molt the
-  television news tells the monster's player the creature is ready to shed its skin.
-- **Hold Z** (d-pad down on a controller): a ring of pictures opens round your crosshair. Move
-  the mouse to one and let go. The army shouts a silly one-sentence 1950s monster-movie line
-  over the radio in its squad's voice, with a subtitle; the monster roars, snuffles, growls,
-  chomps, purrs or sings a little mating call. Everyone hears it; it changes nothing in the
-  game. One every two seconds. Let go in the middle to say nothing.
-- **Restart:** the host presses Escape, then the circular arrow twice (red after the first
-  press). Everyone starts over on the same sides.
+**The lag** (your notes: "terrible lag").
+- When the host computer is too busy for a moment, the game now catches up afterwards. Before,
+  it skipped that moment and from then on everyone's keys reached the game later and later, for
+  the rest of the match. In our five-player test with the host computer stalling every 10
+  seconds, the worst delay climbed from 0.1 s to **1.2 s** by the end of the match before, and
+  stayed at **0.1 to 0.16 s** now.
+- When a player's browser freezes for a moment, it now sends every key press it owes. Before,
+  their steering was ignored and their body stopped and snapped back a second later: after 17
+  of 20 freezes in our test, **0 of 26** now.
+- Right after the host computer stood still, everything runs up to four times as fast for a
+  fraction of a second while the game catches up. That is on purpose.
 
-**The monster**
-- **Throwing on real arcs.** Holding something, you see a yellow arc from your hand, a tube that
-  widens with distance, and a ring where it can land. Look higher to throw farther or to lob
-  over a house; look lower to throw short and flat. It lands somewhere in the ring: a squad
-  standing still about five of your lengths away is hit about three times in four, twice as far
-  about once in four. The camera moves over your right shoulder while you hold something.
-- **What you can pick up glows** gold, brighter and pulsing within reach of your hand.
-- **Rage:** three claw marks round your crosshair heat up from a dark scar to white-hot, and throb
-  when the beam is ready.
-- **The power surge** now shows a big blue lightning badge with a ring that runs down, and every
-  hit flashes electric.
-- **The titan wades:** in the bay, the river and the moat it stands in the water up to its
-  thighs, with foam and a wake, and moves at 70% of its speed.
-- The fallen radio mast's top can be picked up and thrown at every size, and throws from beside
-  rubble fly over it instead of sticking.
+**The army's shooting**
+- **The machine gun streams:** hold the left button, about six tracers a second. Its charged
+  volley works, and both hit harder than your own gun.
+- **A word under the crosshair always says whether you can volley:** READY, or why not (SHAKEN,
+  STUNNED, RELOAD, LANDING, NO LINE, TOO FAR, NO SQUAD). Holding the right button: CHARGING,
+  READY past the notch, FIRE! when full. After you let go: VOLLEY!, WEAK, NO SHOT or IMMUNE.
+- **The weird yellow circle is gone.** TEAM UP now shows beside the monster's nerve bar when
+  another squad's volley has just landed and yours would break it.
+- **BLOCKED:** the crosshair turns red with a bar when your own shot would hit cover in front of
+  the monster.
 
-**The army**
-- Squads on foot squeeze through the narrow gaps between houses; the other units follow.
-- A crate's weapon now changes the charged volley too: a hail of tracers (machine gun), heavy
-  shells (big cannon) or a flight of missiles (missile pod).
+**The monster's throwing**
+- **The throw lands where the crosshair is** (street, roof, squad). The game picks a flat throw
+  or a lob over a house. A bold orange arc, a filled circle and a dashed ring mark the landing,
+  by day and at night.
+- **Red with a word means it cannot get there:** TOO FAR, BLOCKED, TOO CLOSE; BLOCKED for a beam
+  stopped by a building; TOO TALL for the building that will stop a charge.
+- **Who hit you:** a red ring round the squad that shot you, or a red arrow at the screen's edge.
 
-**Both sides**
-- The controls card (H) shows at most five big pictures: only what you can do right now.
-- Civilians no longer pop in and out of view.
-- The molt picture under the city bar lights up exactly when the bar reaches it.
-- New, faster match music, one track per stage, and a last-minute track with an alarm that ends
-  exactly as the clock runs out.
-- The snapping back through the tunnel: a connection stall of up to a second no longer pulls
-  your body back, and a few small jolts the game caused itself are fixed.
+**Words beside every picture.** Every button, bar, card, rose wedge and menu has a label of one
+or two words in capitals, and the button's word follows what it does right now (the monster's
+left button says THROW while it holds something).
 
-## What to try
+## What to try first
 
-- **Monster:** throw cars at squads near and far; lob one over a house. Can you read at a glance
-  where it will land, by day and at night, and at the biggest size? Does the camera move over
-  the shoulder feel jumpy? Does the glow make the garage doors and propane tanks read as things
-  to pick up, or is a street of cars too busy?
-- **Army:** do the narrow gaps help or get you stuck? Does a thrown car feel dodgeable but
-  dangerous? Do the crate volleys feel worth it?
-- **Everyone:** use the rose a lot. Are the shouted lines understandable through the radio
-  crackle? Which squad voices sound too alike? Does the music get tiring, or drown the effects?
-  Try one restart.
+1. **Play one whole match on the same sides as last time** and say: do keys still feel late? Does
+   anyone snap back? Do other players jump about? Say who played the monster.
+2. **Army:** take a machine gun crate and hold the left button on the monster; then hold the right
+   button and let go at FIRE!. Watch the word under your crosshair: did you always know whether
+   you could volley? Volley together with another squad when TEAM UP shows.
+3. **Monster:** throw cars at squads near and far, and at a squad behind a house. Does it land
+   where you pointed? Is the landing mark easy to see at the biggest size and at night?
+4. **New players:** before they press anything, ask them what each button does. Note any word
+   that was unclear, wrong, or missing.
 
-## If your character snaps back
+## After the session: save the log and send it
 
-Press **`** (the key under Escape, left of 1). A small panel opens at the top left with the
-connection's numbers and a 30-second graph. Right after a snap, take a screenshot of the whole
-screen. After the session, double-click `host/logs.cmd` and copy the window. Send both, with who
-played which side and roughly when. In the graph a tall red bar is a snap, a blue spike with it
-means the connection stalled, and purple marks mean that computer froze for a moment. Press **`**
-again to close it. More in [HOSTING.md](HOSTING.md), section 6, item 9.
+1. Double-click `host/savelog.cmd`. A folder **Monster Battle logs** opens on the desktop with
+   the file selected (`stop.cmd` and `update.cmd` also save one first, by themselves). It says
+   for every player, minute by minute, how late their keys were, how often they snapped back and
+   whether their page froze, and every moment the host computer was too busy.
+2. Send that file, with who played which side, and which seat was the host.
+3. About the host computer: Docker or Podman, how many processors and how much memory (Windows:
+   Settings, System, About), and whether anyone shared a screen in the voice chat.
+4. If something felt laggy at one moment: press **`** (left of 1) to open the network readout,
+   take a screenshot at once, and say roughly when.
+
+If `savelog.cmd` does not work, double-click `logs.cmd`, copy everything in the window and send
+that instead.
 
 ## Known risks
 
-- **Nobody has heard the new sounds:** the rose lines, the monster's noises and the new music
-  were checked by measurement only (no speakers here). Tell us what sounds wrong or too loud.
-- Throwing was tuned with bots. The speed and accuracy may need another pass, the landing ring
-  is small on screen at the biggest size, and the arc does not show soldiers in the way.
-- Balance is from bot matches only: the monster won 8 of 20 (16 of 40 over a longer run). Four
-  people may find either side too strong; that is the next round's job.
-- If several squads talk at once their lines wait their turn; a line still waiting after four
-  seconds is dropped.
-- Connection stalls longer than a second still snap you back: that is the tunnel or the network.
-- In a narrow gap the squad's camera sits very close, and some soldiers drawn may overlap a wall.
-- The pictures here were drawn without a graphics card. If anything looks broken or runs
-  slowly, a screenshot helps.
+- **The lag fixes were tested on this machine, not on yours.** We made the host stall and the
+  players' browsers freeze on purpose and the game now copes. Whether your computer was stalling,
+  or the tunnel, or a player's browser, we cannot tell without your log. A stall on someone's own
+  internet line of over a second still snaps them back.
+- **`savelog.cmd` has never been run on Windows** (checked line by line only). If it fails, use
+  `logs.cmd` as above.
+- A browser drawing only a few pictures a second still plays badly (choppy, about half its key
+  presses a little late); graphics acceleration is the fix.
+- **Nobody has used the new words, the machine gun or the throw in a real fight.** All of it was
+  judged on pictures drawn without a graphics card. The words may look large on a big television.
+- A throw lands where the crosshair is, not where a running squad will be: aim ahead of it.
+- **Balance** in bot matches: the monster won 8 of 20 (22 of 40 over a longer run), against 8 of 20
+  and 16 of 40 last time; within what bots can tell. Watch whether the army's machine gun or the
+  monster's easier throwing tips it.

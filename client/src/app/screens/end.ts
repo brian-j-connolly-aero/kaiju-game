@@ -1,12 +1,14 @@
 /**
- * End screen (DESIGN.md section 8): who won and how, as pictures; a pictogram tally of what
- * each player flattened; and a newspaper front page with a photo of the match over squiggle
- * text, while the hearing music plays. The host takes everyone back to the lobby, or restarts the
- * same match from the settings panel.
+ * End screen (DESIGN.md section 8): who won and how, as pictures with their labels ("Monster
+ * wins" or "Squads win"; "City flattened", "Monster down" or "Time up": round 5, ui/labels.ts); a
+ * pictogram tally of what each player flattened; and a newspaper front page with a photo of the
+ * match over squiggle text, while the hearing music plays. The host takes everyone back to the
+ * lobby ("Lobby"), or restarts the same match from the settings panel.
  */
 
 import { TALLY_CLASSES, type MatchEndEvent, type PlayerTally, type TallyClass } from '@mb/shared';
 import { el, icon } from '../../ui/icons';
+import { label, LABELS } from '../../ui/labels';
 import type { AppContext, Screen } from '../context';
 
 const REASON_ICON = { bar: 'tl_tower', kill: 'ui_skull', clock: 'ui_clock' } as const;
@@ -63,9 +65,9 @@ export class EndScreen implements Screen {
     const iWon = result ? (session.role.kind === 'kaiju') === kaijuWon : false;
 
     const banner = el('div', `end-banner ${kaijuWon ? 'kaiju' : 'humans'}`, [
-      icon(kaijuWon ? 'lb_kaiju' : 'lb_human', 'end-winner'),
+      el('div', 'end-pair', [icon(kaijuWon ? 'lb_kaiju' : 'lb_human', 'end-winner'), result ? label(kaijuWon ? LABELS.end.monsterWins : LABELS.end.squadsWin, 'end-label') : '']),
       icon('ui_trophy', 'end-trophy'),
-      result ? icon(REASON_ICON[result.reason], 'end-reason') : '',
+      result ? el('div', 'end-pair', [icon(REASON_ICON[result.reason], 'end-reason'), label(LABELS.end[result.reason], 'end-label')]) : '',
     ]);
     if (session.role.kind !== 'spectator' && result) banner.classList.add(iWon ? 'won' : 'lost');
 
@@ -99,7 +101,7 @@ export class EndScreen implements Screen {
       el('div', 'paper-foot', [squiggles(4, ''), squiggles(4, ''), squiggles(4, '')]),
     ]);
 
-    const back = el('button', 'btn btn-big end-back', [icon('lb_back')]);
+    const back = el('button', 'btn btn-big btn-labelled end-back', [icon('lb_back'), label(LABELS.end.lobby)]);
     back.addEventListener('click', () => {
       ctx.audio.play('ui_click');
       ctx.client.send('toLobby', {});

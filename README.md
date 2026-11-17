@@ -23,8 +23,9 @@ communication rose (your character says something silly; talk itself happens on 
 chat), and the host restarts a match from the Escape menu.
 
 Before the next playtest, read **[docs/PLAYTEST.md](docs/PLAYTEST.md)**: one page on what changed
-since the second playtest, what to try on each side, what to send back if your character snaps
-back, and the known risks.
+since the third playtest (the lag, the army's shooting, the monster's throwing, a word beside
+every picture), what to try first, how to save the game's log afterwards (`host/savelog.cmd`)
+and what to send back, and the known risks.
 
 ## For developers
 

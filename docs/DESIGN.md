@@ -9,8 +9,8 @@ code disagree, fix whichever is wrong and keep them in sync.
 
 **Tier 1 (build first, must be rock solid):** one kaiju (the Lizard, "Gragnor") against four Army
 squads, all three stages, the molt, the full city, bots, lobby with invite codes, the no-reading
-HUD, music, sound effects, voiced radio talk (since round 4: the communication rose), end screen,
-self-hosting package.
+HUD (pictures, with labels of one or two words since round 5), music, sound effects, voiced
+radio talk (since round 4: the communication rose), end screen, self-hosting package.
 
 **Tier 2 (content on top of the same systems):** Crab, Burrower, Moth; Air, Super Science,
 Coalition of Faiths; upgrade drafts; reporter drones with front-page photos; playable tutorial.
@@ -254,7 +254,7 @@ Action timings are the tells. `r` = body radius for the stage.
 | Swipe | Strike | 0.45 / 0.15 / 0.5 s | 120° arc, reach 2.5 r. Units: 70 damage, 40 nerve. Structures: 40 / 300 / 2000 by stage. |
 | Stomp | Stomp | 0.9 / 0.1 / 0.9 s | Shockwave radius 3.6 r. Units: 100 at center to 30 at edge, knockback. Structures: 55 / 420 / 2600 with falloff. |
 | Grab | Grab | 0.4 s | Grabs the nearest car, wreck, live vehicle (stage 2+) or building chunk (stage 2+) in a 100° arc within 2.5 r. |
-| Throw | Strike, holding something | 0.3 / 0 / 0.2 s | A real ballistic arc along the aim, 15° above where the head looks (round 4, below): a car at 25 / 110 / 310 m/s under 9.8 / 46 / 105 m/s² of gravity; each throw a little off (a cone of 10° / 2.9° / 1.85°). Impact: units 120 in radius 4 / 10 / 22 m; structures 60 / 350 / 1500. |
+| Throw | Strike, holding something | 0.3 / 0 / 0.2 s | A real ballistic arc that lands where the crosshair points (round 5, below; the game picks the flat arc or the lob): a car at 25 / 110 / 310 m/s under 9.8 / 46 / 105 m/s² of gravity; each throw a little off (a cone of 10° / 2.9° / 1.85°). Impact: units 120 in radius 4 / 10 / 22 m; structures 60 / 350 / 1500. |
 | Eat | Grab, holding something (or nothing to grab but something edible in reach) | 2.0 s, rooted | Heals 80 hp. 10 s cooldown. The meal is consumed. |
 | Club | Strike, holding a fast-food sign (phase 2) | 0.5 / 0.15 / 0.55 s | 200° arc in front of the head, reach 4 r (1.6 times the swipe's). Units: 140 damage, 60 nerve, thrown back 2.5 r at the body, half that at the tip. Structures: 80 / 600 / 4000, twice a swipe. Three swings, then the sign breaks. |
 | Molt | Molt, one press | 10 s cocoon | Only when a molt is available. The molt cards are offered (below). |
@@ -280,7 +280,8 @@ fast from 60% (a volley that counts) and flashes white when the volley is fired
 
 ### Molt cards
 
-At each molt the kaiju picks one new move from three cards (pictures, no text). As built
+At each molt the kaiju picks one new move from three cards (pictures, each with the move's name
+under it since round 5: "Beam", "Roar", "Charge", "Tail sweep", "Brace"). As built
 (`shared/src/sim/moltCards.ts`):
 
 - The cards are offered when the cocoon starts. First molt: **beam**, **roar**, **charge**.
@@ -338,10 +339,15 @@ definition.
 - **Throw** (round 4, the owner: "real trajectory physics please, could angle over buildings";
   `shared/src/sim/throwArc.ts`, numbers in the kind's `actions.throw`). The object leaves the
   hand (0.6 body radii ahead of the body's axis along the aim, at the hand's height: 2.2 / 16 /
-  58 m) along the aim's heading, at the aim's pitch plus a lift of 15° (so looking at a squad
-  throws at it; looking higher lobs over what stands in the way), and flies a true parabola: no
-  aiming at a point, no aiming delay. Its speed is set by the stage and its weight: a car or a
-  car's wreck 25 / 110 / 310 m/s, a tank, a tank's wreck or a chunk of building 0.85 of that.
+  58 m) along the aim's heading, at the aim's pitch plus a lift of 15°, and flies a true
+  parabola, with no aiming delay. **Where it goes** (round 5, the owner: "monster throwing was
+  confusing"): the monster player's throw lands where the crosshair points. The game picks the
+  aim for it (`aimThrowAtPoint`): the flat arc when the way is clear, the lob over whatever
+  stands in the way when only the lob gets there, and beyond the throw's reach the farthest
+  throw that way. The server still flies whatever aim it is sent; nothing about the flight, the
+  speeds or the spread changed (below: "Throwing on screen"). Its speed is set by the stage and
+  its weight: a car or a car's wreck 25 / 110 / 310 m/s, a tank, a tank's wreck or a chunk of
+  building 0.85 of that.
   Gravity grows with the monster (9.8 / 46 / 105 m/s²) so that the arc keeps the shape of a
   real toss at its size and still lands quickly: at real gravity a titan's throw would hang in
   the air for ten seconds. A car thrown with the head level travels about 39 / 176 / 618 m
@@ -356,7 +362,8 @@ definition.
   squad three hatchling lengths away 98% of the time, five 80%, seven 52%, ten 25%; a tank five
   juvenile lengths away 75%, six 69%, seven 59% (ten is out of reach); a tank troop three titan
   lengths away 93%, five 73%, six 66% (seven is out of reach). A lob is less accurate than a flat
-  throw (it flies longer).
+  throw (it flies longer). With the crosshair on the squad (round 5) the hit rates are the same:
+  80 / 75 / 73% five lengths away by stage, 300 throws each.
   **What it meets.** It hits the first structure, unit or ground its arc meets (never its
   thrower), exactly as the projectile system flies it, and damages everything inside the impact
   radius. Aimed high it clears a building and comes down beyond it; aimed low it hits the wall.
@@ -592,10 +599,19 @@ already"; docs/ROADMAP.md).
   with the volley's charge on top, and reloads for as many of the pick-up's reloads (never less
   than one); the rule that two squads' charged volleys within 5 s break the monster stays:
   - **Machine gun:** tracers, 5 times the rate of fire at a third of the damage, nerve and
-    structure damage per shot (1.67 times as much over time), a third of the splash, and a
-    spread of 1.5° (one sigma) on every shot, a person's own too. In a volley every gun fires a
-    burst of five pulls at once (15 tracers from a full section): 1.67 times a volley's damage
-    and nerve, and the gun's own reload after it.
+    structure damage per shot (1.67 times as much over time), a third of the splash. Since
+    round 5 (the owner: "could only shoot one at a time") Fire **streams**: one tracer every
+    sixth of a second for as long as it is held, from the unit's launchers or tanks in turn, each
+    carrying its sixth of a second's share of that rate (`stream`, `defs/pickups.ts`), with a
+    spread of 0.3° (one sigma) for the look. Round 4 fired all of a pull's tracers on one tick,
+    one pull every 0.53 s on foot and 0.67 s in a tank (a stage 2 tank: a single tracer), with a
+    1.5° spread on every shot that made most of them miss the hatchling: it dealt 0.66 times the
+    plain launchers' damage at 60% of range. Now 1.3 to 1.5 times at every stage and range, the
+    same number of tracers a second on foot as before (6), more in a tank. In a volley every gun
+    fires a burst of five pulls at once (15 tracers from a full section), with the volley's own
+    aim error and no spread (round 4's spread left a machine-gun volley worth 0.64 times a plain
+    one at the hatchling; now 1.4 to 1.6 times): 1.67 times a volley's damage and nerve, and the
+    gun's own reload after it.
   - **Big cannon:** heavy shells, 2.5 times the reload for 3.5 times the damage and structure
     damage, twice the nerve and 1.6 times the splash. In a volley every gun fires a heavy shell:
     3.5 times a volley's damage, twice its nerve.
@@ -635,7 +651,12 @@ already"; docs/ROADMAP.md).
   0 to 1 over 4.5 s, while the HUD's big meter fills. The leader is never planted and can keep
   moving. Let go: every planted squad-mate with charge fires at the crosshair, the leader's own
   shot goes with them if its weapon is ready, and the squad-mates follow again. Let go early for
-  a weak shot. A stunned or shaken squad-mate neither charges nor fires.
+  a weak shot. A stunned or shaken squad-mate neither charges nor fires. A squad-mate still
+  reloading charges only to just under the 60% notch and goes on once its weapon is loaded
+  (round 5): a charge that counts is always one that fires. (Round 4 let it charge to full and
+  then skipped it on the release, its charge spent: after a big cannon or missile pod volley,
+  whose reload outlasts a whole charge, a third of the squad-mates' charged shots were thrown
+  away, and the meter flashed "fired" all the same.)
 - **The swarm:** the squad-mates follow the leader as a loose group around and behind it, keep
   up with it, and fire at will on their own when they have range and a line of fire (half
   nerve, the at-will aim error).
@@ -706,17 +727,29 @@ four are gone the player is out until the next molt and gets a free-flying news 
   charged volley. A planted squad-mate does not fire at will.
 - **The volley.** The volley button held (or let go on this very tick): every living squad-mate
   that is neither stunned nor shaken plants where it stands, its laser on (`state` 'charging'),
-  its charge growing over 4.5 s, its weapon swinging (270° per second) toward the point the
-  view's aim ray from the leader's eye lands on; with the crosshair on a kaiju, toward the
-  middle of its body at that height, so that shots from every side connect. On the tick the
+  its charge growing over 4.5 s (only to just under 60% while its weapon is still reloading:
+  `chargeCap` in `systems/unitOrders.ts`, round 5), its weapon swinging (270° per second) toward
+  the point the view's aim ray from the leader's eye lands on; with the crosshair on a kaiju,
+  toward the middle of its body at that height, so that shots from every side connect. Since
+  round 5 the same holds when that ray stops on a building, a heap or the ground but, carried on
+  through it, passes through a kaiju's body (`volleyPoint` in `sim/squads.ts`): the third-person
+  camera hangs above and behind the leader and sees the monster over a garage the leader
+  crouches behind, and round 4 sent the whole volley, squad-mates standing in the open with clear
+  lines included, into the garage wall (and the artillery radio's barrage onto the garage beside
+  the squad). The leader's own shot stays a shot from where the leader stands. On the tick the
   button is let go, each planted squad-mate with charge whose weapon is ready fires at that
   point with the multipliers and aim error its charge has earned, the leader's own shot joins
   if its weapon is ready, and every planted squad-mate is let go, fired or not: its charge is
   spent and it follows again. Only a charged volley is announced (the `volley` event, "volley
-  away" on the radio, the player's tally). Nothing checks line of sight for a volley, and range
-  only through how far the shots fly: a building in the way is the player's problem, and the
-  bar's gain. A squad-mate that is shaken lets go and backs off; when it steadies with the
-  button still held, it plants afresh, its charge from 0.
+  away" on the radio, the player's tally). Nothing in the simulation checks a squad-mate's own
+  line of fire for a volley, and range only through how far the shots fly: a building between a
+  squad-mate and the point takes its shot (and the bar gains). The squad's screen shows which
+  squad-mates have no line, from the same rules (section 8, "The squad's screen"). A squad-mate
+  that is shaken lets go and backs off; when it steadies with the button still held, it plants
+  afresh, its charge from 0. A held Volley stays held through a stall on the line (round 5: the
+  server used to let go of every button after 1.5 s without input, which fired the volley early
+  and started the charge again from nothing; `server/src/room/match.ts`), and opening the map or
+  the settings panel does not let go of it either.
 - **Aim error** is one sigma on heading and on elevation, drawn for every projectile, times the
   scatter multipliers of the kaiju being shot at, ×0.7 for veterans. "Slowed" means staggered,
   cocooned, or carrying at least 30% of its nerve capacity in accumulated nerve damage. The
@@ -1026,8 +1059,11 @@ falls in `shared/src/sim/systems/cityDamage.ts`, numbers in `shared/src/defs/rub
 
 ## 8. Presentation rules
 
-- **No reading to play.** On-screen text is only names (kaiju, faction, callsigns, the room code)
-  and subtitles. Everything else is icons, bars, button glyphs and pictures.
+- **No reading to play.** On-screen text is only names (kaiju, faction, callsigns, the room code),
+  subtitles, and (since round 5, the owner: "1-2 word descriptions needed, players were confused
+  by just pictures") short labels of one or two plain words beside the pictures: no sentences or
+  instructions. Everything else is icons, bars, button glyphs and pictures. The pictures still
+  carry the interface; the label supports the picture ("Labels", below).
 - Color language, each doubled by a shape: humans cyan (circles), kaiju orange (triangles),
   charging volleys yellow (diamonds), rubble grey.
 - The match clock is a sun-and-moon arc: the time of day is the timer.
@@ -1037,6 +1073,45 @@ falls in `shared/src/sim/systems/cityDamage.ts`, numbers in `shared/src/defs/rub
   can molt. The players talk to each other on a voice chat of their own; the game has none.
 - End screen: the hearing music, a pictogram tally of what each player flattened, a newspaper
   front page with a photo over squiggle text.
+
+### Labels (round 5, as built)
+
+`docs/ROADMAP.md` round 5: "Labels of one or two words. Players were confused by pictures alone."
+Every word is in one table, `client/src/ui/labels.ts`; change a word there and it changes
+everywhere. The rule: one or two plain words, about 14 characters at most ("Reinforcements" is
+the longest), no sentence and no instruction; the same word for the same thing on both sides
+("Blocked", "Too far", "Volley"). One style (`.lbl` in `client/src/styles.css`): capitals, the
+game's display font (the title's) at its heaviest, white with a dark edge so it reads over sky,
+street, smoke and night, about 11 pixels high at 1280 by 720 and 15 at 1920 by 1080 (bigger on the
+big menu buttons, the controls card and the molt cards). A label sits under its picture (a
+button's picture, then its label, then the glyph of its button), or beside it where there is no
+room under it (the meters, the destruction bar's marks, the menu's gear). Red (#ff3f30) means
+"cannot", as on the monster's and the squad's line-of-sight words. Nothing new covers the middle
+of the view: the words near the crosshair are the ones round 5 put there on purpose (the volley
+chip, "Blocked", the monster's "Too far"), and the monster's "Rage" sits outside its claw meter.
+In a window under 900 pixels wide the stage's label is left out (it would run into the skyline).
+
+| Where | Pictures and their labels |
+| --- | --- |
+| The monster's buttons (bottom right) | Strike, or Throw / Swing with something in the hand; Grab, or Eat / Drop; Stomp; each move slot's move (Beam, Roar, Charge, Tail sweep, Brace) or Locked before a molt fills it; Molt; View; then Controls. A garage door held: Shield. |
+| The squad's buttons | Fire, or the crate's weapon (Machine gun, Big cannon, Missiles); Volley; the radio's Artillery; Map; View; Controls. The drone: Up, Down, Map. Menu (top right) for everyone. |
+| The controls card (H) | The same word as the button, between each picture and its button: Move, Strike, Grab, Stomp, the moves, Molt; Move or Drive and Turret, Fire, Volley (Artillery with the radio), Map; Fly, Up, Down, Map. In its header: Talk (the rose) and Close. |
+| The communication rose | The army: Panic, Tough talk, Orders, Science, Home, Food, Retreat, Admire. The monster: Roar, Short roar, Snuffle, Growl, Chomp, Rumble, Mating call. Two words go on two lines. |
+| The molt cards | The move's name between its picture and its key. |
+| Along the top | Time left (the sun-and-moon clock), the destruction bar's marks (Molt, Molt, Monster wins), Stage, Squads (over the list), and for the squads the monster's Health and Nerve. |
+| Bottom left | Health, Nerve, Rage (once the beam is picked), Reload. |
+| Over the middle | The status pictures: Crossfire, Spotted, Shaken, Underwater, Nerve broken, Volley, Incoming, Reconnecting, Squad lost; Click (the mouse is free). The monster's claw meter: Rage. The power surge's badge: Power surge. A crate taken: its name. |
+| Charge and line of sight | The squad's volley chip (Ready, No squad, Landing, Stunned, Shaken, Reload, Too far, No line; Charging, Ready, Fire!; Volley!, Immune, Weak, No shot), the crosshair's Blocked and Too far, the nerve bar's Stagger, Immune, Team up, Hidden (all "The squad's screen", below). The monster's Too far, Blocked, Too close, Too tall ("The monster's line of sight on screen"). The monster's warning diamonds: Volley (on the screen's edge, on the inner side). The tank's second reticle: Gun, while it sits apart from the crosshair. |
+| Home | Create, Join, the fields' Name and Code (shown while empty); what went wrong: No room, Room full, Old version, Offline, Other tab. |
+| Lobby | Leave, Invite (then Copied), Controls, Settings; the side (Monster or Squad), Ready, Start, Bot monster (the host's practice switch); on the seats Host, Ready, Asleep, Offline, and Bot on an empty seat. |
+| Briefing | Monster and Squads over the two sides; Controls. |
+| Settings (Escape) | Volume, Mouse speed, Invert, Full screen, Low detail, Restart (Confirm after the first press), Done. There is no leave button: a player leaves by closing the page. |
+| End screen | Monster wins or Squads win; City flattened, Monster down or Time up; Lobby (the host's way back). |
+
+Tests (`client/test/labels.test.ts`): every word in the table keeps the rule; every picture of the
+controls card in every state of either side, every button of the HUD (the monster's in every hand
+and with every move, the squad's, the drone's, Menu, Controls) and every wedge of the rose has a
+label; the HUD and the card say the same word for the same button.
 
 ### Weight and speed (phase 2, as built)
 
@@ -1158,31 +1233,146 @@ otherwise; nothing here changes the game.
   ring of foam at each step instead of dust, and while it walks a bow wave and a spreading wake.
   Its own first-person view is not lowered (the claws keep their place before the eye).
 
-### Throwing on screen (round 4, as built)
+### Throwing on screen (round 5, as built)
 
-`docs/ROADMAP.md` round 4: "the arc is shown as a tube whose round cross-section grows with
-distance, so the player reads at a glance where it can land". On the monster player's own
-screen only, whenever the hand holds something to throw (not the fast-food sign, which is
-swung), out of the water and not helpless (`client/src/render/throwPreview.ts`):
+`docs/ROADMAP.md` round 5: "a throw lands where the crosshair points (the street, a roof, a
+squad), and the game picks the arc itself ... The preview must be impossible to miss by day and
+by night." Round 4 sent the view's own direction as the aim, so the crosshair and the landing
+were far apart (in third person the crosshair was on the sky for most throws), the view stopped
+tilting at 8° while the aim went on rising, and the preview was thin pale lines. All three are
+gone. On the monster player's own screen only, whenever the hand holds something to throw (not
+the fast-food sign, which is swung), out of the water and not helpless:
 
-- **The preview.** Every frame it works out the throw the server would make with the aim being
-  sent (the same physics: `shared/src/sim/throwArc.ts`): a bright line along the aimed arc from
-  the hand to where it meets a building, a heap beyond the grab reach or the ground; round it the
-  tube of the throw's spread, drawn as its outline as the camera sees it (two lines either side
-  of the arc, as far out as the spread there; a solid tube seen from behind the monster would be
-  a blot over everything) and two of its round cross-sections, faint; where it ends, a ring the
-  size of the spread (an ellipse on the ground or a roof, round for a lob and up to twice as long
-  as it is wide for a flat throw; a circle on a wall) with a faint fill and a dot where the aimed
-  arc lands. Warm yellow with a dark edge, readable by day and at night; where a building stands
-  in front of it, it shows through, fainter. It ignores units (the throw may hit one first).
-- **The aim.** With something to throw in the hand the aim sent is where the view looks, in
-  both views (in third person it otherwise runs from the eye to what the crosshair is on), so
-  the arc moves smoothly with the mouse. The chase camera moves up and over the right shoulder
-  (2.2 body radii across, 0.55 body heights up), so the monster's back does not hide the arc,
-  and neither view looks higher than 8° above level: aiming higher goes on raising the throw
-  (the arc shows it) while the ground where it comes down stays in sight. After the throw the
-  aim comes back down to where the view stopped.
-- The javelin's old straight guide line is gone; the preview shows the javelin's arc too.
+- **The aim** (`client/src/game/controllers/kaijuController.ts`, both views). The camera's center
+  ray finds the crosshair's point: a squad's feet when the ray meets a squad (each squad is a
+  dome as wide as the squad and as tall as its men or its tank), else the street, a roof or a
+  wall. `aimThrowAtPoint` (`shared/src/sim/throwArc.ts`) turns the head toward it (no farther than
+  its 50° reach from the body, as the server allows) and tries the two arcs a throw at that speed
+  has to the point: the flat one first, then the lob. An arc gets there when it comes down within
+  a quarter of the blast's radius of the point (1 / 2.5 / 5.5 m by stage), or anywhere on the roof
+  or wall the crosshair is on within four times that. While the crosshair stays within a blast's
+  radius of where the flat arc last failed, the lob is tried first (so the arc does not flip
+  between the two along a roof's edge). The heading and pitch of the arc picked go to the server
+  as the aim (up to 65° up for a lob; the server accepts up to 89°), and the server flies exactly
+  that arc. No lead on a moving squad: the throw lands where the crosshair is. When no arc gets
+  there it says why, and throws what it can:
+  - **Too far** (beyond reach, or the crosshair on the sky): the farthest throw that way.
+    Javelins and the garage door cannot be lobbed: past their flat reach they are "too far".
+  - **Blocked** (in reach, but every arc meets something first): the arc that comes down nearest.
+  - **Too close** (right under the snout, or beyond the head's turn): what it can.
+  The view looks wherever the mouse puts it, up to the usual 62° (the round 4 stop at 8° and the
+  snap back after a throw are gone). The chase camera still moves up and over the right shoulder
+  (2.2 body radii across, 0.55 body heights up) while the hand is full: without it the arc is
+  seen end-on behind the monster's head, and the street behind a house in front is hidden, so a
+  lob over it can hardly be aimed. The crosshair stays the true landing point either way: its ray
+  starts at the shifted camera. In first person the head (which carries the camera) follows the
+  view, not the aim sent: a lob's aim points far above the view, and the camera used to end up
+  inside the monster's own head.
+- **The preview** (`client/src/render/throwPreview.ts`). Every frame it works out the throw the
+  server would make with the aim being sent, and draws it bold, in widths measured in pixels on
+  a 720-line screen so it reads the same at every stage: a thick deep-orange ribbon along the
+  aimed arc with a near-black ink edge, paler marks running along it toward where it lands
+  (faint near the hand); the tube of the throw's spread as its outline in third person, two thin
+  rings across it near the end in first person; where it lands, the blast's disc filled with a
+  bold rim (never under 22 pixels across its radius), the spread's ellipse round it, dashed (round
+  for a lob, up to four times as long as it is wide for a flat throw; a circle on a wall), a dot,
+  four brackets facing the camera at least 34 pixels out, and a post of light 1.6 body heights
+  tall standing up from it. Where a building stands in front, it shows through at 38%. When the
+  throw cannot get there it all turns red, and the word ("Too far", "Blocked", "Too close") sits
+  under where it lands, white on red, with a red ring and bar round the crosshair
+  (`client/src/ui/kaijuSight.ts`). A lob needs no word: the tall arc and the wide dashed ring show
+  it. Measured on flat ground: flat throws at stage 1 land outside the ellipse 10 / 3 / 1% of the
+  time three, five and seven monster lengths out (36 / 28 / 15% with round 4's shorter ellipse),
+  0% at stages 2 and 3.
+- The javelin's old straight guide line is gone (round 4); the preview shows the javelin's arc too.
+
+### The monster's line of sight on screen (round 5, as built)
+
+`docs/ROADMAP.md` round 5: "when a shot, a volley or an attack cannot reach because something is
+in the way, the screen must say so." On the monster player's own screen
+(`client/src/ui/kaijuSight.ts`, `kaijuController.ts`, `throwPreview.ts`); the same red and the
+same words as the throw:
+
+- **The beam blocked.** While the beam burns, when it ends on a building more than a beam's
+  width short of what the crosshair is on (the beam is stopped by the first building its middle
+  or either edge meets), "Blocked" sits where it ends and the red ring closes round the
+  crosshair. Measured in bot matches: the beam ended on a building in 38 / 42% of its burning time
+  at stages 2 / 3, and in 10 to 12% an edge caught a building while the middle was clear.
+- **The charge's lane.** In a charge's wind-up and run, its lane on the ground ahead (as wide as
+  the body, as long as the run left, chevrons pointing along it), and the first building in it too
+  tall to smash (taller than 9 / 30 / 70 m; the titan wades through everything) outlined in red,
+  at its foot and its roof, with "Too tall" where the run will stop. 4 / 17 / 3% of charges in a
+  random direction meet one.
+- **Who hit it.** Every army shot that hits the monster marks the squad that fired it for two
+  seconds: a red ring over the squad, seen through any building in front, or, when the squad is
+  off the screen, a red wedge on the screen's edge pointing at it (one mark per squad). In bot
+  matches 60 / 62 / 76% of the army's hits came from squads more than 46° off the view, and 3 to
+  13% from squads hidden by buildings; until now only charging volleys were shown.
+- **Stunned behind walls.** A squad the monster stunned (the roar) that a building hides: its
+  stars over it, seen through the building, while the stun lasts.
+
+### The squad's screen (round 5, as built)
+
+`docs/ROADMAP.md` round 5: "players could not tell when they could charge, and the weird yellow
+circle kept refreshing"; "line of sight was confusing"; "labels of one or two words". On the
+squad player's own screen (`client/src/ui/volleyMeter.ts`, `ui/hud.ts`,
+`game/controllers/humanController.ts`). Red means "cannot" here as on the monster's screen, with
+the same words where they mean the same thing ("Blocked", "Too far").
+
+- **The volley chip**, always under the crosshair while the player drives a unit: a small
+  diamond, a picture per squad-mate and a word saying whether a volley can be charged now, or
+  why not. First that fits: **No squad** (every squad-mate gone), **Landing** (all still coming
+  down by parachute), **Stunned**, **Shaken**, **Reload** (every steady squad-mate's reload will
+  outlast the charge's way to the notch: shorter reloads, every few seconds while they fire at
+  will, change nothing a player would notice and are not shown), **Too far** and **No line**
+  (with the crosshair on the monster, or through cover on it: no squad-mate within reach of the
+  volley's point, or none with a clear line to it, cast from its muzzle as a squad-mate looks for
+  a line of fire, heaps counting and bridge decks not), else **Ready**. The pictures: a cyan dot
+  (ready), a yellow diamond (charging), a ring filling clockwise (reloading, when it holds the
+  volley back), a red cross (shaken, or stunned and pulsing), a parachute (coming down), the dot
+  with a red bar through it (no line), a dashed ring (too far), a grey ring (gone).
+- **Held**: the big yellow diamond round the crosshair (25% smaller than round 4's) fills from
+  its bottom point, amber below the white notch at 60%, bright and pulsing above it, with a
+  white edge when full; the word under it says **Charging**, **Ready** past the notch, **Fire!**
+  at full; **Reload** when every one is held under the notch by its reload; the reason in red
+  when nobody can charge (the diamond greyed). Before the server says the squad-mates planted, the
+  fill is carried from the press itself less the round trip, so a slow line does not show an
+  empty diamond.
+- **Let go**: the diamond holds its level until the server answers. The squad's `volley` event
+  flashes it white with **Volley!** (**Immune** when the monster cannot be shaken just then); let
+  go under the notch it fizzles grey, **Weak**; when no squad-mate's shot leaves within 0.4 s and
+  the round trip, **No shot**. (Round 4 decided its own "fired" flash from its own charge, so a
+  squad still reloading flashed "fired" and fired nothing.)
+- **Team up** instead of the weird yellow circle. The window two squads' charged volleys have to
+  break the monster (section 3: five seconds, counted from the other squad's latest hit, as the
+  server counts it) was round 4's big pale-yellow ring round the crosshair whenever another
+  squad's volley landed, button pressed or not, restarted by every hit (up about a fifth of the
+  time in bot matches, with no word). Now it shows only while it means something: another squad's
+  charged volley has hit within five seconds, this squad has a squad-mate able to fire, and the
+  monster's nerve is at least half way to breaking (a full charged volley from the front adds
+  about half) and neither staggered nor immune. Button up, a yellow strip runs down along the
+  bottom of the monster's nerve bar with the word **Team up** beside it; nothing round the
+  crosshair. Held, a thin ring round the big diamond counts the same seconds and **Team up**
+  shows under the word, blinking in the last 1.5 s; a pair made bursts the ring.
+- **The monster's nerve bar** also says why a volley would add no nerve now: **Stagger** (it is
+  staggered: it takes extra damage instead), **Immune** with the seconds left (8 s after each
+  break), and **Hidden** while the squads have lost it at stage 1.
+- **The crosshair against the shot.** The third-person camera hangs above and behind the unit
+  and sees over cover the unit's own shot hits. The controller casts the server's own ray (from
+  the unit's eye along the aim it sends): when the crosshair is on the monster but that ray stops
+  on a building, a heap or the ground first, the crosshair turns into a red ring with a bar
+  through it and says **Blocked** (round 4 showed the orange "on target" diamond while every
+  rocket hit the garage: 94 of 94 placements behind garages). When the shot's point is beyond the
+  weapon's reach (its range times 1.1, after which a shot gives out), measured from the unit and
+  not the camera, the ring is dashed, with **Too far** when the crosshair is on the monster. The
+  tank's gun reticle's ring follows the squad's weapon pick-up's reload (round 4 used the tank's
+  own gun's and sat empty for most of a big cannon's reload).
+- **Words on the buttons** (the bottom right): **Fire** (or the weapon a crate gave: **Machine
+  gun**, **Big cannon**, **Missiles**), **Volley**, **Map**, **View**, **Controls**, **Menu**; the
+  artillery radio's **Artillery** over its pips; the drone's **Up**, **Down**, **Map**; a crate
+  taken pops up with its name under its picture. Since the labels task (section 8, "Labels")
+  each word sits under its picture, over the button's glyph, in capitals, in the labels' one
+  style, like every other word on the screen.
 
 ### Controls (as built: `client/src/game/input/actions.ts`)
 
@@ -1216,7 +1406,8 @@ shortcut that a page cannot cancel).
 | Controls card | H or Enter | Left stick click |
 
 **What the monster player sees of its buttons** (docs/ROADMAP.md phase 1: one move per
-button; `client/src/ui/kaijuKit.ts`). Bottom right, each picture over its button's glyph: Strike
+button; `client/src/ui/kaijuKit.ts`). Bottom right, each picture over its label (since round 5,
+"Labels" above: what the button does now) over its button's glyph: Strike
 (the claws; with something in the hand, the throw), Grab (the hand; with something in the hand,
 the jaws, darkened while the last meal is under 10 s old) and Stomp; then the two move slots, a
 faint egg in a dashed frame until a molt fills it, then the move's picture inside a ring that
@@ -1225,7 +1416,7 @@ rage bar bottom left is shown only once the beam is picked, the claw-mark rage m
 crosshair always: "Round 4's flair" above); Molt, only while the bar offers one,
 pulsing; the camera. The molt cards (`client/src/ui/moltCards.ts`): when the cocoon starts three
 big cards come up in the middle of the screen, each the move's picture moving the way the move
-does, over the key or d-pad direction that picks it; above them the move button the pick will go
+does, over the move's name and the key or d-pad direction that picks it; above them the move button the pick will go
 on, under them a bar that runs down to the end of the intermission. A key, a d-pad press or a
 click picks: the pointer is let go while the cards wait (mouse movement under pointer lock plays
 no part) and the click takes it back. The picked card flies into its slot. Nobody picked by the
@@ -1316,8 +1507,10 @@ marker fades out within about 30 m of the camera, and a soldier within 3.5 m of 
 
 **The controls card** (`client/src/ui/controlsCard.ts`; round 4: "five things at most per side,
 big pictures") shows only what the player can do right now, as at most five big pictures, each
-over its button's glyph on the device in use (it switches when the player picks up a
-controller). A ring round a glyph means hold it. The match screen feeds it the player's state
+over its label (round 5: the same word as its button at the bottom of the screen) and its
+button's glyph on the device in use (it switches when the player picks up a controller). A ring
+round a glyph means hold it. Since the labels its unit is a little smaller (5.1 instead of 5.6
+hundredths of the window's height), so it still ends above the crosshair at 1280 by 720. The match screen feeds it the player's state
 every frame; the lobby and the briefing show the start of a match.
 
 - **Monster:** walking and looking (the movement keys and the mouse, under the monster); Strike
@@ -1332,7 +1525,7 @@ every frame; the lobby and the briefing show the start of a match.
   radio while it has barrages); the map. **The drone** (the squad gone): flying, up, down, the
   map.
 - **Everyone:** the header holds the role's picture and name, the communication rose's key
-  (held) small, and the card's own key.
+  (held) small with "Talk", and the card's own key with "Close".
 
 It has a button in the lobby (for the role picked there) and on the briefing screen, is open
 by itself for the whole briefing, and in a match opens and closes with its key while the game
@@ -1368,7 +1561,8 @@ A player holds the rose key (**Z**, or down on a gamepad's directional pad; the 
 sides) and a ring of wedges opens around the crosshair. Moving the mouse (or the right stick)
 picks a wedge; letting go sends it; letting go in the middle sends nothing. While the ring is up
 the view holds still (the mouse moves the pick), and the body keeps moving and shooting. Each
-wedge is a picture (no words) and a kind of thing to say; sending it makes the player's
+wedge is a picture with its label under it (round 5; "Labels" in section 8) and a kind of thing
+to say; sending it makes the player's
 character say a random line of that kind, which every screen plays at the same moment.
 
 - **The army** (8 wedges, clockwise from the top): panic, bravado, orders, science (somebody call
@@ -1384,6 +1578,7 @@ character say a random line of that kind, which every screen plays at the same m
 - **Spam:** one pick every 2 seconds per player. The rose shows the wait running round its
   middle and greys its wedges meanwhile; the server holds everyone to it as well.
 - **Restart** (round 4): the host's settings panel (Escape) has a circular arrow during a match
-  and on the end screen. One press arms it (it turns red and pulses), a second press within 4
+  and on the end screen, labelled "Restart" (round 5). One press arms it (it turns red and
+  pulses, and its label says "Confirm"), a second press within 4
   seconds starts the match over for everyone: a fresh match with the same people on the same
   sides, the same kaiju, the same start.

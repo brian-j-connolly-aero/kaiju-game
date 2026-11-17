@@ -20,8 +20,10 @@ import type { RoseMessage, RoseRequest } from './rose';
  * Bump when a message or the snapshot layout changes incompatibly. Sent in `welcome`.
  * 3 (round 4): the communication rose (`rose`, both ways), the host's `restart`, and the network
  * readout's optional fields on `pong`.
+ * 4 (round 5): the page's own report on `ping` (`PageReport`: round trip, snapping back, frames
+ * that froze), which the server writes to its log once a minute per player.
  */
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 /** Default port for the one process that serves both the page and the WebSocket. */
 export const DEFAULT_PORT = 2567;
@@ -108,8 +110,28 @@ export interface ClientMessages {
   input: PlayerInput;
   /** Tier 2: pick one of the three offered upgrade cards (0..2). */
   draftPick: { card: number };
-  /** Latency probe; `t` is the client's clock in milliseconds and comes back unchanged. */
-  ping: { t: number };
+  /**
+   * Latency probe; `t` is the client's clock in milliseconds and comes back unchanged. During a
+   * match the page adds its report since its previous ping (`PageReport`, round 5).
+   */
+  ping: { t: number } & PageReport;
+}
+
+/**
+ * What a page saw since its previous ping, for the server's log (a line a minute per player,
+ * server/src/room/slowLog.ts). Every field is optional and the server checks and clamps each.
+ */
+export interface PageReport {
+  /** The page's newest round trip to the server and back, milliseconds. */
+  rtt?: number;
+  /** Corrections of the player's own body of 15 cm or more (it snapped back). */
+  snaps?: number;
+  /** The largest correction, centimeters. */
+  snapMax?: number;
+  /** Frames of 100 ms or more (the page froze). */
+  freezes?: number;
+  /** The longest frame, milliseconds. */
+  frameMax?: number;
 }
 
 export type ClientMessageType = keyof ClientMessages;

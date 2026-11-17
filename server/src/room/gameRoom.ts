@@ -70,6 +70,7 @@ import {
   ackFor,
   advanceMatch,
   createMatchSession,
+  createSlotTally,
   matchOver,
   queueInput,
   setSlotLive,
@@ -79,7 +80,7 @@ import {
   type MatchSession,
 } from './match';
 import { JoinRefused, type Peer } from './peer';
-import { SlowWatch } from './slowLog';
+import { MINUTE_MS, SlowWatch, type PageMinute, type SeatMinute } from './slowLog';
 
 export interface GameRoomOptions {
   /** The 4-letter room code. */
@@ -147,6 +148,30 @@ interface Seat {
   slot: PlayerId;
   /** When this player's last communication rose message went out (milliseconds), for the limit. */
   roseAt: number;
+  /** What their page reported in its pings since the last lines a minute (the server's log). */
+  page: PageMinute;
+}
+
+function emptyPageMinute(): PageMinute {
+  return { reports: 0, rttMean: 0, rttWorst: 0, snaps: 0, snapWorst: 0, freezes: 0, frameWorst: 0 };
+}
+
+/** A number from a page's report, or null when it is not one; clamped to 0..max. */
+function reported(v: unknown, max: number): number | null {
+  return typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(0, v)) : null;
+}
+
+/** Adds one ping's report (`PageReport`, protocol.ts) to a seat's minute. Nonsense is ignored. */
+function notePageReport(page: PageMinute, data: Record<string, unknown>): void {
+  const rtt = reported(data.rtt, 60_000);
+  if (rtt === null) return;
+  page.rttMean = (page.rttMean * page.reports + rtt) / (page.reports + 1);
+  page.reports++;
+  page.rttWorst = Math.max(page.rttWorst, rtt);
+  page.snaps += Math.round(reported(data.snaps, 1000) ?? 0);
+  page.snapWorst = Math.max(page.snapWorst, (reported(data.snapMax, 100_000) ?? 0) / 100);
+  page.freezes += Math.round(reported(data.freezes, 1000) ?? 0);
+  page.frameWorst = Math.max(page.frameWorst, reported(data.frameMax, 60_000) ?? 0);
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -174,6 +199,10 @@ export class GameRoom {
   private buildRefusalLoggedAt = Number.NEGATIVE_INFINITY;
   /** Slow moments of the match loop, for the log (null when `slowLog` is off). */
   private readonly slow: SlowWatch | null;
+  /** When the last lines a minute were written (room clock, milliseconds). */
+  private minuteAt = 0;
+  /** Per slot: the queue's counters when the last lines a minute were written. */
+  private minuteBase: Array<{ arrived: number; dropped: number; trimmed: number }> = [];
 
   constructor(options: GameRoomOptions) {
     this.options = options;
@@ -264,7 +293,7 @@ export class GameRoom {
       if (!player) throw new JoinRefused(JOIN_ERROR.roomFull, 'the room is full');
       player.slot = -1;
       player.waited = false;
-      seat = { seat: player.seat, token, peer, connected: true, droppedAt: 0, lobbySince: this.options.now(), slot: -1, roseAt: Number.NEGATIVE_INFINITY };
+      seat = { seat: player.seat, token, peer, connected: true, droppedAt: 0, lobbySince: this.options.now(), slot: -1, roseAt: Number.NEGATIVE_INFINITY, page: emptyPageMinute() };
       this.seats.push(seat);
       this.byPeer.set(peer.id, seat);
       this.log(`seat ${seat.seat} joined as "${player.name}"`);
@@ -351,6 +380,8 @@ export class GameRoom {
         // How this player's inputs fare at the server, for the network readout (client/src/ui/netReadout.ts).
         const queue = q ? { wait: q.items.length, guessed: q.guessed, dropped: q.dropped } : {};
         seat.peer.send('pong', { t: data.t, tick: m ? m.world.tick : 0, ...queue });
+        // The page's own report since its last ping (round 5), for the lines a minute.
+        if (q) notePageReport(seat.page, data);
         return;
       }
       case 'setName': {
@@ -456,10 +487,49 @@ export class GameRoom {
     const elapsed = m.world.match.elapsed;
     for (const stall of m.stalls) {
       const seat = this.seats.find((s) => s.slot === stall.slot);
-      if (seat) slow.stall(seat.seat, stall.ticks, stall.stopped, elapsed, ended);
+      if (seat) slow.stall(seat.seat, stall.ticks, stall.stopped, elapsed, ended, stall.late);
     }
     m.stalls.length = 0;
     slow.update({ began, ended, simulated, ticks, dropped: m.clock.dropped, elapsed });
+    if (ended - this.minuteAt >= MINUTE_MS || matchOver(m)) this.writeMinute(slow, m, ended);
+  }
+
+  /** The lines a minute (slowLog.ts): the server's, and one per person playing a slot. */
+  private writeMinute(slow: SlowWatch, m: MatchSession, now: number): void {
+    const seats: SeatMinute[] = [];
+    for (const seat of this.seats) {
+      const slot = seat.slot;
+      if (slot < 0 || !m.live[slot]) continue;
+      const t = m.tally[slot];
+      const q = m.queues[slot];
+      const base = this.minuteBase[slot] ?? { arrived: 0, dropped: 0, trimmed: 0 };
+      seats.push({
+        seat: seat.seat,
+        // Slot 0 is the monster's (buildMatchConfig).
+        role: slot === 0 ? 'monster' : 'army',
+        ticks: t.ticks,
+        fed: t.fed,
+        waitingMean: t.fed > 0 ? t.waitingSum / t.fed : 0,
+        waitingMax: t.waitingMax,
+        guessed: t.guessed,
+        late: t.late,
+        longestRun: t.longestRun,
+        arrived: q.arrived - base.arrived,
+        dropped: q.dropped - base.dropped,
+        trimmed: q.trimmed - base.trimmed,
+        page: seat.page.reports > 0 ? seat.page : null,
+      });
+    }
+    slow.minute(seats, m.world.match.elapsed);
+    this.startMinute(m, now);
+  }
+
+  /** Starts counting a new minute for the log. */
+  private startMinute(m: MatchSession, now: number): void {
+    this.minuteAt = now;
+    this.minuteBase = m.queues.map((q) => ({ arrived: q.arrived, dropped: q.dropped, trimmed: q.trimmed }));
+    for (const t of m.tally) Object.assign(t, createSlotTally());
+    for (const seat of this.seats) seat.page = emptyPageMinute();
   }
 
   /** For failures: these are printed even when the room chatter is switched off. */
@@ -632,6 +702,7 @@ export class GameRoom {
     if (this.slow) {
       m.timer = this.slow;
       this.slow.reset();
+      this.startMinute(m, this.options.now());
     }
     this.matchCount++;
     lobby.phase = 'match';

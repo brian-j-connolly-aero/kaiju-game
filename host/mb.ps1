@@ -4,13 +4,16 @@
 #   stop.cmd    stop everything
 #   update.cmd  get the newest copy of the game (git), then start again
 #   logs.cmd    show the most recent messages from the game and the tunnel
+#   savelog.cmd save everything the game and the tunnel wrote since they started into one dated
+#               text file in "Monster Battle logs" on the desktop (stop.cmd and update.cmd save
+#               one first too, because stopping throws the messages away)
 #
 # The .cmd files run this script:  powershell -ExecutionPolicy Bypass -File mb.ps1 <action>
 # Uses Podman if it works, otherwise Docker. Guide: docs\HOSTING.md.
 # Keep this file plain ASCII: Windows PowerShell 5.1 misreads other characters.
 
 param(
-    [ValidateSet('start', 'stop', 'update', 'logs', 'link')]
+    [ValidateSet('start', 'stop', 'update', 'logs', 'link', 'savelog')]
     [string]$Action = 'start'
 )
 
@@ -227,6 +230,102 @@ function Get-CurrentLink {
     return (Get-QuickLink)
 }
 
+# ---- saving the log -------------------------------------------------------------------------
+function Get-LogFolder {
+    # On the desktop, where it is easy to find; in the game folder when there is no desktop.
+    $folder = $null
+    try {
+        $desktop = [Environment]::GetFolderPath('Desktop')
+        if ($desktop -and (Test-Path -LiteralPath $desktop)) { $folder = Join-Path $desktop 'Monster Battle logs' }
+    } catch { }
+    if (-not $folder) { $folder = Join-Path $Root 'logs' }
+    if (-not (Test-Path -LiteralPath $folder)) { New-Item -ItemType Directory -Path $folder -Force | Out-Null }
+    return $folder
+}
+
+function Get-ServiceLog([string[]]$Before, [string]$Service) {
+    # Everything one part wrote since it started, each line with its time. Older compose
+    # programs may not know the two options; then it asks again without them.
+    $text = Get-ComposeText ($Before + @('logs', '--no-color', '--timestamps', $Service))
+    if ($LASTEXITCODE -ne 0) { $text = Get-ComposeText ($Before + @('logs', $Service)) }
+    return $text
+}
+
+function Save-Logs {
+    # Writes everything the game and the tunnel wrote since they started, with a few facts about
+    # this computer, into one dated text file. Returns its path, or '' when there was nothing.
+    $game = Get-ServiceLog @() 'game'
+    # Only a real game log (it starts with the server's own first line), not a message saying
+    # there is no game.
+    if (-not ($game -match 'Monster Battle 9001 server on port')) { return '' }
+    $tunnel = Get-ServiceLog @() 'tunnel'
+    $named = Get-ServiceLog @('--profile', 'named') 'named-tunnel'
+
+    $out = New-Object System.Collections.Generic.List[string]
+    $out.Add("Monster Battle 9001: the game's log, saved $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') (this computer's clock)")
+    $out.Add('')
+    $out.Add('---- This computer ----')
+    try {
+        $cs = Get-CimInstance Win32_ComputerSystem
+        $os = Get-CimInstance Win32_OperatingSystem
+        $out.Add("Windows: $($os.Caption) $($os.Version)")
+        $out.Add("Processors: $($cs.NumberOfLogicalProcessors), memory: $([math]::Round($cs.TotalPhysicalMemory / 1GB, 1)) GB")
+    } catch { $out.Add('(could not read the processors and memory)') }
+    $out.Add("Container program: $script:Engine")
+    try {
+        if ($script:Engine -eq 'podman') {
+            $vm = & podman info --format '{{.Host.CPUs}} processors, {{.Host.MemTotal}} bytes of memory' 2>&1 | Out-String
+        } else {
+            $vm = & docker info --format '{{.NCPU}} processors, {{.MemTotal}} bytes of memory' 2>&1 | Out-String
+        }
+        $out.Add("Its virtual machine: $($vm.Trim())")
+    } catch { }
+    $out.Add('')
+    $out.Add('---- Running now ----')
+    $out.Add((Get-ComposeText @('--profile', 'named', 'ps', '-a')))
+    try {
+        $health = Invoke-WebRequest -Uri "$LocalUrl/healthz" -UseBasicParsing -TimeoutSec 3
+        $out.Add("Health and timing: $($health.Content)")
+    } catch { $out.Add('Health and timing: the game did not answer') }
+    $out.Add('')
+    $out.Add('---- The game ----')
+    $out.Add($game)
+    $out.Add('')
+    $out.Add('---- The quick tunnel ----')
+    $out.Add($tunnel)
+    if ($named.Trim()) {
+        $out.Add('')
+        $out.Add('---- The named tunnel ----')
+        $out.Add($named)
+    }
+
+    $file = Join-Path (Get-LogFolder) ("monster-battle-log_" + (Get-Date -Format 'yyyy-MM-dd_HH-mm-ss') + '.txt')
+    Set-Content -LiteralPath $file -Value ($out -join "`r`n") -Encoding UTF8
+    return $file
+}
+
+function Save-LogAction {
+    Find-Engine
+    Say "Saving everything the game and the tunnel wrote since they started ..."
+    $file = Save-Logs
+    if (-not $file) {
+        Fail ("There is nothing to save: the game is not running, or it was stopped (stopping throws its messages away;`n" +
+              "stop.cmd saves them first, into the 'Monster Battle logs' folder on your desktop).")
+    }
+    Say ''
+    Say '=================================================================='
+    Write-Host '  THE GAME LOG IS SAVED' -ForegroundColor Green
+    Say ''
+    Say '  It is this file (the folder opens by itself):'
+    Write-Host "      $file" -ForegroundColor Cyan
+    Say ''
+    Say '  Send it to whoever gave you the game, with who played which side.'
+    Say '  The game keeps running; saving again later saves everything again.'
+    Say '=================================================================='
+    Say ''
+    try { Start-Process -FilePath 'explorer.exe' -ArgumentList "/select,`"$file`"" | Out-Null } catch { }
+}
+
 # ---- actions --------------------------------------------------------------------------------
 function Start-Game {
     Find-Engine
@@ -266,6 +365,9 @@ function Start-Game {
 
 function Stop-Game {
     Find-Engine
+    # Stopping throws the game's messages away: keep them first.
+    $file = Save-Logs
+    if ($file) { Say "Saved the game's log first: $file" }
     Say 'Stopping Monster Battle 9001 ...'
     if (-not (Invoke-Compose @('--profile', 'named', 'down', '--remove-orphans'))) {
         Fail 'Could not stop everything. The messages above say why.'
@@ -274,6 +376,10 @@ function Stop-Game {
 }
 
 function Update-Game {
+    # A newer game replaces the running one and its messages: keep them first.
+    Find-Engine
+    $file = Save-Logs
+    if ($file) { Say "Saved the game's log first: $file" }
     $hasGit = [bool](Get-Command git -ErrorAction SilentlyContinue)
     if ((Test-Path -LiteralPath (Join-Path $Root '.git')) -and $hasGit) {
         Say 'Getting the newest copy of the game ...'
@@ -298,6 +404,7 @@ switch ($Action) {
     'stop'   { Stop-Game }
     'update' { Update-Game }
     'logs'   { Show-Logs }
+    'savelog' { Save-LogAction }
     'link'   { Find-Engine; Show-Links (Get-CurrentLink) }
 }
 exit 0

@@ -39,11 +39,13 @@ their web browser. The game itself never contacts any other outside service.
      need a Docker account; you can skip signing in.
 3. Put the game folder somewhere easy to find, for example `Documents\monster-battle`. (You may
    have received it as a zip file: right-click it, choose **Extract All**.)
-4. Open the game folder, then the **host** folder inside it. You will use four files there:
+4. Open the game folder, then the **host** folder inside it. You will use five files there:
    - `start.cmd`: start the game and show the link for your friends;
    - `stop.cmd`: stop the game;
    - `update.cmd`: get a newer version and start it;
-   - `logs.cmd`: show the game's recent messages (useful when something goes wrong).
+   - `logs.cmd`: show the game's recent messages (useful when something goes wrong);
+   - `savelog.cmd`: save everything the game wrote this session into one file you can send
+     (section 3, "After the session").
 
 The first start builds the game from its source files. That takes **5 to 15 minutes** and needs
 the internet (to download the building blocks). Every later start takes seconds.
@@ -98,10 +100,30 @@ the internet (to download the building blocks). Every later start takes seconds.
     second click within four seconds restarts). Only the room's host has this button. Everyone
     starts the match again on the same sides.
 
+### After the session: save the game's log
+
+The game writes down how every match went for every player: how long their key presses took
+to reach the game, how often their character snapped back, whether their page froze, and every
+moment the host computer was too busy. That is the evidence we need to fix lag. To keep it:
+
+1. In the **host** folder, double-click **savelog.cmd** (do it before stop.cmd, although stop.cmd
+   saves one too).
+2. The black window says **THE GAME LOG IS SAVED** and shows the file's full name. A folder
+   called **Monster Battle logs** opens on your desktop with the file already selected. Its
+   name has the date and time in it, for example `monster-battle-log_2026-11-17_21-30-05.txt`.
+3. Send that file to whoever gave you the game, and say who played which side.
+
+It holds everything since the game was last started, so one file covers the whole evening.
+**stop.cmd and update.cmd save one first, by themselves**, because stopping throws the game's
+messages away; the window says where they put it. You can open the file with Notepad: the lines
+that matter are explained in section 6, item 9.
+
 ## 4. Stopping
 
 Double-click **stop.cmd** in the host folder. Everyone in a game is disconnected and the public
-link stops working.
+link stops working. Before it stops anything, it saves the game's log into the **Monster Battle
+logs** folder on your desktop (section 3, "After the session"), because stopping throws the
+game's messages away.
 
 If you do not stop it, the game keeps running in the background until you shut down the
 computer, and **starts again by itself** the next time Podman or Docker starts. Stop it when you
@@ -148,11 +170,28 @@ Read the last lines in the black window first: they say in plain words what the 
    for "Checked just now: this link works.", then leave the room and create a new one. Until
    then, send the four-letter code instead: it always works.
 7. **The game feels laggy** (things jump or react late).
-   - Close other heavy programs on the host computer (games, video calls, many browser tabs).
+   - Since round 5 the game copes much better with a busy host computer and with a page that
+     freezes for a moment (see "What round 5 changed" below), but the host computer still does
+     the most work of anyone: it runs the game, its little Linux computer, the tunnel, and a
+     browser drawing the game. These are worth trying (they are sensible, but nobody has
+     measured them on a Windows computer yet):
+     - Close other heavy programs on the host computer (games, video calls, many browser tabs).
+     - Do not share your screen in the voice chat while you host: sharing a screen keeps the
+       computer busy encoding video.
+     - Plug a laptop in, and pick the **Best performance** power mode (Windows 11: Settings,
+       System, Power; Windows 10: the battery icon).
+     - Give the container program at least **2 processors** (more is better if the computer
+       has 8 or more): Docker Desktop: Settings, Resources; Podman Desktop: Settings,
+       Resources, the Podman machine's edit button (it may need to restart the machine).
    - The host should play on `http://localhost:2567`, not on the public link.
+   - Everyone: the game must be drawn by the computer's graphics chip. If a browser shows only
+     a few pictures a second, turn on **Use graphics acceleration when available** (Chrome and
+     Edge: Settings, System) and restart the browser.
    - The quick tunnel routes everyone through Cloudflare; friends far away (another continent)
      will feel some delay. A named tunnel (section 7) is usually a little steadier.
    - If one friend's connection is weak, a wired connection instead of Wi-Fi helps.
+   - Save the game's log afterwards (section 3, "After the session") and send it: it says for
+     every player, minute by minute, where the lag came from.
 8. **The link changes every time.** That is how the free quick tunnel works. If you want an
    address that never changes, use your own domain (section 7).
 9. **Your own soldier or monster snaps back** ("rubber banding": you walk, and every so often
@@ -165,19 +204,40 @@ Read the last lines in the black window first: they say in plain words what the 
      graph shows the last 30 seconds: a tall red bar is a snap; a blue spike at the same moment
      means the connection stalled; purple marks at the bottom mean that computer itself froze
      for a moment.
-   - After the session, double-click **logs.cmd** and copy the window. The server now writes a
-     line whenever it stood still or was slow ("slow moment ... the server stood still for
-     ... ms"), and whenever a player's connection stalled ("seat 2's inputs stopped arriving
-     for 0.80 s ..."). Seat 0 is the first person who joined the room, seat 1 the second, and
-     so on.
-   - Send both (the screenshot and the log) to whoever gave you the game. Tell them who was
+   - After the session, double-click **savelog.cmd** (section 3, "After the session"). What the
+     log says (seat 0 is the first person who joined the room, seat 1 the second, and so on):
+     - "slow moment ... the server stood still for 433 ms, and caught up": the host computer
+       was too busy for a moment. Since round 5 the game catches up afterwards; only a stall
+       over a second still skips a little of the match ("... ms of the match skipped").
+     - "seat 2's inputs stopped arriving for 0.80 s ... (their connection stalled, or their page
+       froze)": nothing came from that player for a moment: their internet, the tunnel, or their
+       browser stood still (their line a minute says whether their page froze).
+     - "seat 2's inputs kept arriving but too late for their ticks ... (their page or computer
+       fell behind, not the connection)": that player's own computer was too slow or froze.
+     - Once a minute during a match, a line for the server ("the server ran 1800 steps ...")
+       and one per player ("seat 2 (army): input delay about 140 ms ..., snapped back 3 times
+       over 15 cm ..., page froze 1 time over 0.1 s ..."). A good minute has about 1800 steps,
+       an input delay under 200 ms and few snaps.
+   - Send both (the screenshot and the log file) to whoever gave you the game. Tell them who was
      playing which side and roughly when it happened.
    Since round 4 a stall of up to one second on the connection no longer pulls a walking body
    back (before, anything over half a second did). Longer stalls still do: those are the tunnel
    or the network, not the game.
 
-If none of this helps, double-click **logs.cmd**, select everything in the window, copy it and
-send it to whoever gave you the game.
+   **What round 5 changed** (after the third playtest's "terrible lag"):
+   - When the host computer is too busy for a moment, the game now catches up afterwards.
+     Before, it skipped that moment, and from then on every player's key presses reached the
+     game a little later, for the rest of the match: in our tests up to almost 2 seconds.
+   - When a player's page freezes for a moment, it now sends every key press it owes when it
+     comes back. Before, it skipped them, and that player's steering was ignored and their body
+     stopped and snapped back after a second, after almost every freeze over a quarter second.
+     A browser drawing only a few pictures a second was in that state all the time.
+   - A delay left over from a slow moment on someone's line is now trimmed away gradually,
+     even while they keep moving (before, only while they stood still).
+
+If none of this helps, double-click **savelog.cmd** and send the file it saves (section 3,
+"After the session") to whoever gave you the game. (**logs.cmd** still shows the newest messages
+in the window, if you only want a quick look.)
 
 ## 7. Using your own domain (a named tunnel; optional)
 
@@ -231,9 +291,10 @@ The same steps work from a Linux terminal, in the game folder:
 
 ```
 host/start.sh       start, and print the links
-host/stop.sh        stop
-host/update.sh      get the newest version (Git) and start again
+host/stop.sh        stop (saves the game's log first)
+host/update.sh      get the newest version (Git) and start again (saves the log first)
 host/logs.sh        recent messages
+host/savelog.sh     save everything the game wrote into logs/ in the game folder
 host/mb.sh link     print the links again
 ```
 
@@ -319,9 +380,12 @@ link have been used for real.)
   text. Your first start is the first real test of the public link. That the tunnel passes its
   own address on to the game (which the invite link relies on) was checked by reading the
   tunnel program's source code, not by running it.
-- **The Windows files** (`start.cmd`, `stop.cmd`, `update.cmd`, `logs.cmd` and `mb.ps1`) have
-  **never been run**. They were checked line by line against the PowerShell version every Windows
-  computer has (5.1), but not executed. That includes the new link check in `mb.ps1`.
+- **The Windows files** (`start.cmd`, `stop.cmd`, `update.cmd`, `logs.cmd`, `savelog.cmd` and
+  `mb.ps1`) have **never been run** on Windows by us (the owner has used start.cmd for the
+  playtests). They were checked line by line against the PowerShell version every Windows
+  computer has (5.1), but not executed. That includes the link check and, from round 5, saving
+  the log (savelog.cmd, and stop.cmd and update.cmd saving one first). The Linux version of
+  saving the log was tried against a stand-in for Podman, not a real game container.
 - Podman Desktop and Docker Desktop on Windows, and Docker on any computer.
 - The named tunnel with your own domain (section 7).
 - The update script with Git (`update.cmd`, `host/update.sh`).

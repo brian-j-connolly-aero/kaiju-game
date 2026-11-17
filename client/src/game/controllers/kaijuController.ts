@@ -10,8 +10,20 @@
  * and never where the player is looking. The chase camera hangs behind a point above the
  * kaiju's shoulders along that direction. In the chase camera the aim sent to the server runs
  * from the kaiju's eye to whatever the camera's center ray lands on (so the beam goes where the
- * crosshair is), except while the hand holds something to throw: then the view's own direction
- * goes out, and the throw's arc on screen (render/throwPreview.ts) shows where it goes.
+ * crosshair is).
+ *
+ * With something to throw in the hand (round 5, both views) the throw lands where the crosshair
+ * points: the camera's center ray finds the point (a squad's feet, the street, a roof, a wall),
+ * `aimThrowAtPoint` (sim/throwArc.ts) picks the arc that gets there (the flat one when the way is
+ * clear, else the lob over what stands in the way) and its heading and pitch go out as the aim,
+ * so the server flies exactly that arc. Beyond the throw's reach (or on the sky) it goes as far as
+ * it can that way. The view itself looks wherever the mouse puts it; the chase camera moves over
+ * the right shoulder so the arc is not hidden behind the monster's back.
+ *
+ * What the monster's attacks cannot reach (round 5, line of sight) is worked out here too and
+ * handed to the screen (`aim`, render/throwPreview.ts and ui/kaijuSight.ts): a throw too far,
+ * blocked or too close; the beam stopped by a building short of the crosshair; a charge's lane
+ * and the first building in it too tall to smash.
  *
  * While the head is not the player's (the beam drags it, or the kaiju is staggered) both
  * cameras ride the head as the server has it, and the mouse only says where it should go.
@@ -23,20 +35,36 @@
 
 import type * as THREE from 'three';
 import {
+  aimThrowAtPoint,
+  beamPath,
   Btn,
   clamp,
   clampAngleAround,
   createAimPoint,
+  createBeamPath,
+  createPointThrowAim,
+  createThrowFlight,
   DEG,
   kaijuEyePoint,
   kaijuKindDef,
   kaijuStageDef,
+  perStage,
+  rayVsCapsule,
   resolveAimPoint,
   strikeVerb,
+  structuresInCircle,
+  throwClearance,
+  throwFlight,
+  unitTypeDef,
   wrapAngle,
   type AimPoint,
+  type CastHit,
   type SnapKaiju,
+  type ThrowReach,
+  type VerticalCapsule,
 } from '@mb/shared';
+import type { AimWord, KaijuAimView } from '../../render/throwPreview';
+import { LABELS } from '../../ui/labels';
 import { clearOfWalls, easeClearance, type Point3 } from './cameraClearance';
 import { aimCamera, setLens, type ControlContext, type Controller, type InputSample } from './types';
 
@@ -56,12 +84,16 @@ const SWIM_EYE = 0.1;
 /**
  * With something to throw in the hand the chase camera moves up and over the right shoulder (body
  * radii across, body heights up), so the throw's arc and where it lands (render/throwPreview.ts)
- * are not hidden behind the monster's own back. The view's direction does not change.
+ * are not hidden behind the monster's own back, and the ground behind a house in front is in view
+ * to lob onto. The view's direction does not change, and the crosshair stays the true landing
+ * point (its ray starts at the shifted camera).
  */
 const THROW_SIDE = 2.2;
 const THROW_UP = 0.55;
-/** With something to throw in the hand, both views look no higher than this (radians); the aim goes on up. */
-export const THROW_VIEW_UP = 8 * DEG;
+/** How close to the crosshair's point a throw must come down to count as there: a quarter of its blast. */
+const THROW_TOLERANCE = 0.25;
+/** The word the screen shows when a throw cannot get to the crosshair's point. */
+const REACH_WORD: Record<Exclude<ThrowReach, 'on'>, AimWord> = { short: LABELS.aim.tooFar, blocked: LABELS.aim.blocked, close: LABELS.aim.tooClose };
 /** The chase camera's lens, and how much wider it opens during a charge's run (degrees). */
 const CHASE_FOV = 60;
 const CHARGE_FOV = 12;
@@ -142,8 +174,34 @@ export class KaijuController implements Controller {
   private swayPhase = 0;
   /** How far the chase camera has moved over the shoulder for a throw, 0..1 (eased). */
   private throwShift = 0;
-  /** The hand held something to throw on the last update. */
-  private wasHolding = false;
+  /**
+   * The monster's aim as the screen shows it (round 5): where the view looks, what a throw in the
+   * hand does at the crosshair, a charge's lane, and what cannot be reached. Rebuilt every update.
+   */
+  readonly aim: KaijuAimView = { yaw: 0, pitch: 0, throw: null, lane: null, warning: null };
+  private readonly throwView = { on: 'none' as 'ground' | 'structure' | 'unit' | 'none', x: 0, y: 0, z: 0, reach: 'on' as ThrowReach, high: false, landX: 0, landY: 0, landZ: 0 };
+  private readonly laneView = { x: 0, z: 0, yaw: 0, half: 0, length: 0, blocker: -1 };
+  private readonly warningView: { word: AimWord; x: number; y: number; z: number; crosshair: boolean } = { word: LABELS.aim.blocked, x: 0, y: 0, z: 0, crosshair: true };
+  /**
+   * Where the crosshair was when the flat arc last failed and the lob was picked: while the
+   * crosshair stays within a blast's radius of it the lob is tried first, so the arc does not flip
+   * between the two along a roof's edge; farther off the flat arc is tried first again.
+   */
+  private readonly lobAt = { x: 0, z: 0, set: false };
+  private readonly pointAim = createPointThrowAim();
+  private readonly flight = createThrowFlight();
+  private readonly beam = createBeamPath();
+  /** What the crosshair is on for the line-of-sight checks (kept apart from `aimPoint`). */
+  private readonly sight: AimPoint = createAimPoint();
+  private readonly ray = { x: 0, y: 0, z: 0 };
+  private readonly rayDir = { x: 0, y: 0, z: 0 };
+  private readonly capsule: VerticalCapsule = { x: 0, z: 0, r: 0, y0: 0, y1: 0 };
+  private readonly capsuleHit: CastHit = { t: 0, nx: 0, ny: 0, nz: 0 };
+  private readonly nearby: number[] = [];
+  /** First person: where the camera was last placed, and the body then (the crosshair's ray starts there). */
+  private readonly fpEye = { x: 0, y: 0, z: 0 };
+  private readonly fpFrom = { x: 0, z: 0 };
+  private fpPlaced = false;
 
   constructor(thirdPerson = false) {
     this.thirdPerson = thirdPerson;
@@ -178,9 +236,7 @@ export class KaijuController implements Controller {
   private placeView(k: SnapKaiju): void {
     if (this.headFree(k)) {
       this.viewYaw = clampAngleAround(this.aimYaw, k.yaw, kaijuKindDef(k.kind).headLeadMax);
-      // Lobbing over a building means aiming high: the view stops a little above level, so the
-      // ground where the throw comes down stays in sight (the aim goes on up; the arc shows it).
-      this.viewPitch = strikeVerb(k.held) === 'throw' ? Math.min(this.aimPitch, THROW_VIEW_UP) : this.aimPitch;
+      this.viewPitch = this.aimPitch;
     } else {
       this.viewYaw = k.aimYaw;
       this.viewPitch = clamp(k.aimPitch, -PITCH_LIMIT, PITCH_LIMIT);
@@ -209,23 +265,27 @@ export class KaijuController implements Controller {
     }
     this.aimYaw = clampAngleAround(this.aimYaw, k.yaw, MAX_HEADING_LEAD);
     this.aimPitch = clamp(this.aimPitch, -PITCH_LIMIT, PITCH_LIMIT);
-    // Thrown (or dropped): the aim comes back down to where the view stopped, so the view does
-    // not leap up into the sky after a lob.
     const holding = strikeVerb(k.held) === 'throw';
-    if (this.wasHolding && !holding) this.aimPitch = Math.min(this.aimPitch, THROW_VIEW_UP);
-    this.wasHolding = holding;
+    if (!holding) this.lobAt.set = false;
     this.sendYaw = this.aimYaw;
     this.sendPitch = this.aimPitch;
     this.placeView(k);
+    const aim = this.aim;
+    aim.yaw = this.viewYaw;
+    aim.pitch = this.viewPitch;
+    aim.throw = null;
+    aim.lane = null;
+    aim.warning = null;
     if (this.thirdPerson && k.phase !== 'cocoon' && k.phase !== 'dead') {
       this.placeChase(ctx, k);
       // (While the head is not the player's the camera rides it, and aiming from the camera
-      // would steer the head by its own picture: the mouse's wish goes out as it is.) With
-      // something to throw in the hand the view's own direction goes out: the throw leaves along
-      // it (sim/throwArc.ts) and the arc on screen moves smoothly with the mouse, where the
-      // crosshair's target jumps from wall to ground at every roof's edge.
-      if (!input.aimOverride && this.headFree(k) && strikeVerb(k.held) !== 'throw') this.aimFromCamera(ctx, k);
+      // would steer the head by its own picture: the mouse's wish goes out as it is.)
+      if (!input.aimOverride && this.headFree(k) && !holding) this.aimFromCamera(ctx, k);
     }
+    // Something to throw: it lands where the crosshair points (the autopilot aims its own).
+    if (holding && !input.aimOverride && this.headFree(k) && k.submerge <= 0) this.aimThrowFromCrosshair(ctx, k);
+    this.watchBeam(ctx, k);
+    this.watchCharge(ctx, k);
     ctx.session.aimYaw = this.sendYaw;
     ctx.session.aimPitch = this.sendPitch;
   }
@@ -345,6 +405,182 @@ export class KaijuController implements Controller {
     camera.rotateZ(swing * amount * SWAY_ROLL * (thirdPerson ? 1 : 0.7));
   }
 
+  /** Where the crosshair's ray starts: the chase camera, or (first person) the eye as last placed. */
+  private rayOrigin(k: SnapKaiju): Point3 {
+    const o = this.ray;
+    if (this.thirdPerson) {
+      o.x = this.chase.x;
+      o.y = this.chase.y;
+      o.z = this.chase.z;
+    } else if (this.fpPlaced) {
+      // Where the camera was put last frame, moved with the body since.
+      o.x = this.fpEye.x + (k.x - this.fpFrom.x);
+      o.y = this.fpEye.y;
+      o.z = this.fpEye.z + (k.z - this.fpFrom.z);
+    } else {
+      kaijuEyePoint({ kind: k.kind, stage: k.stage, x: k.x, z: k.z, aimYaw: this.viewYaw }, o);
+    }
+    return o;
+  }
+
+  /**
+   * Something to throw in the hand (round 5): the throw lands where the crosshair points. The
+   * camera's center ray finds the point: a unit's feet when it meets a unit first (aiming at the
+   * chest, the ground behind it would be the point), else the ground, a roof or a wall; on the sky,
+   * a point beyond any throw's reach. `aimThrowAtPoint` picks the arc that gets there, and its
+   * heading and pitch go out as the aim (the server flies exactly that arc; it accepts pitches up
+   * to 89 degrees, and a lob's reach 65). No lead on a moving squad: the throw lands where the
+   * crosshair is (docs/DESIGN.md section 8, "Throwing on screen").
+   */
+  private aimThrowFromCrosshair(ctx: ControlContext, k: SnapKaiju): void {
+    if (!k.held) return;
+    const st = kaijuStageDef(k.kind, k.stage);
+    const def = kaijuKindDef(k.kind);
+    const o = this.rayOrigin(k);
+    const yaw = this.viewYaw;
+    const pitch = this.viewPitch;
+    const cp = Math.cos(pitch);
+    const dir = this.rayDir;
+    dir.x = Math.sin(yaw) * cp;
+    dir.y = Math.sin(pitch);
+    dir.z = Math.cos(yaw) * cp;
+    const query = ctx.session.mirror.query;
+    const flight = throwFlight(k.kind, k.stage, k.held, this.flight);
+    const longest = (flight.speed * flight.speed) / flight.gravity + st.handHeight * 2;
+    const maxDist = Math.max(st.height * 40, longest * 1.5);
+    const a = resolveAimPoint(query, o.x, o.y, o.z, yaw, pitch, maxDist, this.sight);
+    const view = this.throwView;
+    view.on = a.on === 'kaiju' ? 'none' : a.on;
+    view.x = a.x;
+    view.y = a.y;
+    view.z = a.z;
+    let structure = a.on === 'structure' ? a.id : -1;
+    // A unit the ray meets first: its feet (the blast is round where it lands). Each is a dome
+    // over the ground as wide as the squad and as tall as its men (or its tank), so the ray has
+    // to be on them, not a few meters over their heads.
+    let best = a.on === 'none' ? maxDist : a.dist;
+    const cap = this.capsule;
+    for (const u of ctx.frame.units) {
+      if (!u.alive || u.wreck) continue;
+      const t = unitTypeDef(u.type);
+      cap.x = u.x;
+      cap.z = u.z;
+      cap.r = t.radius;
+      cap.y0 = u.y - t.radius;
+      cap.y1 = Math.max(cap.y0, u.y + Math.max(t.height, 0.5) - t.radius);
+      if (rayVsCapsule(o, dir, best, cap, this.capsuleHit) && this.capsuleHit.t < best) {
+        best = this.capsuleHit.t;
+        view.on = 'unit';
+        view.x = u.x;
+        view.y = u.y;
+        view.z = u.z;
+        structure = -1;
+      }
+    }
+    if (view.on === 'none') {
+      // The sky: a point far out along the view, beyond any reach (the farthest throw that way).
+      view.x = o.x + Math.sin(yaw) * longest * 2;
+      view.y = 0;
+      view.z = o.z + Math.cos(yaw) * longest * 2;
+    }
+    const impact = perStage(def.actions.throw.impactRadius, k.stage);
+    const lob = this.lobAt;
+    const preferHigh = lob.set && Math.hypot(view.x - lob.x, view.z - lob.z) < impact;
+    const r = aimThrowAtPoint(query, k, flight, view.x, view.y, view.z, impact * THROW_TOLERANCE, structure, def.headLeadMax, throwClearance(k), this.pointAim, preferHigh);
+    if (r.reach !== 'on' || !r.high) lob.set = false;
+    else if (!preferHigh) {
+      // The flat arc did not get there and the lob did: remember where.
+      lob.set = true;
+      lob.x = view.x;
+      lob.z = view.z;
+    }
+    view.reach = r.reach;
+    view.high = r.high;
+    view.landX = r.x;
+    view.landY = r.y;
+    view.landZ = r.z;
+    this.sendYaw = r.yaw;
+    this.sendPitch = r.pitch;
+    this.aim.throw = view;
+    if (r.reach !== 'on') this.warn(REACH_WORD[r.reach], r.x, r.y, r.z);
+  }
+
+  private warn(word: AimWord, x: number, y: number, z: number, crosshair = true): void {
+    const w = this.warningView;
+    w.word = word;
+    w.x = x;
+    w.y = y;
+    w.z = z;
+    w.crosshair = crosshair;
+    this.aim.warning = w;
+  }
+
+  /**
+   * While the beam burns: when it ends on a building short of what the crosshair is on (more than
+   * a beam's width short), the screen says 'Blocked' where it ends. The beam is stopped by the first
+   * building its middle line or either edge meets (sim/beam.ts), so an edge can catch a corner
+   * while the middle looks clear.
+   */
+  private watchBeam(ctx: ControlContext, k: SnapKaiju): void {
+    const special = kaijuKindDef(k.kind).actions.special;
+    if (k.action !== 'special' || k.phase !== special.activePhase || k.submerge > 0) return;
+    const query = ctx.session.mirror.query;
+    const beam = beamPath(query, k, special, this.beam);
+    if (beam.end !== 'structure') return;
+    const o = this.rayOrigin(k);
+    const a = resolveAimPoint(query, o.x, o.y, o.z, this.viewYaw, this.viewPitch, perStage(special.range, k.stage) * 2, this.sight);
+    if (a.on === 'structure' && a.id === beam.blocker) return;
+    const far = a.on === 'none' ? Infinity : Math.hypot(a.x - beam.ox, a.y - beam.oy, a.z - beam.oz);
+    if (far > beam.length + perStage(special.width, k.stage)) this.warn(LABELS.aim.blocked, beam.ex, beam.ey, beam.ez);
+  }
+
+  /**
+   * In a charge's wind-up and run: its lane ahead of the body (as wide as the body, as long as the
+   * run left), and the first building in it too tall to smash (DESIGN.md section 4: a charge smashes
+   * buildings up to 9 / 30 / 70 m and a taller one stops it dead): 'Too tall' where the run stops.
+   */
+  private watchCharge(ctx: ControlContext, k: SnapKaiju): void {
+    if (k.action !== 'charge' || (k.phase !== 'windup' && k.phase !== 'charge')) return;
+    const def = kaijuKindDef(k.kind);
+    const charge = def.actions.charge;
+    const st = kaijuStageDef(k.kind, k.stage);
+    const run = st.topSpeed * charge.speedMult;
+    const time = k.phase === 'windup' ? charge.timing.active - charge.rampTime / 2 : Math.max(0, k.phaseDuration - k.phaseTime);
+    const length = run * time;
+    const lane = this.laneView;
+    lane.x = k.x;
+    lane.z = k.z;
+    lane.yaw = k.yaw;
+    lane.half = st.bodyRadius;
+    lane.length = length;
+    lane.blocker = -1;
+    this.aim.lane = lane;
+    if (st.wadesTall) return;
+    const query = ctx.session.mirror.query;
+    const index = query.index;
+    const smash = perStage(charge.smashHeight, k.stage);
+    const step = Math.max(1, st.bodyRadius * 0.75);
+    const dx = Math.sin(k.yaw);
+    const dz = Math.cos(k.yaw);
+    const b = ctx.frame.bounds;
+    for (let d = step; d <= length + 1e-6; d += step) {
+      const x = k.x + dx * d;
+      const z = k.z + dz * d;
+      if (x - st.bodyRadius < b.minX || x + st.bodyRadius > b.maxX || z - st.bodyRadius < b.minZ || z + st.bodyRadius > b.maxZ) {
+        lane.length = d - step;
+        return;
+      }
+      structuresInCircle(query, x, z, st.bodyRadius * 0.9, this.nearby);
+      for (const id of this.nearby) {
+        if (index.spassable[id] === 1 || index.sheight[id] <= smash) continue;
+        lane.length = d - step;
+        lane.blocker = id;
+        this.warn(LABELS.aim.tooTall, k.x + dx * lane.length, 0, k.z + dz * lane.length, false);
+        return;
+      }
+    }
+  }
+
   /** Third person: aim from the kaiju's eye at what the crosshair is on. */
   private aimFromCamera(ctx: ControlContext, k: SnapKaiju): void {
     const p = this.chase;
@@ -430,6 +666,13 @@ export class KaijuController implements Controller {
       this.placeView(k);
       aimCamera(camera, this.viewYaw, this.viewPitch);
       this.sway(camera, k, false);
+      // The next frame's crosshair ray starts here (the sway only rolls it).
+      this.fpEye.x = camera.position.x;
+      this.fpEye.y = camera.position.y;
+      this.fpEye.z = camera.position.z;
+      this.fpFrom.x = k.x;
+      this.fpFrom.z = k.z;
+      this.fpPlaced = true;
     } else {
       // Placed in `update` from the body as it was then; the frame's input steps have moved the
       // drawn body since (MatchSession.refreshLocal), so the camera moves with it, and never

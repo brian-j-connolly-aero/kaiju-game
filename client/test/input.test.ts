@@ -443,6 +443,20 @@ describe('30 Hz input samples', () => {
     expect(ticker.alpha).toBeGreaterThanOrEqual(0);
     expect(ticker.alpha).toBeLessThan(1);
   });
+
+  it('owes the ticks of a frozen page by the real clock, up to a second and a half', () => {
+    // Round 5: a page that froze sent at most 8 ticks (a quarter second) on its next frame, and
+    // its inputs then reached the server late for the rest of the match.
+    expect(new InputTicker().advance(0.6)).toBe(18);
+    expect(MAX_TICKS_PER_FRAME).toBe(45);
+    const ticker = new InputTicker();
+    expect(ticker.advanceTo(50, 1 / 60)).toBe(0);
+    // A frame half a second later plays a clamped 0.25 s, but sends the 15 ticks it owes.
+    expect(ticker.advanceTo(50.5, 0.25)).toBe(15);
+    expect(ticker.advanceTo(50.5 + DT, DT)).toBe(1);
+    // A clock that runs backwards falls back on the frame's own time.
+    expect(ticker.advanceTo(10, DT)).toBe(1);
+  });
 });
 
 describe('the default keys and the browser', () => {

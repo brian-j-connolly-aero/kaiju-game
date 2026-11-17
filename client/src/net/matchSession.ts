@@ -177,6 +177,10 @@ export interface NetSample {
 
 /** Snapshots the readout's history keeps: 30 seconds. */
 export const NET_HISTORY = 450;
+/** A correction of the local body at least this big counts as snapping back in the page's report, meters (as ui/netReadout.ts counts it). */
+const REPORT_SNAP = 0.15;
+/** A frame at least this long counts as the page freezing in its report, seconds. */
+const REPORT_FREEZE = 0.1;
 
 export interface SessionCallbacks {
   sendInput(input: PlayerInput): void;
@@ -289,6 +293,10 @@ export class MatchSession {
   stats = { snapshots: 0, snapshotBytes: 0, events: 0, inputs: 0, lastSnapshotAt: 0 };
   /** The newest snapshots, oldest first, for the network readout (NET_HISTORY of them). */
   readonly net: NetSample[] = [];
+  /** What this page saw since its last ping, for the server's log (`takeReport`, round 5). */
+  private report = { snaps: 0, snapMax: 0, freezes: 0, frameMax: 0 };
+  /** Local time of the previous `sample`, seconds (the page's frames, for the report). */
+  private lastSampleAt = Number.NaN;
 
   private readonly callbacks: SessionCallbacks;
   private queue: QueuedEvent[] = [];
@@ -355,8 +363,21 @@ export class MatchSession {
     this.stats.lastSnapshotAt = now;
     this.reconcileFrom(snap);
     const p = this.predictor;
-    this.net.push({ at: now, gap, jump: p.ready ? p.lastJump : 0, drops: readAck(snap.ackSeq).drops, pending: p.pending.length });
+    const jump = p.ready ? p.lastJump : 0;
+    this.net.push({ at: now, gap, jump, drops: readAck(snap.ackSeq).drops, pending: p.pending.length });
     if (this.net.length > NET_HISTORY) this.net.shift();
+    if (jump >= REPORT_SNAP) this.report.snaps++;
+    this.report.snapMax = Math.max(this.report.snapMax, jump);
+  }
+
+  /**
+   * What the page saw since the last call (corrections of its own body, frames that froze), for
+   * the report its pings carry to the server's log (`PageReport`, protocol.ts), and starts over.
+   */
+  takeReport(): { snaps: number; snapMax: number; freezes: number; frameMax: number } {
+    const r = this.report;
+    this.report = { snaps: 0, snapMax: 0, freezes: 0, frameMax: 0 };
+    return { snaps: r.snaps, snapMax: Math.round(r.snapMax * 100), freezes: r.freezes, frameMax: Math.round(r.frameMax * 1000) };
   }
 
   handleEvents(events: SimEvent[], now: number): void {
@@ -565,6 +586,12 @@ export class MatchSession {
    * has reached. Returns null until the first snapshot has arrived.
    */
   sample(now: number, dt: number): FrameState | null {
+    const frameTime = now - this.lastSampleAt;
+    this.lastSampleAt = now;
+    if (frameTime > 0) {
+      if (frameTime >= REPORT_FREEZE) this.report.freezes++;
+      this.report.frameMax = Math.max(this.report.frameMax, frameTime);
+    }
     const tick = renderTick(this.clock, now);
     const sampled = sampleSnapshots(this.buffer, tick);
     if (!sampled) {

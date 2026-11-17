@@ -17,8 +17,9 @@
  *                     fires the volley later in the tick and un-plants the squad) it stops
  *                     where it is and plants: rooted, laser on (`state` 'charging'), its weapon
  *                     swinging toward the point the leader's aim ray lands on (`volleyAim`), its
- *                     charge growing from 0 to 1 over COMBAT_RULES.chargeTime. The leader
- *                     itself is never planted and drives on;
+ *                     charge growing from 0 to 1 over COMBAT_RULES.chargeTime, but only to just
+ *                     under the 60% notch while its weapon is still reloading (`chargeCap`,
+ *                     round 5). The leader itself is never planted and drives on;
  *     otherwise       it rides in its place in the swarm (`swarmSlot`: one spacing behind the
  *                     leader out to either side, the third two spacings straight behind, single
  *                     file where a street is too narrow), finding its way with sim/nav.ts,
@@ -109,6 +110,22 @@ function plant(u: Unit): void {
   resetRoute(u.nav);
 }
 
+/**
+ * How far under the 60% notch (COMBAT_RULES.volleyMinCharge) a squad-mate whose weapon is still
+ * reloading stops charging (round 5): a charge that counts is then always one that fires.
+ */
+export const RELOAD_CHARGE_GAP = 0.01;
+
+/**
+ * The most a squad-mate's charge may reach this tick: a full charge, or, while its weapon will
+ * still be reloading when the weapon system fires (later this tick), just under the notch. (In
+ * round 4 squad-mates charged to full while reloading a big cannon or a missile pod, then did
+ * not fire on the release, and the charge was gone: a third of their charged volleys.)
+ */
+export function chargeCap(cooldown: number): number {
+  return cooldown > DT + 1e-6 ? COMBAT_RULES.volleyMinCharge - RELOAD_CHARGE_GAP : 1;
+}
+
 /** One tick of a planted squad-mate: it stands, swings its weapon toward the volley's aim point and charges. */
 function holdAndCharge(squad: Squad, u: Unit, aimAt: Vec3 | null): void {
   const c = u.control;
@@ -117,7 +134,8 @@ function holdAndCharge(squad: Squad, u: Unit, aimAt: Vec3 | null): void {
   c.fire = false;
   u.state = 'charging';
   const time = COMBAT_RULES.chargeTime * modMult(squad.mods, 'chargeTime');
-  u.charge = time > 0 ? Math.min(1, u.charge + DT / time) : 1;
+  const cap = chargeCap(u.cooldown);
+  if (u.charge < cap) u.charge = time > 0 ? Math.min(cap, u.charge + DT / time) : cap;
   if (!aimAt) return;
   const dx = aimAt.x - u.x;
   const dz = aimAt.z - u.z;

@@ -1,13 +1,16 @@
 /**
  * Lobby: the room code to share, five seats, a role choice (volunteer for the kaiju or lead a
  * squad), a ready switch, and for the host the start button and the practice option (a bot
- * plays the kaiju). Names are the only words. The player's own name is a field they can change
- * here (the server cleans it, as on joining).
+ * plays the kaiju). Besides the names, each button carries its label of one or two words under
+ * its picture (round 5, ui/labels.ts: "Monster" or "Squad", "Ready", "Start", "Bot monster",
+ * "Leave", "Invite"), and an empty seat says "Bot". The player's own name is a field they can
+ * change here (the server cleans it, as on joining).
  */
 
 import { canStartMatch, factionDef, kaijuKindDef, MATCH_RULES, MAX_NAME_LENGTH, type LobbyState } from '@mb/shared';
 import { storeName } from '../../net/session';
 import { el, icon, portrait } from '../../ui/icons';
+import { label, LABELS, setLabel } from '../../ui/labels';
 import type { AppContext, Screen } from '../context';
 
 /**
@@ -26,6 +29,11 @@ export function inviteLink(code: string, publicUrl: string | undefined, page: { 
  */
 export function seatAsleep(lobby: LobbyState, p: LobbyState['players'][number]): boolean {
   return p.connected && !p.ready && p.seat !== lobby.host && p.waited === true;
+}
+
+/** A seat's flag: its picture and its label. */
+function flag(iconId: string, tone: string, word: string): HTMLElement {
+  return el('span', `flag-pair ${tone}`, [icon(iconId, `flag ${tone}`), label(word, 'flag-label')]);
 }
 
 export class LobbyScreen implements Screen {
@@ -48,14 +56,16 @@ export class LobbyScreen implements Screen {
   enter(ctx: AppContext): void {
     const client = ctx.client;
     const code = el('div', 'room-code', [client.code]);
-    const link = el('button', 'btn', [icon('lb_link')]);
+    const linkWord = label(LABELS.lobby.invite);
+    const link = el('button', 'btn btn-labelled', [icon('lb_link'), linkWord]);
     link.addEventListener('click', () => {
       const address = inviteLink(client.code, client.lobby?.publicUrl, window.location);
       void navigator.clipboard?.writeText(address).catch(() => undefined);
       ctx.audio.play('ui_click');
       link.classList.add('done');
+      setLabel(linkWord, LABELS.lobby.copied);
     });
-    const back = el('button', 'btn', [icon('lb_back')]);
+    const back = el('button', 'btn btn-labelled', [icon('lb_back'), label(LABELS.lobby.leave)]);
     back.addEventListener('click', () => {
       ctx.audio.play('ui_click');
       client.leave();
@@ -88,7 +98,7 @@ export class LobbyScreen implements Screen {
     });
     this.nameField = nameField;
     this.portraitBox = el('div', 'lobby-portrait');
-    this.role = el('button', 'btn btn-big role-toggle');
+    this.role = el('button', 'btn btn-big btn-labelled role-toggle');
     this.role.addEventListener('click', () => {
       const me = client.me();
       if (!me) return;
@@ -96,7 +106,7 @@ export class LobbyScreen implements Screen {
       ctx.audio.unlock();
       ctx.audio.play('ui_click');
     });
-    this.ready = el('button', 'btn btn-big ready-toggle', [icon('lb_ready')]);
+    this.ready = el('button', 'btn btn-big btn-labelled ready-toggle', [icon('lb_ready'), label(LABELS.lobby.ready)]);
     this.ready.addEventListener('click', () => {
       const me = client.me();
       if (!me) return;
@@ -104,20 +114,20 @@ export class LobbyScreen implements Screen {
       ctx.audio.unlock();
       ctx.audio.play('ui_ready');
     });
-    this.practice = el('button', 'btn practice-toggle', [icon('lb_bot'), icon('lb_kaiju')]);
+    this.practice = el('button', 'btn btn-labelled practice-toggle', [el('span', 'btn-pics', [icon('lb_bot'), icon('lb_kaiju')]), label(LABELS.lobby.botMonster)]);
     this.practice.addEventListener('click', () => {
       const lobby = client.lobby;
       if (lobby && client.isHost()) client.send('setOptions', { botKaiju: !lobby.options.botKaiju });
       ctx.audio.play('ui_click');
     });
-    this.start = el('button', 'btn btn-big start', [icon('lb_play')]);
+    this.start = el('button', 'btn btn-big btn-labelled start', [icon('lb_play'), label(LABELS.lobby.start)]);
     this.start.addEventListener('click', () => {
       ctx.audio.unlock();
       ctx.audio.play('ui_match_start');
       client.send('start', {});
     });
 
-    const gear = el('button', 'btn settings-open', [icon('ui_settings')]);
+    const gear = el('button', 'btn btn-labelled settings-open', [icon('ui_settings'), label(LABELS.lobby.settings)]);
     gear.addEventListener('click', () => {
       ctx.audio.unlock();
       ctx.audio.play('ui_click');
@@ -125,7 +135,7 @@ export class LobbyScreen implements Screen {
     });
 
     // The controls card for the role this player has picked, next to the gear.
-    const card = el('button', 'btn controls-open', [icon('ui_controls')]);
+    const card = el('button', 'btn btn-labelled controls-open', [icon('ui_controls'), label(LABELS.common.controls)]);
     card.addEventListener('click', () => {
       ctx.audio.unlock();
       ctx.audio.play('ui_click');
@@ -160,7 +170,7 @@ export class LobbyScreen implements Screen {
       const p = lobby.players.find((x) => x.seat === seat);
       if (!p) {
         // Nobody here: a bot leads this squad.
-        cards.push(el('div', 'seat empty', [icon('lb_bot', 'seat-role bot'), icon('lb_human', 'seat-bot-role')]));
+        cards.push(el('div', 'seat empty', [icon('lb_bot', 'seat-role bot'), icon('lb_human', 'seat-bot-role'), label(LABELS.lobby.bot, 'seat-label')]));
         continue;
       }
       // Not ready for 20 seconds: the host may start without them (`canStartMatch`).
@@ -169,10 +179,10 @@ export class LobbyScreen implements Screen {
         icon(p.wantsKaiju ? 'lb_kaiju' : 'lb_human', `seat-role ${p.wantsKaiju ? 'kaiju' : 'human'}`),
         p.seat === client.seat && this.nameField ? this.ownName(p.name) : el('div', 'seat-name', [p.name]),
         el('div', 'seat-flags', [
-          p.seat === lobby.host ? icon('lb_host', 'flag host') : '',
-          p.ready ? icon('lb_ready', 'flag ok') : '',
-          asleep ? icon('ui_asleep', 'flag asleep') : '',
-          p.connected ? '' : icon('ui_offline', 'flag off'),
+          p.seat === lobby.host ? flag('lb_host', 'host', LABELS.lobby.host) : '',
+          p.ready ? flag('lb_ready', 'ok', LABELS.lobby.ready) : '',
+          asleep ? flag('ui_asleep', 'asleep', LABELS.lobby.asleep) : '',
+          p.connected ? '' : flag('ui_offline', 'off', LABELS.lobby.offline),
         ]),
       ]);
       cards.push(card);
@@ -186,7 +196,7 @@ export class LobbyScreen implements Screen {
       else ctx.controls.setRole('squad', me.kaijuKind, factionDef(me.faction).name);
     }
     if (this.role && me) {
-      this.role.replaceChildren(icon(me.wantsKaiju ? 'lb_kaiju' : 'lb_human'));
+      this.role.replaceChildren(icon(me.wantsKaiju ? 'lb_kaiju' : 'lb_human'), label(me.wantsKaiju ? LABELS.lobby.monster : LABELS.lobby.squad));
       this.role.classList.toggle('kaiju', me.wantsKaiju);
     }
     if (this.portraitBox && me) {

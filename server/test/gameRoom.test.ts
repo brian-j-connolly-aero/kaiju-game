@@ -19,7 +19,7 @@ import {
   type PlayerInput,
 } from '@mb/shared';
 import { describe, expect, it } from 'vitest';
-import { MAX_CATCH_UP_STEPS, STARVED_BUTTON_TICKS, STARVED_TICKS } from '../src/room/match';
+import { MAX_CATCH_UP_STEPS, MAX_OWED_MS, STARVED_BUTTON_TICKS, STARVED_TICKS } from '../src/room/match';
 import { INPUT_QUEUE_MAX } from '../src/room/inputQueue';
 import { JoinRefused } from '../src/room/peer';
 import { ackOf, FakePeer, input, makeRoom, seatPlayers, startMatch, TICK_MS, tokenOf } from './helpers';
@@ -600,7 +600,9 @@ describe('match loop', () => {
      * server a random 0 to `maxLate` ticks late (in order, as over one connection). Records,
      * for every snapshot from the first one that has played an input, how many ticks the body
      * has had beyond the inputs the client counts in its prediction (the snapshot's tick less
-     * the inputs played and the inputs the server will drop), and the buttons the simulation saw.
+     * the inputs played and the inputs the server will drop, plus the inputs trimmed from a
+     * backlog so far: each of those costs the body one tick the client counted), and the buttons
+     * the simulation saw.
      */
     function lateLink(maxLate: number, seed: number) {
       const { room, run } = makeRoom();
@@ -620,8 +622,9 @@ describe('match loop', () => {
       const extra = new Set<number>();
       let lastSnap = 0;
       let arriveLast = 0;
-      for (let t = 1; t <= 600; t++) {
-        // The client: one input per tick. After 15 s the link is quick again.
+      for (let t = 1; t <= 750; t++) {
+        // The client: one input per tick. After 15 s the link is quick again (for 10 s: a
+        // backlog left behind is trimmed one input a second).
         const buttons = t < 580 && roll(9) === 0 ? Btn.fire : 0;
         sent.push(buttons);
         const late = t < 450 ? roll(maxLate + 1) : 0;
@@ -639,21 +642,25 @@ describe('match loop', () => {
         if (snap.tick !== lastSnap) {
           lastSnap = snap.tick;
           const ack = ackOf(snap);
-          if (ack.played > 0) extra.add(snap.tick - ack.played - ack.drops);
+          if (ack.played > 0) extra.add(snap.tick - ack.played - ack.drops + room.match!.queues[slot].trimmed);
         }
       }
-      return { room, world, sent, seen, extra: [...extra] };
+      return { room, world, slot, sent, seen, extra: [...extra] };
     }
 
     it('never gives the body a step the client does not count, and builds up no delay', () => {
       for (const maxLate of [1, 2, 4, 8]) {
-        const { room, extra } = lateLink(maxLate, 7 + maxLate);
+        const { room, slot, extra } = lateLink(maxLate, 7 + maxLate);
         // One value all match long: whatever arrives late, the body has had exactly one tick for
-        // every input the client counts. (Before, every late input added a step that the client
-        // pulled back when the queue later skipped inputs: the stutter.)
+        // every input the client counts, but for the inputs trimmed from a backlog, one tick each.
+        // (Before round 4, every late input added a step that the client pulled back when the
+        // queue later skipped inputs: the stutter.)
         expect(extra, `inputs up to ${maxLate} ticks late`).toHaveLength(1);
-        // Once the link is quick again the inputs wait no more than a tick or two.
-        expect(room.match!.queues[0].items.length, `inputs up to ${maxLate} ticks late`).toBeLessThanOrEqual(2);
+        // Once the link is quick again the inputs wait no more than a tick or two, moving or not.
+        // (Round 5: until then this looked at slot 0, the bot monster's, and a walking player
+        // whose link had been 4 to 8 ticks late kept 5 to 9 inputs waiting for good.)
+        expect(room.match!.queues[slot].items.length, `inputs up to ${maxLate} ticks late`).toBeLessThanOrEqual(2);
+        expect(room.match!.queues[slot].trimmed, `inputs up to ${maxLate} ticks late`).toBeLessThanOrEqual(maxLate + 1);
       }
     });
 
@@ -666,21 +673,61 @@ describe('match loop', () => {
     });
   });
 
-  it('never spirals: a long stall costs a handful of ticks and one snapshot', () => {
+  it('never spirals: after a long stall it catches up one second at most, a few ticks and one snapshot per update', () => {
     const { room, run, skip } = makeRoom();
     const peers = seatPlayers(room, 1);
     startMatch(room, peers);
     run(1);
-    const world = room.match!.world;
+    const m = room.match!;
+    const world = m.world;
     const tick = world.tick;
-    const snaps = peers[0].all('snap').length;
+    let snaps = peers[0].all('snap').length;
     skip(30_000);
-    room.update();
-    expect(world.tick - tick).toBe(MAX_CATCH_UP_STEPS);
-    expect(peers[0].all('snap').length).toBe(snaps + 1);
-    // And it is back to one tick per tick of time straight away.
+    // Each update after the stall runs at most MAX_CATCH_UP_STEPS ticks and sends one snapshot.
+    for (let i = 0; i < TICK_RATE; i++) {
+      const before = world.tick;
+      i === 0 ? room.update() : run(1 / TICK_RATE);
+      expect(world.tick - before).toBeLessThanOrEqual(MAX_CATCH_UP_STEPS);
+      expect(peers[0].all('snap').length).toBeLessThanOrEqual(snaps + 1);
+      snaps = peers[0].all('snap').length;
+    }
+    // Of the thirty seconds, one is caught up (MAX_OWED_MS) and the rest dropped, so the match
+    // is back in step a second later: one tick per tick of time.
+    expect(m.clock.dropped).toBeCloseTo(29_000, 0);
+    const caughtUp = world.tick;
+    expect(caughtUp - tick).toBe(Math.round(MAX_OWED_MS / TICK_MS) + TICK_RATE - 1);
     run(1);
-    expect(world.tick).toBe(tick + MAX_CATCH_UP_STEPS + TICK_RATE);
+    expect(world.tick).toBe(caughtUp + TICK_RATE);
+  });
+
+  it('catches up after the server stood still, so a walking player\'s inputs do not wait longer afterwards', () => {
+    // Round 5: the third playtest's growing lag. A pause of 0.4 s used to drop 8 ticks, and the
+    // walking player's queue then stayed 8 inputs longer for good (it is trimmed only while the
+    // body stands still).
+    const { room, run, runUntil, skip } = makeRoom();
+    const peers = seatPlayers(room, 1);
+    startMatch(room, peers);
+    const m = room.match!;
+    runUntil(() => m.world.match.phase === 'playing', 30);
+    let seq = 0;
+    const send = (): void => room.message(peers[0].id, 'input', input(++seq, { moveZ: 1 }));
+    // The client sends an input every tick, whatever the server does.
+    const walk = (seconds: number): void => {
+      for (let i = 0; i < Math.round(seconds * TICK_RATE); i++) {
+        send();
+        run(1 / TICK_RATE);
+      }
+    };
+    walk(2);
+    const waitingBefore = m.queues[0].items.length;
+    // The server stands still for 0.4 s; the client's inputs keep coming meanwhile.
+    for (let i = 0; i < 12; i++) send();
+    skip(400);
+    walk(10 / TICK_RATE);
+    expect(m.clock.dropped).toBe(0);
+    expect(m.queues[0].items.length).toBeLessThanOrEqual(Math.max(2, waitingBefore));
+    walk(1);
+    expect(m.queues[0].items.length).toBeLessThanOrEqual(Math.max(2, waitingBefore));
   });
 
   it('takes everyone back to the lobby instead of crashing when the simulation throws', () => {

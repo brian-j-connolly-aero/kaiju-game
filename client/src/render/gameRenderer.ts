@@ -36,7 +36,7 @@ import { atlasPixels, renderLandmarkPictures } from './landmarkPictures';
 import { kaijuBlowLanded } from '../game/kaijuBlows';
 import { Crowd } from './crowd';
 import { GrabGlow } from './grabGlow';
-import { ThrowPreview } from './throwPreview';
+import { ThrowPreview, type KaijuAimView } from './throwPreview';
 import { Effects } from './effects';
 import { buildGround, setGroundNight } from './ground';
 import { TrailRibbons } from './kaijuTrails';
@@ -71,6 +71,12 @@ export interface RenderView {
   hint: ActionHint | null;
   /** Local time in seconds (the hint's clock). */
   now: number;
+  /**
+   * The local monster's aim as its controller has it (round 5: the throw at the crosshair, a
+   * charge's lane, what cannot be reached; render/throwPreview.ts), or null (not the monster, or
+   * the cinematic camera). In first person its look also poses the head that carries the camera.
+   */
+  kaijuAim?: KaijuAimView | null;
 }
 
 export interface RenderStats {
@@ -932,6 +938,7 @@ export class GameRenderer {
           insideHead: own && view.kaijuInsideHead,
           camera: this.camera.position,
           tick: frame.tick,
+          look: own ? view.kaijuAim ?? undefined : undefined,
         });
         const st = kaijuStageDef(k.kind, k.stage);
         // A charge runs down whoever is in its path.
@@ -978,7 +985,8 @@ export class GameRenderer {
       // On the monster's own screen, what its hand can pick up glows, brighter within reach.
       this.grabGlow.update(frame.kaijus.find((k) => k.id === view.localKaiju) ?? null, this.mirror, frame.units, this.glow, this.decals, time);
       // ... and what it holds shows the arc it would fly, and where it can come down.
-      this.throwPreview.update(frame.kaijus.find((k) => k.id === view.localKaiju) ?? null, query, this.camera, view.kaijuFirstPerson, this.sky.night);
+      // ... and a charge's lane ahead of it.
+      this.throwPreview.update(frame.kaijus.find((k) => k.id === view.localKaiju) ?? null, query, this.camera, view.kaijuFirstPerson, view.kaijuAim ?? null, view.now);
 
       // The crowd is kept around the kaiju and runs from it, but only where the viewer may know
       // where it is: a squad that has lost the kaiju gets its crowd around its own camera and

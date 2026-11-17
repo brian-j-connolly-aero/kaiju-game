@@ -10,16 +10,23 @@
  * on the monster; it fades when the gun's point is out of the weapon's range; a point off the
  * screen (the turret faces away from the view) is pinned to the screen's edge in its direction.
  *
+ * While it sits apart from the crosshair (the turret still turning, or held short by a building),
+ * its label "Gun" (round 5, ui/labels.ts) says which of the two it is; on the crosshair it needs
+ * none.
+ *
  * It is placed after the camera has been placed for the frame being drawn
  * (`MatchRuntime.onCamera`), so it moves with the picture and not a frame behind it.
  */
 
 import { el } from './icons';
+import { label, LABELS } from './labels';
 import { screenSpot, type ScreenSpot, type ThreatCamera } from './threats';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const RING = 19;
 const RING_LENGTH = 2 * Math.PI * RING;
+/** Farther than this from the crosshair (screen pixels), the reticle shows its label. */
+const APART_PX = 40;
 
 /** What the reticle shows: where the gun points, and how the gun is. */
 export interface GunSight {
@@ -57,7 +64,7 @@ export class GunReticle {
       svg('path', { class: 'gr-ticks', d: 'M0 -23 L0 -31 M23 0 L31 0 M0 23 L0 31 M-23 0 L-31 0' }),
       svg('circle', { class: 'gr-dot', r: 2.4 }),
     );
-    this.root.append(picture);
+    this.root.append(picture, label(LABELS.squad.gun, 'gr-label'));
   }
 
   hide(): void {
@@ -79,7 +86,10 @@ export class GunReticle {
       this.shownReady = ready;
       this.reload.setAttribute('stroke-dashoffset', (RING_LENGTH * (1 - ready)).toFixed(2));
     }
-    const key = `${spot.x.toFixed(4)}:${spot.y.toFixed(4)}:${spot.onScreen ? 1 : 0}:${sight.onKaiju ? 1 : 0}:${sight.inRange ? 1 : 0}:${ready >= 1 ? 1 : 0}`;
+    const w = typeof window !== 'undefined' ? window.innerWidth : 1280;
+    const h = typeof window !== 'undefined' ? window.innerHeight : 720;
+    const apart = !spot.onScreen || Math.hypot((spot.x - 0.5) * w, (spot.y - 0.5) * h) > APART_PX;
+    const key = `${spot.x.toFixed(4)}:${spot.y.toFixed(4)}:${spot.onScreen ? 1 : 0}:${sight.onKaiju ? 1 : 0}:${sight.inRange ? 1 : 0}:${ready >= 1 ? 1 : 0}:${apart ? 1 : 0}`;
     if (key === this.shownKey) return;
     this.shownKey = key;
     const r = this.root;
@@ -88,6 +98,7 @@ export class GunReticle {
     r.classList.toggle('on-kaiju', sight.onKaiju);
     r.classList.toggle('out-of-range', !sight.inRange);
     r.classList.toggle('ready', ready >= 1);
+    r.classList.toggle('apart', apart);
     r.style.left = `${(spot.x * 100).toFixed(3)}%`;
     r.style.top = `${(spot.y * 100).toFixed(3)}%`;
   }
