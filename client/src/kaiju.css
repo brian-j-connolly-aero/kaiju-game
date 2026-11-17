@@ -3,7 +3,8 @@
  * (ui/kaijuKit.ts), the molt card picker (ui/moltCards.ts), and round 4's flair round the
  * crosshair: the rage meter, the hit slashes, the molt's burst and the power surge's badge
  * (ui/kaijuFlair.ts). Kept apart from styles.css, which holds everything else; the same color
- * language: kaiju orange, ready in yellow, the surge blue-white. No text.
+ * language: kaiju orange, ready in yellow, the surge blue-white. No text but the labels of one or
+ * two words beside the pictures (round 5: styles.css `.lbl`; where they sit: the end of this file).
  */
 
 /* --- the kit on the HUD ------------------------------------------------------------------------ */
@@ -148,8 +149,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
-  width: 46px;
-  height: 64px;
+  min-width: 46px;
+  min-height: 64px;
   color: var(--kaiju);
   font-size: 30px;
   align-self: flex-end;
@@ -837,4 +838,185 @@
   .kit-slot .slot-ring {
     inset: -4px;
   }
+}
+
+/* --- the monster's line of sight (round 5, ui/kaijuSight.ts) ---------------------------------- */
+
+.kaiju-sight {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  --cannot: #ff3f30;
+  --cannot-ink: rgba(26, 6, 0, 0.9);
+}
+
+/*
+ * What it aims at and cannot reach: a word of one or two, white on the same red as the throw's
+ * preview turns, just under the point (the throw's landing, the beam's end, the charge's stop).
+ */
+.sight-word {
+  position: absolute;
+  transform: translate(-50%, 22px);
+  padding: 3px 12px 4px;
+  border-radius: 7px;
+  border: 2px solid var(--cannot-ink);
+  background: var(--cannot);
+  color: #fff;
+  font-size: clamp(17px, 2.7vmin, 28px);
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  line-height: 1.1;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
+}
+
+/* ... and a red ring with a bar through it closes round the crosshair. */
+.sight-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 52px;
+  height: 52px;
+  margin: -26px 0 0 -26px;
+  border: 5px solid var(--cannot);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 2px var(--cannot-ink),
+    inset 0 0 0 2px var(--cannot-ink);
+}
+
+.sight-ring::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 46px;
+  height: 5px;
+  margin: -2.5px 0 0 -23px;
+  background: var(--cannot);
+  box-shadow: 0 0 0 2px var(--cannot-ink);
+  transform: rotate(-45deg);
+}
+
+/* Who hit it: a red ring over the squad that fired, seen through any building in front ... */
+.sight-hit {
+  --ring: clamp(34px, 5.4vmin, 58px);
+  position: absolute;
+  width: var(--ring);
+  height: var(--ring);
+  margin: calc(var(--ring) / -2) 0 0 calc(var(--ring) / -2);
+  border: 5px solid var(--cannot);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 2px var(--cannot-ink),
+    inset 0 0 0 2px var(--cannot-ink),
+    0 0 14px rgba(255, 63, 48, 0.7);
+}
+
+/* ... or, off the screen, a red wedge on its edge pointing at it. */
+.sight-hit.edge {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.sight-hit-wedge {
+  display: none;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  border-left: clamp(28px, 4.3vmin, 46px) solid var(--cannot);
+  border-top: clamp(18px, 2.8vmin, 30px) solid transparent;
+  border-bottom: clamp(18px, 2.8vmin, 30px) solid transparent;
+  transform-origin: 0 0;
+  transform: rotate(var(--angle, 0rad)) translate(-14px, calc(-1 * clamp(18px, 2.8vmin, 30px)));
+  filter: drop-shadow(0 0 2px #000) drop-shadow(0 0 8px rgba(255, 63, 48, 0.8));
+}
+
+.sight-hit.edge .sight-hit-wedge {
+  display: block;
+}
+
+/* A stunned squad a building hides: its stars, through the building. */
+.sight-stars {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  color: #ffdb26;
+  font-size: 20px;
+  letter-spacing: -3px;
+  text-shadow:
+    0 0 3px #000,
+    0 0 6px #000;
+  animation: pulse 0.9s infinite;
+}
+
+/* --- the labels in place (round 5, ui/labels.ts) ------------------------------------------------ */
+
+/* A move slot no molt has filled: "Locked", faint like its egg. */
+.kit-slot.empty .hint-word {
+  opacity: 0.4;
+}
+
+/* Grab while the last meal is too recent: dimmed with its picture. */
+.hint.unavailable .hint-word {
+  opacity: 0.55;
+}
+
+/* The molt on offer, and the controls card's button at the start: the label glows with the picture. */
+.hint.glow .hint-word {
+  color: var(--volley);
+}
+
+.kit-slot.ready .hint-word {
+  color: #ffd2a8;
+}
+
+/* "Shield" under the door's strength. */
+.kit-shield-label {
+  margin-top: 3px;
+}
+
+/* "Power surge" under the badge. */
+.kit-surge-label {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 16px);
+  transform: translateX(-50%);
+  color: #dbe9ff;
+  font-size: var(--label-big);
+  text-shadow:
+    0 0 6px #3a62e0,
+    0 1px 2px #000;
+}
+
+/* "Rage" outside the gashes at the lower left, faded with them. */
+.rm-label {
+  position: absolute;
+  right: 95%;
+  top: 60%;
+  transform: translateY(-50%);
+  color: #ffb27a;
+  opacity: 0.8;
+}
+
+.rage-meter.low .rm-label {
+  opacity: 0.5;
+}
+
+.rage-meter.holding .rm-label {
+  opacity: 0.25;
+}
+
+.rage-meter.ready .rm-label {
+  color: #fff0c8;
+  opacity: 1;
+}
+
+/* The move's name on its molt card, between the picture and the button. */
+.molt-card-label {
+  color: #ffe2c8;
+  font-size: calc(var(--card) * 0.13);
 }

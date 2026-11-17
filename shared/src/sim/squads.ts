@@ -12,9 +12,12 @@ import { stageDef } from '../defs/stages';
 import { unitTypeDef } from '../defs/units';
 import { modMult } from '../defs/upgrades';
 import { weaponDef } from '../defs/weapons';
+import type { CityQuery } from '../city/spatialIndex';
+import { createCastHit } from '../math/geom';
 import { clamp } from '../math/scalar';
 import type { Vec2, Vec3 } from '../math/vec';
-import { resolveAimPoint, type AimPoint } from './aim';
+import { resolveAimPoint, type AimKaiju, type AimPoint } from './aim';
+import { castKaijuBody } from './kaijuBody';
 import { solidInCircle } from './nav';
 import { unitSeesKaiju } from './spotting';
 import { kaijuShownHeight } from './swim';
@@ -87,20 +90,76 @@ export function unitAimErrorMult(squad: Squad, u: Unit): number {
 // The volley: planted squad-mates, their lasers and their charge
 // ---------------------------------------------------------------------------------------------
 
+/** A kaiju a volley can be aimed at. Kaiju and snapshot kaiju both satisfy it. */
+export type VolleyKaiju = AimKaiju & { submerge?: number };
+
+/** Which kaiju a volley is at (`volleyPoint`): its index in the list given, or -1; `through` when the aim ray reaches it only through cover. */
+export interface VolleyPick {
+  index: number;
+  through: boolean;
+}
+
+const throughHit = createCastHit();
+const pick: VolleyPick = { index: -1, through: false };
+
 /**
- * Where a squad's volley goes. `out` is the point the view's aim ray from the leader's eye
- * (the crosshair: `control.aimYaw` and `aimPitch`) lands on: a kaiju, a structure, the ground,
- * or far out along the ray. `mates` is where the squad-mates aim: the same point, or, with the
- * crosshair on a kaiju, the middle of its body at the height the ray met it, so that shots from
- * every side connect. Returns the kaiju the volley is at (the one under the crosshair, else the
- * one nearest the point), or null when there is none.
+ * Where a volley goes, from an aim ray: the leader's eye along its aim (`control.aimYaw` and
+ * `aimPitch`, the crosshair). Pure: a client calls it with a snapshot's kaijus and its mirrored
+ * city, and its screen then shows the very point the squad-mates will fire at.
+ *
+ * `out` is the point the ray lands on (`resolveAimPoint`: a kaiju, a structure, a mound, the
+ * ground, or far out along the ray). When it stops on a structure, a mound or the ground and the
+ * same ray, carried on through it, passes through a kaiju's body (above the ground) within
+ * SQUAD_RULES.aimRayRange, the volley is at that kaiju all the same, and `out` becomes that point
+ * on its body (round 5: from behind a garage the third-person camera sees the monster over the
+ * roof, and the leader's own line ends on the garage; the squad-mates standing in the open fire
+ * at the monster, and each one's line is its own business). `mates` is where the squad-mates
+ * aim: with the volley at a kaiju, the middle of its body at the height the ray met it (so that
+ * shots from every side connect), else the point itself. Returns which kaiju (shared scratch:
+ * read it before the next call).
  */
-export function volleyAim(world: World, leader: Unit, out: AimPoint, mates: Vec3): Kaiju | null {
-  const eye = leader.y + unitTypeDef(leader.type).eyeHeight;
-  const c = leader.control;
-  resolveAimPoint(world.cityQuery, leader.x, eye, leader.z, c.aimYaw, c.aimPitch, SQUAD_RULES.aimRayRange, out, world.kaijus);
-  const k = out.on === 'kaiju' ? world.kaijus[out.id] : nearestKaiju(world, out.x, out.z);
-  if (out.on === 'kaiju' && k) {
+export function volleyPoint(
+  city: CityQuery,
+  kaijus: readonly VolleyKaiju[],
+  ox: number,
+  oy: number,
+  oz: number,
+  yaw: number,
+  pitch: number,
+  out: AimPoint,
+  mates: Vec3,
+): VolleyPick {
+  resolveAimPoint(city, ox, oy, oz, yaw, pitch, SQUAD_RULES.aimRayRange, out, kaijus);
+  pick.index = -1;
+  pick.through = false;
+  if (out.on === 'kaiju') {
+    for (let i = 0; i < kaijus.length; i++) if (kaijus[i].id === out.id) pick.index = i;
+  } else if (out.on !== 'none') {
+    // Carried on through what stopped it: the first kaiju body it passes through.
+    const cp = Math.cos(pitch);
+    const dx = Math.sin(yaw) * cp;
+    const dy = Math.sin(pitch);
+    const dz = Math.cos(yaw) * cp;
+    let best: number = SQUAD_RULES.aimRayRange;
+    for (let i = 0; i < kaijus.length; i++) {
+      const k = kaijus[i];
+      if (!k.alive || !castKaijuBody(k, ox, oy, oz, dx, dy, dz, best, 0, throughHit) || throughHit.t >= best) continue;
+      if (oy + dy * throughHit.t < 0) continue;
+      best = throughHit.t;
+      pick.index = i;
+    }
+    if (pick.index >= 0) {
+      pick.through = true;
+      out.on = 'kaiju';
+      out.id = kaijus[pick.index].id;
+      out.dist = best;
+      out.x = ox + dx * best;
+      out.y = oy + dy * best;
+      out.z = oz + dz * best;
+    }
+  }
+  const k = pick.index >= 0 ? kaijus[pick.index] : null;
+  if (k) {
     mates.x = k.x;
     mates.y = clamp(out.y, 0, kaijuShownHeight(k));
     mates.z = k.z;
@@ -109,7 +168,19 @@ export function volleyAim(world: World, leader: Unit, out: AimPoint, mates: Vec3
     mates.y = out.y;
     mates.z = out.z;
   }
-  return k;
+  return pick;
+}
+
+/**
+ * Where a squad's volley goes (`volleyPoint` from the leader's eye along the crosshair). Returns
+ * the kaiju the volley is at (the one under the crosshair or behind the cover it is on, else the
+ * one nearest the point), or null when there is none.
+ */
+export function volleyAim(world: World, leader: Unit, out: AimPoint, mates: Vec3): Kaiju | null {
+  const eye = leader.y + unitTypeDef(leader.type).eyeHeight;
+  const c = leader.control;
+  const p = volleyPoint(world.cityQuery, world.kaijus, leader.x, eye, leader.z, c.aimYaw, c.aimPitch, out, mates);
+  return p.index >= 0 ? world.kaijus[p.index] : nearestKaiju(world, out.x, out.z);
 }
 
 /**

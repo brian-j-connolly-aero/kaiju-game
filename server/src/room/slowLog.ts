@@ -1,19 +1,29 @@
 /**
- * Slow moments of a room's loop, written to the server's log (what `host/logs.cmd` shows), so
- * that a stutter at a playtest can be matched with what the server was doing at the time
- * (docs/HOSTING.md, "If players' bodies snap back"). Three kinds:
+ * Slow moments of a room's loop, written to the server's log (what `host/logs.cmd` shows and
+ * `host/savelog.cmd` saves), so that lag at a playtest can be matched with what the server was
+ * doing at the time (docs/HOSTING.md, "If the game feels laggy"). Three kinds:
  *
  *   - a slow update: one update of the match took longer than SLOW_WORK_MS, with the simulation
  *     systems that took the most of it (timed through the pipeline's `mark`), the snapshot and
  *     sending, and any garbage collection pause inside it;
  *   - the server falling behind: the timer came more than SLOW_GAP_MS after the previous update
- *     (the process stood still: a garbage collection pause, the operating system, the container)
- *     or simulation time was dropped (the match ran slow and the players' inputs wait longer);
- *   - a stall on a player's connection: no input arrived from them for STALL_REPORT_TICKS ticks
- *     or more (match.ts; written when their inputs come again, with how long it lasted).
+ *     (the process stood still: a garbage collection pause, the operating system, the container).
+ *     Since round 5 the match catches that time up (fixedStep.ts); only a stall over a second
+ *     still skips some of the match, and the line says how much;
+ *   - a player's inputs not reaching their ticks for STALL_REPORT_TICKS ticks or more (match.ts;
+ *     written when their inputs come again, with how long it lasted): either nothing arrived (a
+ *     stall on their connection, or their page froze: the server cannot tell those apart, their
+ *     line a minute can) or their inputs kept arriving, each too late for its tick (their page or
+ *     computer fell behind; round 5: this used to read like a stall on the connection).
  *
  * Lines are rationed: at most one per LOG_EVERY_MS per room, the next one saying how many were
  * left out meanwhile. Timing costs a dozen clock reads per tick.
+ *
+ * And, unrationed, a few lines a minute while a match runs (`minute`, round 5): one for the server
+ * (ticks run, how long its updates took, how long it stood still, time skipped) and one per player
+ * (input delay, inputs waiting, ticks guessed, inputs dropped, and what their own page reported:
+ * round trip, snapping back, frames that froze), so that a saved log shows how every player's
+ * game went even when nobody took a screenshot.
  */
 
 import { SYSTEM_ORDER } from '@mb/shared';
@@ -25,6 +35,10 @@ export const SLOW_WORK_MS = 30;
 export const SLOW_GAP_MS = 100;
 /** At most one line per room this often, milliseconds. */
 export const LOG_EVERY_MS = 5000;
+/** The lines a minute come this often, milliseconds of the room's clock. */
+export const MINUTE_MS = 60_000;
+/** Length of one simulation tick, milliseconds (the queue lengths in the lines a minute are turned into time with it). */
+const TICK_MS = 1000 / 30;
 
 /** Plain names of the simulation systems, by SYSTEM_ORDER index, for the log. */
 const SYSTEM_NAMES: Record<(typeof SYSTEM_ORDER)[number], string> = {
@@ -96,6 +110,44 @@ export interface UpdateSample {
   elapsed: number;
 }
 
+/** What one player's page reported in its pings over the minute (`ClientMessages.ping`), or nothing. */
+export interface PageMinute {
+  /** Pings that carried a report. */
+  reports: number;
+  /** Round trips the page measured, milliseconds: the mean and the worst. */
+  rttMean: number;
+  rttWorst: number;
+  /** Corrections of the player's own body of 15 cm or more, and the largest, meters. */
+  snaps: number;
+  snapWorst: number;
+  /** Frames of 100 ms or more (the page froze), and the longest frame, milliseconds. */
+  freezes: number;
+  frameWorst: number;
+}
+
+/** How one player's inputs fared over the minute, for its line (`SlowWatch.minute`). */
+export interface SeatMinute {
+  seat: number;
+  /** What they play. */
+  role: string;
+  /** Ticks played for them; of those, ticks played from their queue. */
+  ticks: number;
+  fed: number;
+  /** Inputs left waiting after a tick played from their queue: the mean and the most. */
+  waitingMean: number;
+  waitingMax: number;
+  /** Ticks played on a guess; of those, ticks at which their inputs had kept arriving (late); the longest run in a row. */
+  guessed: number;
+  late: number;
+  longestRun: number;
+  /** Inputs that arrived; inputs dropped (late ones a guess stood for, skipped, discarded); of those, skipped from a backlog. */
+  arrived: number;
+  dropped: number;
+  trimmed: number;
+  /** What their page said, or null when it sent nothing. */
+  page: PageMinute | null;
+}
+
 export interface SlowWatchOptions {
   /** The clock the systems are timed with, milliseconds; the same as the room's. */
   now: () => number;
@@ -113,6 +165,14 @@ export class SlowWatch {
   private loggedAt = Number.NEGATIVE_INFINITY;
   private skipped = 0;
   private readonly options: SlowWatchOptions;
+  /** The server's own numbers since the last lines a minute. */
+  private minuteUpdates = 0;
+  private minuteTicks = 0;
+  private minuteWork = 0;
+  private minuteWorkMax = 0;
+  private minuteGapMax = 0;
+  private minuteStood = 0;
+  private minuteDropped = 0;
 
   constructor(options: SlowWatchOptions) {
     this.options = options;
@@ -131,11 +191,22 @@ export class SlowWatch {
     this.markAt = t;
   };
 
-  /** A new match: the gap and the dropped time start over. */
+  /** A new match: the gap, the dropped time and the minute start over. */
   reset(): void {
     this.lastBegan = Number.NaN;
     this.lastDropped = 0;
     this.systems.fill(0);
+    this.clearMinute();
+  }
+
+  private clearMinute(): void {
+    this.minuteUpdates = 0;
+    this.minuteTicks = 0;
+    this.minuteWork = 0;
+    this.minuteWorkMax = 0;
+    this.minuteGapMax = 0;
+    this.minuteStood = 0;
+    this.minuteDropped = 0;
   }
 
   /** One update of a running match is over: writes a line if it was a slow moment. */
@@ -147,13 +218,20 @@ export class SlowWatch {
     const work = s.ended - s.began;
     const slowWork = work > SLOW_WORK_MS;
     const stood = gap > SLOW_GAP_MS || dropped > 1;
+    this.minuteUpdates++;
+    this.minuteTicks += s.ticks;
+    this.minuteWork += work;
+    this.minuteWorkMax = Math.max(this.minuteWorkMax, work);
+    this.minuteGapMax = Math.max(this.minuteGapMax, gap);
+    if (gap > SLOW_GAP_MS) this.minuteStood++;
+    this.minuteDropped += dropped;
     if (slowWork || stood) {
       const parts: string[] = [];
       if (stood) {
         const gc = this.options.gc ? gcPausesBetween(s.began - gap, s.began) : 0;
         parts.push(
           `the server stood still for ${Math.round(gap)} ms${gc >= 1 ? ` (garbage collection ${Math.round(gc)} ms of it)` : ''}` +
-            (dropped > 1 ? `, ${Math.round(dropped)} ms of the match skipped (inputs now wait longer)` : ''),
+            (dropped > 1 ? `, ${Math.round(dropped)} ms of the match skipped (inputs wait longer for a while)` : ', and caught up'),
         );
       }
       if (slowWork) {
@@ -165,14 +243,62 @@ export class SlowWatch {
     this.systems.fill(0);
   }
 
-  /** A player's inputs came again after `ticks` ticks without any (`seat` is their lobby seat). */
-  stall(seat: number, ticks: number, stopped: boolean, elapsed: number, now: number): void {
+  /**
+   * A player's inputs came again after `ticks` ticks without any in time (`seat` is their lobby
+   * seat). `late`: at how many of those ticks inputs of theirs had arrived since the tick before,
+   * each too late: when that is most of them, their page or computer fell behind; otherwise
+   * nothing came through (their connection stalled).
+   */
+  stall(seat: number, ticks: number, stopped: boolean, elapsed: number, now: number, late = 0): void {
     const seconds = (ticks / 30).toFixed(2);
-    this.write(
-      `seat ${seat}'s inputs stopped arriving for ${seconds} s ${clockText(elapsed)} into the match (their connection stalled)` +
-        (stopped ? '; their body was stopped after 1 s and snaps back on their screen' : '; the server repeated their last input meanwhile'),
-      now,
+    const what =
+      late * 2 >= ticks
+        ? `seat ${seat}'s inputs kept arriving but too late for their ticks for ${seconds} s ${clockText(elapsed)} into the match (their page or computer fell behind, not the connection)`
+        : `seat ${seat}'s inputs stopped arriving for ${seconds} s ${clockText(elapsed)} into the match (their connection stalled, or their page froze)`;
+    this.write(what + (stopped ? '; their body was stopped after 1 s and snaps back on their screen' : '; the server repeated their last input meanwhile'), now);
+  }
+
+  /**
+   * The lines a minute: one for the server since the last ones, one per player in `seats`.
+   * Never rationed. `elapsed`: seconds into the match.
+   */
+  minute(seats: readonly SeatMinute[], elapsed: number): void {
+    const n = Math.max(1, this.minuteUpdates);
+    const at = `${clockText(elapsed)} into the match, the last minute:`;
+    this.options.log(
+      `${at} the server ran ${this.minuteTicks} steps in ${this.minuteUpdates} updates, ` +
+        `${(this.minuteWork / n).toFixed(1)} ms each on average (longest ${Math.round(this.minuteWorkMax)} ms), ` +
+        `longest wait between updates ${Math.round(this.minuteGapMax)} ms, stood still ${this.minuteStood} time${this.minuteStood === 1 ? '' : 's'}, ` +
+        `${Math.round(this.minuteDropped)} ms of the match skipped`,
     );
+    for (const p of seats) {
+      // An input waits at the server for the ticks before its own, plus half a tick on average.
+      const wait = Math.round((p.waitingMean + 0.5) * TICK_MS);
+      const parts: string[] = [];
+      if (p.page && p.page.reports > 0) {
+        const page = p.page;
+        parts.push(`input delay about ${Math.round(page.rttMean / 2) + wait} ms (${Math.round(page.rttMean / 2)} on the line, ${wait} waiting at the server)`);
+        parts.push(`round trip ${Math.round(page.rttMean)} ms (worst ${Math.round(page.rttWorst)})`);
+      } else {
+        parts.push(`inputs waiting at the server about ${wait} ms`);
+      }
+      parts.push(`queue ${p.waitingMean.toFixed(1)} on average, at most ${p.waitingMax}`);
+      parts.push(
+        `${p.arrived} inputs arrived for ${p.ticks} steps, ${p.guessed} steps played on a guess` +
+          (p.guessed > 0 ? ` (${p.late} with their input late, longest run ${p.longestRun})` : '') +
+          `, ${p.dropped} inputs dropped` +
+          (p.trimmed > 0 ? ` (${p.trimmed} skipped to cut the delay)` : ''),
+      );
+      if (p.page && p.page.reports > 0) {
+        const page = p.page;
+        parts.push(`snapped back ${page.snaps} time${page.snaps === 1 ? '' : 's'} over 15 cm` + (page.snaps > 0 ? ` (largest ${page.snapWorst.toFixed(2)} m)` : ''));
+        parts.push(`page froze ${page.freezes} time${page.freezes === 1 ? '' : 's'} over 0.1 s` + (page.freezes > 0 ? ` (longest ${Math.round(page.frameWorst)} ms)` : ''));
+      } else {
+        parts.push('no report from their page');
+      }
+      this.options.log(`${at} seat ${p.seat} (${p.role}): ${parts.join('; ')}`);
+    }
+    this.clearMinute();
   }
 
   private breakdown(s: UpdateSample, gc: number): string {

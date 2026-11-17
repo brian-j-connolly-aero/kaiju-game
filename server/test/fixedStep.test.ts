@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { createFixedStep, dueSteps, resetFixedStep, type FixedStepOptions } from '../src/room/fixedStep';
+import { catchingUp, createFixedStep, dueSteps, resetFixedStep, type FixedStepOptions } from '../src/room/fixedStep';
 
 const STEP = 1000 / 30;
-const options: FixedStepOptions = { stepMs: STEP, maxSteps: 4, maxFrameMs: 250, slopMs: 2, speed: 1 };
+const options: FixedStepOptions = { stepMs: STEP, maxSteps: 4, maxOwedMs: 1000, slopMs: 2, speed: 1 };
 
 describe('fixed-step accumulator', () => {
   it('runs nothing on the first call and one tick per step of time after that', () => {
@@ -36,18 +36,75 @@ describe('fixed-step accumulator', () => {
     expect(dueSteps(clock, STEP - 1.5 + 20, options)).toBe(0);
   });
 
-  it('never asks for more than maxSteps and drops the backlog after a stall', () => {
+  it('catches up after the server stood still, a few ticks per call, and drops nothing', () => {
+    // Round 5: a stall of 0.4 s used to drop all but 4 ticks of it, and every player's inputs
+    // then waited 8 ticks longer for the rest of the match.
+    for (const stall of [170, 400, 950]) {
+      const clock = createFixedStep();
+      dueSteps(clock, 0, options);
+      let t = 0;
+      let total = 0;
+      for (let i = 0; i < 30; i++) total += dueSteps(clock, (t += STEP), options);
+      t += stall;
+      let calls = 0;
+      // Then the timer comes back every tick: the owed ticks are run within a few calls.
+      while (calls < 12) {
+        const steps = dueSteps(clock, (t += STEP), options);
+        expect(steps).toBeLessThanOrEqual(options.maxSteps);
+        total += steps;
+        calls++;
+      }
+      expect(Math.abs(total - t / STEP)).toBeLessThan(1);
+      expect(clock.dropped).toBe(0);
+      expect(catchingUp(clock, options)).toBe(false);
+    }
+  });
+
+  it('says whether ticks are still owed after a call', () => {
     const clock = createFixedStep();
     dueSteps(clock, 0, options);
-    // A ten second stall: a few catch-up ticks, not three hundred.
+    expect(dueSteps(clock, 400, options)).toBe(4);
+    expect(catchingUp(clock, options)).toBe(true);
+    expect(dueSteps(clock, 400 + STEP, options)).toBe(4);
+    expect(dueSteps(clock, 400 + 2 * STEP, options)).toBe(4);
+    expect(dueSteps(clock, 400 + 3 * STEP, options)).toBe(3);
+    expect(catchingUp(clock, options)).toBe(false);
+    expect(dueSteps(clock, 400 + 4 * STEP, options)).toBe(1);
+  });
+
+  it('never asks for more than maxSteps, and drops what is owed beyond maxOwedMs', () => {
+    const clock = createFixedStep();
+    dueSteps(clock, 0, options);
+    // A ten second stall: a few catch-up ticks per call, not three hundred, and only the last
+    // second of it is owed; the rest is dropped.
     expect(dueSteps(clock, 10_000, options)).toBe(4);
-    expect(clock.owed).toBe(0);
+    expect(clock.dropped).toBeCloseTo(9_000, 6);
+    expect(clock.owed).toBeLessThanOrEqual(options.maxOwedMs);
+    // That second is caught up within ten calls a tick apart, never more than 4 ticks at a time.
+    let t = 10_000;
+    let total = 4;
+    for (let i = 0; i < 10; i++) {
+      const steps = dueSteps(clock, (t += STEP), options);
+      expect(steps).toBeLessThanOrEqual(4);
+      total += steps;
+    }
+    expect(total).toBe(30 + 10);
     // And no debt left behind: the next step of time is one tick.
-    expect(dueSteps(clock, 10_000 + STEP, options)).toBe(1);
-    // Many stalls in a row never add up either.
-    let total = 0;
-    for (let i = 1; i <= 50; i++) total += dueSteps(clock, 20_000 + i * 5_000, options);
-    expect(total).toBe(50 * 4);
+    expect(dueSteps(clock, (t += STEP), options)).toBe(1);
+    // Many stalls in a row never add up either: what is owed never passes a second.
+    let stalls = 0;
+    for (let i = 1; i <= 50; i++) {
+      stalls += dueSteps(clock, (t += 5_000), options);
+      expect(clock.owed).toBeLessThanOrEqual(options.maxOwedMs);
+    }
+    expect(stalls).toBe(50 * 4);
+  });
+
+  it('drops only what a stall over the limit owes beyond it', () => {
+    const clock = createFixedStep();
+    dueSteps(clock, 0, options);
+    dueSteps(clock, 3_000, options);
+    expect(clock.dropped).toBeCloseTo(2_000, 6);
   });
 
   it('ignores a clock that stands still, runs backwards or is not a number', () => {

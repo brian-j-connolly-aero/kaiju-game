@@ -93,6 +93,12 @@ export interface KaijuViewFrame {
    * time it says the tick the phase began, which picks the attack's look.
    */
   tick?: number;
+  /**
+   * First person: where the player's view looks. The head (which carries the camera) follows it
+   * rather than the aim sent, which for a lob points far above the view (round 5: the camera
+   * ended up inside the monster's own head).
+   */
+  look?: { yaw: number; pitch: number };
 }
 
 const NOT_LOCAL: KaijuViewFrame = { firstPerson: false, insideHead: false };
@@ -253,6 +259,8 @@ export class KaijuView {
   hasHand = false;
   /** Seen from inside its own head on the last frame (anything in the hand is shrunk to fit). */
   firstPerson = false;
+  /** First person: the view the head follows this frame (`KaijuViewFrame.look`). */
+  private headLook: { yaw: number; pitch: number } | undefined = undefined;
 
   constructor(assets: AssetStore, materials: Materials, callbacks: KaijuViewCallbacks = {}, ribbons: TrailRibbons | null = null) {
     this.assets = assets;
@@ -474,13 +482,15 @@ export class KaijuView {
     rig.setOffset('hips', 0, hipsLift, 0);
     // Seen from inside the head: lock the head to the aim (it carries the camera anchor, the
     // snout and, riding on it, the arms), so the claws keep their place whatever the body does.
+    // The local player's head follows the view (`look`), not a throw's aim (round 5).
     if (assembly) {
       const neck = rig.node('neck');
       const head = rig.node('head');
       if (neck && head) {
         this.group.updateMatrixWorld(true);
         neck.getWorldQuaternion(quat).invert();
-        aimQuat.setFromEuler(aimEuler.set(-k.aimPitch, k.aimYaw, 0, 'YXZ'));
+        const look = this.headLook;
+        aimQuat.setFromEuler(aimEuler.set(-(look ? look.pitch : k.aimPitch), look ? look.yaw : k.aimYaw, 0, 'YXZ'));
         head.quaternion.copy(quat).multiply(aimQuat);
       }
     }
@@ -571,6 +581,7 @@ export class KaijuView {
     // --- pose --------------------------------------------------------------------------------------
     const assembly = view.firstPerson && phase !== 'dead' && phase !== 'cocoon';
     this.firstPerson = assembly;
+    this.headLook = assembly ? view.look : undefined;
     if (assembly !== this.armsOnHead) {
       this.armsOnHead = assembly;
       rig.ride('arm_L', assembly ? 'head' : null);

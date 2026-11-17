@@ -2,8 +2,9 @@
  * The communication rose (docs/ROADMAP.md, round 4): hold the rose key (Z, or down on the
  * gamepad's d-pad) and a ring of wedges opens around the crosshair; moving the mouse (or the
  * right stick) picks a wedge, letting go sends it, letting go in the middle sends nothing.
- * Pictures only (the no-reading rule): each wedge is a kind of thing to say, and sending it
- * makes the player's character say a random line of that kind (shared/src/net/rose.ts).
+ * Each wedge is a picture of a kind of thing to say with its label of one or two words under it
+ * (round 5, ui/labels.ts: "Panic", "Retreat", "Mating call"), and sending it makes the player's
+ * character say a random line of that kind (shared/src/net/rose.ts).
  *
  * The army's wedges: panic, bravado, orders, science, home, food, retreat, admiring the monster.
  * The monster's: the big roar, the short roar, snuffles, a growl, a chomp, a contented rumble,
@@ -15,6 +16,7 @@
 
 import { ROSE_ARMY, ROSE_GAP_SECONDS, ROSE_KAIJU, type RoseSide } from '@mb/shared';
 import { el, icon } from './icons';
+import { label, roseLabels } from './labels';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -129,6 +131,7 @@ export class CommRose {
   onSend: ((cat: number) => void) | null = null;
 
   private readonly wedges: SVGPathElement[] = [];
+  /** Each wedge's picture with its label (the pair lights up together). */
   private readonly icons: HTMLElement[] = [];
   private readonly dot: HTMLElement;
   private readonly wait: SVGCircleElement;
@@ -158,9 +161,10 @@ export class CommRose {
     svg.append(hub, this.wait);
     this.dot = el('div', 'rose-dot');
     this.root = el('div', `rose rose-${side} hidden`, [svg, this.dot]);
+    const words = roseLabels(side);
     ids.forEach((id, i) => {
       const a = (i * Math.PI * 2) / ids.length;
-      const pic = icon(id, 'rose-icon');
+      const pic = el('div', 'rose-icon', [icon(id), label(words[i] ?? '', 'rose-label')]);
       // The pictures sit on the ring's middle radius (65 of 100), as a share of the rose's size.
       pic.style.left = `${50 + Math.sin(a) * 32.5}%`;
       pic.style.top = `${50 - Math.cos(a) * 32.5}%`;

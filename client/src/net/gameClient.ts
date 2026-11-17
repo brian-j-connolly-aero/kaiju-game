@@ -235,7 +235,10 @@ export class GameClient {
         const now = this.options.now();
         if (this.status !== 'online' || now - this.pingSentAt < this.pingEvery - PING_TIMER_MS / 2) return;
         this.pingSentAt = now;
-        this.link?.send('ping', { t: now });
+        // During a match the ping carries the page's report since the last one, for the server's
+        // log (round 5): a line a minute per player says how their game went.
+        const report = this.session && this.pingLast > 0 ? { rtt: Math.round(this.pingLast), ...this.session.takeReport() } : {};
+        this.link?.send('ping', { t: now, ...report });
       }, PING_TIMER_MS);
     }
   }

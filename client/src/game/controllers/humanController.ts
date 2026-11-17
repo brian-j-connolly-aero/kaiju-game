@@ -5,12 +5,21 @@
  * fire at the crosshair).
  *
  * In third person the aim sent to the server is the direction from the unit's eye to whatever
- * the camera's center ray lands on, so the crosshair is honest. Rocket infantry (stage 1) moves
- * relative to the view. The tank or troop the player drives at stages 2 and 3 is driven like a
- * tank (net/input.ts): W and S are the throttle, A and D turn the hull, and they go to the
- * server as they are, not turned into the view's frame. The turret swings toward the aim at its
- * own rate and the shells leave along it, so the controller also works out where the gun
- * points now (`gunPoint`): the HUD draws a second reticle there.
+ * the camera's center ray lands on. The camera hangs above and behind the unit, so it can see
+ * over a garage the unit's own shot hits: the controller casts the server's own ray (from the
+ * unit's eye along that aim) too, `shotPoint`, and the HUD says "Blocked" when that one stops on
+ * cover short of the monster the crosshair is on (round 5: the crosshair turned to "on target"
+ * while every rocket hit the garage), and "Too far" from the unit's own distance. Rocket infantry
+ * (stage 1) moves relative to the view. The tank or troop the player drives at stages 2 and 3 is
+ * driven like a tank (net/input.ts): W and S are the throttle, A and D turn the hull, and they go
+ * to the server as they are, not turned into the view's frame. The turret swings toward the aim
+ * at its own rate and the shells leave along it, so the controller also works out where the gun
+ * points now (`gunPoint`): the HUD draws a second reticle there. Where the squad's volley would
+ * go is worked out the way the server does it (`volleyPoint` in sim/squads.ts): `volleyAt`.
+ *
+ * Volley is a hold whose release fires the squad. Opening the map (or the settings panel) does
+ * not let go of it: the button stays as it was until the map closes (round 5: M or Tab while
+ * charging used to fire the volley at once, wherever the view pointed).
  */
 
 import type * as THREE from 'three';
@@ -26,11 +35,13 @@ import {
   rayVsCapsule,
   resolveAimPoint,
   unitTypeDef,
+  volleyPoint,
   wrapAngle,
   type AimPoint,
   type CityData,
   type CityQuery,
   type SnapUnit,
+  type Vec3,
   type VerticalCapsule,
 } from '@mb/shared';
 import { clearOfWalls, easeClearance, type Point3 } from './cameraClearance';
@@ -131,16 +142,33 @@ export class HumanController implements Controller {
   readonly aimPoint: AimPoint = createAimPoint();
   /**
    * Where the driven unit's own weapon points now and its shot would land. For a tank that is
-   * along the turret, which catches up with the aim at its own rate; for infantry it is the
-   * crosshair's point. Worked out once the frame's body is in place (`applyCamera`).
+   * along the turret, which catches up with the aim at its own rate; for infantry it is
+   * `shotPoint`. Worked out once the frame's body is in place (`applyCamera`).
    */
   readonly gunPoint: AimPoint = createAimPoint();
+  /**
+   * Where the unit's own shot goes once its weapon points along the aim sent to the server: the
+   * server's ray, from the unit's eye (not the camera's). Short of `aimPoint` when cover in front
+   * of the unit is in the way. Worked out with `gunPoint`.
+   */
+  readonly shotPoint: AimPoint = createAimPoint();
+  /**
+   * Where a volley let go now would go (sim/squads.ts `volleyPoint`, from the unit's eye along the
+   * aim): `volleyAt` is the point (on the monster when the aim ray passes through it, cover or no
+   * cover), `volleyMates` where the squad-mates aim (its middle at that height), `volleyKaiju` the
+   * index of that monster in the frame's list, or -1.
+   */
+  readonly volleyAt: AimPoint = createAimPoint();
+  readonly volleyMates: Vec3 = { x: 0, y: 0, z: 0 };
+  volleyKaiju = -1;
   /** The unit driven right now handles like a tank (stages 2 and 3). */
   tank = false;
   /** The volley button is down (and the map is closed): the squad-mates are planting or charging. */
   volleyHeld = false;
   /** The volley button went down since the last sample (a tap shorter than the gap between two still counts). */
   private volleyTap = false;
+  /** Volley as last sent: kept as it was while the map or the settings panel is open. */
+  private volleySent = false;
   private started = false;
   private lastX = 0;
   private lastZ = 0;
@@ -273,8 +301,10 @@ export class HumanController implements Controller {
       if (input.held.fire) out.buttons |= Btn.fire;
       // Volley is a hold whose end matters (letting go fires the squad): it goes as it is now,
       // so the release is in the very next sample, and a tap between two samples still counts once.
-      if (input.down.volley || this.volleyTap) out.buttons |= Btn.volley;
+      this.volleySent = input.down.volley || this.volleyTap;
     }
+    // With the map (or the panel) open it stays as it was: opening the map does not fire the volley.
+    if (this.volleySent) out.buttons |= Btn.volley;
     this.volleyTap = false;
     return out;
   }
@@ -387,17 +417,26 @@ export class HumanController implements Controller {
   /**
    * Where the driven unit's weapon points: from its eye along its own aim, which is the turret
    * of a tank (the frame's unit carries the predicted turret) and the crosshair's aim for
-   * infantry. Call once the frame's body is where it is drawn.
+   * infantry; where its shot goes once it points along the aim (`shotPoint`), and where a volley
+   * would go (`volleyAt`). Call once the frame's body is where it is drawn.
    */
   private updateGun(ctx: ControlContext): void {
     const u = ctx.frame.localUnit;
     if (!u) return;
-    if (!this.tank) {
-      Object.assign(this.gunPoint, this.aimPoint);
-      return;
-    }
     const def = unitTypeDef(u.type);
-    this.cast(ctx, u.x, u.y + def.eyeHeight, u.z, u.aimYaw, this.aimPitch, this.gunPoint);
+    const eyeY = u.y + def.eyeHeight;
+    this.cast(ctx, u.x, eyeY, u.z, this.aimYaw, this.aimPitch, this.shotPoint);
+    if (this.tank) this.cast(ctx, u.x, eyeY, u.z, u.aimYaw, this.aimPitch, this.gunPoint);
+    else Object.assign(this.gunPoint, this.shotPoint);
+    this.volleyKaiju = volleyPoint(ctx.session.mirror.query, ctx.frame.kaijus, u.x, eyeY, u.z, this.aimYaw, this.aimPitch, this.volleyAt, this.volleyMates).index;
+  }
+
+  /**
+   * The unit's own shot cannot reach what the crosshair is on: the crosshair is on a monster and
+   * the shot, from the unit's eye, stops on a building, a heap or the ground in front of it.
+   */
+  get shotBlocked(): boolean {
+    return this.aimPoint.on === 'kaiju' && (this.shotPoint.on === 'structure' || this.shotPoint.on === 'ground');
   }
 
   applyCamera(ctx: ControlContext, camera: THREE.PerspectiveCamera): void {

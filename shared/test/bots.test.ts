@@ -315,6 +315,9 @@ describe('the kaiju bot', () => {
     const squad = world.squads[s];
     const leader = world.units[squad.driven];
     setPlayerBot(world, squad.player, false);
+    // Loaded guns (holdFire kept them from ever coming ready): since round 5 a squad-mate still
+    // reloading charges only to just under the 60% notch. Planted, they never fire at will.
+    for (const id of squad.units) if (id !== squad.driven) world.units[id].cooldown = 0;
     const d = Math.hypot(k.x - leader.x, k.z - leader.z);
     return input({ buttons: Btn.volley, aimYaw: yawFromTo(leader.x, leader.z, k.x, k.z), aimPitch: Math.atan2(k.height * 0.5 - 2, d) });
   }

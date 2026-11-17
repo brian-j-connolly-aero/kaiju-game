@@ -14,6 +14,9 @@ tank companies.
 You need a computer (not a phone or tablet) with a keyboard and mouse, or a game controller,
 and an up-to-date Chrome, Edge or Firefox. Nothing to install. Turn the sound on. A voice chat
 beside the game helps a lot: the game has none of its own, only the communication rose (below).
+If the game shows only a few pictures a second, your browser is drawing it without the
+computer's graphics chip: turn on **Use graphics acceleration when available** (Chrome and
+Edge: Settings, System) and restart the browser. Keep the game's tab in front while you play.
 The music gets faster with each stage, and when one minute is left on the clock an alarm sounds
 and the music races to the end of the match.
 
@@ -25,9 +28,10 @@ and the music races to the end of the match.
    join as "Player 2" (or 3, 4, 5). The game remembers your name, so next time the link takes
    you straight in. To change your name later, click it in the room (it has a frame around it),
    type the new one and press Enter.
-3. In the room, the button with the monster or the soldier picks the side you would like.
-   Only one person can be the monster; if nobody asks, it takes turns.
-4. Press the tick to say you are ready. The host starts the match.
+3. In the room, the button with the monster or the soldier (it says MONSTER or SQUAD) picks the
+   side you would like. Only one person can be the monster; if nobody asks, it takes turns.
+4. Press the tick (READY) to say you are ready. The host starts the match (START). An empty seat
+   says BOT: a bot leads that squad.
 5. A short briefing plays, with your controls on screen. Click the game view once to let it
    take the mouse. Escape gives the mouse back and opens the settings.
 
@@ -50,11 +54,19 @@ Press **H** or **Enter** (or click the left stick on a controller) at any time t
 controls card; press it again to close it. The game keeps running behind it. Its picture, a card
 with its button under it, is always the last picture at the bottom right of the screen, and it
 glows for the first 20 seconds of a match. The card shows only what you can do right now, as
-five big pictures at most, each over its button: as the monster, the moves you picked at your
+five big pictures at most, each over its name and its button: as the monster, the moves you picked at your
 molts appear once you have them, the molt lights up while it is on offer, and what you hold
 changes what your two mouse buttons show; as a squad, the tank's driving replaces walking at
 stage 2, and a crate's weapon shows on both your buttons. The communication rose's key sits
-small at the top of the card.
+small at the top of the card (TALK).
+
+**Every picture has its name.** Since the third playtest every button and picture you need has a
+word or two beside it, in capitals: the buttons at the bottom right (STRIKE, GRAB, STOMP, FIRE,
+VOLLEY, MAP, VIEW, CONTROLS, and the rest), the bars (HEALTH, NERVE, RAGE, RELOAD), the clock
+(TIME LEFT), the marks on the skyline (MOLT, MOLT, MONSTER WINS), the rose's pictures, the molt
+cards, the menus. The word always says what the button does right now: the monster's left
+button says THROW while it holds something, its right button EAT or DROP. Red words mean
+"cannot" (BLOCKED, TOO FAR), on both sides.
 
 | What | Keyboard and mouse | Controller |
 | --- | --- | --- |
@@ -73,16 +85,18 @@ say nothing. It changes nothing in the game; it is just talk. One every two seco
 wait, the ring is greyed and the wait runs round its middle.
 
 - **Army** (shouted over the radio in your squad's own voice, with your name and the words as a
-  subtitle; clockwise from the top): a panicked face (panic), a thumb up (bravado), a megaphone
-  (orders), a bubbling flask (somebody call the professor), a house with a heart (home: "my
-  mother lives on this street"), a steaming pie (food), a soldier running off (retreat), a face
-  with hearts for eyes (admiring the monster).
-- **Monster** (no words, no subtitle; the noise comes from you, at your size): the big roar, the
-  short roar, snuffles, a growl, a chomp, a contented rumble, and a little musical mating call.
+  subtitle; clockwise from the top): a panicked face (PANIC), a thumb up (TOUGH TALK), a
+  megaphone (ORDERS), a bubbling flask (SCIENCE: somebody call the professor), a house with a
+  heart (HOME: "my mother lives on this street"), a steaming pie (FOOD), a soldier running off
+  (RETREAT), a face with hearts for eyes (ADMIRE: admiring the monster).
+- **Monster** (no words spoken, no subtitle; the noise comes from you, at your size): the big
+  roar (ROAR), the short roar (SHORT ROAR), snuffles (SNUFFLE), a growl (GROWL), a chomp (CHOMP),
+  a contented rumble (RUMBLE), and a little musical mating call (MATING CALL).
 
-**Restart.** The room's host finds a circular arrow in the settings panel (Escape) during a match
-and on the end screen. Press it once (it turns red and pulses), then again within four seconds:
-the match starts over for everyone, with the same people on the same sides.
+**Restart.** The room's host finds a circular arrow (RESTART) in the settings panel (Escape)
+during a match and on the end screen. Press it once (it turns red and pulses, and says CONFIRM),
+then again within four seconds: the match starts over for everyone, with the same people on the
+same sides.
 
 **Monster**
 
@@ -99,17 +113,28 @@ the match starts over for everyone, with the same people on the same sides.
 
 Every button does one thing. Nothing changes when you hold a button down, except the brace.
 
-**Throwing.** With something in your hand, a yellow arc on your screen shows where it will fly:
-a bright line from your hand, a widening tube round it, and a ring where it can land. Throws
-are real tosses: they leave your hand a little above where you look, rise and fall, and land
-somewhere inside the ring (never exactly in the middle twice), so a squad standing still about
-five of your own lengths away is hit most of the time, and farther away less often. Look higher
-to throw farther, or to lob it over a building onto whoever hides behind it; a lob is slower
-and less accurate. Look lower to throw short and flat. While you hold something the camera
-moves over your right shoulder and stops tilting up a little above the horizon, so you can
-always see the ring: moving the mouse up keeps raising the arc. A javelin (an antenna, a radio
-mast's top) flies fast and flat and is steadier than a car; a garage door floats like a frisbee.
-Things you throw hit the first building, soldier or patch of ground in their way.
+**Throwing.** With something in your hand, put the crosshair where you want it to land (the
+street, a roof, a wall or a squad of soldiers) and press the left button: it lands there. The
+game picks the throw for you: a flat, fast one when the way is clear, a high lob over a building
+in the way. A bold orange arc shows the flight, a widening tube round it shows how far off it may
+go, and where it lands you see a filled circle the size of the blast, a dashed ring where it can
+come down (wide for a lob, long for a flat throw), four corner marks and a post of light. Throws
+are real tosses, never exactly in the middle twice, so a squad standing still about five of your
+own lengths away is hit most of the time, and farther away less often. A lob flies longer and
+spreads wider. It lands where the crosshair is, not where a running squad will be: aim ahead of
+it. When it cannot get there everything turns red, a ring with a bar closes round your crosshair
+and one or two words say why: **Too far** (it goes as far as it can that way), **Blocked**
+(something is in the way of every throw) or **Too close**. While you hold something the camera
+moves over your right shoulder so the arc is not hidden behind your back. A javelin (an
+antenna, a radio mast's top) flies fast and flat and cannot be lobbed; a garage door floats like
+a frisbee. Things you throw hit the first building, soldier or patch of ground in their way.
+
+**What you cannot reach, and who is shooting you.** The same red and the same words everywhere:
+your breath beam stopped by a building short of your crosshair says **Blocked** where it ends; in
+a charge you see your lane on the ground, and a building too tall to smash through is outlined in
+red with **Too tall** where your run will stop. When a squad's shot hits you, a red ring circles
+that squad for two seconds, even behind a building; if it is off your screen, a red arrow on the
+screen's edge points at it. Soldiers you stunned behind a building show their stars through it.
 
 **Growing, and new moves.** When the skyline reaches a tower, the cocoon picture by F pulses:
 press F once to shed your skin. In the cocoon three cards come up in the middle of the screen,
@@ -189,7 +214,7 @@ a handful of them, and you gulp them down. People change nothing in the game: th
 you and they score nothing. New people arrive out of your sight (round a corner, behind a
 house, far off) or fade in gently; nobody you can see disappears except under your feet.
 
-![The cards at a molt: the beam, the roar and the charge, each over the key that picks it](progress/monster-molt-cards.png)
+![The cards at a molt: the beam, the roar and the charge, each with its name over the key that picks it](progress/monster-molt-cards.png)
 
 **Squad**
 
@@ -209,20 +234,40 @@ they can. On foot you fit through the narrow gaps between houses (a couple of me
 and your other units follow you through. Your own gun is rockets at first, then a tank gun, then a troop of three tanks, until
 a supply crate gives you something better (below).
 
+**Can you volley now?** Under your crosshair there is always a small picture per unit and a
+word. **Ready** means hold the right button now. Otherwise it says why not: **Shaken** or
+**Stunned** (the monster scared or froze them: a red cross on each), **Reload** (their guns are
+still reloading after a big shot: a ring filling on each), **Landing** (coming down by
+parachute), **No line** (a building or a heap is between them and where you aim: a red bar on
+each one that cannot hit), **Too far**, or **No squad** (they are all gone).
+
 **The volley.** Hold the right button: your three other units stop where they are, point
 yellow laser lines at your crosshair and start to charge. A big yellow diamond fills around your
-crosshair. A white notch marks the point where the volley starts to count: let go before it and
-the shot is weak; past it the diamond lights up and pulses; at the top it is full (about four and
-a half seconds). Let go and they all fire at once, your own shot with them if your gun is
-loaded, and the diamond flashes. You can keep driving while they charge. Under the diamond, one
-small picture per unit: a yellow diamond while it charges, a cyan circle while it follows you,
-red while the monster's roar has frozen or scared it (it cannot charge then).
+crosshair, and the word under it says how far: **Charging**, then **Ready** once it passes the
+white notch (let go before the notch and the shot is weak), then **Fire!** when it is full (about
+four and a half seconds). Let go and they all fire at once, your own shot with them if your gun
+is loaded: the diamond flashes white and says **Volley!** when they really fired, **Weak** if you
+let go too early, **No shot** if nobody could fire, and **Immune** if the monster has just broken
+and cannot be scared again for a few seconds. You can keep driving while they charge. A unit
+whose gun is still reloading charges only up to the notch and waits there until its gun is
+loaded: a charge past the notch always fires.
 
-![The volley charging: the diamond lit past its notch, the three units' lasers meeting at the crosshair](progress/squad-volley-meter.png)
+![The volley charging: the diamond lit past its notch, READY under it, the three units' lasers meeting at the crosshair](progress/squad-volley-meter.png)
 
-**Two squads at once.** When another squad's charged volley hits the monster, a ring appears
-round your diamond and runs down for five seconds. Land your own charged volley before it runs
-out and the monster's nerve can break.
+**Two squads at once.** When another squad's charged volley hits the monster and its nerve is
+high enough to break, **Team up** lights up beside the monster's nerve bar at the top, with a
+yellow strip running down for five seconds. Land your own charged volley before it runs out and
+the monster's nerve breaks. While you hold the right button the same five seconds run down as a
+thin ring round your diamond. Beside the nerve bar you may also see **Stagger** (it is broken
+right now: shoot it, it takes extra damage), **Immune** with a countdown (just broken: volleys add
+no fear until it runs out) and **Hidden** (your squads have lost sight of it).
+
+**Is your own shot blocked?** Your camera is above and behind you, so it can see over a garage
+your own rockets would hit. When your crosshair is on the monster but your shot would hit
+something in front of you, the crosshair turns into a red ring with a bar through it and says
+**Blocked**: step out from behind it. Your volley still goes at the monster: each of your other
+units fires from where it stands (the pictures under the crosshair show who has a clear line).
+**Too far** under the crosshair means the monster is out of your gun's reach.
 
 **Driving a tank** (stages 2 and 3). W and S are the throttle and A and D turn the tank, like a
 real tank: the keys do not follow your view. The camera stays behind the tank and looks where
@@ -244,7 +289,7 @@ your squad (anyone's squad may take any crate). Its picture pops up over your cr
 
 | Crate | What it gives your squad, until the stage ends or your squad is wiped out |
 | --- | --- |
-| Machine gun | Your own gun fires five times as fast: streams of bright tracers. Each shot does less, but more in all. |
+| Machine gun | Hold the left button and your gun fires a steady stream of bright tracers, about six a second. Each does little, but together more than your own gun. |
 | Big cannon | Slow, very heavy shots: a big flash, a puff of smoke, your tank rocks back, and a big blast where it lands. |
 | Missile pod | One press fires six missiles that fan out, trailing smoke, and curve in onto your crosshair. |
 | Artillery radio | Your next three charged volleys each call an artillery barrage where they land (see below). |
@@ -254,7 +299,8 @@ The machine gun, big cannon and missile pod replace your own gun, and your volle
 too: with the machine gun every unit lets rip a burst of tracers, with the big cannon each fires
 a heavy shell, with the missile pod each sends three missiles curving onto your crosshair.
 Between volleys your other units shoot their own guns. While you have one, the picture on your
-left button is that weapon.
+left button is that weapon, with its name under it. Every button at the bottom right has its
+name under its picture too (FIRE, VOLLEY, MAP, VIEW, CONTROLS).
 
 **Artillery.** With the radio, let go of a charged volley (past the notch) and the radio
 crackles: red smoke rises where your volley landed and a red ring closes in on the spot. When the
@@ -272,40 +318,47 @@ see.
 
 ## What the pictures mean
 
-![What a squad leader sees: a tank from behind at sunset, the volley diamond round the crosshair with another squad's five-second ring, the squads on the right, your bars bottom left, your buttons bottom right](progress/art-wired-squad-view.png)
+![What a squad leader sees: a tank from behind at sunset with the monster in the crosshair, NO LINE under it (houses stand between your other tanks and the monster: a red bar on each), the squads on the right, your bars bottom left, your buttons bottom right with their names](progress/art-wired-squad-view.png)
 
-- **Skyline, top centre:** the monster's progress. It fills from the left; the three towers are
-  the three stages, and the last one is the monster's win.
-- **Arc with a sun and a moon, top left:** the clock. When the sun reaches the moon, the army
-  wins.
-- **Three triangles, top right:** the monster's size (stage 1, 2 or 3).
-- **Names with dots, right:** the four squads. Each dot is a unit still alive; a yellow diamond
-  is a unit charging a volley.
-- **Bars, bottom left:** heart is health, spiral is nerve (fear), the shell is your reload. Once
-  the monster has picked the beam it has a flame there too: its rage, which fires the beam.
+- **Skyline, top centre:** the monster's progress. It fills from the left; the marks under it
+  say MOLT (where the monster sheds its skin and grows) and, at the end, MONSTER WINS.
+- **Arc with a sun and a moon, top left (TIME LEFT):** the clock. When the sun reaches the moon,
+  the army wins.
+- **Three triangles, top right (STAGE):** the monster's size (stage 1, 2 or 3).
+- **Names with dots, right (SQUADS):** the four squads. Each dot is a unit still alive; a yellow
+  diamond is a unit charging a volley.
+- **Bars, bottom left:** HEALTH (the heart), NERVE (the spiral: fear), RELOAD (the shell). Once
+  the monster has picked the beam it has RAGE there too (a flame), which fires the beam.
+- **Small pictures and a word under the crosshair (army):** whether your volley can go now, and
+  if not why (see "Can you volley now?" above).
 - **Big yellow diamond round the crosshair (army):** your volley charging (see "The volley"
-  above); a ring round it counting down means another squad's volley just hit: fire yours now.
-- **Cyan sight with four ticks (army, in a tank):** where your tank's gun points right now.
+  above); a thin ring round it counting down, and **Team up** by the monster's nerve bar, means
+  another squad's volley just hit: fire yours now.
+- **Red ring with a bar through it, "Blocked" (army):** your own shot would hit something in front
+  of you, not the monster your crosshair is on.
+- **Cyan sight with four ticks (army, in a tank; GUN beside it while it is apart from your
+  crosshair):** where your tank's gun points right now.
 - **Colours and shapes:** cyan circles are the army, orange triangles are the monster, yellow
   diamonds are volleys being charged. The orange eye in the middle of the screen means a squad
   leader can see the monster up close. The orange triangle over the monster shows only while a
   squad leader has it in plain sight; it is not there all the time.
 - **Glowing stripes on the monster:** its rage. Faint means calm, bright means full; a slow
   throb means it has the beam and can breathe it now. Blue-white means a power surge.
-- **Three claw marks round the crosshair (monster only):** your rage, heating up from a dark
-  scar to white-hot; throbbing with embers when your beam is ready. Claw slashes flashing over
+- **Three claw marks round the crosshair (monster only, RAGE beside them):** your rage, heating
+  up from a dark scar to white-hot; throbbing with embers when your beam is ready. Claw slashes flashing over
   the crosshair: your blow landed.
 - **Gold glow and a gold ring round a car or a thing in the street (monster only):** you can
   pick it up; brighter and pulsing when it is within reach of your hand.
-- **Big blue lightning badge beside the crosshair, screen edges crackling (monster only):** a
-  power surge; the white ring round the badge runs down until it ends.
+- **Big blue lightning badge beside the crosshair, screen edges crackling (monster only, POWER
+  SURGE):** a power surge; the white ring round the badge runs down until it ends.
 - **Spines over two waves, top middle (monster only):** you are swimming under water. Faint
   while you are going down or coming up.
-- **Yellow diamonds at the edge of the monster's screen:** squads charging a volley at it, in
-  the direction they are (an arrow points at them). They grow as the charge builds, flash fast
+- **Yellow diamonds at the edge of the monster's screen (VOLLEY):** squads charging a volley at
+  it, in the direction they are (an arrow points at them). They grow as the charge builds, flash fast
   when the volley is nearly ready, and blink white when it is fired.
-- **Pictures with a button, bottom right:** what you can do right now and which button does it.
-  The monster's two move buttons (Q and E) start as faint eggs and fill at the molts; a ring
+- **Pictures with a word and a button, bottom right:** what you can do right now and which
+  button does it. The monster's two move buttons (Q and E) start as faint eggs (LOCKED) and fill
+  at the molts; a ring
   round a move fills as it comes ready again. Yellow stars spinning over soldiers mean the roar
   has frozen them. With something from the city in its hand the monster's left button shows a
   throw, a javelin or a club (with three dots for the club's swings left), and its right button
@@ -315,6 +368,10 @@ see.
 - **A cyan column of light with a picture over it:** a supply crate, and what is in it.
 - **Grey snow on the map (army):** a radio mast has fallen; the map comes back after twenty
   seconds.
+- **Big pictures over the middle, each with its word:** CROSSFIRE, SPOTTED (the squads can see
+  the monster), SHAKEN (your unit is shaken), UNDERWATER (the monster swimming), NERVE BROKEN,
+  VOLLEY, INCOMING (artillery on its way), RECONNECTING, SQUAD LOST (your squad is gone: you fly
+  the news drone), and CLICK (click the game view to give it the mouse).
 - **Subtitles:** what a squad leader shouts with the communication rose, under the player's
   name. The monster's player also hears the television news say once that the creature is
   ready to shed its skin. Nothing else is said by itself.

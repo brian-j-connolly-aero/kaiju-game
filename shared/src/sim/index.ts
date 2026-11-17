@@ -30,7 +30,7 @@ export {
   strikeVerb,
 } from './cityWeapons';
 export { mapStatic, specialCollapsed } from './systems/specials';
-export { unitOrderSystem, volleyHeld } from './systems/unitOrders';
+export { chargeCap, RELOAD_CHARGE_GAP, unitOrderSystem, volleyHeld } from './systems/unitOrders';
 export { botSystem } from './systems/bots';
 export { movementSystem } from './systems/movement';
 export { callInFallTime, startCallIn, unitWeapon, weaponSystem } from './systems/weapons';

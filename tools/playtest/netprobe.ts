@@ -352,14 +352,17 @@ function makeProbe(name: string, role: 'army' | 'kaiju', url: string, index: num
       return;
     }
     const now = performance.now() / 1000;
-    const dt = lastFrame > 0 ? now - lastFrame : 1 / 60;
+    const real = lastFrame > 0 ? now - lastFrame : 1 / 60;
+    // As the page does (app.ts, matchRuntime.ts): the frame plays at most a quarter second, the
+    // input ticks follow the real clock.
+    const dt = Math.min(0.25, real);
     lastFrame = now;
     const s = session;
     if (s && client.session === s) {
       s.sample(now, dt);
-      const ticks = ticker.advance(dt);
+      const ticks = ticker.advanceTo(now, dt);
       const playing = s.latest?.match.phase === 'playing';
-      if (playing) probe.played += dt;
+      if (playing) probe.played += real;
       for (let i = 0; i < ticks; i++) {
         const bx = s.predictor.body.x;
         const bz = s.predictor.body.z;

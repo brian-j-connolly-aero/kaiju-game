@@ -1,12 +1,18 @@
 /**
  * The fixed-step accumulator: turns wall-clock time into a whole number of simulation ticks.
  *
- * It can never spiral. Three things bound the work one call may ask for:
- *   - a single gap between calls counts for at most `maxFrameMs` (a stalled process, a laptop
- *     that slept, a debugger pause);
- *   - one call asks for at most `maxSteps` ticks;
- *   - when more than that is owed, the rest is dropped, so the simulation runs slow for a moment
- *     instead of trying to catch up forever.
+ * After the server stood still (a busy host computer, the container's virtual machine paused, a
+ * garbage collection), the time it owes is caught up, a few ticks per call, so the match keeps
+ * pace with the players: they send 30 inputs a second whatever the server does, and every tick
+ * the match does not play is one more input waiting in every player's queue for the rest of the
+ * match (round 5: before, the owed time was dropped after a gap of about 0.17 s, and the inputs
+ * of the third playtest waited longer and longer, up to 1.9 s).
+ *
+ * It can never spiral. Two things bound the work:
+ *   - one call asks for at most `maxSteps` ticks (4: a stall of 0.4 s is caught up in about four
+ *     updates, while the world runs up to four times as fast for a moment);
+ *   - at most `maxOwedMs` of wall-clock time is owed at once; a longer stall drops the rest (the
+ *     match runs slow for a moment instead of catching up forever), and `dropped` counts it.
  *
  * Timers fire a little early as often as a little late, so a tick is due once the owed time is
  * within `slopMs` of a full step. The remainder (which may be slightly negative) carries over,
@@ -20,9 +26,9 @@ export interface FixedStep {
   owed: number;
   started: boolean;
   /**
-   * Wall-clock time that was never simulated, milliseconds, in total: a gap over `maxFrameMs`
-   * and whatever was owed beyond `maxSteps`. While it grows the match runs slow (slowLog.ts
-   * reports it), and the players' inputs wait longer at the server.
+   * Wall-clock time that was never simulated, milliseconds, in total: whatever was owed beyond
+   * `maxOwedMs`. When it grows the match ran slow for a moment (slowLog.ts reports it), and the
+   * players' inputs wait longer at the server until the backlog is trimmed (inputQueue.ts).
    */
   dropped: number;
 }
@@ -32,8 +38,8 @@ export interface FixedStepOptions {
   stepMs: number;
   /** Most ticks one call may return. */
   maxSteps: number;
-  /** Longest gap between two calls that is taken at face value, milliseconds. */
-  maxFrameMs: number;
+  /** The most wall-clock time that may be owed and still caught up, milliseconds. */
+  maxOwedMs: number;
   /** How early a tick may run, milliseconds. */
   slopMs: number;
   /** Simulation seconds per wall-clock second (1 in real play; more only in headless tests). */
@@ -50,6 +56,11 @@ export function resetFixedStep(clock: FixedStep): void {
   clock.owed = 0;
 }
 
+/** True while ticks are owed beyond the ones this call returned: the match is catching up. */
+export function catchingUp(clock: FixedStep, o: FixedStepOptions): boolean {
+  return clock.owed + o.slopMs >= o.stepMs;
+}
+
 /** How many ticks to run now. Call it with a monotonic clock, as often as you like. */
 export function dueSteps(clock: FixedStep, nowMs: number, o: FixedStepOptions): number {
   if (!clock.started) {
@@ -62,16 +73,16 @@ export function dueSteps(clock: FixedStep, nowMs: number, o: FixedStepOptions): 
   // A clock that stood still, ran backwards or returned NaN adds nothing.
   if (!(dt > 0)) return 0;
 
-  if (dt > o.maxFrameMs) clock.dropped += dt - o.maxFrameMs;
-  clock.owed += Math.min(dt, o.maxFrameMs) * o.speed;
+  const budget = o.maxOwedMs * o.speed;
+  clock.owed += dt * o.speed;
+  if (clock.owed > budget) {
+    // Longer than can be caught up: the rest is dropped.
+    clock.dropped += (clock.owed - budget) / o.speed;
+    clock.owed = budget;
+  }
   let steps = Math.floor((clock.owed + o.slopMs) / o.stepMs);
   if (steps <= 0) return 0;
-  if (steps > o.maxSteps) {
-    steps = o.maxSteps;
-    clock.dropped += Math.max(0, clock.owed - steps * o.stepMs) / o.speed;
-    clock.owed = 0;
-  } else {
-    clock.owed -= steps * o.stepMs;
-  }
+  if (steps > o.maxSteps) steps = o.maxSteps;
+  clock.owed -= steps * o.stepMs;
   return steps;
 }

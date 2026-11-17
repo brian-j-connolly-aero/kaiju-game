@@ -14,11 +14,15 @@
  * With something in the hand the gashes fade right down, so the throw's arc and where it lands
  * (render/throwPreview.ts) stay clear.
  *
+ * Its label, "Rage" (round 5, ui/labels.ts), sits outside the gashes at the lower left, faded
+ * with them.
+ *
  * The power surge's badge is the kit's (ui/kaijuKit.ts); the HUD puts it beside the crosshair.
  */
 
 import { clamp01, COMBAT_RULES, kaijuKindDef, type SnapKaiju } from '@mb/shared';
 import { el } from './icons';
+import { label, LABELS } from './labels';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -147,7 +151,7 @@ export class RageMeter {
       [-1, 0, 1].map((k) => `<path d="M${(-11 + k * 7).toFixed(0)} -12 L${(-8 + k * 7).toFixed(0)} -12 L${(9 + k * 7).toFixed(0)} 12 L${(6 + k * 7).toFixed(0)} 12Z"/>`).join('') +
       `</g></svg>`;
     this.burst = el('div', 'rm-burst');
-    this.root.append(box, this.slashes, this.burst);
+    this.root.append(box, this.slashes, this.burst, label(LABELS.meters.rage, 'rm-label'));
   }
 
   /**

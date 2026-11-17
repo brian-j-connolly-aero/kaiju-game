@@ -9,13 +9,16 @@
  *
  * Pick-ups (docs/ROADMAP.md, phase 2; defs/pickups.ts): a squad's weapon pick-up
  * (`squad.pickup`) replaces the driven unit's own weapon for all its shots, the Fire button's
- * and the one that goes with a volley (`pickupWeaponDef`): the machine gun's tracers (with a
- * spread on every shot, a person's own too), the big cannon's heavy shells, the missile pod's
+ * and the one that goes with a volley (`pickupWeaponDef`): the machine gun's stream of tracers
+ * (round 5: one tracer at a time from the unit's muzzles in turn, every `stream` seconds, each
+ * carrying that interval's share of the gun's rate of fire, with a hair of spread on every Fire
+ * shot, a person's own too), the big cannon's heavy shells, the missile pod's
  * salvo of missiles that fan out and curve onto the aim point (flight 'guided': a constant
  * acceleration that brings each one exactly onto the point after the time a straight shot would
  * take, then straight on). Since round 4 the planted squad-mates fire it in a volley too, each
  * `volleyPulls` of its trigger pulls at once (a burst of tracers, a heavy shell, half a pod's
- * salvo), with the volley's charge on top; firing on their own they keep their own weapons. The artillery radio
+ * salvo), with the volley's charge on top and the volley's own aim error (no spread: round 5);
+ * firing on their own they keep their own weapons. The artillery radio
  * (`squad.barrages`): each charged volley the squad fires while it has barrages left calls one
  * (`startCallIn`) on the ground the volley's crosshair marks (`resolveMarkerPoint`); one at the
  * empty sky is not spent.
@@ -33,7 +36,10 @@
  *   that has charge, is ready (not shaken, not stunned, weapon off cooldown) fires at the point
  *   the view's aim ray from the leader's eye lands on at that moment (`volleyAim`; with the
  *   crosshair on a kaiju they aim for the middle of its body at that height, so that a shot
- *   from any side connects), with damage x(1 + charge). Nerve is what a volley is for, and it
+ *   from any side connects; since round 5 also when that ray only reaches the kaiju through
+ *   cover in front of the leader), with damage x(1 + charge). (A squad-mate whose weapon is
+ *   still reloading charges only to just under the 60% notch, sim/systems/unitOrders.ts, so a
+ *   charge that counts is always one that fires.) Nerve is what a volley is for, and it
  *   only rewards a charge that is nearly complete (`volleyStrength`): below
  *   COMBAT_RULES.volleyMinCharge the shot is ragged, worth the fire-at-will nerve multiplier
  *   and aimed with the at-will error; from there to a full charge the multiplier rises to
@@ -108,9 +114,11 @@ interface Salvo {
   atWill: boolean;
   /** Trigger pulls fired at once (a pick-up in a volley, `volleyPulls`); 1 for a single pull. The reload is as many times as long, never less than one. */
   pulls: number;
+  /** A stream weapon (`WeaponDef.stream`) streams: one projectile now, the next after `stream` seconds. False in a volley (whole pulls). */
+  stream: boolean;
 }
 
-const salvo: Salvo = { atPoint: false, x: 0, y: 0, z: 0, error: 0, damageMult: 1, nerveMult: 1, volley: false, atWill: false, pulls: 1 };
+const salvo: Salvo = { atPoint: false, x: 0, y: 0, z: 0, error: 0, damageMult: 1, nerveMult: 1, volley: false, atWill: false, pulls: 1, stream: false };
 
 /** A unit that can fire this tick: alive, on the ground, steady, not stunned, its weapon loaded. */
 function ready(u: Unit): boolean {
@@ -130,7 +138,12 @@ function fireSalvo(world: World, squad: Squad, u: Unit, weapon: WeaponDef, s: Sa
   const proj = projectileTypeDef(weapon.projectile);
   // One pull's projectiles leave from `muzzles` points; several pulls at once go from the same points.
   const muzzles = shotsForMembers(weapon, u.members);
-  const shots = muzzles > 0 ? Math.max(1, Math.round(muzzles * s.pulls)) : 0;
+  // A stream (the machine gun on Fire) puts out one projectile at a time, from the muzzles in turn,
+  // each worth its interval's share of what the whole pulls deliver over time.
+  const stream = s.stream && weapon.stream !== undefined && weapon.stream > 0 ? weapon.stream : 0;
+  const shots = muzzles > 0 ? (stream > 0 ? 1 : Math.max(1, Math.round(muzzles * s.pulls))) : 0;
+  const share = stream > 0 ? (muzzles * stream) / weapon.cooldown : 1;
+  const turn = stream > 0 ? Math.floor(world.tick / Math.max(1, Math.round(stream / DT))) % Math.max(1, muzzles) : 0;
   const my = u.y + type.muzzleHeight;
   const fan = weapon.fan ?? 0;
   const loft = weapon.loft ?? 0;
@@ -148,12 +161,12 @@ function fireSalvo(world: World, squad: Squad, u: Unit, weapon: WeaponDef, s: Sa
   const reach = weapon.range * modMult(squad.mods, 'weaponRange') * SQUAD_RULES.rangeSlack;
   const ttl = proj.speed > 0 ? Math.min(proj.ttl, reach / proj.speed) : proj.ttl;
 
-  const damage = weapon.damage * s.damageMult * modMult(squad.mods, 'unitDamage');
-  const nerve = weapon.nerve * s.nerveMult * modMult(squad.mods, 'nerveDamage');
-  const structureDamage = weapon.structureDamage * modMult(squad.mods, 'structureDamage');
+  const damage = weapon.damage * share * s.damageMult * modMult(squad.mods, 'unitDamage');
+  const nerve = weapon.nerve * share * s.nerveMult * modMult(squad.mods, 'nerveDamage');
+  const structureDamage = weapon.structureDamage * share * modMult(squad.mods, 'structureDamage');
 
   for (let j = 0; j < shots; j++) {
-    const off = guided ? (j - (shots - 1) / 2) * spread : ((j % muzzles) - (muzzles - 1) / 2) * spread;
+    const off = guided ? (j - (shots - 1) / 2) * spread : ((stream > 0 ? turn : j % muzzles) - (muzzles - 1) / 2) * spread;
     const mx = u.x + rx * off;
     const mz = u.z + rz * off;
     let yaw = u.aimYaw;
@@ -227,7 +240,7 @@ function fireSalvo(world: World, squad: Squad, u: Unit, weapon: WeaponDef, s: Sa
       ...(guided ? { ax, ay, az, steer } : {}),
     });
   }
-  u.cooldown = weapon.cooldown * Math.max(1, s.pulls) * modMult(squad.mods, 'weaponCooldown');
+  u.cooldown = (stream > 0 ? stream : weapon.cooldown * Math.max(1, s.pulls)) * modMult(squad.mods, 'weaponCooldown');
 }
 
 /**
@@ -259,12 +272,14 @@ function fireLeader(world: World, squad: Squad, leader: Unit, volley: boolean): 
   salvo.nerveMult = 1;
   salvo.volley = volley;
   salvo.pulls = 1;
+  // The machine gun streams whenever the leader fires it (with a volley too: it is the leader's own gun).
+  salvo.stream = true;
   // A bot at the controls is no better a shot than a sub-unit, and its plinking is fire at will.
   salvo.atWill = player.bot && !volley;
   const error = player.bot
     ? (volley ? weapon.aimErrorVolley : weapon.aimErrorAtWill) * unitAimErrorMult(squad, leader) * scatterMult(world.match.stage, target)
     : 0;
-  // The machine gun's spread is on every shot, a person's own too.
+  // The machine gun's hair of spread is on every shot the leader fires, a person's own too.
   salvo.error = Math.hypot(error, weapon.spread ?? 0);
   fireSalvo(world, squad, leader, weapon, salvo);
 }
@@ -306,8 +321,10 @@ function fireVolley(world: World, squad: Squad, leader: Unit): void {
     salvo.volley = isChargedVolley(u.charge);
     salvo.atWill = false;
     salvo.pulls = pulls;
-    // The machine gun's spread is on every shot.
-    salvo.error = Math.hypot((w.aimErrorAtWill + (w.aimErrorVolley - w.aimErrorAtWill) * strength) * unitAimErrorMult(squad, u) * scatter, w.spread ?? 0);
+    salvo.stream = false;
+    // The volley's own aim error, nothing more (round 4 added the machine gun's 1.5 degree spread
+    // on top: at the hatchling a machine-gun volley put less nerve on it than a plain one).
+    salvo.error = (w.aimErrorAtWill + (w.aimErrorVolley - w.aimErrorAtWill) * strength) * unitAimErrorMult(squad, u) * scatter;
     fireSalvo(world, squad, u, w, salvo);
     charge += u.charge;
     ids.push(u.id);
@@ -340,13 +357,22 @@ function fireVolley(world: World, squad: Squad, leader: Unit): void {
 
 /**
  * The artillery radio's barrage, with a charged volley: a fire mission on the ground the
- * volley's crosshair marks (the feet of a kaiju it is on). The empty sky marks nothing, and
- * the barrage is kept for the next volley.
+ * volley's crosshair marks (the feet of a kaiju it is on: under the point of the aim ray nearest
+ * its middle, also when the ray reaches it through cover, as the volley does). The empty sky
+ * marks nothing, and the barrage is kept for the next volley.
  */
 function callBarrage(world: World, squad: Squad, leader: Unit): void {
   const c = leader.control;
   const eye = leader.y + unitTypeDef(leader.type).eyeHeight;
-  if (!resolveMarkerPoint(world.cityQuery, world.kaijus, leader.x, eye, leader.z, c.aimYaw, c.aimPitch, SQUAD_RULES.markerRange, marker)) return;
+  if (aim.on === 'kaiju') {
+    // The volley's point (fireVolley's `volleyAim`) is on this kaiju's body.
+    const k = world.kaijus[aim.id];
+    const hx = Math.sin(c.aimYaw);
+    const hz = Math.cos(c.aimYaw);
+    const along = Math.max(aim.dist * Math.cos(c.aimPitch), (k.x - leader.x) * hx + (k.z - leader.z) * hz);
+    marker.x = leader.x + hx * along;
+    marker.z = leader.z + hz * along;
+  } else if (!resolveMarkerPoint(world.cityQuery, world.kaijus, leader.x, eye, leader.z, c.aimYaw, c.aimPitch, SQUAD_RULES.markerRange, marker)) return;
   squad.barrages--;
   startCallIn(world, squad, 'artillery', marker.x, marker.z);
 }
@@ -360,6 +386,7 @@ function fireAtWill(world: World, squad: Squad, u: Unit): void {
   salvo.volley = false;
   salvo.atWill = true;
   salvo.pulls = 1;
+  salvo.stream = false;
   salvo.error =
     weapon.aimErrorAtWill * unitAimErrorMult(squad, u) * scatterMult(world.match.stage, nearestKaiju(world, u.x, u.z));
   fireSalvo(world, squad, u, weapon, salvo);

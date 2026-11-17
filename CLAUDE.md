@@ -25,7 +25,9 @@ Server-authoritative multiplayer, self-hosted on one PC behind a Cloudflare Tunn
 - Library versions are newer than you may remember. Check the installed package's types and
   README in `node_modules` before using an API from memory.
 - The game must run fully offline: no runtime calls to outside services, no CDN links.
-- No-reading rule: in-game text is only names and subtitles. Everything else is pictures.
+- No-reading rule (relaxed by the owner after the third playtest): in-game text is names,
+  subtitles, and short labels of one or two plain words beside pictures. No sentences or
+  instructions to read; pictures still carry the interface.
 - Tone: absurd world, played completely straight. For the Coalition of Faiths the joke is
   earnest teamwork and absurd firepower, never any faith; all clergy are fictional.
 - Spell out acronyms on first use in anything a person will read (docs, slides, reports).

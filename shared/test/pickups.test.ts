@@ -169,6 +169,7 @@ describe('pick-ups', () => {
       // Five times the rate at a third of the damage: about 1.6 times the damage over time.
       expect((mg.damage / mg.cooldown) / (weapon.damage / weapon.cooldown)).toBeCloseTo(5 / 3, 9);
       expect(mg.spread).toBeGreaterThan(0);
+      expect(mg.stream).toBeGreaterThan(0);
 
       const cannon = pickupWeaponDef(weapon, 'bigCannon');
       expect(cannon.projectile).toBe('heavyShell');
@@ -193,7 +194,7 @@ describe('pick-ups', () => {
     expect(unitWeapon(squad, world.units[1])).toBe(ROCKETS);
   });
 
-  it('the machine gun: five times the rate of fire at a third of the damage, with a spread on a person\'s own shots', () => {
+  it('the machine gun streams: one tracer every sixth of a second from the launchers in turn, five times the rate at a third of the damage over time, a hair of spread (round 5)', () => {
     const { world, squad, leader } = field();
     const fire = { buttons: Btn.fire, aimYaw: 0, aimPitch: 0.05 };
     const own = eventsOf(lead(world, 6 * TICK_RATE, fire), 'projectileSpawn').filter((e) => e.ownerId === leader.id);
@@ -209,13 +210,21 @@ describe('pick-ups', () => {
     }
     const mg = eventsOf(spawns, 'projectileSpawn').filter((e) => e.ownerId === leader.id);
     expect(mg.every((e) => e.projectile === 'tracer')).toBe(true);
-    // 6 s at a fifth of 2.6 s: twelve pulls (the first at once), against three.
-    expect(mg.length).toBe(12 * shotsForMembers(ROCKETS, leader.members));
-    expect([...damages]).toEqual([Math.round((ROCKETS.damage / 3) * 1e6) / 1e6]);
-    // A person's own shots have no aim error, but the machine gun has its spread.
+    // 6 s of one tracer every sixth of a second (the first at once), one per tick at most.
+    const stream = PICKUP_WEAPONS.machineGun.stream ?? 0;
+    expect(mg.length).toBe(Math.round(6 / stream));
+    expect(new Set(mg.map((e) => e.tick)).size).toBe(mg.length);
+    // Each carries its share of five pulls a reload at a third of the damage: 5/3 of the plain launchers over time.
+    const shots = shotsForMembers(ROCKETS, leader.members);
+    const perTracer = ((ROCKETS.damage / 3) * shots * stream) / (ROCKETS.cooldown / 5);
+    expect([...damages]).toEqual([Math.round(perTracer * 1e6) / 1e6]);
+    expect(perTracer / stream / ((ROCKETS.damage * shots) / ROCKETS.cooldown)).toBeCloseTo(5 / 3, 9);
+    // From the launchers in turn: every one of them, not one spot.
+    expect(new Set(mg.map((e) => Math.round(e.x * 100))).size).toBe(shots);
+    // A person's own shots have no aim error; the machine gun keeps a hair of spread for the look.
     const yaws = mg.map((e) => Math.atan2(e.vx, e.vz));
     const sd = Math.sqrt(yaws.reduce((a, y) => a + y * y, 0) / yaws.length);
-    expect(sd).toBeGreaterThan(0.4 * PICKUP_WEAPONS.machineGun.spread);
+    expect(sd).toBeGreaterThan(0);
     expect(sd).toBeLessThan(2.5 * PICKUP_WEAPONS.machineGun.spread);
   });
 

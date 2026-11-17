@@ -1,11 +1,13 @@
 /**
  * Briefing: the few seconds before play. The camera circles down onto the starting
  * neighborhood, and the player's side is shown as a portrait with the names of everyone in the
- * match. (Since round 4 nothing is said here: the automatic voice lines are gone.)
+ * match, under the two sides' labels ("Monster", "Squads": round 5, ui/labels.ts). (Since round 4
+ * nothing is said here: the automatic voice lines are gone.)
  */
 
 import { factionDef, kaijuKindDef } from '@mb/shared';
 import { el, icon, portrait } from '../../ui/icons';
+import { label, LABELS } from '../../ui/labels';
 import type { AppContext, Screen } from '../context';
 
 /** Points the controls card at this player's role in the running match (a spectator gets the squad's: it flies the drone). */
@@ -38,11 +40,13 @@ export class BriefingScreen implements Screen {
     const portraitId = isKaiju ? `portrait_${kaijuSlot.kaijuKind}` : `portrait_${mySlot ? mySlot.faction : 'army'}`;
 
     const sides = el('div', 'briefing-sides', [
+      label(LABELS.briefing.monster, 'side-label kaiju'),
       el('div', 'briefing-side kaiju', [
         icon('lb_kaiju', 'side-icon'),
         el('div', 'side-name', [kaijuKindDef(kaijuSlot.kaijuKind).name]),
         el('div', 'side-player', [kaijuSlot.bot ? icon('lb_bot') : '', kaijuSlot.bot ? '' : kaijuSlot.name]),
       ]),
+      label(LABELS.briefing.squads, 'side-label humans'),
       el(
         'div',
         'briefing-side humans',
@@ -52,7 +56,7 @@ export class BriefingScreen implements Screen {
       ),
     ]);
     // The controls card is open for the whole briefing; the button closes and opens it again.
-    const cardButton = el('button', 'btn controls-open', [icon('ui_controls')]);
+    const cardButton = el('button', 'btn btn-labelled controls-open', [icon('ui_controls'), label(LABELS.common.controls)]);
     cardButton.addEventListener('click', () => {
       ctx.audio.unlock();
       ctx.audio.play('ui_click');

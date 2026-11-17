@@ -724,8 +724,15 @@ export interface WeaponDef {
   /** One-sigma aim error of sub-units and bots, radians. The player-driven unit has none. */
   aimErrorAtWill: number;
   aimErrorVolley: number;
-  /** One-sigma spread on every shot, a person's own included (the machine gun pick-up), radians. Absent: none. */
+  /** One-sigma spread on every Fire shot, a person's own included (the machine gun pick-up), radians. Absent: none. Never added to a volley. */
   spread?: number;
+  /**
+   * A stream weapon (the machine gun pick-up, round 5): on Fire it puts out one projectile every
+   * this many seconds, from its muzzles in turn, each carrying that interval's share of what its
+   * trigger pulls deliver over time (`damage` x shots / `cooldown`). In a volley it still fires
+   * whole trigger pulls. Absent: every trigger pull fires all its projectiles at once.
+   */
+  stream?: number;
   /**
    * A guided salvo (the missile pod pick-up): the projectiles leave fanned out over `fan`
    * radians of heading and `loft` radians above the line to the aim point, and curve onto it.
@@ -758,10 +765,11 @@ export interface PickupWeaponDef {
    * fewer of them in the same proportion as it would its own weapon.
    */
   salvo: number;
-  /** See WeaponDef: `spread` on every shot; `fan` and `loft` make a guided salvo. */
+  /** See WeaponDef: `spread` on every Fire shot; `fan` and `loft` make a guided salvo; `stream` a stream. */
   spread: number;
   fan: number;
   loft: number;
+  stream?: number;
   /**
    * In a charged volley every planted squad-mate fires the pick-up too (round 4), this many of
    * its trigger pulls at once (the machine gun a burst of five, the missile pod half a salvo).

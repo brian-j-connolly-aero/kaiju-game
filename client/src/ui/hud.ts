@@ -1,7 +1,11 @@
 /**
  * The functional placeholder HUD (DESIGN.md section 8): everything is a picture, a bar or a
- * button glyph; the only text is names. A UI specialist will restyle it, so it is one small
- * module that reads a FrameState and touches the page only when a value changes.
+ * button glyph, and since round 5 (the owner: "1-2 word descriptions needed, players were
+ * confused by just pictures") each picture a player must understand carries a label of one or
+ * two words from the one table (ui/labels.ts): every button under its picture, the meters, the
+ * clock, the stage, the destruction bar's marks, the squads, the status pictures, the artillery
+ * radio and a crate taken. A UI specialist will restyle it, so it is one small module that reads
+ * a FrameState and touches the page only when a value changes.
  *
  *   top       destruction bar (a skyline with three towers as the marks), sun-and-moon clock
  *             arc, the stage, and for humans the kaiju's health and nerve
@@ -14,7 +18,17 @@
  *
  * The squad's pick-ups (phase 2): Fire's picture is the weapon a crate gave (machine gun, big
  * cannon, missile pod) while the squad has it; the artillery radio sits beside Volley with a pip
- * for each barrage left; when the squad takes a crate its picture pops up over the crosshair.
+ * for each barrage left; when the squad takes a crate its picture pops up over the crosshair,
+ * with its name.
+ *
+ * The squad's crosshair (round 5, "LOS issues/confusion"): it turns red with a bar through it and
+ * the word "Blocked" when the crosshair is on the monster but the unit's own shot, from the unit
+ * (the camera hangs above and behind it), stops on a building, a heap or the ground in front;
+ * dashed when what it is on is beyond the shot's reach from the unit, with "Too far" when that is
+ * the monster. The monster's nerve bar says why a volley would add nothing ("Stagger", "Immune"
+ * with the seconds of its immunity running down), when the other squads' volley has opened the
+ * five seconds to break it ("Team up", a yellow strip running down: ui/volleyMeter.ts), and
+ * "Hidden" while the squads have lost it.
  *
  * The monster's flair (round 4, ui/kaijuFlair.ts): its rage meter round the crosshair (three
  * claw gashes that heat up, throbbing when the beam is ready), claw slashes over the crosshair
@@ -35,6 +49,7 @@ import {
   weaponDef,
   type PickupId,
   type PickupKind,
+  type UnitTypeId,
   type SimEvent,
   type SnapKaiju,
   type SnapSquad,
@@ -48,6 +63,7 @@ import { skylinePath } from './iconArt';
 import { el, glyph, icon, setGlyph, setIcon, uiMarkup } from './icons';
 import { RageMeter } from './kaijuFlair';
 import { KaijuKit } from './kaijuKit';
+import { fireLabel, label, LABELS, setLabel } from './labels';
 
 /**
  * Where the icon under a mark of the destruction bar is centered, 0..1 of the bar's width:
@@ -63,8 +79,10 @@ export function barMarkAt(mark: number): number {
 export interface HudView {
   /** What the crosshair is on. */
   aimOn: 'ground' | 'structure' | 'kaiju' | 'none';
-  /** The target under the crosshair is within the weapon's range. */
+  /** Where the unit's own shot lands (from the unit, not the camera) is within the weapon's reach. */
   inRange: boolean;
+  /** The crosshair is on the monster, and the unit's own shot stops on something in front of it. */
+  shotBlocked: boolean;
   thirdPerson: boolean;
   /** Recoil pulse, 0..1. */
   recoil: number;
@@ -85,9 +103,9 @@ interface Meter {
   last: number;
 }
 
-function meter(iconId: string, className: string): Meter {
+function meter(iconId: string, className: string, word: string): Meter {
   const fill = el('div', 'meter-fill');
-  const root = el('div', `meter ${className}`, [icon(iconId, 'meter-icon'), el('div', 'meter-track', [fill])]);
+  const root = el('div', `meter ${className}`, [icon(iconId, 'meter-icon'), label(word, 'meter-label'), el('div', 'meter-track', [fill])]);
   return { root, fill, last: -1 };
 }
 
@@ -102,14 +120,87 @@ interface Hint {
   root: HTMLElement;
   glyph: HTMLElement;
   cover: HTMLElement;
+  /** The button's label (one or two words: round 5), under its picture. */
+  word: HTMLElement;
   action: ButtonAction;
 }
 
-function hint(iconId: string, action: ButtonAction): Hint {
+/** A button on the HUD: its picture, the button that does it, and its label (ui/labels.ts). */
+export interface HudButton {
+  icon: string;
+  action: ButtonAction;
+  label: string;
+}
+
+/**
+ * The squad's and the news drone's buttons at the bottom right, and the two everyone has (the
+ * settings panel's, top right; the controls card's, always the last at the bottom right). The
+ * monster's are its kit's (ui/kaijuKit.ts, `kitLabels`). Fire's label follows the weapon a crate
+ * gave (`fireLabel`).
+ */
+export const HUD_BUTTONS = {
+  human: {
+    fire: { icon: 'st_reload', action: 'fire', label: LABELS.squad.fire },
+    volley: { icon: 'st_charge', action: 'volley', label: LABELS.squad.volley },
+    map: { icon: 'st_map', action: 'map', label: LABELS.squad.map },
+    camera: { icon: 'st_camera', action: 'camera', label: LABELS.common.view },
+  },
+  drone: {
+    rise: { icon: 'ui_rise', action: 'rise', label: LABELS.squad.up },
+    sink: { icon: 'ui_sink', action: 'sink', label: LABELS.squad.down },
+    map: { icon: 'st_map', action: 'map', label: LABELS.squad.map },
+  },
+  menu: { icon: 'ui_settings', action: 'menu', label: LABELS.common.menu },
+  controls: { icon: 'ui_controls', action: 'controls', label: LABELS.common.controls },
+} as const satisfies { human: Record<string, HudButton>; drone: Record<string, HudButton>; menu: HudButton; controls: HudButton };
+
+/** A button: its picture, its label under it, then the glyph of the button that does it. */
+function hint(b: HudButton): Hint {
+  return hintOf(b.icon, b.action, b.label);
+}
+
+function hintOf(iconId: string, action: ButtonAction, word: string): Hint {
   const g = glyph(null, 'hint-glyph');
   const cover = el('div', 'hint-cover');
-  const root = el('div', 'hint', [el('div', 'hint-icon', [icon(iconId), cover]), g]);
-  return { root, glyph: g, cover, action };
+  const w = label(word, 'hint-word');
+  const root = el('div', 'hint', [el('div', 'hint-icon', [icon(iconId), cover]), w, g]);
+  return { root, glyph: g, cover, word: w, action };
+}
+
+/** The name of what a crate holds, in a word or two (round 5: beside its picture; ui/labels.ts). */
+export const PICKUP_NAMES: Readonly<Record<PickupKind, string>> = LABELS.pickups;
+
+/** Fire's word: the weapon a crate gave, or plain "Fire" (ui/labels.ts). */
+export const fireWord: (pickup: PickupId) => string = fireLabel;
+
+/**
+ * The reload of the driven unit's own shot when it is full: its weapon with the squad's weapon
+ * pick-up (a stream, the machine gun, between two tracers).
+ */
+export function fireReload(type: UnitTypeId, pickup: PickupId): number {
+  const w = pickupWeaponDef(weaponDef(unitTypeDef(type).weapon), pickup);
+  return w.stream ?? w.cooldown;
+}
+
+/**
+ * How far the driven unit's weapon has reloaded, 0..1, for the HUD's Fire button, its reload bar
+ * and the tank's gun reticle alike (round 5: the reticle used the unit's own weapon, not the
+ * pick-up, and sat empty for most of a big cannon's reload). `peak` is the longest reload seen
+ * since the weapon was last ready (a volley's is longer: as many pulls as it fired); keep it with
+ * `nextReloadPeak`. A stream weapon between two of its shots counts as loaded: the button would
+ * flicker six times a second.
+ */
+export function reloadShare(cooldown: number, type: UnitTypeId, pickup: PickupId, peak: number): number {
+  if (cooldown <= 0) return 1;
+  const full = fireReload(type, pickup);
+  const w = pickupWeaponDef(weaponDef(unitTypeDef(type).weapon), pickup);
+  if (w.stream !== undefined && cooldown <= w.stream + 1e-6) return 1;
+  return 1 - clamp01(cooldown / Math.max(full, peak, 0.01));
+}
+
+/** The longest reload seen since the weapon was last ready: `cooldown` now and the peak so far. */
+export function nextReloadPeak(cooldown: number, peak: number): number {
+  return cooldown > 0 ? Math.max(peak, cooldown) : 0;
 }
 
 function setClass(node: HTMLElement, name: string, on: boolean): void {
@@ -142,6 +233,11 @@ export class Hud {
   private readonly bossName: HTMLElement;
   private readonly bossHp: Meter;
   private readonly bossNerve: Meter;
+  /** Beside the nerve bar: "Stagger", "Immune", "Team up" or "Hidden"; the team-up strip over the bar. */
+  private readonly bossWord: HTMLElement;
+  private readonly bossTeam: HTMLElement;
+  private teamUp = 0;
+  private lastBossWord = '';
   private readonly health: Meter;
   private readonly nerve: Meter;
   private readonly rage: Meter;
@@ -149,6 +245,7 @@ export class Hud {
   private readonly squads: HTMLElement;
   private readonly squadRows: Array<{ root: HTMLElement; name: HTMLElement; pips: HTMLElement[] }> = [];
   private readonly crosshair: HTMLElement;
+  private readonly crosshairWord: HTMLElement;
   /** The monster's buttons: the starting kit, the two move slots, molt (ui/kaijuKit.ts). */
   readonly kit = new KaijuKit();
   /** The monster's rage round the crosshair, its hits and its molts (ui/kaijuFlair.ts). */
@@ -169,8 +266,9 @@ export class Hud {
   /** The artillery radio beside Volley, with a pip for each barrage left. */
   private readonly radio: HTMLElement;
   private readonly radioPips: HTMLElement[] = [];
-  /** A crate's picture popping up over the crosshair when the squad takes it. */
+  /** A crate's picture popping up over the crosshair when the squad takes it, and its name. */
   private readonly taken: HTMLElement;
+  private readonly takenWord: HTMLElement;
   private lastFire = '';
   private lastBarrages = -1;
   private lastBar = -1;
@@ -206,21 +304,21 @@ export class Hud {
       bar.append(this.barEdge);
       this.lastBar = -1;
     });
+    // The marks, each with its label beside it: the two molts, then the kaiju's win.
     for (let i = 0; i < MATCH_RULES.bar.display.length; i++) {
-      const mark = el('div', 'bar-mark', [icon('k_molt')]);
+      const last = i === MATCH_RULES.bar.display.length - 1;
+      const mark = el('div', `bar-mark${last ? ' bar-mark-win' : ''}`, [icon(last ? 'lb_kaiju' : 'k_molt'), label(last ? LABELS.top.monsterWins : LABELS.top.molt, 'bar-mark-label')]);
       mark.style.left = `${barMarkAt(i) * 100}%`;
       this.marks.push(mark);
       bar.append(mark);
     }
-    // The last mark is the kaiju's win, not a molt.
-    this.marks[2].replaceChildren(icon('lb_kaiju'));
 
     // --- clock arc ---
     this.clockSun = el('div', 'clock-sun', [icon('st_sun')]);
-    this.clock = el('div', 'clock', [el('div', 'clock-arc'), this.clockSun, el('div', 'clock-moon', [icon('st_moon')])]);
+    this.clock = el('div', 'clock', [el('div', 'clock-arc'), this.clockSun, el('div', 'clock-moon', [icon('st_moon')]), label(LABELS.top.timeLeft, 'clock-label')]);
 
     // --- stage: three triangles of growing size ---
-    const stage = el('div', 'stage');
+    const stage = el('div', 'stage', [label(LABELS.top.stage, 'stage-label')]);
     for (let i = 0; i < 3; i++) {
       const pip = el('div', `stage-pip stage-pip-${i + 1}`, [icon('lb_kaiju')]);
       this.stagePips.push(pip);
@@ -229,58 +327,63 @@ export class Hud {
 
     // --- the kaiju as the humans see it ---
     this.bossName = el('div', 'boss-name');
-    this.bossHp = meter('st_health', 'boss-hp');
-    this.bossNerve = meter('st_nerve', 'boss-nerve');
+    this.bossHp = meter('st_health', 'boss-hp', LABELS.meters.health);
+    this.bossNerve = meter('st_nerve', 'boss-nerve', LABELS.meters.nerve);
+    this.bossTeam = el('div', 'boss-team');
+    this.bossNerve.fill.parentElement?.append(this.bossTeam);
+    this.bossWord = el('div', 'boss-word lbl hidden');
+    this.bossNerve.root.append(this.bossWord);
     this.boss = el('div', 'boss', [el('div', 'boss-head', [icon('lb_kaiju'), this.bossName]), this.bossHp.root, this.bossNerve.root]);
 
     // --- own meters ---
-    this.health = meter('st_health', 'own-health');
-    this.nerve = meter('st_nerve', 'own-nerve');
-    this.rage = meter('st_rage', 'own-rage');
-    this.reload = meter('st_reload', 'own-reload');
+    this.health = meter('st_health', 'own-health', LABELS.meters.health);
+    this.nerve = meter('st_nerve', 'own-nerve', LABELS.meters.nerve);
+    this.rage = meter('st_rage', 'own-rage', LABELS.meters.rage);
+    this.reload = meter('st_reload', 'own-reload', LABELS.meters.reload);
     const meters = el('div', 'meters', [this.health.root, this.nerve.root, this.rage.root, this.reload.root]);
 
-    // --- squads ---
-    this.squads = el('div', 'squads');
+    // --- squads (a label over the list) ---
+    this.squads = el('div', 'squads', [label(LABELS.top.squads, 'squads-label')]);
 
     // --- verbs ---
-    this.humanHints = {
-      fire: hint('st_reload', 'fire'),
-      volley: hint('st_charge', 'volley'),
-      map: hint('st_map', 'map'),
-      camera: hint('st_camera', 'camera'),
-    };
-    this.droneHints = { rise: hint('ui_rise', 'rise'), sink: hint('ui_sink', 'sink'), map: hint('st_map', 'map') };
+    const b = HUD_BUTTONS;
+    this.humanHints = { fire: hint(b.human.fire), volley: hint(b.human.volley), map: hint(b.human.map), camera: hint(b.human.camera) };
+    this.droneHints = { rise: hint(b.drone.rise), sink: hint(b.drone.sink), map: hint(b.drone.map) };
     this.hintsKaiju = this.kit.root;
     for (let i = 0; i < CRATE_RULES.barrages; i++) this.radioPips.push(el('div', 'radio-pip'));
-    this.radio = el('div', 'squad-radio hidden', [icon('pk_artilleryradio'), el('div', 'radio-pips', this.radioPips)]);
+    this.radio = el('div', 'squad-radio hidden', [icon('pk_artilleryradio'), label(PICKUP_NAMES.artilleryRadio, 'hint-word'), el('div', 'radio-pips', this.radioPips)]);
     const human = Object.values(this.humanHints).map((h) => h.root);
     human.splice(1, 0, this.radio);
     this.hintsHuman = el('div', 'hints', human);
     this.hintsDrone = el('div', 'hints', Object.values(this.droneHints).map((h) => h.root));
 
     // --- crosshair and status pictures ---
-    this.crosshair = el('div', 'crosshair', [el('div', 'crosshair-dot'), el('div', 'crosshair-ring')]);
+    this.crosshairWord = el('div', 'crosshair-word lbl hidden');
+    this.crosshair = el('div', 'crosshair', [el('div', 'crosshair-dot'), el('div', 'crosshair-ring'), this.crosshairWord]);
+    // Each status picture with its label under it.
+    const status = (iconId: string, name: string, word: string): HTMLElement => el('div', `status-icon status-${name}`, [icon(iconId), label(word, 'status-label')]);
+    const s = LABELS.status;
     this.statusIcons = {
-      crossfire: icon('st_crossfire', 'status-icon status-crossfire'),
-      spotted: icon('st_spotted', 'status-icon status-spotted'),
-      shaken: icon('st_shaken', 'status-icon status-shaken'),
-      swim: icon('k_swim', 'status-icon status-swim'),
-      nerveBreak: icon('st_nerve', 'status-icon status-break'),
-      volley: icon('st_charge', 'status-icon status-volley'),
-      callin: icon('st_callin', 'status-icon status-callin'),
-      offline: icon('ui_offline', 'status-icon status-offline'),
-      eliminated: icon('ui_skull', 'status-icon status-eliminated'),
+      crossfire: status('st_crossfire', 'crossfire', s.crossfire),
+      spotted: status('st_spotted', 'spotted', s.spotted),
+      shaken: status('st_shaken', 'shaken', s.shaken),
+      swim: status('k_swim', 'swim', s.underwater),
+      nerveBreak: status('st_nerve', 'break', s.nerveBreak),
+      volley: status('st_charge', 'volley', s.volley),
+      callin: status('st_callin', 'callin', s.incoming),
+      offline: status('ui_offline', 'offline', s.offline),
+      eliminated: status('ui_skull', 'eliminated', s.eliminated),
     };
     this.status = el('div', 'status', Object.values(this.statusIcons));
     // "Click": shown while the game wants the mouse and the pointer is free.
-    this.capture = el('div', 'capture hidden', [icon('ms_left')]);
-    this.taken = el('div', 'pickup-taken hidden', [icon('pk_machinegun')]);
+    this.capture = el('div', 'capture hidden', [icon('ms_left'), label(LABELS.common.click, 'capture-label')]);
+    this.takenWord = el('div', 'pickup-taken-word lbl');
+    this.taken = el('div', 'pickup-taken hidden', [icon('pk_machinegun'), this.takenWord]);
     // The settings panel and the button that opens it.
-    this.menuHint = hint('ui_settings', 'menu');
+    this.menuHint = hint(HUD_BUTTONS.menu);
     this.menuHint.root.classList.add('hint-menu');
     // The controls card and its button: always the last of the verbs, whoever is playing.
-    this.controlsHint = hint('ui_controls', 'controls');
+    this.controlsHint = hint(HUD_BUTTONS.controls);
     this.controlsHint.root.classList.add('hint-controls');
 
     this.root.append(
@@ -313,10 +416,11 @@ export class Hud {
     this.statusUntil[name] = now + seconds;
   }
 
-  /** The player's squad took a supply crate: its picture pops up over the crosshair. */
+  /** The player's squad took a supply crate: its picture pops up over the crosshair, with its name. */
   pickupTaken(kind: PickupKind): void {
     const pic = this.taken.firstElementChild as HTMLElement | null;
     if (pic) setIcon(pic, pickupIcon(kind));
+    this.takenWord.textContent = PICKUP_NAMES[kind];
     this.taken.classList.remove('hidden', 'pop');
     void this.taken.offsetWidth;
     this.taken.classList.add('pop');
@@ -367,13 +471,15 @@ export class Hud {
     setClass(h.root, 'unavailable', !ready);
   }
 
-  /**
-   * The full reload time of the driven unit's weapon (the definition, a weapon pick-up's own
-   * when the squad has one, or longer if seen longer).
-   */
-  private reloadFull(lu: SnapUnit, pickup: PickupId): number {
-    this.reloadPeak = lu.cooldown > 0 ? Math.max(this.reloadPeak, lu.cooldown) : 0;
-    return Math.max(pickupWeaponDef(weaponDef(unitTypeDef(lu.type).weapon), pickup).cooldown, this.reloadPeak, 0.01);
+  /** How far the driven unit's weapon has reloaded (`reloadShare`, keeping the longest reload seen). */
+  private reloaded(lu: SnapUnit, pickup: PickupId): number {
+    this.reloadPeak = nextReloadPeak(lu.cooldown, this.reloadPeak);
+    return reloadShare(lu.cooldown, lu.type, pickup, this.reloadPeak);
+  }
+
+  /** The team-up window's share left (0..1; 0: not shown), from the volley meter (ui/volleyMeter.ts). */
+  setTeamUp(share: number): void {
+    this.teamUp = share;
   }
 
   update(frame: FrameState, session: MatchSession, view: HudView, now: number): void {
@@ -424,6 +530,20 @@ export class Hud {
       setMeter(this.bossNerve, boss.nerve / def.nerveCapacity);
       setClass(this.boss, 'staggered', boss.phase === 'stagger');
       setClass(this.boss, 'lost', !boss.known && view.mode === 'human');
+      // Why a volley would add nothing to its nerve now, or that the other squads have opened the
+      // window to break it (the volley meter says when: `setTeamUp`), or that it is lost.
+      const team = this.teamUp > 0 && view.mode === 'human';
+      const n = LABELS.nerve;
+      const tone = boss.phase === 'stagger' ? 'w-stagger' : boss.nerveImmune > 0 ? 'w-immune' : team ? 'w-team' : !boss.known && view.mode === 'human' ? 'w-lost' : 'hidden';
+      const word =
+        tone === 'w-stagger' ? n.stagger : tone === 'w-immune' ? `${n.immune} ${Math.ceil(boss.nerveImmune)}` : tone === 'w-team' ? n.teamUp : tone === 'w-lost' ? n.hidden : '';
+      if (word !== this.lastBossWord) {
+        this.lastBossWord = word;
+        this.bossWord.textContent = word;
+        this.bossWord.className = `boss-word lbl ${tone}`;
+      }
+      const strip = team ? `${(Math.round(this.teamUp * 200) / 2).toFixed(1)}%` : '0%';
+      if (this.bossTeam.style.width !== strip) this.bossTeam.style.width = strip;
     }
 
     // Own meters.
@@ -445,7 +565,7 @@ export class Hud {
       setMeter(this.health, lu.hp / Math.max(1, lu.maxHp));
       setMeter(this.nerve, lu.nerve / COMBAT_RULES.unitNerveCapacity);
       setClass(this.nerve.root, 'danger', lu.shaken > 0 || lu.stun > 0);
-      setMeter(this.reload, 1 - clamp01(lu.cooldown / this.reloadFull(lu, frame.squads[session.role.squadId]?.pickup ?? 'none')));
+      setMeter(this.reload, this.reloaded(lu, frame.squads[session.role.squadId]?.pickup ?? 'none'));
     }
 
     // Squads.
@@ -475,6 +595,7 @@ export class Hud {
       const pic = this.humanHints.fire.root.querySelector('.hint-icon > .icon') as HTMLElement | null;
       if (pic) setIcon(pic, fire);
       setClass(this.humanHints.fire.root, 'pickup', fire !== 'st_reload');
+      setLabel(this.humanHints.fire.word, fireLabel(own ? own.pickup : 'none'));
       // A new weapon reloads at its own pace: the cover's full turn is measured afresh.
       this.reloadPeak = 0;
     }
@@ -485,7 +606,7 @@ export class Hud {
       this.radioPips.forEach((p, i) => setClass(p, 'on', i < barrages));
     }
     if (lu && own) {
-      this.cooldown(this.humanHints.fire, lu.cooldown / this.reloadFull(lu, own.pickup));
+      this.cooldown(this.humanHints.fire, 1 - this.reloaded(lu, own.pickup));
       // The volley's picture: lit while the squad-mates charge, glowing once the volley counts
       // (the big meter round the crosshair says how far: ui/volleyMeter.ts).
       const charge = volleyMeter(frame.units, own.id);
@@ -501,9 +622,19 @@ export class Hud {
     // The monster's rage round it, and the surge's crackling edges.
     this.rageMeter.update(lk, view.mode === 'kaiju' && !view.mapOpen && match.phase === 'playing', now);
     setClass(this.surgeEdge, 'hidden', !lk || lk.surge <= 0 || view.mode !== 'kaiju');
-    setClass(this.crosshair, 'on-kaiju', view.aimOn === 'kaiju');
-    setClass(this.crosshair, 'out-of-range', view.mode === 'human' && !view.inRange);
+    const human = view.mode === 'human';
+    const blocked = human && view.shotBlocked;
+    const far = human && !blocked && !view.inRange;
+    setClass(this.crosshair, 'on-kaiju', view.aimOn === 'kaiju' && !blocked);
+    setClass(this.crosshair, 'blocked', blocked);
+    setClass(this.crosshair, 'out-of-range', far);
     setClass(this.crosshair, 'kick', view.recoil > 0.5);
+    // The word only where it matters: the crosshair is on the monster.
+    const crossWord = blocked ? LABELS.aim.blocked : far && view.aimOn === 'kaiju' ? LABELS.aim.tooFar : '';
+    if (this.crosshairWord.textContent !== crossWord) {
+      this.crosshairWord.textContent = crossWord;
+      setClass(this.crosshairWord, 'hidden', crossWord === '');
+    }
 
     // Status pictures.
     const s = this.statusIcons;

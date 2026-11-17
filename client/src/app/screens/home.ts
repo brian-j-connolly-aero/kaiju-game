@@ -2,13 +2,16 @@
  * Home: pick a callsign, then create a room or join one by its four-letter code. A code in the
  * page address (#BCDF) is joined at once, except for a first-time visitor with no callsign:
  * they see only the callsign field and the join button (Enter joins; an empty field joins as
- * "Player N"). Problems are shown as a picture, never a sentence.
+ * "Player N"). Problems are shown as a picture with its label of one or two words ("No room",
+ * "Room full", "Old version", "No server"), never a sentence; the buttons and the empty fields
+ * carry theirs too (round 5, ui/labels.ts).
  */
 
 import { JOIN_ERROR, MAX_NAME_LENGTH, ROOM_CODE_LENGTH } from '@mb/shared';
 import { ERROR_NO_ROOM, JoinFailure } from '../../net/connection';
 import { cleanRoomCode, roomCodeFromHash, storeName } from '../../net/session';
 import { el, icon } from '../../ui/icons';
+import { label, LABELS } from '../../ui/labels';
 import type { AppContext, Screen } from '../context';
 
 /**
@@ -33,6 +36,7 @@ export class HomeScreen implements Screen {
     name.spellcheck = false;
     name.autocomplete = 'off';
     name.setAttribute('aria-label', 'callsign');
+    name.placeholder = LABELS.home.name;
 
     const code = el('input', 'field code-field');
     code.type = 'text';
@@ -41,12 +45,16 @@ export class HomeScreen implements Screen {
     code.autocomplete = 'off';
     code.value = roomCodeFromHash(window.location.hash);
     code.setAttribute('aria-label', 'room code');
+    code.placeholder = LABELS.home.code;
 
-    const create = el('button', 'btn btn-big', [icon('lb_create')]);
-    const join = el('button', 'btn btn-big', [icon('lb_join')]);
+    const create = el('button', 'btn btn-big btn-labelled', [icon('lb_create'), label(LABELS.home.create)]);
+    const join = el('button', 'btn btn-big btn-labelled', [icon('lb_join'), label(LABELS.home.join)]);
     const notice = el('div', 'notice');
+    /** What went wrong, by its picture: the label beside it. */
+    const NOTICE_WORDS: Record<string, string> = { lb_join: LABELS.home.noRoom, lb_human: LABELS.home.roomFull, ui_outdated: LABELS.home.oldVersion, ui_offline: LABELS.home.offline, ui_copy: LABELS.home.otherTab };
     const showNotice = (iconId: string): void => {
-      notice.replaceChildren(iconId ? icon(iconId) : '');
+      const word = NOTICE_WORDS[iconId];
+      notice.replaceChildren(iconId ? icon(iconId) : '', iconId && word ? label(word, 'notice-label') : '');
       notice.classList.remove('shake');
       // Restart the shake animation.
       void notice.offsetWidth;
@@ -111,7 +119,7 @@ export class HomeScreen implements Screen {
     });
     name.addEventListener('change', commitName);
     // The invite's join button, beside the callsign: only shown while asking for a callsign.
-    const go = el('button', 'btn invite-join hidden', [icon('lb_join')]);
+    const go = el('button', 'btn btn-labelled invite-join hidden', [icon('lb_join'), label(LABELS.home.join)]);
     go.addEventListener('click', tryJoin);
     name.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !go.classList.contains('hidden')) tryJoin();
@@ -124,7 +132,7 @@ export class HomeScreen implements Screen {
       codeRow.classList.remove('hidden');
     };
 
-    const gear = el('button', 'btn settings-open', [icon('ui_settings')]);
+    const gear = el('button', 'btn btn-labelled settings-open', [icon('ui_settings'), label(LABELS.lobby.settings)]);
     gear.addEventListener('click', () => {
       ctx.audio.unlock();
       ctx.audio.play('ui_click');

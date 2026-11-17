@@ -190,6 +190,24 @@ describe('the kaiju view', () => {
     expect(skin(a).r).toBeGreaterThan(0);
   });
 
+  it('in first person, turns the head (and the camera on it) with the view, not with a lob’s aim far above it (round 5)', () => {
+    const view = new KaijuView(assets, materials);
+    // A lob: the aim sent points 50 degrees above where the player looks.
+    const k = kaiju({ aimYaw: 0.2, aimPitch: 0.9, held: { kind: 'prop', prop: 'car_sedan' } });
+    const look = { yaw: 0.25, pitch: 0.03 };
+    const { fx } = countingEffects();
+    view.update(k, 1 / 30, 1, null, null, new LineBatch(256), fx, { firstPerson: true, insideHead: false, tick: 100, look });
+    const head = (view as unknown as { rig: { node(name: string): THREE.Object3D | null } }).rig.node('head');
+    expect(head).not.toBeNull();
+    const q = head?.getWorldQuaternion(new THREE.Quaternion()) ?? new THREE.Quaternion();
+    const want = new THREE.Quaternion().setFromEuler(new THREE.Euler(-look.pitch, look.yaw, 0, 'YXZ'));
+    expect(q.angleTo(want)).toBeLessThan(1e-3);
+    // Seen by anyone else (third person), the head looks up along the aim.
+    view.update(k, 1 / 30, 1.1, null, null, new LineBatch(256), fx, { firstPerson: false, insideHead: false, tick: 103 });
+    const q3 = head?.getWorldQuaternion(new THREE.Quaternion()) ?? new THREE.Quaternion();
+    expect(q3.angleTo(want)).toBeGreaterThan(0.1);
+  });
+
   it('gulps a handful at once when the monster does anything else', () => {
     const view = new KaijuView(assets, materials);
     view.startSnack();

@@ -12,6 +12,8 @@ __pycache__/
 !.env.example
 coverage/
 /tmp/
+# Game logs saved by host/savelog (Linux, or Windows without a desktop folder).
+/logs/
 test-results/
 playwright-report/
 *.wav

@@ -276,7 +276,10 @@ Pixel art, drawn by script. Sheets are grids of equal cells. Characters are flat
 
 Hand-written SVG, 64 × 64 viewBox, single color via `currentColor`, thick strokes, readable at
 32 px and at the sizes the client really draws them (down to 18 px for button glyphs and bar
-marks). No text inside icons. No third-party icon sets.
+marks). No text inside icons. No third-party icon sets. The labels of one or two words that
+stand beside the pictures since round 5 ("Strike", "Machine gun", "Mating call") are not art:
+the client sets them as text from one table (`client/src/ui/labels.ts`, `DESIGN.md` section 8,
+"Labels"), so a picture never needs a word drawn into it and a word can change without new art.
 
 - The squad's controls (phase 1; only placeholders in `client/src/ui/iconArt.ts` so far, art
   wanted): `sq_foot` (a soldier with a launcher: the squad on foot, stage 1), `sq_charge` (three

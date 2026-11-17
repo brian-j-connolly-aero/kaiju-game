@@ -1,14 +1,15 @@
 /**
- * The settings panel: pictures only (DESIGN.md section 8). A speaker with a slider is the master
- * volume, a mouse with a slider is how fast the mouse turns the view, two opposed arrows switch
- * inverted look, four corners switch fullscreen, a grid of big pixels switches the 3D view to
- * half resolution (for weak graphics hardware), and the check mark closes the panel. Clicking
- * anywhere outside the panel closes it too.
+ * The settings panel (DESIGN.md section 8): pictures, each with its label of one or two words
+ * (round 5, ui/labels.ts). A speaker with a slider is the master volume ("Volume"), a mouse with a
+ * slider is how fast the mouse turns the view ("Mouse speed"), two opposed arrows switch inverted
+ * look ("Invert"), four corners switch fullscreen ("Full screen"), a grid of big pixels switches
+ * the 3D view to half resolution for weak graphics hardware ("Low detail"), and the check mark
+ * closes the panel ("Done"). Clicking anywhere outside the panel closes it too.
  *
- * In a match (or on its end screen) the room's host also gets a circular arrow: restart. The
- * first press arms it (it turns red and pulses), a second press within RESTART_ARM_SECONDS
- * starts the match over for everyone with the same people on the same sides; otherwise it
- * disarms by itself.
+ * In a match (or on its end screen) the room's host also gets a circular arrow: restart
+ * ("Restart"). The first press arms it (it turns red and pulses, "Confirm"), a second press within
+ * RESTART_ARM_SECONDS starts the match over for everyone with the same people on the same sides;
+ * otherwise it disarms by itself.
  *
  * It is opened from the gear button on the home screen and in the lobby, and with Escape (or
  * Start on a gamepad) anywhere, a match included. The panel only shows and edits values: the
@@ -16,6 +17,7 @@
  */
 
 import { el, icon } from './icons';
+import { label, LABELS, setLabel } from './labels';
 
 export interface SettingsValues {
   /** Master volume, 0 to 1. */
@@ -74,18 +76,19 @@ export class SettingsPanel {
   private readonly host: SettingsHost;
   private readonly volume = slider('volume');
   private readonly mouse = slider('mouse speed');
-  private readonly invert = el('button', 'btn settings-toggle settings-invert', [icon('ui_invert')]);
-  private readonly fullscreen = el('button', 'btn settings-toggle settings-fullscreen', [icon('ui_fullscreen')]);
-  private readonly lowRes = el('button', 'btn settings-toggle settings-lowres', [icon('ui_lowres')]);
-  private readonly done = el('button', 'btn settings-done', [icon('lb_ready')]);
-  private readonly restart = el('button', 'btn settings-toggle settings-restart hidden', [icon('ui_restart')]);
+  private readonly invert = el('button', 'btn btn-labelled settings-toggle settings-invert', [icon('ui_invert'), label(LABELS.settings.invert)]);
+  private readonly fullscreen = el('button', 'btn btn-labelled settings-toggle settings-fullscreen', [icon('ui_fullscreen'), label(LABELS.settings.fullscreen)]);
+  private readonly lowRes = el('button', 'btn btn-labelled settings-toggle settings-lowres', [icon('ui_lowres'), label(LABELS.settings.lowRes)]);
+  private readonly done = el('button', 'btn btn-labelled settings-done', [icon('lb_ready'), label(LABELS.settings.done)]);
+  private readonly restartWord = label(LABELS.settings.restart);
+  private readonly restart = el('button', 'btn btn-labelled settings-toggle settings-restart hidden', [icon('ui_restart'), this.restartWord]);
   private armTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(host: SettingsHost) {
     this.host = host;
     const panel = el('div', 'settings-panel', [
-      el('div', 'settings-row', [icon('ui_sound', 'settings-icon'), this.volume]),
-      el('div', 'settings-row', [icon('ms_move', 'settings-icon'), this.mouse]),
+      el('div', 'settings-row', [icon('ui_sound', 'settings-icon'), label(LABELS.settings.volume, 'settings-label'), this.volume]),
+      el('div', 'settings-row', [icon('ms_move', 'settings-icon'), label(LABELS.settings.mouse, 'settings-label'), this.mouse]),
       el('div', 'settings-row settings-buttons', [this.invert, this.fullscreen, this.lowRes, this.restart, this.done]),
     ]);
     this.root.append(panel);
@@ -134,6 +137,7 @@ export class SettingsPanel {
     if (this.armTimer !== null) clearTimeout(this.armTimer);
     this.armTimer = null;
     this.restart.classList.remove('armed');
+    setLabel(this.restartWord, LABELS.settings.restart);
   }
 
   /** First press: arm. Second press while armed: restart and close. */
@@ -142,6 +146,7 @@ export class SettingsPanel {
     if (!this.restartArmed) {
       this.host.click();
       this.restart.classList.add('armed');
+      setLabel(this.restartWord, LABELS.settings.confirm);
       this.armTimer = setTimeout(() => this.disarm(), RESTART_ARM_SECONDS * 1000);
       return;
     }

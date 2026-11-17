@@ -9,8 +9,9 @@
  *   apart from the others', so their fire crosses. A tank is driven like a person drives one:
  *   the way it wants to go becomes throttle and hull turn (`setTankMove`).
  * - hold: stop there, hold the volley button (the squad-mates plant where they stand and
- *   charge), keep the crosshair on the kaiju, and let go at a full charge, waiting a moment for
- *   another squad that is nearly charged so the volleys land together. Then it holds again.
+ *   charge), keep the crosshair on the kaiju, and let go at a full charge (of every gun that is
+ *   loaded: `loadedCharge`), waiting a moment for another squad that is nearly charged so the
+ *   volleys land together. Then it holds again.
  *   Against a kaiju that is staggered or in its cocoon it does not charge: everybody fires as
  *   fast as the guns load. (With the harness profile `MatchConfig.bots.triggerHappy` it never
  *   charges: the lazy way to lead a squad.)
@@ -392,6 +393,24 @@ function crateToFetch(world: World, squad: Squad, leader: Unit): number {
   return best;
 }
 
+/**
+ * The charge the bot lets go at: the mean over its planted squad-mates whose weapons are loaded
+ * (those still reloading wait just under the notch, `chargeCap`: round 5), or, with none loaded,
+ * over them all. So it lets go when every gun that can fire is full, as it did before round 5,
+ * when the reloading ones charged to full and then did not fire; with none loaded it waits.
+ */
+function loadedCharge(world: World, squad: Squad): number {
+  let sum = 0;
+  let n = 0;
+  for (const id of squad.units) {
+    const u = world.units[id];
+    if (!u.alive || id === squad.driven || !u.rooted || u.cooldown > DT + 1e-6) continue;
+    sum += u.charge;
+    n++;
+  }
+  return n > 0 ? sum / n : squadCharge(world, squad);
+}
+
 /** Keeps the volley button down this tick (the squad-mates plant, or stay planted, and charge). */
 function holdVolley(bs: BotState): void {
   bs.hold[VOLLEY] = 1;
@@ -656,7 +675,7 @@ export function squadBot(world: World, p: PlayerState, squad: Squad): void {
     // Moving off (the kaiju came close, the line of fire went), or it is helpless: let go now.
     letGoVolley(bs);
   } else if (volleying) {
-    if (squadCharge(world, squad) >= S.volleyCharge && bs.charging) {
+    if (loadedCharge(world, squad) >= S.volleyCharge && bs.charging) {
       // Charged. Wait a moment for a neighbor that is nearly there, so the volleys land together.
       let waitFor = false;
       for (const other of world.squads) {

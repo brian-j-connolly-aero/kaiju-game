@@ -30,10 +30,17 @@
  *   - One-shot fields of a dropped input (a pick: the monster's molt card) are carried over to
  *     the next input that is kept.
  *
- * Inputs that pile up anyway (the cushion was built while the link was slow, or a burst came in
- * on a jittery link) are trimmed one at a time, but only when skipping one cannot be seen: inputs
- * have waited after every tick for a second (INPUT_BACKLOG_*) and the player's body stands still
- * (or cannot move: the briefing). A client that floods the queue is cut back hard
+ * Inputs that pile up anyway (the cushion was built while the link was slow, a burst came in on
+ * a jittery link, or the server stood still longer than it can catch up: fixedStep.ts) are
+ * trimmed one at a time, once inputs have waited after every tick for a second
+ * (INPUT_BACKLOG_*): at once while the player's body stands still (or cannot move: the
+ * briefing), when skipping one cannot be seen; while it moves too, since round 5, when the
+ * backlog is INPUT_BACKLOG_MOVING or more and the input skipped changes no button, holds none and
+ * no drop is owed (it costs one tick of movement, a small correction, where before a moving
+ * player kept the delay for good). The backlog is over as soon as fewer
+ * than INPUT_BACKLOG_MIN wait after a tick, and the ticks the match runs to catch up after a
+ * stall neither trim nor count towards a backlog (they are playing the waiting inputs anyway;
+ * trimming then would eat the cushion). A client that floods the queue is cut back hard
  * (INPUT_QUEUE_HARD_MAX), carrying over presses and picks.
  *
  * The acknowledgement a snapshot carries (`packedAck`): the newest input up to which every input
@@ -54,7 +61,9 @@ export const INPUT_QUEUE_KEEP = 2;
  * Inputs a queue may hold at all: over this the oldest are discarded outright. A little over 1.5
  * seconds of play: more than the longest stall during which the match loop keeps a silent
  * player's buttons held (STARVED_BUTTON_TICKS in match.ts), so a hold that arrives after such a
- * stall still fits in whole.
+ * stall still fits in whole. Since round 5 the server catches up after it stood still and a page
+ * sends every input it owes after a freeze, so a queue should never come near it; it is the
+ * last guard against a client that floods.
  */
 export const INPUT_QUEUE_HARD_MAX = 48;
 /** The most inputs the server may be committed to drop, and the most dead ticks it remembers. */
@@ -62,6 +71,13 @@ export const INPUT_DROPS_MAX = 30;
 /** A backlog: this many inputs or more still waiting after every tick for INPUT_BACKLOG_TICKS (one second). */
 export const INPUT_BACKLOG_MIN = 2;
 export const INPUT_BACKLOG_TICKS = 30;
+/**
+ * A backlog trimmed while the body moves too (round 5): this many inputs or more still waiting
+ * after every tick for a second. It is trimmed down to one input more than the cushion, a tick
+ * of slack for a jittery line; the last one waits for a still moment, where skipping it cannot be
+ * seen.
+ */
+export const INPUT_BACKLOG_MOVING = 3;
 /**
  * Buttons whose holding time means something: the squad's volley (it charges for as long as it
  * is held) and the monster's two move buttons (a brace lasts as long as its button is held).
@@ -96,6 +112,8 @@ export interface InputQueue {
   windowTicks: number;
   /** A backlog was seen: one input is to be skipped the next time that cannot be seen. */
   trim: boolean;
+  /** The fewest inputs left waiting over the window that raised `trim`. */
+  backlog: number;
   /** Sequence numbers of inputs dropped while older ones were still waiting, until those are played. */
   droppedAhead: number[];
   /** One-shot fields of dropped inputs, waiting for the next input that is kept. */
@@ -104,6 +122,13 @@ export interface InputQueue {
   guessed: number;
   /** Inputs dropped or discarded since the queue was made (the network readout: `pong.dropped`). */
   dropped: number;
+  /** Inputs received since the queue was made, duplicates left out (the server's log). */
+  arrived: number;
+  /**
+   * Inputs skipped from a backlog since the queue was made (also counted in `dropped`). Each one
+   * skipped while the body moved cost it a tick of movement the client had counted.
+   */
+  trimmed: number;
 }
 
 export function createInputQueue(): InputQueue {
@@ -119,10 +144,13 @@ export function createInputQueue(): InputQueue {
     minWaiting: Number.POSITIVE_INFINITY,
     windowTicks: 0,
     trim: false,
+    backlog: 0,
     droppedAhead: [],
     carry: null,
     guessed: 0,
     dropped: 0,
+    arrived: 0,
+    trimmed: 0,
   };
 }
 
@@ -197,6 +225,7 @@ export function pushInput(q: InputQueue, input: PlayerInput, max = INPUT_QUEUE_M
   if (input.seq <= q.lastSeq) return;
   q.lastSeq = input.seq;
   q.started = true;
+  q.arrived++;
   const items = q.items;
 
   if (q.drops > 0) {
@@ -270,18 +299,32 @@ function idleRepeat(q: InputQueue, input: PlayerInput): boolean {
 }
 
 /**
+ * True when skipping an input costs at most one tick of movement: no button changes, none is
+ * held, and no drop is still owed (a backlog behind owed drops shrinks by itself as they come).
+ */
+function plainRepeat(q: InputQueue, input: PlayerInput): boolean {
+  return q.drops === 0 && input.buttons === q.lastButtons && (input.buttons & HOLD_BUTTONS) === 0;
+}
+
+/**
  * The input for this tick, or undefined when the tick is to be played on a guess: nothing has
  * arrived, or the cushion is being built. `still`: the player's body stands still or cannot move
  * this tick, so an input that changes nothing can be skipped without anyone seeing it.
+ * `catchingUp`: the match is running extra ticks after the server stood still (fixedStep.ts), so
+ * a backlog is neither trimmed nor counted on this tick.
  */
-export function takeInput(q: InputQueue, still = false): PlayerInput | undefined {
+export function takeInput(q: InputQueue, still = false, catchingUp = false): PlayerInput | undefined {
   if (q.started && q.cushion < INPUT_CUSHION) return undefined;
   let next = q.items.shift();
   if (!next) return undefined;
-  if (q.trim && still && q.items.length > 0 && idleRepeat(q, next)) {
-    // The backlog: skip this input and play the one after it in its place.
+  // The backlog: skip this input and play the one after it in its place, as long as one is still
+  // left waiting behind that (the cushion).
+  const behind = q.items.length;
+  const skip = still ? behind >= INPUT_BACKLOG_MIN && idleRepeat(q, next) : q.backlog >= INPUT_BACKLOG_MOVING && behind >= INPUT_BACKLOG_MOVING - 1 && plainRepeat(q, next);
+  if (q.trim && !catchingUp && skip) {
     carryOneShots(view(next), q.items[0]);
     q.dropped++;
+    q.trimmed++;
     q.trim = false;
     next = q.items.shift() as PlayerInput;
   }
@@ -289,9 +332,16 @@ export function takeInput(q: InputQueue, still = false): PlayerInput | undefined
   q.guessRun = 0;
   // Caught up with the present: what was left of a stall no longer matters.
   if (q.items.length === 0) q.dead = 0;
+  // The backlog is over as soon as it is short again (a flag left over from it would skip an
+  // input later, when the queue holds only the cushion, and make every tick after a guess).
+  if (q.items.length < INPUT_BACKLOG_MIN) q.trim = false;
+  if (catchingUp) return next;
   q.minWaiting = Math.min(q.minWaiting, q.items.length);
   if (++q.windowTicks >= INPUT_BACKLOG_TICKS) {
-    if (q.minWaiting >= INPUT_BACKLOG_MIN) q.trim = true;
+    if (q.minWaiting >= INPUT_BACKLOG_MIN) {
+      q.trim = true;
+      q.backlog = q.minWaiting;
+    }
     q.minWaiting = Number.POSITIVE_INFINITY;
     q.windowTicks = 0;
   }

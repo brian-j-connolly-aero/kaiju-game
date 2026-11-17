@@ -1226,3 +1226,38 @@ squad-mates must see). It did that over and over all stage. `clearLines` is now 
 - Stage 2 is still about a tenth shorter than section 11 (2:16 against 2:32), though its charged
   volleys are back near the throwing builder's baseline (16.5 a match against 17.5). Not chased:
   left for the next round, after people have played it.
+
+## 13. Round 5: held, nothing retuned (17 November, the round 5 integration)
+
+The owner after the third playtest: "Game was well balanced, humans almost won." Round 5 was to
+keep it. Of its four parts only the army's shooting changes the simulation (the machine gun
+streams with almost no spread, a squad-mate still reloading charges only to the notch, the volley
+goes at the monster also through cover, a held Volley survives a stall: `docs/DESIGN.md` section
+5). The throw at the crosshair is the person's aiming only (the bots never call it), the lag
+fixes are the server's clock and input queues, and the labels are words on screen. The whole
+tree together, `npm run sim -- --seeds 20 --every-anchor` and `--seeds 40 --every-anchor`:
+
+| | Stage 1 | Stage 2 | Stage 3 | Kaiju wins |
+| --- | --- | --- | --- | --- |
+| Round 4 final, seeds 1 to 20 (section 12) | 1:54 | 2:16 | 3:13 (8) | 8 of 20 |
+| Round 4 final, seeds 1 to 40 (section 12) | 1:57 | 2:19 | 3:13 (16) | 16 of 40 |
+| Round 5 final, seeds 1 to 20 | 1:56 | 2:22 | 3:07 (8) | 8 of 20 |
+| Round 5 final, seeds 1 to 40 | 1:55 | 2:25 | 2:59 (22) | 22 of 40 |
+
+(Stage 3 counts only the third stages the monster finished: the number in brackets.)
+
+Every stage time is within about a tenth of round 4 (stage 2 up 4 to 5%, stage 3 down 3 to 7%),
+and the monster's share stays inside the 25 to 60% band, so **nothing was retuned**. The first
+20 seeds came out exactly as in round 4 (8 of 20); seeds 21 to 40 went to the monster more
+often (14 of 20 against 8). The army builder's larger run, 240 matches on each version, saw the
+same small lean: the monster won 116 of 240 (48%) on round 4's code and 129 of 240 (54%) with the
+army changes, and 59 against 59 on seeds 121 to 240 alone. That is about one standard error:
+it may be noise, or a slight lean to the monster from squad-mates that now wait at the notch
+while they reload instead of firing a charge they cannot use. Worth watching at the next
+playtest; not chased with numbers that bots alone give.
+
+### Limits
+
+- Bots, not people. The squad bots use the new machine gun like anyone, but the monster bot
+  never aims a throw at a crosshair. A person whose throws now land where they point, and squads
+  whose machine gun now streams, may shift the balance either way.

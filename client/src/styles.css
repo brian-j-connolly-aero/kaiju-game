@@ -1,7 +1,8 @@
 /*
  * Placeholder styling for every screen and the HUD. Functional, not final: a UI specialist will
  * restyle it. Color language (DESIGN.md section 8): humans cyan, kaiju orange, charging volleys
- * yellow, rubble grey. No text besides names, the room code and subtitles.
+ * yellow, rubble grey. No text besides names, the room code, subtitles and (round 5) the labels
+ * of one or two words beside the pictures (ui/labels.ts; their one style: `.lbl` below).
  */
 
 :root {
@@ -16,7 +17,11 @@
   /* The subtitle line: its text size, and the room three lines of it need (the end screen keeps that free). */
   --subs-font: clamp(15px, 2.2vw, 24px);
   --subs-band: calc(var(--subs-font) * 3.9 + 16px);
-  font-family: 'Trebuchet MS', 'Segoe UI', Verdana, sans-serif;
+  /* The game's display font (the title's), and the labels' sizes: small, and on big buttons. */
+  --display-font: 'Trebuchet MS', 'Segoe UI', Verdana, sans-serif;
+  --label: clamp(11px, 1.5vmin, 15px);
+  --label-big: clamp(13px, 2.1vmin, 22px);
+  font-family: var(--display-font);
 }
 
 * {
@@ -51,6 +56,37 @@ body {
 
 .hidden {
   display: none !important;
+}
+
+/*
+ * Labels (round 5, ui/labels.ts): one or two plain words beside a picture, in capitals, in the
+ * display font, white with a dark edge so they read over sky, street and smoke. Every word on the
+ * screens shares this type: the buttons' labels, the volley chip's and the crosshair's words, the
+ * monster's nerve bar's and the monster's line-of-sight words. Red means "cannot" (#ff3f30).
+ */
+.lbl,
+.hint-word,
+.vm-word,
+.vm-team,
+.crosshair-word,
+.boss-word,
+.sight-word,
+.pickup-taken-word {
+  font-family: var(--display-font);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.lbl {
+  font-size: var(--label);
+  color: #fff;
+  text-shadow:
+    0 1px 2px #000,
+    0 0 3px #000;
+  pointer-events: none;
 }
 
 /* --- shared pieces -------------------------------------------------------------------------- */
@@ -834,7 +870,8 @@ body {
   position: absolute;
   left: 14px;
   bottom: 14px;
-  width: min(280px, 34vw);
+  /* (A little wider since the meters' labels of round 5.) */
+  width: min(320px, 34vw);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -848,7 +885,8 @@ body {
 
 .squads {
   position: absolute;
-  top: 84px;
+  /* (Clear of the stage and the menu's button over it, with their labels: round 5.) */
+  top: 92px;
   right: 12px;
   display: flex;
   flex-direction: column;
@@ -929,7 +967,7 @@ body {
 
 .hints {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   align-items: flex-end;
 }
 
@@ -1031,26 +1069,31 @@ body {
 }
 
 /*
- * The squad's volley meter (ui/volleyMeter.ts): a big yellow diamond round the crosshair that
- * fills from the bottom while Volley is held, a white notch at 60%, the squad-mates under it
- * and, when another squad's volley has landed, a ring counting its five seconds down. The SVG's
- * point (0, 0) is the middle of the screen.
+ * The squad's volley meter (ui/volleyMeter.ts). Always: a chip under the crosshair with a small
+ * diamond, a picture per squad-mate and a word. While Volley is held (and as a release flashes):
+ * the big yellow diamond round the crosshair, filling from the bottom, a white notch at 60%, and
+ * when the other squads' volley has opened the five seconds to break the monster, a thin ring
+ * counting them down. Every SVG's point (0, 0) is its middle.
  */
 .volley-meter {
-  --vm: clamp(150px, 34vmin, 270px);
+  --vm: clamp(112px, 25vmin, 200px);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.vm-big {
   position: absolute;
   left: calc(50% - var(--vm) / 2);
   top: calc(50% - var(--vm) / 2);
   width: var(--vm);
-  height: calc(var(--vm) * 1.16);
-  pointer-events: none;
+  height: var(--vm);
+  overflow: visible;
+  display: none;
 }
 
-.volley-meter svg {
+.volley-meter.big .vm-big {
   display: block;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
 }
 
 .vm-diamond {
@@ -1104,9 +1147,15 @@ body {
   animation-duration: 0.26s;
 }
 
-/* Only the countdown is up (the button is not held): the diamond waits, faint. */
-.volley-meter.idle .vm-diamond {
-  opacity: 0.4;
+/* Held, but nobody can charge (stunned, shaken, no line...): the diamond greys out. */
+.volley-meter.cannot .vm-diamond {
+  opacity: 0.5;
+  filter: grayscale(1);
+}
+
+/* Let go: the level waits for the server's answer. */
+.volley-meter.waiting .vm-diamond {
+  opacity: 0.7;
 }
 
 @keyframes vm-pulse {
@@ -1115,7 +1164,7 @@ body {
   }
 }
 
-/* Let go with the volley charged: a white flash blown outward. */
+/* The server says the volley went: a white flash blown outward. */
 .volley-meter.fired .vm-diamond {
   animation: vm-fired 0.6s ease-out forwards;
 }
@@ -1139,7 +1188,7 @@ body {
   }
 }
 
-/* Let go short of the notch: the charge fizzles out, grey. */
+/* Let go short of the notch, or nothing fired: it fizzles out, grey. */
 .volley-meter.fizzle .vm-fill {
   fill: #8d8d94;
 }
@@ -1155,47 +1204,234 @@ body {
   }
 }
 
-/* The squad-mates: a cyan circle while following, a yellow diamond while charging. */
-.vm-mate-circle {
+/* The chip: under the crosshair (under the big diamond's bottom point while it shows). */
+.vm-chip {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + var(--vm) * 0.43);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.vm-chip-pics {
+  width: clamp(104px, 16vmin, 170px);
+  height: auto;
+  overflow: visible;
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.9));
+}
+
+/* The small diamond: cyan with a yellow core (can charge), grey with a red bar (cannot). Hidden while the big one shows. */
+.vm-badge-edge {
+  fill: rgba(10, 12, 20, 0.6);
+  stroke: var(--human);
+  stroke-width: 2.5;
+}
+
+.vm-badge-core {
+  fill: var(--volley);
+}
+
+.vm-badge-slash {
+  display: none;
+  stroke: #ff3f30;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.volley-meter.big .vm-chip-badge {
+  display: none;
+}
+
+.volley-meter.cannot .vm-badge-edge {
+  stroke: #9a9aa2;
+}
+
+.volley-meter.cannot .vm-badge-core {
+  fill: #9a9aa2;
+}
+
+.volley-meter.cannot .vm-badge-slash {
+  display: inline;
+}
+
+/* One picture per squad-mate: every shape is there, its look shows one or two. */
+.vm-mate > * {
+  display: none;
+}
+
+.vm-mate.none {
+  display: none;
+}
+
+.vm-m-dot {
   fill: var(--human);
   stroke: #0b0e16;
   stroke-width: 2;
 }
 
-.vm-mate-diamond {
-  display: none;
+.vm-mate.ready .vm-m-dot {
+  display: inline;
+}
+
+.vm-m-diamond {
   fill: var(--volley);
   stroke: #0b0e16;
   stroke-width: 2;
 }
 
-.vm-mate.charging .vm-mate-circle,
-.vm-mate.none {
-  display: none;
-}
-
-.vm-mate.charging .vm-mate-diamond {
+.vm-mate.charging .vm-m-diamond {
   display: inline;
 }
 
-/* Stunned or shaken: it cannot charge. */
-.vm-mate.out .vm-mate-circle {
-  fill: var(--danger);
-  animation: pulse 0.3s infinite;
-}
-
-.vm-mate.dead .vm-mate-circle {
-  fill: none;
-  stroke: rgba(141, 141, 148, 0.8);
+/* Reloading (and holding the volley back): a ring that fills clockwise. */
+.vm-m-ring {
+  fill: rgba(10, 12, 20, 0.6);
+  stroke: rgba(30, 200, 224, 0.45);
   stroke-width: 2.5;
 }
 
-/* Another squad's volley has landed: five seconds to land this one. */
+.vm-m-sweep {
+  fill: none;
+  stroke: var(--human);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.vm-mate.reload .vm-m-ring,
+.vm-mate.reload .vm-m-sweep {
+  display: inline;
+}
+
+/* Shaken or stunned: a red cross (stunned pulses). */
+.vm-m-cross {
+  stroke: #ff3f30;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+}
+
+.vm-mate.shaken .vm-m-cross,
+.vm-mate.stunned .vm-m-cross {
+  display: inline;
+}
+
+.vm-mate.stunned {
+  animation: pulse 0.3s infinite;
+}
+
+/* Coming down by parachute. */
+.vm-m-chute {
+  fill: rgba(30, 200, 224, 0.35);
+  stroke: var(--human);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+
+.vm-mate.landing .vm-m-chute {
+  display: inline;
+}
+
+/* No line (a building or a heap in the way): the dot with a red bar through it. */
+.vm-m-wall {
+  stroke: #ff3f30;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+}
+
+.vm-mate.blocked .vm-m-dot,
+.vm-mate.blocked .vm-m-wall {
+  display: inline;
+}
+
+.vm-mate.blocked .vm-m-dot {
+  fill: #6b7c84;
+}
+
+/* Too far: a dashed ring. Gone: a grey ring. */
+.vm-mate.far .vm-m-ring {
+  display: inline;
+  stroke: var(--human);
+  stroke-dasharray: 3 3;
+}
+
+.vm-mate.dead .vm-m-ring {
+  display: inline;
+  fill: none;
+  stroke: rgba(141, 141, 148, 0.8);
+}
+
+/*
+ * The words (one or two, round 5): the volley chip's, the crosshair's, the monster's nerve bar's.
+ * Red means "cannot" here as on the monster's screen (kaiju.css, .sight-word).
+ */
+.vm-word,
+.vm-team,
+.crosshair-word,
+.boss-word {
+  padding: 2px 10px 3px;
+  border-radius: 7px;
+  font-size: clamp(13px, 2vmin, 21px);
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  line-height: 1.1;
+  white-space: nowrap;
+  color: #fff;
+  background: rgba(10, 12, 20, 0.7);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+
+.vm-word.ready {
+  color: #bff6ff;
+  border: 2px solid rgba(30, 200, 224, 0.7);
+}
+
+.vm-word.go {
+  color: #1a1400;
+  background: var(--volley);
+  text-shadow: none;
+  border: 2px solid rgba(26, 20, 0, 0.8);
+}
+
+.volley-meter.full .vm-word.go {
+  animation: pulse 0.26s infinite;
+}
+
+.vm-word.wait {
+  color: #e2e2e8;
+  border: 2px solid rgba(160, 160, 170, 0.7);
+}
+
+.vm-word.cannot {
+  background: #ff3f30;
+  border: 2px solid rgba(26, 6, 0, 0.9);
+}
+
+/* "Team up" under the word while Volley is held and the window is open. */
+.vm-team {
+  display: none;
+  font-size: clamp(11px, 1.6vmin, 17px);
+  color: #1a1400;
+  background: #fff2a8;
+  text-shadow: none;
+}
+
+.volley-meter.held.countdown .vm-team {
+  display: block;
+}
+
+.volley-meter.hurry .vm-team {
+  animation: pulse 0.24s infinite;
+}
+
+/* The team-up ring: thin, round the big diamond, only while it shows. */
 .vm-ring {
   display: none;
 }
 
-.volley-meter.countdown .vm-ring,
+.volley-meter.big.countdown .vm-ring,
 .volley-meter.paired .vm-ring {
   display: inline;
 }
@@ -1203,21 +1439,15 @@ body {
 .vm-ring-track {
   fill: none;
   stroke: rgba(10, 12, 20, 0.45);
-  stroke-width: 11;
+  stroke-width: 6;
 }
 
 .vm-ring-time {
   fill: none;
   stroke: #fff2a8;
-  stroke-width: 8;
+  stroke-width: 4;
   stroke-linecap: round;
-  filter: drop-shadow(0 0 4px var(--volley));
-}
-
-.vm-ring-mark {
-  fill: var(--volley);
-  stroke: #0b0e16;
-  stroke-width: 2;
+  filter: drop-shadow(0 0 3px var(--volley));
 }
 
 .volley-meter.hurry .vm-ring {
@@ -1241,6 +1471,90 @@ body {
     transform: scale(1.5);
     opacity: 0;
   }
+}
+
+/* The crosshair's word, under it: "Blocked" (red) or "Too far"; the size of the monster's own (kaiju.css, .sight-word). */
+.crosshair-word {
+  position: absolute;
+  left: 0;
+  top: 20px;
+  transform: translateX(-50%);
+  padding: 3px 12px 4px;
+  font-size: clamp(17px, 2.7vmin, 28px);
+}
+
+.crosshair-word.hidden {
+  display: none;
+}
+
+.crosshair-word {
+  background: #ff3f30;
+  border: 2px solid rgba(26, 6, 0, 0.9);
+}
+
+/* The unit's own shot cannot reach the monster the crosshair is on: a red ring with a bar through it. */
+.crosshair.blocked .crosshair-ring {
+  border-color: #ff3f30;
+  border-width: 3px;
+  box-shadow: 0 0 0 1.5px rgba(26, 6, 0, 0.9);
+}
+
+.crosshair.blocked .crosshair-ring::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  bottom: -3px;
+  width: 3px;
+  margin-left: -1.5px;
+  background: #ff3f30;
+  transform: rotate(45deg);
+}
+
+/* The monster's nerve bar: its word, and the team-up strip running down over the bar. */
+.boss-nerve .meter-track {
+  position: relative;
+}
+
+.boss-team {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 40%;
+  width: 0;
+  background: repeating-linear-gradient(-45deg, #ffd91a 0 6px, #fff2a8 6px 12px);
+  opacity: 0.9;
+}
+
+.boss-word {
+  font-size: clamp(11px, 1.6vmin, 16px);
+  padding: 1px 8px 2px;
+}
+
+.boss-word.hidden {
+  display: none;
+}
+
+.boss-word.w-team {
+  color: #1a1400;
+  background: var(--volley);
+  text-shadow: none;
+  animation: pulse 0.5s infinite;
+}
+
+.boss-word.w-stagger {
+  color: #0b2a2c;
+  background: #7dfcff;
+  text-shadow: none;
+}
+
+.boss-word.w-immune {
+  color: #e2e2e8;
+  border: 1.5px solid rgba(160, 160, 170, 0.8);
+}
+
+.boss-word.w-lost {
+  color: #e2e2e8;
 }
 
 /*
@@ -1322,7 +1636,10 @@ body {
 }
 
 .status-icon.on {
-  display: inline-block;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
   animation: pulse 0.5s infinite;
 }
 
@@ -1364,11 +1681,11 @@ body {
   animation: none !important;
 }
 
-/* "Click": the mouse is free and a click on the view captures it. */
+/* "Click": the mouse is free and a click on the view captures it (below the squad's volley chip). */
 .capture {
   position: absolute;
   left: 50%;
-  top: 57%;
+  top: 69%;
   transform: translateX(-50%);
   width: 76px;
   height: 76px;
@@ -1742,17 +2059,25 @@ body[data-screen='end'] .subtitles {
   position: absolute;
   top: 2vh;
   right: 2vw;
+  width: 7.4em;
+  font-size: var(--label);
+  padding: 6px 4px;
+}
+
+/* (Their pictures keep their size whatever the label's.) */
+.settings-open > .icon,
+.controls-open > .icon {
   font-size: 28px;
-  padding: 8px 10px;
 }
 
 /* The button that opens the controls card: beside the gear in the lobby, top right on the briefing. */
 .controls-open {
   position: absolute;
   top: 2vh;
-  right: calc(2vw + 66px);
-  font-size: 28px;
-  padding: 8px 12px;
+  right: calc(2vw + 7.4em + 10px);
+  width: 7.4em;
+  font-size: var(--label);
+  padding: 6px 4px;
   color: var(--volley);
   border-color: var(--volley);
   box-shadow: 0 0 10px rgba(255, 217, 26, 0.35);
@@ -1790,8 +2115,9 @@ body:has(.controls:not(.hidden)) .briefing-sides {
 }
 
 .controls-card {
-  /* One unit: the size of a button glyph (the pictures are about twice it). */
-  --u: clamp(22px, 5.6vh, 46px);
+  /* One unit: the size of a button glyph (the pictures are about twice it; a little under 5.6vh
+     since the labels of round 5, so that the card still ends above the crosshair). */
+  --u: clamp(22px, 5.1vh, 46px);
   display: flex;
   flex-direction: column;
   gap: calc(var(--u) * 0.3);
@@ -1867,7 +2193,7 @@ body:has(.controls:not(.hidden)) .briefing-sides {
   justify-content: center;
   gap: calc(var(--u) * 0.45);
   min-width: calc(var(--u) * 3.4);
-  padding: calc(var(--u) * 0.3) calc(var(--u) * 0.35) calc(var(--u) * 0.25);
+  padding: calc(var(--u) * 0.24) calc(var(--u) * 0.35) calc(var(--u) * 0.22);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -1898,14 +2224,15 @@ body:has(.controls:not(.hidden)) .briefing-sides {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: calc(var(--u) * 0.2);
+  /* (Tighter since the labels of round 5 sit between the pictures and the buttons.) */
+  gap: calc(var(--u) * 0.12);
 }
 
 .card-pics {
   display: flex;
   align-items: center;
   gap: calc(var(--u) * 0.1);
-  font-size: calc(var(--u) * 2);
+  font-size: calc(var(--u) * 1.9);
 }
 
 /* A second picture beside the first (what the grab takes, the volley's shot): smaller. */
@@ -2108,7 +2435,7 @@ body:has(.controls:not(.hidden)) .briefing-sides {
   }
 
   .capture {
-    top: 55%;
+    top: 68%;
     width: 56px;
     height: 56px;
     font-size: 34px;
@@ -2200,8 +2527,9 @@ body:has(.controls:not(.hidden)) .briefing-sides {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  margin-bottom: 30px;
+  gap: 3px;
+  /* (Its picture and label level with the buttons' beside it: their glyphs are under them.) */
+  margin-bottom: 16px;
   color: var(--human);
   font-size: 34px;
   filter: drop-shadow(0 0 6px rgba(30, 200, 224, 0.7));
@@ -2222,6 +2550,15 @@ body:has(.controls:not(.hidden)) .briefing-sides {
 .radio-pip.on {
   border-color: var(--human);
   background: var(--human);
+}
+
+/* The button's label (round 5, `.lbl`), under its picture and over the glyph of its button. */
+.hint-word {
+  margin-top: 1px;
+}
+
+.squad-radio .hint-word {
+  color: var(--human);
 }
 
 /* A crate just taken: its picture pops up over the crosshair, big, then rises and fades. */
@@ -2245,6 +2582,28 @@ body:has(.controls:not(.hidden)) .briefing-sides {
 }
 
 .pickup-taken.pop > .icon {
+  animation: pickup-pop 1.6s ease-out forwards;
+}
+
+/* Its name, under it, for as long as the picture shows. */
+.pickup-taken-word {
+  position: absolute;
+  left: 0;
+  top: 56px;
+  transform: translateX(-50%);
+  padding: 2px 12px 3px;
+  border-radius: 7px;
+  font-size: clamp(16px, 2.6vmin, 26px);
+  font-weight: 800;
+  white-space: nowrap;
+  color: #fff;
+  background: rgba(10, 12, 20, 0.75);
+  border: 2px solid var(--human);
+  text-shadow: 0 1px 2px #000;
+  opacity: 0;
+}
+
+.pickup-taken.pop > .pickup-taken-word {
   animation: pickup-pop 1.6s ease-out forwards;
 }
 
@@ -2277,7 +2636,7 @@ body:has(.controls:not(.hidden)) .briefing-sides {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: clamp(240px, 44vmin, 400px);
+  width: clamp(260px, 50vmin, 440px);
   aspect-ratio: 1;
   transform: translate(-50%, -50%);
   z-index: 5;
@@ -2288,7 +2647,8 @@ body:has(.controls:not(.hidden)) .briefing-sides {
   --rose: var(--kaiju);
 }
 
-.rose svg {
+/* (The wedges' own drawing, not the pictures in them.) */
+.rose > svg {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -2337,16 +2697,34 @@ body:has(.controls:not(.hidden)) .briefing-sides {
 
 .rose-icon {
   position: absolute;
-  font-size: clamp(34px, 7.5vmin, 66px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: clamp(30px, 6.4vmin, 58px);
   transform: translate(-50%, -50%);
   color: var(--ink);
   filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.6));
+}
+
+/* Each wedge's label, under its picture (round 5); two words go on two lines. */
+.rose-label {
+  margin-top: 3px;
+  font-size: clamp(10px, 1.55vmin, 16px);
+  white-space: normal;
+  text-align: center;
+  width: min-content;
+  line-height: 1;
 }
 
 .rose-icon.on {
   color: #0e121e;
   filter: none;
   transform: translate(-50%, -50%) scale(1.15);
+}
+
+.rose-icon.on .rose-label {
+  color: #0e121e;
+  text-shadow: none;
 }
 
 .rose-dot {
@@ -2373,4 +2751,233 @@ body:has(.controls:not(.hidden)) .briefing-sides {
   to {
     box-shadow: 0 0 18px 4px rgba(255, 59, 92, 0.75);
   }
+}
+
+/* --- labels in place (round 5, ui/labels.ts; their one style is `.lbl`, near the top) ------- */
+
+/* A button with its label under its picture (the menus): the label takes the button's color. */
+.btn.btn-labelled {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+
+.btn-labelled > .lbl {
+  color: inherit;
+}
+
+.btn-big.btn-labelled > .lbl {
+  font-size: var(--label-big);
+}
+
+/* The practice switch's two pictures side by side over its label. */
+.btn-pics {
+  display: inline-flex;
+  gap: 4px;
+}
+
+/* The HUD's meters: picture, label, bar (the bars start level). */
+.meter-label {
+  flex: none;
+  min-width: 5.1em;
+  font-size: clamp(10px, 1.35vmin, 14px);
+}
+
+/* The destruction bar's marks: the label beside the mark's picture (the picture stays on its mark). */
+.bar-mark-label {
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 3px;
+  font-size: clamp(10px, 1.45vmin, 15px);
+  opacity: 0.9;
+}
+
+.bar-mark.ready .bar-mark-label {
+  color: var(--volley);
+}
+
+/* The last mark sits at the skyline's right end: its label goes to its left, clear of the stage and the menu. */
+.bar-mark-win .bar-mark-label {
+  left: auto;
+  right: 100%;
+  margin: 0 3px 0 0;
+}
+
+/* The clock's label, under the arc (clear of the sun at its lowest). */
+.clock-label {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 14px);
+  transform: translateX(-50%);
+}
+
+/* The stage's label, to the left of its three triangles (left out in a narrow window, where it would run into the skyline). */
+.stage-label {
+  align-self: center;
+  margin-right: 5px;
+}
+
+@media (max-width: 900px) {
+  .stage-label {
+    display: none;
+  }
+}
+
+/* Over the list of squads. */
+.squads-label {
+  align-self: flex-end;
+  padding: 0 8px;
+  font-size: clamp(10px, 1.45vmin, 15px);
+}
+
+/* The big status pictures: the label under each. */
+.status-label {
+  font-size: var(--label-big);
+}
+
+/* "Click", under its circle. */
+.capture-label {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 6px);
+  transform: translateX(-50%);
+  font-size: var(--label-big);
+}
+
+/* The monster's warnings: "Volley" under each yellow diamond ... */
+.threat-label {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translateX(-50%);
+  color: var(--volley);
+  font-size: clamp(10px, 1.45vmin, 15px);
+}
+
+/* ... and on the screen's edge, on its inner side (away from the arrow), clear of the edge's buttons. */
+.threat.edge .threat-label {
+  top: 50%;
+  transform: translate(-50%, -50%) translate(calc(cos(var(--angle, 0rad)) * -48px), calc(sin(var(--angle, 0rad)) * -40px));
+}
+
+/* The tank's gun reticle: "Gun" beside it while it sits apart from the crosshair. */
+.gr-label {
+  display: none;
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 7px;
+  color: var(--human);
+}
+
+.gun-reticle.apart .gr-label {
+  display: block;
+}
+
+/* The controls card: the label between the pictures and the button. */
+.card-label {
+  font-size: calc(var(--u) * 0.46);
+}
+
+.card-small .card-label {
+  font-size: calc(var(--u) * 0.36);
+}
+
+.card-close .card-label {
+  font-size: calc(var(--u) * 0.36);
+  color: inherit;
+}
+
+/* The settings panel: the label between each picture and its slider. */
+.settings-label {
+  flex: none;
+  min-width: 8.6em;
+  font-size: var(--label-big);
+}
+
+.settings-buttons .btn-labelled > .icon {
+  font-size: 30px;
+}
+
+/* The lobby: a seat's flags with their labels, an empty seat's "Bot". */
+.flag-pair {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.flag-label,
+.seat-label {
+  font-size: clamp(10px, 1.45vmin, 15px);
+}
+
+.flag-pair.host .flag-label {
+  color: var(--volley);
+}
+
+.flag-pair.ok .flag-label {
+  color: #49d17d;
+}
+
+.flag-pair.asleep .flag-label {
+  color: #9db8ff;
+}
+
+.flag-pair.off .flag-label {
+  color: var(--danger);
+}
+
+/* The home screen: what went wrong, beside its picture. */
+.notice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.notice-label {
+  color: var(--danger);
+  font-size: var(--label-big);
+}
+
+.field::placeholder {
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(244, 246, 251, 0.35);
+}
+
+/* The briefing's two sides. */
+.side-label {
+  font-size: var(--label-big);
+}
+
+.side-label.kaiju {
+  color: var(--kaiju);
+}
+
+.side-label.humans {
+  color: var(--human);
+}
+
+/* The end screen: who won and how, each label under its picture. */
+.end-pair {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.end-label {
+  color: inherit;
+  font-size: clamp(14px, 2.6vmin, 28px);
+}
+
+.end-reason + .end-label {
+  color: var(--ink);
 }

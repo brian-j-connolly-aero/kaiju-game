@@ -1,6 +1,8 @@
 /**
  * The monster's buttons on the HUD, bottom right (DESIGN.md section 8; docs/ROADMAP.md phase 1:
- * one move per button). Pictures only, each over the glyph of its button on the device in use:
+ * one move per button). Each a picture over the glyph of its button on the device in use, with
+ * its label of one or two words between them (round 5, ui/labels.ts: what the button does now,
+ * "Strike" or "Throw", "Grab" or "Eat", a move's name or "Locked"):
  *
  *   the starting kit   Strike (a swipe; with something in the hand, the throw), Grab (a grab;
  *                      with something in the hand, eating it) and Stomp. With a city weapon in
@@ -27,6 +29,7 @@
 import { heldCityWeapon, heldEdible, kaijuKindDef, kaijuMoveVerb, LAST_STAGE, strikeVerb, type HeldObject, type KaijuMove, type KaijuMoveId, type SnapKaiju } from '@mb/shared';
 import { glyphFor, type Bindings, type ButtonAction, type InputDevice } from '../game/input/actions';
 import { el, glyph, icon, setGlyph, setIcon } from './icons';
+import { grabLabel, label, LABELS, moveLabel, setLabel, strikeLabel } from './labels';
 
 /** The picture of each move a molt can give (docs/ASSETS.md section 5). */
 export const MOVE_ICON: Readonly<Record<KaijuMove, string>> = {
@@ -66,6 +69,8 @@ interface Tile {
   box: HTMLElement;
   pic: HTMLElement;
   cover: HTMLElement;
+  /** Its label, under the picture. */
+  word: HTMLElement;
   glyph: HTMLElement;
   action: ButtonAction;
 }
@@ -74,26 +79,44 @@ function setClass(node: HTMLElement, name: string, on: boolean): void {
   if (node.classList.contains(name) !== on) node.classList.toggle(name, on);
 }
 
-function tile(iconId: string, action: ButtonAction, extra = ''): Tile {
+function tile(iconId: string, action: ButtonAction, word: string, extra = ''): Tile {
   const pic = icon(iconId);
   const cover = el('div', 'hint-cover');
   const box = el('div', 'hint-icon', [pic, cover]);
+  const w = label(word, 'hint-word');
   const g = glyph(null, 'hint-glyph');
-  const root = el('div', `hint ${extra}`.trim(), [box, g]);
-  return { root, box, pic, cover, glyph: g, action };
+  const root = el('div', `hint ${extra}`.trim(), [box, w, g]);
+  return { root, box, pic, cover, word: w, glyph: g, action };
 }
 
 const SLOT_ACTIONS = ['move1', 'move2'] as const;
 
+/** The kit's buttons, in their order on the HUD. */
+export const KIT_ACTIONS = ['strike', 'grab', 'stomp', 'move1', 'move2', 'molt', 'camera'] as const satisfies readonly ButtonAction[];
+
+/** What each of the kit's buttons is labelled with this in the hand and these moves picked (ui/labels.ts). */
+export function kitLabels(held: HeldObject | null, moves: readonly [KaijuMoveId, KaijuMoveId]): Record<(typeof KIT_ACTIONS)[number], string> {
+  return {
+    strike: strikeLabel(held),
+    grab: grabLabel(held),
+    stomp: LABELS.kaiju.stomp,
+    move1: moveLabel(moves[0]),
+    move2: moveLabel(moves[1]),
+    molt: LABELS.kaiju.molt,
+    camera: LABELS.common.view,
+  };
+}
+
 export class KaijuKit {
   readonly root: HTMLElement;
-  private readonly strike = tile('k_swipe', 'strike', 'kit-strike');
-  private readonly grab = tile('k_grab', 'grab', 'kit-grab');
-  private readonly stomp = tile('k_stomp', 'stomp', 'kit-stomp');
-  private readonly slots: [Tile, Tile] = [tile('k_molt', 'move1', 'kit-slot empty'), tile('k_molt', 'move2', 'kit-slot empty')];
+  private readonly start = kitLabels(null, ['none', 'none']);
+  private readonly strike = tile('k_swipe', 'strike', this.start.strike, 'kit-strike');
+  private readonly grab = tile('k_grab', 'grab', this.start.grab, 'kit-grab');
+  private readonly stomp = tile('k_stomp', 'stomp', this.start.stomp, 'kit-stomp');
+  private readonly slots: [Tile, Tile] = [tile('k_molt', 'move1', this.start.move1, 'kit-slot empty'), tile('k_molt', 'move2', this.start.move2, 'kit-slot empty')];
   private readonly rings: [HTMLElement, HTMLElement];
-  private readonly molt = tile('k_molt', 'molt', 'kit-molt hidden');
-  private readonly camera = tile('st_camera', 'camera', 'kit-camera');
+  private readonly molt = tile('k_molt', 'molt', this.start.molt, 'kit-molt hidden');
+  private readonly camera = tile('st_camera', 'camera', this.start.camera, 'kit-camera');
   /** The fast-food sign's swings left, under Strike. */
   private readonly pips: HTMLElement[] = [];
   /** A garage door in the hand: the door over the front it covers, and its strength left. */
@@ -128,9 +151,9 @@ export class KaijuKit {
     for (let i = 0; i < 3; i++) this.pips.push(el('div', 'kit-pip'));
     this.strike.box.append(el('div', 'kit-pips', this.pips));
     this.shieldBar = el('div', 'kit-shield-fill');
-    this.shield = el('div', 'kit-shield hidden', [el('div', 'kit-shield-arc'), icon('k_shield'), el('div', 'kit-shield-bar', [this.shieldBar])]);
+    this.shield = el('div', 'kit-shield hidden', [el('div', 'kit-shield-arc'), icon('k_shield'), el('div', 'kit-shield-bar', [this.shieldBar]), label(LABELS.kaiju.shield, 'kit-shield-label')]);
     this.surgeRing = el('div', 'kit-surge-ring');
-    this.badge = el('div', 'kit-surge hidden', [this.surgeRing, el('div', 'kit-surge-bolt', [icon('k_surge')])]);
+    this.badge = el('div', 'kit-surge hidden', [this.surgeRing, el('div', 'kit-surge-bolt', [icon('k_surge')]), label(LABELS.kaiju.surge, 'kit-surge-label')]);
     this.root = el('div', 'hints kaiju-kit', [this.shield, this.strike.root, this.grab.root, this.stomp.root, this.slots[0].root, this.slots[1].root, this.molt.root, this.camera.root]);
   }
 
@@ -169,6 +192,8 @@ export class KaijuKit {
     // The starting kit: what Strike and Grab do depends on the hand.
     setIcon(this.strike.pic, strikeIcon(k.held));
     setIcon(this.grab.pic, grabIcon(k.held));
+    setLabel(this.strike.word, strikeLabel(k.held));
+    setLabel(this.grab.word, grabLabel(k.held));
     this.updateWeapon(k);
     // With something edible in the hand and the last meal too recent, Grab does nothing.
     const eatWait = heldEdible(k.held) && k.cooldowns.eat > 0 ? k.cooldowns.eat / Math.max(0.01, def.actions.eat.cooldown) : 0;
@@ -240,6 +265,7 @@ export class KaijuKit {
     if (move !== this.shown[i]) {
       this.shown[i] = move;
       setIcon(s.pic, moveIcon(move));
+      setLabel(s.word, moveLabel(move));
       setClass(s.root, 'empty', move === 'none');
       s.root.dataset.move = move;
       this.peak[i] = 0;

@@ -2,7 +2,8 @@
  * One running match: a World plus what the server needs around it to run the loop in
  * ARCHITECTURE.md section 4.
  *
- *   - a fixed 30 Hz step driven by the accumulator in fixedStep.ts;
+ *   - a fixed 30 Hz step driven by the accumulator in fixedStep.ts, which catches up after the
+ *     server stood still (up to MAX_OWED_MS) instead of dropping the time;
  *   - one input per human-controlled slot per tick, taken from that slot's short queue, a tick
  *     after it was due; a tick with nothing queued is played on a guess (the previous input
  *     again, held buttons included), and the queue is told: the guess stands in for the input
@@ -19,6 +20,7 @@
  */
 
 import {
+  Btn,
   createWorld,
   drivenUnit,
   encodeSnapshot,
@@ -37,14 +39,19 @@ import {
   type SystemMark,
   type World,
 } from '@mb/shared';
-import { createFixedStep, dueSteps, type FixedStep, type FixedStepOptions } from './fixedStep';
+import { catchingUp, createFixedStep, dueSteps, type FixedStep, type FixedStepOptions } from './fixedStep';
 import { clearInputQueue, createInputQueue, noteGuessedTick, packedAck, pushInput, takeInput, type InputQueue } from './inputQueue';
 
 export const TICK_MS = 1000 / TICK_RATE;
 /** Ticks one update may run to catch up (at speed 1). */
 export const MAX_CATCH_UP_STEPS = 4;
-/** The longest gap between two updates that is simulated in full, milliseconds. */
-export const MAX_FRAME_MS = 250;
+/**
+ * The most time the match may owe and still catch up after the server stood still, milliseconds
+ * (fixedStep.ts). Until round 5 a gap counted for at most 250 ms and anything over 4 ticks owed
+ * was dropped, so every stall of about 0.17 s or more left every player's inputs waiting longer
+ * for the rest of the match.
+ */
+export const MAX_OWED_MS = 1000;
 /** How early a tick may run, milliseconds (timers are only accurate to about a millisecond). */
 export const STEP_SLOP_MS = 2;
 /**
@@ -59,9 +66,10 @@ export const STEP_SLOP_MS = 2;
 export const STARVED_TICKS = 30;
 /**
  * Ticks without a fresh input after which a connected player's held buttons are let go too
- * (1.5 s). Buttons are kept longer than movement so that a hiccup on the line in the middle of a
- * hold (a brace, a volley's charge) does not cut the hold short and then start it again when the
- * late inputs arrive.
+ * (1.5 s), all but Volley, which stays held until inputs come again (its release fires the
+ * squad: round 5). Buttons are kept longer than movement so that a hiccup on the line in the
+ * middle of a hold (a brace, a volley's charge) does not cut the hold short and then start it
+ * again when the late inputs arrive.
  */
 export const STARVED_BUTTON_TICKS = 45;
 /** Slower than this a body counts as standing still (meters per second). */
@@ -82,6 +90,37 @@ export interface InputStall {
   ticks: number;
   /** Their body was brought to a stop meanwhile (STARVED_TICKS). */
   stopped: boolean;
+  /**
+   * Of those ticks, the ones at which inputs from them had arrived since the tick before: their
+   * inputs kept coming, but each too late for its tick (a page or computer that fell behind, not
+   * a stall on the line, where nothing arrives).
+   */
+  late: number;
+}
+
+/**
+ * How one player's inputs fared over a stretch of the match, for the server's log (a line a
+ * minute per player: gameRoom.ts, slowLog.ts). The room takes it and starts it over.
+ */
+export interface SlotTally {
+  /** Ticks played for them while a person drove the slot. */
+  ticks: number;
+  /** Inputs left waiting after each tick played from the queue, summed (divide by `fed`). */
+  waitingSum: number;
+  /** The most inputs left waiting after a tick. */
+  waitingMax: number;
+  /** Ticks played from their queue (the rest were guesses). */
+  fed: number;
+  /** Ticks played on a guess after their first input. */
+  guessed: number;
+  /** Guessed ticks at which an input of theirs had arrived since the tick before (too late). */
+  late: number;
+  /** The longest run of guessed ticks in a row. */
+  longestRun: number;
+}
+
+export function createSlotTally(): SlotTally {
+  return { ticks: 0, waitingSum: 0, waitingMax: 0, fed: 0, guessed: 0, late: 0, longestRun: 0 };
 }
 
 export interface MatchSession {
@@ -106,6 +145,12 @@ export interface MatchSession {
   timer: TickTimer | null;
   /** Stalls of players' inputs since the room last took them (STALL_REPORT_TICKS). */
   stalls: InputStall[];
+  /** Per slot: guessed ticks of the current run at which an input had arrived since the tick before. */
+  runLate: number[];
+  /** Per slot: the queue's count of inputs received, as of the tick before. */
+  seenArrived: number[];
+  /** Per slot: how their inputs fared since the room last took the tallies (`SlotTally`). */
+  tally: SlotTally[];
 }
 
 export interface MatchSessionOptions {
@@ -124,7 +169,7 @@ export function createMatchSession(options: MatchSessionOptions): MatchSession {
   const stepOptions: FixedStepOptions = {
     stepMs: TICK_MS,
     maxSteps: Math.ceil(MAX_CATCH_UP_STEPS * speed),
-    maxFrameMs: MAX_FRAME_MS,
+    maxOwedMs: MAX_OWED_MS,
     slopMs: STEP_SLOP_MS,
     speed,
   };
@@ -144,6 +189,9 @@ export function createMatchSession(options: MatchSessionOptions): MatchSession {
     scratch: new Array<PlayerInput | undefined>(n),
     timer: null,
     stalls: [],
+    runLate: new Array<number>(n).fill(0),
+    seenArrived: new Array<number>(n).fill(0),
+    tally: Array.from({ length: n }, createSlotTally),
   };
 }
 
@@ -159,6 +207,7 @@ export function setSlotLive(m: MatchSession, slot: PlayerId, live: boolean, fres
   if (slot < 0 || slot >= m.live.length) return;
   m.live[slot] = live;
   m.starved[slot] = 0;
+  m.runLate[slot] = 0;
   // The acknowledgement starts over for a new page and carries on for the same page come back.
   clearInputQueue(m.queues[slot], live && fresh);
   setPlayerBot(m.world, slot, !live);
@@ -183,33 +232,58 @@ function standsStill(world: World, slot: PlayerId): boolean {
   return !body || !body.alive || body.vx * body.vx + body.vz * body.vz < STILL_SPEED * STILL_SPEED;
 }
 
-/** Runs exactly one simulation tick. */
-export function stepMatch(m: MatchSession): void {
+/**
+ * Runs exactly one simulation tick. `catchingUp`: it is one of the extra ticks run after the
+ * server stood still, so the input queues neither trim nor count a backlog (inputQueue.ts).
+ */
+export function stepMatch(m: MatchSession, catchingUp = false): void {
   const world = m.world;
   if (world.match.phase === 'ended') return;
   const inputs = m.scratch;
   for (let slot = 0; slot < inputs.length; slot++) {
     inputs[slot] = undefined;
     if (!m.live[slot]) continue;
-    const next = takeInput(m.queues[slot], standsStill(world, slot));
+    const queue = m.queues[slot];
+    const tally = m.tally[slot];
+    // Whether an input of theirs came in since the tick before (for the log: late, or missing).
+    const arrived = queue.arrived !== m.seenArrived[slot];
+    m.seenArrived[slot] = queue.arrived;
+    tally.ticks++;
+    const next = takeInput(queue, standsStill(world, slot), catchingUp);
     if (next) {
       inputs[slot] = next;
       const gap = m.starved[slot];
-      if (gap >= STALL_REPORT_TICKS && m.stalls.length < 16) m.stalls.push({ slot, ticks: gap, stopped: gap >= STARVED_TICKS });
+      if (gap >= STALL_REPORT_TICKS && m.stalls.length < 16) m.stalls.push({ slot, ticks: gap, stopped: gap >= STARVED_TICKS, late: m.runLate[slot] });
       m.starved[slot] = 0;
+      m.runLate[slot] = 0;
+      tally.fed++;
+      tally.waitingSum += queue.items.length;
+      if (queue.items.length > tally.waitingMax) tally.waitingMax = queue.items.length;
       continue;
     }
     // Nothing arrived for this tick: it is played on a guess, the last input again.
     const last = world.players[slot].input;
     let buttons = last.buttons;
     const starved = ++m.starved[slot];
+    if (queue.started) {
+      tally.guessed++;
+      if (arrived) {
+        tally.late++;
+        m.runLate[slot]++;
+      }
+      if (starved > tally.longestRun) tally.longestRun = starved;
+    }
     if (starved === STARVED_TICKS || starved === STARVED_BUTTON_TICKS) {
       // Still connected but silent: stop walking, keep looking the same way; a little later let
       // go of the buttons as well.
       const stop = neutralInput(last.seq);
       stop.aimYaw = last.aimYaw;
       stop.aimPitch = last.aimPitch;
-      if (starved < STARVED_BUTTON_TICKS) stop.buttons = last.buttons;
+      // A held Volley stays held (round 5): letting go fires the squad's volley, so a stall in
+      // the middle of a charge used to fire it early and start the charge again from nothing
+      // when the late inputs came. A planted squad is harmless; the player's own release, or a
+      // bot taking the seat, ends it.
+      stop.buttons = starved < STARVED_BUTTON_TICKS ? last.buttons : last.buttons & Btn.volley;
       inputs[slot] = stop;
       buttons = stop.buttons;
     }
@@ -230,9 +304,12 @@ export function stepMatch(m: MatchSession): void {
 export function advanceMatch(m: MatchSession, nowMs: number): number {
   if (matchOver(m)) return 0;
   const steps = dueSteps(m.clock, nowMs, m.stepOptions);
+  // More ticks now than one update's worth, or more still owed: the server stood still and is
+  // catching up.
+  const catching = steps > Math.ceil(m.stepOptions.speed) || catchingUp(m.clock, m.stepOptions);
   let ran = 0;
   for (let i = 0; i < steps && !matchOver(m); i++) {
-    stepMatch(m);
+    stepMatch(m, catching);
     ran++;
   }
   return ran;

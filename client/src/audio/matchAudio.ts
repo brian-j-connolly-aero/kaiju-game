@@ -126,6 +126,8 @@ function jitter(spread = 0.05): number {
 }
 /** At most one sound per salvo, and the machine gun's clatter no closer together than this (seconds). */
 const MG_GAP = 0.09;
+/** A streaming machine gun starts its burst of clatter (0.84 s long) at most this often. */
+const MG_BURST_EVERY = 0.7;
 /** A shot glancing off the monster's garage door clangs no more often than this (seconds). */
 const CLANG_GAP = 0.1;
 
@@ -272,6 +274,8 @@ export class MatchAudio {
   private readonly thrown = new Map<number, PropKindId>();
   /** The last salvo heard (owner and tick: a salvo is several shots on one tick) and the machine gun's last clatter. */
   private lastSalvo = '';
+  /** When each machine gun's burst of clatter last started (local seconds, by its owner). */
+  private readonly mgBurstAt = new Map<number, number>();
   private lastCrack = -1;
   private lastClang = -1;
   private result: MatchEndEvent | null = null;
@@ -777,7 +781,14 @@ export class MatchAudio {
     const at = { x: e.x, y: e.y, z: e.z, refDistance: e.projectile === 'rocket' ? 12 : 30 };
     if (e.projectile === 'rocket') a.play('rocket_launch', { ...at, rate: jitter() });
     else if (e.projectile === 'shell') a.play('tank_fire', { ...at, rate: jitter() });
-    else if (e.projectile === 'tracer') a.play('mg_burst', { ...at, refDistance: 22, gain: 0.6, rate: jitter() });
+    else if (e.projectile === 'tracer') {
+      // The machine gun streams one tracer at a time (round 5): one burst of clatter covers the
+      // next few, so it is heard as a gun firing on, not as a pile of bursts.
+      const key = e.ownerId + (e.owner === 'unit' ? 0 : 1e6);
+      if (this.time - (this.mgBurstAt.get(key) ?? -1e9) < MG_BURST_EVERY) return;
+      this.mgBurstAt.set(key, this.time);
+      a.play('mg_burst', { ...at, refDistance: 22, gain: 0.6, rate: jitter() });
+    }
     else if (e.projectile === 'heavyShell') a.play('cannon_fire', { ...at, refDistance: 45, gain: 1 });
     else if (e.projectile === 'missile') {
       a.play('rocket_launch', { ...at, refDistance: 25, gain: 1, rate: 0.85 });
